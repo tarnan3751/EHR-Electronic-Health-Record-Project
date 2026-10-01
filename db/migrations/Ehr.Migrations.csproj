@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- EF Core migrations for Ehr.Data's context, generated with dotnet ef (see README.md), and the full SQL
+       they produce (schema.sql). Applied by infra/migrate as ehr_owner; the running apps never reference this. -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ehr.Data\Ehr.Data.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/db/">
+    <Project Path="db/migrations/Ehr.Migrations.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Ehr.Data/Ehr.Data.csproj" />
     <Project Path="src/Ehr.Design/Ehr.Design.csproj" />
@@ -7,6 +10,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Ehr.Architecture.Tests/Ehr.Architecture.Tests.csproj" />
+    <Project Path="tests/Ehr.Data.Tests/Ehr.Data.Tests.csproj" />
     <Project Path="tests/Ehr.Security.Tests/Ehr.Security.Tests.csproj" />
     <Project Path="tests/Ehr.Web.Tests/Ehr.Web.Tests.csproj" />
   </Folder>
