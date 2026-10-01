@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <!-- For `dotnet run` on your machine: the connection string, kept out of the repo (see README.md). -->
+    <UserSecretsId>5c0f3e8a-2b7d-4f61-9a4e-8d1b6c2e7f90</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Ehr.Domain\Ehr.Domain.csproj" />
     <ProjectReference Include="..\Ehr.Design\Ehr.Design.csproj" />

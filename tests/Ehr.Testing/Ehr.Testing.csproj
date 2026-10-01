@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared by the test projects, and not a test project itself: a real PostgreSQL 18 set up the way
+       infra/migrate sets up the primary, and the repository root. -->
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The migrations, which bring in Ehr.Data: the database is built the way infra/migrate builds it. -->
+    <ProjectReference Include="..\..\db\migrations\Ehr.Migrations.csproj" />
+  </ItemGroup>
+
+</Project>

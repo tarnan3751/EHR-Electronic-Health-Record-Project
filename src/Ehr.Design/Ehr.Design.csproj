@@ -13,4 +13,12 @@
     <PackageReference Include="Microsoft.Web.LibraryManager.Build" />
   </ItemGroup>
 
+  <!-- LibMan downloads into wwwroot/lib during the build, after MSBuild has listed the files in wwwroot. On a clean
+       build (always, in Docker and CI) the downloaded files would be missing from that list and never served. -->
+  <Target Name="IncludeRestoredLibraries" AfterTargets="LibraryManagerRestore">
+    <ItemGroup>
+      <Content Include="wwwroot/lib/**" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

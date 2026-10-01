@@ -14,7 +14,8 @@ Conventions every coding agent (and every person) follows in this repo. Most com
 ## Where raw SQL is allowed
 
 - Dapper, for hot reads, inside `Ehr.Data` only. It borrows EF Core's connection and transaction so the RLS context applies.
-- The RLS context is set with `set_config(..., true)` as the first statement of every transaction. Plain `SET` is banned: on a pooled connection it can leak into the next request.
+- The RLS context is set with `set_config(..., true)` as the first statement of every transaction. Plain `SET` is banned: on a pooled connection it can leak into the next request. `UserContextInterceptor` (`Ehr.Data`) does this, and `DatabaseTransactionFilter` (`Ehr.Web`) runs each page handler in one transaction.
+- With nobody signed in, `app.user_id` is an empty string, not NULL, so policies read it as `NULLIF(current_setting('app.user_id', true), '')::uuid`.
 - `db/policies` (RLS, triggers, roles) is hand-written SQL.
 - Sync watermarks use transaction IDs, never timestamps.
 

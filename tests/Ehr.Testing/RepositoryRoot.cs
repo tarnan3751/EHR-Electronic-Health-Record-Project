@@ -1,6 +1,6 @@
-namespace Ehr.Data.Tests;
+namespace Ehr.Testing;
 
-static class RepositoryRoot
+public static class RepositoryRoot
 {
     // The folder holding Ehr.slnx, found by walking up from the test binaries.
     public static string Path { get; } = Find();

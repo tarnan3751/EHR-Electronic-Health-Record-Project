@@ -5,7 +5,7 @@ using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
 
-namespace Ehr.Security.Tests;
+namespace Ehr.Testing;
 
 // A real PostgreSQL 18, set up the way infra/migrate sets up the primary: the initdb bootstrap (ehr_owner and the
 // ehr schema), then, as ehr_owner, db/policies/00-roles.sql, the EF Core migrations, and the rest of db/policies.

@@ -1,0 +1,15 @@
+@model QuickTextForm
+<li id="quick-text-@Model.Id">
+    <form class="quick-text-form" method="post"
+          hx-post="@Url.Page("Index", "Save")" hx-target="closest li" hx-swap="outerHTML">
+        <input type="hidden" name="Id" value="@Model.Id">
+        <input type="hidden" name="Version" value="@Model.Version">
+        <label>Shortcut <input asp-for="Shortcut" id="shortcut-@Model.Id" autocomplete="off"></label>
+        <span asp-validation-for="Shortcut" class="error"></span>
+        <label>Text <textarea asp-for="Body" id="body-@Model.Id" rows="2"></textarea></label>
+        <span asp-validation-for="Body" class="error"></span>
+        <button>Save</button>
+        <button type="button" hx-get="@Url.Page("Index", "Row", new { id = Model.Id })"
+                hx-target="closest li" hx-swap="outerHTML">Cancel</button>
+    </form>
+</li>
