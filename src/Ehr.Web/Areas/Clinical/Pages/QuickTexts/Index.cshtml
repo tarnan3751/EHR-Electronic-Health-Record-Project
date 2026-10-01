@@ -1,0 +1,36 @@
+@page "/"
+@model IndexModel
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    @* The htmx features that run JavaScript from attributes stay off, so a strict CSP can be added later. *@
+    <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false}'>
+    <title>Quick text</title>
+    <link rel="stylesheet" href="~/_content/Ehr.Design/css/ehr.css">
+    <script src="~/_content/Ehr.Design/lib/htmx/dist/htmx.min.js" defer></script>
+</head>
+<body>
+    <main>
+        <h1>Quick text</h1>
+        <p>Shared phrases, each inserted by typing its shortcut.</p>
+
+        @if (Model.CanSave)
+        {
+            <partial name="_AddForm" model="new QuickTextForm()" />
+        }
+        else
+        {
+            <p class="notice" role="status">Read-only: phrases can't be saved off-site yet.</p>
+        }
+
+        <ul id="quick-texts" class="quick-texts">
+            @foreach (var quickText in Model.QuickTexts)
+            {
+                <partial name="_QuickText" model="quickText" />
+            }
+        </ul>
+    </main>
+</body>
+</html>

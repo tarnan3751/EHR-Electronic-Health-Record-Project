@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\db\migrations\Ehr.Migrations.csproj" />
+    <!-- RepositoryRoot. -->
+    <ProjectReference Include="..\Ehr.Testing\Ehr.Testing.csproj" />
   </ItemGroup>
 
 </Project>

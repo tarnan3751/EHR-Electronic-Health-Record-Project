@@ -10,12 +10,11 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
-    <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The migrations, which bring in Ehr.Data: the tests build the database the way infra/migrate does. -->
-    <ProjectReference Include="..\..\db\migrations\Ehr.Migrations.csproj" />
+    <!-- The migrated database (MigratedDatabase), which brings in Ehr.Data. -->
+    <ProjectReference Include="..\Ehr.Testing\Ehr.Testing.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,20 @@
+@model QuickTextConflict
+<li id="quick-text-@Model.Theirs.Id" class="conflict">
+    <form method="post" hx-post="@Url.Page("Index", "Save")" hx-target="closest li" hx-swap="outerHTML">
+        <p role="alert">Someone else saved this phrase while you were editing it. Choose which version to keep.</p>
+        <dl>
+            <dt>Theirs (saved)</dt>
+            <dd><span class="shortcut">@Model.Theirs.Shortcut</span> <span class="body">@Model.Theirs.Body</span></dd>
+            <dt>Mine (not saved)</dt>
+            <dd><span class="shortcut">@Model.Mine.Shortcut</span> <span class="body">@Model.Mine.Body</span></dd>
+        </dl>
+        @* Keep mine saves over their version, so it starts from their version number. *@
+        <input type="hidden" name="Id" value="@Model.Theirs.Id">
+        <input type="hidden" name="Version" value="@Model.Theirs.Version">
+        <input type="hidden" name="Shortcut" value="@Model.Mine.Shortcut">
+        <input type="hidden" name="Body" value="@Model.Mine.Body">
+        <button>Keep mine</button>
+        <button type="button" hx-get="@Url.Page("Index", "Row", new { id = Model.Theirs.Id })"
+                hx-target="closest li" hx-swap="outerHTML">Keep theirs</button>
+    </form>
+</li>

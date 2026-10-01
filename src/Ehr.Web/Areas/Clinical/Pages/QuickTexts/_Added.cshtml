@@ -1,0 +1,6 @@
+@model QuickText
+@* After an add: an empty add form, plus the new phrase added to the end of the list (htmx's out-of-band swap). *@
+<partial name="_AddForm" model="new QuickTextForm()" />
+<ul hx-swap-oob="beforeend:#quick-texts">
+    <partial name="_QuickText" model="Model" />
+</ul>

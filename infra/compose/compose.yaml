@@ -70,6 +70,8 @@ services:
     environment:
       <<: *web-app-env
       Ehr__Site: OnPrem
+      # Reads and writes the primary as ehr_app.
+      ConnectionStrings__Ehr: "Host=onprem-db;Database=ehr;Username=ehr_app;Password=${EHR_APP_PASSWORD:?set it in infra/compose/.env}"
     ports:
       - "127.0.0.1:${ONPREM_HTTPS_PORT:-8443}:8443"
     networks: [onprem, inference]
@@ -128,6 +130,8 @@ services:
     environment:
       <<: *web-app-env
       Ehr__Site: Cloud
+      # Reads the replica beside it as ehr_read. It has no credentials for the primary.
+      ConnectionStrings__Ehr: "Host=cloud-db;Database=ehr;Username=ehr_read;Password=${EHR_READ_PASSWORD:?set it in infra/compose/.env}"
     # No published port: off-site browsers reach it through the wan service, like the internet.
     networks: [cloud]
     depends_on:

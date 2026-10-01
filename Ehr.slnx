@@ -12,6 +12,7 @@
     <Project Path="tests/Ehr.Architecture.Tests/Ehr.Architecture.Tests.csproj" />
     <Project Path="tests/Ehr.Data.Tests/Ehr.Data.Tests.csproj" />
     <Project Path="tests/Ehr.Security.Tests/Ehr.Security.Tests.csproj" />
+    <Project Path="tests/Ehr.Testing/Ehr.Testing.csproj" />
     <Project Path="tests/Ehr.Web.Tests/Ehr.Web.Tests.csproj" />
   </Folder>
 </Solution>

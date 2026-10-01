@@ -4,12 +4,12 @@ An electronic health record with a web app (clinical and patient portal) and a M
 
 ## Status
 
-Early foundation. No EHR features exist yet. The walking skeleton (one trivial feature, team quick text, through every layer) is being built; step 1, the database foundation, is done.
+Early foundation. No EHR features exist yet. The walking skeleton (one trivial feature, team quick text, through every layer) is being built; steps 1 (the database foundation) and 2 (the on-site page) are done.
 
 **Working today**
 
 - The desktop app (Tauri) opens a blank window. Verified running on an Apple Silicon Mac. CI builds it on macOS and Windows on every push, and both builds pass; it hasn't been run on a Windows PC yet.
-- The web app (ASP.NET Core Razor Pages) serves a blank page, locally and inside the server stack. A smoke test checks that it returns HTTP 200.
+- The web app (ASP.NET Core Razor Pages with htmx) serves the quick text page at `/`: a shared list of phrases, each with a shortcut such as `.nad`. On-site, phrases can be added and edited; a save that started from an older version is refused and shows both versions, with **Keep mine** and **Keep theirs**. Off-site (the cloud app) the list is read-only, from the replica, until saves are forwarded to the on-prem app. There's no sign-in yet, so the server stack must stay local. Tests run the page against a real PostgreSQL 18.
 - The local server stack runs the whole server architecture in Docker Compose: the PostgreSQL 18 primary, its streaming replica, Barman backups with point-in-time restore, and a simulated WAN. Verified on Linux, and on an Apple Silicon Mac for replication, isolation, backups and restore; Windows is not yet verified.
 - The database foundation: the app's roles (`ehr_owner` for migrations, `ehr_app` and `ehr_read` for the apps), the first table (`quick_texts`), and a migration job that brings the primary up to date every time the server stack starts. Security tests check the roles against a real PostgreSQL 18. See [Database changes](#database-changes).
 - CI (GitHub Actions) checks every push and pull request. `main` only accepts reviewed pull requests that pass it, and each commit on `main` publishes the web image. See [Continuous integration](#continuous-integration).
@@ -32,8 +32,9 @@ src/
 tests/
   Ehr.Security.Tests/      RLS, role, and audit gates against real PostgreSQL 18
   Ehr.Architecture.Tests/  layering, and PHI reads only through the PHI reader
-  Ehr.Web.Tests/           the web app, run in memory: a smoke test so far
+  Ehr.Web.Tests/           the web app, run in memory as each server, against real PostgreSQL 18
   Ehr.Data.Tests/          the data layer and migrations
+  Ehr.Testing/             shared by the test projects: a migrated PostgreSQL 18 in a container
 db/
   migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
   policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
@@ -79,7 +80,7 @@ Everyone:
 
 **If VS Code can't find a tool** (`command not found` for `cargo`, `dotnet` or `docker`): it was opened before the tool was installed. Quit VS Code completely (Cmd+Q on macOS) and reopen it.
 
-## Running the blank apps
+## Running the apps
 
 **Desktop app:**
 
@@ -90,13 +91,19 @@ cargo tauri dev
 
 The first build takes several minutes because it downloads the pinned Rust and compiles SQLCipher and OpenSSL; later builds are quick. A blank window titled "EHR" opens.
 
-**Web app:**
+**Web app:** it uses the server stack's primary database, so start the stack first (see [Local server stack](#local-server-stack)). Once, tell the app how to connect, with the `EHR_APP_PASSWORD` from `infra/compose/.env`. This stores it in your user profile, outside the repository:
+
+```
+dotnet user-secrets set ConnectionStrings:Ehr "Host=127.0.0.1;Port=15432;Database=ehr;Username=ehr_app;Password=<EHR_APP_PASSWORD>" --project src/Ehr.Web
+```
+
+Then run it:
 
 ```
 dotnet run --project src/Ehr.Web
 ```
 
-Then open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Receiver uses. The first build needs internet access to download htmx and Alpine.js.
+and open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Receiver uses. It runs as the on-prem app. The first build needs internet access to download htmx and Alpine.js.
 
 **In VS Code:** open the repository folder, then use Terminal → Run Task:
 
@@ -108,7 +115,7 @@ Then open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Rece
 | Server stack: stop | Stops it and keeps its data |
 | Server stack: reset | Stops it and deletes all its data |
 
-**Tests:** `dotnet test` runs every test project. Docker must be running: the security tests start a real PostgreSQL 18 in a container. The architecture project is allowed to report zero tests until its first test is written.
+**Tests:** `dotnet test` runs every test project. Docker must be running: the security and web tests start a real PostgreSQL 18 in a container. The architecture project is allowed to report zero tests until its first test is written.
 
 ## Local server stack
 
@@ -135,7 +142,7 @@ Tests fail if the model has changes no migration covers, if `schema.sql` is out 
 | Job | What it checks |
 |---|---|
 | Web app | Restores packages (a high or critical security advisory fails the run), builds in Release, then runs `dotnet format --verify-no-changes` and `dotnet test` |
-| Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that all three sites load over HTTPS, both databases accept connections, the replica and Barman are streaming, and `barman check` passes |
+| Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that all three sites load the home page over HTTPS (the on-prem app reads the primary; the cloud app reads the replica), both databases accept connections, the replica and Barman are streaming, and `barman check` passes |
 | Desktop | `cargo fmt --check`, `cargo clippy` (warnings count as errors) and `cargo build`, on macOS (Apple Silicon) and Windows (x64) |
 | `ci` | Passes only when every job above passes. It's the one check `main` requires. |
 | Publish image | On `main` only, after `ci` passes: pushes `ghcr.io/tarnan3751/ehr-web:<commit>` for `linux/amd64` and `linux/arm64` |

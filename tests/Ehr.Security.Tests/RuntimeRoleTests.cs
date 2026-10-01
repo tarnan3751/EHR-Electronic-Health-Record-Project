@@ -1,3 +1,4 @@
+using Ehr.Testing;
 using Npgsql;
 using Xunit;
 

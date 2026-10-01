@@ -1,0 +1,9 @@
+@model QuickTextForm
+<form id="add-quick-text" class="quick-text-form" method="post"
+      hx-post="@Url.Page("Index", "Add")" hx-target="this" hx-swap="outerHTML">
+    <label>Shortcut <input asp-for="Shortcut" id="add-shortcut" autocomplete="off" placeholder=".nad"></label>
+    <span asp-validation-for="Shortcut" class="error"></span>
+    <label>Text <textarea asp-for="Body" id="add-body" rows="2"></textarea></label>
+    <span asp-validation-for="Body" class="error"></span>
+    <button>Add</button>
+</form>

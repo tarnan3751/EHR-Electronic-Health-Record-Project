@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Runs the web app in memory and checks what it serves. Starts with one smoke test; web tests go here. -->
+  <!-- Runs the web app in memory, as the on-prem and the cloud server, against a real PostgreSQL 18, and checks
+       what it serves. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -14,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ehr.Web\Ehr.Web.csproj" />
+    <ProjectReference Include="..\Ehr.Testing\Ehr.Testing.csproj" />
   </ItemGroup>
 
 </Project>

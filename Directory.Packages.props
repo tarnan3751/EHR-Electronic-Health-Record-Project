@@ -25,6 +25,8 @@
 
   <ItemGroup Label="Tests (xunit on Microsoft.Testing.Platform; opted in via global.json)">
     <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.1" />
+    <!-- For tests/Ehr.Testing, which shares fixtures without being a test project. Same version as xunit.v3.mtp-v2. -->
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.1" />
     <!-- Runs the web app in memory. Same .NET 10 servicing release as the ASP.NET Core packages above. -->
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />

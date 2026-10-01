@@ -17,7 +17,7 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | `llama` | Llama 3.1 on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
 | `restore-db` | A restored copy of the primary | Opt-in `restore` profile, for the restore drill |
 
-The apps are the blank web app for now; both containers run the same image and don't yet behave differently. `Ehr__Site` is set for when write forwarding and the read-only data path are built. The MedASR sidecar joins the `ai` profile once its code exists.
+Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and refuses saves (HTTP 405) until write forwarding is built, so off-site the quick text page is read-only. There's no sign-in yet, so keep the stack local. The MedASR sidecar joins the `ai` profile once its code exists.
 
 ## One-time setup
 
