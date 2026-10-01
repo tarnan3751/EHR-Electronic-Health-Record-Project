@@ -20,10 +20,11 @@ Conventions every coding agent (and every person) follows in this repo. Most com
 
 ## How migrations are made
 
-- Schema: EF Core migrations, generated into `db/migrations`.
-- RLS, triggers, and roles: hand-written in `db/policies`.
-- The infrastructure roles `replicator` (cloud standby) and `barman` (backups) are created when the primary is first initialized, by `infra/compose/postgres/primary/initdb`. Neither has table privileges.
-- Migrations run as `ehr_owner`, in CI and deploy only. The running app never uses that role.
+- Schema: EF Core migrations in `db/migrations` (the `Ehr.Migrations` project), added with `dotnet ef migrations add <Name> --project db/migrations`. Every migration is committed with the regenerated `db/migrations/schema.sql`, so reviewers read the real SQL; a test fails if it's out of date.
+- RLS, triggers, roles, and grants: hand-written in `db/policies`. Plain SQL only (no psql commands), safe to run again. `00-roles.sql` runs before the migrations; every other file runs after them, in name order.
+- Every table gets explicit grants in `db/policies/10-grants.sql` and the same privileges in `ExpectedPrivileges` in `Ehr.Security.Tests`. A table without them fails CI. The file revokes everything from the runtime roles first, so it is the complete list: never grant privileges anywhere else. Runtime roles never get `DELETE` unless a feature needs it.
+- The infrastructure roles `replicator` (cloud standby) and `barman` (backups), and the migration role `ehr_owner` with the `ehr` schema it owns, are created when the primary is first initialized, by `infra/compose/postgres/primary/initdb`. `replicator` and `barman` have no table privileges. `ehr_owner` can create roles, which it uses to manage `ehr_app` and `ehr_read` from `db/policies`; PostgreSQL stops it from creating superuser, replication, or `BYPASSRLS` roles.
+- Migrations run as `ehr_owner`, only through the migration job (`infra/migrate`): in the local stack, in CI, and at deploy. The running apps never use that role.
 
 ## Human review
 
@@ -39,19 +40,20 @@ Every change reaches `main` through a pull request, with the `ci` check passing 
 The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 
 - Restore (a high or critical package advisory fails it), a Release build, `dotnet format --verify-no-changes`, and `dotnet test`.
-- The local server stack: it starts, serves all three sites, replicates, and backs up.
+- No runtime role owns anything, has `BYPASSRLS` or another elevated attribute, or holds a privilege beyond its grants (`Ehr.Security.Tests`).
+- Every model change has a migration, and `db/migrations/schema.sql` matches the migrations (`Ehr.Data.Tests`).
+- The local server stack: the migration job applies cleanly, and the stack serves all three sites, replicates, and backs up.
 - macOS and Windows desktop builds, with `cargo fmt --check` and `cargo clippy -D warnings`.
 
 Gates added to `ci` as the code they check appears:
 
 - Every PHI table has RLS enabled and forced, plus a write-audit trigger.
-- No runtime role owns a table or has `BYPASSRLS`.
 - Querying a PHI table without `app.user_id` set returns zero rows.
 - An architecture test proves PHI reads only go through the PHI reader.
 - p99 server render under 20 ms on 50,000 seeded patients; page JavaScript under 50 KB; first contentful paint under 500 ms.
 - Dictation eval scores do not drop below the last accepted baseline.
 
-Run `dotnet format` (and `cargo fmt` for the desktop app) before pushing. When `Ehr.Security.Tests` or `Ehr.Architecture.Tests` gets its first test, delete that project's `--ignore-exit-code 8` line.
+Run `dotnet format` (and `cargo fmt` for the desktop app) before pushing. When `Ehr.Architecture.Tests` gets its first test, delete its `--ignore-exit-code 8` line.
 
 ## Cross-platform
 

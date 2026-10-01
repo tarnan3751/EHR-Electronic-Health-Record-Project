@@ -4,17 +4,18 @@ An electronic health record with a web app (clinical and patient portal) and a M
 
 ## Status
 
-Early foundation. No EHR features exist yet.
+Early foundation. No EHR features exist yet. The walking skeleton (one trivial feature, team quick text, through every layer) is being built; step 1, the database foundation, is done.
 
 **Working today**
 
 - The desktop app (Tauri) opens a blank window. Verified running on an Apple Silicon Mac. CI builds it on macOS and Windows on every push, and both builds pass; it hasn't been run on a Windows PC yet.
 - The web app (ASP.NET Core Razor Pages) serves a blank page, locally and inside the server stack. A smoke test checks that it returns HTTP 200.
 - The local server stack runs the whole server architecture in Docker Compose: the PostgreSQL 18 primary, its streaming replica, Barman backups with point-in-time restore, and a simulated WAN. Verified on Linux, and on an Apple Silicon Mac for replication, isolation, backups and restore; Windows is not yet verified.
+- The database foundation: the app's roles (`ehr_owner` for migrations, `ehr_app` and `ehr_read` for the apps), the first table (`quick_texts`), and a migration job that brings the primary up to date every time the server stack starts. Security tests check the roles against a real PostgreSQL 18. See [Database changes](#database-changes).
 - CI (GitHub Actions) checks every push and pull request. `main` only accepts reviewed pull requests that pass it, and each commit on `main` publishes the web image. See [Continuous integration](#continuous-integration).
 - Dependency manifests and toolchain versions are in place. Python packages use version ranges until a lockfile is added.
 
-**Not built yet:** the database schema and policies, sign-in and authorization, the clinical workflows, the patient portal, desktop sync, dictation, and the security and architecture tests (their projects exist but are empty).
+**Not built yet:** the patient data model and its row-level security, sign-in and authorization, the clinical workflows, the patient portal, desktop sync, dictation, and the architecture tests (the project exists but is empty).
 
 ## Layout
 
@@ -32,12 +33,13 @@ tests/
   Ehr.Security.Tests/      RLS, role, and audit gates against real PostgreSQL 18
   Ehr.Architecture.Tests/  layering, and PHI reads only through the PHI reader
   Ehr.Web.Tests/           the web app, run in memory: a smoke test so far
+  Ehr.Data.Tests/          the data layer and migrations
 db/
-  migrations/       EF-generated
-  policies/         RLS, triggers, roles (hand-written, human-reviewed)
+  migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
+  policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
 eval/               dictation gold set and scoring
 bench/              load tests and budget assertions
-infra/              compose (local server stack), barman (backup image), tailscale (access rules)
+infra/              compose (local server stack), migrate (migration job), barman (backup image), tailscale (access rules)
 .github/            CI workflow and Dependabot settings
 .vscode/            shared settings, recommended extensions, and run tasks
 .editorconfig       editor and formatting settings (checked in CI)
@@ -106,11 +108,25 @@ Then open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Rece
 | Server stack: stop | Stops it and keeps its data |
 | Server stack: reset | Stops it and deletes all its data |
 
-**Tests:** `dotnet test` runs every test project. So far only the web app's smoke test exists; the security and architecture projects are allowed to report zero tests until their first test is written.
+**Tests:** `dotnet test` runs every test project. Docker must be running: the security tests start a real PostgreSQL 18 in a container. The architecture project is allowed to report zero tests until its first test is written.
 
 ## Local server stack
 
 `infra/compose` runs the whole server architecture on one machine with Docker Compose: the on-prem primary and app, the cloud replica and app, the isolated Barman backup host, and a simulated WAN with latency between them. It also covers the failure drills and a point-in-time restore. Setup (certificates and hosts-file entries) and every command are in [infra/compose/README.md](infra/compose/README.md).
+
+## Database changes
+
+The schema comes from EF Core migrations in `db/migrations`; roles, grants, and later row-level security and triggers are hand-written SQL in `db/policies`. The migration job (`infra/migrate`) applies both to the primary, as `ehr_owner`, every time the server stack starts; the replica gets them by replication. CI's stack job runs the same job.
+
+Run `dotnet tool restore` once, for the pinned `dotnet-ef`. Then, from the repository folder:
+
+1. Change the model in `src/Ehr.Data`.
+2. Add a migration: `dotnet ef migrations add <Name> --project db/migrations`
+3. Regenerate the SQL that reviewers read: `dotnet ef migrations script --project db/migrations --output db/migrations/schema.sql`
+4. For a new table, add its grants to `db/policies/10-grants.sql` and the same privileges to `ExpectedPrivileges` in `tests/Ehr.Security.Tests/RuntimeRoleTests.cs`.
+5. Restart the server stack to apply it, and run `dotnet test`.
+
+Tests fail if the model has changes no migration covers, if `schema.sql` is out of date, or if a table has no grant decision. To undo a migration you haven't pushed, delete its two files and run `git restore db/migrations/EhrDbContextModelSnapshot.cs`. (`dotnet ef migrations remove` expects a database at the default port, which the local stack doesn't use.)
 
 ## Continuous integration
 
@@ -119,7 +135,7 @@ Then open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Rece
 | Job | What it checks |
 |---|---|
 | Web app | Restores packages (a high or critical security advisory fails the run), builds in Release, then runs `dotnet format --verify-no-changes` and `dotnet test` |
-| Server stack | Starts the local server stack (`infra/compose`), then checks that all three sites load over HTTPS, both databases accept connections, the replica and Barman are streaming, and `barman check` passes |
+| Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that all three sites load over HTTPS, both databases accept connections, the replica and Barman are streaming, and `barman check` passes |
 | Desktop | `cargo fmt --check`, `cargo clippy` (warnings count as errors) and `cargo build`, on macOS (Apple Silicon) and Windows (x64) |
 | `ci` | Passes only when every job above passes. It's the one check `main` requires. |
 | Publish image | On `main` only, after `ci` passes: pushes `ghcr.io/tarnan3751/ehr-web:<commit>` for `linux/amd64` and `linux/arm64` |
@@ -169,6 +185,7 @@ There is no `latest` tag: a deployment names the exact commit it runs.
 | Area | File |
 |---|---|
 | .NET package versions | `Directory.Packages.props` |
+| .NET tools (`dotnet-ef`) | `.config/dotnet-tools.json`; run `dotnet tool restore` once |
 | htmx, Alpine.js (CSP build) | `src/Ehr.Design/libman.json`, restored into `wwwroot/lib` at build and served from our own origin |
 | Desktop | `src/Ehr.Desktop/src-tauri/Cargo.toml` |
 | MedASR sidecar | `src/Ehr.Dictation/sidecar/pyproject.toml` |

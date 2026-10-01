@@ -32,6 +32,7 @@ services:
       POSTGRES_DB: ehr
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:?set it in infra/compose/.env}
       BARMAN_PASSWORD: ${BARMAN_PASSWORD:?set it in infra/compose/.env}
+      EHR_OWNER_PASSWORD: ${EHR_OWNER_PASSWORD:?set it in infra/compose/.env}
     command:
       - postgres
       - -c
@@ -48,6 +49,22 @@ services:
     networks: [onprem]
     healthcheck: *postgres-healthcheck
 
+  # Runs on every start: applies the db/policies roles, EF Core migrations, then the rest of db/policies, as
+  # ehr_owner, and exits. "Exited (0)" means the database is up to date. The replica gets the changes by replication.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/migrate/Dockerfile
+    image: ehr-migrate:dev
+    environment:
+      EHR_OWNER_PASSWORD: ${EHR_OWNER_PASSWORD:?set it in infra/compose/.env}
+      EHR_APP_PASSWORD: ${EHR_APP_PASSWORD:?set it in infra/compose/.env}
+      EHR_READ_PASSWORD: ${EHR_READ_PASSWORD:?set it in infra/compose/.env}
+    networks: [onprem]
+    depends_on:
+      onprem-db:
+        condition: service_healthy
+
   onprem-app:
     <<: *web-app
     environment:
@@ -59,6 +76,8 @@ services:
     depends_on:
       onprem-db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   # Opt-in (--profile ai). Reachable only from the on-prem app, with no internet access.
   llama:
@@ -117,6 +136,8 @@ services:
       # Starts only once the latency is in place. This also lets `docker compose up --wait` succeed,
       # which otherwise fails when the one-shot wan-latency job exits.
       wan-latency:
+        condition: service_completed_successfully
+      migrate:
         condition: service_completed_successfully
 
   # ---- Isolated backup site ----------------------------------------------------------------

@@ -7,6 +7,7 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | Service | Stands in for | Notes |
 |---|---|---|
 | `onprem-db` | On-prem PostgreSQL 18 primary | Owns every write |
+| `migrate` | A deploy's database step | One-shot job that applies `db/policies` and the EF Core migrations to the primary as `ehr_owner` each time the stack starts; "Exited (0)" means the database is up to date. Both apps start only after it. |
 | `onprem-app` | On-prem app | On-site clinicians reach it directly |
 | `cloud-db` | Cloud hot standby | Clones the primary over the WAN on first start, then streams from it |
 | `cloud-app` | Cloud app | Reached only through the simulated internet |
@@ -21,7 +22,7 @@ The apps are the blank web app for now; both containers run the same image and d
 ## One-time setup
 
 1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty. For the `ai` profile, give Docker at least 10 GB. On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
-2. **Settings file.** Copy `.env.example` to `.env`. The defaults work; `.env` is gitignored.
+2. **Settings file.** Copy `.env.example` to `.env`. The defaults work; `.env` is gitignored. If you already have a `.env`, copy over any lines it's missing from `.env.example`; Compose names the missing setting if you don't.
 3. **Certificates.** Install [mkcert](https://github.com/FiloSottile/mkcert) (macOS: `brew install mkcert`; Windows: `winget install FiloSottile.mkcert`), then:
    ```
    mkcert -install
@@ -45,6 +46,10 @@ The apps are the blank web app for now; both containers run the same image and d
 
 Add `--wait` to `up` to return only once every container is running and healthy, as CI does.
 
+**After pulling changes to `postgres/primary/initdb`:** those scripts only run when the primary's volume is first created, so reset once with `docker compose --profile "*" down -v`. The change that added `ehr_owner` is one of these.
+
+On a fresh database, the `migrate` log shows `Failed executing DbCommand` for `ehr.__ef_migrations_history`. That's harmless: EF Core reads its history table before creating it.
+
 In VS Code, the same three are under Terminal → Run Task: "Server stack: start", "Server stack: stop" and "Server stack: reset".
 
 ## Addresses
@@ -54,7 +59,7 @@ In VS Code, the same three are under Terminal → Run Task: "Server stack: start
 | https://ehr.example.com:8443 | On-site clinician: the LAN, straight to the on-prem app |
 | https://ehr-remote.example.com:9443 | Off-site clinician: the internet, to the cloud app |
 | https://portal.example.com:9443 | Patient portal: the internet, to the cloud app |
-| `127.0.0.1:15432` / `15433` | Primary / replica, for app roles once `db/policies` creates them |
+| `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env` |
 | http://127.0.0.1:8474 | Toxiproxy API, to change latency or cut links |
 
 Everything binds to `127.0.0.1`. For a superuser shell, use `docker compose exec -u postgres onprem-db psql` (or `cloud-db`); superuser logins over the network are refused.
