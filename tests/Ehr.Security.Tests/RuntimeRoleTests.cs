@@ -79,16 +79,18 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [Fact]
     public async Task Runtime_roles_have_exactly_their_granted_privileges()
     {
-        foreach (var ((role, table), expected) in ExpectedPrivileges)
-        {
-            var actual = await QueryAsync(
-                "SELECT p FROM unnest(@privileges) AS p WHERE has_table_privilege(@role, 'ehr.' || quote_ident(@table), p)",
-                reader => reader.GetString(0),
-                ("privileges", TablePrivileges), ("role", role), ("table", table));
+        await AssertExactPrivilegesAsync();
+    }
 
-            Assert.True(expected.Order().SequenceEqual(actual.Order()),
-                $"{role} on {table}: expected [{string.Join(", ", expected)}], has [{string.Join(", ", actual)}]");
-        }
+    [Fact]
+    public async Task Applying_again_removes_privileges_granted_by_hand()
+    {
+        await MigratedDatabase.ExecuteAsync(database.SuperuserConnectionString,
+            "GRANT DELETE, TRUNCATE ON ehr.quick_texts TO ehr_app; GRANT INSERT ON ehr.data_protection_keys TO ehr_read");
+
+        await database.ApplyAsync();
+
+        await AssertExactPrivilegesAsync();
     }
 
     [Theory]
@@ -109,6 +111,20 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     public async Task Applying_everything_again_is_harmless()
     {
         await database.ApplyAsync();
+    }
+
+    async Task AssertExactPrivilegesAsync()
+    {
+        foreach (var ((role, table), expected) in ExpectedPrivileges)
+        {
+            var actual = await QueryAsync(
+                "SELECT p FROM unnest(@privileges) AS p WHERE has_table_privilege(@role, 'ehr.' || quote_ident(@table), p)",
+                reader => reader.GetString(0),
+                ("privileges", TablePrivileges), ("role", role), ("table", table));
+
+            Assert.True(expected.Order().SequenceEqual(actual.Order()),
+                $"{role} on {table}: expected [{string.Join(", ", expected)}], has [{string.Join(", ", actual)}]");
+        }
     }
 
     async Task<List<T>> QueryAsync<T>(string sql, Func<NpgsqlDataReader, T> read, params (string Name, object Value)[] parameters)
