@@ -64,6 +64,7 @@ Everyone:
 | Docker Desktop | Compose v2 | For the local server stack |
 | mkcert | | Local HTTPS certificates for the server stack |
 | VS Code | | Accept the recommended extensions: C# Dev Kit, rust-analyzer, Tauri |
+| Alpine.js | 3.17 | `npm install alpinejs` |
 
 **Apple Silicon Mac**
 
