@@ -132,6 +132,10 @@ services:
       Ehr__Site: Cloud
       # Reads the replica beside it as ehr_read. It has no credentials for the primary.
       ConnectionStrings__Ehr: "Host=cloud-db;Database=ehr;Username=ehr_read;Password=${EHR_READ_PASSWORD:?set it in infra/compose/.env}"
+      # Forwards saves, and a person's reads just after they save, to the on-prem app across the WAN. Both apps serve
+      # the same wildcard certificate, which is how the cloud app knows it's talking to the real on-prem app.
+      Ehr__OnPrem__Url: https://onprem.example.com:8443
+      Ehr__OnPrem__Certificate: /certs/example.com.pem
     # No published port: off-site browsers reach it through the wan service, like the internet.
     networks: [cloud]
     depends_on:
@@ -185,7 +189,12 @@ services:
     ports:
       - "127.0.0.1:${CLOUD_HTTPS_PORT:-9443}:9443"
       - "127.0.0.1:${TOXIPROXY_API_PORT:-8474}:8474"
-    networks: [onprem, cloud, backup]
+    networks:
+      onprem:
+      cloud:
+        # The cloud app's name for the on-prem app (wan_cloud_to_onprem_app), covered by the wildcard certificate.
+        aliases: [onprem.example.com]
+      backup:
     healthcheck:
       test: ["CMD", "/toxiproxy-cli", "list"]
       interval: 5s

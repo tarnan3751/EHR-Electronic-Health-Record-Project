@@ -1,5 +1,6 @@
 using Ehr.Data;
 using Ehr.Web;
+using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,17 +11,22 @@ var site = builder.Configuration.GetValue<Site?>("Ehr:Site")
 var connectionString = builder.Configuration.GetConnectionString("Ehr")
     ?? throw new InvalidOperationException("Set ConnectionStrings:Ehr. See \"Running the apps\" in README.md.");
 
-builder.Services.AddSingleton(new CurrentSite(site));
 builder.Services.AddEhrData(connectionString);
 
-// The keys that protect form tokens live in the database, so tokens survive a restart and both servers can share
-// the keys. Only on-prem creates them; the cloud app reads them from the replica.
+// The keys that protect form tokens live in the database, so tokens survive a restart and both servers share the
+// keys: a form the cloud app renders is saved by the on-prem app. Only on-prem creates them; the cloud app reads them
+// from the replica.
 var dataProtection = builder.Services.AddDataProtection()
     .SetApplicationName("Ehr")
     .PersistKeysToDbContext<EhrDbContext>();
 if (site == Site.Cloud)
 {
     dataProtection.DisableAutomaticKeyGeneration();
+
+    // The cloud app saves nothing itself; it forwards those requests to the on-prem app.
+    builder.Services.AddHttpForwarder();
+    builder.Services.AddSingleton(OnPremApp.FromConfiguration(builder.Configuration));
+    builder.Services.AddSingleton<LastSaveCookie>();
 }
 
 builder.Services.AddRazorPages()
@@ -30,21 +36,11 @@ builder.Services.AddRazorPages()
 
 var app = builder.Build();
 
-// The cloud app can't save yet, so every request that would change data is refused before it reaches a page.
-// Forwarding these requests to the on-prem app will replace this.
+// Routing first, so the cloud app's forwarding can tell page requests from static files.
+app.UseRouting();
 if (site == Site.Cloud)
 {
-    app.Use((context, next) =>
-    {
-        if (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
-        {
-            return next(context);
-        }
-
-        context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
-        context.Response.Headers.Allow = "GET, HEAD";
-        return Task.CompletedTask;
-    });
+    app.UseMiddleware<CloudForwardingMiddleware>();
 }
 
 app.MapStaticAssets();

@@ -1,11 +1,7 @@
 @model QuickText
-@inject CurrentSite Site
 <li id="quick-text-@Model.Id">
     <span class="shortcut">@Model.Shortcut</span>
     <span class="body">@Model.Body</span>
-    @if (Site.CanSave)
-    {
-        <button type="button" hx-get="@Url.Page("Index", "Edit", new { id = Model.Id })"
-                hx-target="closest li" hx-swap="outerHTML">Edit</button>
-    }
+    <button type="button" hx-get="@Url.Page("Index", "Edit", new { id = Model.Id })"
+            hx-target="closest li" hx-swap="outerHTML">Edit</button>
 </li>

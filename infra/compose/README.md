@@ -17,7 +17,7 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | `llama` | Llama 3.1 on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
 | `restore-db` | A restored copy of the primary | Opt-in `restore` profile, for the restore drill |
 
-Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and refuses saves (HTTP 405) until write forwarding is built, so off-site the quick text page is read-only. There's no sign-in yet, so keep the stack local. The MedASR sidecar joins the `ai` profile once its code exists.
+Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. There's no sign-in yet, so keep the stack local. The MedASR sidecar joins the `ai` profile once its code exists.
 
 ## One-time setup
 
@@ -90,6 +90,8 @@ These follow the failure table in the project overview.
 | Replica lagging | Raise `wan_replication` latency (see above) | `docker compose up -d --force-recreate wan-latency` |
 | Backup host down | `docker compose stop barman` | `docker compose start barman` |
 | Cloud box compromised | `docker compose stop cloud-app cloud-db` | `docker compose start cloud-db cloud-app` |
+
+With the internet link or the primary down, off-site pages still load from the replica, and a save shows "Not saved: the server is unavailable". With the primary down, saving on-site shows the same.
 
 To see the effect:
 

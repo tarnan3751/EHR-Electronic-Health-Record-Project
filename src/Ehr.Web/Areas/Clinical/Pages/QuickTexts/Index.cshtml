@@ -10,20 +10,16 @@
     <title>Quick text</title>
     <link rel="stylesheet" href="~/_content/Ehr.Design/css/ehr.css">
     <script src="~/_content/Ehr.Design/lib/htmx/dist/htmx.min.js" defer></script>
+    <script src="~/_content/Ehr.Design/js/request-errors.js" defer></script>
 </head>
 <body>
     <main>
         <h1>Quick text</h1>
         <p>Shared phrases, each inserted by typing its shortcut.</p>
 
-        @if (Model.CanSave)
-        {
-            <partial name="_AddForm" model="new QuickTextForm()" />
-        }
-        else
-        {
-            <p class="notice" role="status">Read-only: phrases can't be saved off-site yet.</p>
-        }
+        <p id="request-error" class="notice error" role="alert" hidden></p>
+
+        <partial name="_AddForm" model="new QuickTextForm()" />
 
         <ul id="quick-texts" class="quick-texts">
             @foreach (var quickText in Model.QuickTexts)
