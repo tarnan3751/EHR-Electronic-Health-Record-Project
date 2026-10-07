@@ -8,11 +8,9 @@ namespace Ehr.Web.Areas.Clinical.Pages.QuickTexts;
 
 // The team's shared phrases. Adding and editing go through htmx: each handler after the first returns only the
 // part of the page that changed. Every handler runs in one transaction (DatabaseTransactionFilter).
-public class IndexModel(EhrDbContext db, CurrentSite site) : PageModel
+public class IndexModel(EhrDbContext db) : PageModel
 {
     public IReadOnlyList<QuickText> QuickTexts { get; private set; } = [];
-
-    public bool CanSave => site.CanSave;
 
     public async Task OnGetAsync() =>
         QuickTexts = await db.QuickTexts.AsNoTracking().OrderBy(q => q.Shortcut).ToListAsync(HttpContext.RequestAborted);
