@@ -15,6 +15,11 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // the cloud app reads the same keys from the replica.
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
+    // Sync: which rows each transaction changed (written by a trigger), and the push operations already applied.
+    public DbSet<ChangeLogEntry> ChangeLog => Set<ChangeLogEntry>();
+
+    public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
+
     // Every host and tool configures the context through here, so they agree on naming and on where
     // migrations live: the Ehr.Migrations project in db/migrations.
     public static void Configure(DbContextOptionsBuilder builder, string connectionString) =>
@@ -35,5 +40,14 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
             quickText.Property(q => q.Body).HasMaxLength(4000);
             quickText.Property(q => q.Version).IsConcurrencyToken();
         });
+
+        modelBuilder.Entity<ChangeLogEntry>(entry =>
+        {
+            entry.Property(e => e.TransactionId).HasColumnType("xid8").HasDefaultValueSql("pg_current_xact_id()");
+            entry.HasIndex(e => e.TransactionId);
+            entry.Property(e => e.TableName).HasMaxLength(63);
+        });
+
+        modelBuilder.Entity<SyncOperation>().HasKey(o => o.IdempotencyKey);
     }
 }

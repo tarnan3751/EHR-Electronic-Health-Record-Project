@@ -17,12 +17,13 @@ Conventions every coding agent (and every person) follows in this repo. Most com
 - The RLS context is set with `set_config(..., true)` as the first statement of every transaction. Plain `SET` is banned: on a pooled connection it can leak into the next request. `UserContextInterceptor` (`Ehr.Data`) does this, and `DatabaseTransactionFilter` (`Ehr.Web`) runs each page handler in one transaction.
 - With nobody signed in, `app.user_id` is an empty string, not NULL, so policies read it as `NULLIF(current_setting('app.user_id', true), '')::uuid`.
 - `db/policies` (RLS, triggers, roles) is hand-written SQL.
-- Sync watermarks use transaction IDs, never timestamps.
+- Sync watermarks use transaction IDs, never timestamps (`ChangeLog` in `Ehr.Data`). A trigger writes the change log (`db/policies/20-change-log.sql`); the app roles can only read it.
 
 ## How migrations are made
 
 - Schema: EF Core migrations in `db/migrations` (the `Ehr.Migrations` project), added with `dotnet ef migrations add <Name> --project db/migrations`. Every migration is committed with the regenerated `db/migrations/schema.sql`, so reviewers read the real SQL; a test fails if it's out of date.
 - RLS, triggers, roles, and grants: hand-written in `db/policies`. Plain SQL only (no psql commands), safe to run again. `00-roles.sql` runs before the migrations; every other file runs after them, in name order.
+- A function that runs as its owner (`SECURITY DEFINER`) sets `search_path` and revokes `EXECUTE` from `PUBLIC`. `Ehr.Security.Tests` fails otherwise.
 - Every table gets explicit grants in `db/policies/10-grants.sql` and the same privileges in `ExpectedPrivileges` in `Ehr.Security.Tests`. A table without them fails CI. The file revokes everything from the runtime roles first, so it is the complete list: never grant privileges anywhere else. Runtime roles never get `DELETE` unless a feature needs it.
 - The infrastructure roles `replicator` (cloud standby) and `barman` (backups), and the migration role `ehr_owner` with the `ehr` schema it owns, are created when the primary is first initialized, by `infra/compose/postgres/primary/initdb`. `replicator` and `barman` have no table privileges. `ehr_owner` can create roles, which it uses to manage `ehr_app` and `ehr_read` from `db/policies`; PostgreSQL stops it from creating superuser, replication, or `BYPASSRLS` roles.
 - Migrations run as `ehr_owner`, only through the migration job (`infra/migrate`): in the local stack, in CI, and at deploy. The running apps never use that role.
@@ -41,7 +42,7 @@ Every change reaches `main` through a pull request, with the `ci` check passing 
 The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 
 - Restore (a high or critical package advisory fails it), a Release build, `dotnet format --verify-no-changes`, and `dotnet test`.
-- No runtime role owns anything, has `BYPASSRLS` or another elevated attribute, or holds a privilege beyond its grants (`Ehr.Security.Tests`).
+- No runtime role owns anything, has `BYPASSRLS` or another elevated attribute, or holds a privilege beyond its grants, and every `SECURITY DEFINER` function is locked down (`Ehr.Security.Tests`).
 - Every model change has a migration, and `db/migrations/schema.sql` matches the migrations (`Ehr.Data.Tests`).
 - The local server stack: the migration job applies cleanly, and the stack serves all three sites, replicates, and backs up.
 - macOS and Windows desktop builds, with `cargo fmt --check` and `cargo clippy -D warnings`.

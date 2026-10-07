@@ -18,6 +18,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "quick_texts")] = ["SELECT"],
         [("ehr_app", "data_protection_keys")] = ["SELECT", "INSERT"],
         [("ehr_read", "data_protection_keys")] = ["SELECT"],
+        [("ehr_app", "change_log")] = ["SELECT"],
+        [("ehr_read", "change_log")] = ["SELECT"],
+        [("ehr_app", "sync_operations")] = ["SELECT", "INSERT"],
+        [("ehr_read", "sync_operations")] = [],
         [("ehr_app", "__ef_migrations_history")] = [],
         [("ehr_read", "__ef_migrations_history")] = [],
     };
@@ -100,12 +104,39 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.quick_texts")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "CREATE ROLE intruder")]
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.quick_texts VALUES (gen_random_uuid(), '.x', 'x', 1, now())")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "INSERT INTO ehr.change_log (table_name, row_id) VALUES ('quick_texts', gen_random_uuid())")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.change_log")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.sync_operations")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT * FROM ehr.sync_operations")]
     public async Task Runtime_roles_are_refused_outside_their_grants(string role, string password, string sql)
     {
         var error = await Assert.ThrowsAsync<PostgresException>(
             () => MigratedDatabase.ExecuteAsync(database.ConnectionStringFor(role, password), sql));
 
         Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, error.SqlState);
+    }
+
+    // A function that runs as its owner (SECURITY DEFINER) can do what the owner can, so nobody else may call it
+    // directly, and its search_path is pinned so a caller can't put their own objects in front of the ones it uses.
+    [Fact]
+    public async Task Functions_that_run_as_their_owner_are_locked_down()
+    {
+        var functions = await QueryAsync(
+            """
+            SELECT p.proname,
+                   coalesce(exists (SELECT FROM unnest(p.proconfig) AS c WHERE c LIKE 'search_path=%'), false),
+                   p.proacl IS NOT NULL AND NOT exists (SELECT FROM aclexplode(p.proacl) WHERE grantee = 0)
+            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'ehr' AND p.prosecdef
+            """,
+            reader => (Name: reader.GetString(0), PinsSearchPath: reader.GetBoolean(1), NotPublic: reader.GetBoolean(2)));
+
+        Assert.NotEmpty(functions);
+        Assert.All(functions, function =>
+        {
+            Assert.True(function.PinsSearchPath, $"{function.Name} doesn't set search_path");
+            Assert.True(function.NotPublic, $"{function.Name} can be called by PUBLIC");
+        });
     }
 
     [Fact]
