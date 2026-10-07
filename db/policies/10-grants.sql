@@ -23,4 +23,10 @@ GRANT SELECT ON ehr.quick_texts TO ehr_read;
 GRANT SELECT, INSERT ON ehr.data_protection_keys TO ehr_app;
 GRANT SELECT ON ehr.data_protection_keys TO ehr_read;
 
+-- Sync's change log: sync pulls read it on both servers. Only its trigger writes it (20-change-log.sql).
+GRANT SELECT ON ehr.change_log TO ehr_app, ehr_read;
+
+-- Sync pushes already applied: pushes are saved on-prem only, so the read role gets nothing.
+GRANT SELECT, INSERT ON ehr.sync_operations TO ehr_app;
+
 COMMIT;

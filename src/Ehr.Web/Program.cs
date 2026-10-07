@@ -1,5 +1,7 @@
 using Ehr.Data;
+using Ehr.Domain.QuickTexts;
 using Ehr.Web;
+using Ehr.Web.Api.Sync;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.DataProtection;
 
@@ -12,6 +14,7 @@ var connectionString = builder.Configuration.GetConnectionString("Ehr")
     ?? throw new InvalidOperationException("Set ConnectionStrings:Ehr. See \"Running the apps\" in README.md.");
 
 builder.Services.AddEhrData(connectionString);
+builder.Services.AddScoped<QuickTextSaver>();
 
 // The keys that protect form tokens live in the database, so tokens survive a restart and both servers share the
 // keys: a form the cloud app renders is saved by the on-prem app. Only on-prem creates them; the cloud app reads them
@@ -45,5 +48,6 @@ if (site == Site.Cloud)
 
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
+app.MapQuickTextSync();
 
 app.Run();

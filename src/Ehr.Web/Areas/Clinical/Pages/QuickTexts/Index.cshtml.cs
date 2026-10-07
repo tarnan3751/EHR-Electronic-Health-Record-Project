@@ -1,14 +1,15 @@
 using Ehr.Data;
+using Ehr.Domain.QuickTexts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace Ehr.Web.Areas.Clinical.Pages.QuickTexts;
 
 // The team's shared phrases. Adding and editing go through htmx: each handler after the first returns only the
-// part of the page that changed. Every handler runs in one transaction (DatabaseTransactionFilter).
-public class IndexModel(EhrDbContext db) : PageModel
+// part of the page that changed. Every handler runs in one transaction (DatabaseTransactionFilter), and saves go
+// through QuickTextSaver, the same rules the sync API uses.
+public class IndexModel(EhrDbContext db, QuickTextSaver saver) : PageModel
 {
     public IReadOnlyList<QuickText> QuickTexts { get; private set; } = [];
 
@@ -37,28 +38,19 @@ public class IndexModel(EhrDbContext db) : PageModel
             return Partial("_AddForm", form);
         }
 
-        var quickText = new QuickText
+        var saved = await saver.AddAsync(Guid.CreateVersion7(), form, operationKey: null, HttpContext.RequestAborted);
+        switch (saved.Outcome)
         {
-            Id = Guid.CreateVersion7(),
-            Shortcut = Normalize(form.Shortcut!),
-            Body = form.Body!,
-            UpdatedAt = DateTimeOffset.UtcNow,
-        };
-        db.QuickTexts.Add(quickText);
-
-        try
-        {
-            await db.SaveChangesAsync(HttpContext.RequestAborted);
+            case QuickTextSaveOutcome.Saved:
+                // The posted values would otherwise refill the fresh add form.
+                ModelState.Clear();
+                return Partial("_Added", saved.QuickText);
+            case QuickTextSaveOutcome.ShortcutTaken:
+                ModelState.AddModelError(nameof(form.Shortcut), $"{saved.QuickText!.Shortcut} is already in use.");
+                return Partial("_AddForm", form);
+            default:
+                throw new InvalidOperationException($"Adding a new phrase can't end {saved.Outcome}.");
         }
-        catch (DbUpdateException e) when (IsShortcutTaken(e))
-        {
-            ModelState.AddModelError(nameof(form.Shortcut), $"{quickText.Shortcut} is already in use.");
-            return Partial("_AddForm", form);
-        }
-
-        // The posted values would otherwise refill the fresh add form.
-        ModelState.Clear();
-        return Partial("_Added", quickText);
     }
 
     public async Task<IActionResult> OnPostSaveAsync(QuickTextForm form)
@@ -68,45 +60,22 @@ public class IndexModel(EhrDbContext db) : PageModel
             return Partial("_EditForm", form);
         }
 
-        var quickText = await db.QuickTexts.FindAsync([form.Id], HttpContext.RequestAborted);
-        if (quickText is null)
+        var saved = await saver.UpdateAsync(form.Id, form.Version, form, operationKey: null, HttpContext.RequestAborted);
+        switch (saved.Outcome)
         {
-            return NotFound();
+            case QuickTextSaveOutcome.Saved:
+                return Partial("_QuickText", saved.QuickText);
+            case QuickTextSaveOutcome.ChangedSince:
+                // Nothing was saved. Show both versions and let the person choose.
+                return Partial("_Conflict", new QuickTextConflict(form, saved.QuickText!));
+            case QuickTextSaveOutcome.ShortcutTaken:
+                ModelState.AddModelError(nameof(form.Shortcut), $"{saved.QuickText!.Shortcut} is already in use.");
+                return Partial("_EditForm", form);
+            default:
+                return NotFound();
         }
-
-        // Saves only over the version this edit started from: if someone has saved since, the UPDATE matches no
-        // row and EF Core throws DbUpdateConcurrencyException.
-        db.Entry(quickText).Property(q => q.Version).OriginalValue = form.Version;
-        quickText.Shortcut = Normalize(form.Shortcut!);
-        quickText.Body = form.Body!;
-        quickText.Version = form.Version + 1;
-        quickText.UpdatedAt = DateTimeOffset.UtcNow;
-
-        try
-        {
-            await db.SaveChangesAsync(HttpContext.RequestAborted);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            // Nothing was saved. Show both versions and let the person choose.
-            await db.Entry(quickText).ReloadAsync(HttpContext.RequestAborted);
-            return Partial("_Conflict", new QuickTextConflict(form, quickText));
-        }
-        catch (DbUpdateException e) when (IsShortcutTaken(e))
-        {
-            ModelState.AddModelError(nameof(form.Shortcut), $"{quickText.Shortcut} is already in use.");
-            return Partial("_EditForm", form);
-        }
-
-        return Partial("_QuickText", quickText);
     }
 
     Task<QuickText?> FindAsync(Guid id) =>
         db.QuickTexts.AsNoTracking().SingleOrDefaultAsync(q => q.Id == id, HttpContext.RequestAborted);
-
-    // Shortcuts are stored in lowercase, so .NAD and .nad are the same shortcut.
-    static string Normalize(string shortcut) => shortcut.ToLowerInvariant();
-
-    static bool IsShortcutTaken(DbUpdateException e) =>
-        e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ix_quick_texts_shortcut" };
 }

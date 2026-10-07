@@ -4,18 +4,19 @@ An electronic health record with a web app (clinical and patient portal) and a M
 
 ## Status
 
-Early foundation. No EHR features exist yet. The walking skeleton (one trivial feature, team quick text, through every layer) is being built; steps 1 to 3 (the database foundation, the on-site page, and the off-site host) are done.
+Early foundation. No EHR features exist yet. The walking skeleton (one trivial feature, team quick text, through every layer) is being built; steps 1 to 4 (the database foundation, the on-site page, the off-site host, and the sync API) are done.
 
 **Working today**
 
 - The desktop app (Tauri) opens a blank window. Verified running on an Apple Silicon Mac. CI builds it on macOS and Windows on every push, and both builds pass; it hasn't been run on a Windows PC yet.
 - The web app (ASP.NET Core Razor Pages with htmx) serves the quick text page at `/`: a shared list of phrases, each with a shortcut such as `.nad`. On-site, phrases can be added and edited; a save that started from an older version is refused and shows both versions, with **Keep mine** and **Keep theirs**. Off-site, the cloud app shows the list from the replica and forwards saves to the on-prem app; right after a save, that person's pages come from on-prem until the replica has the change. If the on-prem server can't be reached, off-site pages still load and a save says it wasn't saved. There's no sign-in yet, so the server stack must stay local. Tests run the page against a real PostgreSQL 18.
+- The sync API for the desktop app, at `/api/sync/quick-texts` on both servers (`src/Ehr.Web/Api/Sync`). A pull returns the phrases changed since a transaction-ID watermark, fed by a change log that a database trigger writes; a push applies batches of changes, each with an idempotency key, and returns applied, duplicate, conflict (with the saved phrase) or invalid for each. The desktop app doesn't use it yet.
 - The local server stack runs the whole server architecture in Docker Compose: the PostgreSQL 18 primary, its streaming replica, Barman backups with point-in-time restore, and a simulated WAN. Verified on Linux, and on an Apple Silicon Mac for replication, isolation, backups and restore; Windows is not yet verified.
 - The database foundation: the app's roles (`ehr_owner` for migrations, `ehr_app` and `ehr_read` for the apps), the first table (`quick_texts`), and a migration job that brings the primary up to date every time the server stack starts. Security tests check the roles against a real PostgreSQL 18. See [Database changes](#database-changes).
 - CI (GitHub Actions) checks every push and pull request. `main` only accepts reviewed pull requests that pass it, and each commit on `main` publishes the web image. See [Continuous integration](#continuous-integration).
 - Dependency manifests and toolchain versions are in place. Python packages use version ranges until a lockfile is added.
 
-**Not built yet:** the patient data model and its row-level security, sign-in and authorization, the clinical workflows, the patient portal, desktop sync, dictation, and the architecture tests (the project exists but is empty).
+**Not built yet:** the patient data model and its row-level security, sign-in and authorization, the clinical workflows, the patient portal, the desktop app's side of sync, dictation, and the architecture tests (the project exists but is empty).
 
 ## Layout
 
