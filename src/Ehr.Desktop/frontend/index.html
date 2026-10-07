@@ -2,7 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EHR</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
 </head>
-<body></body>
+<body>
+  <main>
+    <h1>Quick text</h1>
+    <p>Shared phrases, each inserted by typing its shortcut. Changes are saved on this computer first, then sent.</p>
+
+    <section class="sync" aria-label="Sync">
+      <p>
+        <span id="connection" class="connection">Connecting…</span>
+        <span id="waiting"></span>
+        <span id="checked" class="quiet"></span>
+        <button type="button" id="sync-now">Sync now</button>
+      </p>
+      <p id="sync-problem" class="quiet" hidden></p>
+    </section>
+
+    <p id="notice" class="notice" role="alert" hidden></p>
+    <p id="request-error" class="notice error" role="alert" hidden></p>
+
+    <section id="conflicts" hidden>
+      <h2>Changes not saved</h2>
+      <ul id="conflict-list" class="quick-texts"></ul>
+    </section>
+
+    <form id="add-quick-text" class="quick-text-form">
+      <label>Shortcut <input name="shortcut" autocomplete="off" placeholder=".nad"></label>
+      <span class="error" data-for="shortcut"></span>
+      <label>Text <textarea name="body" rows="2"></textarea></label>
+      <span class="error" data-for="body"></span>
+      <button>Add</button>
+    </form>
+
+    <ul id="quick-texts" class="quick-texts"></ul>
+  </main>
+</body>
 </html>
