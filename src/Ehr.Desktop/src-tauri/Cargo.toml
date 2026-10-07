@@ -20,6 +20,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Sync API client (rustls).
 reqwest = { version = "0.13", features = ["json"] }
+# The background sync loop, and async tests. Already in Tauri's dependency tree.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+# The local database's key: 32 random bytes from the OS, kept as hex in the credential store.
+getrandom = "0.3"
+hex = "0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The "keychain" store works for apps that are not code-signed with a provisioning profile.

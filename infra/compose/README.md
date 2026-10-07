@@ -62,6 +62,8 @@ In VS Code, the same three are under Terminal → Run Task: "Server stack: start
 | `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env` |
 | http://127.0.0.1:8474 | Toxiproxy API, to change latency or cut links |
 
+The desktop app syncs with the first two: the on-prem address when it answers, the cloud address otherwise.
+
 Everything binds to `127.0.0.1`. For a superuser shell, use `docker compose exec -u postgres onprem-db psql` (or `cloud-db`); superuser logins over the network are refused.
 
 ## Simulated latency
