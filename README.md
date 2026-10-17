@@ -60,6 +60,7 @@ Everyone:
 |---|---|---|
 | .NET SDK | 10.0 (LTS) | `global.json` |
 | Rust, via rustup | 1.98.1 | `src/Ehr.Desktop/src-tauri/rust-toolchain.toml`; installs itself on the first build |
+| Strawberry Perl | 5.42.3 | [Download Strawberry Perl](https://strawberryperl.com/) (Windows); Ensure Perl is added to `PATH` |
 | Tauri CLI | 2.x | `cargo binstall tauri-cli --version "^2"` (prebuilt, seconds) or `cargo install tauri-cli --version "^2" --locked` (compiles, minutes) |
 | uv, for Python 3.12+ | | `pyproject.toml` in `src/Ehr.Dictation/sidecar` and `eval` |
 | Docker Desktop | Compose v2 | For the local server stack |
