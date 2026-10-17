@@ -37,7 +37,7 @@ CREATE TABLE ehr.quick_texts (
 CREATE UNIQUE INDEX ix_quick_texts_shortcut ON ehr.quick_texts (shortcut);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261001063107_InitialQuickText', '10.0.12');
+VALUES ('20261001063107_InitialQuickText', '10.0.13');
 
 COMMIT;
 
@@ -60,7 +60,7 @@ CREATE TABLE ehr.sync_operations (
 CREATE INDEX ix_change_log_transaction_id ON ehr.change_log (transaction_id);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261007041719_SyncLog', '10.0.12');
+VALUES ('20261007041719_SyncLog', '10.0.13');
 
 COMMIT;
 
