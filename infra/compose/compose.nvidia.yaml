@@ -1,9 +1,10 @@
-# Windows or Linux server with an NVIDIA GPU: run Llama on the GPU.
+# Windows or Linux server with an NVIDIA GPU: run K2 Horizon on the GPU.
 #   docker compose -f compose.yaml -f compose.nvidia.yaml --profile ai up -d
 # llama-server offloads layers to the GPU automatically (--n-gpu-layers defaults to auto).
 services:
   llama:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11176
+    # Updated. Previously Llama - image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11176
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11669
     deploy:
       resources:
         reservations:

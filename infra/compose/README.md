@@ -14,7 +14,7 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | `barman` | Isolated backup host | Streams WAL and takes base backups; listens on nothing |
 | `wan` | Tailscale and the internet | [Toxiproxy](https://github.com/Shopify/toxiproxy): the only path between sites, with latency on every link |
 | `wan-latency` | | One-shot job that sets the latency each time the stack starts; "Exited (0)" means it worked. `cloud-app` starts only after it. |
-| `llama` | Llama 3.1 on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
+| `llama` | K2 Horizon 7B in llama.cpp's `llama-server`, on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
 | `restore-db` | A restored copy of the primary | Opt-in `restore` profile, for the restore drill |
 
 Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. There's no sign-in yet, so keep the stack local. The MedASR sidecar joins the `ai` profile once its code exists.
@@ -123,7 +123,7 @@ Barman takes a base backup about a minute after its first start, streams WAL con
 
 ## AI profile
 
-1. Put the Llama 3.1 8B Instruct 4-bit GGUF file in `infra/compose/models/`, and set `LLAMA_MODEL_FILE` and `LLAMA_API_KEY` in `.env`. The model is gitignored; `llama` refuses to start without an API key.
+1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/` and prints the `LLAMA_MODEL_FILE` value. Set that and `LLAMA_API_KEY` in `.env`. The models folder is gitignored; `llama` refuses to start without an API key.
 2. Start with `docker compose --profile ai up -d`.
 3. On a machine with an NVIDIA GPU, add the override file:
    `docker compose -f compose.yaml -f compose.nvidia.yaml --profile ai up -d`

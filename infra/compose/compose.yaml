@@ -84,7 +84,10 @@ services:
   # Opt-in (--profile ai). Reachable only from the on-prem app, with no internet access.
   llama:
     profiles: [ai]
-    image: ghcr.io/ggml-org/llama.cpp:server-b11176
+    
+    # Updated. Previously - image: ghcr.io/ggml-org/llama.cpp:server-b11176
+    image: ghcr.io/ggml-org/llama.cpp:server-b11669
+
     # Refuses to start without an API key. (A required variable here would break the whole stack,
     # because Compose checks variables for every service, including inactive profiles.)
     entrypoint:
@@ -92,9 +95,14 @@ services:
       - -c
       - '[ -n "$${LLAMA_API_KEY}" ] || { echo "Set LLAMA_API_KEY in infra/compose/.env" >&2; exit 1; }; exec /app/llama-server "$$@"'
       - llama-server
-    command: ["--no-webui", "--no-slots"]
+    
+    # Updated. K2 Horizon thinks at full effort by default, which is slow; low is enough to fill in a note.
+    command: ["--no-webui", "--no-slots", "--chat-template-kwargs", "{\"reasoning_effort\":\"low\"}"]
+    
     environment:
-      LLAMA_ARG_MODEL: /models/${LLAMA_MODEL_FILE:-Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf}
+      # Updated. Prevously LLAMA_ARG_MODEL: /models/${LLAMA_MODEL_FILE:-Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf}
+      LLAMA_ARG_MODEL: /models/${LLAMA_MODEL_FILE:-K2-Horizon-7B-Q4_K_M.gguf}
+      
       LLAMA_ARG_CTX_SIZE: "8192"
       LLAMA_ARG_N_PARALLEL: "2"
       LLAMA_API_KEY: ${LLAMA_API_KEY:-}

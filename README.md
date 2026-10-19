@@ -4,7 +4,7 @@ An electronic health record with a web app (clinical and patient portal) and a M
 
 ## Status
 
-Early foundation. No EHR features exist yet. The walking skeleton (one trivial feature, team quick text, through every layer) is being built; steps 1 to 5 (the database foundation, the on-site page, the off-site host, the sync API, and the desktop app) are done.
+Early foundation. No EHR features exist yet. The walking skeleton (one trivial feature, team quick text, through every layer) is done: the database foundation, the on-site page, the off-site host, the sync API, and the desktop app. Next is the model spike: both dictation models running on the demo laptop, with a measured time for a two-minute dictation.
 
 **Working today**
 
@@ -14,9 +14,10 @@ Early foundation. No EHR features exist yet. The walking skeleton (one trivial f
 - The local server stack runs the whole server architecture in Docker Compose: the PostgreSQL 18 primary, its streaming replica, Barman backups with point-in-time restore, and a simulated WAN. Verified on Linux, and on an Apple Silicon Mac for replication, isolation, backups and restore; Windows is not yet verified.
 - The database foundation: the app's roles (`ehr_owner` for migrations, `ehr_app` and `ehr_read` for the apps), the first table (`quick_texts`), and a migration job that brings the primary up to date every time the server stack starts. Security tests check the roles against a real PostgreSQL 18. See [Database changes](#database-changes).
 - CI (GitHub Actions) checks every push and pull request. `main` only accepts reviewed pull requests that pass it, and each commit on `main` publishes the web image. See [Continuous integration](#continuous-integration).
+- The dictation models download with one script, `src/Ehr.Dictation/setup_models.py`, which checks every file against the hash Hugging Face publishes: K2 Horizon 7B for note structuring and MedASR for speech to text. Nothing uses them yet. See [Dictation models](#dictation-models).
 - Dependency manifests and toolchain versions are in place. Python packages use version ranges until a lockfile is added.
 
-**Not built yet:** the patient data model and its row-level security, sign-in and authorization, the clinical workflows, the patient portal, dictation, and the architecture tests (the project exists but is empty).
+**Not built yet:** the patient data model and its row-level security, sign-in and authorization, the clinical workflows, the patient portal, dictation itself (the MedASR sidecar, the note schema and prompt, the review screen), and the architecture tests (the project exists but is empty).
 
 ## Layout
 
@@ -29,7 +30,7 @@ src/
   Ehr.Data/         EF Core + Dapper on Npgsql: read and write contexts, RLS interceptor
   Ehr.Design/       Razor class library: design tokens, CSS, sprite sheet, shared partials, htmx, Alpine.js
   Ehr.Desktop/      Tauri 2 app: src-tauri (Rust shell, SQLCipher, sync) + frontend
-  Ehr.Dictation/    sidecar (Python, MedASR), llama-server config, note schema
+  Ehr.Dictation/    setup_models.py (downloads both models) and its tests; sidecar (Python, MedASR), llama-server config, note schema
 tests/
   Ehr.Security.Tests/      RLS, role, and audit gates against real PostgreSQL 18
   Ehr.Architecture.Tests/  layering, and PHI reads only through the PHI reader
@@ -60,9 +61,8 @@ Everyone:
 |---|---|---|
 | .NET SDK | 10.0 (LTS) | `global.json` |
 | Rust, via rustup | 1.98.1 | `src/Ehr.Desktop/src-tauri/rust-toolchain.toml`; installs itself on the first build |
-| Strawberry Perl | 5.42.3 | [Download Strawberry Perl](https://strawberryperl.com/) (Windows); Ensure Perl is added to `PATH` |
 | Tauri CLI | 2.x | `cargo binstall tauri-cli --version "^2"` (prebuilt, seconds) or `cargo install tauri-cli --version "^2" --locked` (compiles, minutes) |
-| uv, for Python 3.12+ | | `pyproject.toml` in `src/Ehr.Dictation/sidecar` and `eval` |
+| uv, for Python 3.12+ | | `pyproject.toml` in `src/Ehr.Dictation/sidecar` and `eval`; `src/Ehr.Dictation/setup_models.py` lists its own dependencies |
 | Docker Desktop | Compose v2 | For the local server stack |
 | mkcert | | Local HTTPS certificates for the server stack |
 | VS Code | | Accept the recommended extensions: C# Dev Kit, rust-analyzer, Tauri |
@@ -75,7 +75,7 @@ Everyone:
 **Windows PC**
 
 - Visual Studio Build Tools with the "Desktop development with C++" workload. Keep rustup's default MSVC toolchain.
-- Strawberry Perl, ahead of Git's Perl on `PATH`. The vendored OpenSSL build rejects Git Bash's Perl, so build from PowerShell, not Git Bash.
+- [Strawberry Perl](https://strawberryperl.com/), ahead of Git's Perl on `PATH`. The vendored OpenSSL build rejects Git Bash's Perl, so build from PowerShell, not Git Bash.
 - Docker Desktop with the WSL2 backend (virtualization enabled in the firmware). Its default memory is enough for the server stack; for the `ai` profile, raise `memory` in `%UserProfile%\.wslconfig`.
 - Clone to a short path outside OneDrive, such as `C:\src\ehr`. The OpenSSL build nests deep enough to hit Windows' 260-character path limit, and OneDrive locks files mid-build.
 - NASM is not needed: `src/Ehr.Desktop/src-tauri/.cargo/config.toml` lets the TLS library use its prebuilt objects.
@@ -119,17 +119,43 @@ and open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Recei
 | Server stack: stop | Stops it and keeps its data |
 | Server stack: reset | Stops it and deletes all its data |
 
-**Tests:** `dotnet test` runs every test project. Docker must be running: the security and web tests start a real PostgreSQL 18 in a container. The architecture project is allowed to report zero tests until its first test is written. For the desktop app, run `cargo test` from `src/Ehr.Desktop/src-tauri`; it needs no Docker.
+**Tests:** `dotnet test` runs every test project. Docker must be running: the security and web tests start a real PostgreSQL 18 in a container. The architecture project is allowed to report zero tests until its first test is written. For the desktop app, run `cargo test` from `src/Ehr.Desktop/src-tauri`; it needs no Docker. For the dictation model script, run `uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests`; it needs no network.
 
 ## Local server stack
 
 `infra/compose` runs the whole server architecture on one machine with Docker Compose: the on-prem primary and app, the cloud replica and app, the isolated Barman backup host, and a simulated WAN with latency between them. It also covers the failure drills and a point-in-time restore. Setup (certificates and hosts-file entries) and every command are in [infra/compose/README.md](infra/compose/README.md).
 
+## Dictation models
+
+Only dictation work needs these; everything else runs without them. Both run on the on-prem server only, with no cloud AI.
+
+| Model | Job | Source | Size | License |
+|---|---|---|---|---|
+| K2 Horizon 7B, Q4_K_M GGUF | Turns a transcript into proposed note fields, in `llama-server` | [IFM/K2-Horizon-7B-GGUF](https://huggingface.co/IFM/K2-Horizon-7B-GGUF) (llama.cpp calls it `IFM/K2-Horizon-7B-GGUF:Q4_K_M`) | About 5.6 GB | Apache 2.0 |
+| MedASR | Speech to text, in a Python sidecar | [google/medasr](https://huggingface.co/google/medasr) | Small (105M parameters) | Health AI Developer Foundations terms; gated |
+
+Once: create a Hugging Face account, accept the MedASR terms on its page, create a read-only access token, and sign in with `uvx --from huggingface_hub hf auth login`. The token stays in your user profile, never in the repository. Then, from the repository folder:
+
+```
+uv run src/Ehr.Dictation/setup_models.py --dry-run   # what it will download, and how big
+uv run src/Ehr.Dictation/setup_models.py             # both models
+```
+
+- K2 Horizon goes in `infra/compose/models/`, and MedASR in `infra/compose/models/medasr/`. The folder is gitignored, and the script refuses one that Git would track: weights are never committed.
+- Every file is checked against the SHA-256 Hugging Face publishes. A second run downloads nothing unless a file is missing or different, and an interrupted run can be restarted.
+- `infra/compose/models/models-manifest.json` records the repository, commit, file and SHA-256 of what was installed, for the provenance each dictated note stores. `--verify` re-checks the files against it, offline.
+- If you already have the K2 Horizon file (for example from `llama-server -hf`), pass it with `--from-file <path>`. It's used only if it's byte-for-byte the published file.
+- The K2 Horizon license and model card are saved in `infra/compose/models/notices/`. Apache 2.0 asks that they go along with the file.
+
+To run K2 Horizon in the local stack, set `LLAMA_MODEL_FILE` (the script prints the value) and `LLAMA_API_KEY` in `infra/compose/.env`, then start the `ai` profile (see [infra/compose/README.md](infra/compose/README.md#ai-profile)). K2 Horizon "thinks" at full effort by default, which is slow; the `llama` service sets its reasoning effort to low.
+
+K2 Horizon "7B" stores about 9 billion parameters. With an 8K context it needs about 6 to 7 GB of memory, so a computer with 8 GB of RAM struggles. MedASR is small enough for any machine's CPU.
+
 ## Database changes
 
 The schema comes from EF Core migrations in `db/migrations`; roles, grants, and later row-level security and triggers are hand-written SQL in `db/policies`. The migration job (`infra/migrate`) applies both to the primary, as `ehr_owner`, every time the server stack starts; the replica gets them by replication. CI's stack job runs the same job.
 
-Run `dotnet tool restore` once, for the pinned `dotnet-ef`. Then, from the repository folder:
+Run `dotnet tool restore` for the pinned `dotnet-ef`: once, and again whenever `.config/dotnet-tools.json` changes. Then, from the repository folder:
 
 1. Change the model in `src/Ehr.Data`.
 2. Add a migration: `dotnet ef migrations add <Name> --project db/migrations`
@@ -200,22 +226,28 @@ There is no `latest` tag: a deployment names the exact commit it runs.
 | htmx, Alpine.js (CSP build) | `src/Ehr.Design/libman.json`, restored into `wwwroot/lib` at build and served from our own origin |
 | Desktop | `src/Ehr.Desktop/src-tauri/Cargo.toml` |
 | MedASR sidecar | `src/Ehr.Dictation/sidecar/pyproject.toml` |
+| Dictation models | `src/Ehr.Dictation/setup_models.py` (repositories and quantization); what each machine installed is in `infra/compose/models/models-manifest.json` |
+| llama.cpp build | `infra/compose/compose.yaml` and `infra/compose/compose.nvidia.yaml` (container images); this README for the native builds |
 | Dictation eval | `eval/pyproject.toml` |
 | Container images for the local stack | `infra/compose/compose.yaml`, `infra/barman/Dockerfile`, `src/Ehr.Web/Dockerfile` |
 | GitHub Actions used by CI | `.github/workflows/ci.yml`, each pinned to a commit. Dependabot (`.github/dependabot.yml`) proposes updates weekly. |
 
 ## Dictation server hardware
 
-Llama 3.1 runs in llama.cpp's `llama-server`, pinned to build **b11176** on every machine. In the local stack it's the opt-in `ai` profile. MedASR will run in Docker on CPU, since the model is small; its sidecar isn't written yet.
+K2 Horizon 7B runs in llama.cpp's `llama-server`, pinned to build **b11669** on every machine. Support for K2 Horizon arrived in b11454; older builds fail with `unknown model architecture: 'k2-horizon'`. In the local stack it's the opt-in `ai` profile. MedASR will run in Docker on CPU, since the model is small; its sidecar isn't written yet.
 
 | Server machine | How `llama-server` runs |
 |---|---|
-| Windows, NVIDIA GPU | In Docker: the `ai` profile plus `infra/compose/compose.nvidia.yaml`, which switches to `server-cuda-b11176`. Docker Desktop passes NVIDIA GPUs through WSL2; keep the NVIDIA driver current. Plan on 8 GB of GPU memory; 6 GB fits one request at a time. |
-| Windows, AMD GPU | Natively: the b11176 Windows Vulkan build from the llama.cpp GitHub release. Docker Desktop can't use AMD GPUs. |
-| Apple Silicon Mac | Natively: the b11176 macOS arm64 build, which uses Metal. Or Podman with krunkit running `server-vulkan-b11176`, which keeps it in a container at roughly 75–80% of native speed. Docker Desktop can't use the Mac's GPU. |
-| No usable GPU | In Docker: the `ai` profile as is (`server-b11176`), on CPU. |
+| Windows, NVIDIA GPU | In Docker: the `ai` profile plus `infra/compose/compose.nvidia.yaml`, which switches to `server-cuda-b11669`. Docker Desktop passes NVIDIA GPUs through WSL2; keep the NVIDIA driver current. The model file alone is about 5.6 GB, so plan on 8 GB of GPU memory. |
+| Windows, AMD GPU | Natively: the b11669 Windows Vulkan build from the llama.cpp GitHub release. Docker Desktop can't use AMD GPUs. |
+| Apple Silicon Mac | Natively: the b11669 macOS arm64 build, which uses Metal. Or Podman with krunkit running `server-vulkan-b11669`, which keeps it in a container at roughly 75–80% of native speed. Docker Desktop can't use the Mac's GPU. |
+| No usable GPU | In Docker: the `ai` profile as is (`server-b11669`), on CPU. |
 
-- A native `llama-server` sits outside the Compose network, so nothing enforces "no internet egress" for it. Start it with a local model file, never with a flag that downloads one.
+- A native `llama-server` sits outside the Compose network, so nothing enforces "no internet egress" for it. Start it with the local model file, never with `-hf` or another flag that downloads one, and keep the same safeguards as the container: listen on `127.0.0.1` only, require an API key, turn off the web UI (`--no-webui`), set the reasoning effort to low, and never use `--tools` or `--log-prompts-dir` (it would write what patients say to disk). For example:
+
+  ```
+  llama-server -m infra/compose/models/<file> --host 127.0.0.1 --port 8080 --api-key <key> --no-webui -c 8192 -np 1 --chat-template-kwargs '{"reasoning_effort":"low"}'
+  ```
 - Record the dictation eval baseline on the server machine itself. CUDA, Vulkan, Metal and CPU builds can produce slightly different output, even at temperature 0.
 
 ## Runtime dependencies outside the package managers
@@ -225,8 +257,8 @@ For local development, PostgreSQL 18, Barman and the WAN simulation (Toxiproxy 2
 - PostgreSQL 18 (primary and hot standby)
 - Barman, in streaming mode
 - Tailscale
-- llama.cpp `llama-server`, build b11176 (see above)
+- llama.cpp `llama-server`, build b11669 (see above)
 - ffmpeg
-- Model weights, downloaded during setup and never committed:
+- Model weights, downloaded by `src/Ehr.Dictation/setup_models.py` and never committed (see [Dictation models](#dictation-models)):
   - MedASR 1.0. The weights are gated: accept the Health AI Developer Foundations terms on Hugging Face first.
-  - Llama 3.1 8B Instruct, 4-bit GGUF (about 5 GB). The Llama 3.1 Community License requires displaying "Built with Llama" and shipping its notice file.
+  - K2 Horizon 7B, Q4_K_M GGUF (about 5.6 GB), under Apache 2.0. Ship its license and notices with the file.

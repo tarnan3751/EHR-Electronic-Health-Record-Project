@@ -63,7 +63,7 @@ The team develops on Apple Silicon Macs and Intel/AMD Windows PCs; servers and C
 
 - Line endings are LF (`.gitattributes`). Only `.cmd` and `.bat` files use CRLF.
 - Match the case of file and folder names exactly. Macs and Windows ignore case; the Linux servers don't.
-- No bash-only scripts on your machine. Use `dotnet run script.cs` (.NET 10) or PowerShell 7, which run on both. Scripts that run inside Linux containers are POSIX `sh`.
+- No bash-only scripts on your machine. Use `dotnet run script.cs` (.NET 10) or PowerShell 7, which run on both. Dictation and eval tooling, which is already Python, may also use Python run with `uv run`, with its dependencies declared in the script. Scripts that run inside Linux containers are POSIX `sh`.
 - Container images are built in CI for `linux/amd64` and `linux/arm64`, never pushed from a laptop. Macs build arm64 images that an x86-64 server can't run.
 - PostgreSQL data lives in Docker named volumes, not host folders.
 - The local stack (`infra/compose`) publishes ports on `127.0.0.1` only, and app images run as a non-root user.
