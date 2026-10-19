@@ -3,7 +3,6 @@
 # llama-server offloads layers to the GPU automatically (--n-gpu-layers defaults to auto).
 services:
   llama:
-    # Updated. Previously Llama - image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11176
     image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11669
     deploy:
       resources:

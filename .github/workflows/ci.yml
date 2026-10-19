@@ -182,13 +182,28 @@ jobs:
       - name: Build
         run: cargo build --locked
 
+  dictation:
+    name: Dictation scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      # The command in README.md. The tests use a fake Hugging Face Hub, so they need no network.
+      - name: Test setup_models.py
+        run: uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests
+
   # Fails if any job it needs failed or was cancelled. A skipped job counts as passing, so a job
   # can later be limited to runs where its files changed.
   ci:
     # Branch protection requires a check by this name; renaming it means updating the ruleset.
     name: ci
     if: always()
-    needs: [web, stack, desktop]
+    needs: [web, stack, desktop, dictation]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

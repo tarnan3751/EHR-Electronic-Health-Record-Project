@@ -46,6 +46,7 @@ The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 - Every model change has a migration, and `db/migrations/schema.sql` matches the migrations (`Ehr.Data.Tests`).
 - The local server stack: the migration job applies cleanly, and the stack serves all three sites, replicates, and backs up.
 - macOS and Windows desktop builds, with `cargo fmt --check` and `cargo clippy -D warnings`.
+- The tests for `src/Ehr.Dictation/setup_models.py`.
 
 Gates added to `ci` as the code they check appears:
 
