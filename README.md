@@ -174,6 +174,7 @@ Tests fail if the model has changes no migration covers, if `schema.sql` is out 
 | Web app | Restores packages (a high or critical security advisory fails the run), builds in Release, then runs `dotnet format --verify-no-changes` and `dotnet test` |
 | Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that all three sites load the home page over HTTPS (the on-prem app reads the primary; the cloud app reads the replica), both databases accept connections, the replica and Barman are streaming, and `barman check` passes |
 | Desktop | `cargo fmt --check`, `cargo clippy` (warnings count as errors) and `cargo build`, on macOS (Apple Silicon) and Windows (x64) |
+| Dictation scripts | The tests for `src/Ehr.Dictation/setup_models.py`, against a fake Hugging Face Hub |
 | `ci` | Passes only when every job above passes. It's the one check `main` requires. |
 | Publish image | On `main` only, after `ci` passes: pushes `ghcr.io/tarnan3751/ehr-web:<commit>` for `linux/amd64` and `linux/arm64` |
 
