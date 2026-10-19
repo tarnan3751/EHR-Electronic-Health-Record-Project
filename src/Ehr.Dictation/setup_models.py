@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["huggingface_hub>=2.2,<3"]
+# dependencies = ["huggingface_hub>=2.2,<3", "httpx2>=2,<3"]
 # ///
 """Downloads the dictation models for the on-prem server, on macOS or Windows:
 
