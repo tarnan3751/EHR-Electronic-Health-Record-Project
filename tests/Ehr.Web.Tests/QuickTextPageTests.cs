@@ -17,7 +17,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
         var shortcut = WebApps.NewShortcut();
         await apps.InsertAsync(shortcut, "<script>alert(1)</script>");
 
-        var html = await CreateClient(apps.OnPrem).GetStringAsync("/", Cancel);
+        var html = await (await OpenAsync(apps, apps.OnPrem)).Client.GetStringAsync("/", Cancel);
 
         Assert.Contains(shortcut, html);
         Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", html);
@@ -28,7 +28,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     public async Task Adding_saves_the_phrase_in_lowercase_and_returns_its_row()
     {
         var shortcut = WebApps.NewShortcut();
-        var page = await OpenAsync(apps.OnPrem);
+        var page = await OpenAsync(apps, apps.OnPrem);
 
         using var response = await page.PostAsync("Add", ("Shortcut", shortcut.ToUpperInvariant()), ("Body", "No acute distress."));
 
@@ -43,7 +43,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     {
         var shortcut = WebApps.NewShortcut();
         await apps.InsertAsync(shortcut, "First");
-        var page = await OpenAsync(apps.OnPrem);
+        var page = await OpenAsync(apps, apps.OnPrem);
 
         using var response = await page.PostAsync("Add", ("Shortcut", shortcut), ("Body", "Second"));
 
@@ -58,7 +58,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData(".no-text", " ", "Enter the text.")]
     public async Task Invalid_input_is_refused(string shortcut, string body, string message)
     {
-        var page = await OpenAsync(apps.OnPrem);
+        var page = await OpenAsync(apps, apps.OnPrem);
 
         using var response = await page.PostAsync("Add", ("Shortcut", shortcut), ("Body", body));
 
@@ -70,9 +70,9 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     public async Task Edit_starts_from_the_saved_version()
     {
         var id = await apps.InsertAsync(WebApps.NewShortcut(), "Text", version: 3);
-        var client = CreateClient(apps.OnPrem);
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
 
-        var html = await client.GetStringAsync($"/?handler=Edit&id={id}", Cancel);
+        var html = await session.Client.GetStringAsync($"/?handler=Edit&id={id}", Cancel);
 
         Assert.Contains("name=\"Version\" value=\"3\"", html);
         Assert.Contains("__RequestVerificationToken", html);
@@ -83,7 +83,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     {
         var shortcut = WebApps.NewShortcut();
         var id = await apps.InsertAsync(shortcut, "Old text");
-        var page = await OpenAsync(apps.OnPrem);
+        var page = await OpenAsync(apps, apps.OnPrem);
 
         using var response = await page.PostAsync("Save", ("Id", id), ("Version", 1), ("Shortcut", shortcut), ("Body", "New text"));
 
@@ -96,7 +96,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     {
         var shortcut = WebApps.NewShortcut();
         var id = await apps.InsertAsync(shortcut, "Saved by someone else", version: 2);
-        var page = await OpenAsync(apps.OnPrem);
+        var page = await OpenAsync(apps, apps.OnPrem);
 
         using var response = await page.PostAsync("Save", ("Id", id), ("Version", 1), ("Shortcut", shortcut), ("Body", "My edit"));
 
@@ -112,10 +112,10 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     public async Task Saves_without_the_form_token_are_refused()
     {
         var shortcut = WebApps.NewShortcut();
-        var client = CreateClient(apps.OnPrem);
-        await client.GetStringAsync("/", Cancel);
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+        await session.Client.GetStringAsync("/", Cancel);
 
-        using var response = await client.PostAsync("/?handler=Add", Form(("Shortcut", shortcut), ("Body", "Text")), Cancel);
+        using var response = await session.Client.PostAsync("/?handler=Add", Form(("Shortcut", shortcut), ("Body", "Text")), Cancel);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(await apps.RowsAsync(shortcut));
@@ -124,7 +124,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     [Fact]
     public async Task Form_token_keys_are_stored_in_the_database()
     {
-        await OpenAsync(apps.OnPrem);
+        await OpenAsync(apps, apps.OnPrem);
 
         await using var connection = await apps.OpenDatabaseAsync();
         await using var command = new NpgsqlCommand("SELECT count(*) FROM ehr.data_protection_keys", connection);
@@ -136,7 +136,8 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     {
         await apps.InsertAsync(WebApps.NewShortcut(), "Read from the cloud");
 
-        var html = await CreateClient(apps.Cloud).GetStringAsync("/", Cancel);
+        var session = await SignInAsync(apps.Cloud, await apps.ClinicianAsync());
+        var html = await session.Client.GetStringAsync("/", Cancel);
 
         Assert.Contains("Read from the cloud", html);
         Assert.Contains("id=\"add-quick-text\"", html);

@@ -1,8 +1,11 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
+using Ehr.Data.Accounts;
+using Ehr.Domain.Accounts;
 using Ehr.Testing;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,9 +16,19 @@ namespace Ehr.Web.Tests;
 
 // The web app in memory, configured as each server, against one migrated database. The cloud app reads as ehr_read
 // like the real one, but from the primary: there's no replica in these tests. Its WAN link to the on-prem app is an
-// in-memory one, which records what crosses it.
+// in-memory one, which records what crosses it. The on-prem app starts with the bootstrap admin settings, as the
+// stack does, and every app's emails are kept rather than sent.
 public sealed class WebApps : IAsyncLifetime
 {
+    public const string BootstrapAdminEmail = "admin@example.test";
+
+    public const string BootstrapAdminPassword = "the-first-admin-password";
+
+    // Every staff account the tests create has this password.
+    public const string StaffPassword = "a-long-enough-password";
+
+    StaffAccount? clinician;
+
     public MigratedDatabase Database { get; } = new();
 
     public WebApplicationFactory<Program> OnPrem { get; private set; } = null!;
@@ -28,27 +41,83 @@ public sealed class WebApps : IAsyncLifetime
     // Each request the cloud app forwarded, as "METHOD /path?query".
     public ConcurrentQueue<string> Forwarded { get; } = new();
 
+    public RecordingEmailSender Emails { get; } = new();
+
     public async ValueTask InitializeAsync()
     {
         await Database.InitializeAsync();
-        OnPrem = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+        OnPrem = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, bootstrapAdmin: true);
 
         // Starting the on-prem app first also creates the Data Protection key, which the cloud app can't create.
         var link = new RecordingLink(OnPrem.Server.CreateHandler(), Forwarded);
         var readOnly = Database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
-        Cloud = new App(Site.Cloud, readOnly, new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
-        CloudCutOff = new App(Site.Cloud, readOnly, new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())));
+        Cloud = new App(Site.Cloud, readOnly, Emails, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
+        CloudCutOff = new App(Site.Cloud, readOnly, Emails, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())));
     }
 
     public async ValueTask DisposeAsync()
     {
-        await CloudCutOff.DisposeAsync();
-        await Cloud.DisposeAsync();
-        await OnPrem.DisposeAsync();
+        // Whatever got as far as starting.
+        if (CloudCutOff is not null)
+        {
+            await CloudCutOff.DisposeAsync();
+        }
+
+        if (Cloud is not null)
+        {
+            await Cloud.DisposeAsync();
+        }
+
+        if (OnPrem is not null)
+        {
+            await OnPrem.DisposeAsync();
+        }
+
         await Database.DisposeAsync();
     }
 
     public static string NewShortcut() => "." + Guid.NewGuid().ToString("N")[..12];
+
+    public static string NewEmail() => $"{Guid.NewGuid():N}@example.test";
+
+    // The clinician most tests sign in as, created once per fixture.
+    public async Task<StaffAccount> ClinicianAsync() => clinician ??= await CreateStaffAsync("Dr. Test", StaffRoles.Clinician);
+
+    // A staff account with a password and an enrolled authenticator, the way the app leaves one after its first
+    // sign-in, created through the same Identity services the app uses.
+    public async Task<StaffAccount> CreateStaffAsync(string displayName, params string[] roles)
+    {
+        await using var scope = OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        var email = NewEmail();
+        var user = new StaffUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = displayName, Roles = roles };
+        var created = await users.CreateAsync(user, StaffPassword);
+        Assert.True(created.Succeeded, string.Join(" ", created.Errors.Select(e => e.Description)));
+        await users.ResetAuthenticatorKeyAsync(user);
+        var key = (await users.GetAuthenticatorKeyAsync(user))!;
+        await users.SetTwoFactorEnabledAsync(user, true);
+        return new(user.Id, email, StaffPassword, key);
+    }
+
+    // A patient row, inserted as the superuser the way a seed would: row-level security doesn't apply, and the audit
+    // trigger records no actor.
+    public async Task<Guid> InsertPatientAsync(string givenName, string familyName)
+    {
+        var id = Guid.CreateVersion7();
+        await using var connection = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO ehr.patients (id, mrn, given_name, family_name, birth_date, gender, version, updated_at)
+            VALUES (@id, @mrn, @given, @family, '1980-01-01', 'unknown', 1, now())
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("mrn", id.ToString("N")[..12]);
+        command.Parameters.AddWithValue("given", givenName);
+        command.Parameters.AddWithValue("family", familyName);
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        return id;
+    }
 
     public async Task<Guid> InsertAsync(string shortcut, string body, int version = 1)
     {
@@ -81,6 +150,22 @@ public sealed class WebApps : IAsyncLifetime
         return rows;
     }
 
+    // How many audit events match, read as the superuser.
+    public async Task<long> AuditEventsAsync(string action, Guid? actorId = null, Guid? patientId = null)
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT count(*) FROM ehr.audit_events
+            WHERE action = @action AND (@actor IS NULL OR actor_id = @actor) AND (@patient IS NULL OR patient_id = @patient)
+            """,
+            connection);
+        command.Parameters.AddWithValue("action", action);
+        command.Parameters.AddWithValue("actor", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)actorId ?? DBNull.Value);
+        command.Parameters.AddWithValue("patient", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)patientId ?? DBNull.Value);
+        return (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
+    }
+
     // As the superuser, to set up and inspect rows around what the apps do.
     public async Task<NpgsqlConnection> OpenDatabaseAsync()
     {
@@ -89,7 +174,8 @@ public sealed class WebApps : IAsyncLifetime
         return connection;
     }
 
-    sealed class App(Site site, string connectionString, OnPremApp? onPrem = null) : WebApplicationFactory<Program>
+    sealed class App(Site site, string connectionString, RecordingEmailSender emails, OnPremApp? onPrem = null, bool bootstrapAdmin = false)
+        : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -97,10 +183,21 @@ public sealed class WebApps : IAsyncLifetime
                 .UseSetting("Ehr:Site", site.ToString())
                 .UseSetting("ConnectionStrings:Ehr", connectionString)
                 .UseSetting("Ehr:OnPrem:Url", "https://onprem.test");
-            if (onPrem is not null)
+            if (bootstrapAdmin)
             {
-                builder.ConfigureTestServices(services => services.AddSingleton(onPrem));
+                builder
+                    .UseSetting("Ehr:Bootstrap:AdminEmail", BootstrapAdminEmail)
+                    .UseSetting("Ehr:Bootstrap:AdminPassword", BootstrapAdminPassword);
             }
+
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IEmailSender>(emails);
+                if (onPrem is not null)
+                {
+                    services.AddSingleton(onPrem);
+                }
+            });
         }
     }
 
@@ -119,3 +216,6 @@ public sealed class WebApps : IAsyncLifetime
             throw new HttpRequestException("Connection refused", new SocketException((int)SocketError.ConnectionRefused));
     }
 }
+
+// A staff account the tests can sign in as: its password and the key its authenticator app would hold.
+public sealed record StaffAccount(Guid Id, string Email, string Password, string AuthenticatorKey);

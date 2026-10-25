@@ -18,7 +18,7 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     [Fact]
     public async Task The_on_prem_app_reports_its_WAL_position_after_a_save()
     {
-        var page = await OpenAsync(apps.OnPrem);
+        var page = await OpenAsync(apps, apps.OnPrem);
 
         using var response = await page.PostAsync("Add", ("Shortcut", WebApps.NewShortcut()), ("Body", "Text"));
 
@@ -30,7 +30,7 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     public async Task Saves_on_the_cloud_app_are_made_by_the_on_prem_app()
     {
         var shortcut = WebApps.NewShortcut();
-        var page = await OpenAsync(apps.Cloud);
+        var page = await OpenAsync(apps, apps.Cloud);
         var forwarded = apps.Forwarded.Count;
 
         using var response = await page.PostAsync("Add", ("Shortcut", shortcut), ("Body", "Saved through the cloud"));
@@ -94,7 +94,7 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     public async Task With_the_on_prem_app_unreachable_a_save_fails_clearly()
     {
         var shortcut = WebApps.NewShortcut();
-        var page = await OpenAsync(apps.CloudCutOff);
+        var page = await OpenAsync(apps, apps.CloudCutOff, via: apps.Cloud);
 
         using var response = await page.PostAsync("Add", ("Shortcut", shortcut), ("Body", "Text"));
 
@@ -108,19 +108,24 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     {
         await apps.InsertAsync(WebApps.NewShortcut(), "Still readable");
 
+        // Signed in on-site; the cookie is as good off-site, with the link down.
+        var signedIn = await CookieHeaderAsync(apps.OnPrem, await apps.ClinicianAsync());
         using var client = CreateClient(apps.CloudCutOff, handleCookies: false);
         using var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        request.Headers.Add("Cookie", LastSaveCookie(position: "FFFFFFFF/FFFFFFFF"));
+        request.Headers.Add("Cookie", $"{signedIn}; {LastSaveCookie(position: "FFFFFFFF/FFFFFFFF")}");
         using var response = await client.SendAsync(request, Cancel);
 
         Assert.Contains("Still readable", await ReadAsync(response));
     }
 
+    // A request from a signed-in browser, with the given last-save cookie added. The sign-in goes through the on-prem
+    // app, so nothing of it crosses the link being counted.
     async Task<HttpResponseMessage> GetFromCloudAsync(string path, string cookie)
     {
+        var signedIn = await CookieHeaderAsync(apps.OnPrem, await apps.ClinicianAsync());
         using var client = CreateClient(apps.Cloud, handleCookies: false);
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
-        request.Headers.Add("Cookie", cookie);
+        request.Headers.Add("Cookie", $"{signedIn}; {cookie}");
         return await client.SendAsync(request, Cancel);
     }
 
