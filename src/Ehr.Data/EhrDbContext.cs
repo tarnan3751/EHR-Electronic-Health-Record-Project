@@ -1,3 +1,6 @@
+using Ehr.Data.Accounts;
+using Ehr.Data.Audit;
+using Ehr.Data.Patients;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +22,19 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     public DbSet<ChangeLogEntry> ChangeLog => Set<ChangeLogEntry>();
 
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
+
+    // Accounts: staff and patients sign in separately, from separate tables (Accounts/). Not PHI, and not under
+    // row-level security: sign-in finds the account before anyone is signed in.
+    public DbSet<StaffUser> StaffUsers => Set<StaffUser>();
+
+    public DbSet<PatientUser> PatientUsers => Set<PatientUser>();
+
+    // PHI: row-level security enabled and forced, every write recorded by trigger (db/policies). Read it only
+    // through the PHI reader in Ehr.Domain.
+    public DbSet<Patient> Patients => Set<Patient>();
+
+    // Every view and change of patient information, and every sign-in. Append-only.
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     // Every host and tool configures the context through here, so they agree on naming and on where
     // migrations live: the Ehr.Migrations project in db/migrations.

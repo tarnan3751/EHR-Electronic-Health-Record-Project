@@ -12,6 +12,6 @@ public class PatientUser : IdentityUser<Guid>
     // UUIDv7, like every other ID here. Identity leaves a Guid key empty, so it is set on creation.
     public PatientUser() => Id = Guid.CreateVersion7();
 
-    // The patient record this account sees. One account per patient.
+    // The patient record this account sees (ehr.patients). One account per patient.
     public Guid PatientId { get; set; }
 }

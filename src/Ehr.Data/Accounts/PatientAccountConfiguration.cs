@@ -1,3 +1,4 @@
+using Ehr.Data.Patients;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -24,8 +25,10 @@ public sealed class PatientAccountConfiguration :
         user.Property(u => u.Email).HasMaxLength(256);
         user.Property(u => u.NormalizedEmail).HasMaxLength(256);
 
-        // One account per patient. The foreign key to ehr.patients is added with that table.
+        // One account per patient, and never an account without its patient. Nothing deletes patients, but if
+        // something ever did, the account would stand in the way rather than vanish.
         user.HasIndex(u => u.PatientId).IsUnique();
+        user.HasOne<Patient>().WithMany().HasForeignKey(u => u.PatientId).OnDelete(DeleteBehavior.Restrict);
 
         user.HasMany<PatientUserClaim>().WithOne().HasForeignKey(claim => claim.UserId).IsRequired();
         user.HasMany<PatientUserLogin>().WithOne().HasForeignKey(login => login.UserId).IsRequired();
