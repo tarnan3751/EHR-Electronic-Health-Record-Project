@@ -17,8 +17,6 @@ public sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
         patient.Property(p => p.GivenName).HasMaxLength(100);
         patient.Property(p => p.FamilyName).HasMaxLength(100);
         patient.Property(p => p.Gender).HasMaxLength(10);
-        // A hex SHA-256.
-        patient.Property(p => p.EnrollmentCodeHash).HasMaxLength(64);
         patient.Property(p => p.Version).IsConcurrencyToken();
     }
 }

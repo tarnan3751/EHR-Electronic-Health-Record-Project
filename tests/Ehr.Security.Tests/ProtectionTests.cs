@@ -38,6 +38,8 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["patient_user_logins"] = Protection.Internal,
         ["patient_user_tokens"] = Protection.Internal,
         ["patients"] = Protection.Phi,
+        // Registration looks a code up before anyone is signed in, so this is grants-only; it holds hashes, not codes.
+        ["patient_enrollments"] = Protection.Internal,
         ["audit_events"] = Protection.Restricted,
     };
 

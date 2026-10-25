@@ -489,15 +489,6 @@ namespace Ehr.Migrations
                         .HasColumnType("date")
                         .HasColumnName("birth_date");
 
-                    b.Property<DateTimeOffset?>("EnrollmentCodeExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("enrollment_code_expires_at");
-
-                    b.Property<string>("EnrollmentCodeHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("enrollment_code_hash");
-
                     b.Property<string>("FamilyName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -542,6 +533,52 @@ namespace Ehr.Migrations
                         {
                             t.HasCheckConstraint("ck_patients_gender", "gender IN ('female', 'male', 'other', 'unknown')");
                         });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.PatientEnrollment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<Guid?>("IssuedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issued_by");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<DateTimeOffset?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeemed_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_patient_enrollments");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_patient_enrollments_code_hash");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_patient_enrollments_patient_id");
+
+                    b.ToTable("patient_enrollments", "ehr");
                 });
 
             modelBuilder.Entity("Ehr.Data.QuickText", b =>
@@ -694,6 +731,16 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.PatientEnrollment", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_enrollments_patients_patient_id");
                 });
 #pragma warning restore 612, 618
         }

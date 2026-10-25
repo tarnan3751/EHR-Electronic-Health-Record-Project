@@ -43,6 +43,12 @@ GRANT SELECT ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_log
 GRANT SELECT, INSERT, UPDATE ON ehr.patients TO ehr_app;
 GRANT SELECT ON ehr.patients TO ehr_read;
 
+-- Portal enrollment codes, as hashes. Internal: grants only, no row-level security, because registration looks a
+-- code up before anyone is signed in; the hash is useless without the code, which is never stored. The app marks a
+-- code redeemed (UPDATE). No DELETE.
+GRANT SELECT, INSERT, UPDATE ON ehr.patient_enrollments TO ehr_app;
+GRANT SELECT ON ehr.patient_enrollments TO ehr_read;
+
 -- Audit events. Restricted: row-level security is enabled and forced, in the policy files that follow; no trigger,
 -- since nothing audits the audit. Append-only: no UPDATE and no DELETE for anyone at runtime. The write-audit
 -- trigger inserts as the table's owner; the app role inserts read and sign-in events.

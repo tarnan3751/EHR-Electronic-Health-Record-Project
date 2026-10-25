@@ -20,12 +20,6 @@ public class Patient
     // One of AdministrativeGender.
     public required string Gender { get; set; }
 
-    // Portal enrollment: the SHA-256 of a one-time code given to the patient at the clinic, and when it stops
-    // working. Only the hash is stored, so the replica never holds a usable code. Null once redeemed or never issued.
-    public string? EnrollmentCodeHash { get; set; }
-
-    public DateTimeOffset? EnrollmentCodeExpiresAt { get; set; }
-
     // Goes up by one on every update. A save that started from an older version is a conflict.
     public int Version { get; set; } = 1;
 

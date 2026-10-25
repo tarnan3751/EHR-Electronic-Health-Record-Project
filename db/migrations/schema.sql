@@ -222,3 +222,29 @@ VALUES ('20261025220332_SecurityFoundation', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.patients DROP COLUMN enrollment_code_expires_at;
+
+ALTER TABLE ehr.patients DROP COLUMN enrollment_code_hash;
+
+CREATE TABLE ehr.patient_enrollments (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    code_hash character varying(64) NOT NULL,
+    issued_by uuid,
+    issued_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    redeemed_at timestamp with time zone,
+    CONSTRAINT pk_patient_enrollments PRIMARY KEY (id),
+    CONSTRAINT fk_patient_enrollments_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_patient_enrollments_code_hash ON ehr.patient_enrollments (code_hash);
+
+CREATE INDEX ix_patient_enrollments_patient_id ON ehr.patient_enrollments (patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261025223256_PatientEnrollments', '10.0.13');
+
+COMMIT;
+
