@@ -72,6 +72,9 @@ services:
       Ehr__Site: OnPrem
       # Reads and writes the primary as ehr_app.
       ConnectionStrings__Ehr: "Host=onprem-db;Database=ehr;Username=ehr_app;Password=${EHR_APP_PASSWORD:?set it in infra/compose/.env}"
+      # The first admin, created when there are no staff accounts yet. Optional: empty values skip it with a warning.
+      Ehr__Bootstrap__AdminEmail: ${EHR_BOOTSTRAP_ADMIN_EMAIL:-}
+      Ehr__Bootstrap__AdminPassword: ${EHR_BOOTSTRAP_ADMIN_PASSWORD:-}
     ports:
       - "127.0.0.1:${ONPREM_HTTPS_PORT:-8443}:8443"
     networks: [onprem, inference]
