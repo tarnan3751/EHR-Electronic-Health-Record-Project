@@ -1,0 +1,52 @@
+@* The one page frame: the head every page needs, and a header that says who is signed in and where they can go.
+   Staff see the clinic's links for their roles; a patient sees the portal's. Nobody signed in sees no header. *@
+@{
+    var isPatient = User.HasClaim(claim => claim.Type == EhrClaims.PatientId);
+    var displayName = User.FindFirst(EhrClaims.DisplayName)?.Value ?? User.Identity?.Name;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    @* The htmx features that run JavaScript from attributes stay off, so a strict CSP can be added later. *@
+    <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false}'>
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/_content/Ehr.Design/css/ehr.css">
+    <script src="~/_content/Ehr.Design/lib/htmx/dist/htmx.min.js" defer></script>
+    <script src="~/_content/Ehr.Design/js/request-errors.js" defer></script>
+</head>
+<body>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <header class="site-header">
+            <nav aria-label="Main">
+                @if (isPatient)
+                {
+                    <a asp-area="Portal" asp-page="/Index">My record</a>
+                }
+                else
+                {
+                    <a asp-area="Clinical" asp-page="/QuickTexts/Index">Quick text</a>
+                    @if (User.IsInRole(StaffRoles.Clinician))
+                    {
+                        <a asp-area="Clinical" asp-page="/Patients/Index">Patients</a>
+                    }
+                    @if (User.IsInRole(StaffRoles.Admin))
+                    {
+                        <a asp-area="Clinical" asp-page="/Admin/Staff">Staff</a>
+                    }
+                }
+            </nav>
+            <form method="post" asp-area="@(isPatient ? "Portal" : "Clinical")" asp-page="/Account/SignOut" class="sign-out">
+                <span>@displayName</span>
+                <button>Sign out</button>
+            </form>
+        </header>
+    }
+    <main>
+        <p id="request-error" class="notice error" role="alert" hidden></p>
+        @RenderBody()
+    </main>
+</body>
+</html>

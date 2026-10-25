@@ -1,0 +1,26 @@
+@page "/patients/{id:guid}"
+@model ChartModel
+@{
+    ViewData["Title"] = $"{Model.Patient.FamilyName}, {Model.Patient.GivenName}";
+}
+<h1>@Model.Patient.FamilyName, @Model.Patient.GivenName</h1>
+<dl class="record">
+    <dt>MRN</dt><dd>@Model.Patient.Mrn</dd>
+    <dt>Born</dt><dd>@Model.Patient.BirthDate.ToString("yyyy-MM-dd")</dd>
+    <dt>Gender</dt><dd>@Model.Patient.Gender</dd>
+</dl>
+
+<h2>Patient portal</h2>
+@if (Model.EnrollmentCode is { } code)
+{
+    <section class="notice">
+        <p>Give the patient this code. It lets them register for the portal once, within 14 days, and isn't shown again.</p>
+        <p class="code">@code</p>
+    </section>
+}
+else
+{
+    <form method="post" asp-page-handler="Enroll">
+        <button>Issue an enrollment code</button>
+    </form>
+}

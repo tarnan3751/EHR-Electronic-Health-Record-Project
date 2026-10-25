@@ -1,0 +1,21 @@
+@page "/portal/confirm"
+@model ConfirmModel
+@{
+    ViewData["Title"] = "Confirm your email address";
+}
+<h1>Confirm your email address</h1>
+@if (Model.Confirmed == true)
+{
+    <p class="notice">Your address is confirmed. You can <a asp-page="SignIn">sign in</a> now.</p>
+}
+else if (Model.Confirmed == false)
+{
+    <p class="notice error">This link is not valid or has expired. Register again to get a new one.</p>
+}
+else
+{
+    <form method="post" class="account-form" asp-route-user="@Model.UserId" asp-route-token="@Model.Token">
+        <p>Press the button to confirm that this address is yours.</p>
+        <button>Confirm</button>
+    </form>
+}

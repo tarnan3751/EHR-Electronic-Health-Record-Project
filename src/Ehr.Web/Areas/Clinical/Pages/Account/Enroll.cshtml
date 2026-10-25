@@ -1,0 +1,30 @@
+@page "/sign-in/enroll"
+@model EnrollModel
+@{
+    ViewData["Title"] = "Set up your authenticator";
+}
+@if (Model.RecoveryCodes is { } codes)
+{
+    <h1>Your recovery codes</h1>
+    <p>Your authenticator is set up and you are signed in. If you ever lose your phone, one of these codes signs you in instead. Each works once. Save them somewhere safe now: they are not shown again.</p>
+    <ul class="recovery-codes">
+        @foreach (var code in codes)
+        {
+            <li class="code">@code</li>
+        }
+    </ul>
+    <p><a href="@Model.Continue">Continue</a></p>
+}
+else
+{
+    <h1>Set up your authenticator</h1>
+    <p>Every staff sign-in needs a code from an authenticator app on your phone, wherever you sign in from. Add this account to your app, then enter the code it shows.</p>
+    <p><a href="@Model.Setup!.Uri">Open in an authenticator app</a>, or enter this key by hand:</p>
+    <p class="code">@Model.KeyGrouped</p>
+    <form method="post" class="account-form">
+        <input type="hidden" asp-for="ReturnUrl">
+        <label>Code from your app <input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" required autofocus></label>
+        <span asp-validation-for="Code" class="error"></span>
+        <button>Finish setup</button>
+    </form>
+}

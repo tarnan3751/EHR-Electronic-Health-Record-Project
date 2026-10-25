@@ -1,0 +1,35 @@
+@page "/patients"
+@model IndexModel
+@{
+    ViewData["Title"] = "Patients";
+}
+<h1>Patients</h1>
+<form method="get" class="search-form">
+    <label>Name or MRN <input asp-for="Q" type="search" autocomplete="off" autofocus></label>
+    <button>Search</button>
+</form>
+@if (Model.Q is { Length: > 0 })
+{
+    @if (Model.Results.Count == 0)
+    {
+        <p>No patients match.</p>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr><th>Name</th><th>MRN</th><th>Born</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var patient in Model.Results)
+                {
+                    <tr>
+                        <td><a asp-page="Chart" asp-route-id="@patient.Id">@patient.FamilyName, @patient.GivenName</a></td>
+                        <td>@patient.Mrn</td>
+                        <td>@patient.BirthDate.ToString("yyyy-MM-dd")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}

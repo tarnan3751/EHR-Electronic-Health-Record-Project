@@ -1,0 +1,46 @@
+@page "/admin/staff"
+@model StaffModel
+@{
+    ViewData["Title"] = "Staff";
+}
+<h1>Staff</h1>
+
+@if (Model.SetupLink is { } link)
+{
+    <section class="notice">
+        <p>The account is created. Send this link to the person; it works once, and they choose their password with it. It isn't shown again.</p>
+        <p class="code">@link</p>
+    </section>
+}
+
+<table>
+    <thead>
+        <tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var member in Model.Staff)
+        {
+            <tr>
+                <td>@member.DisplayName</td>
+                <td>@member.Email</td>
+                <td>@string.Join(", ", member.Roles)</td>
+                <td>@StaffModel.StatusOf(member)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<h2>Add a staff account</h2>
+<form method="post" class="account-form">
+    <label>Email <input asp-for="Input.Email" type="email" autocomplete="off" required></label>
+    <span asp-validation-for="Input.Email" class="error"></span>
+    <label>Name to show <input asp-for="Input.DisplayName" autocomplete="off" required></label>
+    <span asp-validation-for="Input.DisplayName" class="error"></span>
+    <fieldset>
+        <legend>Roles</legend>
+        <label><input asp-for="Input.Clinician" type="checkbox"> Clinician: finds patients, reads charts, writes notes, places orders</label>
+        <label><input asp-for="Input.Admin" type="checkbox"> Admin: manages staff accounts and reads the audit log</label>
+    </fieldset>
+    <div asp-validation-summary="ModelOnly" class="error"></div>
+    <button>Create account</button>
+</form>
