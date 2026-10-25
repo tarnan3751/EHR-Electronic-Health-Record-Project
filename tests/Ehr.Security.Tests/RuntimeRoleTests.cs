@@ -22,6 +22,26 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "change_log")] = ["SELECT"],
         [("ehr_app", "sync_operations")] = ["SELECT", "INSERT"],
         [("ehr_read", "sync_operations")] = [],
+        [("ehr_app", "staff_users")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "staff_users")] = ["SELECT"],
+        [("ehr_app", "staff_user_claims")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "staff_user_claims")] = ["SELECT"],
+        [("ehr_app", "staff_user_logins")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "staff_user_logins")] = ["SELECT"],
+        [("ehr_app", "staff_user_tokens")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "staff_user_tokens")] = ["SELECT"],
+        [("ehr_app", "patient_users")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "patient_users")] = ["SELECT"],
+        [("ehr_app", "patient_user_claims")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "patient_user_claims")] = ["SELECT"],
+        [("ehr_app", "patient_user_logins")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "patient_user_logins")] = ["SELECT"],
+        [("ehr_app", "patient_user_tokens")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "patient_user_tokens")] = ["SELECT"],
+        [("ehr_app", "patients")] = ["SELECT", "INSERT", "UPDATE"],
+        [("ehr_read", "patients")] = ["SELECT"],
+        [("ehr_app", "audit_events")] = ["SELECT", "INSERT"],
+        [("ehr_read", "audit_events")] = ["SELECT"],
         [("ehr_app", "__ef_migrations_history")] = [],
         [("ehr_read", "__ef_migrations_history")] = [],
     };
@@ -108,6 +128,11 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.change_log")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.sync_operations")]
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT * FROM ehr.sync_operations")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.patients")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.staff_users")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.audit_events SET reason = 'changed'")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.audit_events")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.audit_events (action, source) VALUES ('read', 'cloud')")]
     public async Task Runtime_roles_are_refused_outside_their_grants(string role, string password, string sql)
     {
         var error = await Assert.ThrowsAsync<PostgresException>(

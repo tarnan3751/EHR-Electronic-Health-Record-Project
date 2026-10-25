@@ -29,4 +29,24 @@ GRANT SELECT ON ehr.change_log TO ehr_app, ehr_read;
 -- Sync pushes already applied: pushes are saved on-prem only, so the read role gets nothing.
 GRANT SELECT, INSERT ON ehr.sync_operations TO ehr_app;
 
+-- Staff and patient accounts, with Identity's claim, login and token tables (Accounts/ in Ehr.Data). Internal: grants
+-- only, no row-level security, because sign-in has to find the account before anyone is signed in. No DELETE:
+-- accounts are disabled, never removed, and the app calls none of Identity's remove-claim, remove-login or
+-- remove-token methods.
+GRANT SELECT, INSERT, UPDATE ON ehr.staff_users, ehr.staff_user_claims, ehr.staff_user_logins, ehr.staff_user_tokens TO ehr_app;
+GRANT SELECT ON ehr.staff_users, ehr.staff_user_claims, ehr.staff_user_logins, ehr.staff_user_tokens TO ehr_read;
+GRANT SELECT, INSERT, UPDATE ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_logins, ehr.patient_user_tokens TO ehr_app;
+GRANT SELECT ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_logins, ehr.patient_user_tokens TO ehr_read;
+
+-- Patients. PHI: row-level security is enabled and forced, and every write is recorded by trigger, in the policy
+-- files that follow. No DELETE: patients are never removed.
+GRANT SELECT, INSERT, UPDATE ON ehr.patients TO ehr_app;
+GRANT SELECT ON ehr.patients TO ehr_read;
+
+-- Audit events. Restricted: row-level security is enabled and forced, in the policy files that follow; no trigger,
+-- since nothing audits the audit. Append-only: no UPDATE and no DELETE for anyone at runtime. The write-audit
+-- trigger inserts as the table's owner; the app role inserts read and sign-in events.
+GRANT SELECT, INSERT ON ehr.audit_events TO ehr_app;
+GRANT SELECT ON ehr.audit_events TO ehr_read;
+
 COMMIT;
