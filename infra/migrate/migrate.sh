@@ -3,7 +3,7 @@
 # safe to repeat. Connects as ehr_owner, whose credentials the running apps never get.
 #   1. db/policies/00-roles.sql  the runtime roles, then their passwords from the environment
 #   2. EF Core migrations        the schema from db/migrations, through the bundle built into this image
-#   3. db/policies/*.sql         everything else (grants; later RLS and triggers), in file-name order
+#   3. db/policies/*.sql         everything else (grants, row-level security, triggers), in file-name order
 set -eu
 
 export PGHOST="${PGHOST:-onprem-db}" PGDATABASE="${PGDATABASE:-ehr}" PGUSER=ehr_owner PGPASSWORD="$EHR_OWNER_PASSWORD"
