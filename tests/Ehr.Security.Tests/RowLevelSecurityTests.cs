@@ -117,7 +117,7 @@ public class RowLevelSecurityTests(MigratedDatabase database) : IClassFixture<Mi
 
         // What the PHI reader will do on the on-prem site, in the transaction of the read.
         await Accounts.ExecuteAsync(App, clinician,
-            "INSERT INTO ehr.audit_events (actor_id, action, table_name, row_id, patient_id, source) VALUES (@actor, 'read', 'patients', @id, @id, 'onprem')",
+            "INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source) VALUES (uuidv7(), now(), @actor, 'read', 'patients', @id, @id, 'onprem')",
             ("actor", clinician), ("id", patient));
 
         Assert.Equal(["read"], await Accounts.QueryAsync(App, admin,

@@ -28,8 +28,10 @@ BEGIN
         changed := jsonb_build_object(lower(TG_OP) || 'ed', kept);
     END IF;
 
-    INSERT INTO ehr.audit_events (actor_id, action, table_name, row_id, patient_id, source, details)
+    INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, details)
     VALUES (
+        uuidv7(),
+        now(),
         NULLIF(current_setting('app.user_id', true), '')::uuid,
         lower(TG_OP),
         TG_TABLE_NAME,

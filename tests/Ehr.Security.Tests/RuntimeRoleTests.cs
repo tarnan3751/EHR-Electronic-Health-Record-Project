@@ -134,7 +134,7 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.staff_users")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.audit_events SET reason = 'changed'")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.audit_events")]
-    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.audit_events (action, source) VALUES ('read', 'cloud')")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.audit_events (id, occurred_at, action, source) VALUES (uuidv7(), now(), 'read', 'cloud')")]
     public async Task Runtime_roles_are_refused_outside_their_grants(string role, string password, string sql)
     {
         var error = await Assert.ThrowsAsync<PostgresException>(

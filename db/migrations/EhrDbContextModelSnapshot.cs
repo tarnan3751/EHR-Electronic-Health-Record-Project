@@ -375,12 +375,9 @@ namespace Ehr.Migrations
 
             modelBuilder.Entity("Ehr.Data.Audit.AuditEvent", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("Action")
                         .IsRequired()
@@ -397,10 +394,8 @@ namespace Ehr.Migrations
                         .HasColumnName("details");
 
                     b.Property<DateTimeOffset>("OccurredAt")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at")
-                        .HasDefaultValueSql("now()");
+                        .HasColumnName("occurred_at");
 
                     b.Property<Guid?>("PatientId")
                         .HasColumnType("uuid")
@@ -425,12 +420,6 @@ namespace Ehr.Migrations
                         .HasMaxLength(63)
                         .HasColumnType("character varying(63)")
                         .HasColumnName("table_name");
-
-                    b.Property<ulong>("TransactionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("xid8")
-                        .HasColumnName("transaction_id")
-                        .HasDefaultValueSql("pg_current_xact_id()");
 
                     b.HasKey("Id")
                         .HasName("pk_audit_events");

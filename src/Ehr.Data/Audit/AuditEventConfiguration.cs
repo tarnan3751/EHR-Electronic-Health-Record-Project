@@ -9,8 +9,8 @@ public sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEven
     public void Configure(EntityTypeBuilder<AuditEvent> auditEvent)
     {
         auditEvent.ToTable("audit_events");
-        auditEvent.Property(e => e.OccurredAt).HasDefaultValueSql("now()");
-        auditEvent.Property(e => e.TransactionId).HasColumnType("xid8").HasDefaultValueSql("pg_current_xact_id()");
+        // Set by the writer, never by the database (see AuditEvent): no generated columns, so inserts need no RETURNING.
+        auditEvent.Property(e => e.Id).ValueGeneratedNever();
         auditEvent.Property(e => e.Action).HasMaxLength(40);
         auditEvent.Property(e => e.TableName).HasMaxLength(63);
         auditEvent.Property(e => e.Source).HasMaxLength(10);

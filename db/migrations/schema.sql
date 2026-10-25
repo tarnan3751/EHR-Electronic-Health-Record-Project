@@ -248,3 +248,29 @@ VALUES ('20261025223256_PatientEnrollments', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+DROP TABLE ehr.audit_events;
+
+CREATE TABLE ehr.audit_events (
+    id uuid NOT NULL,
+    occurred_at timestamp with time zone NOT NULL,
+    actor_id uuid,
+    action character varying(40) NOT NULL,
+    table_name character varying(63),
+    row_id uuid,
+    patient_id uuid,
+    source character varying(10) NOT NULL,
+    reason character varying(500),
+    details jsonb,
+    CONSTRAINT pk_audit_events PRIMARY KEY (id)
+);
+
+CREATE INDEX ix_audit_events_actor_id_occurred_at ON ehr.audit_events (actor_id, occurred_at);
+
+CREATE INDEX ix_audit_events_patient_id_occurred_at ON ehr.audit_events (patient_id, occurred_at);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261025230200_AuditEventsClientIds', '10.0.13');
+
+COMMIT;
+
