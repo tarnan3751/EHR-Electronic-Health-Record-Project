@@ -24,4 +24,21 @@ public static class AuditActions
 
     // The first admin account, created from configuration when there were no staff accounts.
     public const string BootstrapAdmin = "bootstrap_admin";
+
+    public const string PasswordChanged = "password_changed";
+
+    // A staff account enrolled an authenticator app, or used one of its recovery codes.
+    public const string MfaEnrolled = "mfa_enrolled";
+
+    public const string RecoveryCodeUsed = "recovery_code_used";
+
+    // An admin created a staff account and its setup link.
+    public const string StaffInvited = "staff_invited";
+
+    // A clinician issued a patient a portal enrollment code.
+    public const string EnrollmentIssued = "enrollment_issued";
+
+    public const string PatientRegistered = "patient_registered";
+
+    public const string EmailConfirmed = "email_confirmed";
 }
