@@ -9,7 +9,9 @@ Early foundation. No EHR features exist yet. The walking skeleton (one trivial f
 **Working today**
 
 - The desktop app (Tauri) shows the quick text list, and works offline. Phrases are kept in an encrypted local database (SQLCipher) whose key is made on first launch and kept in the macOS Keychain or Windows Credential Manager. Adds and edits are saved there first, in an outbox; a background sync, every 10 seconds and straight after a change, sends them and brings back what changed, from the on-prem app when it can be reached and through the cloud app otherwise. A change the server refuses comes back with both versions and **Keep mine** and **Keep theirs**, as on the page. The window shows whether it's online and how many changes are waiting. Every network call is made in Rust, not in the web view. Verified on Linux against the local server stack, including offline changes, conflicts and the off-site path. CI builds it on macOS and Windows; it hasn't been run on a Windows PC yet.
-- The web app (ASP.NET Core Razor Pages with htmx) serves the quick text page at `/`: a shared list of phrases, each with a shortcut such as `.nad`. On-site, phrases can be added and edited; a save that started from an older version is refused and shows both versions, with **Keep mine** and **Keep theirs**. Off-site, the cloud app shows the list from the replica and forwards saves to the on-prem app; right after a save, that person's pages come from on-prem until the replica has the change. If the on-prem server can't be reached, off-site pages still load and a save says it wasn't saved. There's no sign-in yet, so the server stack must stay local. Tests run the page against a real PostgreSQL 18.
+- The web app (ASP.NET Core Razor Pages with htmx) serves the quick text page at `/`: a shared list of phrases, each with a shortcut such as `.nad`. On-site, phrases can be added and edited; a save that started from an older version is refused and shows both versions, with **Keep mine** and **Keep theirs**. Off-site, the cloud app shows the list from the replica and forwards saves to the on-prem app; right after a save, that person's pages come from on-prem until the replica has the change. If the on-prem server can't be reached, off-site pages still load and a save says it wasn't saved. Tests run the page against a real PostgreSQL 18.
+- Sign-in and authorization. Staff and patients have separate accounts, cookies and sign-in pages (`Areas/Clinical/Pages/Account`, `Areas/Portal/Pages/Account`). Every staff sign-in takes a password and a code from an authenticator app, wherever it comes from; a new account enrolls its app at its first sign-in, and sees recovery codes once. The on-prem app creates the first admin from `Ehr:Bootstrap` settings when there are no staff accounts; admins create the rest at **Staff**, each with a one-time setup link. Policies attach to whole areas (`Program.cs`): any staff account for the clinic's root, clinicians for patients, admins for staff, patient accounts for the portal, and nothing anonymous but the sign-in pages, static files and, for now, the sync API. The signed-in account reaches the database as `app.user_id`, where row-level security is the second layer.
+- The first PHI table, patients, with row-level security enabled and forced, a write-audit trigger, and the PHI reader in `Ehr.Domain` that every read goes through and that records each one (`db/policies`, `Phi/PhiReader.cs`). Clinicians find patients by name or MRN and open a chart that shows demographics and issues a portal enrollment code. A patient registers at `/portal/register` with that code, confirms their email, signs in, and sees their own record and nobody else's: the portal takes the patient from the session, never from a request. Pages that read PHI always come from the on-prem app, since reading PHI writes an audit event the replica can't take. Every view and change of patient information, and every sign-in, is in `ehr.audit_events`, which admins can read and nothing at runtime can change.
 - The sync API for the desktop app, at `/api/sync/quick-texts` on both servers (`src/Ehr.Web/Api/Sync`). A pull returns the phrases changed since a transaction-ID watermark, fed by a change log that a database trigger writes; a push applies batches of changes, each with an idempotency key, and returns applied, duplicate, conflict (with the saved phrase) or invalid for each.
 - The local server stack runs the whole server architecture in Docker Compose: the PostgreSQL 18 primary, its streaming replica, Barman backups with point-in-time restore, and a simulated WAN. Verified on Linux, and on an Apple Silicon Mac for replication, isolation, backups and restore; Windows is not yet verified.
 - The database foundation: the app's roles (`ehr_owner` for migrations, `ehr_app` and `ehr_read` for the apps), the first table (`quick_texts`), and a migration job that brings the primary up to date every time the server stack starts. Security tests check the roles against a real PostgreSQL 18. See [Database changes](#database-changes).
@@ -17,7 +19,7 @@ Early foundation. No EHR features exist yet. The walking skeleton (one trivial f
 - The dictation models download with one script, `src/Ehr.Dictation/setup_models.py`, which checks every file against the hash Hugging Face publishes: K2 Horizon 7B for note structuring and MedASR for speech to text. Nothing uses them yet. See [Dictation models](#dictation-models).
 - Dependency manifests and toolchain versions are in place. Python packages use version ranges until a lockfile is added.
 
-**Not built yet:** the patient data model and its row-level security, sign-in and authorization, the clinical workflows, the patient portal, dictation itself (the MedASR sidecar, the note schema and prompt, the review screen), and the architecture tests (the project exists but is empty).
+**Not built yet:** the rest of the patient data model (encounters, notes, orders, results), the clinical workflows beyond finding a patient and opening a chart, the portal's results, appointments and messages, an audit log page for admins, emergency (break-glass) access, dictation itself (the MedASR sidecar, the note schema and prompt, the review screen), desktop sign-in (until then the sync API is anonymous, and syncs only quick texts), and the cloud app's own queue of audit events (until then PHI pages are forwarded to on-prem and are unavailable off-site when the link is down).
 
 ## Layout
 
@@ -109,6 +111,15 @@ dotnet run --project src/Ehr.Web
 
 and open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Receiver uses. It runs as the on-prem app. The first build needs internet access to download htmx and Alpine.js.
 
+To sign in, the app needs an admin account. Give it the settings the stack gets from `.env`, once, the same way:
+
+```
+dotnet user-secrets set Ehr:Bootstrap:AdminEmail admin@example.com --project src/Ehr.Web
+dotnet user-secrets set Ehr:Bootstrap:AdminPassword <a password of 12 or more characters> --project src/Ehr.Web
+```
+
+The account is created at the next start if there are no staff accounts yet. The first sign-in asks for a new password and an authenticator app. Without a mail server configured (`Ehr:Smtp:Host`), the portal's emails are written to the console.
+
 **In VS Code:** open the repository folder, then use Terminal → Run Task:
 
 | Task | What it does |
@@ -119,7 +130,7 @@ and open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Recei
 | Server stack: stop | Stops it and keeps its data |
 | Server stack: reset | Stops it and deletes all its data |
 
-**Tests:** `dotnet test` runs every test project. Docker must be running: the security and web tests start a real PostgreSQL 18 in a container. The architecture project is allowed to report zero tests until its first test is written. For the desktop app, run `cargo test` from `src/Ehr.Desktop/src-tauri`; it needs no Docker. For the dictation model script, run `uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests`; it needs no network.
+**Tests:** `dotnet test` runs every test project. Docker must be running: the security and web tests start a real PostgreSQL 18 in a container. For the desktop app, run `cargo test` from `src/Ehr.Desktop/src-tauri`; it needs no Docker. For the dictation model script, run `uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests`; it needs no network.
 
 ## Local server stack
 
@@ -160,10 +171,10 @@ Run `dotnet tool restore` for the pinned `dotnet-ef`: once, and again whenever `
 1. Change the model in `src/Ehr.Data`.
 2. Add a migration: `dotnet ef migrations add <Name> --project db/migrations`
 3. Regenerate the SQL that reviewers read: `dotnet ef migrations script --project db/migrations --output db/migrations/schema.sql`
-4. For a new table, add its grants to `db/policies/10-grants.sql` and the same privileges to `ExpectedPrivileges` in `tests/Ehr.Security.Tests/RuntimeRoleTests.cs`.
+4. For a new table, add its grants to `db/policies/10-grants.sql` and the same privileges to `ExpectedPrivileges` in `tests/Ehr.Security.Tests/RuntimeRoleTests.cs`, and decide its protection in `ExpectedProtection` in `ProtectionTests.cs`. A PHI table also gets its policies in `30-rls.sql` and the write-audit trigger in `40-audit.sql`.
 5. Restart the server stack to apply it, and run `dotnet test`.
 
-Tests fail if the model has changes no migration covers, if `schema.sql` is out of date, or if a table has no grant decision. To undo a migration you haven't pushed, delete its two files and run `git restore db/migrations/EhrDbContextModelSnapshot.cs`. (`dotnet ef migrations remove` expects a database at the default port, which the local stack doesn't use.)
+Tests fail if the model has changes no migration covers, if `schema.sql` is out of date, or if a table has no grant or protection decision. To undo a migration you haven't pushed, delete its two files and run `git restore db/migrations/EhrDbContextModelSnapshot.cs`. (`dotnet ef migrations remove` expects a database at the default port, which the local stack doesn't use.)
 
 ## Continuous integration
 
@@ -172,7 +183,7 @@ Tests fail if the model has changes no migration covers, if `schema.sql` is out 
 | Job | What it checks |
 |---|---|
 | Web app | Restores packages (a high or critical security advisory fails the run), builds in Release, then runs `dotnet format --verify-no-changes` and `dotnet test` |
-| Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that all three sites load the home page over HTTPS (the on-prem app reads the primary; the cloud app reads the replica), both databases accept connections, the replica and Barman are streaming, and `barman check` passes |
+| Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that the clinic's home sends an anonymous browser to sign in and the sign-in pages load over HTTPS on all three sites (the on-prem app reads the primary; the cloud app reads the replica), both databases accept connections, the replica and Barman are streaming, and `barman check` passes |
 | Desktop | `cargo fmt --check`, `cargo clippy` (warnings count as errors) and `cargo build`, on macOS (Apple Silicon) and Windows (x64) |
 | Dictation scripts | The tests for `src/Ehr.Dictation/setup_models.py`, against a fake Hugging Face Hub |
 | `ci` | Passes only when every job above passes. It's the one check `main` requires. |

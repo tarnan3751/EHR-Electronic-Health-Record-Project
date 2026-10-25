@@ -14,10 +14,13 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | `barman` | Isolated backup host | Streams WAL and takes base backups; listens on nothing |
 | `wan` | Tailscale and the internet | [Toxiproxy](https://github.com/Shopify/toxiproxy): the only path between sites, with latency on every link |
 | `wan-latency` | | One-shot job that sets the latency each time the stack starts; "Exited (0)" means it worked. `cloud-app` starts only after it. |
+| `mail` | The clinic's mail relay | [Mailpit](https://mailpit.axllent.org/): catches every email the on-prem app sends and shows them at http://127.0.0.1:8025; delivers nothing |
 | `llama` | K2 Horizon 7B in llama.cpp's `llama-server`, on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
 | `restore-db` | A restored copy of the primary | Opt-in `restore` profile, for the restore drill |
 
-Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. There's no sign-in yet, so keep the stack local. The MedASR sidecar joins the `ai` profile once its code exists.
+Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. Pages that read patient data always come from the on-prem app, because reading them writes an audit event. The MedASR sidecar joins the `ai` profile once its code exists.
+
+**Signing in.** On its first start the on-prem app creates one admin account from `EHR_BOOTSTRAP_ADMIN_EMAIL` and `EHR_BOOTSTRAP_ADMIN_PASSWORD` in `.env`. Sign in with it at https://ehr.example.com:8443: it asks for a new password, then for an authenticator app (any TOTP app; the page shows the key), then shows recovery codes once. From **Staff** it creates the other accounts, each with a one-time setup link. Patients register at https://portal.example.com:9443/portal/register with the enrollment code a clinician issues from the chart; the confirmation email lands in Mailpit.
 
 ## One-time setup
 
@@ -61,6 +64,7 @@ In VS Code, the same three are under Terminal → Run Task: "Server stack: start
 | https://portal.example.com:9443 | Patient portal: the internet, to the cloud app |
 | `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env` |
 | http://127.0.0.1:8474 | Toxiproxy API, to change latency or cut links |
+| http://127.0.0.1:8025 | Mailpit: the emails the on-prem app sent |
 
 The desktop app syncs with the first two: the on-prem address when it answers, the cloud address otherwise.
 

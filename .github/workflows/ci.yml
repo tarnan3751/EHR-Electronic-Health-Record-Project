@@ -80,14 +80,21 @@ jobs:
       - name: Start the stack
         run: docker compose up --detach --wait --wait-timeout 300
 
-      # On-site through the LAN, then off-site and the portal through the simulated internet.
+      # On-site through the LAN, then off-site and the portal through the simulated internet. Nothing is served
+      # without signing in: the clinic's home sends an anonymous browser to its sign-in page, and the sign-in pages load.
       - name: Pages load
         run: |
-          for site in ehr.example.com:8443 ehr-remote.example.com:9443 portal.example.com:9443; do
-            curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
-              --cacert certs/example.com.pem --resolve "$site:127.0.0.1" \
-              --output /dev/null --write-out "https://$site %{http_code}\n" "https://$site/"
-          done
+          check() {
+            code=$(curl --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
+              --cacert certs/example.com.pem --resolve "$1:127.0.0.1" \
+              --output /dev/null --write-out "%{http_code}" "https://$1$2")
+            echo "https://$1$2 $code (expected $3)"
+            [ "$code" = "$3" ]
+          }
+          check ehr.example.com:8443 / 302
+          check ehr.example.com:8443 /sign-in 200
+          check ehr-remote.example.com:9443 /sign-in 200
+          check portal.example.com:9443 /portal/sign-in 200
 
       - name: Databases accept connections
         run: |

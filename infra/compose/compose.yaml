@@ -15,6 +15,10 @@ x-web-app: &web-app
     ASPNETCORE_HTTPS_PORTS: "8443"
     ASPNETCORE_Kestrel__Certificates__Default__Path: /certs/example.com.pem
     ASPNETCORE_Kestrel__Certificates__Default__KeyPath: /certs/example.com-key.pem
+    # Where people reach each site, for the links the apps hand out: a staff setup link, a patient's confirmation
+    # email. The on-prem app handles forms posted to the cloud site, so it can't take these from the request.
+    Ehr__Links__ClinicalBaseUrl: https://ehr-remote.example.com:9443
+    Ehr__Links__PortalBaseUrl: https://portal.example.com:9443
 
 x-postgres-healthcheck: &postgres-healthcheck
   test: ["CMD", "pg_isready", "-U", "postgres"]
@@ -75,6 +79,10 @@ services:
       # The first admin, created when there are no staff accounts yet. Optional: empty values skip it with a warning.
       Ehr__Bootstrap__AdminEmail: ${EHR_BOOTSTRAP_ADMIN_EMAIL:-}
       Ehr__Bootstrap__AdminPassword: ${EHR_BOOTSTRAP_ADMIN_PASSWORD:-}
+      # The portal's emails go to the mail catcher below.
+      Ehr__Smtp__Host: mail
+      Ehr__Smtp__Port: "1025"
+      Ehr__Smtp__From: no-reply@example.com
     ports:
       - "127.0.0.1:${ONPREM_HTTPS_PORT:-8443}:8443"
     networks: [onprem, inference]
@@ -83,6 +91,14 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+
+  # Catches every email the on-prem app sends (portal confirmations) and shows them at http://127.0.0.1:8025;
+  # nothing is delivered anywhere. Stands in for the clinic's mail relay.
+  mail:
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    networks: [onprem]
 
   # Opt-in (--profile ai). Reachable only from the on-prem app, with no internet access.
   llama:
