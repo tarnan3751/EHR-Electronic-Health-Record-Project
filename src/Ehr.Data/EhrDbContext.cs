@@ -33,6 +33,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     {
         modelBuilder.HasDefaultSchema(Schema);
 
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EhrDbContext).Assembly);
+
         modelBuilder.Entity<QuickText>(quickText =>
         {
             quickText.Property(q => q.Shortcut).HasMaxLength(32);
