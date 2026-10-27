@@ -38,6 +38,12 @@ GRANT SELECT ON ehr.staff_users, ehr.staff_user_claims, ehr.staff_user_logins, e
 GRANT SELECT, INSERT, UPDATE ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_logins, ehr.patient_user_tokens TO ehr_app;
 GRANT SELECT ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_logins, ehr.patient_user_tokens TO ehr_read;
 
+-- The desktop app's sessions, by token hash (Accounts/DesktopSession.cs). Internal, like the account tables: every
+-- sync request looks its session up before anyone is signed in; the cloud app does so against the replica. The on-prem
+-- app creates sessions and revokes them at sign-out (UPDATE). No DELETE.
+GRANT SELECT, INSERT, UPDATE ON ehr.desktop_sessions TO ehr_app;
+GRANT SELECT ON ehr.desktop_sessions TO ehr_read;
+
 -- Patients. PHI: row-level security is enabled and forced, and every write is recorded by trigger, in the policy
 -- files that follow. No DELETE: patients are never removed.
 GRANT SELECT, INSERT, UPDATE ON ehr.patients TO ehr_app;

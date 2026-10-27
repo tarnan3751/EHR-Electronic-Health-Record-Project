@@ -37,6 +37,8 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["patient_user_claims"] = Protection.Internal,
         ["patient_user_logins"] = Protection.Internal,
         ["patient_user_tokens"] = Protection.Internal,
+        // Every sync request looks its session up before anyone is signed in.
+        ["desktop_sessions"] = Protection.Internal,
         ["patients"] = Protection.Phi,
         ["patient_assignments"] = Protection.Phi,
         ["break_glass_accesses"] = Protection.Phi,

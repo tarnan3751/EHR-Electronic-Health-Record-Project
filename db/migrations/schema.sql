@@ -317,3 +317,26 @@ VALUES ('20261027101614_BreakGlass', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.desktop_sessions (
+    id uuid NOT NULL,
+    staff_user_id uuid NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    security_stamp character varying(64) NOT NULL,
+    device character varying(100) NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    CONSTRAINT pk_desktop_sessions PRIMARY KEY (id),
+    CONSTRAINT fk_desktop_sessions_staff_users_staff_user_id FOREIGN KEY (staff_user_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_desktop_sessions_staff_user_id ON ehr.desktop_sessions (staff_user_id);
+
+CREATE UNIQUE INDEX ix_desktop_sessions_token_hash ON ehr.desktop_sessions (token_hash);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261027102835_DesktopSessions', '10.0.13');
+
+COMMIT;
+

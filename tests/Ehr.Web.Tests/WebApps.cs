@@ -1,8 +1,12 @@
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Text.Json;
 using Ehr.Data.Accounts;
 using Ehr.Domain.Accounts;
 using Ehr.Testing;
+using Ehr.Web.Api.Desktop;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -28,6 +32,8 @@ public sealed class WebApps : IAsyncLifetime
     public const string StaffPassword = "a-long-enough-password";
 
     StaffAccount? clinician;
+
+    string? desktopToken;
 
     public MigratedDatabase Database { get; } = new();
 
@@ -98,6 +104,43 @@ public sealed class WebApps : IAsyncLifetime
         await users.SetTwoFactorEnabledAsync(user, true);
         return new(user.Id, email, StaffPassword, key);
     }
+
+    // A staff account that has set its password but not enrolled an authenticator yet: invited, with its setup done.
+    public async Task<StaffAccount> CreateStaffWithoutAuthenticatorAsync(string displayName, params string[] roles)
+    {
+        await using var scope = OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        var email = NewEmail();
+        var user = new StaffUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = displayName, Roles = roles };
+        var created = await users.CreateAsync(user, StaffPassword);
+        Assert.True(created.Succeeded, string.Join(" ", created.Errors.Select(e => e.Description)));
+        return new(user.Id, email, StaffPassword, AuthenticatorKey: "");
+    }
+
+    // What a password change does to the account: every session it had is over.
+    public async Task UpdateSecurityStampAsync(StaffAccount account)
+    {
+        await using var scope = OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        var updated = await users.UpdateSecurityStampAsync((await users.FindByIdAsync(account.Id.ToString()))!);
+        Assert.True(updated.Succeeded);
+    }
+
+    // The desktop session token of the fixture's clinician, from the sign-in API, created once per fixture.
+    public async Task<string> DesktopTokenAsync() => desktopToken ??= await DesktopSignInAsync(OnPrem, await ClinicianAsync());
+
+    // Signs the account in as the desktop app would, with its password and a code from its authenticator key.
+    public async Task<string> DesktopSignInAsync(WebApplicationFactory<Program> app, StaffAccount account)
+    {
+        using var response = await DesktopSignInResponseAsync(app, account, Totp.Code(account.AuthenticatorKey));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var signedIn = await response.Content.ReadFromJsonAsync<SignInResponse>(JsonSerializerOptions.Web, TestContext.Current.CancellationToken);
+        return signedIn!.Token;
+    }
+
+    public Task<HttpResponseMessage> DesktopSignInResponseAsync(WebApplicationFactory<Program> app, StaffAccount account, string code) =>
+        Browser.CreateClient(app).PostAsJsonAsync("/api/desktop/sign-in",
+            new SignInRequest(account.Email, account.Password, code, "test desktop"), JsonSerializerOptions.Web, TestContext.Current.CancellationToken);
 
     // A patient row, inserted as the superuser the way a seed would: row-level security doesn't apply, and the audit
     // trigger records no actor.

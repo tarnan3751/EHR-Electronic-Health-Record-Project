@@ -4,6 +4,7 @@ using Ehr.Domain.Audit;
 using Ehr.Domain.Authorization;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -74,7 +75,9 @@ public static class AccountServiceCollectionExtensions
                 Cookie(options, "__Host-Ehr.StaffPending", TimeSpan.FromMinutes(10));
                 options.SlidingExpiration = false;
                 options.LoginPath = "/sign-in";
-            });
+            })
+            // The desktop app's session token, on the API paths. A refused request gets a 401, never a redirect.
+            .AddScheme<AuthenticationSchemeOptions, DesktopTokenHandler>(AccountSchemes.Desktop, "Desktop session token", _ => { });
 
         services.AddAuthorization(options => options.AddEhrPolicies());
 
@@ -83,6 +86,7 @@ public static class AccountServiceCollectionExtensions
         services.AddScoped<PhiReader>();
         services.AddScoped<StaffSignIn>();
         services.AddScoped<StaffAccounts>();
+        services.AddScoped<DesktopSessions>();
         services.AddScoped<PatientSignIn>();
         services.AddScoped<PatientRegistration>();
         services.AddScoped<PatientEnrollments>();

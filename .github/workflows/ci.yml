@@ -81,7 +81,8 @@ jobs:
         run: docker compose up --detach --wait --wait-timeout 300
 
       # On-site through the LAN, then off-site and the portal through the simulated internet. Nothing is served
-      # without signing in: the clinic's home sends an anonymous browser to its sign-in page, and the sign-in pages load.
+      # without signing in: the clinic's home sends an anonymous browser to its sign-in page, the sign-in pages load,
+      # and the desktop app's sync API refuses a request without a session token.
       - name: Pages load
         run: |
           check() {
@@ -95,6 +96,7 @@ jobs:
           check ehr.example.com:8443 /sign-in 200
           check ehr-remote.example.com:9443 /sign-in 200
           check portal.example.com:9443 /portal/sign-in 200
+          check ehr.example.com:8443 "/api/sync/quick-texts?since=0" 401
 
       - name: Databases accept connections
         run: |

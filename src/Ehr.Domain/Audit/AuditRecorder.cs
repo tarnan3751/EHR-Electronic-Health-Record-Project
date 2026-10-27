@@ -10,7 +10,8 @@ namespace Ehr.Domain.Audit;
 public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource source)
 {
     public AuditEvent Record(
-        string action, Guid? patientId = null, string? tableName = null, Guid? rowId = null, string? reason = null, Guid? actorId = null)
+        string action, Guid? patientId = null, string? tableName = null, Guid? rowId = null, string? reason = null, Guid? actorId = null,
+        string? details = null)
     {
         var auditEvent = new AuditEvent
         {
@@ -23,6 +24,7 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
             TableName = tableName,
             RowId = rowId,
             Reason = reason,
+            Details = details,
         };
         db.AuditEvents.Add(auditEvent);
         return auditEvent;

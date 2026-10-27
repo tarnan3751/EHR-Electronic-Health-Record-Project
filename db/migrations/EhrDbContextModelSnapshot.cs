@@ -23,6 +23,60 @@ namespace Ehr.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Ehr.Data.Accounts.DesktopSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Device")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("device");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("security_stamp");
+
+                    b.Property<Guid>("StaffUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staff_user_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_desktop_sessions");
+
+                    b.HasIndex("StaffUserId")
+                        .HasDatabaseName("ix_desktop_sessions_staff_user_id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_desktop_sessions_token_hash");
+
+                    b.ToTable("desktop_sessions", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Accounts.PatientUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -728,6 +782,16 @@ namespace Ehr.Migrations
                         .HasName("pk_data_protection_keys");
 
                     b.ToTable("data_protection_keys", "ehr");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Accounts.DesktopSession", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("StaffUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_desktop_sessions_staff_users_staff_user_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Accounts.PatientUser", b =>

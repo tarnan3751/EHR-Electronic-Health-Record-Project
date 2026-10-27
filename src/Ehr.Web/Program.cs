@@ -5,6 +5,7 @@ using Ehr.Domain.Audit;
 using Ehr.Domain.Authorization;
 using Ehr.Domain.QuickTexts;
 using Ehr.Web;
+using Ehr.Web.Api.Desktop;
 using Ehr.Web.Api.Sync;
 using Ehr.Web.Email;
 using Ehr.Web.Forwarding;
@@ -90,8 +91,9 @@ app.UseAuthorization();
 // Static files are the same for everyone, signed in or not.
 app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages().WithStaticAssets();
-// The desktop app has no sign-in yet, and quick texts are not PHI. Explicitly anonymous until desktop sign-in exists,
-// rather than broken by the fallback policy: GitHub issue #11, "Desktop sign-in and sync API authorization".
-app.MapQuickTextSync().AllowAnonymous();
+// The desktop app signs in at /api/desktop and sends the session token it gets with every sync request. Both APIs
+// take the Desktop policy: a clinician's session token, and nothing else (Api/Desktop, Api/Sync).
+app.MapDesktopApi();
+app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop);
 
 app.Run();

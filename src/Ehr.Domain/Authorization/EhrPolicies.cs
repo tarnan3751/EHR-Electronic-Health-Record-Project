@@ -21,6 +21,9 @@ public static class EhrPolicies
     // The portal: a patient account, which always belongs to one patient.
     public const string Patient = "Patient";
 
+    // The APIs the desktop app calls, with its session token: a clinician's account only.
+    public const string Desktop = "Desktop";
+
     public static AuthorizationOptions AddEhrPolicies(this AuthorizationOptions options)
     {
         options.AddPolicy(Staff, policy => policy
@@ -38,6 +41,10 @@ public static class EhrPolicies
             .AddAuthenticationSchemes(AccountSchemes.Patient)
             .RequireAuthenticatedUser()
             .RequireClaim(EhrClaims.PatientId));
+        options.AddPolicy(Desktop, policy => policy
+            .AddAuthenticationSchemes(AccountSchemes.Desktop)
+            .RequireAuthenticatedUser()
+            .RequireRole(StaffRoles.Clinician));
 
         // Nothing is anonymous unless it says so: an endpoint with no policy of its own still needs a signed-in user.
         options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();

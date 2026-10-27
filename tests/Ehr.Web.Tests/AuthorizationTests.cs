@@ -26,15 +26,29 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
 
     [Theory]
     [InlineData("/_content/Ehr.Design/css/ehr.css")]
-    [InlineData("/api/sync/quick-texts?since=0")]
     [InlineData("/sign-in")]
     [InlineData("/portal/sign-in")]
     [InlineData("/portal/register")]
-    public async Task Static_files_the_sync_api_and_the_sign_in_pages_are_anonymous(string path)
+    public async Task Static_files_and_the_sign_in_pages_are_anonymous(string path)
     {
         using var response = await Client(apps.OnPrem, new CookieContainer(), followRedirects: false).GetAsync(path, Cancel);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // The desktop app is not a browser: a refused API request gets a 401, never a redirect to the sign-in page.
+    [Theory]
+    [InlineData("/api/sync/quick-texts?since=0")]
+    [InlineData("/api/desktop/sign-out")]
+    public async Task The_apis_answer_an_anonymous_request_with_401(string path)
+    {
+        using var client = Client(apps.OnPrem, new CookieContainer(), followRedirects: false);
+        using var response = path.EndsWith("sign-out", StringComparison.Ordinal)
+            ? await client.PostAsync(path, null, Cancel)
+            : await client.GetAsync(path, Cancel);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Null(response.Headers.Location);
     }
 
     [Fact]

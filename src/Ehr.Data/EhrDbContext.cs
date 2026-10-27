@@ -29,6 +29,9 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<PatientUser> PatientUsers => Set<PatientUser>();
 
+    // The desktop app's sessions, by token hash. Grants only, like the account tables.
+    public DbSet<DesktopSession> DesktopSessions => Set<DesktopSession>();
+
     // PHI: row-level security enabled and forced, every write recorded by trigger (db/policies). Read it only
     // through the PHI reader in Ehr.Domain.
     public DbSet<Patient> Patients => Set<Patient>();
