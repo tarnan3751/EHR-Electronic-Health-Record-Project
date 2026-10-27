@@ -4,26 +4,37 @@
 //! watermark, then sends the outbox in batches. Both are safe to repeat, on either server: a pull only moves a phrase
 //! forward (store.rs), and each change carries its key, so one that reached the server before its answer was lost
 //! comes back as a duplicate.
+//!
+//! Signing in and out are here too. The session a sign-in returns is kept in the credential store (key.rs), so it
+//! outlasts the app.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use reqwest::{Client, Response, Url};
+use keyring_core::Entry;
+use reqwest::{Client, RequestBuilder, Response, Url};
 use serde::de::DeserializeOwned;
 
-use crate::api::{PullResponse, PushRequest, PushResponse};
+use crate::api::{PullResponse, PushRequest, PushResponse, Refusal, Session, SignIn};
+use crate::key;
 use crate::store::{self, Store};
 
 /// The on-prem app on the clinic network, then the cloud app over the internet. EHR_SYNC_SERVERS, separated by
 /// commas, replaces them.
 const DEFAULT_SERVERS: &str = "https://ehr.example.com:8443,https://ehr-remote.example.com:9443";
 const PATH: &str = "/api/sync/quick-texts";
+const SIGN_IN: &str = "/api/desktop/sign-in";
+const SIGN_OUT: &str = "/api/desktop/sign-out";
 /// The most the server takes in one push (QuickTextSync.MaxOperations).
 const BATCH: usize = 100;
 
 pub struct Sync {
     http: Client,
     servers: Vec<String>,
+    /// Where the session is kept between launches: the credential store's entry (key.rs), or in tests a mock store's.
+    saved: Entry,
+    /// The session, as saved; none while signed out.
+    session: Mutex<Option<Session>>,
 }
 
 /// How a round went. `server` answered, if any did; `problem` says why the round didn't finish. Changes not sent
@@ -49,7 +60,7 @@ impl From<store::Error> for Failure {
 }
 
 impl Sync {
-    pub fn from_environment() -> Result<Sync, String> {
+    pub fn from_environment(saved: Entry) -> Result<Sync, String> {
         let servers =
             std::env::var("EHR_SYNC_SERVERS").unwrap_or_else(|_| DEFAULT_SERVERS.to_owned());
         Sync::new(
@@ -59,11 +70,13 @@ impl Sync {
                 .filter(|server| !server.is_empty())
                 .map(str::to_owned)
                 .collect(),
+            saved,
         )
     }
 
-    /// HTTPS is checked against the OS's trusted certificates, as a browser would.
-    pub fn new(servers: Vec<String>) -> Result<Sync, String> {
+    /// HTTPS is checked against the OS's trusted certificates, as a browser would. `saved` is where the session is
+    /// kept; the one in it, if any, carries on.
+    pub fn new(servers: Vec<String>, saved: Entry) -> Result<Sync, String> {
         let http = Client::builder()
             .connect_timeout(Duration::from_secs(3))
             .timeout(Duration::from_secs(20))
@@ -73,7 +86,70 @@ impl Sync {
             .into_iter()
             .map(|server| server.trim_end_matches('/').to_owned())
             .collect();
-        Ok(Sync { http, servers })
+        let session = Mutex::new(key::read_session(&saved));
+        Ok(Sync {
+            http,
+            servers,
+            saved,
+            session,
+        })
+    }
+
+    /// The name of the clinician signed in, for the page; none while signed out.
+    pub fn account(&self) -> Option<String> {
+        self.session()
+            .as_ref()
+            .map(|session| session.display_name.clone())
+    }
+
+    /// Signs in with the first server that answers, and keeps the session. That server's answer stands: trying the
+    /// next with the same code would count as a second attempt. Err says why not, for the page to show the person.
+    pub async fn sign_in(&self, email: &str, password: &str, code: &str) -> Result<(), String> {
+        let device = format!("{} desktop", std::env::consts::OS);
+        let sign_in = SignIn {
+            email,
+            password,
+            code,
+            device: &device,
+        };
+        let response = self
+            .first_answer(|server| self.http.post(format!("{server}{SIGN_IN}")).json(&sign_in))
+            .await?;
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(match response.json::<Refusal>().await {
+                Ok(refusal) => refusal.problem,
+                Err(_) => format!("Couldn't sign in: the server answered {status}."),
+            });
+        }
+        let session: Session = response.json().await.map_err(|error| {
+            format!(
+                "Couldn't sign in: the server's answer wasn't understood ({}).",
+                reason(&error)
+            )
+        })?;
+
+        let mut current = self.session();
+        key::save_session(&self.saved, &session)?;
+        *current = Some(session);
+        Ok(())
+    }
+
+    /// Ends the session on the first server that answers, if any does, then forgets it here whatever the answer: a
+    /// server that can't be reached, or has already ended the session, doesn't keep the person signed in.
+    pub async fn sign_out(&self) -> Result<(), String> {
+        let Some(token) = self.token() else {
+            return Ok(());
+        };
+        let _ = self
+            .first_answer(|server| {
+                self.http
+                    .post(format!("{server}{SIGN_OUT}"))
+                    .bearer_auth(&token)
+            })
+            .await;
+        self.forget(&token)
     }
 
     pub async fn round(&self, store: &Mutex<Store>) -> Report {
@@ -103,7 +179,7 @@ impl Sync {
             },
             None => Report {
                 server: None,
-                problem: Some(format!("Couldn't connect to {}.", unreachable.join(" or "))),
+                problem: Some(couldnt_connect(&unreachable)),
             },
         }
     }
@@ -148,6 +224,44 @@ impl Sync {
             store::lock(store).apply_push(answered)?;
         }
     }
+
+    /// Sends the request `to` makes for each server in turn, until one answers. Err says why none did.
+    async fn first_answer(&self, to: impl Fn(&str) -> RequestBuilder) -> Result<Response, String> {
+        let mut unreachable = Vec::new();
+        for server in &self.servers {
+            match to(server).send().await {
+                Ok(response) => return Ok(response),
+                Err(error) => unreachable.push(format!("{server} ({})", reason(&error))),
+            }
+        }
+        Err(couldnt_connect(&unreachable))
+    }
+
+    fn session(&self) -> MutexGuard<'_, Option<Session>> {
+        self.session.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn token(&self) -> Option<String> {
+        self.session().as_ref().map(|session| session.token.clone())
+    }
+
+    /// Forgets the session, here and in the credential store, unless a sign-in has replaced it since `token` was sent.
+    fn forget(&self, token: &str) -> Result<(), String> {
+        let mut current = self.session();
+        if current
+            .as_ref()
+            .is_none_or(|session| session.token != token)
+        {
+            return Ok(());
+        }
+        *current = None;
+        key::forget_session(&self.saved)
+    }
+}
+
+/// Each server that couldn't be reached is listed with why: "https://ehr.example.com:8443 (Connection refused)".
+fn couldnt_connect(unreachable: &[String]) -> String {
+    format!("Couldn't connect to {}.", unreachable.join(" or "))
 }
 
 /// `doing` says what the request was for, in the problem if it fails: "get changes".
@@ -193,6 +307,8 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
+    use keyring_core::api::CredentialStoreApi;
+    use keyring_core::mock;
     use serde_json::{Value, json};
 
     use super::*;
@@ -200,8 +316,8 @@ mod tests {
     /// A status for `FakeServer` to close the connection without answering.
     const HANG_UP: u16 = 0;
 
-    /// One request as the fake server saw it: the method and path, then the body.
-    type Request = (String, String);
+    /// One request as the fake server saw it: the method and path, the Authorization header, then the body.
+    type Request = (String, Option<String>, String);
 
     /// An HTTP server on a free local port that answers each request with `respond`'s status and JSON.
     struct FakeServer {
@@ -246,27 +362,34 @@ mod tests {
         let mut line = String::new();
         reader.read_line(&mut line).unwrap();
         let mut length = 0;
+        let mut authorization = None;
         loop {
             let mut header = String::new();
             reader.read_line(&mut header).unwrap();
             if header.trim().is_empty() {
                 break;
             }
-            if let Some((name, value)) = header.split_once(':')
-                && name.eq_ignore_ascii_case("content-length")
-            {
-                length = value.trim().parse().unwrap();
+            if let Some((name, value)) = header.split_once(':') {
+                if name.eq_ignore_ascii_case("content-length") {
+                    length = value.trim().parse().unwrap();
+                } else if name.eq_ignore_ascii_case("authorization") {
+                    authorization = Some(value.trim().to_owned());
+                }
             }
         }
         let mut body = vec![0; length];
         reader.read_exact(&mut body).unwrap();
         let method_and_path = line.rsplit_once(' ').unwrap().0.to_owned();
-        (method_and_path, String::from_utf8(body).unwrap())
+        (
+            method_and_path,
+            authorization,
+            String::from_utf8(body).unwrap(),
+        )
     }
 
     /// Pulls return one phrase and watermark 42; pushes apply every change.
     fn server_that_applies(request: &Request) -> (u16, String) {
-        let (method, body) = request;
+        let (method, _, body) = request;
         if method.starts_with("GET") {
             return (200, json!({ "watermark": "42", "quickTexts": [phrase("00000000-0000-7000-8000-000000000001", ".pulled", 1)] }).to_string());
         }
@@ -303,8 +426,46 @@ mod tests {
         format!("http://{}", listener.local_addr().unwrap())
     }
 
+    /// The session a sign-in returns, as the tests' servers send it.
+    fn session() -> Value {
+        json!({ "token": "the-token", "displayName": "Dr. Example", "expiresAt": "2026-11-26T12:34:56.789Z" })
+    }
+
+    /// A credential store in memory, so the tests never touch the real one; holding `session`, if any.
+    fn credentials(session: Option<Value>) -> Arc<mock::Store> {
+        let credentials = mock::Store::new().unwrap();
+        if let Some(session) = session {
+            saved_entry(&credentials)
+                .set_password(&session.to_string())
+                .unwrap();
+        }
+        credentials
+    }
+
+    /// The entry the client keeps its session in.
+    fn saved_entry(credentials: &mock::Store) -> Entry {
+        credentials
+            .build("com.example.ehr", "server-session", None)
+            .unwrap()
+    }
+
+    /// The session kept in `credentials`, if any.
+    fn saved(credentials: &mock::Store) -> Option<Value> {
+        let json = saved_entry(credentials).get_password().ok()?;
+        Some(serde_json::from_str(&json).unwrap())
+    }
+
+    fn client_with(servers: &[&str], credentials: &mock::Store) -> Sync {
+        Sync::new(
+            servers.iter().map(|server| (*server).to_owned()).collect(),
+            saved_entry(credentials),
+        )
+        .unwrap()
+    }
+
+    /// Signed in.
     fn client(servers: &[&str]) -> Sync {
-        Sync::new(servers.iter().map(|server| (*server).to_owned()).collect()).unwrap()
+        client_with(servers, &credentials(Some(session())))
     }
 
     #[tokio::test]
@@ -327,7 +488,7 @@ mod tests {
         let paths: Vec<_> = server
             .requests()
             .into_iter()
-            .map(|(path, _)| path)
+            .map(|(path, _, _)| path)
             .collect();
         assert_eq!(
             paths,
@@ -441,8 +602,8 @@ mod tests {
         let sizes: Vec<_> = server
             .requests()
             .into_iter()
-            .filter(|(path, _)| path.starts_with("POST"))
-            .map(|(_, body)| {
+            .filter(|(path, _, _)| path.starts_with("POST"))
+            .map(|(_, _, body)| {
                 serde_json::from_str::<Value>(&body).unwrap()["operations"]
                     .as_array()
                     .unwrap()
@@ -451,5 +612,111 @@ mod tests {
             .collect();
         assert_eq!(sizes, [100, 50]);
         assert!(store::lock(&store).pending(10).unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn signing_in_keeps_the_session() {
+        let server = FakeServer::start(|_| (200, session().to_string()));
+        let credentials = credentials(None);
+        let client = client_with(&[&server.url], &credentials);
+
+        let signed_in = client
+            .sign_in("clinician@example.com", "a password", "123456")
+            .await;
+
+        assert_eq!(signed_in, Ok(()));
+        let requests = server.requests();
+        assert_eq!(requests.len(), 1);
+        let (path, _, body) = &requests[0];
+        assert_eq!(path, &format!("POST {SIGN_IN}"));
+        assert_eq!(
+            serde_json::from_str::<Value>(body).unwrap(),
+            json!({
+                "email": "clinician@example.com",
+                "password": "a password",
+                "code": "123456",
+                "device": format!("{} desktop", std::env::consts::OS),
+            })
+        );
+        assert_eq!(client.account().as_deref(), Some("Dr. Example"));
+        assert_eq!(saved(&credentials), Some(session()));
+    }
+
+    /// The first server to answer decides, so a wrong code is never tried twice.
+    #[tokio::test]
+    async fn a_refused_sign_in_says_why() {
+        for status in [401, 403] {
+            let refuses = FakeServer::start(move |_| {
+                (
+                    status,
+                    json!({ "problem": "Wrong email, password or code." }).to_string(),
+                )
+            });
+            let accepts = FakeServer::start(|_| (200, session().to_string()));
+            let credentials = credentials(None);
+            let client = client_with(&[&refuses.url, &accepts.url], &credentials);
+
+            let signed_in = client
+                .sign_in("clinician@example.com", "a password", "123456")
+                .await;
+
+            assert_eq!(
+                signed_in,
+                Err("Wrong email, password or code.".to_owned()),
+                "{status}"
+            );
+            assert!(accepts.requests().is_empty(), "{status}");
+            assert_eq!(client.account(), None, "{status}");
+            assert_eq!(saved(&credentials), None, "{status}");
+        }
+    }
+
+    #[tokio::test]
+    async fn signing_in_with_no_server_says_so() {
+        let address = nothing_there();
+        let client = client_with(&[&address], &credentials(None));
+
+        let signed_in = client
+            .sign_in("clinician@example.com", "a password", "123456")
+            .await;
+
+        assert!(
+            signed_in
+                .unwrap_err()
+                .starts_with(&format!("Couldn't connect to {address} ("))
+        );
+    }
+
+    #[tokio::test]
+    async fn signing_out_ends_the_session_there_and_here() {
+        let server = FakeServer::start(|_| (204, String::new()));
+        let credentials = credentials(Some(session()));
+        let client = client_with(&[&server.url], &credentials);
+
+        let signed_out = client.sign_out().await;
+
+        assert_eq!(signed_out, Ok(()));
+        assert_eq!(
+            server.requests(),
+            [(
+                format!("POST {SIGN_OUT}"),
+                Some("Bearer the-token".to_owned()),
+                String::new()
+            )]
+        );
+        assert_eq!(client.account(), None);
+        assert_eq!(saved(&credentials), None);
+    }
+
+    #[tokio::test]
+    async fn signing_out_works_offline() {
+        let credentials = credentials(Some(session()));
+        let client = client_with(&[&nothing_there()], &credentials);
+
+        let signed_out = client.sign_out().await;
+
+        assert_eq!(signed_out, Ok(()));
+        assert_eq!(client.account(), None);
+        assert_eq!(saved(&credentials), None);
     }
 }

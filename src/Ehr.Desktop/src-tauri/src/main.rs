@@ -27,6 +27,8 @@ const SYNC_EVERY: Duration = Duration::from_secs(10);
 struct App {
     /// Or why the local database couldn't be opened.
     store: Result<Mutex<Store>, String>,
+    /// Or why the sync client couldn't be made.
+    sync: Result<sync::Sync, String>,
     status: Mutex<Status>,
     /// Starts a sync round now: after a change, or when the person asks.
     wake: Notify,
@@ -40,15 +42,21 @@ impl App {
             .map_err(|problem| format!("The local database couldn't be opened: {problem}"))
     }
 
+    fn sync(&self) -> Result<&sync::Sync, String> {
+        self.sync.as_ref().map_err(Clone::clone)
+    }
+
     fn status(&self) -> MutexGuard<'_, Status> {
         self.status.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
-/// The last sync round, for the page.
+/// The last sync round, and who is signed in, for the page.
 #[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct Status {
+    /// The name of the clinician signed in, from the session when the page asks; none while signed out.
+    account: Option<String>,
     /// The server that answered; none while offline.
     server: Option<String>,
     problem: Option<String>,
@@ -75,7 +83,10 @@ fn view(app: State<'_, App>) -> Result<View, String> {
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
-        status: app.status().clone(),
+        status: Status {
+            account: app.sync.as_ref().ok().and_then(sync::Sync::account),
+            ..app.status().clone()
+        },
     })
 }
 
@@ -125,6 +136,25 @@ fn sync_now(app: State<'_, App>) {
     app.wake.notify_one();
 }
 
+/// Signs in with the servers, then syncs. Err is what to show under the form.
+#[tauri::command]
+async fn sign_in(
+    app: State<'_, App>,
+    email: String,
+    password: String,
+    code: String,
+) -> Result<(), String> {
+    app.sync()?.sign_in(&email, &password, &code).await?;
+    app.wake.notify_one();
+    Ok(())
+}
+
+/// Signs out. The local copy stays, to read.
+#[tauri::command]
+async fn sign_out(app: State<'_, App>) -> Result<(), String> {
+    app.sync()?.sign_out().await
+}
+
 fn save(app: &App, edit: Option<(Uuid, i64)>, shortcut: &str, body: &str) -> Result<Save, String> {
     let store = app.store()?;
     let phrases = store.phrases()?;
@@ -164,7 +194,7 @@ fn save(app: &App, edit: Option<(Uuid, i64)>, shortcut: &str, body: &str) -> Res
 async fn sync_in_background(handle: AppHandle) {
     let app = handle.state::<App>();
     let Ok(store) = &app.store else { return };
-    let client = match sync::Sync::from_environment() {
+    let client = match app.sync() {
         Ok(client) => client,
         Err(problem) => {
             app.status().problem = Some(problem);
@@ -235,6 +265,8 @@ fn main() {
             };
             app.manage(App {
                 store,
+                // After open_store, which chose the credential store that keeps the session.
+                sync: key::session_entry().and_then(sync::Sync::from_environment),
                 status: Mutex::new(Status {
                     notice,
                     ..Status::default()
@@ -244,7 +276,9 @@ fn main() {
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![view, add, edit, resolve, sync_now])
+        .invoke_handler(tauri::generate_handler![
+            view, add, edit, resolve, sync_now, sign_in, sign_out
+        ])
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");
 }
