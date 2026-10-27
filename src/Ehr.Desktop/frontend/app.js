@@ -40,25 +40,37 @@ async function call(command, args) {
 async function refresh() {
   const view = await call('view');
   if (view) {
+    const signedIn = view.status.account != null;
     renderStatus(view.status, view.waiting);
+    renderAccount(view.status.account);
     renderConflicts(view.conflicts);
-    renderPhrases(view.phrases);
+    renderPhrases(view.phrases, signedIn);
   }
 }
 
 function renderStatus(status, waiting) {
+  const signedIn = status.account != null;
   const checked = status.checkedAt != null;
   const online = status.server != null;
   const connection = byId('connection');
-  connection.classList.toggle('online', checked && online);
-  connection.classList.toggle('offline', checked && !online);
-  connection.textContent = !checked ? 'Connecting…' : online ? `Online: ${host(status.server)}` : 'Offline';
+  connection.classList.toggle('online', signedIn && checked && online);
+  connection.classList.toggle('offline', signedIn && checked && !online);
+  connection.textContent = !signedIn ? 'Signed out' : !checked ? 'Connecting…' : online ? `Online: ${host(status.server)}` : 'Offline';
 
   byId('waiting').textContent =
     waiting === 0 ? 'Everything is sent.' : `${waiting} ${waiting === 1 ? 'change' : 'changes'} waiting to send.`;
   byId('checked').textContent = checked ? `Checked at ${new Date(status.checkedAt).toLocaleTimeString()}.` : '';
   show(byId('sync-problem'), status.problem);
   show(byId('notice'), status.notice);
+}
+
+// Signed out, the page offers to sign in, and the phrases can be read but not changed (renderPhrases).
+function renderAccount(account) {
+  const signedIn = account != null;
+  byId('account').hidden = !signedIn;
+  byId('account-name').textContent = account ?? '';
+  byId('sign-in').hidden = signedIn;
+  byId('add-quick-text').hidden = !signedIn;
 }
 
 function host(url) {
@@ -126,31 +138,36 @@ function conflictItem(conflict) {
   return el('li', {}, el('div', { className: 'conflict' }, ...content));
 }
 
-// The phrases. Redrawn only when they change; a phrase being edited keeps its form and what's typed in it.
+// The phrases. Redrawn only when they change; a phrase being edited keeps its form and what's typed in it. Signed
+// out, they can't be changed, since a change has to be sent under someone's session: no Edit buttons, no open forms.
 let shownPhrases = '';
 
-function renderPhrases(phrases) {
-  const json = JSON.stringify(phrases);
+function renderPhrases(phrases, signedIn) {
+  const json = JSON.stringify({ phrases, signedIn });
   if (json === shownPhrases) return;
   shownPhrases = json;
 
   const list = byId('quick-texts');
-  const editing = new Map([...list.querySelectorAll(':scope > li.editing')].map((li) => [li.dataset.id, li]));
+  const editing = new Map(
+    signedIn ? [...list.querySelectorAll(':scope > li.editing')].map((li) => [li.dataset.id, li]) : [],
+  );
   const focused = list.contains(document.activeElement) ? document.activeElement : null;
-  list.replaceChildren(...phrases.map((phrase) => editing.get(phrase.id) ?? phraseItem(phrase)));
+  list.replaceChildren(...phrases.map((phrase) => editing.get(phrase.id) ?? phraseItem(phrase, signedIn)));
   focused?.focus();
 }
 
-function phraseItem(phrase) {
+function phraseItem(phrase, signedIn) {
   const li = el('li', {}, ...phraseText(phrase));
   li.dataset.id = phrase.id;
   if (phrase.pending) li.append(el('span', { className: 'pending', textContent: 'Not sent yet' }));
-  li.append(
-    button('Edit', () => {
-      li.classList.add('editing');
-      showEditForm(li, phrase.id, phrase.version, phrase);
-    }),
-  );
+  if (signedIn) {
+    li.append(
+      button('Edit', () => {
+        li.classList.add('editing');
+        showEditForm(li, phrase.id, phrase.version, phrase);
+      }),
+    );
+  }
   return li;
 }
 
@@ -238,6 +255,30 @@ addForm.addEventListener('submit', async (event) => {
     addForm.elements.shortcut.focus();
     await refresh();
   }
+});
+
+const signInForm = byId('sign-in');
+signInForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const { email, password, code } = signInForm.elements;
+  // One at a time: sending the same code again would count as another attempt.
+  const submit = signInForm.querySelector('button');
+  submit.disabled = true;
+  try {
+    await invoke('sign_in', { email: email.value, password: password.value, code: code.value });
+    signInForm.reset();
+    show(byId('sign-in-problem'), null);
+  } catch (problem) {
+    show(byId('sign-in-problem'), String(problem));
+  } finally {
+    submit.disabled = false;
+  }
+  await refresh();
+});
+
+byId('sign-out').addEventListener('click', async () => {
+  await call('sign_out');
+  await refresh();
 });
 
 byId('sync-now').addEventListener('click', () => call('sync_now'));
