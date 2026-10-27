@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Ehr.Data.Accounts;
 using Ehr.Domain.Accounts;
@@ -49,16 +51,29 @@ public sealed class WebApps : IAsyncLifetime
 
     public RecordingEmailSender Emails { get; } = new();
 
+    // The certificate both apps encrypt the Data Protection keys with, as PEM files, the way the stack mounts it.
+    public string KeyCertificatePath { get; } = Path.Combine(Path.GetTempPath(), $"ehr-keys-{Guid.NewGuid():N}.pem");
+
+    public string KeyCertificateKeyPath => KeyCertificatePath[..^4] + "-key.pem";
+
     public async ValueTask InitializeAsync()
     {
+        using (var key = RSA.Create(2048))
+        {
+            var request = new CertificateRequest("CN=EHR Data Protection", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(1));
+            await File.WriteAllTextAsync(KeyCertificatePath, certificate.ExportCertificatePem());
+            await File.WriteAllTextAsync(KeyCertificateKeyPath, key.ExportPkcs8PrivateKeyPem());
+        }
+
         await Database.InitializeAsync();
-        OnPrem = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, bootstrapAdmin: true);
+        OnPrem = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, this, bootstrapAdmin: true);
 
         // Starting the on-prem app first also creates the Data Protection key, which the cloud app can't create.
         var link = new RecordingLink(OnPrem.Server.CreateHandler(), Forwarded);
         var readOnly = Database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
-        Cloud = new App(Site.Cloud, readOnly, Emails, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
-        CloudCutOff = new App(Site.Cloud, readOnly, Emails, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())));
+        Cloud = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
+        CloudCutOff = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())));
     }
 
     public async ValueTask DisposeAsync()
@@ -80,6 +95,8 @@ public sealed class WebApps : IAsyncLifetime
         }
 
         await Database.DisposeAsync();
+        File.Delete(KeyCertificatePath);
+        File.Delete(KeyCertificateKeyPath);
     }
 
     public static string NewShortcut() => "." + Guid.NewGuid().ToString("N")[..12];
@@ -264,7 +281,7 @@ public sealed class WebApps : IAsyncLifetime
         return connection;
     }
 
-    sealed class App(Site site, string connectionString, RecordingEmailSender emails, OnPremApp? onPrem = null, bool bootstrapAdmin = false)
+    sealed class App(Site site, string connectionString, RecordingEmailSender emails, WebApps apps, OnPremApp? onPrem = null, bool bootstrapAdmin = false)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -272,7 +289,9 @@ public sealed class WebApps : IAsyncLifetime
             builder
                 .UseSetting("Ehr:Site", site.ToString())
                 .UseSetting("ConnectionStrings:Ehr", connectionString)
-                .UseSetting("Ehr:OnPrem:Url", "https://onprem.test");
+                .UseSetting("Ehr:OnPrem:Url", "https://onprem.test")
+                .UseSetting("Ehr:DataProtection:Certificate", apps.KeyCertificatePath)
+                .UseSetting("Ehr:DataProtection:CertificateKey", apps.KeyCertificateKeyPath);
             if (bootstrapAdmin)
             {
                 builder

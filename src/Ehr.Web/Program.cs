@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using Ehr.Data;
 using Ehr.Data.Audit;
 using Ehr.Domain.Accounts;
@@ -37,12 +38,20 @@ else
     builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
 }
 
-// The keys that protect form tokens live in the database, so tokens survive a restart and both servers share the
-// keys: a form the cloud app renders is saved by the on-prem app. Only on-prem creates them; the cloud app reads them
-// from the replica.
+// The keys that protect cookies and form tokens live in the database, so they survive a restart and both servers share
+// them: a form the cloud app renders is saved by the on-prem app. Only on-prem creates them; the cloud app reads them
+// from the replica. At rest they are encrypted with the certificate in Ehr:DataProtection, which both servers hold, so
+// a copy of the table alone can't forge a cookie; without one, the keys are stored in the clear, and the log says so.
 var dataProtection = builder.Services.AddDataProtection()
     .SetApplicationName("Ehr")
     .PersistKeysToDbContext<EhrDbContext>();
+var keyCertificatePath = builder.Configuration["Ehr:DataProtection:Certificate"];
+if (keyCertificatePath is { Length: > 0 })
+{
+    var keyCertificate = X509Certificate2.CreateFromPemFile(keyCertificatePath, builder.Configuration["Ehr:DataProtection:CertificateKey"]);
+    dataProtection.ProtectKeysWithCertificate(keyCertificate).UnprotectKeysWithAnyCertificate(keyCertificate);
+}
+
 if (site == Site.OnPrem)
 {
     // The first admin account, when there are none. Only the primary can write it.
@@ -74,6 +83,10 @@ builder.Services.AddRazorPages(options =>
     .AddViewOptions(options => options.HtmlHelperOptions.ClientValidationEnabled = false);
 
 var app = builder.Build();
+if (keyCertificatePath is not { Length: > 0 })
+{
+    app.Logger.LogWarning("Ehr:DataProtection:Certificate is not set, so the keys that protect cookies and form tokens are stored in the database in the clear.");
+}
 
 // Routing first, so the cloud app's forwarding can tell page requests from static files. Forwarded requests are
 // authenticated and authorized by the on-prem app; everything served here is authenticated below, and the signed-in

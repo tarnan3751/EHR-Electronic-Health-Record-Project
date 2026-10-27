@@ -121,14 +121,26 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Empty(await apps.RowsAsync(shortcut));
     }
 
+    // Both apps hold the certificate the keys are encrypted with: the cloud app rendered a form the on-prem app accepts.
     [Fact]
-    public async Task Form_token_keys_are_stored_in_the_database()
+    public async Task Form_token_keys_are_stored_in_the_database_encrypted_with_the_certificate()
     {
         await OpenAsync(apps, apps.OnPrem);
 
         await using var connection = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand("SELECT count(*) FROM ehr.data_protection_keys", connection);
-        Assert.True((long)(await command.ExecuteScalarAsync(Cancel))! > 0);
+        await using var command = new NpgsqlCommand("SELECT xml FROM ehr.data_protection_keys", connection);
+        await using var reader = await command.ExecuteReaderAsync(Cancel);
+        var keys = 0;
+        while (await reader.ReadAsync(Cancel))
+        {
+            keys++;
+            var xml = reader.GetString(0);
+            Assert.Contains("<encryptedSecret", xml);
+            Assert.Contains("decryptorType=\"Microsoft.AspNetCore.DataProtection.XmlEncryption.EncryptedXmlDecryptor", xml);
+            Assert.DoesNotContain("<masterKey", xml);
+        }
+
+        Assert.True(keys > 0);
     }
 
     [Fact]
