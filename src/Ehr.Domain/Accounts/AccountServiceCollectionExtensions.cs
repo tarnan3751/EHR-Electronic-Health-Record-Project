@@ -89,6 +89,7 @@ public static class AccountServiceCollectionExtensions
         services.AddScoped<DesktopSessions>();
         services.AddScoped<PatientSignIn>();
         services.AddScoped<PatientRegistration>();
+        services.AddScoped<PatientAccounts>();
         services.AddScoped<PatientEnrollments>();
         services.AddScoped<PatientAssignments>();
         services.AddScoped<BreakGlass>();
