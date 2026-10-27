@@ -13,9 +13,15 @@
     </section>
 }
 
+@if (Model.Message is { } message)
+{
+    <p class="notice">@message</p>
+}
+<div asp-validation-summary="ModelOnly" class="error"></div>
+
 <table>
     <thead>
-        <tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th></tr>
+        <tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th><th></th></tr>
     </thead>
     <tbody>
         @foreach (var member in Model.Staff)
@@ -25,6 +31,26 @@
                 <td>@member.Email</td>
                 <td>@string.Join(", ", member.Roles)</td>
                 <td>@StaffModel.StatusOf(member)</td>
+                <td>
+                    @if (member.Id != Model.CurrentUserId)
+                    {
+                        <div class="actions">
+                            <form method="post" asp-page-handler="Reissue"><input type="hidden" name="id" value="@member.Id"><button>New setup link</button></form>
+                            @if (member.TwoFactorEnabled)
+                            {
+                                <form method="post" asp-page-handler="ResetAuthenticator"><input type="hidden" name="id" value="@member.Id"><button>Reset authenticator</button></form>
+                            }
+                            @if (StaffAccounts.IsDisabled(member))
+                            {
+                                <form method="post" asp-page-handler="Enable"><input type="hidden" name="id" value="@member.Id"><button>Enable</button></form>
+                            }
+                            else
+                            {
+                                <form method="post" asp-page-handler="Disable"><input type="hidden" name="id" value="@member.Id"><button>Disable</button></form>
+                            }
+                        </div>
+                    }
+                </td>
             </tr>
         }
     </tbody>
@@ -41,6 +67,5 @@
         <label><input asp-for="Input.Clinician" type="checkbox"> Clinician: finds patients, reads charts, writes notes, places orders</label>
         <label><input asp-for="Input.Admin" type="checkbox"> Admin: manages staff accounts and reads the audit log</label>
     </fieldset>
-    <div asp-validation-summary="ModelOnly" class="error"></div>
     <button>Create account</button>
 </form>

@@ -27,6 +27,19 @@ public static class AuditActions
 
     public const string PasswordChanged = "password_changed";
 
+    // A patient asked for a password reset link; an admin reset a staff password, so the old one stopped working and
+    // a new setup link was issued.
+    public const string PasswordResetRequested = "password_reset_requested";
+
+    public const string PasswordReset = "password_reset";
+
+    // An admin reset a staff account's authenticator, disabled the account, or enabled it again.
+    public const string AuthenticatorReset = "authenticator_reset";
+
+    public const string AccountDisabled = "account_disabled";
+
+    public const string AccountEnabled = "account_enabled";
+
     // A staff account enrolled an authenticator app, or used one of its recovery codes.
     public const string MfaEnrolled = "mfa_enrolled";
 
@@ -46,6 +59,7 @@ public static class AuditActions
     public static readonly string[] All =
     [
         Read, Insert, Update, Delete, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
-        MfaEnrolled, RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed,
+        PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
+        RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed,
     ];
 }

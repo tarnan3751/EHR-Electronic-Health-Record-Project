@@ -9,7 +9,9 @@ namespace Ehr.Domain.Accounts;
 
 // Staff accounts, as an admin manages them: an account is created by invitation, without a password, and the person
 // chooses their password through a one-time setup link and enrolls an authenticator at their first sign-in. No
-// temporary passwords change hands. Accounts are disabled by lockout, never deleted.
+// temporary passwords change hands. A forgotten password gets a new setup link, a lost phone a new authenticator
+// enrollment, and a person who leaves has their account disabled: locked out indefinitely, never deleted. Each of
+// those changes the account's security stamp, so its cookies and desktop sessions end. Every action is an audit event.
 public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db, AuditRecorder audit)
 {
     public Task<List<StaffUser>> ListAsync(CancellationToken cancellationToken) =>
@@ -40,6 +42,53 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
         await db.SaveChangesAsync(cancellationToken);
         return new(result, user, token);
     }
+
+    // A new setup link, for an invitation that never arrived or a forgotten password. A password the account had stops
+    // working now; the person chooses the next one through the link.
+    public async Task<Invitation> ReissueAsync(StaffUser user, CancellationToken cancellationToken)
+    {
+        if (user.PasswordHash is not null)
+        {
+            var removed = await users.RemovePasswordAsync(user);
+            if (!removed.Succeeded)
+            {
+                return new(removed, null, null);
+            }
+        }
+
+        var token = await users.GeneratePasswordResetTokenAsync(user);
+        audit.Record(AuditActions.PasswordReset, tableName: "staff_users", rowId: user.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new(IdentityResult.Success, user, token);
+    }
+
+    // The account enrolls an authenticator app again at its next sign-in; the old app and recovery codes stop working.
+    public async Task ResetAuthenticatorAsync(StaffUser user, CancellationToken cancellationToken)
+    {
+        await users.SetTwoFactorEnabledAsync(user, false);
+        await users.ResetAuthenticatorKeyAsync(user);
+        audit.Record(AuditActions.AuthenticatorReset, tableName: "staff_users", rowId: user.Id);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Disabled: locked out with no end, which sign-in and row-level security both refuse. Nothing is deleted.
+    public async Task DisableAsync(StaffUser user, CancellationToken cancellationToken)
+    {
+        await users.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+        await users.UpdateSecurityStampAsync(user);
+        audit.Record(AuditActions.AccountDisabled, tableName: "staff_users", rowId: user.Id);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task EnableAsync(StaffUser user, CancellationToken cancellationToken)
+    {
+        await users.SetLockoutEndDateAsync(user, null);
+        await users.ResetAccessFailedCountAsync(user);
+        audit.Record(AuditActions.AccountEnabled, tableName: "staff_users", rowId: user.Id);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public static bool IsDisabled(StaffUser user) => user.LockoutEnd == DateTimeOffset.MaxValue;
 
     // The invited person's first password, through the token in their setup link.
     public async Task<IdentityResult> SetPasswordAsync(StaffUser user, string token, string password, CancellationToken cancellationToken)
