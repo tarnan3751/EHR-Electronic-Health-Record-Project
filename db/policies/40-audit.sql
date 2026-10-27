@@ -50,3 +50,7 @@ REVOKE ALL ON FUNCTION ehr.record_write() FROM PUBLIC;
 CREATE OR REPLACE TRIGGER patients_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.patients
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER patient_assignments_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.patient_assignments
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();

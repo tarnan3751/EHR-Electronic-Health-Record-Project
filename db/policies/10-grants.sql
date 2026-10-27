@@ -43,6 +43,11 @@ GRANT SELECT ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_log
 GRANT SELECT, INSERT, UPDATE ON ehr.patients TO ehr_app;
 GRANT SELECT ON ehr.patients TO ehr_read;
 
+-- Patient assignments: which patients are on a clinician's panel. PHI, like patients: row-level security and the
+-- write-audit trigger follow. An assignment ends (UPDATE); it is never deleted.
+GRANT SELECT, INSERT, UPDATE ON ehr.patient_assignments TO ehr_app;
+GRANT SELECT ON ehr.patient_assignments TO ehr_read;
+
 -- Portal enrollment codes, as hashes. Internal: grants only, no row-level security, because registration looks a
 -- code up before anyone is signed in; the hash is useless without the code, which is never stored. The app marks a
 -- code redeemed (UPDATE). No DELETE.

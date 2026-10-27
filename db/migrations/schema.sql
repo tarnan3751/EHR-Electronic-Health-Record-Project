@@ -274,3 +274,24 @@ VALUES ('20261025230200_AuditEventsClientIds', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.patient_assignments (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    clinician_id uuid NOT NULL,
+    assigned_at timestamp with time zone NOT NULL,
+    ended_at timestamp with time zone,
+    CONSTRAINT pk_patient_assignments PRIMARY KEY (id),
+    CONSTRAINT fk_patient_assignments_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_patient_assignments_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_patient_assignments_clinician_id ON ehr.patient_assignments (clinician_id);
+
+CREATE UNIQUE INDEX ix_patient_assignments_patient_id_clinician_id ON ehr.patient_assignments (patient_id, clinician_id) WHERE ended_at IS NULL;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261027100839_PatientAssignments', '10.0.13');
+
+COMMIT;
+

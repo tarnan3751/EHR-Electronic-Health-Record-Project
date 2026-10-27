@@ -80,6 +80,53 @@ public class RowLevelSecurityTests(MigratedDatabase database) : IClassFixture<Mi
     }
 
     [Fact]
+    public async Task A_clinician_keeps_their_own_panel_and_reads_every_panel()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        var assignment = await Accounts.AssignAsync(database, clinician, patient);
+
+        const string count = "SELECT count(*) FROM ehr.patient_assignments WHERE id = @id";
+        foreach (var connectionString in new[] { App, Read })
+        {
+            Assert.Equal(["1"], await Accounts.QueryAsync(connectionString, clinician, count, ("id", assignment)));
+            Assert.Equal(["1"], await Accounts.QueryAsync(connectionString, colleague, count, ("id", assignment)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, admin, count, ("id", assignment)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, null, count, ("id", assignment)));
+        }
+
+        // Only onto their own panel, and only their own assignments end.
+        var assigningForAnother = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (@id, @patient, @clinician, now())",
+            ("id", Guid.CreateVersion7()), ("patient", patient), ("clinician", colleague)));
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, assigningForAnother.SqlState);
+        Assert.Empty(await Accounts.QueryAsync(App, colleague,
+            "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id RETURNING id", ("id", assignment)));
+        Assert.Equal([assignment.ToString()], await Accounts.QueryAsync(App, clinician,
+            "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id RETURNING id", ("id", assignment)));
+    }
+
+    [Fact]
+    public async Task A_patient_sees_who_their_clinicians_are_and_nobody_elses()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var own = await Accounts.PatientAsync(database, clinician);
+        var other = await Accounts.PatientAsync(database, clinician);
+        await Accounts.AssignAsync(database, clinician, own);
+        await Accounts.AssignAsync(database, clinician, other);
+        var account = await Accounts.PatientAccountAsync(database, own);
+
+        const string count = "SELECT count(*) FROM ehr.patient_assignments WHERE patient_id = @id";
+        foreach (var connectionString in new[] { App, Read })
+        {
+            Assert.Equal(["1"], await Accounts.QueryAsync(connectionString, account, count, ("id", own)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, account, count, ("id", other)));
+        }
+    }
+
+    [Fact]
     public async Task A_locked_out_clinician_sees_nothing()
     {
         var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);

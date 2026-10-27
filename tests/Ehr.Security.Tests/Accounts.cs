@@ -58,6 +58,16 @@ static class Accounts
         return id;
     }
 
+    // A patient put on a clinician's panel, by that clinician through the app role, as the app will.
+    public static async Task<Guid> AssignAsync(MigratedDatabase database, Guid clinicianId, Guid patientId)
+    {
+        var id = Guid.CreateVersion7();
+        await ExecuteAsync(database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), clinicianId,
+            "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (@id, @patient, @clinician, now())",
+            ("id", id), ("patient", patientId), ("clinician", clinicianId));
+        return id;
+    }
+
     public static async Task ExecuteAsync(string connectionString, Guid? userId, string sql, params (string Name, object Value)[] parameters)
     {
         await using var connection = new NpgsqlConnection(connectionString);

@@ -36,6 +36,20 @@ public class WriteAuditTests(MigratedDatabase database) : IClassFixture<Migrated
     }
 
     [Fact]
+    public async Task An_assignment_is_recorded_against_its_patient()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+
+        var assignment = await Accounts.AssignAsync(database, clinician, patient);
+
+        var events = await Accounts.QueryAsync(database.SuperuserConnectionString, null,
+            "SELECT action || ' ' || table_name || ' ' || actor_id || ' ' || patient_id FROM ehr.audit_events WHERE row_id = @id",
+            ("id", assignment));
+        Assert.Equal([$"insert patient_assignments {clinician} {patient}"], events);
+    }
+
+    [Fact]
     public async Task A_write_without_a_user_is_recorded_with_no_actor()
     {
         // The superuser bypasses row-level security, as a migration or a seed would; the trigger still fires.

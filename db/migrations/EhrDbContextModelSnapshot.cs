@@ -524,6 +524,43 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.PatientAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid>("ClinicianId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_patient_assignments");
+
+                    b.HasIndex("ClinicianId")
+                        .HasDatabaseName("ix_patient_assignments_clinician_id");
+
+                    b.HasIndex("PatientId", "ClinicianId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_patient_assignments_patient_id_clinician_id")
+                        .HasFilter("ended_at IS NULL");
+
+                    b.ToTable("patient_assignments", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.PatientEnrollment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -720,6 +757,23 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.PatientAssignment", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_assignments_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_assignments_patients_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.PatientEnrollment", b =>

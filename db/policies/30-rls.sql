@@ -8,9 +8,10 @@
 -- once per query rather than once per row, and they run as the caller: the account tables are not under RLS, and
 -- both runtime roles may read them.
 --
--- The access model, version one: a clinician sees and writes every patient in the clinic; a patient sees their own
--- record; an admin manages accounts and reads the audit log, but has no access to patient data. Emergency access
--- and care-team scoping tighten this later without changing the mechanism.
+-- The access model: a clinician sees and writes every patient in the clinic, and keeps a panel of their own
+-- patients (patient_assignments), which is what they see first; a patient sees their own record; an admin manages
+-- accounts and reads the audit log, but has no access to patient data. Opening the chart of a patient off one's
+-- panel asks for a reason, which the app records (Ehr.Domain.Patients.BreakGlass); the database does not gate it.
 
 CREATE OR REPLACE FUNCTION ehr.current_user_id() RETURNS uuid
     LANGUAGE sql STABLE
@@ -57,6 +58,27 @@ CREATE POLICY patients_clinician_update ON ehr.patients FOR UPDATE
 
 DROP POLICY IF EXISTS patients_own_select ON ehr.patients;
 CREATE POLICY patients_own_select ON ehr.patients FOR SELECT USING (id = ehr.current_patient_id());
+
+-- Patient assignments (PHI). Clinicians read every panel; a clinician puts patients on their own panel and ends their
+-- own assignments, nobody else's; a patient reads who their clinicians are. Nobody deletes (10-grants.sql).
+ALTER TABLE ehr.patient_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.patient_assignments FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS patient_assignments_clinician_select ON ehr.patient_assignments;
+CREATE POLICY patient_assignments_clinician_select ON ehr.patient_assignments FOR SELECT USING (ehr.is_clinician());
+
+DROP POLICY IF EXISTS patient_assignments_own_insert ON ehr.patient_assignments;
+CREATE POLICY patient_assignments_own_insert ON ehr.patient_assignments FOR INSERT
+    WITH CHECK (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+
+DROP POLICY IF EXISTS patient_assignments_own_update ON ehr.patient_assignments;
+CREATE POLICY patient_assignments_own_update ON ehr.patient_assignments FOR UPDATE
+    USING (ehr.is_clinician() AND clinician_id = ehr.current_user_id())
+    WITH CHECK (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+
+DROP POLICY IF EXISTS patient_assignments_patient_select ON ehr.patient_assignments;
+CREATE POLICY patient_assignments_patient_select ON ehr.patient_assignments FOR SELECT
+    USING (patient_id = ehr.current_patient_id());
 
 -- Audit events (restricted). Admins read. Anyone the grants let insert may insert: the app role for read and
 -- sign-in events, and the write-audit trigger (40-audit.sql), which runs as the table's owner and is bound by this

@@ -33,6 +33,9 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // through the PHI reader in Ehr.Domain.
     public DbSet<Patient> Patients => Set<Patient>();
 
+    // Which patients are on which clinician's panel. PHI, like patients: read it through the PHI reader too.
+    public DbSet<PatientAssignment> PatientAssignments => Set<PatientAssignment>();
+
     // One-time portal enrollment codes, as hashes. Grants only: registration looks a code up before anyone is signed in.
     public DbSet<PatientEnrollment> PatientEnrollments => Set<PatientEnrollment>();
 
