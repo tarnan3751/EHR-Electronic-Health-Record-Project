@@ -145,6 +145,36 @@ td {
     white-space: nowrap;
 }
 
+/* The audit page: the filter, and the rows that need a look. */
+.filter-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.5rem 1rem;
+    align-items: end;
+    margin-bottom: 1rem;
+}
+
+.filter-form select {
+    font: inherit;
+    width: 100%;
+}
+
+tr.flagged {
+    background: color-mix(in srgb, #c5221f 12%, transparent);
+}
+
+td.id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+}
+
+td pre {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+}
+
 /* A row of forms with one button each. */
 .actions {
     display: flex;

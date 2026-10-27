@@ -79,6 +79,7 @@ public static class AccountServiceCollectionExtensions
         services.AddAuthorization(options => options.AddEhrPolicies());
 
         services.AddScoped<AuditRecorder>();
+        services.AddScoped<AuditLog>();
         services.AddScoped<PhiReader>();
         services.AddScoped<StaffSignIn>();
         services.AddScoped<StaffAccounts>();

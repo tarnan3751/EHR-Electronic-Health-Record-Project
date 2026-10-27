@@ -41,4 +41,11 @@ public static class AuditActions
     public const string PatientRegistered = "patient_registered";
 
     public const string EmailConfirmed = "email_confirmed";
+
+    // Every action, for the audit page's filter.
+    public static readonly string[] All =
+    [
+        Read, Insert, Update, Delete, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
+        MfaEnrolled, RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed,
+    ];
 }
