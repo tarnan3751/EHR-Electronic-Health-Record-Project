@@ -6,13 +6,14 @@
 //! comes back as a duplicate.
 //!
 //! Signing in and out are here too. The session a sign-in returns is kept in the credential store (key.rs), so it
-//! outlasts the app.
+//! outlasts the app. Every sync request carries its token: signed out, a round sends nothing, and a server that
+//! refuses the token (401) ends the session here too.
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use keyring_core::Entry;
-use reqwest::{Client, RequestBuilder, Response, Url};
+use reqwest::{Client, RequestBuilder, Response, StatusCode, Url};
 use serde::de::DeserializeOwned;
 
 use crate::api::{PullResponse, PushRequest, PushResponse, Refusal, Session, SignIn};
@@ -49,6 +50,8 @@ enum Failure {
     /// No answer came back: nothing listening, no such host, a certificate this computer doesn't trust, a dropped
     /// connection, or no answer in time.
     Unreachable(String),
+    /// The server refused the session (401): it expired or was revoked, or the account is locked out.
+    SessionEnded,
     /// The server answered, but not with what the round needed.
     Problem(String),
 }
@@ -153,10 +156,18 @@ impl Sync {
     }
 
     pub async fn round(&self, store: &Mutex<Store>) -> Report {
+        let Some(token) = self.token() else {
+            return Report {
+                server: None,
+                problem: Some(
+                    "Signed out: nothing is sent or brought back until you sign in.".to_owned(),
+                ),
+            };
+        };
         let mut unreachable = Vec::new();
         let mut answered = None;
         for server in &self.servers {
-            match self.sync_with(server, store).await {
+            match self.sync_with(server, &token, store).await {
                 Ok(()) => {
                     return Report {
                         server: Some(server.clone()),
@@ -165,6 +176,15 @@ impl Sync {
                 }
                 Err(Failure::Unreachable(reason)) => {
                     unreachable.push(format!("{server} ({reason})"))
+                }
+                Err(Failure::SessionEnded) => {
+                    // Gone from memory either way. An entry the credential store couldn't delete is refused again at
+                    // the next launch, and deleted then.
+                    let _ = self.forget(&token);
+                    return Report {
+                        server: Some(server.clone()),
+                        problem: Some("The session ended: sign in again to sync.".to_owned()),
+                    };
                 }
                 Err(Failure::Problem(problem)) => {
                     answered.get_or_insert((server, problem));
@@ -184,12 +204,21 @@ impl Sync {
         }
     }
 
-    async fn sync_with(&self, server: &str, store: &Mutex<Store>) -> Result<(), Failure> {
+    async fn sync_with(
+        &self,
+        server: &str,
+        token: &str,
+        store: &Mutex<Store>,
+    ) -> Result<(), Failure> {
         let since = store::lock(store).watermark()?;
         let url = Url::parse_with_params(&format!("{server}{PATH}"), [("since", &since)]).map_err(
             |error| Failure::Problem(format!("{server} isn't a server address: {error}")),
         )?;
-        let pull: PullResponse = answer("get changes", self.http.get(url).send().await).await?;
+        let pull: PullResponse = answer(
+            "get changes",
+            self.http.get(url).bearer_auth(token).send().await,
+        )
+        .await?;
         store::lock(store).apply_pull(&pull)?;
 
         loop {
@@ -202,6 +231,7 @@ impl Sync {
                 "send changes",
                 self.http
                     .post(format!("{server}{PATH}"))
+                    .bearer_auth(token)
                     .json(&PushRequest { operations: &batch })
                     .send()
                     .await,
@@ -278,6 +308,9 @@ async fn answer<T: DeserializeOwned>(
     })?;
 
     let status = response.status();
+    if status == StatusCode::UNAUTHORIZED {
+        return Err(Failure::SessionEnded);
+    }
     if !status.is_success() {
         return Err(Failure::Problem(format!(
             "Couldn't {doing}: the server answered {status}."
@@ -612,6 +645,117 @@ mod tests {
             .collect();
         assert_eq!(sizes, [100, 50]);
         assert!(store::lock(&store).pending(10).unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn every_request_carries_the_session() {
+        let server = FakeServer::start(server_that_applies);
+        let store = memory_store();
+        store::lock(&store).add(".mine", "Added here").unwrap();
+
+        client(&[&server.url]).round(&store).await;
+
+        let sent: Vec<_> = server
+            .requests()
+            .into_iter()
+            .map(|(path, authorization, _)| (path, authorization))
+            .collect();
+        let bearer = Some("Bearer the-token".to_owned());
+        assert_eq!(
+            sent,
+            [
+                (format!("GET {PATH}?since=0"), bearer.clone()),
+                (format!("POST {PATH}"), bearer)
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn signed_out_a_round_sends_nothing() {
+        let server = FakeServer::start(server_that_applies);
+        let store = memory_store();
+        store::lock(&store).add(".mine", "Added here").unwrap();
+
+        let report = client_with(&[&server.url], &credentials(None))
+            .round(&store)
+            .await;
+
+        assert_eq!(
+            report,
+            Report {
+                server: None,
+                problem: Some(
+                    "Signed out: nothing is sent or brought back until you sign in.".to_owned()
+                )
+            }
+        );
+        assert!(server.requests().is_empty());
+        assert_eq!(store::lock(&store).pending(10).unwrap().len(), 1);
+    }
+
+    /// The server answers 401 when the session has expired or been revoked, or the account is locked out.
+    #[tokio::test]
+    async fn a_refused_session_is_forgotten() {
+        let refuses = FakeServer::start(|_| (401, "{}".to_owned()));
+        let applies = FakeServer::start(server_that_applies);
+        let store = memory_store();
+        store::lock(&store).add(".mine", "Waiting").unwrap();
+        let credentials = credentials(Some(session()));
+        let client = client_with(&[&refuses.url, &applies.url], &credentials);
+
+        let report = client.round(&store).await;
+        let next = client.round(&store).await;
+
+        assert_eq!(
+            report,
+            Report {
+                server: Some(refuses.url.clone()),
+                problem: Some("The session ended: sign in again to sync.".to_owned())
+            }
+        );
+        assert!(
+            applies.requests().is_empty(),
+            "not tried with a refused token"
+        );
+        assert_eq!(client.account(), None);
+        assert_eq!(saved(&credentials), None);
+        assert_eq!(next.server, None, "signed out now");
+        assert_eq!(refuses.requests().len(), 1);
+        assert_eq!(
+            store::lock(&store).pending(10).unwrap().len(),
+            1,
+            "the change stays here"
+        );
+    }
+
+    /// The server answers 403 when the account isn't a clinician's.
+    #[tokio::test]
+    async fn a_forbidden_round_keeps_the_session() {
+        let server = FakeServer::start(|_| (403, "{}".to_owned()));
+        let store = memory_store();
+        let credentials = credentials(Some(session()));
+        let client = client_with(&[&server.url], &credentials);
+
+        let report = client.round(&store).await;
+
+        assert_eq!(
+            report.problem.as_deref(),
+            Some("Couldn't get changes: the server answered 403 Forbidden.")
+        );
+        assert_eq!(client.account().as_deref(), Some("Dr. Example"));
+        assert_eq!(saved(&credentials), Some(session()));
+    }
+
+    /// A round that ends with a 401 after the person has signed out and in again leaves the new session alone.
+    #[test]
+    fn a_session_signed_in_since_is_kept() {
+        let credentials = credentials(Some(session()));
+        let client = client_with(&[], &credentials);
+
+        client.forget("an-earlier-token").unwrap();
+
+        assert_eq!(client.account().as_deref(), Some("Dr. Example"));
+        assert_eq!(saved(&credentials), Some(session()));
     }
 
     #[tokio::test]

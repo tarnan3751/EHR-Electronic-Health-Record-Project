@@ -1,5 +1,6 @@
 //! The EHR desktop app: a window over an encrypted local database (store.rs) that syncs with the servers in the
-//! background (sync.rs). The page (frontend/) calls the commands below and redraws on the "changed" event.
+//! background (sync.rs) while a clinician is signed in. The page (frontend/) calls the commands below and redraws on
+//! the "changed" event.
 
 // Release builds on Windows open no console window alongside the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -149,10 +150,12 @@ async fn sign_in(
     Ok(())
 }
 
-/// Signs out. The local copy stays, to read.
+/// Signs out, and starts a round so the status says so. The local copy stays, to read.
 #[tauri::command]
 async fn sign_out(app: State<'_, App>) -> Result<(), String> {
-    app.sync()?.sign_out().await
+    let signed_out = app.sync()?.sign_out().await;
+    app.wake.notify_one();
+    signed_out
 }
 
 fn save(app: &App, edit: Option<(Uuid, i64)>, shortcut: &str, body: &str) -> Result<Save, String> {
