@@ -45,10 +45,11 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Alex Example", record);
         Assert.DoesNotContain("Blair", record);
 
-        // Three reads of this patient: the clinician's chart view, the chart again when the code was issued, and the
-        // portal view by the patient's account, recorded on the on-prem app it was forwarded to.
-        Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: own));
-        Assert.Equal(3, await apps.AuditEventsAsync(AuditActions.Read, patientId: own));
+        // Four reads of this patient: the clinician's panel when they signed in, their chart view, the chart again when
+        // the code was issued, and the portal view by the patient's account, recorded on the on-prem app it was
+        // forwarded to.
+        Assert.Equal(3, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: own));
+        Assert.Equal(4, await apps.AuditEventsAsync(AuditActions.Read, patientId: own));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.PatientRegistered, patientId: own));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.EnrollmentIssued, actorId: clinician.Id, patientId: own));
     }
@@ -80,7 +81,9 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
     {
         var clinician = await apps.ClinicianAsync();
         var patient = await apps.InsertPatientAsync("Dana", "Viewed");
+        // Signed in first: the home lists the panel, and that would be a read too.
         var session = await SignInAsync(apps.OnPrem, clinician);
+        await apps.AssignAsync(clinician, patient);
 
         var html = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
 
@@ -119,9 +122,10 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("can't be reached", await response.Content.ReadAsStringAsync(Cancel));
     }
 
-    // A clinician issues the patient an enrollment code from the chart, and reads it off the page.
+    // A clinician issues one of their patients an enrollment code from the chart, and reads it off the page.
     async Task<string> IssueCodeAsync(StaffAccount clinician, Guid patient)
     {
+        await apps.AssignAsync(clinician, patient);
         var session = await SignInAsync(apps.OnPrem, clinician);
         using var response = await PostFormAsync(session.Client, $"/patients/{patient}?handler=Enroll", $"/patients/{patient}");
         var match = EnrollmentCode().Match(await ReadAsync(response));

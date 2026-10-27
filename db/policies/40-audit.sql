@@ -54,3 +54,7 @@ CREATE OR REPLACE TRIGGER patients_audit
 CREATE OR REPLACE TRIGGER patient_assignments_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.patient_assignments
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER break_glass_accesses_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.break_glass_accesses
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();

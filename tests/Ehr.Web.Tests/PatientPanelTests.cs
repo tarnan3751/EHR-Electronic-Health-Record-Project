@@ -35,7 +35,9 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         var empty = await session.Client.GetStringAsync("/patients", Cancel);
         Assert.Contains("No patients are on your panel yet", empty);
 
-        // From the chart. The post comes back to the chart, which now shows the patient as theirs.
+        // From the chart, which asks for a reason first, since the patient isn't theirs yet. The post comes back to
+        // the chart, which now shows the patient as theirs.
+        using var reasoned = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Taking over their care"));
         using var added = await PostFormAsync(session.Client, $"/patients/{patient}?handler=Assign", $"/patients/{patient}");
         var chart = await ReadAsync(added);
         Assert.Equal($"/patients/{patient}", PathOf(added));
@@ -53,9 +55,10 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Add to my patients", await ReadAsync(removed));
         Assert.DoesNotContain($"/patients/{patient}", await session.Client.GetStringAsync("/patients", Cancel));
 
-        // The panel listing was a read of the patient, like the chart views; the assignment and its end are writes.
+        // The panel listing was a read of the patient, like the chart views; the emergency access, the assignment and
+        // its end are writes.
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient) >= 6);
-        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Insert, actorId: clinician.Id, patientId: patient));
+        Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.Insert, actorId: clinician.Id, patientId: patient));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Update, actorId: clinician.Id, patientId: patient));
     }
 
@@ -65,9 +68,10 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         var clinician = await apps.CreateStaffAsync("Dr. Mine", StaffRoles.Clinician);
         var colleague = await apps.CreateStaffAsync("Dr. Theirs", StaffRoles.Clinician);
         var patient = await apps.InsertPatientAsync("Harper", "Separate");
+        await apps.AssignAsync(clinician, patient);
         var session = await SignInAsync(apps.OnPrem, clinician);
-        using var added = await PostFormAsync(session.Client, $"/patients/{patient}?handler=Assign", $"/patients/{patient}");
-        Assert.Equal(HttpStatusCode.OK, added.StatusCode);
+        using var chart = await session.Client.GetAsync($"/patients/{patient}", Cancel);
+        Assert.Equal(HttpStatusCode.OK, chart.StatusCode);
 
         var colleagueSession = await SignInAsync(apps.OnPrem, colleague);
         var theirPanel = await colleagueSession.Client.GetStringAsync("/patients", Cancel);

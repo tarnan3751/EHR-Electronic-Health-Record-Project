@@ -467,6 +467,47 @@ namespace Ehr.Migrations
                     b.ToTable("change_log", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.BreakGlassAccess", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClinicianId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_break_glass_accesses");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_break_glass_accesses_patient_id");
+
+                    b.HasIndex("ClinicianId", "PatientId", "ExpiresAt")
+                        .HasDatabaseName("ix_break_glass_accesses_clinician_id_patient_id_expires_at");
+
+                    b.ToTable("break_glass_accesses", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.Patient", b =>
                 {
                     b.Property<Guid>("Id")
@@ -757,6 +798,23 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.BreakGlassAccess", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_break_glass_accesses_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_break_glass_accesses_patients_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.PatientAssignment", b =>

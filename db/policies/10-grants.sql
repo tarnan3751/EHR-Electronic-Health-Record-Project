@@ -48,6 +48,11 @@ GRANT SELECT ON ehr.patients TO ehr_read;
 GRANT SELECT, INSERT, UPDATE ON ehr.patient_assignments TO ehr_app;
 GRANT SELECT ON ehr.patient_assignments TO ehr_read;
 
+-- Emergency access to a chart off the clinician's panel, with its reason. PHI, like patients: row-level security and
+-- the write-audit trigger follow. Written once: no UPDATE and no DELETE.
+GRANT SELECT, INSERT ON ehr.break_glass_accesses TO ehr_app;
+GRANT SELECT ON ehr.break_glass_accesses TO ehr_read;
+
 -- Portal enrollment codes, as hashes. Internal: grants only, no row-level security, because registration looks a
 -- code up before anyone is signed in; the hash is useless without the code, which is never stored. The app marks a
 -- code redeemed (UPDATE). No DELETE.

@@ -4,6 +4,10 @@
     ViewData["Title"] = $"{Model.Patient.FamilyName}, {Model.Patient.GivenName}";
 }
 <h1>@Model.Patient.FamilyName, @Model.Patient.GivenName @if (Model.OnPanel) { <span class="tag">Yours</span> }</h1>
+@if (Model.EmergencyUntil is { } until)
+{
+    <p class="notice">Emergency access: this patient is not on your panel. Your access and the reason you gave are recorded for review. It lasts until @until.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+}
 <dl class="record">
     <dt>MRN</dt><dd>@Model.Patient.Mrn</dd>
     <dt>Born</dt><dd>@Model.Patient.BirthDate.ToString("yyyy-MM-dd")</dd>

@@ -295,3 +295,25 @@ VALUES ('20261027100839_PatientAssignments', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.break_glass_accesses (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    clinician_id uuid NOT NULL,
+    reason character varying(500) NOT NULL,
+    granted_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    CONSTRAINT pk_break_glass_accesses PRIMARY KEY (id),
+    CONSTRAINT fk_break_glass_accesses_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_break_glass_accesses_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_break_glass_accesses_clinician_id_patient_id_expires_at ON ehr.break_glass_accesses (clinician_id, patient_id, expires_at);
+
+CREATE INDEX ix_break_glass_accesses_patient_id ON ehr.break_glass_accesses (patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261027101614_BreakGlass', '10.0.13');
+
+COMMIT;
+

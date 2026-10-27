@@ -119,6 +119,20 @@ public sealed class WebApps : IAsyncLifetime
         return id;
     }
 
+    // The patient on the clinician's panel, inserted as the superuser the way a seed would, so the chart opens without
+    // asking for a reason (BreakGlass).
+    public async Task AssignAsync(StaffAccount clinician, Guid patientId)
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(
+            "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (@id, @patient, @clinician, now())",
+            connection);
+        command.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("patient", patientId);
+        command.Parameters.AddWithValue("clinician", clinician.Id);
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
     public async Task<Guid> InsertAsync(string shortcut, string body, int version = 1)
     {
         var id = Guid.CreateVersion7();
@@ -164,6 +178,26 @@ public sealed class WebApps : IAsyncLifetime
         command.Parameters.AddWithValue("actor", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)actorId ?? DBNull.Value);
         command.Parameters.AddWithValue("patient", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)patientId ?? DBNull.Value);
         return (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
+    }
+
+    // The reasons recorded with the matching events, read as the superuser.
+    public async Task<List<string>> ReasonsAsync(string action, Guid actorId, Guid patientId)
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT reason FROM ehr.audit_events WHERE action = @action AND actor_id = @actor AND patient_id = @patient ORDER BY occurred_at",
+            connection);
+        command.Parameters.AddWithValue("action", action);
+        command.Parameters.AddWithValue("actor", actorId);
+        command.Parameters.AddWithValue("patient", patientId);
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        var reasons = new List<string>();
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            reasons.Add(reader.GetString(0));
+        }
+
+        return reasons;
     }
 
     // As the superuser, to set up and inspect rows around what the apps do.

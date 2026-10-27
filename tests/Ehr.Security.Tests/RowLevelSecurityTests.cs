@@ -127,6 +127,41 @@ public class RowLevelSecurityTests(MigratedDatabase database) : IClassFixture<Mi
     }
 
     [Fact]
+    public async Task Emergency_access_is_recorded_and_read_by_the_clinician_alone()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var patient = await Accounts.PatientAsync(database, clinician);
+
+        const string insert = """
+            INSERT INTO ehr.break_glass_accesses (id, patient_id, clinician_id, reason, granted_at, expires_at)
+            VALUES (@id, @patient, @clinician, 'Covering the night shift', now(), now() + interval '4 hours')
+            """;
+        var id = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, clinician, insert, ("id", id), ("patient", patient), ("clinician", clinician));
+        var forAnother = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician, insert,
+            ("id", Guid.CreateVersion7()), ("patient", patient), ("clinician", colleague)));
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, forAnother.SqlState);
+
+        const string count = "SELECT count(*) FROM ehr.break_glass_accesses WHERE id = @id";
+        foreach (var connectionString in new[] { App, Read })
+        {
+            Assert.Equal(["1"], await Accounts.QueryAsync(connectionString, clinician, count, ("id", id)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, colleague, count, ("id", id)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, admin, count, ("id", id)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, null, count, ("id", id)));
+        }
+
+        // Written once: the app role can't change it, and the trigger recorded it against the patient.
+        var changing = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            "UPDATE ehr.break_glass_accesses SET reason = 'Changed' WHERE id = @id", ("id", id)));
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, changing.SqlState);
+        Assert.Equal([$"insert break_glass_accesses {clinician} {patient}"], await Accounts.QueryAsync(database.SuperuserConnectionString, null,
+            "SELECT action || ' ' || table_name || ' ' || actor_id || ' ' || patient_id FROM ehr.audit_events WHERE row_id = @id", ("id", id)));
+    }
+
+    [Fact]
     public async Task A_locked_out_clinician_sees_nothing()
     {
         var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);

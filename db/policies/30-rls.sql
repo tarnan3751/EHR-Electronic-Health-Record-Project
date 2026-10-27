@@ -80,6 +80,19 @@ DROP POLICY IF EXISTS patient_assignments_patient_select ON ehr.patient_assignme
 CREATE POLICY patient_assignments_patient_select ON ehr.patient_assignments FOR SELECT
     USING (patient_id = ehr.current_patient_id());
 
+-- Emergency access (PHI). A clinician records and reads their own; admins review it in the audit log, where the
+-- break_glass event carries the same reason. Nothing updates or deletes (10-grants.sql).
+ALTER TABLE ehr.break_glass_accesses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.break_glass_accesses FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS break_glass_accesses_own_select ON ehr.break_glass_accesses;
+CREATE POLICY break_glass_accesses_own_select ON ehr.break_glass_accesses FOR SELECT
+    USING (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+
+DROP POLICY IF EXISTS break_glass_accesses_own_insert ON ehr.break_glass_accesses;
+CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR INSERT
+    WITH CHECK (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+
 -- Audit events (restricted). Admins read. Anyone the grants let insert may insert: the app role for read and
 -- sign-in events, and the write-audit trigger (40-audit.sql), which runs as the table's owner and is bound by this
 -- policy too because RLS is forced. Nothing updates or deletes (10-grants.sql).

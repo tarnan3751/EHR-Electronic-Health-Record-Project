@@ -1,0 +1,14 @@
+@page "/patients/{id:guid}/reason"
+@using Ehr.Domain.Patients
+@model ReasonModel
+@{
+    ViewData["Title"] = "Emergency access";
+}
+<h1>Emergency access</h1>
+<p>This patient is not on your panel. To open the chart, say why you need it. Your access and the reason are recorded and reviewed, and the chart stays open to you for @BreakGlass.Duration.TotalHours hours.</p>
+<form method="post" class="account-form">
+    <label>Reason <textarea asp-for="Reason" rows="3" required autofocus></textarea></label>
+    <span asp-validation-for="Reason" class="error"></span>
+    <button>Open the chart</button>
+</form>
+<p><a asp-page="Index">Back to patients</a></p>
