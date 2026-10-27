@@ -59,15 +59,17 @@ jobs:
         with:
           persist-credentials: false
 
-      # The one-time setup from infra/compose/README.md, with a self-signed certificate standing in
-      # for mkcert. The key must be readable by the app's non-root user.
+      # The one-time setup from infra/compose/README.md, with a self-signed certificate standing in for mkcert: one
+      # certificate for the three sites and both databases, and, being self-signed, its own root for the database
+      # clients to verify it against. The key must be readable by the app's non-root user.
       - name: Create settings and a certificate
         run: |
           cp .env.example .env
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=example.com" \
-            -addext "subjectAltName=DNS:example.com,DNS:*.example.com" \
+            -addext "subjectAltName=DNS:example.com,DNS:*.example.com,DNS:onprem-db,DNS:cloud-db,DNS:wan,DNS:localhost,IP:127.0.0.1" \
             -keyout certs/example.com-key.pem -out certs/example.com.pem
           chmod 644 certs/example.com-key.pem
+          cp certs/example.com.pem certs/rootCA.pem
 
       - name: Check the Compose files
         run: |
@@ -102,6 +104,22 @@ jobs:
         run: |
           docker compose exec -T -u postgres onprem-db pg_isready
           docker compose exec -T -u postgres cloud-db pg_isready
+
+      # Every connection over the network to either database (the apps, the replica's and Barman's streams) is TLS;
+      # the superuser's own shell over the local socket is the only one that isn't, and is left out.
+      - name: Database connections use TLS
+        run: |
+          query="select count(*) filter (where not s.ssl) || ' plain, ' || count(*) filter (where s.ssl) || ' encrypted'
+                 from pg_stat_ssl s join pg_stat_activity a using (pid) where a.client_addr is not null"
+          for db in onprem-db cloud-db; do
+            report=$(docker compose exec -T -u postgres "$db" psql -Atc "$query")
+            echo "$db: $report"
+            case "$report" in
+              "0 plain, 0 encrypted") echo "Nothing is connected to $db"; exit 1 ;;
+              "0 plain, "*) ;;
+              *) exit 1 ;;
+            esac
+          done
 
       # The primary sees the cloud replica and Barman streaming through their replication slots.
       - name: Replication is streaming

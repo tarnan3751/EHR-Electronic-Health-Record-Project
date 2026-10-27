@@ -29,9 +29,10 @@ Both apps run the same image; `Ehr__Site` and the connection string decide how e
 3. **Certificates.** Install [mkcert](https://github.com/FiloSottile/mkcert) (macOS: `brew install mkcert`; Windows: `winget install FiloSottile.mkcert`), then:
    ```
    mkcert -install
-   mkcert -cert-file certs/example.com.pem -key-file certs/example.com-key.pem example.com "*.example.com"
+   mkcert -cert-file certs/example.com.pem -key-file certs/example.com-key.pem example.com "*.example.com" onprem-db cloud-db wan localhost 127.0.0.1
+   cp "$(mkcert -CAROOT)/rootCA.pem" certs/rootCA.pem
    ```
-   On macOS, also run `chmod 644 certs/example.com-key.pem`: the app runs as a non-root user and mkcert makes the key readable only by you. It's a local-only certificate, and `certs/` is gitignored.
+   One certificate serves the three sites and both databases, which is why it also names the containers: `onprem-db`, `cloud-db`, and `wan`, the WAN link the replica and Barman reach the primary through. `rootCA.pem` is what the apps, the migration job, the replica and Barman verify it against (see [Encryption](#encryption)). On macOS, also run `chmod 644 certs/example.com-key.pem`: the app runs as a non-root user and mkcert makes the key readable only by you. It's a local-only certificate, and `certs/` is gitignored. If your certificate predates the databases using TLS, run the two commands again and reset the stack (`down -v`, below): the replica records how it connects when it is first cloned.
 4. **Hosts file.** Add this line to `/etc/hosts` (macOS, with `sudo`) or `C:\Windows\System32\drivers\etc\hosts` (Windows, as administrator), and remove it when you're done:
    ```
    127.0.0.1 ehr.example.com ehr-remote.example.com portal.example.com
@@ -62,7 +63,7 @@ In VS Code, the same three are under Terminal → Run Task: "Server stack: start
 | https://ehr.example.com:8443 | On-site clinician: the LAN, straight to the on-prem app |
 | https://ehr-remote.example.com:9443 | Off-site clinician: the internet, to the cloud app |
 | https://portal.example.com:9443 | Patient portal: the internet, to the cloud app |
-| `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env` |
+| `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env`, over TLS (the certificate also names `localhost` and `127.0.0.1`) |
 | http://127.0.0.1:8474 | Toxiproxy API, to change latency or cut links |
 | http://127.0.0.1:8025 | Mailpit: the emails the on-prem app sent |
 
@@ -134,8 +135,21 @@ Barman takes a base backup about a minute after its first start, streams WAL con
 
 Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. The root README's "Dictation server hardware" section covers the faster native options.
 
+## Encryption
+
+**In transit.** Every connection in the stack is TLS with the certificate from the one-time setup, verified against its root: browsers and the desktop app to the three sites; both apps and the migration job to their databases (`SSL Mode=VerifyFull`); the replica's and Barman's streams from the primary across the WAN link; and the cloud app's forwarding to the on-prem app. The databases refuse anything else: `hostssl` is the only kind of network line in `postgres/*/pg_hba.conf`, and `postgres/tls.sh` hands PostgreSQL the certificate in the form it accepts. To see it:
+
+```
+docker compose exec -u postgres onprem-db psql -c "select a.usename, a.client_addr, s.ssl, s.version from pg_stat_ssl s join pg_stat_activity a using (pid) where a.client_addr is not null"
+```
+
+In the real deployment the cross-site links also run inside Tailscale, which encrypts them once more.
+
+**At rest.** The keys that protect cookies and form tokens (`ehr.data_protection_keys`) are encrypted with the same certificate before they are stored; both apps hold it, so a copy of the table alone forges nothing. `docker compose exec -u postgres onprem-db psql -d ehr -c "select xml from ehr.data_protection_keys"` shows an `encryptedSecret`, never a key. (A stack set up before this change keeps its older, unencrypted key until that key rotates; `down -v` starts clean.) The desktop app's local copy is SQLCipher, keyed from the OS credential store. PostgreSQL itself does not encrypt its files, and neither does Barman: the database volumes and the backups are exactly as encrypted as the disk they live on. On the demo laptop that is FileVault (`fdesetup status` must say `FileVault is On`; Docker Desktop keeps its volumes inside your home folder, so they are covered), on a Windows PC BitLocker, and on the rented cloud servers the provider's encrypted volumes or LUKS. Check it before the demo: for the databases and the backups, "encrypted at rest" rests on it.
+
 ## What this doesn't reproduce
 
 - **Tailscale:** the Docker networks copy who can reach whom, not Tailscale's device identity or access rules.
 - **DNS and certificates:** the hosts file stands in for split-horizon DNS, and mkcert stands in for the ACME wildcard certificate.
+- **Disk encryption:** the volumes are as encrypted as the host's disk, and no more (see [Encryption](#encryption)).
 - **Network timing:** the TCP handshake latency and HTTP/3 limits above.

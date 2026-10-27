@@ -19,6 +19,10 @@ x-web-app: &web-app
     # email. The on-prem app handles forms posted to the cloud site, so it can't take these from the request.
     Ehr__Links__ClinicalBaseUrl: https://ehr-remote.example.com:9443
     Ehr__Links__PortalBaseUrl: https://portal.example.com:9443
+    # The keys that protect cookies and form tokens are encrypted at rest with the same certificate, which both apps
+    # hold (see "Encryption" in the README).
+    Ehr__DataProtection__Certificate: /certs/example.com.pem
+    Ehr__DataProtection__CertificateKey: /certs/example.com-key.pem
 
 x-postgres-healthcheck: &postgres-healthcheck
   test: ["CMD", "pg_isready", "-U", "postgres"]
@@ -37,6 +41,7 @@ services:
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:?set it in infra/compose/.env}
       BARMAN_PASSWORD: ${BARMAN_PASSWORD:?set it in infra/compose/.env}
       EHR_OWNER_PASSWORD: ${EHR_OWNER_PASSWORD:?set it in infra/compose/.env}
+    entrypoint: ["/bin/sh", "/tls/tls.sh", "docker-entrypoint.sh"]
     command:
       - postgres
       - -c
@@ -44,10 +49,20 @@ services:
       # A backup or replica outage can't fill the primary's disk.
       - -c
       - max_slot_wal_keep_size=2GB
+      # Every connection is TLS with the stack's certificate (pg_hba.conf allows nothing else); tls.sh hands PostgreSQL
+      # the certificate in the form it accepts.
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/run/postgresql/tls/server.crt
+      - -c
+      - ssl_key_file=/var/run/postgresql/tls/server.key
     volumes:
       - onprem-db:/var/lib/postgresql
       - ./postgres/primary/initdb:/docker-entrypoint-initdb.d:ro
       - ./postgres/primary/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/tls.sh:/tls/tls.sh:ro
+      - ./certs:/certs:ro
     ports:
       - "127.0.0.1:${ONPREM_DB_PORT:-15432}:5432"
     networks: [onprem]
@@ -64,6 +79,11 @@ services:
       EHR_OWNER_PASSWORD: ${EHR_OWNER_PASSWORD:?set it in infra/compose/.env}
       EHR_APP_PASSWORD: ${EHR_APP_PASSWORD:?set it in infra/compose/.env}
       EHR_READ_PASSWORD: ${EHR_READ_PASSWORD:?set it in infra/compose/.env}
+      # psql and the migration bundle both verify the primary's certificate against the stack's root.
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /certs/rootCA.pem
+    volumes:
+      - ./certs:/certs:ro
     networks: [onprem]
     depends_on:
       onprem-db:
@@ -75,7 +95,7 @@ services:
       <<: *web-app-env
       Ehr__Site: OnPrem
       # Reads and writes the primary as ehr_app.
-      ConnectionStrings__Ehr: "Host=onprem-db;Database=ehr;Username=ehr_app;Password=${EHR_APP_PASSWORD:?set it in infra/compose/.env}"
+      ConnectionStrings__Ehr: "Host=onprem-db;Database=ehr;Username=ehr_app;Password=${EHR_APP_PASSWORD:?set it in infra/compose/.env};SSL Mode=VerifyFull;Root Certificate=/certs/rootCA.pem"
       # The first admin, created when there are no staff accounts yet. Optional: empty values skip it with a warning.
       Ehr__Bootstrap__AdminEmail: ${EHR_BOOTSTRAP_ADMIN_EMAIL:-}
       Ehr__Bootstrap__AdminPassword: ${EHR_BOOTSTRAP_ADMIN_PASSWORD:-}
@@ -129,12 +149,25 @@ services:
     environment:
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:?set it in infra/compose/.env}
     # Clones the primary over the WAN link on first start, then runs as a read-only hot standby.
-    entrypoint: ["/bin/sh", "/bootstrap/bootstrap-standby.sh"]
-    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+    entrypoint: ["/bin/sh", "/tls/tls.sh", "/bin/sh", "/bootstrap/bootstrap-standby.sh"]
+    command:
+      - postgres
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
+      # Every connection is TLS with the stack's certificate (pg_hba.conf allows nothing else); tls.sh hands PostgreSQL
+      # the certificate in the form it accepts.
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/run/postgresql/tls/server.crt
+      - -c
+      - ssl_key_file=/var/run/postgresql/tls/server.key
     volumes:
       - cloud-db:/var/lib/postgresql
       - ./postgres/replica/bootstrap-standby.sh:/bootstrap/bootstrap-standby.sh:ro
       - ./postgres/replica/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/tls.sh:/tls/tls.sh:ro
+      - ./certs:/certs:ro
     ports:
       - "127.0.0.1:${CLOUD_DB_PORT:-15433}:5432"
     networks: [cloud]
@@ -151,7 +184,7 @@ services:
       <<: *web-app-env
       Ehr__Site: Cloud
       # Reads the replica beside it as ehr_read. It has no credentials for the primary.
-      ConnectionStrings__Ehr: "Host=cloud-db;Database=ehr;Username=ehr_read;Password=${EHR_READ_PASSWORD:?set it in infra/compose/.env}"
+      ConnectionStrings__Ehr: "Host=cloud-db;Database=ehr;Username=ehr_read;Password=${EHR_READ_PASSWORD:?set it in infra/compose/.env};SSL Mode=VerifyFull;Root Certificate=/certs/rootCA.pem"
       # Forwards saves, and a person's reads just after they save, to the on-prem app across the WAN. Both apps serve
       # the same wildcard certificate, which is how the cloud app knows it's talking to the real on-prem app.
       Ehr__OnPrem__Url: https://onprem.example.com:8443
@@ -177,6 +210,8 @@ services:
       BARMAN_PASSWORD: ${BARMAN_PASSWORD:?set it in infra/compose/.env}
     volumes:
       - barman:/var/lib/barman
+      # The root its connections to the primary verify the certificate against (barman/onprem.conf).
+      - ./certs:/certs:ro
     # No ports and no listening services: Barman only ever connects out, to the primary.
     networks: [backup]
     depends_on:
