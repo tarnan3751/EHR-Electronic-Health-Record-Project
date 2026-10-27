@@ -37,17 +37,23 @@ static partial class Browser
 
         var codePage = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
         await ExpectAsync(codePage, "/sign-in/code");
-        var home = await PostFormAsync(client, "/sign-in/code", codePage, ("Code", Totp.Code(account.AuthenticatorKey)));
-        await ExpectAsync(home, "/");
+        // The home sends each account to its first page: a clinician's panel, an admin's staff page.
+        using var home = await PostFormAsync(client, "/sign-in/code", codePage, ("Code", Totp.Code(account.AuthenticatorKey)));
+        if (home.StatusCode != HttpStatusCode.OK || PathOf(home).StartsWith("/sign-in", StringComparison.Ordinal))
+        {
+            Assert.Fail($"Expected to be signed in, got {(int)home.StatusCode} at {PathOf(home)}:\n{await home.Content.ReadAsStringAsync(Cancel)}");
+        }
 
         return new Session(jar, via is null || via == app ? client : Client(app, jar));
     }
+
+    public const string QuickTexts = "/quick-texts";
 
     // The quick text page, signed in as the fixture's clinician.
     public static async Task<Page> OpenAsync(WebApps apps, WebApplicationFactory<Program> app, WebApplicationFactory<Program>? via = null)
     {
         var session = await SignInAsync(app, await apps.ClinicianAsync(), via);
-        var html = await session.Client.GetStringAsync("/", Cancel);
+        var html = await session.Client.GetStringAsync(QuickTexts, Cancel);
         return new Page(session.Client, Token(html));
     }
 
@@ -108,6 +114,6 @@ sealed record Session(CookieContainer Jar, HttpClient Client);
 sealed record Page(HttpClient Client, string Token)
 {
     public Task<HttpResponseMessage> PostAsync(string handler, params (string Name, object Value)[] fields) =>
-        Client.PostAsync($"/?handler={handler}", Browser.Form([.. fields, ("__RequestVerificationToken", Token)]),
+        Client.PostAsync($"{Browser.QuickTexts}?handler={handler}", Browser.Form([.. fields, ("__RequestVerificationToken", Token)]),
             TestContext.Current.CancellationToken);
 }

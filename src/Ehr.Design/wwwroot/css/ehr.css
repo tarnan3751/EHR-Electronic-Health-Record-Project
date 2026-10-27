@@ -136,6 +136,22 @@ td {
     flex: 1;
 }
 
+/* A small label beside a name: "Yours" on a patient on the clinician's panel. */
+.tag {
+    font-size: 0.8rem;
+    padding: 0 0.4rem;
+    border: 1px solid currentColor;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+}
+
+/* A row of forms with one button each. */
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
 dl.record {
     display: grid;
     grid-template-columns: max-content 1fr;

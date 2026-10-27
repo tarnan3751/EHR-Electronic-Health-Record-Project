@@ -5,7 +5,7 @@ using static Ehr.Web.Tests.Browser;
 
 namespace Ehr.Web.Tests;
 
-// The quick text page at /, on each server, through the same handlers htmx calls. The tests share one database,
+// The quick text page at /quick-texts, on each server, through the same handlers htmx calls. The tests share one database,
 // so each one uses its own shortcuts.
 public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
 {
@@ -17,7 +17,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
         var shortcut = WebApps.NewShortcut();
         await apps.InsertAsync(shortcut, "<script>alert(1)</script>");
 
-        var html = await (await OpenAsync(apps, apps.OnPrem)).Client.GetStringAsync("/", Cancel);
+        var html = await (await OpenAsync(apps, apps.OnPrem)).Client.GetStringAsync(QuickTexts, Cancel);
 
         Assert.Contains(shortcut, html);
         Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", html);
@@ -72,7 +72,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
         var id = await apps.InsertAsync(WebApps.NewShortcut(), "Text", version: 3);
         var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
 
-        var html = await session.Client.GetStringAsync($"/?handler=Edit&id={id}", Cancel);
+        var html = await session.Client.GetStringAsync($"{QuickTexts}?handler=Edit&id={id}", Cancel);
 
         Assert.Contains("name=\"Version\" value=\"3\"", html);
         Assert.Contains("__RequestVerificationToken", html);
@@ -113,9 +113,9 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     {
         var shortcut = WebApps.NewShortcut();
         var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
-        await session.Client.GetStringAsync("/", Cancel);
+        await session.Client.GetStringAsync(QuickTexts, Cancel);
 
-        using var response = await session.Client.PostAsync("/?handler=Add", Form(("Shortcut", shortcut), ("Body", "Text")), Cancel);
+        using var response = await session.Client.PostAsync($"{QuickTexts}?handler=Add", Form(("Shortcut", shortcut), ("Body", "Text")), Cancel);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(await apps.RowsAsync(shortcut));
@@ -137,7 +137,7 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
         await apps.InsertAsync(WebApps.NewShortcut(), "Read from the cloud");
 
         var session = await SignInAsync(apps.Cloud, await apps.ClinicianAsync());
-        var html = await session.Client.GetStringAsync("/", Cancel);
+        var html = await session.Client.GetStringAsync(QuickTexts, Cancel);
 
         Assert.Contains("Read from the cloud", html);
         Assert.Contains("id=\"add-quick-text\"", html);

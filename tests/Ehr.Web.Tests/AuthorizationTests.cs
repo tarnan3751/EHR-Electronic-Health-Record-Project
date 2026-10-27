@@ -56,7 +56,7 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
         using var client = Client(apps.OnPrem, session.Jar, followRedirects: false);
 
         using var patients = await client.GetAsync("/patients", Cancel);
-        using var quickText = await client.GetAsync("/", Cancel);
+        using var quickText = await client.GetAsync(QuickTexts, Cancel);
         using var staff = await client.GetAsync("/admin/staff", Cancel);
 
         Assert.Equal("/denied", new Uri(Base, patients.Headers.Location!).AbsolutePath);
@@ -82,7 +82,7 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("/sign-in", new Uri(Base, anonymous.Headers.Location!).AbsolutePath);
 
         var session = await SignInAsync(apps.Cloud, await apps.ClinicianAsync());
-        using var signedIn = await Client(apps.Cloud, session.Jar, followRedirects: false).GetAsync("/", Cancel);
+        using var signedIn = await Client(apps.Cloud, session.Jar, followRedirects: false).GetAsync(QuickTexts, Cancel);
         Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
     }
 }

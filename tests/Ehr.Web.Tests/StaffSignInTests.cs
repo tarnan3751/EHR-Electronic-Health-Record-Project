@@ -87,7 +87,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await session.Client.GetStringAsync("/", Cancel);
         Assert.Contains("Dr. Signed In", html);
-        Assert.Contains("Quick text", html);
+        Assert.Contains("My patients", html);
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
     }
 

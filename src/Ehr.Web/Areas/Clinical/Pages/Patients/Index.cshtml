@@ -10,26 +10,25 @@
 </form>
 @if (Model.Q is { Length: > 0 })
 {
+    <h2>Search results</h2>
     @if (Model.Results.Count == 0)
     {
         <p>No patients match.</p>
     }
     else
     {
-        <table>
-            <thead>
-                <tr><th>Name</th><th>MRN</th><th>Born</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var patient in Model.Results)
-                {
-                    <tr>
-                        <td><a asp-page="Chart" asp-route-id="@patient.Id">@patient.FamilyName, @patient.GivenName</a></td>
-                        <td>@patient.Mrn</td>
-                        <td>@patient.BirthDate.ToString("yyyy-MM-dd")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <partial name="_PatientTable" model="new PatientTable(Model.Results, Model.Panel, MarkPanel: true)" />
+    }
+}
+else
+{
+    <h2>My patients</h2>
+    @if (Model.PanelPatients.Count == 0)
+    {
+        <p>No patients are on your panel yet. Search for a patient and add them from the chart.</p>
+    }
+    else
+    {
+        <partial name="_PatientTable" model="new PatientTable(Model.PanelPatients, Model.Panel, MarkPanel: false)" />
     }
 }

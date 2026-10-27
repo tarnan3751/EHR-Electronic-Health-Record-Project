@@ -10,7 +10,7 @@ namespace Ehr.Domain.Phi;
 // data it returned, in the same transaction, so a view without its record is impossible. Row-level security decides
 // which rows exist for the current user: a clinician sees every patient, a patient only themselves, anyone else
 // nothing. Ehr.Architecture.Tests fails if anything outside this namespace touches the patient entity.
-public sealed class PhiReader(EhrDbContext db, AuditRecorder audit)
+public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext user)
 {
     public const string PatientsTable = "patients";
 
@@ -36,8 +36,21 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit)
         }
 
         var prefix = term.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
-        var patients = await db.Patients.AsNoTracking()
-            .Where(p => p.Mrn == term || EF.Functions.ILike(p.FamilyName, prefix) || EF.Functions.ILike(p.GivenName, prefix))
+        return await ReadAsync(
+            db.Patients.Where(p => p.Mrn == term || EF.Functions.ILike(p.FamilyName, prefix) || EF.Functions.ILike(p.GivenName, prefix)),
+            limit, cancellationToken);
+    }
+
+    // The patients on the signed-in clinician's panel (PatientAssignment), the ones the clinic's home shows first.
+    public Task<IReadOnlyList<Patient>> PanelAsync(int limit, CancellationToken cancellationToken) =>
+        ReadAsync(
+            db.Patients.Where(p => db.PatientAssignments.Any(a => a.PatientId == p.Id && a.ClinicianId == user.UserId && a.EndedAt == null)),
+            limit, cancellationToken);
+
+    // A list of patients, in name order, each one a recorded read.
+    async Task<IReadOnlyList<Patient>> ReadAsync(IQueryable<Patient> query, int limit, CancellationToken cancellationToken)
+    {
+        var patients = await query.AsNoTracking()
             .OrderBy(p => p.FamilyName).ThenBy(p => p.GivenName).ThenBy(p => p.Id)
             .Take(limit)
             .ToListAsync(cancellationToken);

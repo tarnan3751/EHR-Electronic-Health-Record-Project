@@ -37,7 +37,7 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Contains("Saved through the cloud", await ReadAsync(response));
         Assert.Equal([(shortcut, "Saved through the cloud", 1)], await apps.RowsAsync(shortcut));
-        Assert.Equal(["POST /?handler=Add"], apps.Forwarded.Skip(forwarded));
+        Assert.Equal([$"POST {QuickTexts}?handler=Add"], apps.Forwarded.Skip(forwarded));
 
         // The WAL position became the browser's last-save cookie and isn't passed on.
         Assert.False(response.Headers.Contains("Ehr-Wal-Position"));
@@ -49,10 +49,10 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     {
         var forwarded = apps.Forwarded.Count;
 
-        using var response = await GetFromCloudAsync("/", LastSaveCookie(position: "FFFFFFFF/FFFFFFFF"));
+        using var response = await GetFromCloudAsync(QuickTexts, LastSaveCookie(position: "FFFFFFFF/FFFFFFFF"));
 
         Assert.Contains("Quick text", await ReadAsync(response));
-        Assert.Equal(["GET /"], apps.Forwarded.Skip(forwarded));
+        Assert.Equal([$"GET {QuickTexts}"], apps.Forwarded.Skip(forwarded));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     {
         var forwarded = apps.Forwarded.Count;
 
-        using var response = await GetFromCloudAsync("/", LastSaveCookie(position: "0/0"));
+        using var response = await GetFromCloudAsync(QuickTexts, LastSaveCookie(position: "0/0"));
 
         Assert.Contains("Quick text", await ReadAsync(response));
         Assert.Empty(apps.Forwarded.Skip(forwarded));
@@ -72,7 +72,7 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     {
         var forwarded = apps.Forwarded.Count;
 
-        using var response = await GetFromCloudAsync("/", LastSaveCookie(position: "FFFFFFFF/FFFFFFFF") + "x");
+        using var response = await GetFromCloudAsync(QuickTexts, LastSaveCookie(position: "FFFFFFFF/FFFFFFFF") + "x");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Empty(apps.Forwarded.Skip(forwarded));
@@ -111,7 +111,7 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
         // Signed in on-site; the cookie is as good off-site, with the link down.
         var signedIn = await CookieHeaderAsync(apps.OnPrem, await apps.ClinicianAsync());
         using var client = CreateClient(apps.CloudCutOff, handleCookies: false);
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/");
+        using var request = new HttpRequestMessage(HttpMethod.Get, QuickTexts);
         request.Headers.Add("Cookie", $"{signedIn}; {LastSaveCookie(position: "FFFFFFFF/FFFFFFFF")}");
         using var response = await client.SendAsync(request, Cancel);
 

@@ -3,12 +3,26 @@
 @{
     ViewData["Title"] = $"{Model.Patient.FamilyName}, {Model.Patient.GivenName}";
 }
-<h1>@Model.Patient.FamilyName, @Model.Patient.GivenName</h1>
+<h1>@Model.Patient.FamilyName, @Model.Patient.GivenName @if (Model.OnPanel) { <span class="tag">Yours</span> }</h1>
 <dl class="record">
     <dt>MRN</dt><dd>@Model.Patient.Mrn</dd>
     <dt>Born</dt><dd>@Model.Patient.BirthDate.ToString("yyyy-MM-dd")</dd>
     <dt>Gender</dt><dd>@Model.Patient.Gender</dd>
 </dl>
+<div class="actions">
+    @if (Model.OnPanel)
+    {
+        <form method="post" asp-page-handler="Unassign">
+            <button>Remove from my patients</button>
+        </form>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="Assign">
+            <button>Add to my patients</button>
+        </form>
+    }
+</div>
 
 <h2>Patient portal</h2>
 @if (Model.EnrollmentCode is { } code)
