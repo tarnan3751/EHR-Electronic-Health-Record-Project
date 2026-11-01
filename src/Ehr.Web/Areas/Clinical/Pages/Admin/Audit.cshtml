@@ -1,0 +1,68 @@
+@page "/admin/audit"
+@using Ehr.Data.Audit
+@model AuditModel
+@{
+    ViewData["Title"] = "Audit";
+}
+<h1>Audit</h1>
+<p>Every view and change of patient information, and every sign-in, newest first. Emergency access is marked for review.</p>
+<form method="get" class="filter-form">
+    <label>Action
+        <select asp-for="Action">
+            <option value="">Any</option>
+            @foreach (var action in AuditActions.All)
+            {
+                <option value="@action">@action</option>
+            }
+        </select>
+    </label>
+    <label>Staff account
+        <select asp-for="Actor">
+            <option value="">Anyone</option>
+            @foreach (var member in Model.Staff)
+            {
+                <option value="@member.Id">@member.DisplayName</option>
+            }
+        </select>
+    </label>
+    <label>Patient ID <input asp-for="Patient" autocomplete="off"></label>
+    <label>From <input asp-for="From" type="date"></label>
+    <label>To <input asp-for="To" type="date"></label>
+    <label><input asp-for="Flagged" type="checkbox"> Emergency access only</label>
+    <button>Show</button>
+</form>
+@if (Model.Log.Events.Count == 0)
+{
+    <p>No events match.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr><th>When (UTC)</th><th>Who</th><th>What</th><th>Patient</th><th>Row</th><th>Reason and details</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var e in Model.Log.Events)
+            {
+                <tr class="@(e.Action == AuditActions.BreakGlass ? "flagged" : null)">
+                    <td>@e.OccurredAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td>@(e.ActorId is { } actor ? Model.Log.Actors.GetValueOrDefault(actor, actor.ToString()) : "System")</td>
+                    <td>@e.Action@if (e.Action == AuditActions.BreakGlass) {<text> <span class="tag">Review</span></text>}</td>
+                    <td class="id">@e.PatientId</td>
+                    <td class="id">@(e.TableName is { } table ? $"{table} {e.RowId}" : "")</td>
+                    <td>
+                        @e.Reason
+                        @if (e.Details is { } details)
+                        {
+                            <details><summary>Details</summary><pre>@details</pre></details>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (Model.Log.More)
+    {
+        <p><a asp-page="Audit" asp-all-route-data="Model.OlderRoute()">Older events</a></p>
+    }
+}

@@ -1,0 +1,25 @@
+@page "/portal/reset"
+@model ResetModel
+@{
+    ViewData["Title"] = "Choose a new password";
+}
+<h1>Choose a new password</h1>
+@if (Model.Done)
+{
+    <p class="notice">Your password is changed. <a asp-page="SignIn">Sign in</a> with it.</p>
+}
+else if (!Model.LinkIsValid)
+{
+    <p class="notice error">This link is not valid or has already been used. <a asp-page="Forgot">Ask for a new one</a>.</p>
+}
+else
+{
+    <form method="post" class="account-form" asp-route-user="@Model.UserId" asp-route-token="@Model.Token">
+        <label>New password <input asp-for="Input.Password" type="password" autocomplete="new-password" required autofocus></label>
+        <span asp-validation-for="Input.Password" class="error"></span>
+        <label>New password, again <input asp-for="Input.Confirm" type="password" autocomplete="new-password" required></label>
+        <span asp-validation-for="Input.Confirm" class="error"></span>
+        <div asp-validation-summary="ModelOnly" class="error"></div>
+        <button>Change password</button>
+    </form>
+}

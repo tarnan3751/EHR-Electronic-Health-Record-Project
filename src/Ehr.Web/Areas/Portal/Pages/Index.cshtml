@@ -1,0 +1,19 @@
+@page "/portal"
+@model IndexModel
+@{
+    ViewData["Title"] = "My record";
+}
+<h1>My record</h1>
+@if (Model.Patient is { } patient)
+{
+    <dl class="record">
+        <dt>Name</dt><dd>@patient.GivenName @patient.FamilyName</dd>
+        <dt>Medical record number</dt><dd>@patient.Mrn</dd>
+        <dt>Date of birth</dt><dd>@patient.BirthDate.ToString("yyyy-MM-dd")</dd>
+    </dl>
+    <p>Results, appointments and messages will appear here.</p>
+}
+else
+{
+    <p class="notice error">Your record is not available right now. Contact the clinic if this continues.</p>
+}

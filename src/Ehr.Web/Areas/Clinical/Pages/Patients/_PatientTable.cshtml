@@ -1,0 +1,22 @@
+@model PatientTable
+<table>
+    <thead>
+        <tr><th>Name</th><th>MRN</th><th>Born</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var patient in Model.Patients)
+        {
+            <tr>
+                <td>
+                    <a asp-page="Chart" asp-route-id="@patient.Id">@patient.FamilyName, @patient.GivenName</a>
+                    @if (Model.MarkPanel && Model.Panel.Contains(patient.Id))
+                    {
+                        <span class="tag">Yours</span>
+                    }
+                </td>
+                <td>@patient.Mrn</td>
+                <td>@patient.BirthDate.ToString("yyyy-MM-dd")</td>
+            </tr>
+        }
+    </tbody>
+</table>

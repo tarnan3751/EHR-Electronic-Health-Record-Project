@@ -1,3 +1,6 @@
+using Ehr.Data.Accounts;
+using Ehr.Data.Audit;
+using Ehr.Data.Patients;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +23,31 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
 
+    // Accounts: staff and patients sign in separately, from separate tables (Accounts/). Not PHI, and not under
+    // row-level security: sign-in finds the account before anyone is signed in.
+    public DbSet<StaffUser> StaffUsers => Set<StaffUser>();
+
+    public DbSet<PatientUser> PatientUsers => Set<PatientUser>();
+
+    // The desktop app's sessions, by token hash. Grants only, like the account tables.
+    public DbSet<DesktopSession> DesktopSessions => Set<DesktopSession>();
+
+    // PHI: row-level security enabled and forced, every write recorded by trigger (db/policies). Read it only
+    // through the PHI reader in Ehr.Domain.
+    public DbSet<Patient> Patients => Set<Patient>();
+
+    // Which patients are on which clinician's panel. PHI, like patients: read it through the PHI reader too.
+    public DbSet<PatientAssignment> PatientAssignments => Set<PatientAssignment>();
+
+    // Emergency access to a chart off the clinician's panel, with its reason. PHI; written once, never changed.
+    public DbSet<BreakGlassAccess> BreakGlassAccesses => Set<BreakGlassAccess>();
+
+    // One-time portal enrollment codes, as hashes. Grants only: registration looks a code up before anyone is signed in.
+    public DbSet<PatientEnrollment> PatientEnrollments => Set<PatientEnrollment>();
+
+    // Every view and change of patient information, and every sign-in. Append-only.
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
     // Every host and tool configures the context through here, so they agree on naming and on where
     // migrations live: the Ehr.Migrations project in db/migrations.
     public static void Configure(DbContextOptionsBuilder builder, string connectionString) =>
@@ -32,6 +60,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EhrDbContext).Assembly);
 
         modelBuilder.Entity<QuickText>(quickText =>
         {

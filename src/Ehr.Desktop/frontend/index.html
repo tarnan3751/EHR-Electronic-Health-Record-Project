@@ -18,9 +18,20 @@
         <span id="waiting"></span>
         <span id="checked" class="quiet"></span>
         <button type="button" id="sync-now">Sync now</button>
+        <span id="account" hidden>Signed in as <span id="account-name"></span>. <button type="button" id="sign-out">Sign out</button></span>
       </p>
       <p id="sync-problem" class="quiet" hidden></p>
     </section>
+
+    <form id="sign-in" hidden>
+      <h2>Sign in to sync</h2>
+      <p>With your clinic account, and the code from your authenticator app or one of your recovery codes.</p>
+      <label>Email <input name="email" type="email" autocomplete="username" required></label>
+      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+      <label>Code <input name="code" autocomplete="one-time-code" required></label>
+      <p id="sign-in-problem" class="error" role="alert" hidden></p>
+      <button>Sign in</button>
+    </form>
 
     <p id="notice" class="notice" role="alert" hidden></p>
     <p id="request-error" class="notice error" role="alert" hidden></p>
@@ -30,7 +41,7 @@
       <ul id="conflict-list" class="quick-texts"></ul>
     </section>
 
-    <form id="add-quick-text" class="quick-text-form">
+    <form id="add-quick-text" class="quick-text-form" hidden>
       <label>Shortcut <input name="shortcut" autocomplete="off" placeholder=".nad"></label>
       <span class="error" data-for="shortcut"></span>
       <label>Text <textarea name="body" rows="2"></textarea></label>

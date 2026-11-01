@@ -1,0 +1,14 @@
+@page "/sign-in/code"
+@model CodeModel
+@{
+    ViewData["Title"] = "Enter your code";
+}
+<h1>Enter your code</h1>
+<p>Enter the code from your authenticator app, or one of your recovery codes.</p>
+<form method="post" class="account-form">
+    <input type="hidden" asp-for="ReturnUrl">
+    <label>Code <input asp-for="Code" autocomplete="one-time-code" required autofocus></label>
+    <span asp-validation-for="Code" class="error"></span>
+    <div asp-validation-summary="ModelOnly" class="error"></div>
+    <button>Sign in</button>
+</form>

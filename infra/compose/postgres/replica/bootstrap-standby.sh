@@ -7,8 +7,9 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   mkdir -p "$PGDATA"
   chown postgres:postgres "$PGDATA"
   chmod 700 "$PGDATA"
+  # The connection settings, TLS included, are written into the standby's configuration for its streaming afterwards.
   until PGPASSWORD="$REPLICATOR_PASSWORD" gosu postgres pg_basebackup \
-      --host=wan --port=5432 --username=replicator \
+      --dbname="host=wan port=5432 user=replicator sslmode=verify-full sslrootcert=/certs/rootCA.pem" \
       --pgdata="$PGDATA" --wal-method=stream --slot=cloud_replica \
       --write-recovery-conf --checkpoint=fast --progress; do
     echo "Primary not reachable yet; retrying in 3 seconds"

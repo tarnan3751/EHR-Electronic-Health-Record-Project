@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Ehr.Web.Api.Sync;
@@ -10,8 +11,9 @@ using static Ehr.Web.Tests.Browser;
 
 namespace Ehr.Web.Tests;
 
-// The sync API (Api/Sync/QuickTextSync.cs) as the desktop app uses it. The tests in this class run one at a time,
-// so each can tell which changes a pull should return.
+// The sync API (Api/Sync/QuickTextSync.cs) as the desktop app uses it, with the fixture clinician's desktop session
+// token on every request (DesktopSignInTests covers the token itself). The tests in this class run one at a time, so
+// each can tell which changes a pull should return.
 public class QuickTextSyncTests(WebApps apps) : IClassFixture<WebApps>
 {
     const string Path = "/api/sync/quick-texts";
@@ -171,7 +173,7 @@ public class QuickTextSyncTests(WebApps apps) : IClassFixture<WebApps>
     [Fact]
     public async Task A_watermark_that_isnt_one_is_refused()
     {
-        using var response = await CreateClient(apps.OnPrem).GetAsync($"{Path}?since=yesterday", Cancel);
+        using var response = await (await ClientAsync(apps.OnPrem)).GetAsync($"{Path}?since=yesterday", Cancel);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -179,17 +181,25 @@ public class QuickTextSyncTests(WebApps apps) : IClassFixture<WebApps>
     static PushOperation NewPhrase(string shortcut, string body) =>
         new(Guid.CreateVersion7(), Guid.CreateVersion7(), BaseVersion: null, shortcut, body);
 
-    static async Task<PullResponse> PullAsync(WebApplicationFactory<Program> app, string since) =>
-        (await CreateClient(app).GetFromJsonAsync<PullResponse>($"{Path}?since={since}", JsonSerializerOptions.Web, Cancel))!;
-
-    static async Task<PushResponse> PushAsync(WebApplicationFactory<Program> app, params PushOperation[] operations)
+    // A client that sends the desktop session token, as the app does.
+    async Task<HttpClient> ClientAsync(WebApplicationFactory<Program> app)
     {
-        using var response = await CreateClient(app).PostAsJsonAsync(Path, new PushRequest(operations), JsonSerializerOptions.Web, Cancel);
+        var client = CreateClient(app);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await apps.DesktopTokenAsync());
+        return client;
+    }
+
+    async Task<PullResponse> PullAsync(WebApplicationFactory<Program> app, string since) =>
+        (await (await ClientAsync(app)).GetFromJsonAsync<PullResponse>($"{Path}?since={since}", JsonSerializerOptions.Web, Cancel))!;
+
+    async Task<PushResponse> PushAsync(WebApplicationFactory<Program> app, params PushOperation[] operations)
+    {
+        using var response = await (await ClientAsync(app)).PostAsJsonAsync(Path, new PushRequest(operations), JsonSerializerOptions.Web, Cancel);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<PushResponse>(JsonSerializerOptions.Web, Cancel))!;
     }
 
-    static async Task<PushResult> PushOneAsync(WebApplicationFactory<Program> app, PushOperation operation) =>
+    async Task<PushResult> PushOneAsync(WebApplicationFactory<Program> app, PushOperation operation) =>
         Assert.Single((await PushAsync(app, operation)).Results);
 
     static async Task<Guid> InsertAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string body)

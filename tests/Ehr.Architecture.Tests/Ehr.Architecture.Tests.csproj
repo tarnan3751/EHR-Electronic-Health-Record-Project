@@ -5,13 +5,13 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
-    <!-- No tests yet, and "zero tests ran" fails `dotnet test` (exit code 8). Remove with the first test. -->
-    <TestingPlatformCommandLineArguments>--ignore-exit-code 8</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" />
+    <!-- Reads the compiled IL directly, for the rules type-level analysis can't see into (async method bodies). -->
+    <PackageReference Include="Mono.Cecil" />
   </ItemGroup>
 
   <ItemGroup>
