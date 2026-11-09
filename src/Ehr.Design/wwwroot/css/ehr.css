@@ -32,6 +32,10 @@ textarea {
     border-left: 4px solid currentColor;
 }
 
+.notice.read-only {
+    color: #8a5300;
+}
+
 .quick-texts {
     list-style: none;
     padding: 0;

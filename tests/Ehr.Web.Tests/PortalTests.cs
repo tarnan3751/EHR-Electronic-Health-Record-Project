@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Ehr.Data.Audit;
+using Ehr.Web.CloudAudit;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -46,10 +48,12 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Blair", record);
 
         // Four reads of this patient: the clinician's panel when they signed in, their chart view, the chart again when
-        // the code was issued, and the portal view by the patient's account, recorded on the on-prem app it was
-        // forwarded to.
+        // the code was issued, and the portal view by the patient's account, which the cloud app served from its
+        // replica, queued, and shipped to the on-prem app.
+        await apps.ShipCloudAuditAsync();
         Assert.Equal(3, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: own));
         Assert.Equal(4, await apps.AuditEventsAsync(AuditActions.Read, patientId: own));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, patientId: own, source: AuditSources.Cloud));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.PatientRegistered, patientId: own));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.EnrollmentIssued, actorId: clinician.Id, patientId: own));
     }
@@ -107,19 +111,28 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
-    public async Task With_the_on_prem_app_unreachable_phi_pages_are_unavailable_off_site()
+    public async Task With_the_on_prem_app_unreachable_phi_pages_are_read_only_off_site()
     {
         var clinician = await apps.ClinicianAsync();
         var patient = await apps.InsertPatientAsync("Finley", "Remote");
+        // Signed in first: the home lists the panel, and that would be a read too.
         var signedIn = await CookieHeaderAsync(apps.Cloud, clinician);
+        await apps.AssignAsync(clinician, patient);
+        // The cloud app finds out within a couple of seconds; this is that check, now.
+        Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
 
         using var client = CreateClient(apps.CloudCutOff, handleCookies: false);
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/patients/{patient}");
         request.Headers.Add("Cookie", signedIn);
         using var response = await client.SendAsync(request, Cancel);
 
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Contains("can't be reached", await response.Content.ReadAsStringAsync(Cancel));
+        var html = await ReadAsync(response);
+        Assert.Contains("Remote, Finley", html);
+        Assert.Contains("Read-only: the clinic's server can't be reached", html);
+        // Recorded in the cloud app's queue, waiting for the on-prem app.
+        var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
+        Assert.Contains(queued, e => e.Action == AuditActions.Read && e.PatientId == patient && e.ActorId == clinician.Id);
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient));
     }
 
     // A clinician issues one of their patients an enrollment code from the chart, and reads it off the page.

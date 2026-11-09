@@ -4,6 +4,7 @@
     var isPatient = User.HasClaim(claim => claim.Type == EhrClaims.PatientId);
     var displayName = User.FindFirst(EhrClaims.DisplayName)?.Value ?? User.Identity?.Name;
 }
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 <!doctype html>
 <html lang="en">
 <head>
@@ -47,6 +48,11 @@
     }
     <main>
         <p id="request-error" class="notice error" role="alert" hidden></p>
+        @if (!OnPrem.IsReachable)
+        {
+            @* FR-34: off-site, with the clinic's server down, records can still be read but nothing can be saved. *@
+            <p class="notice read-only" role="status">Read-only: the clinic's server can't be reached. You can look at records, but changes can't be saved until it's back.</p>
+        }
         @RenderBody()
     </main>
 </body>

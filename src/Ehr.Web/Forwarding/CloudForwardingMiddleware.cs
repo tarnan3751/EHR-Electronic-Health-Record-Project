@@ -7,10 +7,11 @@ namespace Ehr.Web.Forwarding;
 // The cloud app's write path. The replica can't take writes, so every request that could change data goes to the
 // on-prem app, which saves and renders the response; it comes back in one WAN round trip. The on-prem app reports
 // the save's WAL position, which LastSaveCookie keeps. Until the replica has replayed that far, the same browser's
-// page requests go to the on-prem app too, so people always see their own saves. Pages that read PHI always go to
-// on-prem, since reading PHI writes an audit event (RequiresOnPremAttribute).
+// page requests go to the on-prem app too, so people always see their own saves. Other reads, PHI included, come from
+// the replica; the PHI reader records them in the cloud app's audit queue (CloudAudit). Each attempt to reach the
+// on-prem app updates OnPremStatus.
 public sealed class CloudForwardingMiddleware(
-    RequestDelegate next, IHttpForwarder forwarder, OnPremApp onPrem, LastSaveCookie lastSave)
+    RequestDelegate next, IHttpForwarder forwarder, OnPremApp onPrem, LastSaveCookie lastSave, OnPremStatus status)
 {
     static readonly ForwarderRequestConfig RequestConfig = new() { ActivityTimeout = TimeSpan.FromSeconds(30) };
 
@@ -31,21 +32,8 @@ public sealed class CloudForwardingMiddleware(
             return;
         }
 
-        // A page that reads PHI records an audit event, which only the on-prem app can write (RequiresOnPremAttribute).
-        var endpoint = context.GetEndpoint();
-        if (endpoint?.Metadata.GetMetadata<RequiresOnPremAttribute>() is not null)
-        {
-            if (await ForwardAsync(context) != ForwarderError.None && !context.Response.HasStarted)
-            {
-                context.Response.Clear();
-                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                await context.Response.WriteAsync("Not available: the on-prem server can't be reached.", CancellationToken.None);
-            }
-
-            return;
-        }
-
         // Only pages read data. Static files are the same on both servers.
+        var endpoint = context.GetEndpoint();
         var isPage = endpoint?.Metadata.GetMetadata<PageActionDescriptor>() is not null;
         if (!isPage || !lastSave.TryRead(context, out var position))
         {
@@ -68,8 +56,16 @@ public sealed class CloudForwardingMiddleware(
         }
     }
 
-    ValueTask<ForwarderError> ForwardAsync(HttpContext context) =>
-        forwarder.SendAsync(context, onPrem.Url, onPrem.Client, RequestConfig, transformer);
+    async ValueTask<ForwarderError> ForwardAsync(HttpContext context)
+    {
+        var error = await forwarder.SendAsync(context, onPrem.Url, onPrem.Client, RequestConfig, transformer);
+        if (error is ForwarderError.None or ForwarderError.Request or ForwarderError.RequestTimedOut)
+        {
+            status.Report(reachable: error == ForwarderError.None);
+        }
+
+        return error;
+    }
 
     // Moves the on-prem app's WAL position from the response into the browser's LastSaveCookie.
     sealed class KeepWalPosition(LastSaveCookie lastSave) : HttpTransformer
