@@ -6,8 +6,10 @@ using Ehr.Domain.Audit;
 using Ehr.Domain.Authorization;
 using Ehr.Domain.QuickTexts;
 using Ehr.Web;
+using Ehr.Web.Api.Audit;
 using Ehr.Web.Api.Desktop;
 using Ehr.Web.Api.Sync;
+using Ehr.Web.CloudAudit;
 using Ehr.Web.Email;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.DataProtection;
@@ -52,6 +54,9 @@ if (keyCertificatePath is { Length: > 0 })
     dataProtection.ProtectKeysWithCertificate(keyCertificate).UnprotectKeysWithAnyCertificate(keyCertificate);
 }
 
+// Whether the on-prem app can be reached; only the cloud app ever finds that it can't. Every page shows it.
+builder.Services.AddSingleton<OnPremStatus>();
+
 if (site == Site.OnPrem)
 {
     // The first admin account, when there are none. Only the primary can write it.
@@ -65,6 +70,16 @@ else
     builder.Services.AddHttpForwarder();
     builder.Services.AddSingleton(OnPremApp.FromConfiguration(builder.Configuration));
     builder.Services.AddSingleton<LastSaveCookie>();
+
+    // It serves PHI reads from its replica, so it records them in its own queue and ships them to the on-prem app,
+    // which keeps working while the on-prem app is down (CloudAudit).
+    var queueDirectory = builder.Configuration["Ehr:CloudAudit:Directory"]
+        ?? throw new InvalidOperationException("Set Ehr:CloudAudit:Directory to where the cloud app keeps its audit events.");
+    builder.Services.AddSingleton(new CloudAuditQueue(queueDirectory));
+    builder.Services.AddSingleton<IAuditQueue>(services => services.GetRequiredService<CloudAuditQueue>());
+    builder.Services.AddSingleton(CloudAuditKey.FromConfiguration(builder.Configuration));
+    builder.Services.AddSingleton<CloudAuditShipper>();
+    builder.Services.AddHostedService(services => services.GetRequiredService<CloudAuditShipper>());
 }
 
 builder.Services.AddRazorPages(options =>
@@ -108,5 +123,11 @@ app.MapRazorPages().WithStaticAssets();
 // take the Desktop policy: a clinician's session token, and nothing else (Api/Desktop, Api/Sync).
 app.MapDesktopApi();
 app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop);
+// The cloud app ships its audit events here, with the key both apps share. Without a key (an on-prem app run on its
+// own, as in "Running the apps") there's no cloud app and no door.
+if (site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 })
+{
+    app.MapCloudAudit(CloudAuditKey.FromConfiguration(builder.Configuration));
+}
 
 app.Run();

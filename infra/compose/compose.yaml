@@ -23,6 +23,8 @@ x-web-app: &web-app
     # hold (see "Encryption" in the README).
     Ehr__DataProtection__Certificate: /certs/example.com.pem
     Ehr__DataProtection__CertificateKey: /certs/example.com-key.pem
+    # The secret the cloud app ships its audit events to the on-prem app with; both apps hold it.
+    Ehr__CloudAudit__Key: ${EHR_CLOUD_AUDIT_KEY:?set it in infra/compose/.env}
 
 x-postgres-healthcheck: &postgres-healthcheck
   test: ["CMD", "pg_isready", "-U", "postgres"]
@@ -189,6 +191,12 @@ services:
       # the same wildcard certificate, which is how the cloud app knows it's talking to the real on-prem app.
       Ehr__OnPrem__Url: https://onprem.example.com:8443
       Ehr__OnPrem__Certificate: /certs/example.com.pem
+      # The PHI reads it serves from the replica are recorded here, then shipped to the on-prem app. A volume, so a
+      # restart loses nothing it hasn't shipped.
+      Ehr__CloudAudit__Directory: /var/lib/ehr/cloud-audit
+    volumes:
+      - ./certs:/certs:ro
+      - cloud-audit:/var/lib/ehr/cloud-audit
     # No published port: off-site browsers reach it through the wan service, like the internet.
     networks: [cloud]
     depends_on:
@@ -283,4 +291,5 @@ networks:
 volumes:
   onprem-db:
   cloud-db:
+  cloud-audit:
   barman:

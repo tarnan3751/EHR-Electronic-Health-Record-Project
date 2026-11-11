@@ -8,7 +8,9 @@ using System.Text.Json;
 using Ehr.Data.Accounts;
 using Ehr.Domain.Accounts;
 using Ehr.Testing;
+using Ehr.Web.Api.Audit;
 using Ehr.Web.Api.Desktop;
+using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -56,6 +58,12 @@ public sealed class WebApps : IAsyncLifetime
 
     public string KeyCertificateKeyPath => KeyCertificatePath[..^4] + "-key.pem";
 
+    // The secret both apps share for shipping the cloud app's audit events.
+    public const string CloudAuditKey = "a-cloud-audit-key-for-the-tests-only";
+
+    // Each cloud app keeps its audit queue in its own folder under this one.
+    public string CloudAuditRoot { get; } = Path.Combine(Path.GetTempPath(), $"ehr-cloud-audit-{Guid.NewGuid():N}");
+
     public async ValueTask InitializeAsync()
     {
         using (var key = RSA.Create(2048))
@@ -97,6 +105,10 @@ public sealed class WebApps : IAsyncLifetime
         await Database.DisposeAsync();
         File.Delete(KeyCertificatePath);
         File.Delete(KeyCertificateKeyPath);
+        if (Directory.Exists(CloudAuditRoot))
+        {
+            Directory.Delete(CloudAuditRoot, recursive: true);
+        }
     }
 
     public static string NewShortcut() => "." + Guid.NewGuid().ToString("N")[..12];
@@ -237,17 +249,23 @@ public sealed class WebApps : IAsyncLifetime
         return rows;
     }
 
+    // Ships whatever the connected cloud app has queued now, rather than waiting for its next try.
+    public async Task ShipCloudAuditAsync() =>
+        Assert.True(await Cloud.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(TestContext.Current.CancellationToken));
+
     // How many audit events match, read as the superuser.
-    public async Task<long> AuditEventsAsync(string action, Guid? actorId = null, Guid? patientId = null)
+    public async Task<long> AuditEventsAsync(string action, Guid? actorId = null, Guid? patientId = null, string? source = null)
     {
         await using var connection = await OpenDatabaseAsync();
         await using var command = new NpgsqlCommand(
             """
             SELECT count(*) FROM ehr.audit_events
             WHERE action = @action AND (@actor IS NULL OR actor_id = @actor) AND (@patient IS NULL OR patient_id = @patient)
+              AND (@source IS NULL OR source = @source)
             """,
             connection);
         command.Parameters.AddWithValue("action", action);
+        command.Parameters.AddWithValue("source", NpgsqlTypes.NpgsqlDbType.Text, (object?)source ?? DBNull.Value);
         command.Parameters.AddWithValue("actor", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)actorId ?? DBNull.Value);
         command.Parameters.AddWithValue("patient", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)patientId ?? DBNull.Value);
         return (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
@@ -291,7 +309,9 @@ public sealed class WebApps : IAsyncLifetime
                 .UseSetting("ConnectionStrings:Ehr", connectionString)
                 .UseSetting("Ehr:OnPrem:Url", "https://onprem.test")
                 .UseSetting("Ehr:DataProtection:Certificate", apps.KeyCertificatePath)
-                .UseSetting("Ehr:DataProtection:CertificateKey", apps.KeyCertificateKeyPath);
+                .UseSetting("Ehr:DataProtection:CertificateKey", apps.KeyCertificateKeyPath)
+                .UseSetting("Ehr:CloudAudit:Key", CloudAuditKey)
+                .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")));
             if (bootstrapAdmin)
             {
                 builder
@@ -310,11 +330,17 @@ public sealed class WebApps : IAsyncLifetime
         }
     }
 
+    // Records what the cloud app forwards. The audit shipper's batches cross the same link every couple of seconds
+    // but aren't forwarded requests, so they're left out.
     sealed class RecordingLink(HttpMessageHandler onPrem, ConcurrentQueue<string> log) : DelegatingHandler(onPrem)
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            log.Enqueue($"{request.Method} {request.RequestUri!.PathAndQuery}");
+            if (request.RequestUri!.AbsolutePath != CloudAuditApi.Path)
+            {
+                log.Enqueue($"{request.Method} {request.RequestUri.PathAndQuery}");
+            }
+
             return base.SendAsync(request, cancellationToken);
         }
     }

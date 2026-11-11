@@ -6,8 +6,9 @@ namespace Ehr.Domain.Audit;
 // Records what the app itself must record: PHI reads (PhiReader), sign-ins, and account events. Writes to PHI tables
 // are recorded by the database trigger instead (db/policies/40-audit.sql). An event joins the request's unit of work
 // and commits with its transaction, so a read without its record is impossible. The actor is the signed-in user
-// unless the caller knows better, as at a sign-in, where the user isn't signed in yet.
-public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource source)
+// unless the caller knows better, as at a sign-in, where the user isn't signed in yet. On the cloud site, whose database
+// is a replica that takes no writes, the host registers an IAuditQueue and events go there instead.
+public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource source, IAuditQueue? queue = null)
 {
     public AuditEvent Record(
         string action, Guid? patientId = null, string? tableName = null, Guid? rowId = null, string? reason = null, Guid? actorId = null,
@@ -26,9 +27,24 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
             Reason = reason,
             Details = details,
         };
-        db.AuditEvents.Add(auditEvent);
+        if (queue is null)
+        {
+            db.AuditEvents.Add(auditEvent);
+        }
+        else
+        {
+            queue.Enqueue(auditEvent);
+        }
+
         return auditEvent;
     }
+}
+
+// Where the cloud site keeps the events it records until the on-prem app has them. Enqueue returns only once the
+// event is stored durably, and throws otherwise, so a read is never shown without its record.
+public interface IAuditQueue
+{
+    void Enqueue(AuditEvent auditEvent);
 }
 
 // Which server this app is, as the audit log names it: AuditSources.OnPrem or AuditSources.Cloud. The host registers it.

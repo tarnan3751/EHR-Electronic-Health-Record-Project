@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using Ehr.Domain.Patients;
-using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +9,6 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 
 // Where the chart sends a clinician whose patient this isn't: the stated reason emergency access requires (BreakGlass).
 // Nothing about the patient is shown here; the search results the clinician came from already were a recorded read.
-[RequiresOnPrem]
 public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) : PageModel
 {
     [BindProperty]

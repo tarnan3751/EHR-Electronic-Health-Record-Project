@@ -1,7 +1,6 @@
 using Ehr.Data.Patients;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
-using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -11,7 +10,6 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 // BreakGlass); then the read goes through the PHI reader, which records it, and a patient this clinician may not see
 // is not found, which gives nothing away. From here a clinician puts the patient on their panel or takes them off it,
 // and issues the patient a portal enrollment code.
-[RequiresOnPrem]
 public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, PatientEnrollments enrollments) : PageModel
 {
     public Patient Patient { get; private set; } = null!;

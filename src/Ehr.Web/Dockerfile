@@ -22,6 +22,9 @@ RUN dotnet publish src/Ehr.Web/Ehr.Web.csproj --configuration Release --no-resto
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
+# Where the cloud app keeps its audit events until the on-prem app has them (Ehr:CloudAudit:Directory). Made here, owned
+# by the app's user, so a new volume mounted on it starts out writable by that user.
+RUN mkdir -p /var/lib/ehr/cloud-audit && chown $APP_UID /var/lib/ehr/cloud-audit
 # The image ships a non-root user but starts as root unless told otherwise.
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Ehr.Web.dll"]
