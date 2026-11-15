@@ -1,7 +1,7 @@
 [project]
 name = "ehr-dictation-sidecar"
 version = "0.1.0"
-description = "MedASR speech-to-text sidecar. Runs on the on-prem server only, with no internet egress."
+description = "Dictation sidecar: MedASR speech to text, note fields from K2 Horizon through llama-server, and the checks on them. Runs on the on-prem server only, with no internet egress."
 requires-python = ">=3.12"
 dependencies = [
     "transformers>=5.17,<6",  # MedASR requires Transformers 5.x
@@ -9,7 +9,24 @@ dependencies = [
     "numpy>=2.5,<3",
     "fastapi>=0.141,<1",
     "uvicorn>=0.54,<1",
+    "httpx2>=2,<3",  # calls llama-server
 ]
+
+# The tests. The image leaves them out (uv sync --no-dev).
+[dependency-groups]
+dev = [
+    "pytest>=9,<10",
+    "jsonschema>=4.26,<5",
+]
+
+# A package, so the eval (eval/) can import the same code it measures.
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "ehr_dictation"
+module-root = ""
 
 [tool.uv]
 # Linux covers the container on every server (arm64 under Docker on a Mac, x86-64 on a PC).
@@ -31,3 +48,6 @@ torch = [
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
