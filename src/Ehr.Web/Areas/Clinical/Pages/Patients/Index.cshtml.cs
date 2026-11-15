@@ -15,10 +15,14 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 // patients exist for this clinician.
 public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageModel
 {
-    public const int Limit = 100;
+    // A search can be narrowed, and each patient it lists is a recorded read, most of a broad search's time (NFR-01).
+    public const int Limit = 50;
 
     // As the clinician types, each pause lists patients again, and each one listed is a recorded read: so fewer.
     public const int LiveLimit = 20;
+
+    // A panel can't be narrowed, so it lists more: a lower cap would hide the clinician's own patients.
+    public const int PanelLimit = 100;
 
     // The longest a name and an MRN can be (PatientConfiguration).
     const int MaximumNameLength = 100;
@@ -65,11 +69,11 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
     {
         if (Search.IsEmpty)
         {
-            // Fields emptied as the clinician types list nobody: the panel would be up to Limit more reads at every
+            // Fields emptied as the clinician types list nobody: the panel would be up to PanelLimit more reads at every
             // pause, and Clear brings it back.
             if (!Live)
             {
-                PanelPatients = await phi.PanelAsync(Limit, HttpContext.RequestAborted);
+                PanelPatients = await phi.PanelAsync(PanelLimit, HttpContext.RequestAborted);
             }
 
             return;

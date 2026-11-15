@@ -299,20 +299,28 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
-    public async Task A_search_that_reaches_the_limit_says_to_narrow_it()
+    public async Task A_search_that_reaches_the_limit_lists_50_reads_each_once_and_says_to_narrow_it()
     {
         var family = Unique("Crowded");
+        var patients = new List<Guid>();
         for (var i = 0; i <= Ehr.Web.Areas.Clinical.Pages.Patients.IndexModel.Limit; i++)
         {
-            await apps.InsertPatientAsync($"Given{i:D3}", family);
+            patients.Add(await apps.InsertPatientAsync($"Given{i:D3}", family));
         }
 
-        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+        var clinician = await apps.CreateStaffAsync("Dr. Crowded", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPrem, clinician);
 
         var html = await session.Client.GetStringAsync($"/patients?name={family}", Cancel);
 
-        Assert.Equal(Ehr.Web.Areas.Clinical.Pages.Patients.IndexModel.Limit, Listed(html).Count);
-        Assert.Contains("More patients match than are listed here. Add a date of birth, or more of the name, to narrow the search.", html);
+        var listed = Listed(html);
+        Assert.Equal(50, listed.Count);
+        Assert.Contains("More patients match than are listed here. Add more letters of the name, or a date of birth, to narrow them.", html);
+        Assert.Equal(50, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
+        foreach (var patient in patients)
+        {
+            Assert.Equal(listed.Contains(patient) ? 1 : 0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+        }
     }
 
     [Fact]

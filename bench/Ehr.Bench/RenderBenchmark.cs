@@ -357,7 +357,7 @@ internal static partial class RenderBenchmark
         Console.WriteLine(
             $"Writing to {target.Host}:{target.Port}/{target.Database} as {target.Username}: one staff account, locked at the end; "
             + $"{PanelSize} panel assignments, each with its write-audit event; and an audit event for every patient each page lists, "
-            + "about 250,000 at 50,000 patients. Nothing deletes them.");
+            + "about 195,000 at 50,000 patients. Nothing deletes them.");
         return true;
     }
 
