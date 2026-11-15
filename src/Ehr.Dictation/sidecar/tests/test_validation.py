@@ -405,6 +405,15 @@ def test_a_qualifier_stops_at_a_new_subject():
     assert own("No fever she is eating well.", "Fever.", "No fever").reasons == ["negation_dropped"]
 
 
+def test_without_punctuation_a_qualifier_stops_at_the_next_step_or_heading():
+    said = "no further pancreatitis continue monthly olezarsen no other injury on exam swelling below the malleolus"
+
+    assert own(said, "Continue monthly olezarsen.", "continue monthly olezarsen").pending
+    assert own(said, "Swelling below the malleolus.", "swelling below the malleolus").pending
+    assert own("Does not take aspirin.", "Takes aspirin.", "take aspirin").reasons == ["negation_dropped"]
+    assert own("Not able to take aspirin.", "Takes aspirin.", "take aspirin").reasons == ["negation_dropped"]
+
+
 def test_a_certainty_word_reaches_back_only_from_the_end_of_its_clause():
     said = "Sore throat likely viral pharyngitis."
 

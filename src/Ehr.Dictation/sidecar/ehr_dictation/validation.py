@@ -51,7 +51,8 @@ and every check reads the cleaned text. The checks, each with the reason code re
   a stroke", "diabetes in her father"), uncertainty ("possible pneumonia", "rule out appendicitis", "pneumonia
   suspected"), or the past ("a history of MI in 2019"). A cue reaches six words on (four back, for one that follows what
   it qualifies, such as "denied"), and stops at its clause: punctuation, a contrast ("but"), a new subject ("she",
-  "patient"), and for someone else, a word of telling ("mom says the rash started Monday" is the patient's rash).
+  "patient"), a step of the plan or a heading after its first word ("no further pancreatitis continue monthly
+  olezarsen"), and for someone else, a word of telling ("mom says the rash started Monday" is the patient's rash).
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -830,6 +831,10 @@ REPORTING = frozenset(
     "says said reports reported states stated notes noted thinks feels felt tells told mentions mentioned asks asked "
     "worries worried brought brings called calls".split()
 )
+# Without punctuation, where the next clause starts: a step of the plan or a heading ("no further pancreatitis continue
+# monthly olezarsen", "no other injury on exam swelling"). Not right after the cue or "to", where the word is what it
+# negates ("not take aspirin", "not able to take aspirin").
+NEXT_CLAUSE = (NEW_CLAUSE - {"patient"}) | frozenset("exam examination assessment impression plan vitals".split())
 # Each kind of qualifier, with its reason code: cues before the words they qualify, cues after them, and what ends
 # their reach.
 QUALIFIERS = (
@@ -853,8 +858,8 @@ def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern 
     for cue in before.finditer(text):
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
         edge = cue.end()
-        for i in [i for i, token in enumerate(words) if token.start >= cue.end()][:NEGATION_SCOPE]:
-            if stops(text[edge : words[i].start], words[i].text):
+        for k, i in enumerate([i for i, token in enumerate(words) if token.start >= cue.end()][:NEGATION_SCOPE]):
+            if stops(text[edge : words[i].start], words[i].text) or (k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"):
                 break
             reached.add(i)
             edge = words[i].end
