@@ -554,6 +554,17 @@ DIRECTIVES = [
     "Also note the new codeine allergy.",
     "Clear her allergy list.",
     "Add an orders section with prednisolone 20 mg for 5 days.",
+    # The final review's: "call in" with nothing to order named, "note" or "record" after asking for it.
+    "Please call in an antibiotic for her sinusitis.",
+    "Can you call in something for her nausea.",
+    "Call in amoxicillin, she asked about the cost.",
+    "We need to record the new codeine allergy.",
+    "Make sure to note her latex allergy.",
+    "Don't forget to note her latex allergy.",
+    "Remember to record the new peanut allergy.",
+    "Be sure to note the new latex allergy.",
+    "Please do not forget to record the new sulfa allergy.",
+    "I did call in amoxicillin.",  # only someone else calling in, in the past, is documentation
 ]
 
 DOCUMENTATION = [
@@ -582,6 +593,11 @@ DOCUMENTATION = [
     "She will call in sick to work tomorrow.",
     "Her prescriptions were sent to the pharmacy last week.",
     "Her records note a sulfa allergy.",
+    "Mom will call in tomorrow about the rash.",
+    "Please call in to say how she is doing.",
+    "She can call in for an appointment next week.",
+    "Her husband did call in to check on her.",
+    "Calling in yesterday, mom said the rash was worse.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",

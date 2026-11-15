@@ -28,11 +28,11 @@ and every check reads the cleaned text. The checks, each with the reason code re
   (a look-alike from another alphabet), markup, a link, code or JSON.
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
   its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one
-  is being placed now ("I'm ordering"), to write, send, call in, refill or renew a prescription, to send something to
-  the pharmacy, to make an orders section, or to change the allergy list (add, remove, record, clear, update); hyphens
-  are ignored ("re-fill"). A plan stays a plan: "start", "continue", "increase" or "stop" a drug, orders in the past or
-  by someone else ("her cardiologist ordered an echo last year"), and an instruction not to ("don't order an A1c", "no
-  need to order labs"), pass.
+  is being placed now ("I'm ordering"), to write, send, refill or renew a prescription, to call in anything ("call in
+  something for her nausea", not "call in sick"), to send something to the pharmacy, to make an orders section, or to
+  change the allergy list (add, remove, record, clear, update); hyphens are ignored ("re-fill"). A plan stays a plan:
+  "start", "continue", "increase" or "stop" a drug, orders in the past or by someone else ("her cardiologist ordered an
+  echo last year"), and an instruction not to ("don't order an A1c", "no need to order labs"), pass.
 - no_sources, source_too_short (under two words, without a number), source_not_in_transcript (compared word by word,
   ignoring case and punctuation), source_in_unclear_passage.
 - source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "no correction", "I mean",
@@ -624,22 +624,35 @@ _ALLERGY_CHANGES = [
     re.compile(rf"\ballerg\w*\s+list\b{_SAME_SENTENCE}{{0,30}}?\b(?:add|remove|update|change|delete)\b", re.IGNORECASE),
 ]
 # Instructions only in some places, each with the test of its place:
-# - "call in" something to order: a prescription, a refill, the pharmacy or a drug ("mom called in yesterday about the
-#   rash", "she will call in sick" are not);
-# - "note" or "record" an allergy as an instruction, at the start of its clause ("her records note a sulfa allergy" is
+# - "call in" anything ("call in an antibiotic", "call in something for her nausea"), but not calling in sick, about
+#   something, to say something or for an appointment, nor yesterday ("she will call in sick", "mom will call in about
+#   the rash"), unless a drug or a prescription comes first ("call in amoxicillin, she asked about the cost"); nor
+#   someone else calling in, in the past ("her husband did call in");
+# - "note" or "record" an allergy as an instruction: at the start of its clause, or after asking for it ("we need to
+#   record", "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy" is
 #   documentation).
 _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
+_NOT_AN_ORDER = re.compile(r"\b(?:sick|about|yesterday|to say|for an? appointment)\b", re.IGNORECASE)
 _TO_ORDER = re.compile(r"\b(?:prescriptions?|scripts?|rx|refills?|pharmacy)\b", re.IGNORECASE)
+_SOMEONE_ELSE_DID = re.compile(r"\b(?:did|had|was|were)\b", re.IGNORECASE)
+_SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
 _NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
+_ASKING = re.compile(r"\b(?:need to|make sure(?: to)?|remember to|be sure to|don't forget to|do not forget to)\b", re.I)
 
 
 def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
     rest = text[match.end() : _sentence_end(text, match.end())]
-    return bool(_TO_ORDER.search(rest)) or any(_is_drug(token.text) for token in tokens(rest)[:4])
+    excluded = _NOT_AN_ORDER.search(rest)
+    if excluded:
+        first = rest[: excluded.start()]
+        if not (_TO_ORDER.search(first) or any(_is_drug(token.text) for token in tokens(first))):
+            return False
+    before = text[clause : match.start()]
+    return not (_SOMEONE_ELSE_DID.search(before) and not any(token.text in _SPEAKER for token in tokens(before)))
 
 
 def _at_clause_start(text: str, match: re.Match, clause: int) -> bool:
-    return all(token.text in LEAD_IN for token in tokens(text[clause : match.start()]))
+    return all(token.text in LEAD_IN for token in tokens(_ASKING.sub(" ", text[clause : match.start()])))
 
 
 # A past-tense statement about the pharmacy is documentation: "her prescriptions were sent to the pharmacy last week".
