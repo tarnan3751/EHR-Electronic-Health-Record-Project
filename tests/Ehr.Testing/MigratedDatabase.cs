@@ -27,6 +27,9 @@ public sealed class MigratedDatabase : IAsyncLifetime
     // The superuser, for inspecting the catalog.
     public string SuperuserConnectionString => container.GetConnectionString();
 
+    // The migration role, which also runs the synthetic seed (bench/Ehr.Seed).
+    public string OwnerConnectionString => ConnectionStringFor("ehr_owner", OwnerPassword);
+
     public string ConnectionStringFor(string role, string password) =>
         new NpgsqlConnectionStringBuilder(container.GetConnectionString()) { Username = role, Password = password }.ConnectionString;
 

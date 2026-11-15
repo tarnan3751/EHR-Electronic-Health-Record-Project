@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The command line for the synthetic clinic: `seed` loads it into a database (README.md, "Synthetic data"). -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ehr.Seed\Ehr.Seed.csproj" />
+  </ItemGroup>
+
+</Project>

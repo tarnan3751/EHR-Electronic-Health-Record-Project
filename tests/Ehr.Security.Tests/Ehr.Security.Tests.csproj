@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- CI gates: RLS enabled and forced on every PHI table, write-audit triggers, runtime roles
-       own nothing and lack BYPASSRLS, zero rows without app.user_id. Runs against real PostgreSQL 18. -->
+       own nothing and lack BYPASSRLS, zero rows without app.user_id, and a synthetic seed that leaves all of that
+       as it was. Runs against real PostgreSQL 18. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -15,6 +16,8 @@
   <ItemGroup>
     <!-- The migrated database (MigratedDatabase), which brings in Ehr.Data. -->
     <ProjectReference Include="..\Ehr.Testing\Ehr.Testing.csproj" />
+    <!-- The synthetic seed, which must leave every table it fills as protected as it found it. -->
+    <ProjectReference Include="..\..\bench\Ehr.Seed\Ehr.Seed.csproj" />
   </ItemGroup>
 
 </Project>

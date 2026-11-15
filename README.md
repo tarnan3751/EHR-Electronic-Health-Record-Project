@@ -43,7 +43,7 @@ db/
   migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
   policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
 eval/               dictation gold set and scoring
-bench/              load tests and budget assertions
+bench/              the synthetic clinic and its seed (Ehr.Seed, run through Ehr.Bench)
 infra/              compose (local server stack), migrate (migration job), barman (backup image), tailscale (access rules)
 .github/            CI workflow and Dependabot settings
 .vscode/            shared settings, recommended extensions, and run tasks
@@ -177,6 +177,19 @@ Run `dotnet tool restore` for the pinned `dotnet-ef`: once, and again whenever `
 5. Restart the server stack to apply it, and run `dotnet test`.
 
 Tests fail if the model has changes no migration covers, if `schema.sql` is out of date, or if a table has no grant or protection decision. To undo a migration you haven't pushed, delete its two files and run `git restore db/migrations/EhrDbContextModelSnapshot.cs`. (`dotnet ef migrations remove` expects a database at the default port, which the local stack doesn't use.)
+
+## Synthetic data
+
+`bench/` holds a synthetic clinic: patients with allergies, medications, diagnoses and visits, the same every time, and obviously synthetic (every name carries a number, every MRN starts `SYN`).
+
+To fill the local stack's primary with 50,000 of them, start the stack, then, from the repository folder, point `EHR_SEED_CONNECTION` at the primary as `ehr_owner`, with the `EHR_OWNER_PASSWORD` from `infra/compose/.env`, and run the seed:
+
+```
+export EHR_SEED_CONNECTION="Host=127.0.0.1;Port=15432;Database=ehr;Username=ehr_owner;Password=<EHR_OWNER_PASSWORD>;SSL Mode=VerifyFull;Root Certificate=infra/compose/certs/rootCA.pem"
+dotnet run -c Release --project bench/Ehr.Bench -- seed
+```
+
+In PowerShell, set it with `$env:EHR_SEED_CONNECTION = "..."` instead. `--patients <n>` loads another number. The seed fills only a clinic with no patients; otherwise it refuses and changes nothing, and to start again you reset the stack (`docker compose --profile "*" down -v`). It runs as `ehr_owner` because nothing else may write these tables, and loads with binary COPY, which PostgreSQL refuses under forced row-level security: so, in one transaction, it lifts that and turns off the write-audit trigger on each table it fills, loads them, and turns both back on before it commits (`bench/Ehr.Seed/Seeder.cs`). No other session ever sees the tables unprotected, a failure leaves nothing behind, and the seeded rows have no write-audit events.
 
 ## Continuous integration
 

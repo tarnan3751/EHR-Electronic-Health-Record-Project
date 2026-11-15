@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The synthetic clinic (SyntheticClinic) and the seed that loads it (Seeder), shared by the benchmark's command
+       line (Ehr.Bench) and the tests that check the seed leaves the database protected (Ehr.Security.Tests). -->
+
+  <ItemGroup>
+    <!-- The tables' entities and code lists, so the seed writes what the app reads; Npgsql comes with it. -->
+    <ProjectReference Include="..\..\src\Ehr.Data\Ehr.Data.csproj" />
+  </ItemGroup>
+
+</Project>

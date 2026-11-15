@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/bench/">
+    <Project Path="bench/Ehr.Bench/Ehr.Bench.csproj" />
+    <Project Path="bench/Ehr.Seed/Ehr.Seed.csproj" />
+  </Folder>
   <Folder Name="/db/">
     <Project Path="db/migrations/Ehr.Migrations.csproj" />
   </Folder>
