@@ -74,7 +74,7 @@ FRAME = RATE // 50  # 20 ms frames for levels and SNR
 SPEECH_DBFS = -26.0  # level of the active speech in every item
 ACTIVE_WITHIN_DB = 30.0  # a frame is speech-active within this of the loud (95th percentile) frames
 LEAD_IN, TAIL, GAP = 0.5, 0.7, 0.25  # seconds of silence before, after and between synthesized chunks
-MAX_SECONDS = 300  # the dictation session limit: no item may be longer
+MAX_SECONDS = 180  # the dictation session limit: no item may be longer
 CHUNK_CHARS = 250  # Kokoro reads best in pieces of about 100 to 250 phonemes
 PINK_FROM_HZ = 20.0  # the bottom of hearing
 

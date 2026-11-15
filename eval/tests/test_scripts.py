@@ -31,7 +31,7 @@ ACCENTS = {"us", "gb", "hi-voice", "es-voice", "fr-voice"}
 MIN_WORDS, MAX_WORDS = 75, 330
 LONG_WORDS = 290  # near two minutes when spoken
 SHORT_WORDS = 110
-MAX_LENGTH_WORDS = (780, 830)  # near five minutes, the dictation session limit: max-length scripts only
+MAX_LENGTH_WORDS = (420, 540)  # near three minutes, the dictation session limit: max-length scripts only
 REPEAT_WORDS = 8  # a run of this many words said twice in one script is a repeated passage
 
 # Drugs first approved by the FDA in 2023 to 2025, as named in the FDA's "Novel Drug Approvals" lists for those

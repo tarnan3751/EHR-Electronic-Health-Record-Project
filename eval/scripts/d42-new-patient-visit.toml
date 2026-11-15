@@ -1,4 +1,4 @@
-# Dictation test script (synthetic): five-minute new-patient visit with exertional chest tightness. Format: eval/README.md.
+# Dictation test script (synthetic): three-minute new-patient visit with exertional chest tightness. Format: eval/README.md.
 id = "d42-new-patient-visit"
 voice = "ff_siwis"
 tags = [
@@ -15,130 +15,78 @@ retracted = ["62"]
 text = """
 New patient visit {period} {new paragraph}
 History {colon} [[58-year-old|fifty-eight-year-old]] man who has moved here from out of state and is establishing
-care {period} His main concern is shortness of breath when he walks up hills or carries groceries up the stairs for
-about [[3 months|three months]] {period} Twice he has felt a tightness across his chest after climbing two flights
-of stairs and it went away within a few minutes of resting {period} He has no chest pain at rest and nothing at
-night {period} No palpitations no fainting and no leg swelling {period} He also has heartburn after large meals most
-days but no trouble swallowing no vomiting and no weight loss {period} No blood in the stool and no black stools
-{period} He has gained about [[8 kg|eight kilograms]] over the last [[2 years|two years]] {period} He has no cough
-and no wheeze {period} He snores less since starting [[CPAP|see pap]] and wakes rested on most days {period}
-{new paragraph}
-Past history {colon} high blood pressure for about [[10 years|ten years]] {period} High cholesterol {period}
-Prediabetes with an [[A1c|A-one-C]] of [[6.2|six point two]] last year {period} Gout with two flares in the big toe
-and the last one in the spring {period} Obstructive sleep apnea on [[CPAP|see pap]] which he uses most nights
-{period} Colon polyps removed at a colonoscopy on [[March 3, 2021|March third twenty twenty-one]] {period} Appendix
-out as a teenager {period} He had a tetanus booster [[3 years|three years]] ago and has not had the shingles vaccine
-{period} {new paragraph}
-Medications {colon} amlodipine [[10 mg|ten milligrams]] daily {comma} hydrochlorothiazide
+care {period} For about [[3 months|three months]] he has been short of breath walking up hills {period} Twice he has
+felt a tightness across his chest after climbing two flights of stairs and it went away within a few minutes of
+resting {period} He has no chest pain at rest and nothing at night {period} He has heartburn after large meals but no
+trouble swallowing and no weight loss {period} Past history {colon} high blood pressure for [[10 years|ten years]]
+{comma} high cholesterol {comma} prediabetes {comma} gout with two flares in the big toe and obstructive sleep apnea
+on [[CPAP|see pap]] {period} Colon polyps removed at a colonoscopy on [[March 3, 2021|March third twenty
+twenty-one]] {period} Medications {colon} amlodipine [[10 mg|ten milligrams]] daily {comma} hydrochlorothiazide
 [[25 mg|twenty-five milligrams]] daily {comma} atorvastatin [[20 mg|twenty milligrams]] at night {comma} allopurinol
 [[100 mg|one hundred milligrams]] daily and omeprazole [[20 mg|twenty milligrams]] before breakfast {period}
-Allergies {colon} penicillin gave him hives as a child {period} {new paragraph}
-Family history {colon} his father had a heart attack at [[62|sixty-two]] sorry at [[52|fifty-two]] and his mother
-has type [[2|two]] diabetes {period} His brother has high blood pressure {period} Social history {colon} he drives a
-city bus on early shifts that start at six in the morning {period} He sleeps about [[7 hours|seven hours]] a night
-{period} He smoked a pack a day for [[20 years|twenty years]] and quit [[5 years|five years]] ago {period} He drinks
-two or three beers on the weekend {period} He is married with two grown children {period} He walks the dog for about
-[[20 minutes|twenty minutes]] most evenings {period} {new paragraph}
-Examination {colon} blood pressure [[152/94|one fifty-two over ninety-four]] and
-[[148/90|one forty-eight over ninety]] on a repeat check {comma} heart rate [[84|eighty-four]] and regular {comma}
-oxygen saturation [[97%|ninety-seven percent]] {comma} weight [[104 kg|one hundred four kilograms]] {comma}
-[[BMI 33|B M I thirty-three]] {period} Heart sounds normal with no murmur {period} Chest clear {period} No carotid
-bruits {period} Pulses are full in both feet {period} No edema {period} No tophi on the hands or feet {period}
-Abdomen soft and non-tender with no enlarged liver {period} {new paragraph}
-Results he brought from his last doctor {colon} [[LDL|L D L]] [[132|one thirty-two]] {comma} [[HDL|H D L]]
-[[38|thirty-eight]] {comma} [[A1c|A-one-C]] [[6.4|six point four]] {comma} uric acid [[8.9|eight point nine]] and
-creatinine [[1.0|one point zero]] {period} [[ECG|E C G]] today shows sinus rhythm with no ischemic changes {period}
+Allergies {colon} penicillin gave him hives as a child {period} Family history {colon} his father had a heart attack
+at [[62|sixty-two]] sorry at [[52|fifty-two]] and his mother has type [[2|two]] diabetes {period} He drives a city
+bus {period} He smoked a pack a day for [[20 years|twenty years]] and quit [[5 years|five years]] ago {period}
+{new paragraph}
+Examination {colon} blood pressure [[152/94|one fifty-two over ninety-four]] and [[148/90|one forty-eight over
+ninety]] on a repeat check {comma} heart rate [[84|eighty-four]] and regular {comma} [[BMI 33|B M I thirty-three]]
+{period} Heart sounds normal with no murmur {period} Chest clear {period} No edema {period} Results he brought
+{colon} [[LDL|L D L]] [[132|one thirty-two]] {comma} [[A1c|A-one-C]] [[6.4|six point four]] {comma} uric acid
+[[8.9|eight point nine]] {period} [[ECG|E C G]] today shows sinus rhythm with no ischemic changes {period}
 {new paragraph}
 Assessment {colon} number one {comma} exertional shortness of breath and chest tightness in a former smoker with
 several risk factors {comma} possible stable angina {period} Number two {comma} hypertension not controlled {period}
-Number three {comma} high cholesterol above goal for his risk {period} Number four {comma} prediabetes slowly rising
-{period} Number five {comma} gout made worse by the hydrochlorothiazide {period} Number six {comma} reflux
-controlled on omeprazole with no alarm features {period} Number seven {comma} obstructive sleep apnea on
-[[CPAP|see pap]] {period} {new paragraph}
+Number three {comma} high cholesterol above goal for his risk {period} Number four {comma} gout made worse by the
+hydrochlorothiazide {period} Number five {comma} reflux controlled on omeprazole {period} {new paragraph}
 Plan {colon} exercise stress echo in the next two weeks {period} Start aspirin [[81 mg|eighty-one milligrams]] daily
-until the stress test {period} He is not to drive the bus if he gets chest tightness at work and he knows to call
-[[911|nine one one]] if it lasts more than a few minutes or comes on at rest {period} Stop hydrochlorothiazide and
-start losartan [[50 mg|fifty milligrams]] daily {period} Continue amlodipine {period} Increase atorvastatin to
-[[40 mg|forty milligrams]] at night {period} Increase allopurinol to [[200 mg|two hundred milligrams]] daily
-{period} Continue omeprazole and refill the omeprazole for [[90 days|ninety days]] {period} Put penicillin on his
-allergy list {period} Recheck kidney function {comma} potassium and uric acid in [[2 weeks|two weeks]] {period} Low
-dose [[CT|C T]] of the chest for lung cancer screening {period} His next colonoscopy is due next year {period} We
-will talk about the shingles vaccine at the next visit {period} Keep using the [[CPAP|see pap]] every night {period}
-Cut down on beer and large late meals and aim to lose [[5 kg|five kilograms]] over six months {period} Return in
-[[4 weeks|four weeks]] on [[December 17|December seventeenth]] with home blood pressure readings {period}
+{period} He is not to drive the bus if he gets chest tightness at work and he knows to call [[911|nine one one]] if
+it comes on at rest {period} Stop hydrochlorothiazide and start losartan [[50 mg|fifty milligrams]] daily {period}
+Increase atorvastatin to [[40 mg|forty milligrams]] and allopurinol to [[200 mg|two hundred milligrams]] {period}
+Continue omeprazole and refill the omeprazole for [[90 days|ninety days]] {period} Put penicillin on his allergy list
+{period} Return on [[December 17|December seventeenth]] with home blood pressure readings {period}
 """
 
 [gold.history]
-value = "58-year-old man who has moved here from out of state and is establishing care. Shortness of breath when he walks up hills or carries groceries up the stairs for about 3 months. Twice felt a tightness across his chest after climbing two flights of stairs, which went away within a few minutes of resting. No chest pain at rest and nothing at night. No palpitations, no fainting, no leg swelling. Heartburn after large meals most days, but no trouble swallowing, no vomiting, no weight loss. No blood in the stool, no black stools. Gained about 8 kg over the last 2 years. No cough, no wheeze. Snores less since starting CPAP and wakes rested on most days. Past history: high blood pressure for about 10 years; high cholesterol; prediabetes with an A1c of 6.2 last year; gout with two flares in the big toe, the last one in the spring; obstructive sleep apnea on CPAP, used most nights; colon polyps removed at a colonoscopy on March 3, 2021; appendix out as a teenager. Tetanus booster 3 years ago; has not had the shingles vaccine. Medications: amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily and omeprazole 20 mg before breakfast. Allergies: penicillin gave him hives as a child. Family history: father had a heart attack at 52; mother has type 2 diabetes; brother has high blood pressure. Social history: drives a city bus on early shifts that start at six in the morning. Sleeps about 7 hours a night. Smoked a pack a day for 20 years, quit 5 years ago. Drinks two or three beers on the weekend. Married with two grown children. Walks the dog for about 20 minutes most evenings. Blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, oxygen saturation 97%, weight 104 kg, BMI 33. Heart sounds normal with no murmur. Chest clear. No carotid bruits. Pulses full in both feet. No edema. No tophi on the hands or feet. Abdomen soft and non-tender, no enlarged liver. Results from his last doctor: LDL 132, HDL 38, A1c 6.4, uric acid 8.9, creatinine 1.0. ECG today: sinus rhythm with no ischemic changes."
+value = "58-year-old man who has moved here from out of state and is establishing care. Short of breath walking up hills for about 3 months. Twice felt a tightness across his chest after climbing two flights of stairs, which went away within a few minutes of resting. No chest pain at rest and nothing at night. Heartburn after large meals, but no trouble swallowing and no weight loss. Past history: high blood pressure for 10 years, high cholesterol, prediabetes, gout with two flares in the big toe, and obstructive sleep apnea on CPAP. Colon polyps removed at a colonoscopy on March 3, 2021. Medications: amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily and omeprazole 20 mg before breakfast. Allergies: penicillin gave him hives as a child. Family history: father had a heart attack at 52; mother has type 2 diabetes. Drives a city bus. Smoked a pack a day for 20 years, quit 5 years ago. Blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today: sinus rhythm with no ischemic changes."
 sources = [
     "58-year-old man who has moved here from out of state and is establishing care.",
-    "His main concern is shortness of breath when he walks up hills or carries groceries up the stairs for about 3 months.",
+    "For about 3 months he has been short of breath walking up hills.",
     "Twice he has felt a tightness across his chest after climbing two flights of stairs and it went away within a few minutes of resting.",
     "He has no chest pain at rest and nothing at night.",
-    "No palpitations no fainting and no leg swelling.",
-    "He also has heartburn after large meals most days but no trouble swallowing no vomiting and no weight loss.",
-    "No blood in the stool and no black stools.",
-    "He has gained about 8 kg over the last 2 years.",
-    "He has no cough and no wheeze.",
-    "He snores less since starting CPAP and wakes rested on most days.",
-    "high blood pressure for about 10 years.",
-    "High cholesterol.",
-    "Prediabetes with an A1c of 6.2 last year.",
-    "Gout with two flares in the big toe and the last one in the spring.",
-    "Obstructive sleep apnea on CPAP which he uses most nights.",
+    "He has heartburn after large meals but no trouble swallowing and no weight loss.",
+    "high blood pressure for 10 years, high cholesterol, prediabetes, gout with two flares in the big toe and obstructive sleep apnea on CPAP.",
     "Colon polyps removed at a colonoscopy on March 3, 2021.",
-    "Appendix out as a teenager.",
-    "He had a tetanus booster 3 years ago and has not had the shingles vaccine.",
     "amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily and omeprazole 20 mg before breakfast.",
     "penicillin gave him hives as a child.",
     "his father had a heart attack at 62 sorry at 52 and his mother has type 2 diabetes.",
-    "His brother has high blood pressure.",
-    "he drives a city bus on early shifts that start at six in the morning.",
-    "He sleeps about 7 hours a night.",
+    "He drives a city bus.",
     "He smoked a pack a day for 20 years and quit 5 years ago.",
-    "He drinks two or three beers on the weekend.",
-    "He is married with two grown children.",
-    "He walks the dog for about 20 minutes most evenings.",
-    "blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, oxygen saturation 97%, weight 104 kg, BMI 33.",
+    "blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33.",
     "Heart sounds normal with no murmur.",
     "Chest clear.",
-    "No carotid bruits.",
-    "Pulses are full in both feet.",
     "No edema.",
-    "No tophi on the hands or feet.",
-    "Abdomen soft and non-tender with no enlarged liver.",
-    "LDL 132, HDL 38, A1c 6.4, uric acid 8.9 and creatinine 1.0.",
+    "LDL 132, A1c 6.4, uric acid 8.9.",
     "ECG today shows sinus rhythm with no ischemic changes.",
 ]
 
 [gold.assessment]
-value = "1. Exertional shortness of breath and chest tightness in a former smoker with several risk factors; possible stable angina. 2. Hypertension, not controlled. 3. High cholesterol above goal for his risk. 4. Prediabetes, slowly rising. 5. Gout made worse by the hydrochlorothiazide. 6. Reflux controlled on omeprazole, with no alarm features. 7. Obstructive sleep apnea on CPAP."
+value = "1. Exertional shortness of breath and chest tightness in a former smoker with several risk factors; possible stable angina. 2. Hypertension, not controlled. 3. High cholesterol above goal for his risk. 4. Gout made worse by the hydrochlorothiazide. 5. Reflux controlled on omeprazole."
 sources = [
     "number one, exertional shortness of breath and chest tightness in a former smoker with several risk factors, possible stable angina.",
     "Number two, hypertension not controlled.",
     "Number three, high cholesterol above goal for his risk.",
-    "Number four, prediabetes slowly rising.",
-    "Number five, gout made worse by the hydrochlorothiazide.",
-    "Number six, reflux controlled on omeprazole with no alarm features.",
-    "Number seven, obstructive sleep apnea on CPAP.",
+    "Number four, gout made worse by the hydrochlorothiazide.",
+    "Number five, reflux controlled on omeprazole.",
 ]
 
 [gold.plan]
-value = "Exercise stress echo in the next two weeks. Start aspirin 81 mg daily until the stress test. Not to drive the bus if he gets chest tightness at work; knows to call 911 if it lasts more than a few minutes or comes on at rest. Stop hydrochlorothiazide and start losartan 50 mg daily. Continue amlodipine. Increase atorvastatin to 40 mg at night. Increase allopurinol to 200 mg daily. Continue omeprazole. Recheck kidney function, potassium and uric acid in 2 weeks. Low dose CT of the chest for lung cancer screening. Next colonoscopy due next year. Shingles vaccine to be discussed at the next visit. Keep using the CPAP every night. Cut down on beer and large late meals, and aim to lose 5 kg over six months. Return in 4 weeks, on December 17, with home blood pressure readings."
+value = "Exercise stress echo in the next two weeks. Start aspirin 81 mg daily. Not to drive the bus if he gets chest tightness at work; knows to call 911 if it comes on at rest. Stop hydrochlorothiazide and start losartan 50 mg daily. Increase atorvastatin to 40 mg and allopurinol to 200 mg. Continue omeprazole. Return on December 17 with home blood pressure readings."
 sources = [
     "exercise stress echo in the next two weeks.",
-    "Start aspirin 81 mg daily until the stress test.",
-    "He is not to drive the bus if he gets chest tightness at work and he knows to call 911 if it lasts more than a few minutes or comes on at rest.",
+    "Start aspirin 81 mg daily.",
+    "He is not to drive the bus if he gets chest tightness at work and he knows to call 911 if it comes on at rest.",
     "Stop hydrochlorothiazide and start losartan 50 mg daily.",
-    "Continue amlodipine.",
-    "Increase atorvastatin to 40 mg at night.",
-    "Increase allopurinol to 200 mg daily.",
+    "Increase atorvastatin to 40 mg and allopurinol to 200 mg.",
     "Continue omeprazole",
-    "Recheck kidney function, potassium and uric acid in 2 weeks.",
-    "Low dose CT of the chest for lung cancer screening.",
-    "His next colonoscopy is due next year.",
-    "We will talk about the shingles vaccine at the next visit.",
-    "Keep using the CPAP every night.",
-    "Cut down on beer and large late meals and aim to lose 5 kg over six months.",
-    "Return in 4 weeks on December 17 with home blood pressure readings.",
+    "Return on December 17 with home blood pressure readings.",
 ]
