@@ -157,8 +157,8 @@ def main() -> int:
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
         f"field F1 {metrics['fields']['content']['f1']} (clinical gold {metrics['fields_clinical']['content']['f1']}), "
         f"every recording sorted, no order or allergy change shown and no retracted value without a warning, "
-        f"{metrics['possible_correction']['flagged']} of {metrics['possible_correction']['shown']} offered values "
-        f"flagged as a possible correction. Run on {latest['run']['machine']['label']}."
+        f"{metrics['warnings']['any']['flagged']} of {metrics['warnings']['shown']} offered values carry a warning. "
+        f"Run on {latest['run']['machine']['label']}."
     )
     return 0
 

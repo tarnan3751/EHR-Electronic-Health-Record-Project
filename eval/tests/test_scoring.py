@@ -174,27 +174,37 @@ def test_a_retracted_value_with_a_warning_is_counted_apart(scripts):
     import dataclasses
 
     retracting = {"d01": dataclasses.replace(scripts["d01"], retracted=("4 days",)), "d02": scripts["d02"]}
-    warned = dataclasses.replace(pending("Cough for 4 days."), warnings=[[9, 15]])
+    warned = dataclasses.replace(pending("Cough for 4 days."), warnings=[["possible_correction", 9, 15]])
 
     order_allergy = score([item("d01", "x", history=warned)], retracting)["order_allergy"]
 
     assert (order_allergy["retracted_shown"], order_allergy["retracted_shown_unflagged"]) == (1, 0)
 
 
-def test_the_warnings_false_alarms_are_the_right_values_flagged(scripts):
+def test_each_warnings_catches_and_false_alarms_are_counted(scripts):
     import dataclasses
 
+    retracting = {"d01": dataclasses.replace(scripts["d01"], retracted=("4 days",)), "d02": scripts["d02"]}
+    correction, unclear = ["possible_correction", 0, 1], ["near_unclear_passage", 2, 3]
+    def warned(value, *warnings):
+        return dataclasses.replace(pending(value), warnings=list(warnings))
+
     items = [
-        item("d01", "x", tags=["vitals"], history=dataclasses.replace(pending("Cough for 3 days."), warnings=[[0, 1]])),
-        item("d01", "x", tags=["vitals"], history=pending("Cough for 3 days.")),
-        item("d01", "x", history=dataclasses.replace(pending("Cough for 4 days."), warnings=[[0, 1]])),  # wrong anyway
+        item("d01", "x", tags=["noise:none"], history=warned("Cough for 3 days.", correction)),
+        item("d01", "x", tags=["noise:none"], history=pending("Cough for 3 days.")),
+        item("d01", "x", tags=["noise:babble@5dB"], history=warned("Cough for 3 days.", unclear)),
+        item("d01", "x", history=warned("Cough for 4 days.", correction)),  # caught
     ]
 
-    warning = score(items, scripts)["possible_correction"]
+    warnings = score(items, retracting)["warnings"]
 
-    assert (warning["shown"], warning["flagged"]) == (3, 2)
-    assert warning["rules"]["right"] == 2 and warning["rules"]["false_alarm_rate"] == 0.5
-    assert warning["clinical"]["by_tag"]["vitals"]["false_alarm_rate"] == 0.5
+    assert (warnings["shown"], warnings["holding_a_retracted_value"]) == (4, 1)
+    assert (warnings["possible_correction"]["flagged"], warnings["possible_correction"]["retracted_caught"]) == (2, 1)
+    assert (warnings["near_unclear_passage"]["flagged"], warnings["near_unclear_passage"]["retracted_caught"]) == (1, 0)
+    assert warnings["any"]["rules"] | {"clean": None, "by_tag": None} == {
+        "right": 3, "flagged": 2, "false_alarm_rate": round(2 / 3, 4), "clean": None, "by_tag": None}
+    assert warnings["possible_correction"]["clinical"]["clean"]["false_alarm_rate"] == 0.5
+    assert warnings["near_unclear_passage"]["rules"]["clean"]["flagged"] == 0
 
 
 def test_fields_are_scored_per_tag(scripts):

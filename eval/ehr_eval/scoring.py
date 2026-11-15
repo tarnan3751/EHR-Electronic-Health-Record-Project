@@ -18,9 +18,9 @@
   many of those the result reported as not carried over, so the screen can say they still need placing (recall against
   the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was legitimate (false
   discards), so the owner can judge where that rule draws its line.
-- possible_correction: how many offered values carry a possible-correction warning, and of the right ones (matching
-  the gold, holding nothing retracted), the share flagged anyway: the warning's false-alarm rate, overall and per tag,
-  against each gold set.
+- warnings: for each warning code and for any warning, how many offered values carry it, how many of those holding a
+  retracted value it caught, and of the right ones (matching the gold, holding nothing retracted), the share flagged
+  anyway: its false-alarm rate, overall, on clean recordings and per tag, against each gold set.
 - sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took and how many tokens
   K2 Horizon read and wrote, separately for the two-minute dictations and those at the 3-minute limit, with the live
   transcript's time per chunk.
@@ -54,9 +54,9 @@ class FieldOutcome:
     status: str = "empty"  # pending (offered) or empty
     reasons: list[str] = field(default_factory=list)
     # What the sidecar sends when the field is pending: the proposed value with any instruction cut out of it, and
-    # where its possible-correction warnings point (code points in the transcript).
+    # its warnings, each [code, start, end] (code points in the transcript).
     value: str = ""
-    warnings: list[list[int]] = field(default_factory=list)
+    warnings: list[list] = field(default_factory=list)
 
     @property
     def shown(self) -> str:
@@ -96,7 +96,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "validation": _validation(items),
         "unsupported_content": _unsupported(items),
         "order_allergy": _order_allergy(items, scripts),
-        "possible_correction": _possible_correction(items, scripts),
+        "warnings": _warnings(items, scripts),
         "sorting": _sorting(items),
         "timing": _timing(items),
     }
@@ -238,6 +238,7 @@ def _absent_drugs(script: Script) -> list[str]:
 
 def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     shown = retracted_shown = drug_shown = retracted_unflagged = drug_unflagged = 0
+    unflagged: list[dict] = []
     reported = said = 0
     discarded = lost = lost_without_attempt = 0
     legitimate = 0
@@ -260,6 +261,8 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
             if not outcome.warnings:
                 retracted_unflagged += retracted_here
                 drug_unflagged += drugs_here
+                unflagged += [{"variant": item.variant, "field": name, "shown": text}
+                              for text in [*retracted, *absent_drugs] if text and _contains(shown_text, text)]
             gold = script.gold[name].value.strip()
             legitimate += bool(gold)
             if outcome.status != "pending" and "order_or_allergy_change" in outcome.reasons:
@@ -273,6 +276,7 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
         "retracted_shown_unflagged": retracted_unflagged,
         "drug_not_in_gold_shown": drug_shown,
         "drug_not_in_gold_shown_unflagged": drug_unflagged,
+        "unflagged": unflagged,
         "forbidden_said": said,
         "reported_not_carried_over": reported,
         "reported_recall": _ratio(reported, said),
@@ -283,38 +287,61 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     }
 
 
-def _possible_correction(items: list[Item], scripts: dict[str, Script]) -> dict:
-    """How often a right value is flagged as a possible correction: of the values shown whose gold field has a value,
-    and which hold no retracted value, no forbidden text and no drug the gold leaves out, and whose numbers and drug
-    names are all in the gold value, the share that carry a warning. Overall and per tag, against each gold set. Also
-    how many values were flagged at all."""
+WARNING_CODES = ("possible_correction", "near_unclear_passage")
+CLEAN = "noise:none"
+
+
+def _wrong_items(value: str, script: Script) -> list[str]:
+    """What a shown value must never hold: a retracted value, or a drug no gold value carries."""
+    text = normalize(value)
+    wrong = [normalize(t) for t in script.retracted] + _absent_drugs(script)
+    return [item for item in wrong if item and _contains(text, item)]
+
+
+def _warnings(items: list[Item], scripts: dict[str, Script]) -> dict:
+    """For each warning code, and for any warning: how many shown values carry it; of those holding a retracted value or
+    a drug no gold value carries, how many it caught; and of the right values, how many it flagged anyway, its false
+    alarms, overall, on clean recordings and per tag, against each gold set. A right value is one shown whose gold
+    field has a value, which holds nothing retracted, forbidden or outside the gold, and whose numbers and drug names
+    are all in the gold value."""
 
     def right(value: str, gold: str, script: Script) -> bool:
         text, gold_text = normalize(value), normalize(gold)
-        wrong = [normalize(t) for t in (*script.retracted, *script.forbidden)] + _absent_drugs(script)
         drugs = [normalize(drug) for drug in script.drugs if _contains(text, normalize(drug))]
         return (
-            bool(gold.strip()) and not any(_contains(text, t) for t in wrong if t)
+            bool(gold.strip()) and not _wrong_items(value, script)
+            and not any(_contains(text, normalize(t)) for t in script.forbidden)
             and set(numbers(text)) <= set(numbers(gold_text)) and all(_contains(gold_text, drug) for drug in drugs)
         )
 
-    def measure(golds: Callable[[Script], dict[str, Gold]], group: list[Item]) -> dict:
-        right_values = flagged = 0
+    def flagged(outcome: FieldOutcome, codes: tuple[str, ...]) -> bool:
+        return any(warning[0] in codes for warning in outcome.warnings)
+
+    def false_alarms(golds: Callable[[Script], dict[str, Gold]], group: list[Item], codes: tuple[str, ...]) -> dict:
+        right_values = flags = 0
         for item in group:
             script = scripts[item.script]
             for name, outcome in item.fields.items():
                 if outcome.shown.strip() and right(outcome.shown, golds(script)[name].value, script):
                     right_values += 1
-                    flagged += bool(outcome.warnings)
-        return {"right": right_values, "flagged": flagged, "false_alarm_rate": _ratio(flagged, right_values)}
+                    flags += flagged(outcome, codes)
+        return {"right": right_values, "flagged": flags, "false_alarm_rate": _ratio(flags, right_values)}
 
     tags = sorted({tag for item in items for tag in item.tags})
-    by_gold = {}
-    for key, golds in (("rules", lambda script: script.gold_rules), ("clinical", lambda script: script.gold)):
-        by_gold[key] = measure(golds, items) | {
-            "by_tag": {tag: measure(golds, [item for item in items if tag in item.tags]) for tag in tags}}
-    shown = [outcome for item in items for outcome in item.fields.values() if outcome.shown.strip()]
-    return {"shown": len(shown), "flagged": sum(1 for outcome in shown if outcome.warnings)} | by_gold
+    shown = [(item, outcome) for item in items for outcome in item.fields.values() if outcome.shown.strip()]
+    wrong = [(item, outcome) for item, outcome in shown if _wrong_items(outcome.shown, scripts[item.script])]
+    out: dict = {"shown": len(shown), "holding_a_retracted_value": len(wrong)}
+    for key, codes in [(code, (code,)) for code in WARNING_CODES] + [("any", WARNING_CODES)]:
+        measured = {"flagged": sum(flagged(outcome, codes) for _, outcome in shown),
+                    "retracted_caught": sum(flagged(outcome, codes) for _, outcome in wrong)}
+        for gold_key, golds in (("rules", lambda script: script.gold_rules), ("clinical", lambda script: script.gold)):
+            measured[gold_key] = false_alarms(golds, items, codes) | {
+                "clean": false_alarms(golds, [item for item in items if CLEAN in item.tags], codes),
+                "by_tag": {
+                    tag: false_alarms(golds, [item for item in items if tag in item.tags], codes) for tag in tags},
+            }
+        out[key] = measured
+    return out
 
 
 def _sorting(items: list[Item]) -> dict:
