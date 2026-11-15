@@ -5,7 +5,7 @@ Conventions every coding agent (and every person) follows in this repo. Most com
 ## Where authorization is applied
 
 - Twice, always: ASP.NET Core policies in the app, then row-level security (RLS) in PostgreSQL. A missed check in code must still return no unauthorized rows.
-- Policies attach to whole areas by convention (`Areas/Clinical`, `Areas/Portal`, `Api/Sync`), not handler by handler.
+- Policies attach to whole areas by convention (`Areas/Clinical`, `Areas/Portal`, `Api/Sync`, `Api/Dictation`), not handler by handler.
 - Portal handlers never accept a patient ID. The subject always comes from the session.
 - Every PHI read goes through the PHI reader service in `Ehr.Domain`, which records an audit event.
 - RLS is enabled and forced on every PHI table. The app connects as `ehr_app` or `ehr_read`, which own nothing and lack `BYPASSRLS`.
