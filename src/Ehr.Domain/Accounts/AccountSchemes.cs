@@ -21,8 +21,8 @@ public static class AccountSchemes
     // The default, which forwards to Staff, Patient or Desktop.
     public const string Default = "Ehr";
 
-    // Everything the patient portal serves lives under this path; the APIs the desktop app calls under the other; and
-    // everything else is the clinic's.
+    // Everything the patient portal serves lives under this path; the APIs under the other, where the default is the
+    // desktop app's token (dictation's policy names the staff cookie instead); and everything else is the clinic's.
     public const string PortalPath = "/portal";
 
     public const string ApiPath = "/api";

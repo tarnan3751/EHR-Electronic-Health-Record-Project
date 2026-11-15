@@ -11,6 +11,7 @@ using Ehr.Domain.Accounts;
 using Ehr.Testing;
 using Ehr.Web.Api.Audit;
 using Ehr.Web.Api.Desktop;
+using Ehr.Web.Api.Dictation;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Hosting;
@@ -27,7 +28,8 @@ namespace Ehr.Web.Tests;
 // The web app in memory, configured as each server, against one migrated database. The cloud app reads as ehr_read
 // like the real one, but from the primary: there's no replica in these tests. Its WAN link to the on-prem app is an
 // in-memory one, which records what crosses it. The on-prem app starts with the bootstrap admin settings, as the
-// stack does, and every app's emails are kept rather than sent.
+// stack does, and its dictation service is a stub in memory (DictationSidecarStub). Every app's emails are kept
+// rather than sent.
 public sealed class WebApps : IAsyncLifetime
 {
     public const string BootstrapAdminEmail = "admin@example.test";
@@ -78,6 +80,11 @@ public sealed class WebApps : IAsyncLifetime
 
     public RecordingEmailSender Emails { get; } = new();
 
+    public DictationSidecarStub Dictation { get; } = new();
+
+    // Rather than 20 seconds, so the test of a service that doesn't answer is quick.
+    public static readonly TimeSpan DictationTimeout = TimeSpan.FromSeconds(2);
+
     // The certificate both apps encrypt the Data Protection keys with, as PEM files, the way the stack mounts it.
     public string KeyCertificatePath { get; } = Path.Combine(Path.GetTempPath(), $"ehr-keys-{Guid.NewGuid():N}.pem");
 
@@ -100,7 +107,8 @@ public sealed class WebApps : IAsyncLifetime
         }
 
         await Database.InitializeAsync();
-        OnPrem = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, this, bootstrapAdmin: true);
+        OnPrem = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, this, bootstrapAdmin: true,
+            dictation: new DictationSidecar(DictationSidecarStub.Url, DictationSidecarStub.ApiKey, new HttpMessageInvoker(Dictation), DictationTimeout));
         OnPremProduction = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, this, environment: Environments.Production);
 
         // Starting the on-prem app first also creates the Data Protection key, which the cloud app can't create.
@@ -391,7 +399,7 @@ public sealed class WebApps : IAsyncLifetime
 
     sealed class App(
         Site site, string connectionString, RecordingEmailSender emails, WebApps apps, OnPremApp? onPrem = null, bool bootstrapAdmin = false,
-        string? environment = null)
+        string? environment = null, DictationSidecar? dictation = null)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -423,6 +431,11 @@ public sealed class WebApps : IAsyncLifetime
                 if (onPrem is not null)
                 {
                     services.AddSingleton(onPrem);
+                }
+
+                if (dictation is not null)
+                {
+                    services.AddSingleton(dictation);
                 }
             });
         }

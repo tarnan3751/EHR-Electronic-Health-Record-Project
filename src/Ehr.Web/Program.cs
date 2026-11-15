@@ -8,6 +8,7 @@ using Ehr.Domain.QuickTexts;
 using Ehr.Web;
 using Ehr.Web.Api.Audit;
 using Ehr.Web.Api.Desktop;
+using Ehr.Web.Api.Dictation;
 using Ehr.Web.Api.Sync;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Email;
@@ -62,6 +63,9 @@ if (site == Site.OnPrem)
 {
     // The first admin account, when there are none. Only the primary can write it.
     builder.Services.AddHostedService<AdminBootstrap>();
+
+    // The dictation service runs beside the models, on-prem only (Api/Dictation).
+    builder.Services.AddSingleton(DictationSidecar.FromConfiguration(builder.Configuration));
 }
 else
 {
@@ -132,6 +136,13 @@ app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop);
 if (site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 })
 {
     app.MapCloudAudit(CloudAuditKey.FromConfiguration(builder.Configuration));
+}
+
+// Dictation, for clinicians in the browser, with the staff cookie. Only the on-prem app maps it; the cloud app
+// forwards it there, as it does every POST and DELETE (Api/Dictation).
+if (site == Site.OnPrem)
+{
+    app.MapDictationApi().RequireAuthorization(EhrPolicies.Clinician);
 }
 
 app.Run();

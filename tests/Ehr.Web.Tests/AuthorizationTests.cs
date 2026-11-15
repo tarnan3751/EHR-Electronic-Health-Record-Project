@@ -36,16 +36,16 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // The desktop app is not a browser: a refused API request gets a 401, never a redirect to the sign-in page.
+    // The desktop app is not a browser, and the pages' scripts read the status: a refused API request gets a 401, never
+    // a redirect to the sign-in page, whether the API takes the desktop token or the staff cookie (dictation).
     [Theory]
-    [InlineData("/api/sync/quick-texts?since=0")]
-    [InlineData("/api/desktop/sign-out")]
-    public async Task The_apis_answer_an_anonymous_request_with_401(string path)
+    [InlineData("GET", "/api/sync/quick-texts?since=0")]
+    [InlineData("POST", "/api/desktop/sign-out")]
+    [InlineData("POST", "/api/dictation/sessions")]
+    public async Task The_apis_answer_an_anonymous_request_with_401(string method, string path)
     {
         using var client = Client(apps.OnPrem, new CookieContainer(), followRedirects: false);
-        using var response = path.EndsWith("sign-out", StringComparison.Ordinal)
-            ? await client.PostAsync(path, null, Cancel)
-            : await client.GetAsync(path, Cancel);
+        using var response = await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), path), Cancel);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Null(response.Headers.Location);
