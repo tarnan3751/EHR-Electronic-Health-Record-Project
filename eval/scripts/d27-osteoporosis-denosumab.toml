@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): bone health clinic on denosumab, with a scan order to leave out. Format: eval/README.md.
 id = "d27-osteoporosis-denosumab"
 voice = "ff_siwis"
-tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
+tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer"]
 dates = ["2026-05-06", "2027-05-06"]
 drugs = ["denosumab"]
 forbidden = ["order a bone density scan"]
@@ -11,7 +11,7 @@ Bone health clinic {period} [[72-year-old|seventy-two-year-old]] woman with oste
 [[-2.8|minus two point eight]] at the lumbar spine and [[-2.4|minus two point four]] at the hip {period} She has
 had denosumab [[60 mg|sixty milligrams]] under the skin every [[6 months|six months]] {comma} the last dose on
 [[May 6, 2026|May sixth twenty twenty-six]] {comma} so she is due now {period} She takes calcium and vitamin D every
-day {period} No new fractures {comma} no jaw pain and no thigh pain {period} She has seen her dentist this year
+day {period} Her mother broke her hip at [[78|seventy-eight]] {period} No new fractures {comma} no jaw pain and no thigh pain {period} She has seen her dentist this year
 {period} Calcium [[9.4|nine point four]] {comma} vitamin D [[38|thirty-eight]] {period} {new paragraph}
 Assessment {colon} osteoporosis on denosumab {comma} no new fractures {period} {new paragraph}
 Plan {colon} denosumab [[60 mg|sixty milligrams]] given today in clinic {comma} next dose due on
@@ -21,12 +21,13 @@ fractures {period} Continue calcium and vitamin D {period} Also please order a b
 """
 
 [gold.history]
-value = "72-year-old woman with osteoporosis and a wrist fracture 2 years ago. DEXA in the spring: T-score -2.8 at the lumbar spine and -2.4 at the hip. Denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so due now. Takes calcium and vitamin D every day. No new fractures, no jaw pain, no thigh pain. Has seen her dentist this year. Calcium 9.4, vitamin D 38."
+value = "72-year-old woman with osteoporosis and a wrist fracture 2 years ago. DEXA in the spring: T-score -2.8 at the lumbar spine and -2.4 at the hip. Denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so due now. Takes calcium and vitamin D every day. Her mother broke her hip at 78. No new fractures, no jaw pain, no thigh pain. Has seen her dentist this year. Calcium 9.4, vitamin D 38."
 sources = [
     "72-year-old woman with osteoporosis and a wrist fracture 2 years ago.",
     "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip.",
     "She has had denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so she is due now.",
     "She takes calcium and vitamin D every day.",
+    "Her mother broke her hip at 78.",
     "No new fractures, no jaw pain and no thigh pain.",
     "She has seen her dentist this year.",
     "Calcium 9.4, vitamin D 38.",

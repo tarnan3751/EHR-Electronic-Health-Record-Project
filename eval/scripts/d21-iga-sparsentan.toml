@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): nephrology clinic switching losartan to sparsentan for IgA nephropathy. Format: eval/README.md.
 id = "d21-iga-sparsentan"
 voice = "am_michael"
-tags = ["long", "vitals", "numbers", "drug-new", "negation", "recombination", "spoken-punctuation"]
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "recombination", "spoken-punctuation", "experiencer"]
 dates = []
 drugs = ["losartan", "dapagliflozin", "sparsentan"]
 text = """

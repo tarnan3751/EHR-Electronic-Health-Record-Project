@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): migraine on zavegepant nasal spray, with a refill to leave out. Format: eval/README.md.
 id = "d19-migraine-zavegepant"
 voice = "ff_siwis"
-tags = ["numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
+tags = ["numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer"]
 noise = ["hvac"]
 dates = []
 drugs = ["sumatriptan", "zavegepant", "atogepant"]
@@ -12,7 +12,7 @@ aura {comma} currently about [[6|six]] migraine days a month {period} Triptans h
 with sumatriptan and does not want to take them again {period} She has been using zavegepant nasal spray
 [[10 mg|ten milligrams]] {comma} one spray at onset {comma} and it works within about an hour for most attacks
 {period} She notices a bad taste afterwards but no other side effects {period} She takes atogepant
-[[60 mg|sixty milligrams]] daily for prevention {period} No new neurological symptoms {comma} no visual loss and no
+[[60 mg|sixty milligrams]] daily for prevention {period} Her mother and her sister both have migraine {period} No new neurological symptoms {comma} no visual loss and no
 weakness {period} Headaches are worse with bright light and noise but not worse lying down or in the morning
 {period} {new paragraph}
 Neurological exam is normal {comma} fundi normal {period} {new paragraph}
@@ -24,13 +24,14 @@ Plan {colon} continue zavegepant up to one spray in [[24 hours|twenty-four hours
 """
 
 [gold.history]
-value = "36-year-old woman with migraine without aura, currently about 6 migraine days a month. Chest tightness with sumatriptan; does not want triptans again. Using zavegepant nasal spray 10 mg, one spray at onset; works within about an hour for most attacks. Bad taste afterwards, no other side effects. Takes atogepant 60 mg daily for prevention. No new neurological symptoms, no visual loss, no weakness. Headaches worse with bright light and noise, but not worse lying down or in the morning. Neurological exam normal, fundi normal."
+value = "36-year-old woman with migraine without aura, currently about 6 migraine days a month. Chest tightness with sumatriptan; does not want triptans again. Using zavegepant nasal spray 10 mg, one spray at onset; works within about an hour for most attacks. Bad taste afterwards, no other side effects. Takes atogepant 60 mg daily for prevention. Her mother and her sister both have migraine. No new neurological symptoms, no visual loss, no weakness. Headaches worse with bright light and noise, but not worse lying down or in the morning. Neurological exam normal, fundi normal."
 sources = [
     "36-year-old woman with migraine without aura, currently about 6 migraine days a month.",
     "Triptans helped but she had chest tightness with sumatriptan and does not want to take them again.",
     "She has been using zavegepant nasal spray 10 mg, one spray at onset, and it works within about an hour for most attacks.",
     "She notices a bad taste afterwards but no other side effects.",
     "She takes atogepant 60 mg daily for prevention.",
+    "Her mother and her sister both have migraine.",
     "No new neurological symptoms, no visual loss and no weakness.",
     "Headaches are worse with bright light and noise but not worse lying down or in the morning.",
     "Neurological exam is normal, fundi normal.",

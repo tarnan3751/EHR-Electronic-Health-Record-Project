@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): alopecia areata starting ritlecitinib, with an allergy change to leave out. Format: eval/README.md.
 id = "d32-alopecia-ritlecitinib"
 voice = "ef_dora"
-tags = ["numbers", "drug-new", "negation", "allergy-change", "spoken-punctuation"]
+tags = ["numbers", "drug-new", "negation", "allergy-change", "spoken-punctuation", "experiencer"]
 dates = []
 drugs = ["doxycycline", "ritlecitinib"]
 forbidden = ["put doxycycline on her allergy list"]

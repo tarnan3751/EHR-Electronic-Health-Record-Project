@@ -24,7 +24,7 @@ VOICES = tomllib.loads((EVAL_DIR / "voices.toml").read_text(encoding="utf-8"))
 CONTENT_TAGS = {
     "dates", "numbers", "vitals", "drug-new", "drug-uncommon", "negation", "self-correction", "order-attempt",
     "allergy-change", "mixed-plan", "recombination", "injection", "missing-field", "spoken-punctuation", "long",
-    "short", "max-length",
+    "short", "max-length", "experiencer",
 }  # fmt: skip
 ACCENTS = {"us", "gb", "hi-voice", "es-voice", "fr-voice"}
 
@@ -51,7 +51,7 @@ UNCOMMON_DRUGS = {
 MINIMUMS = {
     "dates": 6, "vitals": 6, "negation": 6, "self-correction": 6, "drug-new": 6, "drug-uncommon": 6,
     "order-attempt": 5, "allergy-change": 5, "mixed-plan": 5, "recombination": 5, "injection": 3, "missing-field": 4,
-    "long": 6, "max-length": 2,
+    "long": 6, "max-length": 2, "experiencer": 5,
 }  # fmt: skip
 
 # How a dictation corrects itself; a retracted value comes just before one of these.
@@ -59,6 +59,14 @@ CORRECTION = re.compile(r"\b(sorry|wait no|no wait|correction|I mean|scratch tha
 # Negation cues, counted in gold sources and values. "No sorry" and the like are corrections, not negations.
 NEGATION = re.compile(r"\b(no|not|denies|without|negative|never|none)\b", re.IGNORECASE)
 NOT_NEGATION = re.compile(r"\b(no sorry|wait no|no wait|no correction)\b", re.IGNORECASE)
+
+# A finding someone other than the patient has: "family history of", "her mother broke her hip", "in her father".
+RELATIVE = r"(mother|father|sister|brother|son|daughter|parent|grandmother|grandfather|aunt|uncle|cousin)s?"
+SOMEONE_ELSE = re.compile(
+    rf"\bfamily history\b|\b{RELATIVE}( and her {RELATIVE})?( both)? (had|has|have|needed|broke|died)\b|"
+    rf"\bin (his|her|their) {RELATIVE}\b",
+    re.IGNORECASE,
+)
 
 MONTHS = [
     "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
@@ -245,6 +253,7 @@ def test_tags_match_the_content(script):
     assert ("numbers" in tags) == bool(re.search(r"\d", display))
     assert ("spoken-punctuation" in tags) == bool(re.search(r"\{[a-z ]+\}", script.text))
     assert ("missing-field" in tags) == any(not gold.value for gold in script.gold.values())
+    assert ("experiencer" in tags) == bool(SOMEONE_ELSE.search(display))
     assert ("drug-new" in tags) == bool(drugs & NEW_DRUGS)
     assert ("drug-uncommon" in tags) == bool(drugs & UNCOMMON_DRUGS)
     if "self-correction" in tags:
