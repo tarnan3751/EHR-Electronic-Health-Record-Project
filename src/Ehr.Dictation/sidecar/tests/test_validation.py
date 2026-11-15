@@ -520,6 +520,26 @@ def test_an_order_sentence_is_cut_and_the_rest_of_the_plan_kept():
     assert [text.text[s:e] for s, e in checked.spans] == ["Start metformin 500 mg daily"]
 
 
+def test_a_source_quoting_an_instruction_counts_for_the_rest_of_its_words():
+    text = transcript("Start metformin 500 mg twice daily and order an A1c. Recheck in 3 months.")
+    quote = "Start metformin 500 mg twice daily and order an A1c"
+
+    checked = field("Start metformin 500 mg twice daily.", quote, name="plan", text=text)
+
+    assert checked.pending
+    assert [text.text[s:e] for s, e in checked.spans] == ["Start metformin 500 mg twice daily"]
+    assert "unsupported_content" in field("Start metformin 500 mg twice daily. A1c.", quote, name="plan",
+                                          text=text).reasons
+
+
+
+def test_an_instruction_inside_a_source_splits_it_in_two():
+    said = "Start naproxen, order an MRI, recheck in 3 months."
+
+    assert own(said, "Start naproxen. Recheck in 3 months.").pending
+    assert own(said, "MRI, recheck in 3 months.").reasons == ["unsupported_content"]
+
+
 def test_an_instruction_after_and_is_cut_where_it_starts():
     checked = own("Start lisinopril 10 mg daily and order a chest x-ray.",
                   "Start lisinopril 10 mg daily and order a chest x-ray.", "start lisinopril 10 mg daily")

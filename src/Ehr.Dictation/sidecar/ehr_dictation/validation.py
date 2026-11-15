@@ -13,9 +13,10 @@ can't come from "left knee pain, right knee normal", nor "continue lisinopril 50
 and metformin 500 mg". A source with a correction in it is read as corrected.
 
 An instruction to order something or to change the allergy list is never carried into the note (FR-14), but the rest of
-a field is: each sentence of a value holding one is cut where the instruction starts, and sources quoting one are set
-aside. Separately, not_carried_over() lists every such instruction in the transcript, with its kind and where the
-clinician said it, so the review screen can say what still has to be placed in Orders or the allergy list.
+a field is: each sentence of a value holding one is cut where the instruction starts, and a source quoting one counts
+only for its words outside it. Separately, not_carried_over() lists every such instruction in the transcript, with its
+kind and where the clinician said it, so the review screen can say what still has to be placed in Orders or the
+allergy list.
 
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
@@ -26,7 +27,7 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - bad_format: control or format characters, characters NFKC would change, a non-ASCII letter the transcript never uses
   (a look-alike from another alphabet), markup, a link, code or JSON.
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
-  its sources once those quoting an instruction were set aside. An instruction says to place an order, or that one is
+  its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one is
   being placed now ("I'm ordering"), to send, call in, refill or renew a prescription, or to change the allergy list;
   hyphens are ignored ("re-fill"). A plan stays a plan: "start", "continue", "increase" or "stop" a drug, and orders in
   the past or by someone else ("her cardiologist ordered an echo last year"), pass.
@@ -250,11 +251,11 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         if isinstance(found, str):
             reasons.add(found)
             continue
-        # A source quoting an instruction is set aside: whatever the value took from it is then ungrounded.
-        if any(_overlaps(found, directive) for directive in transcript.directives):
-            continue
-        spans.append(found)
-        kept.append(quote)
+        # Only the part of a source outside any instruction counts: whatever the value took from the instruction is then
+        # ungrounded.
+        for piece in _outside_instructions(found, transcript):
+            spans.append(piece)
+            kept.append(transcript.text[piece[0] : piece[1]])
     if quotes and not kept and not reasons & {"source_too_short", "source_not_in_transcript", "source_in_unclear_passage"}:
         reasons.add("order_or_allergy_change")
     quotes = kept
@@ -306,6 +307,24 @@ def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int
     unused = [span for span in clear if span not in earlier]
     after = earlier[-1][1] if earlier else 0
     return next((span for span in unused if span[0] >= after), unused[0] if unused else clear[0])
+
+
+def _outside_instructions(span: tuple[int, int], transcript: _Transcript) -> list[tuple[int, int]]:
+    """The runs of a span's words that are outside every instruction, each a span of its own."""
+    pieces: list[tuple[int, int]] = []
+    run: list[Token] = []
+    for word in transcript.words:
+        if not (span[0] <= word.start and word.end <= span[1]):
+            continue
+        if any(_overlaps((word.start, word.end), directive) for directive in transcript.directives):
+            if run:
+                pieces.append((run[0].start, run[-1].end))
+            run = []
+        else:
+            run.append(word)
+    if run:
+        pieces.append((run[0].start, run[-1].end))
+    return pieces
 
 
 def _overlaps(a: tuple[int, int], b: tuple[int, int]) -> bool:
