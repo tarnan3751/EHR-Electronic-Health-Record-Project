@@ -4,7 +4,7 @@ An electronic health record with a web app (clinical and patient portal) and a M
 
 ## Status
 
-Early foundation, with the first EHR feature: finding a patient and opening their chart. The walking skeleton (one trivial feature, team quick text, through every layer) is done: the database foundation, the on-site page, the off-site host, the sync API, and the desktop app. Next is the model spike: both dictation models running on the demo laptop, with a measured time for a two-minute dictation.
+Early foundation, with the first EHR feature: finding a patient and opening their chart. The walking skeleton (one trivial feature, team quick text, through every layer) is done: the database foundation, the on-site page, the off-site host, the sync API, and the desktop app. Dictation's server side is built and measured on a test set (see [Dictation](#dictation)); next are its screens: the dictate button, and the note-writing and review screens.
 
 **Working today**
 
@@ -13,13 +13,14 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 - Sign-in and authorization. Staff and patients have separate accounts, cookies and sign-in pages (`Areas/Clinical/Pages/Account`, `Areas/Portal/Pages/Account`). Every staff sign-in takes a password and a code from an authenticator app, wherever it comes from; a new account enrolls its app at its first sign-in, and sees recovery codes once. The on-prem app creates the first admin from `Ehr:Bootstrap` settings when there are no staff accounts; admins create the rest at **Staff**, each with a one-time setup link, and look after them there: a new setup link for a forgotten password, an authenticator reset for a lost phone, and disabling an account, which locks it out and ends its sessions until it is enabled again. Policies attach to whole areas (`Program.cs`): any staff account for the clinic's root (which sends a clinician to their patients and an admin to the staff page), clinicians for patients, admins for staff, patient accounts for the portal, and nothing anonymous but the sign-in pages and static files. The desktop app signs in at `/api/desktop/sign-in` with the same two factors and gets a session token, which every sync request carries; the token is a clinician's, lasts thirty days, and ends at sign-out or when the password changes (`ehr.desktop_sessions`). The signed-in account reaches the database as `app.user_id`, where row-level security is the second layer.
 - The first PHI table, patients, with row-level security enabled and forced, a write-audit trigger, and the PHI reader in `Ehr.Domain` that every read goes through and that records each one (`db/policies`, `Phi/PhiReader.cs`). A clinician's home is their panel: the patients they have added to it from the chart (`ehr.patient_assignments`, PHI like the patients themselves). A search by name, date of birth and MRN, combined, covers the whole clinic: it marks the patients on the clinician's panel as theirs and the rest as restricted, since opening one of those asks for a reason, says what to correct when criteria can't be searched (such as a date that doesn't exist), and the chart links back to the same results. Results also come as the clinician types, up to 20 at a time, since each patient listed is a recorded read; Enter gives the full list. The name field has the focus on arrival, `/` reaches the search from any clinical page, and the arrow keys move through the results. When the database fails, the search says it couldn't be completed and the chart that it couldn't be loaded, rather than showing a blank page; a chart that doesn't exist says so too. The chart shows demographics, the allergies, medications and diagnoses the patient has now, and their five latest visits with the latest one's blood pressure and heart rate, each section saying when nothing is recorded (and "No known allergies" apart from no allergy information); these live in their own PHI tables, shaped on FHIR like patients and read only for now, and opening the chart is one recorded read of the patient. From the chart a clinician puts the patient on the panel or takes them off, and issues a portal enrollment code. Opening the chart of a patient who is not on the clinician's panel first asks for a reason (emergency, or break-glass, access): the reason is recorded as a `break_glass` audit event for admins to review, and the chart stays open to that clinician for four hours (`ehr.break_glass_accesses`). The database still lets every clinician read every patient, as the team decided; the reason and its review are the control. A patient registers at `/portal/register` with that code, confirms their email, signs in, and sees their own record and nobody else's; a forgotten password is reset through a one-time link sent to their address (`/portal/forgot`). The portal takes the patient from the session, never from a request. Off-site, pages that read PHI come from the cloud app's replica like any other page. The replica takes no writes, so the cloud app records those reads, and the sign-outs it handles itself, in its own audit queue, a file on its disk that is flushed before the page is sent, and ships them to the on-prem app every couple of seconds with a key both apps share (`src/Ehr.Web/CloudAudit`, `Api/Audit`), where they arrive with source `cloud`. So charts and the portal stay readable off-site while the on-prem server is down, and nothing read there goes unrecorded. Every view and change of patient information, and every sign-in, is in `ehr.audit_events`, which nothing at runtime can change. Admins review it at **Audit** (`/admin/audit`): the newest events first, narrowed by action, staff account, patient ID and dates, with emergency access flagged. Admins have no access to patient data, so a patient appears there by ID; the values a write changed, which the trigger records, are the one place an admin sees any.
 - The sync API for the desktop app, at `/api/sync/quick-texts` on both servers (`src/Ehr.Web/Api/Sync`), for a desktop session token; the cloud app checks the token against its replica. A pull returns the phrases changed since a transaction-ID watermark, fed by a change log that a database trigger writes; a push applies batches of changes, each with an idempotency key, and returns applied, duplicate, conflict (with the saved phrase) or invalid for each.
-- The local server stack runs the whole server architecture in Docker Compose: the PostgreSQL 18 primary, its streaming replica, Barman backups with point-in-time restore, and a simulated WAN. Every connection in it is TLS, verified against the setup's certificate authority, and the keys that protect cookies and form tokens are encrypted at rest with the sites' certificate; "Encryption" in [infra/compose/README.md](infra/compose/README.md#encryption) says what the host's disk has to provide for the rest. Verified on Linux, and on an Apple Silicon Mac for replication, isolation, backups and restore; Windows is not yet verified.
+- The local server stack runs the whole server architecture in Docker Compose: the PostgreSQL 18 primary, its streaming replica, Barman backups with point-in-time restore, and a simulated WAN. Every connection in it is TLS, verified against the setup's certificate authority, apart from the `ai` profile's calls to the models inside the on-prem server; the keys that protect cookies and form tokens are encrypted at rest with the sites' certificate; "Encryption" in [infra/compose/README.md](infra/compose/README.md#encryption) says what the host's disk has to provide for the rest. Verified on Linux, and on an Apple Silicon Mac for replication, isolation, backups and restore; Windows is not yet verified.
 - The database foundation: the app's roles (`ehr_owner` for migrations, `ehr_app` and `ehr_read` for the apps), the first table (`quick_texts`), and a migration job that brings the primary up to date every time the server stack starts. Security tests check the roles against a real PostgreSQL 18. See [Database changes](#database-changes).
 - CI (GitHub Actions) checks every push and pull request. `main` only accepts reviewed pull requests that pass it, and each commit on `main` publishes the web image. See [Continuous integration](#continuous-integration).
-- The dictation models download with one script, `src/Ehr.Dictation/setup_models.py`, which checks every file against the hash Hugging Face publishes: K2 Horizon 7B for note structuring and MedASR for speech to text. Nothing uses them yet. See [Dictation models](#dictation-models).
-- Dependency manifests and toolchain versions are in place. Python packages use version ranges until a lockfile is added.
+- The dictation models download with one script, `src/Ehr.Dictation/setup_models.py`, which checks every file against the hash Hugging Face publishes: K2 Horizon 7B for note structuring and MedASR for speech to text. See [Dictation models](#dictation-models).
+- Dictation, server side: MedASR transcribes as the clinician speaks, marking passages too quiet, too noisy or too uncertain to trust; K2 Horizon sorts the finished transcript into History, Assessment and Plan; and every proposed value is checked against the transcript before anyone can see it, so one that isn't grounded in it, or that orders something or changes the allergy list, is never shown. What passes is pending until a clinician approves it, and nothing is stored. The on-prem app's dictation API, for clinicians, is what the coming screens will use; off-site, the cloud app forwards it. A test set of synthetic dictations measures it all, and CI checks the committed results against the prompt and checks in each commit. Measured on an Apple Silicon Mac; the accepted baseline is recorded on the server machine. See [Dictation](#dictation).
+- Dependency manifests and toolchain versions are in place. The dictation sidecar's and the eval's Python packages are locked, each in its `uv.lock`; `setup_models.py` lists its own version ranges.
 
-**Not built yet:** the rest of the patient data model (notes, orders, results, and editing allergies, medications, diagnoses and visits), the clinical workflows beyond finding a patient and opening a chart, the portal's results, appointments and messages, dictation itself (the MedASR sidecar, the note schema and prompt, the review screen), and the desktop app syncing anything but quick texts.
+**Not built yet:** the rest of the patient data model (notes, orders, results, and editing allergies, medications, diagnoses and visits), the clinical workflows beyond finding a patient and opening a chart, the portal's results, appointments and messages, dictation's screens (the dictate button, and the note-writing and review screens) and storing dictated notes, and the desktop app syncing anything but quick texts.
 
 ## Layout
 
@@ -32,7 +33,7 @@ src/
   Ehr.Data/         EF Core + Dapper on Npgsql: read and write contexts, RLS interceptor
   Ehr.Design/       Razor class library: design tokens, CSS, sprite sheet, shared partials, htmx, Alpine.js
   Ehr.Desktop/      Tauri 2 app: src-tauri (Rust shell, SQLCipher, sync) + frontend
-  Ehr.Dictation/    setup_models.py (downloads both models) and its tests; sidecar (Python, MedASR), llama-server config, note schema
+  Ehr.Dictation/    setup_models.py (downloads both models) and its tests; sidecar (Python: MedASR, K2 Horizon, the checks), schema (note schema and prompt), llama-server config
 tests/
   Ehr.Security.Tests/      RLS, role, and audit gates against real PostgreSQL 18
   Ehr.Architecture.Tests/  layering, and PHI reads only through the PHI reader
@@ -42,7 +43,7 @@ tests/
 db/
   migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
   policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
-eval/               dictation gold set and scoring
+eval/               dictation test set, scoring and results
 bench/              the synthetic clinic and its seed (Ehr.Seed), and the render-time benchmark (Ehr.Bench)
 infra/              compose (local server stack), migrate (migration job), barman (backup image), tailscale (access rules)
 .github/            CI workflow and Dependabot settings
@@ -132,7 +133,7 @@ The account is created at the next start if there are no staff accounts yet. The
 | Server stack: stop | Stops it and keeps its data |
 | Server stack: reset | Stops it and deletes all its data |
 
-**Tests:** `dotnet test` runs every test project. Docker must be running: the security and web tests start a real PostgreSQL 18 in a container. For the desktop app, run `cargo test` from `src/Ehr.Desktop/src-tauri`; it needs no Docker. For the dictation model script, run `uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests`; it needs no network.
+**Tests:** `dotnet test` runs every test project. Docker must be running: the security and web tests start a real PostgreSQL 18 in a container. For the desktop app, run `cargo test` from `src/Ehr.Desktop/src-tauri`; it needs no Docker. For the dictation model script, run `uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests`; it needs no network. For the dictation sidecar and the eval, with ffmpeg installed, run `uv run --project src/Ehr.Dictation/sidecar pytest src/Ehr.Dictation/sidecar/tests` and `uv run --project eval pytest eval/tests`; they use stand-ins for the models.
 
 ## Local server stack
 
@@ -159,10 +160,40 @@ uv run src/Ehr.Dictation/setup_models.py             # both models
 - `infra/compose/models/models-manifest.json` records the repository, commit, file and SHA-256 of what was installed, for the provenance each dictated note stores. `--verify` re-checks the files against it, offline.
 - If you already have the K2 Horizon file (for example from `llama-server -hf`), pass it with `--from-file <path>`. It's used only if it's byte-for-byte the published file.
 - The K2 Horizon license and model card are saved in `infra/compose/models/notices/`. Apache 2.0 asks that they go along with the file.
+- The dictation sidecar doesn't use MedASR's optional 6-gram language model (`lm_6.kenlm` and `lm_6.arpa.xz`, about 945 MB together). Add `--medasr-exclude 'lm_6.*'` to leave it out.
 
 To run K2 Horizon in the local stack, set `LLAMA_MODEL_FILE` (the script prints the value) and `LLAMA_API_KEY` in `infra/compose/.env`, then start the `ai` profile (see [infra/compose/README.md](infra/compose/README.md#ai-profile)). K2 Horizon "thinks" at full effort by default, which is slow; the `llama` service sets its reasoning effort to low.
 
 K2 Horizon "7B" stores about 9 billion parameters. With an 8K context it needs about 6 to 7 GB of memory, so a computer with 8 GB of RAM struggles. MedASR is small enough for any machine's CPU.
+
+## Dictation
+
+A clinician dictates, and MedASR transcribes as they speak. When they stop, K2 Horizon sorts the transcript into History, Assessment and Plan, and every proposed value is checked against the transcript before anyone can see it. What passes is pending until a clinician approves it; nothing is stored. This is the server side and the API the coming screens will use.
+
+- **The sidecar** (`src/Ehr.Dictation/sidecar`, Python) does all of it, on the on-prem server only. ffmpeg decodes whatever the browser recorded, in memory. MedASR transcribes it, cut at pauses, and marks passages too quiet, too noisy or too uncertain to trust, which are left out of what K2 Horizon sorts. llama-server runs K2 Horizon with the note schema (`src/Ehr.Dictation/schema`) as its response format. `validation.py` throws away any value that isn't grounded in the transcript, or that orders something or changes the allergy list, and keeps only the reason. The sidecar has no database access, and its logs carry no audio or text. Its API and limits are in the header of `ehr_dictation/api.py`.
+- **The on-prem app's API** (`src/Ehr.Web/Api/Dictation`) is for clinicians signed in to the web app, and the cloud app forwards it to the on-prem app. Every call answers within 20 seconds; if K2 Horizon is unavailable or too slow, the transcript comes back as plain text with a note that the fields couldn't be sorted.
+- **In the local stack** the sidecar is the `ai` profile's `dictation` service (see [infra/compose/README.md](infra/compose/README.md#ai-profile)).
+
+To use the sidecar with `dotnet run`, start llama-server natively as under [Dictation server hardware](#dictation-server-hardware). Then set `DICTATION_API_KEY` (any long random value), `LLAMA_API_KEY` (llama-server's), `DICTATION_MODELS_DIR=infra/compose/models`, `DICTATION_LLAMA_URL=http://127.0.0.1:8080` and, on a Mac, `DICTATION_DEVICE=mps` in the environment, and from the repository folder run:
+
+```
+uv run --project src/Ehr.Dictation/sidecar uvicorn --factory ehr_dictation.api:create_app --host 127.0.0.1 --port 8090
+```
+
+and tell the web app where it is, once:
+
+```
+dotnet user-secrets set Ehr:Dictation:Url http://127.0.0.1:8090 --project src/Ehr.Web
+dotnet user-secrets set Ehr:Dictation:ApiKey <the same DICTATION_API_KEY> --project src/Ehr.Web
+```
+
+**The eval** (`eval/`) measures the pipeline on a test set of synthetic dictations (`eval/scripts`), recorded by text-to-speech voices with background noise mixed in (`eval/README.md` says how to make the recordings, and how to record the scripts in your own voice). Some voices stand in for accents; they are synthetic stand-ins, not real regional accents. With the models installed, llama-server running and `LLAMA_API_KEY` set:
+
+```
+uv run --project eval python -m ehr_eval.run --llama-url http://127.0.0.1:8080 --device mps
+```
+
+It writes `eval/results/latest.json`: word error rate overall and per tag, date and drug-name accuracy, note-field precision, recall and F1, what the checks passed and discarded and why, the share of offered words the transcript doesn't support, any order or allergy change offered (there must be none), what the order-and-allergy rule discarded that was legitimate, and the time for a two-minute dictation by stage. It is stamped with the models' hashes, the prompt and schema hash, the test set's hash and the machine. CI's gate needs that file to match the commit, so a change to the prompt, schema, validation rules or test set means running the eval again and committing the new results. The accepted baseline, `eval/results/baseline.json`, is recorded by the owner on the server machine; after that, the gate also fails any run that scores lower, or comes from another machine.
 
 ## Database changes
 
@@ -262,16 +293,16 @@ There is no `latest` tag: a deployment names the exact commit it runs.
 | .NET tools (`dotnet-ef`) | `.config/dotnet-tools.json`; run `dotnet tool restore` once |
 | htmx, Alpine.js (CSP build) | `src/Ehr.Design/libman.json`, restored into `wwwroot/lib` at build and served from our own origin |
 | Desktop | `src/Ehr.Desktop/src-tauri/Cargo.toml` |
-| MedASR sidecar | `src/Ehr.Dictation/sidecar/pyproject.toml` |
+| Dictation sidecar | `src/Ehr.Dictation/sidecar/pyproject.toml`, locked in its `uv.lock` |
 | Dictation models | `src/Ehr.Dictation/setup_models.py` (repositories and quantization); what each machine installed is in `infra/compose/models/models-manifest.json` |
 | llama.cpp build | `infra/compose/compose.yaml` and `infra/compose/compose.nvidia.yaml` (container images); this README for the native builds |
-| Dictation eval | `eval/pyproject.toml` |
-| Container images for the local stack | `infra/compose/compose.yaml`, `infra/barman/Dockerfile`, `src/Ehr.Web/Dockerfile` |
+| Dictation eval | `eval/pyproject.toml`, locked in `eval/uv.lock`, where every package it shares with the sidecar has the sidecar's version |
+| Container images for the local stack | `infra/compose/compose.yaml`, `infra/barman/Dockerfile`, `src/Ehr.Web/Dockerfile`, `src/Ehr.Dictation/sidecar/Dockerfile` |
 | GitHub Actions used by CI | `.github/workflows/ci.yml`, each pinned to a commit. Dependabot (`.github/dependabot.yml`) proposes updates weekly. |
 
 ## Dictation server hardware
 
-K2 Horizon 7B runs in llama.cpp's `llama-server`, pinned to build **b11669** on every machine. Support for K2 Horizon arrived in b11454; older builds fail with `unknown model architecture: 'k2-horizon'`. In the local stack it's the opt-in `ai` profile. MedASR will run in Docker on CPU, since the model is small; its sidecar isn't written yet.
+K2 Horizon 7B runs in llama.cpp's `llama-server`, pinned to build **b11669** on every machine. Support for K2 Horizon arrived in b11454; older builds fail with `unknown model architecture: 'k2-horizon'`. In the local stack it's the opt-in `ai` profile. MedASR runs in the dictation sidecar, in Docker on the CPU, since the model is small; natively on a Mac it can use the GPU (`DICTATION_DEVICE=mps`).
 
 | Server machine | How `llama-server` runs |
 |---|---|
