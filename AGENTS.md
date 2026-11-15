@@ -53,10 +53,11 @@ The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 - macOS and Windows desktop builds, with `cargo fmt --check` and `cargo clippy -D warnings`.
 - The tests for `src/Ehr.Dictation/setup_models.py`, the dictation sidecar and the eval, and the sidecar's image built for `linux/amd64` and `linux/arm64`.
 - The committed dictation eval results (`eval/results/latest.json`) come from the current prompt, note schema, generation parameters, sidecar code, eval code and test set, cover every script with every recording sorted, show no order or allergy change and no retracted value without a warning that the owner hasn't accepted in `eval/known-limitations.toml`, and score no lower than the last accepted baseline.
+- p99 server render time excluding the commit under 20 ms on 50,000 seeded patients (`bench/Ehr.Bench`). The full time, commit included, is reported beside it; its 20 ms target is checked on the clinic server, because CI runners' disks make commit time unsteady.
 
 Gates added to `ci` as the code they check appears:
 
-- p99 server render under 20 ms on 50,000 seeded patients; page JavaScript under 50 KB, compressed, as served; first contentful paint under 500 ms.
+- Page JavaScript under 50 KB, compressed, as served; first contentful paint under 500 ms.
 
 Run `dotnet format` (and `cargo fmt` for the desktop app) before pushing.
 

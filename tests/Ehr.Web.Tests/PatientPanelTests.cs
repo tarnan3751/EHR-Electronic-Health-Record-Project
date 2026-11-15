@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Web.CloudAudit;
@@ -11,7 +12,7 @@ namespace Ehr.Web.Tests;
 // A clinician's panel (Areas/Clinical/Pages/Patients, PatientAssignments): the clinic's home shows their own patients
 // first, a search covers the clinic and marks theirs, and the chart puts a patient on the panel or takes them off,
 // except off-site while the clinic's server can't be reached.
-public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
+public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
@@ -50,6 +51,7 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         var panel = await session.Client.GetStringAsync("/patients", Cancel);
         Assert.Contains("My patients", panel);
         Assert.Contains($"/patients/{patient}", panel);
+        Assert.DoesNotContain("More patients are on your panel", panel);
         var search = await session.Client.GetStringAsync("/patients?name=Paneled", Cancel);
         Assert.Contains($"/patients/{patient}", search);
         Assert.Contains("Yours", search);
@@ -85,6 +87,38 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Yours", theirSearch);
     }
 
+    // A search lists at most 50; the panel, which can't be narrowed, lists 100, each one a recorded read, and says how
+    // to reach the rest.
+    [Fact]
+    public async Task A_panel_of_101_lists_100_reads_each_once_and_says_to_search_for_the_rest()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Busy", StaffRoles.Clinician);
+        var family = "Crowd" + Guid.NewGuid().ToString("N")[..6];
+        var patients = new List<Guid>();
+        for (var i = 0; i <= Ehr.Web.Areas.Clinical.Pages.Patients.IndexModel.PanelLimit; i++)
+        {
+            patients.Add(await apps.InsertPatientAsync($"Given{i:D3}", family));
+            await apps.AssignAsync(clinician, patients[^1]);
+        }
+
+        // Signing in lands on the panel, which lists it once already.
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        var before = await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id);
+        var panel = await session.Client.GetStringAsync("/patients", Cancel);
+
+        var listed = ChartLink().Matches(panel).Select(match => Guid.Parse(match.Groups[1].Value)).ToList();
+        Assert.Equal(100, listed.Count);
+        Assert.Contains("More patients are on your panel than are listed here: these are the first 100, in name order. Search to find the others.", panel);
+        Assert.Equal(before + 100, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
+        // In name order the 101st is the last, never listed, and never read. Each one listed was read once for each
+        // listing, the sign-in's and this one.
+        Assert.DoesNotContain(patients[^1], listed);
+        foreach (var patient in patients)
+        {
+            Assert.Equal(listed.Contains(patient) ? 2 : 0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+        }
+    }
+
     [Fact]
     public async Task With_the_on_prem_app_unreachable_the_chart_offers_no_changes()
     {
@@ -117,4 +151,8 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Contains("Enrollment codes can be issued once the clinic's server is back.", chart);
         });
     }
+
+    // A patient's chart link, as the page's tables have them.
+    [GeneratedRegex("href=\"/patients/([0-9a-f-]{36})")]
+    private static partial Regex ChartLink();
 }

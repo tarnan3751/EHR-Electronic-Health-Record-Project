@@ -9,20 +9,45 @@ namespace Ehr.Testing;
 
 // A real PostgreSQL 18, set up the way infra/migrate sets up the primary: the initdb bootstrap (ehr_owner and the
 // ehr schema), then, as ehr_owner, db/policies/00-roles.sql, the EF Core migrations, and the rest of db/policies.
+//
+// For the tests it runs as Testcontainers starts PostgreSQL, with fsync, synchronous_commit and full_page_writes off:
+// a commit returns before its changes reach the disk. That makes the suites fast and changes nothing they check:
+// every later query sees a committed transaction the same either way, and no test crashes the server. The render-time
+// benchmark times commits, so its database (Durable) has all three on, as the stack's primary does.
 public sealed class MigratedDatabase : IAsyncLifetime
 {
     public const string AppPassword = "test-app";
     public const string ReadPassword = "test-read";
     const string OwnerPassword = "test-owner";
 
-    readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:18")
-        .WithDatabase("ehr")
-        .WithEnvironment("EHR_OWNER_PASSWORD", OwnerPassword)
-        .WithResourceMapping(
-            new FileInfo(RepositoryRoot.Combine("infra/compose/postgres/primary/initdb/20-ehr-owner.sh")),
-            "/docker-entrypoint-initdb.d/",
-            fileMode: Unix.FileMode755)
-        .Build();
+    readonly PostgreSqlContainer container;
+
+    public MigratedDatabase()
+        : this(durable: false)
+    {
+    }
+
+    MigratedDatabase(bool durable)
+    {
+        var builder = new PostgreSqlBuilder("postgres:18")
+            .WithDatabase("ehr")
+            .WithEnvironment("EHR_OWNER_PASSWORD", OwnerPassword)
+            .WithResourceMapping(
+                new FileInfo(RepositoryRoot.Combine("infra/compose/postgres/primary/initdb/20-ehr-owner.sh")),
+                "/docker-entrypoint-initdb.d/",
+                fileMode: Unix.FileMode755);
+        if (durable)
+        {
+            // In place of Testcontainers' own command, which turns the three off.
+            builder = builder.WithCommand(new OverwriteEnumerable<string>(
+                ["-c", "fsync=on", "-c", "synchronous_commit=on", "-c", "full_page_writes=on"]));
+        }
+
+        container = builder.Build();
+    }
+
+    // One whose commits wait for the disk, for the benchmark.
+    public static MigratedDatabase Durable() => new(durable: true);
 
     // The superuser, for inspecting the catalog.
     public string SuperuserConnectionString => container.GetConnectionString();
