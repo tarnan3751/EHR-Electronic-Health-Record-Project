@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "The note fields K2 Horizon may propose from one dictated transcript (FR-11), sent to llama-server as the response format, so the model can't answer in any other shape (the sidecar's prompt.py strips $schema and $comment first). History, Assessment and Plan only: there is no field for orders or allergies (FR-14). Each field is a value and the passages of the transcript it came from, copied word for word; an empty value with no sources means the transcript said nothing for that field. Changing this file needs line-by-line human review (AGENTS.md) and a new eval run (eval/README.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["history", "assessment", "plan"],
+  "properties": {
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "sources"],
+      "properties": {
+        "value": { "type": "string", "maxLength": 2000 },
+        "sources": { "type": "array", "maxItems": 12, "items": { "type": "string", "maxLength": 600 } }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "sources"],
+      "properties": {
+        "value": { "type": "string", "maxLength": 1200 },
+        "sources": { "type": "array", "maxItems": 12, "items": { "type": "string", "maxLength": 600 } }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "sources"],
+      "properties": {
+        "value": { "type": "string", "maxLength": 1200 },
+        "sources": { "type": "array", "maxItems": 12, "items": { "type": "string", "maxLength": 600 } }
+      }
+    }
+  }
+}
