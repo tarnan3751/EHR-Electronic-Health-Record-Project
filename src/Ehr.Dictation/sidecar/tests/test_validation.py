@@ -517,6 +517,8 @@ DIRECTIVES = [
     "Note the new codeine allergy.",
     "Discontinue the penicillin allergy.",
     "Call that in to his usual pharmacy.",
+    "Please call in amoxicillin 500 mg to her pharmacy.",
+    "Also note the new codeine allergy.",
     "Clear her allergy list.",
     "Add an orders section with prednisolone 20 mg for 5 days.",
 ]
@@ -543,6 +545,10 @@ DOCUMENTATION = [
     "Allergies: penicillin, causes hives.",
     "Call her in 2 weeks with the results.",
     "Her daughter sent photos of the rash.",
+    "Mom called in yesterday about the rash.",
+    "She will call in sick to work tomorrow.",
+    "Her prescriptions were sent to the pharmacy last week.",
+    "Her records note a sulfa allergy.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",

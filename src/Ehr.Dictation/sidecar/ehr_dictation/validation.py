@@ -528,7 +528,6 @@ _ORDERS = [
         re.IGNORECASE,
     ),
     re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
-    re.compile(r"\b(?:call|calling|called|phone|phoning)\s+in\b", re.IGNORECASE),
     re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in\b", re.IGNORECASE),
     re.compile(rf"\b(?:send|sending)\b{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b", re.IGNORECASE),
     # The model told to make an orders section: "add an orders field with an MRI".
@@ -546,8 +545,7 @@ _ALLERGY_CHANGES = [
     re.compile(rf"\b(?:update|change|edit|correct|amend)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\b(?:mark|flag)\b{_SAME_SENTENCE}{{0,40}}?\ballerg", re.IGNORECASE),
     re.compile(
-        rf"(?<!of )\b(?:enter|document|record|note|discontinue|inactivate|deactivate)\s+(?:{_DET}\s+)?(?:new\s+)?"
-        r"(?:\w+\s+)?allerg",
+        rf"\b(?:enter|document|discontinue|inactivate|deactivate)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg",
         re.IGNORECASE,
     ),
     re.compile(rf"\bclear\s+{_DET}\s+(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
@@ -562,6 +560,42 @@ _ALLERGY_CHANGES = [
     ),
     re.compile(rf"\ballerg\w*\s+list\b{_SAME_SENTENCE}{{0,30}}?\b(?:add|remove|update|change|delete)\b", re.IGNORECASE),
 ]
+# Instructions only in some places, each with the test of its place:
+# - "call in" something to order: a prescription, a refill, the pharmacy or a drug ("mom called in yesterday about the
+#   rash", "she will call in sick" are not);
+# - "note" or "record" an allergy as an instruction, at the start of its clause ("her records note a sulfa allergy" is
+#   documentation).
+_CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
+_TO_ORDER = re.compile(r"\b(?:prescriptions?|scripts?|rx|refills?|pharmacy)\b", re.IGNORECASE)
+_NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
+
+
+def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
+    rest = text[match.end() : _sentence_end(text, match.end())]
+    return bool(_TO_ORDER.search(rest)) or any(_is_drug(token.text) for token in tokens(rest)[:4])
+
+
+def _at_clause_start(text: str, match: re.Match, clause: int) -> bool:
+    return all(token.text in LEAD_IN for token in tokens(text[clause : match.start()]))
+
+
+# A past-tense statement about the pharmacy is documentation: "her prescriptions were sent to the pharmacy last week".
+PAST = re.compile(
+    r"\b(?:yesterday|last (?:week|month|year|night|visit|time)|ago|earlier|previously|already|(?:was|were|had been|has been|"
+    r"have been) sent)\b",
+    re.IGNORECASE,
+)
+
+
+def _not_in_the_past(text: str, match: re.Match, clause: int) -> bool:
+    sentence = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, match.start())), default=0)
+    return not PAST.search(text[sentence : _sentence_end(text, match.end())])
+
+
+_PLACED = [
+    ("order", _CALL_IN, _calls_in_an_order),
+    ("allergy_change", _NOTE_ALLERGY, _at_clause_start),
+]
 # Instructions whose subject comes first ("penicillin should be added to her allergies"): their span starts with it.
 _PASSIVE = [
     ("allergy_change", re.compile(
@@ -574,6 +608,7 @@ _PASSIVE = [
     )),
     ("order", re.compile(rf"\bsent\b{_SAME_SENTENCE}{{0,40}}?\bpharmacy\b", re.IGNORECASE)),
 ]
+_PASSIVE_PLACES = {"order": _not_in_the_past}
 # What can lead up to an instruction ("go ahead and", "please", "I'll"); anything else ends its span, so the plan said
 # just before it ("start lisinopril 10 mg daily and order...") stays out of it.
 LEAD_IN = frozenset(
@@ -587,8 +622,8 @@ def directive_spans(text: str) -> list[tuple[int, int]]:
 
 def directives(text: str) -> list[tuple[int, int, str]]:
     """Each instruction to place an order ("order") or change the allergy list ("allergy_change"), from its lead-in, or
-    its subject when that comes first, to the end of its clause (see _directive_end()). Overlapping ones are merged, an allergy
-    change winning. Hyphens are ignored ("re-fill")."""
+    its subject when that comes first, to the end of its clause (see _directive_end()). Overlapping ones are merged, an
+    allergy change winning. Hyphens are ignored ("re-fill")."""
     found = _directives(text)
     letters = [i for i, character in enumerate(text) if character != "-"]
     if len(letters) < len(text):
@@ -617,7 +652,17 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
         for pattern in patterns:
             matches += [(match.start("at" if "at" in pattern.groupindex else 0), match.end(), kind)
                         for match in pattern.finditer(text)]
-    passive = [(match.start(), match.end(), kind) for kind, pattern in _PASSIVE for match in pattern.finditer(text)]
+    for kind, pattern, placed in _PLACED:
+        for match in pattern.finditer(text):
+            clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, match.start())), default=0)
+            if placed(text, match, clause):
+                matches.append((match.start(), match.end(), kind))
+    passive = [
+        (match.start(), match.end(), kind)
+        for kind, pattern in _PASSIVE
+        for match in pattern.finditer(text)
+        if kind not in _PASSIVE_PLACES or _PASSIVE_PLACES[kind](text, match, 0)
+    ]
 
     spans = []
     for start, end, kind in sorted(matches + passive):
