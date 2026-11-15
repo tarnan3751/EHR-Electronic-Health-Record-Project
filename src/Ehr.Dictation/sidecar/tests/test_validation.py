@@ -588,6 +588,9 @@ DIRECTIVES = [
     "Be sure to note the new latex allergy.",
     "Please do not forget to record the new sulfa allergy.",
     "I did call in amoxicillin.",  # only someone else calling in, in the past, is documentation
+    "The nurse was asked to call in amoxicillin to her pharmacy.",
+    "The nurse is to call in amoxicillin.",
+    "Her daughter has been told to call in amoxicillin.",
 ]
 
 DOCUMENTATION = [
@@ -620,6 +623,9 @@ DOCUMENTATION = [
     "Please call in to say how she is doing.",
     "She can call in for an appointment next week.",
     "Her husband did call in to check on her.",
+    "Her husband was calling in from work.",
+    "Her daughters were calling in from abroad.",
+    "Her son had been calling in every week.",
     "Calling in yesterday, mom said the rash was worse.",
     "Her son will call in later to say how she is.",
     "She may call in today for an appointment.",
