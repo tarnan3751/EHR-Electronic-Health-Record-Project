@@ -8,7 +8,8 @@ sidecar's own formatter, is the reference transcript, and the gold sources quote
 text-to-speech voices and the people recording read (generate_audio.py, eval/README.md).
 
 The dataset hash covers the scripts, the voices and the audio generator, so results from a different test set are
-told apart (gate.py).
+told apart (gate.py). The measurement hash covers the eval's own code that produces and scores a run, and both
+lockfiles, so results measured or scored differently are told apart too.
 """
 
 from __future__ import annotations
@@ -25,6 +26,8 @@ from ehr_dictation.transcript import format as format_transcript
 EVAL_DIR = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = EVAL_DIR / "scripts"
 DATASET_FILES = ("voices.toml", "generate_audio.py")
+MEASUREMENT_FILES = ("ehr_eval/scripts.py", "ehr_eval/normalize.py", "ehr_eval/dates.py", "ehr_eval/scoring.py",
+                     "ehr_eval/run.py", "uv.lock", "../src/Ehr.Dictation/sidecar/uv.lock")
 
 ALTERNATIVE = re.compile(r"\[\[([^\[\]|]*)\|([^\[\]]*)\]\]")
 COMMAND = re.compile(r"\{([^{}]*)\}")
@@ -96,4 +99,14 @@ def dataset_sha256(eval_dir: Path = EVAL_DIR) -> str:
         if path.is_file():
             digest.update(path.relative_to(eval_dir).as_posix().encode() + b"\0")
             digest.update(path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    return digest.hexdigest()
+
+
+def measurement_sha256(eval_dir: Path = EVAL_DIR) -> str:
+    """One hash over the code that runs and scores the eval, and the packages both sides lock."""
+    digest = hashlib.sha256()
+    for name in MEASUREMENT_FILES:
+        path = eval_dir / name
+        digest.update(name.encode() + b"\0")
+        digest.update((path.read_bytes().replace(b"\r\n", b"\n") if path.is_file() else b"missing") + b"\0")
     return digest.hexdigest()

@@ -9,8 +9,9 @@
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - order_allergy: offered values holding text a script marks forbidden (an order or allergy change it tried to slip in;
-  must be 0), and what the order-and-allergy rule threw away that the gold says was legitimate (false discards), so
-  the owner can judge where that rule draws its line.
+  must be 0); how many of those the result reported as not carried over, so the screen can say they still need placing
+  (recall against the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was
+  legitimate (false discards), so the owner can judge where that rule draws its line.
 - sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took, separately for
   the two-minute dictations, with the live transcript's time per chunk.
 """
@@ -59,8 +60,10 @@ class Item:
     reason: str | None = None
     fields: dict[str, FieldOutcome] = field(default_factory=dict)
     unknown: list[str] = field(default_factory=list)
+    not_carried_over: list[tuple[str, int, int]] = field(default_factory=list)  # code points in the hypothesis
     unclear_passages: int = 0
     timings: dict[str, float] = field(default_factory=dict)
+    tokens: dict[str, int] = field(default_factory=dict)  # llama-server's count: prompt, predicted
     chunk_seconds: list[float] = field(default_factory=list)
 
 
@@ -158,8 +161,11 @@ def _fields(items: list[Item], scripts: dict[str, Script]) -> dict:
 
 
 def _f1(precision: float | None, recall: float | None) -> float | None:
+    """None only when there was nothing to find; with gold to find and nothing offered, 0."""
+    if recall is None:
+        return None
     if not precision or not recall:
-        return 0.0 if precision is not None and recall is not None else None
+        return 0.0
     return round(2 * precision * recall / (precision + recall), 4)
 
 
@@ -190,16 +196,31 @@ def _unsupported(items: list[Item]) -> dict:
     return {"proposed": rate(lambda f: f.proposed), "shown": rate(lambda f: f.shown)}
 
 
+def _contains(text: str, phrase: str) -> bool:
+    """Whether the phrase is in the text as whole words, after normalizing both."""
+    return bool(phrase) and f" {phrase} " in f" {text} "
+
+
+def _reported(item: Item, phrase: str) -> bool:
+    """Whether the phrase was said inside an instruction the result reported as not carried over."""
+    return any(_contains(normalize(item.hypothesis[start:end]), phrase) for _, start, end in item.not_carried_over)
+
+
 def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     shown = 0
+    reported = said = 0
     discarded = lost = lost_without_attempt = 0
     legitimate = 0
     for item in items:
         script = scripts[item.script]
         forbidden = [normalize(text) for text in script.forbidden]
+        for phrase in forbidden:
+            if phrase:
+                said += 1
+                reported += _reported(item, phrase)
         for name, outcome in item.fields.items():
             shown_text = normalize(outcome.shown)
-            shown += sum(1 for text in forbidden if text and text in shown_text)
+            shown += sum(1 for text in forbidden if _contains(shown_text, text))
             gold = script.gold[name].value.strip()
             legitimate += bool(gold)
             if outcome.status != "pending" and "order_or_allergy_change" in outcome.reasons:
@@ -209,6 +230,9 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
                     lost_without_attempt += not (ORDER_ALLERGY_TAGS & set(script.tags))
     return {
         "shown": shown,
+        "forbidden_said": said,
+        "reported_not_carried_over": reported,
+        "reported_recall": _ratio(reported, said),
         "discarded_by_rule": discarded,
         "legitimate_fields_lost": lost,
         "lost_where_nothing_was_attempted": lost_without_attempt,

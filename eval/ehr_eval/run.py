@@ -8,9 +8,15 @@ recording goes through the sidecar's own code: ffmpeg decoding, MedASR transcrip
 checks, timed stage by stage. The two-minute recordings are also fed in one-second chunks, as a live dictation is, to
 time the transcript's update after each chunk. Nothing reaches the network but llama-server.
 
-The results go to eval/results/latest.json (--out), stamped with the models' hashes, the prompt, schema and validation
-version, the test set's hash and the machine. Record the accepted baseline on the server machine only (README.md,
-"Dictation server hardware"): a run on another machine is for information.
+It runs K2 Horizon as the sidecar ships it, reasoning off. --reasoning low256 runs the comparison the owner asked for
+instead, reasoning on at "low" capped at 256 tokens (and enable_thinking set, since a llama-server started with
+--reasoning off would otherwise keep it off): its results go to eval/results/compare-low256.json, which the gate
+doesn't check.
+
+The results go to eval/results/latest.json (--out), stamped with the models' hashes, the prompt, schema and parameters
+hash, the sidecar's code hash, the eval's own measurement hash, the test set's hash and the machine. Record the
+accepted baseline on the server machine only (README.md, "Dictation server hardware"): a run on another machine is for
+information.
 """
 
 from __future__ import annotations
@@ -32,16 +38,25 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 from ehr_dictation import audio, prompt, provenance, validation  # noqa: E402
 from ehr_dictation.asr import MedAsr  # noqa: E402
 from ehr_dictation.llama import LlamaServer, StructuringFailed, Structurer  # noqa: E402
+from ehr_dictation.provenance import CODE_SHA256  # noqa: E402
 from ehr_dictation.sessions import Sessions  # noqa: E402
 from ehr_dictation.settings import Settings  # noqa: E402
 from ehr_dictation.transcriber import Progress, advance  # noqa: E402
 from ehr_dictation.transcript import assemble  # noqa: E402
 
 from . import scoring  # noqa: E402
-from .scripts import EVAL_DIR, dataset_sha256, load_all  # noqa: E402
+from .scripts import EVAL_DIR, dataset_sha256, load_all, measurement_sha256  # noqa: E402
 
 REPO_ROOT = EVAL_DIR.parent
 SCHEMA_VERSION = 1
+
+# The settings a run can use: what ships, and the comparison.
+REASONING = {
+    "off": prompt.PARAMETERS,
+    "low256": prompt.PARAMETERS | {"reasoning_effort": "low", "reasoning_budget_tokens": 256,
+                                   "chat_template_kwargs": {"enable_thinking": True}},
+}
+OUT = {"off": "latest.json", "low256": "compare-low256.json"}
 
 
 def variant_tags(variant: dict, script_tags: list[str]) -> list[str]:
@@ -70,6 +85,7 @@ async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: St
         seconds=samples.size / audio.SAMPLE_RATE,
         hypothesis=transcript.text,
         sorting="done",
+        not_carried_over=[(kind, start, end) for start, end, kind in validation.directives(transcript.text)],
         unclear_passages=len(transcript.unclear_ranges()),
         timings=timings,
     )
@@ -81,6 +97,8 @@ async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: St
         timings["structure"] = time.perf_counter() - started
         return item
     timings["structure"] = time.perf_counter() - started
+    item.tokens = {key: int(proposal.timings[key]) for key in ("prompt_n", "cache_n", "predicted_n")
+                   if proposal.timings and isinstance(proposal.timings.get(key), int)}
 
     checks = validation.check(proposal.fields, proposal.unknown, transcript)
     item.unknown = list(checks.unknown)
@@ -165,8 +183,9 @@ async def main_async(args: argparse.Namespace) -> int:
     models = provenance.load(args.models_dir)
     recognizer = MedAsr(args.models_dir / provenance.MEDASR_DIR, args.device)
     llama = LlamaServer(args.llama_url, api_key)
-    structuring = prompt.load()
+    structuring = prompt.load(parameters=REASONING[args.reasoning])
     structurer = Structurer(llama, structuring, models.language_file, timeout=Settings.structuring_seconds)
+    out = args.out or EVAL_DIR / "results" / OUT[args.reasoning]
     started_at = datetime.now(UTC).isoformat(timespec="seconds")
 
     items: list[scoring.Item] = []
@@ -188,6 +207,8 @@ async def main_async(args: argparse.Namespace) -> int:
             "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "machine": machine(args.machine, args.device),
             "llama_server": structurer.build,
+            "reasoning": args.reasoning,
+            "parameters": structuring.parameters,
         },
         "provenance": {
             "speech": models.speech,
@@ -195,7 +216,8 @@ async def main_async(args: argparse.Namespace) -> int:
             "prompt": structuring.prompt_sha256,
             "schema": structuring.schema_sha256,
             "structuring": structuring.structuring_sha256,
-            "validation": validation.VERSION,
+            "code": CODE_SHA256,
+            "measurement": measurement_sha256(),
         },
         "dataset": {
             "sha256": dataset_sha256(),
@@ -207,9 +229,9 @@ async def main_async(args: argparse.Namespace) -> int:
         "metrics": scoring.score(items, scripts),
         "items": [dataclasses.asdict(item) for item in items],
     }
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Wrote {args.out}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"Wrote {out}")
     return 0
 
 
@@ -220,7 +242,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--audio", type=Path, default=EVAL_DIR / "audio", help="the recordings and their manifest.json")
     parser.add_argument("--device", default="cpu", help="where MedASR runs: cpu, mps (Apple Silicon) or cuda")
     parser.add_argument("--machine", help="a name for this machine in the results (default: its CPU, memory and OS)")
-    parser.add_argument("--out", type=Path, default=EVAL_DIR / "results" / "latest.json")
+    parser.add_argument("--reasoning", choices=sorted(REASONING), default="off",
+                        help="off, as shipped (default), or low256, the comparison")
+    parser.add_argument("--out", type=Path, help="default: eval/results/latest.json, or compare-low256.json")
     parser.add_argument("--only", nargs="*", help="script IDs to run, for a quick look; the gate wants all of them")
     parser.add_argument("--no-live", action="store_true", help="skip the one-second-chunk timing")
     return asyncio.run(main_async(parser.parse_args(argv)))

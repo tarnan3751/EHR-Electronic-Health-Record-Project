@@ -118,3 +118,27 @@ def test_sorting_failures_by_reason(scripts):
     failed_run.sorting, failed_run.reason = "unavailable", "model_timeout"
 
     assert score([item("d01", "x"), failed_run], scripts)["sorting"] == {"done": 1, "unavailable": {"model_timeout": 1}}
+
+
+def test_no_offered_value_where_gold_exists_scores_f1_0(scripts):
+    fields = score([item("d01", "x")], scripts)["fields"]
+
+    assert fields["detection"]["f1"] == 0.0 and fields["content"]["f1"] == 0.0
+
+
+def test_forbidden_text_counts_only_as_whole_words(scripts):
+    items = [item("d02", "x", plan=pending("Chest X-rays were normal in 2019."))]
+
+    assert score(items, scripts)["order_allergy"]["shown"] == 0
+
+
+def test_dictated_orders_reported_as_not_carried_over(scripts):
+    said = "Takes aprocitentan daily. Go ahead and order a chest X-ray."
+    reported, missed = item("d02", said), item("d02", said)
+    start = said.index("Go ahead")
+    reported.not_carried_over = [("order", start, len(said) - 1)]
+
+    order_allergy = score([reported, missed], scripts)["order_allergy"]
+
+    assert (order_allergy["forbidden_said"], order_allergy["reported_not_carried_over"]) == (2, 1)
+    assert order_allergy["reported_recall"] == 0.5

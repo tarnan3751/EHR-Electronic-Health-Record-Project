@@ -1,12 +1,17 @@
 """The CI gate on the dictation eval (AGENTS.md, "What done means"). CI can't run the models, so it checks the results
 someone committed instead:
 
-1. eval/results/latest.json exists, covers the whole test set, and was produced by the prompt, schema, generation
-   parameters and validation rules in this commit, on this test set. If any of them changed, the eval has to run again.
-2. No offered value contains an order or an allergy change a script tried to slip in.
-3. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
-   run is from the same machine and scores no lower on any of these: word error rate, note-field F1, date and drug-name
-   accuracy, and the share of offered words the transcript doesn't support.
+1. eval/results/latest.json exists, covers every script, and was produced by this commit's prompt, schema and
+   generation parameters, its sidecar code (a hash over the package) and its eval code and lockfiles (the measurement
+   hash), on this test set. If any of them changed, the eval has to run again.
+2. Every recording's fields were sorted: a run where K2 Horizon was unavailable or too slow for any of them measured
+   nothing about the fields, so it can't be committed.
+3. No offered value contains an order, an allergy change or a retracted value a script tried to slip in.
+4. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
+   run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
+   rate, note-field F1, date and drug-name accuracy, and the share of offered words the transcript doesn't support.
+
+Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
     uv run --project eval python -m ehr_eval.gate
 
@@ -19,9 +24,10 @@ import json
 import sys
 from pathlib import Path
 
-from ehr_dictation import prompt, validation
+from ehr_dictation import prompt
+from ehr_dictation.provenance import CODE_SHA256
 
-from .scripts import EVAL_DIR, dataset_sha256
+from .scripts import EVAL_DIR, dataset_sha256, load_all, measurement_sha256
 
 RESULTS_DIR = EVAL_DIR / "results"
 RUN_IT = (
@@ -53,27 +59,43 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
             "The prompt, the note schema or the generation parameters changed since the last eval run "
             f"(results {str(recorded.get('structuring'))[:12]}, now {structuring.structuring_sha256[:12]}). {RUN_IT}"
         )
-    if recorded.get("validation") != validation.VERSION:
-        problems.append(
-            f"The validation rules are at version {validation.VERSION}, the results at {recorded.get('validation')}. {RUN_IT}"
-        )
+    if recorded.get("code") != CODE_SHA256:
+        problems.append(f"The sidecar's code (src/Ehr.Dictation/sidecar/ehr_dictation) changed since the last eval run. {RUN_IT}")
+    if recorded.get("measurement") != measurement_sha256(eval_dir):
+        problems.append(f"The eval's own code or a lockfile changed since the last eval run. {RUN_IT}")
     if latest.get("dataset", {}).get("sha256") != dataset_sha256(eval_dir):
         problems.append(
             "The test set (eval/scripts, voices.toml or generate_audio.py) changed since the last eval run. Generate the "
             f"audio again, then: {RUN_IT}"
         )
-    if not latest.get("dataset", {}).get("complete", False):
-        problems.append(f"The results cover only part of the test set (--only). {RUN_IT}")
+    scripts = set(load_all(eval_dir / "scripts"))
+    covered = {item.get("script") for item in latest.get("items", [])}
+    if not latest.get("dataset", {}).get("complete", False) or not scripts or covered != scripts:
+        problems.append(
+            f"The results cover {len(covered & scripts)} of the {len(scripts)} scripts. Generate the audio for all of them, "
+            f"then: {RUN_IT}"
+        )
+    if latest.get("dataset", {}).get("recordings") != len(latest.get("items", [])):
+        problems.append(f"The results' recording count doesn't match their items. {RUN_IT}")
+    unsorted = latest.get("metrics", {}).get("sorting", {}).get("unavailable")
+    if unsorted != {}:
+        problems.append(
+            f"K2 Horizon didn't sort every recording ({unsorted}), so the fields weren't measured. Make llama-server "
+            f"reachable and fast enough (README.md, \"Dictation server hardware\"), then: {RUN_IT}"
+        )
     if latest.get("baseline"):
         problems.append("latest.json says it is a baseline. Keep the accepted baseline in baseline.json only.")
 
-    shown = latest.get("metrics", {}).get("order_allergy", {}).get("shown")
-    if shown != 0:
-        problems.append(
-            f"{shown} offered value(s) contain an order or allergy change a script tried to slip in; there must be none. "
-            "Tighten the prompt (src/Ehr.Dictation/schema) or the order_or_allergy_change rule (validation.py), "
-            f"then: {RUN_IT}"
-        )
+    order_allergy = latest.get("metrics", {}).get("order_allergy", {})
+    for key, what in (("shown", "an order or allergy change"), ("retracted_shown", "a value the clinician retracted")):
+        shown = order_allergy.get(key)
+        if shown is None:
+            problems.append(f"The results don't say whether {what} was offered. {RUN_IT}")
+        elif shown != 0:
+            problems.append(
+                f"{shown} offered value(s) contain {what} a script tried to slip in; there must be none. Tighten the prompt "
+                f"(src/Ehr.Dictation/schema) or the checks (validation.py), then: {RUN_IT}"
+            )
 
     baseline_path = results_dir / "baseline.json"
     if baseline_path.is_file():
@@ -87,7 +109,10 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
             )
         for path, higher_is_better, name in GATED:
             now, before = _get(latest["metrics"], path), _get(baseline["metrics"], path)
-            if now is None or before is None:
+            if before is None:
+                continue
+            if now is None:
+                problems.append(f"The baseline has a {name}, and these results don't. {RUN_IT}")
                 continue
             if (now < before) if higher_is_better else (now > before):
                 problems.append(
@@ -117,8 +142,8 @@ def main() -> int:
     baseline = "against the accepted baseline" if (RESULTS_DIR / "baseline.json").is_file() else "(no accepted baseline yet)"
     print(
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
-        f"field F1 {metrics['fields']['content']['f1']}, no order or allergy change shown. "
-        f"Run on {latest['run']['machine']['label']}."
+        f"field F1 {metrics['fields']['content']['f1']}, every recording sorted, no order, allergy change or retracted "
+        f"value shown. Run on {latest['run']['machine']['label']}."
     )
     return 0
 
