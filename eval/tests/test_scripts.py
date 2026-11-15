@@ -18,6 +18,7 @@ sys.path.insert(0, str(EVAL_DIR))
 import dictation_scripts as ds  # noqa: E402
 
 SCRIPTS = ds.load_scripts()
+FIELDS = ds.FIELDS
 VOICES = tomllib.loads((EVAL_DIR / "voices.toml").read_text(encoding="utf-8"))
 
 CONTENT_TAGS = {
@@ -68,6 +69,13 @@ WRITTEN_DATE = re.compile(rf"\b({'|'.join(MONTHS)}) (\d{{1,2}})(?:, (\d{{4}}))?\
 
 def ids(scripts):
     return [script.id for script in scripts]
+
+
+def golds(script):
+    """Both gold sets, each field of each: the clinical gold, then the rule-following gold."""
+    for table, fields in (("gold", script.gold), ("gold_rules", script.gold_rules)):
+        for field, gold in fields.items():
+            yield f"{table}.{field}", gold
 
 
 def written(date: str) -> str:
@@ -136,7 +144,7 @@ def test_spoken_text_has_only_words(script):
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
 def test_gold_sources_are_quoted_from_the_display_text(script):
-    for field, gold in script.gold.items():
+    for field, gold in golds(script):
         assert bool(gold.value) == bool(gold.sources), f"{field}: a value needs sources, and sources a value"
         for source in gold.sources:
             assert source in script.display, f"{field} source isn't verbatim in the display text: {source!r}"
@@ -144,7 +152,7 @@ def test_gold_sources_are_quoted_from_the_display_text(script):
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
 def test_gold_values_have_no_markup_or_forbidden_text(script):
-    for field, gold in script.gold.items():
+    for field, gold in golds(script):
         assert not re.search(r"[{}]|\[\[|\]\]", gold.value), f"{field} value has markup"
         for item in script.forbidden:
             assert item.lower() not in gold.value.lower(), f"{field} value contains forbidden {item!r}"
@@ -154,10 +162,20 @@ def test_gold_values_have_no_markup_or_forbidden_text(script):
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
 def test_gold_values_keep_every_negation(script):
-    for field, gold in script.gold.items():
+    for field, gold in golds(script):
         said = sum(len(NEGATION.findall(NOT_NEGATION.sub("", source))) for source in gold.sources)
         kept = len(NEGATION.findall(gold.value))
         assert kept >= said, f"{field}: its sources negate {said} times, its value {kept}"
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
+def test_a_rule_following_gold_is_written_only_where_it_differs_and_never_drops_a_field(script):
+    for field in script.rules_fields:
+        assert script.gold_rules[field] != script.gold[field], f"gold_rules.{field} is the clinical gold again: omit it"
+    for field in FIELDS:
+        assert bool(script.gold_rules[field].value) == bool(script.gold[field].value), (
+            f"gold_rules.{field} and gold.{field} disagree on whether the field has anything"
+        )
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
@@ -169,7 +187,7 @@ def test_retracted_values_come_before_a_correction_and_stay_out_of_gold(script):
         assert any(CORRECTION.search(script.display[end : end + 40]) for end in positions), (
             f"retracted {value!r} isn't followed by a correction"
         )
-        for field, gold in script.gold.items():
+        for field, gold in golds(script):
             assert value.lower() not in gold.value.lower(), f"{field} value has retracted {value!r}"
 
 
@@ -189,7 +207,7 @@ def test_mixed_plans_keep_the_treatment_and_list_the_directive(script):
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
 def test_numbers_in_gold_values_are_written_as_in_the_display_text(script):
-    for field, gold in script.gold.items():
+    for field, gold in golds(script):
         for token in re.findall(r"\S*\d\S*", gold.value):
             token = token.strip(".,;:()")
             assert token in script.display, f"{field} value has {token!r}, which the display text doesn't"

@@ -53,7 +53,7 @@ PUNCTUATION = {
 
 MARKUP = re.compile(r"\{([^{}]*)\}|\[\[([^\[\]|]*)\|([^\[\]|]*)\]\]")
 WORD = re.compile(r"[A-Za-z]+(?:['-][A-Za-z]+)*")
-KEYS = {"id", "voice", "tags", "noise", "dates", "drugs", "forbidden", "retracted", "text", "gold"}
+KEYS = {"id", "voice", "tags", "noise", "dates", "drugs", "forbidden", "retracted", "text", "gold", "gold_rules"}
 REQUIRED = {"id", "voice", "tags", "dates", "drugs", "text", "gold"}
 
 
@@ -80,6 +80,10 @@ class Script:
     text: str
     gold: dict[str, Gold]
     path: Path
+    # The best answer the dictation service's rules allow, field by field: a script's own [gold_rules.<field>] where
+    # the clinical gold (gold) doesn't follow them, and the clinical gold where it does. rules_fields names the former.
+    gold_rules: dict[str, Gold]
+    rules_fields: tuple[str, ...] = ()
 
     @property
     def spoken(self) -> str:
@@ -150,15 +154,21 @@ def load_script(path: Path) -> Script:
     gold = data["gold"]
     if not isinstance(gold, dict) or set(gold) != set(FIELDS):
         raise ScriptError(f"{path.name}: gold must have exactly {', '.join(FIELDS)}")
-    fields = {}
-    for field in FIELDS:
-        entry = gold[field]
-        if set(entry) != {"value", "sources"} or not isinstance(entry["value"], str):
-            raise ScriptError(f"{path.name}: gold.{field} must have a value (string) and sources (list)")
-        sources = entry["sources"]
+    rules = data.get("gold_rules", {})
+    if not isinstance(rules, dict) or not set(rules) <= set(FIELDS):
+        raise ScriptError(f"{path.name}: gold_rules may have only {', '.join(FIELDS)}")
+
+    def entry(table: str, field: str, value: object) -> Gold:
+        if not isinstance(value, dict) or set(value) != {"value", "sources"} or not isinstance(value["value"], str):
+            raise ScriptError(f"{path.name}: {table}.{field} must have a value (string) and sources (list)")
+        sources = value["sources"]
         if not isinstance(sources, list) or not all(isinstance(s, str) and s for s in sources):
-            raise ScriptError(f"{path.name}: gold.{field}.sources must be a list of non-empty strings")
-        fields[field] = Gold(entry["value"].strip(), tuple(sources))
+            raise ScriptError(f"{path.name}: {table}.{field}.sources must be a list of non-empty strings")
+        return Gold(value["value"].strip(), tuple(sources))
+
+    fields = {field: entry("gold", field, gold[field]) for field in FIELDS}
+    rules_fields = tuple(field for field in FIELDS if field in rules)
+    gold_rules = {field: entry("gold_rules", field, rules[field]) if field in rules else fields[field] for field in FIELDS}
 
     for key in ("id", "voice", "text"):
         if not isinstance(data[key], str) or not data[key].strip():
@@ -176,6 +186,8 @@ def load_script(path: Path) -> Script:
         text=data["text"],
         gold=fields,
         path=path,
+        gold_rules=gold_rules,
+        rules_fields=rules_fields,
     )
     try:
         spoken_text(script.text)
