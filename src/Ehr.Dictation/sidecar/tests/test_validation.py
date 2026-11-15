@@ -136,6 +136,57 @@ def test_each_correction_cue_supersedes_what_it_replaces(cue):
     assert own(said, "Lisinopril 20 mg daily.").pending
 
 
+def test_a_correction_reaches_a_source_that_does_not_quote_it():
+    said = "Start lisinopril 10 mg daily for blood pressure, sorry, 20 mg daily."
+
+    assert "source_superseded" in own(said, "Start lisinopril 10 mg.", "Start lisinopril 10 mg").reasons
+
+
+def test_a_correction_at_the_start_of_the_next_sentence_counts():
+    said = "Start lisinopril 10 mg daily. Sorry, 20 mg daily."
+
+    assert "source_superseded" in own(said, "Start lisinopril 10 mg daily.", "Start lisinopril 10 mg daily").reasons
+    assert own("Start lisinopril 10 mg daily. She is sorry, 20 mg daily.", "Start lisinopril 10 mg daily.",
+               "Start lisinopril 10 mg daily").pending
+
+
+def test_a_correction_supersedes_only_the_measurement_it_corrects():
+    said = "Blood pressure 98/60, heart rate 78, no sorry 72."
+
+    assert own(said, "Blood pressure 98/60.", "Blood pressure 98/60").pending
+    assert "source_superseded" in own(said, "Heart rate 78.", "heart rate 78").reasons
+    assert own(said, "Heart rate 72.", "heart rate 78, no sorry 72").pending
+
+
+def test_no_sorry_is_a_correction_not_a_negation():
+    said = "Psoriasis improving, PASI 12 no sorry PASI 10."
+
+    assert own(said, "PASI 10.", "PASI 10").pending
+    assert own(said, "Psoriasis improving, PASI 10.").pending
+    assert "source_superseded" in own(said, "PASI 12.", "PASI 12").reasons
+
+
+def test_what_a_correction_says_again_is_not_superseded():
+    said = "Start lisinopril 10 mg, sorry, lisinopril 20 mg daily."
+
+    assert own(said, "Start lisinopril.", "Start lisinopril 10 mg").pending
+    assert "source_superseded" in own(said, "Start lisinopril 10 mg.", "Start lisinopril 10 mg").reasons
+
+
+def test_a_term_superseded_in_one_source_but_said_in_another_is_fine():
+    text = transcript(DICTATION)
+
+    assert field("140/90.", "Blood pressure today 150 over 90", "140 over 90", text=text).pending
+    assert own("Fever 3 days, sorry, 2 days. Cough 3 days.", "Cough 3 days.", "Fever 3 days", "Cough 3 days").pending
+
+
+def test_a_side_the_clinician_corrected_is_superseded():
+    said = "Pain in the left knee, sorry, right knee, for two weeks."
+
+    assert "source_superseded" in own(said, "Pain in the left knee.", "Pain in the left knee").reasons
+    assert own(said, "Pain in the right knee, for two weeks.").pending
+
+
 def test_a_drug_is_superseded_only_when_the_correction_names_another():
     assert own("Lisinopril 10 mg sorry 20 mg daily.", "Lisinopril 20 mg daily.").pending
     assert "source_superseded" in own("Start lisinopril, sorry, losartan 50 mg daily.",

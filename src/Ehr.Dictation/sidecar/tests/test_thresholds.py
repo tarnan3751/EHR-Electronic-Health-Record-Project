@@ -72,9 +72,9 @@ def test_speech_without_a_pause_is_cut_by_20_seconds():
     assert 15 * FPS <= cut <= 20 * FPS
 
 
-def test_a_correction_counts_within_three_words():
-    assert "source_superseded" in own("Fever 3 days, okay well sorry 2 days.", "Fever 3 days.", "Fever 3 days").reasons
-    assert "source_superseded" not in own("Fever 3 days, okay well then sorry.", "Fever 3 days.", "Fever 3 days").reasons
+def test_a_correction_counts_when_its_value_starts_within_three_words_of_the_cue():
+    assert "source_superseded" in own("Fever 3 days, sorry, it was 2 days.", "Fever 3 days.", "Fever 3 days").reasons
+    assert own("Fever 3 days, sorry, it was only 2 days.", "Fever 3 days.", "Fever 3 days").pending
 
 
 def test_field_and_source_limits():
