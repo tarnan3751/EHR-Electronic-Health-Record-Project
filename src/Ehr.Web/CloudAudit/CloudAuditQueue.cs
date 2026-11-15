@@ -37,21 +37,29 @@ public sealed class CloudAuditQueue : IAuditQueue, IDisposable
 
     public string EventsPath { get; }
 
-    public void Enqueue(AuditEvent auditEvent)
+    public void Enqueue(AuditEvent auditEvent) => Enqueue([auditEvent]);
+
+    // A request's events go to disk together: one write and one flush, however many patients a page listed.
+    public void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents)
     {
-        var line = JsonSerializer.SerializeToUtf8Bytes(auditEvent, Json);
+        using var lines = new MemoryStream();
+        foreach (var auditEvent in auditEvents)
+        {
+            JsonSerializer.Serialize(lines, auditEvent, Json);
+            lines.WriteByte(NewLine);
+        }
+
         lock (gate)
         {
             var start = events.Seek(0, SeekOrigin.End);
             try
             {
-                events.Write(line);
-                events.WriteByte(NewLine);
+                events.Write(lines.GetBuffer().AsSpan(0, (int)lines.Length));
                 events.Flush(flushToDisk: true);
             }
             catch
             {
-                // A half-written line would run into the next one.
+                // A half-written batch would run into the next line, and none of it was confirmed.
                 events.SetLength(start);
                 throw;
             }

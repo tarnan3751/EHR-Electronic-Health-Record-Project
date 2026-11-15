@@ -146,6 +146,40 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
+    public async Task An_off_site_search_queues_one_read_per_patient_listed_and_ships_them_from_the_cloud()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var family = "Batch" + Guid.NewGuid().ToString("N")[..8];
+        Guid[] patients =
+            [await apps.InsertPatientAsync("Ada", family), await apps.InsertPatientAsync("Bo", family), await apps.InsertPatientAsync("Cy", family)];
+        var signedIn = await CookieHeaderAsync(apps.Cloud, clinician);
+        // Held in the queue until the on-prem app can take them, so what was queued can be counted.
+        apps.PrimaryDown = true;
+        try
+        {
+            using var response = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, $"/patients?q={family}", signedIn);
+
+            var html = await ReadAsync(response);
+            Assert.All(patients, patient => Assert.Contains($"/patients/{patient}", html));
+            var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
+            var reads = queued.Where(e => e.PatientId is { } id && patients.Contains(id)).ToList();
+            Assert.Equal(patients.Order(), reads.Select(e => e.PatientId!.Value).Order());
+            Assert.All(reads, e => Assert.Equal((AuditActions.Read, clinician.Id), (e.Action, e.ActorId)));
+
+            apps.PrimaryDown = false;
+            Assert.True(await ShipperOf(apps.CloudPrimaryDrill).ShipAsync(Cancel));
+            foreach (var patient in patients)
+            {
+                Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.Cloud));
+            }
+        }
+        finally
+        {
+            apps.PrimaryDown = false;
+        }
+    }
+
+    [Fact]
     public async Task The_on_prem_app_takes_events_only_with_the_shared_key()
     {
         var patient = Guid.CreateVersion7();

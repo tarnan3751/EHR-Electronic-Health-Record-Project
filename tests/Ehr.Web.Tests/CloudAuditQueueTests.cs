@@ -31,6 +31,19 @@ public sealed class CloudAuditQueueTests : IDisposable
     }
 
     [Fact]
+    public void A_batch_comes_back_in_order_and_survives_a_restart()
+    {
+        AuditEvent[] batch = [Event(), Event(), Event()];
+        using (var queue = new CloudAuditQueue(directory))
+        {
+            queue.Enqueue(batch);
+        }
+
+        using var restarted = new CloudAuditQueue(directory);
+        Assert.Equal(batch.Select(e => e.Id), restarted.ReadPending(10).Events.Select(e => e.Id));
+    }
+
+    [Fact]
     public void Once_everything_is_shipped_the_file_starts_over()
     {
         using var queue = new CloudAuditQueue(directory);

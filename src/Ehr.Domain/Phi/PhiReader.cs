@@ -54,13 +54,9 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .OrderBy(p => p.FamilyName).ThenBy(p => p.GivenName).ThenBy(p => p.Id)
             .Take(limit)
             .ToListAsync(cancellationToken);
-        foreach (var patient in patients)
-        {
-            audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
-        }
-
         if (patients.Count > 0)
         {
+            audit.RecordReads(PatientsTable, patients.Select(p => (p.Id, p.Id)));
             await db.SaveChangesAsync(cancellationToken);
         }
 
