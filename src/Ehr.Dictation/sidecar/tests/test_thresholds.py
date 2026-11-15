@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import numpy as np
 from conftest import noise, speech_and_pauses, tone
-from test_validation import own, transcript
+from test_validation import field, own, transcript
 
 from ehr_dictation import quality, segmenter, settings, validation
 from ehr_dictation.validation import not_carried_over
@@ -17,9 +17,9 @@ def test_the_values():
     assert (quality.QUIET_DBFS, quality.NOISY_SNR_DB, quality.CONFIDENCE) == (-42.0, 10.0, 0.55)
     assert (quality.SILENCE_DBFS, quality.MIN_SOUND_FRAMES) == (-60.0, 50)
     assert (segmenter.MIN_PAUSE, segmenter.KEEP, segmenter.MAX_SEGMENT) == (40, 300, 2000)
-    assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 12, 600)
+    assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 30, 600)
     assert (validation.DIRECTIVE_REACH, validation.LEAD_IN_REACH) == (14, 5)
-    assert validation.LIMITS == {"history": 2000, "assessment": 1200, "plan": 1200}
+    assert validation.LIMITS == {"history": 3000, "assessment": 2000, "plan": 2000}
     limits = settings.Settings(api_key="k", llama_api_key="k")
     assert (limits.max_session_seconds, limits.max_session_bytes, limits.max_chunk_bytes) == (180, 10 << 20, 2 << 20)
     assert (limits.call_seconds, limits.stop_wait_seconds, limits.structuring_seconds) == (15.0, 8.0, 90.0)
@@ -88,7 +88,11 @@ def test_an_instruction_reaches_at_most_14_words_when_nothing_ends_its_clause():
 
 
 def test_field_and_source_limits():
-    words = "cough " * 199
-    assert "too_long" not in own(words, words.strip()[:1200], words.strip()[:600]).reasons
-    assert "too_long" in own(words, (words * 2).strip()[:1201], words.strip()[:600]).reasons
-    assert "too_long" in own(words, "cough cough", (words * 2).strip()[:601]).reasons
+    words = "cough " * 599
+    text = transcript(words)
+    for name, limit in (("history", 3000), ("assessment", 2000), ("plan", 2000)):
+        assert "too_long" not in field(words.strip()[:limit], words.strip()[:600], name=name, text=text).reasons
+        assert "too_long" in field(words.strip()[: limit + 1], words.strip()[:600], name=name, text=text).reasons
+    assert "too_long" in own(words, "cough cough", words.strip()[:601]).reasons
+    assert "too_long" not in own(words, "cough cough", *["cough cough"] * 30).reasons
+    assert "too_long" in own(words, "cough cough", *["cough cough"] * 31).reasons

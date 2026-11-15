@@ -23,7 +23,7 @@ and every check reads the cleaned text. The checks, each with the reason code re
 
 - unknown_field: a key outside history, assessment and plan (the schema allows none; this is the backstop).
 - not_dictated: an empty value. Not a failure: the transcript said nothing for that field.
-- too_long: over the field's length limit, over 12 sources, or a source over 600 characters.
+- too_long: over the field's length limit (LIMITS), over 30 sources, or a source over 600 characters.
 - bad_format: control or format characters, characters NFKC would change, a non-ASCII letter the transcript never uses
   (a look-alike from another alphabet), markup, a link, code or JSON.
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
@@ -71,8 +71,10 @@ from .prompt import FIELDS
 from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, STOPWORDS, TENS, UNITS, Token, numbers, stem, tokens
 from .transcript import Transcript, utf16_offset
 
-LIMITS = {"history": 2000, "assessment": 1200, "plan": 1200}
-MAX_SOURCES = 12
+# As the schema says (a test checks): a field can hold all a three-minute dictation says, which is about 2,500
+# characters, and a source per sentence of it.
+LIMITS = {"history": 3000, "assessment": 2000, "plan": 2000}
+MAX_SOURCES = 30
 MAX_QUOTE = 600
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause

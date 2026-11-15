@@ -413,8 +413,8 @@ def test_a_certainty_word_reaches_back_only_from_the_end_of_its_clause():
 
 
 def test_too_long_fails():
-    assert "too_long" in field("x " * 1001, "He takes lisinopril").reasons
-    assert "too_long" in field("Lisinopril.", *(["He takes lisinopril"] * 13)).reasons
+    assert "too_long" in field("x " * 1501, "He takes lisinopril").reasons
+    assert "too_long" in field("Lisinopril.", *(["He takes lisinopril"] * 31)).reasons
 
 
 @pytest.mark.parametrize("value", ["<b>Hypertension</b>", "See https://example.com", "{\"plan\": \"x\"}",

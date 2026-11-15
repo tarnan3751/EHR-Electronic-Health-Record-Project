@@ -61,7 +61,7 @@ def test_the_hash_changes_with_the_prompt_the_schema_or_the_parameters(tmp_path,
 
     shutil.copy(prompt.SCHEMA_DIRECTORY / prompt.PROMPT_FILE, edited)
     schema = tmp_path / prompt.SCHEMA_FILE
-    schema.write_text(schema.read_text(encoding="utf-8").replace('"maxItems": 12', '"maxItems": 11', 1), encoding="utf-8")
+    schema.write_text(schema.read_text(encoding="utf-8").replace('"maxItems": 30', '"maxItems": 29', 1), encoding="utf-8")
     assert prompt.load(tmp_path).structuring_sha256 != original.structuring_sha256
 
     shutil.copy(prompt.SCHEMA_DIRECTORY / prompt.SCHEMA_FILE, schema)

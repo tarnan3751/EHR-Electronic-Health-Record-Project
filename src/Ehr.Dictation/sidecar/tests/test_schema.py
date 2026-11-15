@@ -9,7 +9,7 @@ import jsonschema
 import pytest
 from conftest import answer
 
-from ehr_dictation import prompt
+from ehr_dictation import prompt, validation
 from ehr_dictation.llama import ModelOutputInvalid, parse_answer
 
 SCHEMA = json.loads((prompt.SCHEMA_DIRECTORY / prompt.SCHEMA_FILE).read_text(encoding="utf-8"))
@@ -63,3 +63,10 @@ def test_history_is_the_history_of_present_illness_with_findings_and_reviewed_re
 
     assert history.startswith("The history of present illness")
     assert "vital signs and examination findings" in history and "(labs, ECG, imaging)" in history
+
+
+def test_the_schema_limits_are_the_checks_limits():
+    for name, field in SCHEMA["properties"].items():
+        value, sources = field["properties"]["value"], field["properties"]["sources"]
+        assert value["maxLength"] == validation.LIMITS[name], name
+        assert (sources["maxItems"], sources["items"]["maxLength"]) == (validation.MAX_SOURCES, validation.MAX_QUOTE)
