@@ -7,8 +7,11 @@ using Ehr.Data.Audit;
 using Ehr.Web.Api.Audit;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -222,6 +225,108 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync("made_up", patientId: patient));
     }
 
+    // Each is something the cloud app never records, and the audit log keeps whatever it is given.
+    [Theory]
+    [InlineData("a sign-in")]
+    [InlineData("emergency access")]
+    [InlineData("no actor")]
+    [InlineData("no patient")]
+    [InlineData("another row")]
+    [InlineData("a reason")]
+    [InlineData("details")]
+    [InlineData("an hour ahead")]
+    [InlineData("null")]
+    public async Task Only_reads_of_one_patient_by_a_signed_in_account_are_taken(string what)
+    {
+        var good = Event(Guid.CreateVersion7());
+        var bad = Event(Guid.CreateVersion7());
+        switch (what)
+        {
+            case "a sign-in":
+                bad.Action = AuditActions.SignIn;
+                break;
+            case "emergency access":
+                bad.Action = AuditActions.BreakGlass;
+                break;
+            case "no actor":
+                bad.ActorId = null;
+                break;
+            case "no patient":
+                bad.PatientId = null;
+                break;
+            case "another row":
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            case "a reason":
+                bad.Reason = "Covering the night shift";
+                break;
+            case "details":
+                bad.Details = "{}";
+                break;
+            case "an hour ahead":
+                bad.OccurredAt = DateTimeOffset.UtcNow.AddHours(1);
+                break;
+        }
+
+        using var response = await PostAsync(what == "null" ? [good, null] : [good, bad], WebApps.CloudAuditKey);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(await RecordedAsync(good.Id));
+        Assert.False(await RecordedAsync(bad.Id));
+        // A clock that runs ahead is told apart, for the cloud app's log.
+        Assert.Contains(
+            what == "an hour ahead" ? "more than 5 minutes ahead of this server's clock" : "each a read of one patient",
+            await response.Content.ReadAsStringAsync(Cancel));
+    }
+
+    [Fact]
+    public async Task A_read_queued_through_a_long_outage_is_taken()
+    {
+        var old = Event(Guid.CreateVersion7());
+        old.OccurredAt = DateTimeOffset.UtcNow.AddDays(-3);
+
+        using var response = await PostAsync([old], WebApps.CloudAuditKey);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(await RecordedAsync(old.Id));
+    }
+
+    [Fact]
+    public async Task Without_the_key_the_body_is_not_read()
+    {
+        using var client = CreateClient(apps.OnPrem, handleCookies: false);
+
+        using var response = await client.PostAsync(CloudAuditApi.Path, new StringContent("[{\"id\":", Encoding.UTF8, "application/json"), Cancel);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task With_the_key_a_malformed_body_is_refused()
+    {
+        using var client = CreateClient(apps.OnPrem, handleCookies: false);
+        using var request = new HttpRequestMessage(HttpMethod.Post, CloudAuditApi.Path)
+        {
+            Content = new StringContent("[{\"id\":", Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", WebApps.CloudAuditKey);
+
+        using var response = await client.SendAsync(request, Cancel);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // The server enforces it as it reads; the in-memory test server doesn't, so this checks what the endpoint declares.
+    [Fact]
+    public void The_import_takes_at_most_a_megabyte()
+    {
+        var endpoint = apps.OnPrem.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Single(e => e.RoutePattern.RawText == CloudAuditApi.Path);
+
+        Assert.Equal(1024 * 1024, endpoint.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize);
+    }
+
     [Fact]
     public async Task On_prem_pages_never_say_read_only()
     {
@@ -230,16 +335,27 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Read-only", await session.Client.GetStringAsync(QuickTexts, Cancel));
     }
 
+    // A read as the PHI reader records one.
     static AuditEvent Event(Guid patient) => new()
     {
         Id = Guid.CreateVersion7(),
         OccurredAt = DateTimeOffset.UtcNow,
         Action = AuditActions.Read,
         Source = AuditSources.Cloud,
+        ActorId = Guid.CreateVersion7(),
         PatientId = patient,
         TableName = "patients",
         RowId = patient,
     };
+
+    // Whether the event with this ID is in the audit log, read as the superuser.
+    async Task<bool> RecordedAsync(Guid id)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM ehr.audit_events WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", id);
+        return (long)(await command.ExecuteScalarAsync(Cancel))! > 0;
+    }
 
     static CloudAuditShipper ShipperOf(WebApplicationFactory<Program> app) =>
         app.Services.GetRequiredService<CloudAuditShipper>();
@@ -258,7 +374,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         return await client.SendAsync(request, Cancel);
     }
 
-    async Task<HttpResponseMessage> PostAsync(AuditEvent[] events, string? key)
+    async Task<HttpResponseMessage> PostAsync(AuditEvent?[] events, string? key)
     {
         using var client = CreateClient(apps.OnPrem, handleCookies: false);
         using var request = new HttpRequestMessage(HttpMethod.Post, CloudAuditApi.Path)
