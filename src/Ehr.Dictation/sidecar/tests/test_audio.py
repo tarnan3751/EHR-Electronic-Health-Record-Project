@@ -3,11 +3,14 @@ goes, and nothing touches the disk."""
 
 from __future__ import annotations
 
+import subprocess
+
 import numpy as np
 import pytest
 from conftest import encode, tone
 
-from ehr_dictation.audio import SAMPLE_RATE, AudioError, decode
+from ehr_dictation import audio
+from ehr_dictation.audio import SAMPLE_RATE, AudioError, DecodeTimeout, decode
 
 
 @pytest.mark.parametrize("container", ["webm", "ogg", "mp4", "wav"])
@@ -80,3 +83,15 @@ def test_hours_of_near_silence_in_a_small_file_decode_only_to_the_limit():
     assert len(flac) < 3_000_000
     assert samples.size <= 11 * SAMPLE_RATE + SAMPLE_RATE // 10
     assert time.perf_counter() - started < 5
+
+
+def test_running_out_of_time_is_a_timeout_not_bad_audio(monkeypatch):
+    recording = encode(tone(1.0), "webm")
+
+    def slow(command, **options):
+        raise subprocess.TimeoutExpired(command, options["timeout"])
+
+    monkeypatch.setattr(audio.subprocess, "run", slow)
+
+    with pytest.raises(DecodeTimeout):
+        decode(recording)

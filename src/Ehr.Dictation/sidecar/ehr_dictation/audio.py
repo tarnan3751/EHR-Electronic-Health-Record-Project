@@ -8,7 +8,8 @@ describe the recording.
 
 A small file can hold hours of near-silence, so the decoded length is capped (max_seconds): a recording longer than a
 session may be decodes to just past the limit, never to gigabytes. A decode also has a time limit (DECODE_SECONDS), well
-inside the on-prem app's 20 seconds for a call.
+inside the on-prem app's 20 seconds for a call; running out of it (DecodeTimeout) means the server was busy, not that
+the bytes weren't audio.
 """
 
 from __future__ import annotations
@@ -24,6 +25,10 @@ DECODE_SECONDS = 10.0
 
 class AudioError(Exception):
     """The bytes aren't audio ffmpeg can decode. The message says nothing about what was in them."""
+
+
+class DecodeTimeout(AudioError):
+    """ffmpeg didn't finish in time: the server was busy, which says nothing about the audio."""
 
 
 def ffmpeg() -> str:
@@ -54,7 +59,7 @@ def decode(
             check=False,
         )
     except subprocess.TimeoutExpired:
-        raise AudioError("ffmpeg took too long to decode the audio.") from None
+        raise DecodeTimeout("ffmpeg took too long to decode the audio.") from None
 
     output = completed.stdout
     whole = len(output) // 4 * 4

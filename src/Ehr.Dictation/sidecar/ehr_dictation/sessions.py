@@ -4,7 +4,7 @@ cancelled, when no audio has reached it for a while, or a while after its result
 A session belongs to the clinician who started it (the owner the on-prem app names); to anyone else it doesn't exist.
 Audio arrives in numbered chunks. A chunk sent again is ignored, so a client that lost an answer can resend; a chunk
 that skips ahead is refused with the number expected, so a client that lost its connection resends from there and the
-transcript carries on (FR-10). After each chunk the transcript is brought up to date (transcriber.py), if MedASR is
+transcript carries on (FR-10); a chunk ffmpeg can't decode in time is refused as busy, to be sent again. After each chunk the transcript is brought up to date (transcriber.py), if MedASR is
 free in time; if not, the chunk is kept and the answer has the transcript as it was, and the next chunk catches up.
 
 Stop takes no more audio and, in the background, transcribes the rest, drops the audio, and has K2 Horizon sort the
@@ -12,8 +12,8 @@ transcript. Stop and result answer within a few seconds whatever state that has 
 transcribed), the fields once sorted, and every instruction in the transcript to order something or change the allergy
 list, which the note never carries (notCarriedOver), so the review screen can say what still needs placing. If K2
 Horizon is unavailable or too slow, the result keeps the transcript and says why the fields are missing (UC 10); if
-MedASR fails on the rest of the recording, it keeps the transcript as it was live, not final, with the reason
-transcription_failed. The fields are checked (validation.py) and marked pending; a field that failed
+MedASR fails on the rest of the recording, or ffmpeg can't decode it in time twice over, it keeps the transcript as it
+was live, not final, with the reason transcription_failed. The fields are checked (validation.py) and marked pending; a field that failed
 carries only its reason codes.
 
 Cancelling discards everything at once (UC 9): the session is marked cancelled, its background work is cancelled,
@@ -201,6 +201,8 @@ class Sessions:
                     self._decode, candidate, partial=True, max_seconds=limit + 1,
                     timeout=min(audio.DECODE_SECONDS, self._left(deadline)),
                 )
+            except audio.DecodeTimeout:
+                raise _busy() from None  # the chunk isn't kept: sent again, it's decoded again
             except audio.AudioError:
                 raise _not_audio() from None
             self._still_there(session)
@@ -276,9 +278,10 @@ class Sessions:
         started = time.perf_counter()
         try:
             try:
-                samples = await asyncio.to_thread(
-                    self._decode, recording, partial=False, max_seconds=self._settings.max_session_seconds + 1
-                )
+                samples = await self._decoded(recording)
+            except audio.DecodeTimeout:
+                self._unfinished(session, "DecodeTimeout")
+                return
             except audio.AudioError:
                 session.failure = _not_audio()
                 return
@@ -306,6 +309,17 @@ class Sessions:
         finally:
             session.finished_at = self._clock()
             session.done.set()
+
+    async def _decoded(self, recording: bytes) -> np.ndarray:
+        """The whole recording, decoded; tried once more if ffmpeg runs out of time, since nobody is waiting on it."""
+
+        def decode() -> np.ndarray:
+            return self._decode(recording, partial=False, max_seconds=self._settings.max_session_seconds + 1)
+
+        try:
+            return await asyncio.to_thread(decode)
+        except audio.DecodeTimeout:
+            return await asyncio.to_thread(decode)
 
     @staticmethod
     def _unfinished(session: Session, cause: str) -> None:

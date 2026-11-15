@@ -12,7 +12,7 @@ from conftest import MODELS, FakeLlama, FakeRecognizer, answer, raw_decoder, spe
 import threading
 import time
 
-from ehr_dictation.audio import SAMPLE_RATE, AudioError
+from ehr_dictation.audio import SAMPLE_RATE, AudioError, DecodeTimeout
 from ehr_dictation.provenance import CODE_SHA256
 from ehr_dictation.sessions import SessionError, Sessions
 
@@ -396,9 +396,38 @@ def test_stop_answers_within_its_budget_and_the_result_follows(settings):
     assert later["sorting"] == "done" and later["transcript"]["final"]
 
 
-def test_a_chunk_ffmpeg_cant_decode_in_time_is_refused_as_not_audio(settings):
+class SlowDecoder:
+    """Runs out of time the first `slow` times it is called, then decodes as raw_decoder does."""
+
+    def __init__(self, slow: int) -> None:
+        self.slow = slow
+        self.calls = 0
+
+    def __call__(self, data: bytes, **options: object):
+        self.calls += 1
+        if self.calls <= self.slow:
+            raise DecodeTimeout("ffmpeg took too long to decode the audio.")
+        return raw_decoder(data, **options)
+
+
+def test_a_chunk_ffmpeg_cant_decode_in_time_is_refused_as_busy_and_can_be_sent_again(settings):
+    async def run():
+        sessions = Sessions(settings, FakeRecognizer(), FakeLlama(GROUNDED).structurer(), MODELS, decoder=SlowDecoder(1))
+        session = sessions.start(ALICE)
+        chunk = b"".join(chunks()[:2])
+        with pytest.raises(SessionError) as refused:
+            await sessions.add_audio(session.id, ALICE, 0, chunk)
+        return refused.value, await sessions.add_audio(session.id, ALICE, 0, chunk)
+
+    refused, again = asyncio.run(run())
+
+    assert (refused.status, refused.code) == (429, "busy")
+    assert again["receivedSeq"] == 0 and again["audioSeconds"] == 2.0
+
+
+def test_bytes_that_are_not_audio_are_refused_as_not_audio(settings):
     def broken(data: bytes, **_: object):
-        raise AudioError("ffmpeg took too long to decode the audio.")
+        raise AudioError("ffmpeg couldn't decode the audio (exit code 1).")
 
     async def run():
         sessions = Sessions(settings, FakeRecognizer(), FakeLlama(GROUNDED).structurer(), MODELS, decoder=broken)
@@ -410,6 +439,25 @@ def test_a_chunk_ffmpeg_cant_decode_in_time_is_refused_as_not_audio(settings):
     refused = asyncio.run(run())
 
     assert (refused.status, refused.code) == (422, "not_audio")
+
+
+@pytest.mark.parametrize(("slow", "sorting", "reason"), [(1, "done", None), (2, "unavailable", "transcription_failed")])
+def test_after_stop_a_decode_out_of_time_is_tried_once_more(settings, slow, sorting, reason):
+    async def run():
+        decoder = SlowDecoder(0)
+        sessions = Sessions(settings, FakeRecognizer(), FakeLlama(GROUNDED).structurer(), MODELS, decoder=decoder)
+        session_id = await dictate(sessions)
+        live = sessions._sessions[session_id].transcript.text
+        decoder.slow, decoder.calls = slow, 0
+        await sessions.stop(session_id, ALICE)
+        return live, await sessions.result(session_id, ALICE, wait=5), decoder.calls
+
+    live, result, calls = asyncio.run(run())
+
+    assert (result["sorting"], result["reason"], calls) == (sorting, reason, 2)
+    assert result["transcript"]["final"] == (sorting == "done")
+    if reason:
+        assert result["transcript"]["text"] == live
 
 
 # ---- Limits --------------------------------------------------------------------------------------------------------
