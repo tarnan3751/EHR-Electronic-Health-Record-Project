@@ -493,6 +493,13 @@ DOCUMENTATION = [
     "She was put on amoxicillin and had an allergic reaction.",
     "No change in her allergies.",
     "The ordering physician is her cardiologist.",
+    # Instructions not to.
+    "Start metformin and don't order an A1c.",
+    "Do not order an MRI.",
+    "No need to order labs today.",
+    "Hold off on ordering an MRI.",
+    "We will not be ordering a CT.",
+    "Sulfa should not be added to her allergies.",
 ]
 
 
@@ -508,6 +515,13 @@ def test_an_order_or_allergy_list_change_is_never_carried(value):
 def test_documentation_that_mentions_orders_or_allergies_passes(value):
     assert directive_spans(value) == []
     assert own(value, value).pending
+
+
+def test_an_instruction_not_to_must_keep_its_negation():
+    said = "Start naproxen and don't order an MRI."
+
+    assert not_carried_over(transcript(said)) == []
+    assert own(said, "An MRI.", "don't order an MRI").reasons == ["negation_dropped"]
 
 
 def test_an_order_sentence_is_cut_and_the_rest_of_the_plan_kept():

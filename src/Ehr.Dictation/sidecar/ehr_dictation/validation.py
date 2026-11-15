@@ -29,8 +29,9 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
   its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one is
   being placed now ("I'm ordering"), to send, call in, refill or renew a prescription, or to change the allergy list;
-  hyphens are ignored ("re-fill"). A plan stays a plan: "start", "continue", "increase" or "stop" a drug, and orders in
-  the past or by someone else ("her cardiologist ordered an echo last year"), pass.
+  hyphens are ignored ("re-fill"). A plan stays a plan: "start", "continue", "increase" or "stop" a drug, orders in the
+  past or by someone else ("her cardiologist ordered an echo last year"), and an instruction not to ("don't order an
+  A1c", "no need to order labs"), pass.
 - no_sources, source_too_short (under two words, without a number), source_not_in_transcript (compared word by word,
   ignoring case and punctuation), source_in_unclear_passage.
 - source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "no correction", "I mean",
@@ -542,6 +543,8 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
     spans = []
     for start, end, kind in sorted(matches + passive):
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
+        if NEGATED_INSTRUCTION.search(text[clause:start]):
+            continue
         span_start = start
         subject = (start, end, kind) in passive
         for token in reversed([token for token in words if token.end <= start][-LEAD_IN_REACH:]):
@@ -552,6 +555,13 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
     return spans
 
 
+# An instruction not to: "don't order an A1c", "no need to order labs", "hold off on ordering an MRI", "sulfa should not
+# be added". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value.
+NEGATED_INSTRUCTION = re.compile(
+    r"\b(?:not|don't|dont|never|won't|no need(?: to| for)?|hold off(?: on)?|no)\s+(?:(?:be|to|on|going|any|further|yet)\s+)"
+    r"{0,3}$",
+    re.IGNORECASE,
+)
 # Words that start another clause, which ends an instruction's span.
 CLAUSE_STARTS = frozenset("then but so because although though while whereas also".split())
 # After "and" or a comma, a new subject or another step of the plan starts another clause; anything else ("order a CBC
@@ -761,7 +771,7 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
 NEGATION = re.compile(
     r"\b(?:no(?![\s,]+(?:sorry|wait|correction)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
     r"free of|ruled out|rules out|doesn't|does not|didn't|did not|isn't|is not|wasn't|was not|hasn't|has not|haven't|"
-    r"have not|non)\b",
+    r"have not|don't|do not|won't|will not|shouldn't|should not|non)\b",
     re.IGNORECASE,
 )
 # Cues that negate what comes before them: "chest pain denied", "fracture ruled out".
