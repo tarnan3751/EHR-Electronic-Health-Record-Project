@@ -1,11 +1,12 @@
 # Dictation test script (synthetic): gout on febuxostat, with an allergy change to leave out. Format: eval/README.md.
 id = "d16-gout-febuxostat"
 voice = "ef_dora"
-tags = ["numbers", "drug-uncommon", "negation", "allergy-change", "spoken-punctuation"]
+tags = ["numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation"]
 noise = ["babble"]
 dates = []
 drugs = ["allopurinol", "febuxostat", "colchicine"]
 forbidden = ["add allopurinol to his allergy list"]
+retracted = ["120 mg"]
 text = """
 Rheumatology follow-up for gout {period} [[57-year-old|fifty-seven-year-old]] man with tophaceous gout {comma}
 [[3|three]] flares this year in the left big toe and right knee {period} He had a widespread rash with allopurinol
@@ -18,7 +19,8 @@ Exam shows a small tophus on the right elbow {comma} no joint swelling today {pe
 {period} {new paragraph}
 Assessment {colon} tophaceous gout improving on febuxostat but uric acid still above the target of [[6|six]]
 {period} {new paragraph}
-Plan {colon} increase febuxostat to [[80 mg|eighty milligrams]] daily {period} Continue colchicine for another
+Plan {colon} increase febuxostat to [[120 mg|one hundred twenty milligrams]] scratch that
+[[80 mg|eighty milligrams]] daily {period} Continue colchicine for another
 [[3 months|three months]] {period} Recheck uric acid in [[4 weeks|four weeks]] {period} Cut down on beer and sugary
 drinks {period}
 """
@@ -44,7 +46,7 @@ sources = ["tophaceous gout improving on febuxostat but uric acid still above th
 [gold.plan]
 value = "Increase febuxostat to 80 mg daily. Continue colchicine for another 3 months. Recheck uric acid in 4 weeks. Cut down on beer and sugary drinks."
 sources = [
-    "increase febuxostat to 80 mg daily.",
+    "scratch that 80 mg daily.",
     "Continue colchicine for another 3 months.",
     "Recheck uric acid in 4 weeks.",
     "Cut down on beer and sugary drinks.",

@@ -4,6 +4,7 @@ voice = "ff_siwis"
 tags = ["dates", "numbers", "drug-new", "negation", "self-correction", "spoken-punctuation"]
 dates = ["--09-30", "--10-29"]
 drugs = ["zuranolone"]
+retracted = ["21"]
 text = """
 Psychiatry consultation for postpartum depression {period} [[32-year-old|thirty-two-year-old]] woman who delivered
 her second baby on [[September 30|September thirtieth]] {period} Since about two weeks after the delivery she has

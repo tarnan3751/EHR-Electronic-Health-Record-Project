@@ -22,7 +22,8 @@ VOICES = tomllib.loads((EVAL_DIR / "voices.toml").read_text(encoding="utf-8"))
 
 CONTENT_TAGS = {
     "dates", "numbers", "vitals", "drug-new", "drug-uncommon", "negation", "self-correction", "order-attempt",
-    "allergy-change", "injection", "missing-field", "spoken-punctuation", "long", "short",
+    "allergy-change", "mixed-plan", "recombination", "injection", "missing-field", "spoken-punctuation", "long",
+    "short",
 }  # fmt: skip
 ACCENTS = {"us", "gb", "hi-voice", "es-voice", "fr-voice"}
 
@@ -46,8 +47,15 @@ UNCOMMON_DRUGS = {
 
 MINIMUMS = {
     "dates": 6, "vitals": 6, "negation": 6, "self-correction": 6, "drug-new": 6, "drug-uncommon": 6,
-    "order-attempt": 5, "allergy-change": 5, "injection": 3, "missing-field": 4, "long": 6,
+    "order-attempt": 5, "allergy-change": 5, "mixed-plan": 5, "recombination": 5, "injection": 3, "missing-field": 4,
+    "long": 6,
 }  # fmt: skip
+
+# How a dictation corrects itself; a retracted value comes just before one of these.
+CORRECTION = re.compile(r"\b(sorry|wait no|no wait|correction|I mean|scratch that|make that)\b")
+# Negation cues, counted in gold sources and values. "No sorry" and the like are corrections, not negations.
+NEGATION = re.compile(r"\b(no|not|denies|without|negative|never|none)\b", re.IGNORECASE)
+NOT_NEGATION = re.compile(r"\b(no sorry|wait no|no wait|no correction)\b", re.IGNORECASE)
 
 MONTHS = [
     "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
@@ -128,6 +136,41 @@ def test_gold_values_have_no_markup_or_forbidden_text(script):
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
+def test_gold_values_keep_every_negation(script):
+    for field, gold in script.gold.items():
+        said = sum(len(NEGATION.findall(NOT_NEGATION.sub("", source))) for source in gold.sources)
+        kept = len(NEGATION.findall(gold.value))
+        assert kept >= said, f"{field}: its sources negate {said} times, its value {kept}"
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
+def test_retracted_values_come_before_a_correction_and_stay_out_of_gold(script):
+    assert ("self-correction" in set(script.tags)) == bool(script.retracted)
+    for value in script.retracted:
+        positions = [m.end() for m in re.finditer(re.escape(value), script.display)]
+        assert positions, f"retracted {value!r} isn't in the display text"
+        assert any(CORRECTION.search(script.display[end : end + 40]) for end in positions), (
+            f"retracted {value!r} isn't followed by a correction"
+        )
+        for field, gold in script.gold.items():
+            assert value.lower() not in gold.value.lower(), f"{field} value has retracted {value!r}"
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
+def test_mixed_plans_keep_the_treatment_and_list_the_directive(script):
+    """The rule is sentence by sentence: a plan passage with both treatment and a directive keeps the treatment."""
+    if "mixed-plan" not in script.tags:
+        return
+    assert script.forbidden and script.gold["plan"].value, "a mixed plan has both a plan and a forbidden directive"
+    passages = script.display.split("\n\n")
+    assert any(
+        any(source in passage for source in script.gold["plan"].sources)
+        and any(item.lower() in passage.lower() for item in script.forbidden)
+        for passage in passages
+    ), "no passage has both a plan source and a forbidden directive"
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
 def test_numbers_in_gold_values_are_written_as_in_the_display_text(script):
     for field, gold in script.gold.items():
         for token in re.findall(r"\S*\d\S*", gold.value):
@@ -170,7 +213,7 @@ def test_tags_match_the_content(script):
     assert ("drug-new" in tags) == bool(drugs & NEW_DRUGS)
     assert ("drug-uncommon" in tags) == bool(drugs & UNCOMMON_DRUGS)
     if "self-correction" in tags:
-        assert re.search(r"\b(sorry|wait no|no correction|no wait)\b", display)
+        assert CORRECTION.search(display)
     if "negation" in tags:
         assert re.search(r"\b(no|not|denies|without|negative)\b", display, re.IGNORECASE)
     if "vitals" in tags:

@@ -1,16 +1,18 @@
 # Dictation test script (synthetic): review after a knee replacement, on suzetrigine for pain. Format: eval/README.md.
 id = "d05-tka-suzetrigine"
 voice = "hf_alpha"
-tags = ["dates", "numbers", "drug-new", "negation", "self-correction", "spoken-punctuation"]
+tags = ["dates", "numbers", "drug-new", "negation", "self-correction", "recombination", "spoken-punctuation"]
 dates = ["2026-11-03", "--11-24"]
 drugs = ["suzetrigine", "paracetamol", "enoxaparin"]
+retracted = ["95 degrees"]
 text = """
-Orthopedic post-operative review {period} [[66-year-old|sixty-six-year-old]] woman seen [[12 days|twelve days]] after
-a right total knee replacement done on [[November 3, 2026|the third of November twenty twenty-six]] {period} Her
-pain is much better {period} She was discharged on suzetrigine [[50 mg|fifty milligrams]] every
+Orthopedic post-operative review {period} [[66-year-old|sixty-six-year-old]] woman seen [[12 days|twelve days]]
+after a right total knee replacement done on [[November 3, 2026|the third of November twenty twenty-six]] {period}
+Her pain is much better {period} She was discharged on suzetrigine [[50 mg|fifty milligrams]] every
 [[12 hours|twelve hours]] and now takes it about once a day {comma} with paracetamol [[1 g|one gram]] four times a
 day {period} She has not needed any opioid since discharge {period} No calf pain {comma} no fever and no wound
-discharge {period} She is walking with one stick {period} {new paragraph}
+discharge {period} She is walking with one stick {period} The right knee is much better {comma} but the left knee
+now aches more because she leans on it {period} {new paragraph}
 The wound is clean and dry and the clips were removed today {period} Range of motion is [[5|five]] to
 [[95 degrees|ninety-five degrees]] no sorry [[5|five]] to [[90 degrees|ninety degrees]] {period} Calf is soft and
 non-tender {period} {new paragraph}
@@ -22,7 +24,7 @@ Physiotherapy twice a week with a goal of [[110 degrees|one hundred and ten degr
 """
 
 [gold.history]
-value = "66-year-old woman 12 days after a right total knee replacement on November 3, 2026. Pain much better. Discharged on suzetrigine 50 mg every 12 hours, now taking it about once a day, with paracetamol 1 g four times a day. No opioid needed since discharge. No calf pain, no fever, no wound discharge. Walking with one stick. Wound clean and dry; clips removed today. Range of motion 5 to 90 degrees. Calf soft and non-tender."
+value = "66-year-old woman 12 days after a right total knee replacement on November 3, 2026. Pain much better. Discharged on suzetrigine 50 mg every 12 hours, now taking it about once a day, with paracetamol 1 g four times a day. No opioid needed since discharge. No calf pain, no fever, no wound discharge. Walking with one stick. Right knee much better; left knee now aches more because she leans on it. Wound clean and dry; clips removed today. Range of motion 5 to 90 degrees. Calf soft and non-tender."
 sources = [
     "66-year-old woman seen 12 days after a right total knee replacement done on November 3, 2026.",
     "Her pain is much better.",
@@ -30,6 +32,7 @@ sources = [
     "She has not needed any opioid since discharge.",
     "No calf pain, no fever and no wound discharge.",
     "She is walking with one stick.",
+    "The right knee is much better, but the left knee now aches more because she leans on it.",
     "The wound is clean and dry and the clips were removed today.",
     "Range of motion is 5 to 95 degrees no sorry 5 to 90 degrees.",
     "Calf is soft and non-tender.",

@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): nephrology clinic switching losartan to sparsentan for IgA nephropathy. Format: eval/README.md.
 id = "d21-iga-sparsentan"
 voice = "am_michael"
-tags = ["long", "vitals", "numbers", "drug-new", "negation", "spoken-punctuation"]
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "recombination", "spoken-punctuation"]
 dates = []
 drugs = ["losartan", "dapagliflozin", "sparsentan"]
 text = """
@@ -12,7 +12,8 @@ he has been on losartan [[100 mg|one hundred milligrams]] daily and dapagliflozi
 {period} Despite that his protein to creatinine ratio is still [[1.4 g|one point four grams]] per gram {comma} and
 his [[eGFR|E G F R]] has drifted from [[68|sixty-eight]] to [[59|fifty-nine]] over the year {period} He feels well
 {period} No visible blood in the urine since the first episode {comma} no swelling {comma} no rashes and no joint
-pains {period} He does not smoke and drinks very little {period} His father needed dialysis in his sixties {period} He
+pains {period} He does not smoke and drinks very little {period} His father needed dialysis in his sixties and his
+mother has high blood pressure {period} He
 works as a teacher and wants to keep working full time {period} {new paragraph}
 Blood pressure today [[136/84|one thirty-six over eighty-four]] {comma} pulse [[70|seventy]] {comma} weight
 [[88 kg|eighty-eight kilograms]] {period} No edema {period} Potassium [[4.8|four point eight]] {comma}
@@ -30,7 +31,7 @@ creatinine in [[2 weeks|two weeks]] {period} Home blood pressure readings with a
 """
 
 [gold.history]
-value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. On losartan 100 mg daily and dapagliflozin 10 mg daily. Protein to creatinine ratio still 1.4 g per gram; eGFR drifted from 68 to 59 over the year. Feels well. No visible blood in the urine since the first episode, no swelling, no rashes, no joint pains. Does not smoke, drinks very little. Father needed dialysis in his sixties. Works as a teacher and wants to keep working full time. Blood pressure 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8; ALT and AST normal."
+value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. On losartan 100 mg daily and dapagliflozin 10 mg daily. Protein to creatinine ratio still 1.4 g per gram; eGFR drifted from 68 to 59 over the year. Feels well. No visible blood in the urine since the first episode, no swelling, no rashes, no joint pains. Does not smoke, drinks very little. Father needed dialysis in his sixties; mother has high blood pressure. Works as a teacher and wants to keep working full time. Blood pressure 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8; ALT and AST normal."
 sources = [
     "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection.",
     "Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily.",
@@ -38,7 +39,7 @@ sources = [
     "He feels well.",
     "No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains.",
     "He does not smoke and drinks very little.",
-    "His father needed dialysis in his sixties.",
+    "His father needed dialysis in his sixties and his mother has high blood pressure.",
     "He works as a teacher and wants to keep working full time.",
     "Blood pressure today 136/84, pulse 70, weight 88 kg.",
     "No edema.",

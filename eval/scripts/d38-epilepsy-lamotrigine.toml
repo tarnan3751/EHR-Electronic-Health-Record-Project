@@ -4,10 +4,11 @@ voice = "hf_alpha"
 tags = ["dates", "numbers", "negation", "self-correction", "spoken-punctuation"]
 dates = ["--08-19", "--10-02", "--10-04"]
 drugs = ["levetiracetam", "lamotrigine"]
+retracted = ["October 2"]
 text = """
 Epilepsy clinic follow-up {period} [[31-year-old|thirty-one-year-old]] woman with focal epilepsy {comma} on
 levetiracetam [[750 mg|seven hundred and fifty milligrams]] twice daily {period} She had a focal to bilateral tonic
-clonic seizure on [[August 19|the nineteenth of August]] and another on [[October 2|the second of October]] no sorry
+clonic seizure on [[August 19|the nineteenth of August]] and another on [[October 2|the second of October]] correction
 [[October 4|the fourth of October]] {comma} both after poor sleep {period} Since the levetiracetam she has felt
 irritable and low and her partner has noticed it too {period} No thoughts of self-harm {period} She is not driving
 {period} She is planning a pregnancy in the next year {period} {new paragraph}
@@ -27,7 +28,7 @@ because of the pregnancy plans {period} No driving until [[12 months|twelve mont
 value = "31-year-old woman with focal epilepsy on levetiracetam 750 mg twice daily. Focal to bilateral tonic clonic seizures on August 19 and October 4, both after poor sleep. Irritable and low since starting levetiracetam, noticed by her partner too. No thoughts of self-harm. Not driving. Planning a pregnancy in the next year. Examination normal. MRI: small area of left hippocampal sclerosis. EEG: left temporal sharp waves."
 sources = [
     "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily.",
-    "She had a focal to bilateral tonic clonic seizure on August 19 and another on October 2 no sorry October 4, both after poor sleep.",
+    "She had a focal to bilateral tonic clonic seizure on August 19 and another on October 2 correction October 4, both after poor sleep.",
     "Since the levetiracetam she has felt irritable and low and her partner has noticed it too.",
     "No thoughts of self-harm.",
     "She is not driving.",

@@ -6,6 +6,7 @@ noise = ["monitor"]
 dates = []
 drugs = ["apixaban", "dronedarone", "amiodarone"]
 forbidden = ["remove the amiodarone allergy"]
+retracted = ["468"]
 text = """
 Cardiology follow-up for paroxysmal atrial fibrillation {period} [[68-year-old|sixty-eight-year-old]] man on
 apixaban [[5 mg|five milligrams]] twice daily and dronedarone [[400 mg|four hundred milligrams]] twice daily with

@@ -5,10 +5,12 @@ tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "sp
 noise = ["monitor"]
 dates = []
 drugs = ["fludrocortisone", "midodrine"]
+retracted = ["124"]
 text = """
 Autonomic clinic follow-up {period} [[24-year-old|twenty-four-year-old]] woman with postural orthostatic tachycardia
 syndrome since a viral illness last year {period} She gets lightheaded and her heart races within a few minutes of
-standing {comma} worse in the heat and after hot showers {period} She has not fainted {period} She is drinking about
+standing {comma} worse in the heat and after hot showers {period} She has nearly fainted twice but has not
+fainted {period} She is drinking about
 [[2.5 liters|two and a half liters]] a day and taking salt tablets {period} Fludrocortisone
 [[0.1 mg|point one milligrams]] helped a little but gave her headaches {period} {new paragraph}
 Orthostatic vitals {colon} lying heart rate [[68|sixty-eight]] {comma} blood pressure
@@ -24,11 +26,11 @@ Recheck in [[6 weeks|six weeks]] {period}
 """
 
 [gold.history]
-value = "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year. Lightheaded with her heart racing within a few minutes of standing, worse in the heat and after hot showers. Has not fainted. Drinking about 2.5 liters a day and taking salt tablets. Fludrocortisone 0.1 mg helped a little but gave her headaches. Lying heart rate 68, blood pressure 108/70. After 10 minutes standing heart rate 118, blood pressure 104/72. Hands a little mottled on standing. Otherwise normal exam."
+value = "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year. Lightheaded with her heart racing within a few minutes of standing, worse in the heat and after hot showers. Nearly fainted twice but has not fainted. Drinking about 2.5 liters a day and taking salt tablets. Fludrocortisone 0.1 mg helped a little but gave her headaches. Lying heart rate 68, blood pressure 108/70. After 10 minutes standing heart rate 118, blood pressure 104/72. Hands a little mottled on standing. Otherwise normal exam."
 sources = [
     "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year.",
     "She gets lightheaded and her heart races within a few minutes of standing, worse in the heat and after hot showers.",
-    "She has not fainted.",
+    "She has nearly fainted twice but has not fainted.",
     "She is drinking about 2.5 liters a day and taking salt tablets.",
     "Fludrocortisone 0.1 mg helped a little but gave her headaches.",
     "Orthostatic vitals: lying heart rate 68, blood pressure 108/70.",

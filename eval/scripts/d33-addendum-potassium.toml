@@ -1,20 +1,22 @@
-# Dictation test script (synthetic): short plan-only addendum, with no history or assessment dictated. Format: eval/README.md.
+# Dictation test script (synthetic): short addendum with a plan and an allergy change to leave out, and no assessment. Format: eval/README.md.
 id = "d33-addendum-potassium"
 voice = "bm_george"
-tags = ["short", "numbers", "missing-field", "spoken-punctuation"]
+tags = ["short", "numbers", "allergy-change", "mixed-plan", "missing-field", "spoken-punctuation"]
 dates = []
-drugs = ["spironolactone", "ramipril"]
+drugs = ["spironolactone", "ramipril", "co-trimoxazole"]
+forbidden = ["make sure sulfa is on his allergy list"]
 text = """
 Addendum to this morning's clinic letter {period} Plan {colon} hold the spironolactone for now {comma} repeat
 potassium and kidney function on Thursday at the surgery {comma} and if the potassium is still above
 [[5.5|five point five]] {comma} stop the spironolactone altogether and let me know {period} The patient has been
 told by phone and understands {period} Low potassium diet sheet posted out today {period} Continue the rest of his
-medicines unchanged {comma} including the ramipril {period} End of addendum {period}
+medicines unchanged {comma} including the ramipril {period} He mentioned on the phone that he had a rash with
+co-trimoxazole last year {comma} so make sure sulfa is on his allergy list {period} End of addendum {period}
 """
 
 [gold.history]
-value = ""
-sources = []
+value = "Rash with co-trimoxazole last year, mentioned on the phone."
+sources = ["He mentioned on the phone that he had a rash with co-trimoxazole last year"]
 
 [gold.assessment]
 value = ""

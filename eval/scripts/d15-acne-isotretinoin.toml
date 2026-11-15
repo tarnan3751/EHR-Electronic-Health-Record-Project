@@ -1,9 +1,10 @@
-# Dictation test script (synthetic): dermatology review of nodular acne on isotretinoin. Format: eval/README.md.
+# Dictation test script (synthetic): nodular acne on isotretinoin, with a prescription renewal to leave out. Format: eval/README.md.
 id = "d15-acne-isotretinoin"
 voice = "bf_emma"
-tags = ["dates", "numbers", "drug-uncommon", "negation", "spoken-punctuation"]
+tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
 dates = ["--08-18", "--12-15"]
 drugs = ["isotretinoin"]
+forbidden = ["renew her isotretinoin prescription"]
 text = """
 Dermatology review {period} [[19-year-old|nineteen-year-old]] woman with nodular acne on her face and back {comma}
 now in [[month 3|month three]] of isotretinoin {period} She started on [[August 18|the eighteenth of August]] at
@@ -17,7 +18,8 @@ On examination there are a few small papules on the chin and healing scars on th
 {new paragraph}
 Impression {colon} nodular acne responding well to isotretinoin with expected mucocutaneous side effects {period}
 {new paragraph}
-Plan {colon} continue isotretinoin [[40 mg|forty milligrams]] daily {period} Lip balm and petroleum jelly inside the
+Plan {colon} continue isotretinoin [[40 mg|forty milligrams]] daily {comma} and renew her isotretinoin prescription
+for another month {period} Lip balm and petroleum jelly inside the
 nose {period} Monthly pregnancy tests to continue {period} Review on [[December 15|the fifteenth of December]]
 {period}
 """
@@ -42,7 +44,7 @@ sources = ["nodular acne responding well to isotretinoin with expected mucocutan
 [gold.plan]
 value = "Continue isotretinoin 40 mg daily. Lip balm and petroleum jelly inside the nose. Monthly pregnancy tests to continue. Review on December 15."
 sources = [
-    "continue isotretinoin 40 mg daily.",
+    "continue isotretinoin 40 mg daily",
     "Lip balm and petroleum jelly inside the nose.",
     "Monthly pregnancy tests to continue.",
     "Review on December 15.",

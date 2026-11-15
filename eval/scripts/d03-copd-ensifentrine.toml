@@ -9,12 +9,13 @@ text = """
 Respiratory clinic letter {comma} follow-up after an exacerbation of [[COPD|C O P D]] {period} {new paragraph}
 This [[71-year-old|seventy-one-year-old]] retired joiner was admitted on [[October 28|the twenty-eighth of October]]
 with an infective exacerbation and discharged after [[4 days|four days]] on a [[5-day|five-day]] course of
-prednisolone [[30 mg|thirty milligrams]] and doxycycline {period} He feels about back to his usual self {period} His wife says he is
-coping well at home {period} His breathlessness is [[MRC grade 3|M R C grade three]] {comma} so he stops for breath after about
-[[100 meters|a hundred meters]] on the flat {period} He still has a morning cough with white sputum but no green
-sputum {comma} no fever and no chest pain {period} He has not smoked for [[6 years|six years]] {period} His
-inhalers are tiotropium and olodaterol once daily {comma} and his technique was good when I watched him today
-{period} He had [[3|three]] exacerbations in the last year needing steroids {period} {new paragraph}
+prednisolone [[30 mg|thirty milligrams]] and doxycycline {period} He feels about back to his usual self {period} His
+wife says he is coping well at home {period} His breathlessness is [[MRC grade 3|M R C grade three]] {comma} so he
+stops for breath after about [[100 meters|a hundred meters]] on the flat {period} He still has a morning cough with
+white sputum but no green sputum {comma} no fever and no chest pain {period} He has not smoked for
+[[6 years|six years]] {period} His inhalers are tiotropium and olodaterol once daily {comma} and his technique was
+good when I watched him today {period} He had [[3|three]] exacerbations in the last year needing steroids {period}
+{new paragraph}
 On examination his oxygen saturation is [[94%|ninety-four percent]] on room air {comma} respiratory rate
 [[18|eighteen]] {comma} pulse [[84|eighty-four]] and temperature [[36.8|thirty-six point eight]] degrees {period}
 There are scattered wheezes at both bases {comma} no crackles {period} Spirometry from the summer showed an
@@ -24,9 +25,9 @@ Impression {colon} moderate to severe [[COPD|C O P D]] with frequent exacerbatio
 therapy {period} Recovering well from the October admission {period} {new paragraph}
 Plan {colon} add ensifentrine [[3 mg|three milligrams]] nebulized twice daily {comma} alongside his current inhalers
 {period} I have explained it is a new kind of inhaled treatment and he may notice back pain or a mild headache at
-first {period} Refer to pulmonary rehabilitation {period} Rescue pack of prednisolone and doxycycline to keep at home
-with a written action plan {period} Review in clinic in [[3 months|three months]] {comma} sooner if he has another
-flare {period}
+first {period} Refer to pulmonary rehabilitation {period} Rescue pack of prednisolone and doxycycline to keep at
+home with a written action plan {period} Review in clinic in [[3 months|three months]] {comma} sooner if he has
+another flare {period}
 """
 
 [gold.history]

@@ -53,7 +53,7 @@ PUNCTUATION = {
 
 MARKUP = re.compile(r"\{([^{}]*)\}|\[\[([^\[\]|]*)\|([^\[\]|]*)\]\]")
 WORD = re.compile(r"[A-Za-z]+(?:['-][A-Za-z]+)*")
-KEYS = {"id", "voice", "tags", "noise", "dates", "drugs", "forbidden", "text", "gold"}
+KEYS = {"id", "voice", "tags", "noise", "dates", "drugs", "forbidden", "retracted", "text", "gold"}
 REQUIRED = {"id", "voice", "tags", "dates", "drugs", "text", "gold"}
 
 
@@ -76,6 +76,7 @@ class Script:
     dates: tuple[str, ...]
     drugs: tuple[str, ...]
     forbidden: tuple[str, ...]
+    retracted: tuple[str, ...]
     text: str
     gold: dict[str, Gold]
     path: Path
@@ -171,6 +172,7 @@ def load_script(path: Path) -> Script:
         dates=strings("dates"),
         drugs=strings("drugs"),
         forbidden=strings("forbidden"),
+        retracted=strings("retracted"),
         text=data["text"],
         gold=fields,
         path=path,

@@ -5,11 +5,12 @@ tags = ["short", "numbers", "missing-field"]
 dates = []
 drugs = ["amoxicillin", "ibuprofen"]
 text = """
-Quick dictation for the [[3-year-old|three-year-old]] in room four left acute otitis media his third since the summer
-start amoxicillin [[90 mg/kg|ninety milligrams per kilogram]] a day split twice daily for [[10 days|ten days]]
-ibuprofen for pain and fever if he is not better in [[48 to 72 hours|forty-eight to seventy-two hours]] mum should
-bring him back for review and if he has one more infection before the spring we will refer him to the ear nose and
-throat team he can go back to nursery when the fever settles
+Quick dictation for the [[3-year-old|three-year-old]] in room four left acute otitis media his third since the
+summer start amoxicillin [[90 mg/kg|ninety milligrams per kilogram]] a day split twice daily for
+[[10 days|ten days]] ibuprofen with food for pain and fever if he is not better in
+[[48 to 72 hours|forty-eight to seventy-two hours]] mum should bring him back for review and if he has one more
+infection before the spring we will refer him to the ear nose and throat team to talk about grommets he can go back
+to nursery when the fever settles and he is eating normally again
 """
 
 [gold.history]
@@ -24,11 +25,11 @@ sources = [
 ]
 
 [gold.plan]
-value = "Start amoxicillin 90 mg/kg a day, split twice daily, for 10 days. Ibuprofen for pain and fever. If not better in 48 to 72 hours, mum to bring him back for review. If one more infection before the spring, refer to the ear nose and throat team. Back to nursery when the fever settles."
+value = "Start amoxicillin 90 mg/kg a day, split twice daily, for 10 days. Ibuprofen with food for pain and fever. If not better in 48 to 72 hours, mum to bring him back for review. If one more infection before the spring, refer to the ear nose and throat team to talk about grommets. Back to nursery when the fever settles and he is eating normally again."
 sources = [
     "start amoxicillin 90 mg/kg a day split twice daily for 10 days",
-    "ibuprofen for pain and fever",
+    "ibuprofen with food for pain and fever",
     "if he is not better in 48 to 72 hours mum should bring him back for review",
-    "if he has one more infection before the spring we will refer him to the ear nose and throat team",
-    "he can go back to nursery when the fever settles",
+    "if he has one more infection before the spring we will refer him to the ear nose and throat team to talk about grommets",
+    "he can go back to nursery when the fever settles and he is eating normally again",
 ]

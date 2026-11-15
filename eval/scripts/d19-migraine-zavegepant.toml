@@ -1,10 +1,11 @@
-# Dictation test script (synthetic): migraine follow-up on zavegepant nasal spray. Format: eval/README.md.
+# Dictation test script (synthetic): migraine on zavegepant nasal spray, with a refill to leave out. Format: eval/README.md.
 id = "d19-migraine-zavegepant"
 voice = "ff_siwis"
-tags = ["numbers", "drug-new", "negation", "spoken-punctuation"]
+tags = ["numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
 noise = ["hvac"]
 dates = []
 drugs = ["sumatriptan", "zavegepant", "atogepant"]
+forbidden = ["refill her atogepant"]
 text = """
 Neurology clinic {comma} migraine follow-up {period} [[36-year-old|thirty-six-year-old]] woman with migraine without
 aura {comma} currently about [[6|six]] migraine days a month {period} Triptans helped but she had chest tightness
@@ -12,16 +13,18 @@ with sumatriptan and does not want to take them again {period} She has been usin
 [[10 mg|ten milligrams]] {comma} one spray at onset {comma} and it works within about an hour for most attacks
 {period} She notices a bad taste afterwards but no other side effects {period} She takes atogepant
 [[60 mg|sixty milligrams]] daily for prevention {period} No new neurological symptoms {comma} no visual loss and no
-weakness {period} Headaches are not worse lying down or in the morning {period} {new paragraph}
+weakness {period} Headaches are worse with bright light and noise but not worse lying down or in the morning
+{period} {new paragraph}
 Neurological exam is normal {comma} fundi normal {period} {new paragraph}
 Assessment {colon} episodic migraine without aura {comma} improving {comma} good response to zavegepant for acute
 attacks {period} {new paragraph}
 Plan {colon} continue zavegepant up to one spray in [[24 hours|twenty-four hours]] {comma} continue atogepant
-{period} Keep a headache diary {period} Return in [[6 months|six months]] or sooner if the pattern changes {period}
+{comma} and refill her atogepant for three months {period} Keep a headache diary {period} Return in
+[[6 months|six months]] or sooner if the pattern changes {period}
 """
 
 [gold.history]
-value = "36-year-old woman with migraine without aura, currently about 6 migraine days a month. Chest tightness with sumatriptan; does not want triptans again. Using zavegepant nasal spray 10 mg, one spray at onset; works within about an hour for most attacks. Bad taste afterwards, no other side effects. Takes atogepant 60 mg daily for prevention. No new neurological symptoms, no visual loss, no weakness. Headaches not worse lying down or in the morning. Neurological exam normal, fundi normal."
+value = "36-year-old woman with migraine without aura, currently about 6 migraine days a month. Chest tightness with sumatriptan; does not want triptans again. Using zavegepant nasal spray 10 mg, one spray at onset; works within about an hour for most attacks. Bad taste afterwards, no other side effects. Takes atogepant 60 mg daily for prevention. No new neurological symptoms, no visual loss, no weakness. Headaches worse with bright light and noise, but not worse lying down or in the morning. Neurological exam normal, fundi normal."
 sources = [
     "36-year-old woman with migraine without aura, currently about 6 migraine days a month.",
     "Triptans helped but she had chest tightness with sumatriptan and does not want to take them again.",
@@ -29,7 +32,7 @@ sources = [
     "She notices a bad taste afterwards but no other side effects.",
     "She takes atogepant 60 mg daily for prevention.",
     "No new neurological symptoms, no visual loss and no weakness.",
-    "Headaches are not worse lying down or in the morning.",
+    "Headaches are worse with bright light and noise but not worse lying down or in the morning.",
     "Neurological exam is normal, fundi normal.",
 ]
 
@@ -40,7 +43,7 @@ sources = ["episodic migraine without aura, improving, good response to zavegepa
 [gold.plan]
 value = "Continue zavegepant, up to one spray in 24 hours; continue atogepant. Keep a headache diary. Return in 6 months, or sooner if the pattern changes."
 sources = [
-    "continue zavegepant up to one spray in 24 hours, continue atogepant.",
+    "continue zavegepant up to one spray in 24 hours, continue atogepant",
     "Keep a headache diary.",
     "Return in 6 months or sooner if the pattern changes.",
 ]

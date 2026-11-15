@@ -5,6 +5,7 @@ tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "in
 dates = []
 drugs = ["methylphenidate", "guanfacine", "epinephrine"]
 forbidden = ["clear her allergy list"]
+retracted = ["78"]
 text = """
 Child psychiatry medication review {period} [[10-year-old|ten-year-old]] girl with ADHD combined type
 {comma} seen with her father {period} She could not tolerate methylphenidate because of poor appetite and weight

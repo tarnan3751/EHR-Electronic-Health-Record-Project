@@ -1,9 +1,10 @@
 # Dictation test script (synthetic): pediatric endocrine clinic, congenital adrenal hyperplasia on crinecerfont. Format: eval/README.md.
 id = "d31-cah-crinecerfont"
 voice = "bf_emma"
-tags = ["vitals", "numbers", "drug-new", "drug-uncommon", "negation", "self-correction", "spoken-punctuation"]
+tags = ["vitals", "numbers", "drug-new", "drug-uncommon", "negation", "self-correction", "recombination", "spoken-punctuation"]
 dates = []
 drugs = ["hydrocortisone", "fludrocortisone", "crinecerfont"]
+retracted = ["100 mg"]
 text = """
 Pediatric endocrine clinic {period} [[12-year-old|twelve-year-old]] boy with classic congenital adrenal hyperplasia
 due to [[21-hydroxylase|twenty-one hydroxylase]] deficiency {comma} seen with his mum {period} He has been on
@@ -14,16 +15,15 @@ meals no sorry [[50 mg|fifty milligrams]] twice daily {comma} since he weighs un
 {period} He feels well {comma} no headaches {comma} no tiredness and no salt craving {period} No illnesses needing
 stress doses since the last visit {period} {new paragraph}
 Height [[148 cm|one hundred and forty-eight centimeters]] {comma} weight [[44 kg|forty-four kilograms]] {comma}
-blood pressure [[110/68|one hundred and ten over sixty-eight]] {period} Puberty
-[[Tanner stage 2|Tanner stage two]] {period} Morning [[17-hydroxyprogesterone|seventeen hydroxy progesterone]] has
-fallen from [[85|eighty-five]] to [[22|twenty-two]] nanomoles per liter and androstenedione is now in the normal
-range {period} {new paragraph}
+blood pressure [[110/68|one hundred and ten over sixty-eight]] {period} Puberty [[Tanner stage 2|Tanner stage two]]
+{period} Morning [[17-hydroxyprogesterone|seventeen hydroxy progesterone]] has fallen from [[85|eighty-five]] to
+[[22|twenty-two]] nanomoles per liter and androstenedione is now in the normal range {period} {new paragraph}
 Impression {colon} good androgen control on crinecerfont {comma} allowing the hydrocortisone to come down {period}
 {new paragraph}
-Plan {colon} reduce hydrocortisone to [[15 mg|fifteen milligrams]] a day {comma} split [[7.5|seven and a half]]
-{comma} [[5|five]] and [[2.5 mg|two and a half milligrams]] {period} Continue crinecerfont and fludrocortisone
-{period} Sick day rules reviewed again with mum {period} Bone age X-ray and repeat hormone levels before the next
-visit in [[3 months|three months]] {period}
+Plan {colon} reduce hydrocortisone to [[15 mg|fifteen milligrams]] a day {comma} split
+[[7.5 mg|seven and a half milligrams]] in the morning {comma} [[5 mg|five]] at midday and [[2.5 mg|two and a half]]
+in the evening {period} Continue crinecerfont and fludrocortisone {period} Sick day rules reviewed again with mum
+{period} Bone age X-ray and repeat hormone levels before the next visit in [[3 months|three months]] {period}
 """
 
 [gold.history]
@@ -44,9 +44,9 @@ value = "Good androgen control on crinecerfont, allowing the hydrocortisone to c
 sources = ["good androgen control on crinecerfont, allowing the hydrocortisone to come down."]
 
 [gold.plan]
-value = "Reduce hydrocortisone to 15 mg a day, split 7.5, 5 and 2.5 mg. Continue crinecerfont and fludrocortisone. Sick day rules reviewed again with mum. Bone age X-ray and repeat hormone levels before the next visit in 3 months."
+value = "Reduce hydrocortisone to 15 mg a day, split 7.5 mg in the morning, 5 mg at midday and 2.5 mg in the evening. Continue crinecerfont and fludrocortisone. Sick day rules reviewed again with mum. Bone age X-ray and repeat hormone levels before the next visit in 3 months."
 sources = [
-    "reduce hydrocortisone to 15 mg a day, split 7.5, 5 and 2.5 mg.",
+    "reduce hydrocortisone to 15 mg a day, split 7.5 mg in the morning, 5 mg at midday and 2.5 mg in the evening.",
     "Continue crinecerfont and fludrocortisone.",
     "Sick day rules reviewed again with mum.",
     "Bone age X-ray and repeat hormone levels before the next visit in 3 months.",

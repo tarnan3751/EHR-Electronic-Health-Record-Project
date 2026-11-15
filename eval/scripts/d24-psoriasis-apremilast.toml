@@ -1,9 +1,10 @@
 # Dictation test script (synthetic): psoriasis starting apremilast, no spoken punctuation. Format: eval/README.md.
 id = "d24-psoriasis-apremilast"
 voice = "hf_alpha"
-tags = ["numbers", "drug-uncommon", "negation", "self-correction"]
+tags = ["numbers", "drug-uncommon", "negation", "self-correction", "recombination"]
 dates = []
 drugs = ["calcipotriol", "betamethasone", "apremilast"]
+retracted = ["PASI 12"]
 text = """
 Dermatology note for a [[38-year-old|thirty-eight-year-old]] man with plaque psoriasis on the elbows knees and scalp
 for about ten years he has used calcipotriol and betamethasone gel which helps the scalp but the plaques on his legs

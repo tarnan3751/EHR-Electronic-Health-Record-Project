@@ -1,10 +1,10 @@
 # Dictation test script (synthetic): memory clinic on donanemab, with a lab order to leave out. Format: eval/README.md.
 id = "d18-alzheimers-donanemab"
 voice = "bm_george"
-tags = ["dates", "numbers", "drug-new", "negation", "order-attempt", "spoken-punctuation"]
+tags = ["dates", "numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
 dates = ["--10-21", "--11-18"]
 drugs = ["donanemab", "donepezil"]
-forbidden = ["order a vitamin B12 level"]
+forbidden = ["put an order in for a vitamin B12 level"]
 text = """
 Memory clinic follow-up {period} [[74-year-old|seventy-four-year-old]] woman with early Alzheimer's disease
 confirmed on amyloid [[PET|pet]] {comma} here with her husband {period} She has had [[3|three]] infusions of
@@ -19,7 +19,7 @@ Impression {colon} mild cognitive impairment due to Alzheimer's disease {comma} 
 related imaging abnormalities so far {period} {new paragraph}
 Plan {colon} continue monthly donanemab {comma} fourth infusion on [[November 18|the eighteenth of November]]
 {period} Repeat [[MRI|M R I]] before the seventh infusion {period} Carry on with donepezil [[10 mg|ten milligrams]]
-at night {period} And please order a vitamin [[B12|B twelve]] level today {period} Driving to stop for now as
+at night {comma} and put an order in for a vitamin [[B12|B twelve]] level today {period} Driving to stop for now as
 discussed with them both {period} Review in [[3 months|three months]] {period}
 """
 
@@ -46,7 +46,7 @@ value = "Continue monthly donanemab; fourth infusion on November 18. Repeat MRI 
 sources = [
     "continue monthly donanemab, fourth infusion on November 18.",
     "Repeat MRI before the seventh infusion.",
-    "Carry on with donepezil 10 mg at night.",
+    "Carry on with donepezil 10 mg at night",
     "Driving to stop for now as discussed with them both.",
     "Review in 3 months.",
 ]

@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): cardiac amyloidosis clinic switching tafamidis to acoramidis. Format: eval/README.md.
 id = "d29-attr-acoramidis"
 voice = "am_michael"
-tags = ["long", "vitals", "numbers", "drug-new", "negation", "spoken-punctuation"]
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "recombination", "spoken-punctuation"]
 dates = []
 drugs = ["tafamidis", "acoramidis", "furosemide", "apixaban"]
 text = """

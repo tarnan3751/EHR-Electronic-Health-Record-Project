@@ -1,24 +1,25 @@
 # Dictation test script (synthetic): atopic dermatitis starting lebrikizumab, with an allergy change to leave out. Format: eval/README.md.
 id = "d06-eczema-lebrikizumab"
 voice = "ef_dora"
-tags = ["numbers", "drug-new", "negation", "allergy-change", "spoken-punctuation"]
+tags = ["numbers", "drug-new", "negation", "allergy-change", "mixed-plan", "spoken-punctuation"]
 noise = ["hvac"]
 dates = []
 drugs = ["triamcinolone", "tacrolimus", "dupilumab", "cephalexin", "lebrikizumab"]
-forbidden = ["add cephalexin to her allergy list"]
+forbidden = ["cephalexin should be added to her allergies"]
 text = """
 Dermatology follow-up for atopic dermatitis {period} [[29-year-old|twenty-nine-year-old]] woman with lifelong eczema
 {comma} worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face {period} She
 itches most nights and wakes [[2|two]] or [[3|three]] times {period} No skin infections recently and no eye symptoms
 {period} She tried dupilumab last year and stopped after [[4 months|four months]] because of conjunctivitis {period}
-By the way she told the nurse she got hives from cephalexin last month so add cephalexin to her allergy list
-{period} {new paragraph}
+By the way she told the nurse she got hives from cephalexin last month {period}
+{new paragraph}
 Exam shows lichenified plaques in both elbow creases and behind the knees {comma} with excoriations {period}
 [[EASI|Easy]] score is [[18|eighteen]] {period} {new paragraph}
 Moderate atopic dermatitis not controlled on topical treatment {period} {new paragraph}
 Plan {colon} start lebrikizumab [[500 mg|five hundred milligrams]] at [[week 0|week zero]] and
 [[week 2|week two]] {comma} then [[250 mg|two hundred fifty milligrams]] every [[2 weeks|two weeks]] until
-[[week 16|week sixteen]] {period} Continue the ointments as needed {period} Moisturize twice a day {period} Recheck
+[[week 16|week sixteen]] {period} Continue the ointments as needed {comma} and cephalexin should
+be added to her allergies {period} Moisturize twice a day {period} Recheck
 in [[16 weeks|sixteen weeks]] {period}
 """
 
@@ -42,7 +43,7 @@ sources = ["Moderate atopic dermatitis not controlled on topical treatment."]
 value = "Start lebrikizumab 500 mg at week 0 and week 2, then 250 mg every 2 weeks until week 16. Continue the ointments as needed. Moisturize twice a day. Recheck in 16 weeks."
 sources = [
     "start lebrikizumab 500 mg at week 0 and week 2, then 250 mg every 2 weeks until week 16.",
-    "Continue the ointments as needed.",
+    "Continue the ointments as needed",
     "Moisturize twice a day.",
     "Recheck in 16 weeks.",
 ]
