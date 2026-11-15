@@ -178,7 +178,7 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
 
-        Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+        Assert.Matches("<a [^>]*href=\"/patients\"[^>]*>Back to my patients</a>", html);
     }
 
     // Off-site with the on-prem app unable to save, the chart comes from the replica with the read-only notice, and its

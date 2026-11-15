@@ -6,9 +6,13 @@
 }
 <h1>Patients</h1>
 @* A plain GET: it works without JavaScript and off-site from the replica, and the results' links carry the criteria
-   back from the chart. The fields' names are the query string's. *@
-<form method="get" class="search-form" role="search">
-    <label>Name <input type="search" name="name" value="@Model.Search.Name" autocomplete="off" autofocus></label>
+   back from the chart. The fields' names are the query string's. As the clinician types, htmx asks for the results
+   alone after a pause, dropping a request still on its way when a newer one starts; Enter or Search submits the form
+   as usual. The page's address doesn't follow the typing: htmx would keep copies of the page, names and all, in the
+   browser's storage for its history. The arrow keys and "/" are patient-search.js. *@
+<form method="get" class="search-form" role="search"
+      hx-get="@Url.Page("Index", "Results")" hx-trigger="input delay:300ms" hx-target="#search-results" hx-sync="this:replace">
+    <label>Name <input type="search" name="name" value="@Model.Search.Name" autocomplete="off" autofocus data-search-field aria-keyshortcuts="/"></label>
     <label>Date of birth <input type="date" name="birthdate" value="@Model.Search.Birthdate" max="@IndexModel.LatestBirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"></label>
     <label>MRN <input type="search" name="mrn" value="@Model.Search.Mrn" autocomplete="off"></label>
     <button>Search</button>

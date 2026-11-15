@@ -9,11 +9,16 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 
 // The clinician's patients: their own panel first, and a search across the clinic by name, date of birth and MRN,
 // combined, with the patients on their panel marked as theirs and the rest as restricted, since opening one of those
-// asks for a reason first (Reason). Criteria that can't be searched as given say why instead. Every patient listed is
-// a PHI read, recorded by the PHI reader; row-level security decides which patients exist for this clinician.
+// asks for a reason first (Reason). Criteria that can't be searched as given say why instead. Results also come as the
+// clinician types (OnGetResultsAsync, through htmx), the results alone and fewer of them; a plain submit still works
+// without JavaScript. Every patient listed is a PHI read, recorded by the PHI reader; row-level security decides which
+// patients exist for this clinician.
 public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageModel
 {
     public const int Limit = 100;
+
+    // As the clinician types, each pause lists patients again, and each one listed is a recorded read: so fewer.
+    public const int LiveLimit = 20;
 
     // The longest a name and an MRN can be (PatientConfiguration).
     const int MaximumNameLength = 100;
@@ -37,17 +42,36 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
 
     public bool More { get; private set; }
 
+    // Whether these are results as the clinician types, which list up to LiveLimit.
+    public bool Live { get; private set; }
+
     // Who is on the panel, to mark in the results.
     public IReadOnlySet<Guid> Panel { get; private set; } = new HashSet<Guid>();
 
     // The latest date of birth a search takes: today, with a day's slack for the clinic's time zone.
     public static DateOnly LatestBirthDate => DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
 
-    public async Task OnGetAsync()
+    public Task OnGetAsync() => LoadAsync(Limit);
+
+    // The results alone, for htmx to put under the form as the clinician types.
+    public async Task<IActionResult> OnGetResultsAsync()
+    {
+        Live = true;
+        await LoadAsync(LiveLimit);
+        return Partial("_SearchResults", this);
+    }
+
+    async Task LoadAsync(int limit)
     {
         if (Search.IsEmpty)
         {
-            PanelPatients = await phi.PanelAsync(Limit, HttpContext.RequestAborted);
+            // Fields emptied as the clinician types list nobody: the panel would be up to Limit more reads at every
+            // pause, and Clear brings it back.
+            if (!Live)
+            {
+                PanelPatients = await phi.PanelAsync(Limit, HttpContext.RequestAborted);
+            }
+
             return;
         }
 
@@ -100,7 +124,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
             return;
         }
 
-        var found = await phi.SearchPatientsAsync(name, birthDate, mrn, Limit, HttpContext.RequestAborted);
+        var found = await phi.SearchPatientsAsync(name, birthDate, mrn, limit, HttpContext.RequestAborted);
         (Searched, Results, More) = (true, found.Patients, found.More);
         Panel = await assignments.PanelIdsAsync(HttpContext.RequestAborted);
     }

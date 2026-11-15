@@ -1,5 +1,6 @@
-@* What the patients page shows under the search form: what to correct, the search's results, or, with no search, the
-   clinician's panel. *@
+@* What the patients page shows under the search form, and all that comes back as the clinician types: what to correct,
+   the search's results, or, with no search, the clinician's panel, which typing that empties the fields doesn't
+   list again. *@
 @model IndexModel
 @if (Model.Problems.Count > 0)
 {
@@ -24,11 +25,19 @@ else if (Model.Searched)
             <p><span class="tag restricted">Restricted</span> Not on your panel: opening the chart asks for a reason first.</p>
         }
         <partial name="_PatientTable" model="new PatientTable(Model.Results, Model.Panel, MarkPanel: true, Model.Search)" />
-        @if (Model.More)
+        @if (Model.More && Model.Live)
+        {
+            <p>More patients match than are listed here. Keep typing to narrow them, or press Enter for the full list.</p>
+        }
+        else if (Model.More)
         {
             <p>More patients match than are listed here. Add a date of birth, or more of the name, to narrow the search.</p>
         }
     }
+}
+else if (Model.Live)
+{
+    <p>Type a name, a date of birth or an MRN to search, or press Clear to see your patients.</p>
 }
 else
 {

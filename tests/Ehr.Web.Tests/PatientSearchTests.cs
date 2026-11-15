@@ -10,7 +10,8 @@ namespace Ehr.Web.Tests;
 
 // The patient search (Areas/Clinical/Pages/Patients/Index, PhiReader.SearchPatientsAsync): a name, a date of birth and
 // an MRN, combined; criteria that can't be searched say why; results mark the clinician's own patients and the charts
-// that ask for a reason first; every patient listed is one recorded read; and the criteria travel to the chart and back.
+// that ask for a reason first; every patient listed is one recorded read; results also come as the clinician types,
+// fewer of them, and the keyboard reaches them; and the criteria travel to the chart and back.
 public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -250,7 +251,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
         var patient = await apps.InsertPatientAsync("Ada", family);
         var session = await SignInAsync(apps.OnPrem, clinician);
         var search = $"/patients?name={family}";
-        var backToSearch = $"<a href=\"{search}\">Back to search</a>";
+        var backToSearch = $"<a [^>]*href=\"{Regex.Escape(search)}\"[^>]*>Back to search</a>";
         var chartLink = $"/patients/{patient}?name={family}";
         Assert.Contains($"href=\"{chartLink}\"", await session.Client.GetStringAsync(search, Cancel));
 
@@ -259,24 +260,146 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
         using var reasonPage = await session.Client.GetAsync(chartLink, Cancel);
         Assert.Equal($"/patients/{patient}/reason?name={family}", reasonPage.RequestMessage!.RequestUri!.PathAndQuery);
         var reasonHtml = await ReadAsync(reasonPage);
-        Assert.Contains(backToSearch, reasonHtml);
+        Assert.Matches(backToSearch, reasonHtml);
         Assert.Contains("<form method=\"post\" class=\"account-form\">", reasonHtml);
 
         using var chart = await PostFormAsync(session.Client, $"/patients/{patient}/reason?name={family}", reasonPage, ("Reason", "Covering the night shift"));
         Assert.Equal(chartLink, chart.RequestMessage!.RequestUri!.PathAndQuery);
         var chartHtml = await ReadAsync(chart);
-        Assert.Contains(backToSearch, chartHtml);
+        Assert.Matches(backToSearch, chartHtml);
 
         Assert.Contains($"action=\"/patients/{patient}?name={family}&amp;handler=Assign\"", chartHtml);
         using var assigned = await PostFormAsync(session.Client, $"/patients/{patient}?name={family}&handler=Assign", chart);
         Assert.Equal(chartLink, assigned.RequestMessage!.RequestUri!.PathAndQuery);
-        Assert.Contains(backToSearch, await ReadAsync(assigned));
+        Assert.Matches(backToSearch, await ReadAsync(assigned));
     }
 
-    // Off-site with the on-prem app unable to save, a search comes from the replica with the read-only notice, and its
-    // reads wait in the cloud app's queue until the on-prem app takes them.
     [Fact]
-    public async Task Off_site_during_an_outage_a_search_comes_from_the_replica_and_its_reads_are_queued_then_shipped()
+    public async Task As_you_type_returns_the_results_alone()
+    {
+        var family = Unique("Typed");
+        var patient = await apps.InsertPatientAsync("Ada", family);
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var page = await session.Client.GetStringAsync("/patients", Cancel);
+        var typed = await TypedAsync(session.Client, $"name={family}&birthdate=&mrn=");
+
+        Assert.Contains("hx-get=\"/patients?handler=Results\" hx-trigger=\"input delay:300ms\" hx-target=\"#search-results\"", page);
+        Assert.Contains("<div id=\"search-results\">", page);
+        Assert.Equal([patient], Listed(typed));
+        Assert.Contains("Search results", typed);
+        Assert.DoesNotContain("<html", typed);
+        Assert.DoesNotContain("<form", typed);
+        Assert.DoesNotContain("<h1>", typed);
+    }
+
+    [Fact]
+    public async Task As_you_type_lists_at_most_twenty_each_a_recorded_read_and_points_to_the_full_list()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Typist", StaffRoles.Clinician);
+        var family = Unique("Typist");
+        var patients = new List<Guid>();
+        for (var i = 0; i <= Ehr.Web.Areas.Clinical.Pages.Patients.IndexModel.LiveLimit; i++)
+        {
+            patients.Add(await apps.InsertPatientAsync($"Given{i:D3}", family));
+        }
+
+        var session = await SignInAsync(apps.OnPrem, clinician);
+
+        var typed = await TypedAsync(session.Client, $"name={family}");
+
+        var listed = Listed(typed);
+        Assert.Equal(Ehr.Web.Areas.Clinical.Pages.Patients.IndexModel.LiveLimit, listed.Count);
+        Assert.Contains("More patients match than are listed here. Keep typing to narrow them, or press Enter for the full list.", typed);
+        foreach (var patient in patients)
+        {
+            Assert.Equal(listed.Contains(patient) ? 1 : 0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+        }
+    }
+
+    [Fact]
+    public async Task As_you_type_asks_for_corrections_like_a_submit_and_reads_nothing()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Hasty", StaffRoles.Clinician);
+        await apps.InsertPatientAsync("Ada", "Q" + Unique("uirk"));
+        var session = await SignInAsync(apps.OnPrem, clinician);
+
+        var shortName = await TypedAsync(session.Client, "name=Q");
+        var badDate = await TypedAsync(session.Client, "name=Ada&birthdate=1980-02-30");
+
+        Assert.Contains("Type at least 2 letters of the name.", shortName);
+        Assert.Contains("Enter the date of birth as a full date, such as 1980-05-02.", badDate);
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
+    }
+
+    // Emptying the fields as the clinician types would otherwise list the panel again at every pause, each patient a
+    // recorded read; Clear brings it back with one page.
+    [Fact]
+    public async Task As_you_type_emptied_fields_list_nobody()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Eraser", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Ada", Unique("Paneled"));
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        // Signing in lands on the panel: one read.
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+
+        var emptied = await TypedAsync(session.Client, "name=&birthdate=&mrn=");
+
+        Assert.Contains("Type a name, a date of birth or an MRN to search, or press Clear to see your patients.", emptied);
+        Assert.Empty(Listed(emptied));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+    }
+
+    // A chart fetched before anyone opened it would be a recorded read of a chart nobody looked at, and one off the
+    // panel would ask for emergency access: the results are plain links, which nothing fetches ahead.
+    [Fact]
+    public async Task Nothing_on_the_search_page_prefetches_a_chart()
+    {
+        var family = Unique("Plain");
+        var patient = await apps.InsertPatientAsync("Ada", family);
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var page = await session.Client.GetStringAsync($"/patients?name={family}", Cancel);
+        var typed = await TypedAsync(session.Client, $"name={family}");
+
+        Assert.All([page, typed], html =>
+        {
+            Assert.Contains($"/patients/{patient}", html);
+            foreach (var ahead in new[] { "prefetch", "preload", "prerender", "speculationrules", "mouseenter", "mouseover", "hx-boost" })
+            {
+                Assert.DoesNotContain(ahead, html, StringComparison.OrdinalIgnoreCase);
+            }
+
+            Assert.DoesNotMatch("hx-[a-z]+=\"/patients/[0-9a-f]", html);
+        });
+    }
+
+    [Fact]
+    public async Task The_patients_page_focuses_the_name_and_a_shortcut_reaches_it()
+    {
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+        var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("An Admin", StaffRoles.Admin));
+
+        var page = await session.Client.GetStringAsync("/patients", Cancel);
+        var quickTexts = await session.Client.GetStringAsync(QuickTexts, Cancel);
+        var staff = await admin.Client.GetStringAsync("/admin/staff", Cancel);
+
+        Assert.Matches("<input type=\"search\" name=\"name\"[^>]* autofocus data-search-field aria-keyshortcuts=\"/\">", page);
+        Assert.All([page, quickTexts], html =>
+        {
+            Assert.Contains("js/patient-search", html);
+            Assert.Matches("<a [^>]*data-search-shortcut aria-keyshortcuts=\"/\"[^>]*>Patients</a>", html);
+        });
+        // An admin has no patients to search.
+        Assert.DoesNotContain("patient-search", staff);
+    }
+
+    // Off-site with the on-prem app unable to save, a search and the results as the clinician types come from the
+    // replica, the page with the read-only notice, and their reads wait in the cloud app's queue until the on-prem app
+    // takes them.
+    [Fact]
+    public async Task Off_site_during_an_outage_search_and_as_you_type_come_from_the_replica_and_their_reads_are_queued_then_shipped()
     {
         var clinician = await apps.CreateStaffAsync("Dr. Away", StaffRoles.Clinician);
         var family = Unique("Away");
@@ -289,24 +412,38 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
             Assert.False(await shipper.ShipAsync(Cancel));
 
             var html = await session.Client.GetStringAsync($"/patients?name={family}", Cancel);
+            var typed = await TypedAsync(session.Client, $"name={family}");
 
             Assert.Equal(patients.Order(), Listed(html).Order());
+            Assert.Equal(patients.Order(), Listed(typed).Order());
             Assert.Contains("Restricted", html);
             Assert.Contains("Read-only: the clinic's server can't be reached", html);
+            // One read of each patient for each page.
             var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
-            Assert.Equal(patients.Order(), queued.Where(e => e.ActorId == clinician.Id).Select(e => e.PatientId!.Value).Order());
+            var reads = queued.Where(e => e.ActorId == clinician.Id).ToList();
+            Assert.All(reads, e => Assert.Equal((AuditActions.Read, "patients"), (e.Action, e.TableName!)));
+            Assert.Equal([.. patients.Concat(patients).Order()], reads.Select(e => e.PatientId!.Value).Order());
 
             apps.PrimaryDown = false;
             Assert.True(await shipper.ShipAsync(Cancel));
             foreach (var patient in patients)
             {
-                Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.Cloud));
+                Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.Cloud));
             }
         }
         finally
         {
             apps.PrimaryDown = false;
         }
+    }
+
+    // What htmx asks for as the clinician types: the results alone, with its own header.
+    static async Task<string> TypedAsync(HttpClient client, string query)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/patients?handler=Results&{query}");
+        request.Headers.Add("HX-Request", "true");
+        using var response = await client.SendAsync(request, Cancel);
+        return await ReadAsync(response);
     }
 
     // A family name no other test uses, so a search finds only this test's patients.

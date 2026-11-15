@@ -1,11 +1,11 @@
 @* The way back from a chart, or from the reason it asks for: to the search it came from, with its criteria, or to the
-   clinician's panel when it didn't come from a search. *@
+   clinician's panel when it didn't come from a search. The "/" key follows it (patient-search.js). *@
 @model SearchQuery
 @if (Model.IsEmpty)
 {
-    <a asp-page="Index">Back to my patients</a>
+    <a asp-page="Index" data-search-back aria-keyshortcuts="/">Back to my patients</a>
 }
 else
 {
-    <a asp-page="Index" asp-all-route-data="Model.RouteData()">Back to search</a>
+    <a asp-page="Index" asp-all-route-data="Model.RouteData()" data-search-back aria-keyshortcuts="/">Back to search</a>
 }
