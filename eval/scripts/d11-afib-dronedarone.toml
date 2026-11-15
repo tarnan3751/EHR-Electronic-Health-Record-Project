@@ -52,8 +52,9 @@ sources = [
 ]
 
 [gold_rules.history]
-value = "68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals. He had 2 short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago. Blood pressure 134/82, heart rate 64 and regular. ECG today shows sinus rhythm with a QTc of 448 milliseconds. Creatinine 1.1."
+value = "Cardiology follow-up for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals. He had 2 short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago. Blood pressure 134/82, heart rate 64 and regular. ECG today shows sinus rhythm with a QTc of 448 milliseconds. Creatinine 1.1."
 sources = [
+    "Cardiology follow-up for paroxysmal atrial fibrillation.",
     "68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals.",
     "He had 2 short episodes of palpitations last month, each lasting less than an hour.",
     "No bleeding, no syncope.",

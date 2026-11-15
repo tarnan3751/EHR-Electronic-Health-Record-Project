@@ -85,9 +85,9 @@ sources = [
 ]
 
 [gold_rules.plan]
-value = "We are switching to acoramidis. Stop tafamidis and start acoramidis 712 mg twice daily. Increase furosemide to 80 mg in the morning and 40 mg in the afternoon for 5 days, then back to 40 mg twice daily. Kidney function and potassium on Friday. Daily weights, call the heart failure nurse if up more than 1 kg in a day. Continue apixaban. Clinic review in 4 weeks."
+value = "He has been on tafamidis, but his insurance will no longer cover it, so we are switching to acoramidis. Stop tafamidis and start acoramidis 712 mg twice daily. Increase furosemide to 80 mg in the morning and 40 mg in the afternoon for 5 days, then back to 40 mg twice daily. Kidney function and potassium on Friday. Daily weights, call the heart failure nurse if up more than 1 kg in a day. Continue apixaban. Clinic review in 4 weeks."
 sources = [
-    "so we are switching to acoramidis.",
+    "He has been on tafamidis, but his insurance will no longer cover it, so we are switching to acoramidis.",
     "stop tafamidis and start acoramidis 712 mg twice daily.",
     "Increase furosemide to 80 mg in the morning and 40 mg in the afternoon for 5 days, then back to 40 mg twice daily.",
     "Kidney function and potassium on Friday.",

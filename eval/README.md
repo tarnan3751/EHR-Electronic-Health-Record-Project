@@ -84,6 +84,12 @@ Values copy numbers, units, dates, drug names and doses as the display text writ
 
 **Two gold sets.** `[gold.*]`, above, is the clinical gold: what a careful clinician would accept. `[gold_rules.*]` is the rule-following gold: the best answer the dictation service's own checks allow (`validation.py` in the sidecar, and the structuring prompt's rules), which is the clinician's own words in their order with nothing added but an article. A script writes `[gold_rules.<field>]`, a `value` and `sources` like the clinical gold's, only for a field whose clinical gold doesn't follow those rules; for every other field the rule-following gold is the clinical gold. A test fails if one is written the same as the clinical gold, or is empty where the clinical gold isn't: the two say the same things. Every rule-following value must pass the service's checks against the display text (`tests/test_gold.py`). Which clinical gold values the checks would discard, and why, is in `clinical-gold.md`; after changing a script or the checks, write it again with `uv run --project eval python -m ehr_eval.goldreport` (a test fails while it is out of date).
 
+Where the rules let the rule-following gold say only less well what the clinical gold says, for the owner to weigh:
+
+- d30 history keeps "does not drink alcohol olezarsen 80 mg by monthly injection was started on June 15, 2026" as one run-on: without punctuation the negation reaches the olezarsen, and a value that split the sentence would drop it.
+- d31 history keeps "with meals" before the corrected dose: "crinecerfont twice daily with meals, 50 mg twice daily".
+- d39 assessment leaves out "3-year-old", said only to name the patient at the start of the dictation.
+
 `drugs` lists medicine names (generic or brand) as written in the display text, including any named only in a forbidden directive; not drug classes ("statins"), vitamins and supplements, or vaccines named by disease.
 
 **Tags.** A script's tags describe its content. The audio generator adds the voice's accent, and the noise and container of each audio variant.
