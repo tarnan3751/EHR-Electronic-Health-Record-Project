@@ -6,9 +6,10 @@ Grounding is strict: every word of a value must be in that value's own sources, 
 (case, punctuation, numbers as digits whether written or spoken, a few unit spellings, and simple plural and tense
 endings), except for a short list of connecting words (REFORMULATION). Nothing else may be added: not "twice", not
 "right" for "left", not another drug, not a heading. Nor may words be recombined: the value is cut into segments at
-punctuation and at "and" and "or", and each segment's words must be found in order in one of its sources, with at most
-MAX_GAP of that source's own words between any two of them (connecting words and doses don't count). So "right knee
-pain" can't come from "left knee pain, right knee normal". A source with a correction in it is read as corrected.
+punctuation (not the point in "12.5") and at "and" and "or", and each segment's words must be found in order in one of
+its sources, with at most MAX_GAP of that source's own words between any two of them (connecting words and doses don't
+count). So "right knee pain" can't come from "left knee pain, right knee normal". A source with a correction in it is
+read as corrected.
 
 An instruction to order something or to change the allergy list is never carried into the note (FR-14), but the rest of
 a field is: each sentence of a value holding one is cut where the instruction starts, and sources quoting one are set
@@ -283,8 +284,7 @@ CORRECTION = re.compile(
 def _followed_by_correction(text: str, words: list[Token], end: int) -> bool:
     following = [token for token in words if token.start >= end][:CORRECTION_WINDOW]
     window = text[end : following[-1].end] if following else ""
-    sentence_end = min((i for i in (window.find(mark) for mark in ".?!\n") if i != -1), default=len(window))
-    return bool(CORRECTION.search(window[:sentence_end]))
+    return bool(CORRECTION.search(window[: _sentence_end(window, 0)]))
 
 
 def _superseded_terms(quotes: list[str]) -> set[str]:
@@ -309,6 +309,15 @@ def _superseded_terms(quotes: list[str]) -> set[str]:
 # ---- Format --------------------------------------------------------------------------------------------------------
 
 BAD_FORMAT = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]|<[^>]*>|https?://|www\.|```|[\[\]{}]")
+
+# Where a sentence or a clause ends: never at the point or comma inside a number ("12.5 mg", "38.9", "1,000").
+SENTENCE_MARK = re.compile(r"[!?\n]|\.(?!\d)|(?<!\d)\.")
+CLAUSE_MARK = re.compile(r"[!?;\n]|[.,](?!\d)|(?<!\d)[.,]")
+
+
+def _sentence_end(text: str, start: int) -> int:
+    found = SENTENCE_MARK.search(text, start)
+    return found.start() if found else len(text)
 
 
 # ---- Orders and allergy-list changes (FR-14) ----------------------------------------------------------------------
@@ -398,13 +407,13 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
 
     spans = []
     for start, end, kind in sorted(matches):
-        clause = max(text.rfind(mark, 0, start) for mark in ".!?;\n,") + 1
+        clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
         span_start = start
         for token in reversed([token for token in words if token.end <= start][-LEAD_IN_REACH:]):
             if token.text not in LEAD_IN or token.start < clause:
                 break
             span_start = token.start
-        sentence = min((i for i in (text.find(mark, end) for mark in ".!?\n") if i != -1), default=len(text))
+        sentence = _sentence_end(text, end)
         reach = [token for token in words if token.start >= end][:DIRECTIVE_REACH]
         span_end = min(sentence, reach[-1].end if reach else end)
         spans.append((span_start, max(span_end, end), kind))
@@ -499,7 +508,7 @@ def _ungrounded(value: str, sources: str) -> bool:
     return False
 
 
-SEGMENT_BREAK = re.compile(r"[.,;:!?()\n]+|\b(?:and|or)\b", re.IGNORECASE)
+SEGMENT_BREAK = re.compile(r"(?:[;:!?()\n]|[.,](?!\d)|(?<!\d)[.,])+|\b(?:and|or)\b", re.IGNORECASE)
 CONNECTING = frozenset(_word_key(word) for word in REFORMULATION)
 
 

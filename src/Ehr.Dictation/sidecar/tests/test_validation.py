@@ -170,6 +170,18 @@ def test_number_words_match_digits_and_unit_spellings_match():
     assert own("Started on lisinopril ten milligrams two weeks ago.", "Started lisinopril 10 mg 2 weeks ago.").pending
 
 
+@pytest.mark.parametrize("said", ["Continue aprocitentan 12.5 mg daily.", "Temperature 38.9, heart rate 112.",
+                                  "Potassium 5.5, recheck in 1 week.", "Start semaglutide 0.25 mg weekly."])
+def test_a_decimal_point_does_not_split_a_value(said):
+    assert own(said, said).pending
+
+
+def test_an_instruction_reaches_past_a_decimal_point():
+    text = transcript("Prescribe semaglutide 0.25 mg weekly. Recheck in 3 months.")
+
+    assert [text.text[r["start"] : r["end"]] for r in not_carried_over(text)] == ["Prescribe semaglutide 0.25 mg weekly"]
+
+
 def test_connecting_and_framing_words_may_be_added_but_nothing_else():
     assert own("He takes lisinopril 10 mg daily.", "Patient reports he takes lisinopril daily.").pending
     assert "unsupported_content" in own("Cough for three days.", "She has a cough for three days.").reasons
