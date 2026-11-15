@@ -4,10 +4,11 @@
 
 A run keeps, for each recording, MedASR's passages as heard and K2 Horizon's proposals as answered (run.py). This
 rebuilds each transcript from those passages exactly, runs validation.py over the proposals, and writes the results
-again, stamped with the current code and measurement hashes and everything else as the run recorded it: the model
-outputs are the same ones, and only what is checked and scored has changed. It is how a change to the rules is
-measured on the same answers (for example strict against relaxed), and it refuses a run made with another prompt,
-schema or parameters, whose answers the current code would never have been given.
+again, stamped with the current scoring hash and everything else as the run recorded it: the model outputs are the
+same ones, and only what is checked and scored has changed. It is how a change to the rules is measured on the same
+answers (for example strict against relaxed). It refuses a run made with another prompt, schema or parameters, or
+with other code making the transcript and the answers (the pipeline hash), whose answers the current code would never
+have given.
 """
 
 from __future__ import annotations
@@ -19,17 +20,21 @@ import sys
 from pathlib import Path
 
 from ehr_dictation import prompt, validation
-from ehr_dictation.provenance import CODE_SHA256
 from ehr_dictation.transcript import Segment, assemble
 
 from . import scoring
-from .scripts import load_all, measurement_sha256
+from .scripts import load_all, pipeline_sha256, scoring_sha256
 
 
 def rescore(results: dict) -> dict:
     structuring = prompt.load(parameters=results["run"]["parameters"])
     if results["provenance"]["structuring"] != structuring.structuring_sha256:
         raise ValueError("These results came from another prompt, schema or parameters: run the eval again instead.")
+    if results["provenance"].get("pipeline") != pipeline_sha256():
+        raise ValueError(
+            "These results came from other code making the transcript or the answers (the sidecar apart from its checks, "
+            "or a lockfile): run the eval again instead."
+        )
     items = []
     for stored in results["items"]:
         item = scoring.Item(**{key: value for key, value in stored.items() if key != "fields"})
@@ -46,13 +51,9 @@ def rescore(results: dict) -> dict:
                 item.fields[name].warnings = [list(span) for span in checked.warnings]
         items.append(item)
     out = dict(results)
-    out["provenance"] = results["provenance"] | {"code": CODE_SHA256, "measurement": measurement_sha256()}
+    out["provenance"] = results["provenance"] | {"scoring": scoring_sha256()}
     # The model's answers are the run's own; only the checks and the scoring are this code's.
-    out["rescored_from"] = {
-        "code": results["provenance"]["code"],
-        "measurement": results["provenance"]["measurement"],
-        "structuring_outputs_reused": True,
-    }
+    out["rescored_from"] = {"scoring": results["provenance"].get("scoring"), "structuring_outputs_reused": True}
     out["metrics"] = scoring.score(items, load_all())
     out["items"] = [dataclasses.asdict(item) for item in items]
     return out

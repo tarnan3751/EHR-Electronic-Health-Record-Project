@@ -67,8 +67,8 @@ word between them (no, wait, sorry, scratch, mean, correction, actually, rather,
 item. near_unclear_passage, for each passage marked unclear within NEAR_UNCLEAR words of one of the value's sources: the
 value was sorted from words right beside something speech recognition couldn't hear; it points at that passage.
 
-The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of this
-package's code, so a change to any rule asks for a new run.
+The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of these
+checks, so a change to any rule asks for the stored answers to be scored again (eval/ehr_eval/rescore.py).
 """
 
 from __future__ import annotations

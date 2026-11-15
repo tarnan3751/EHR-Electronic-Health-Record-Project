@@ -2,8 +2,9 @@
 someone committed instead:
 
 1. eval/results/latest.json exists, covers every script, and was produced by this commit's prompt, schema and
-   generation parameters, its sidecar code (a hash over the package) and its eval code and lockfiles (the measurement
-   hash), on this test set. If any of them changed, the eval has to run again.
+   generation parameters, its code making the transcript and the answers (the pipeline hash), and on this test set; if
+   any of them changed, the eval has to run again. And it was scored by this commit's checks and scoring code (the
+   scoring hash); if only they changed, re-scoring the stored answers (rescore.py) is enough.
 2. Every recording's fields were sorted: a run where K2 Horizon was unavailable or too slow for any of them measured
    nothing about the fields, so it can't be committed.
 3. No offered value contains an order or an allergy change a script tried to slip in, and none without a
@@ -28,9 +29,8 @@ import sys
 from pathlib import Path
 
 from ehr_dictation import prompt
-from ehr_dictation.provenance import CODE_SHA256
 
-from .scripts import EVAL_DIR, dataset_sha256, load_all, measurement_sha256
+from .scripts import EVAL_DIR, dataset_sha256, load_all, pipeline_sha256, scoring_sha256
 
 RESULTS_DIR = EVAL_DIR / "results"
 RUN_IT = (
@@ -62,14 +62,17 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
             "The prompt, the note schema or the generation parameters changed since the last eval run "
             f"(results {str(recorded.get('structuring'))[:12]}, now {structuring.structuring_sha256[:12]}). {RUN_IT}"
         )
-    if recorded.get("code") != CODE_SHA256:
+    if recorded.get("pipeline") != pipeline_sha256(eval_dir):
         problems.append(
-            "The sidecar's code (src/Ehr.Dictation/sidecar/ehr_dictation, validation.py and the rest) changed since these "
-            "results were made. If only the checks changed, re-score the stored answers with the code that ships: "
-            "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json. Otherwise: " + RUN_IT
+            "What makes the transcript and the model's answers (the sidecar's code apart from its checks, or a lockfile) "
+            f"changed since the last eval run. {RUN_IT}"
         )
-    if recorded.get("measurement") != measurement_sha256(eval_dir):
-        problems.append(f"The eval's own code or a lockfile changed since the last eval run. {RUN_IT}")
+    elif recorded.get("scoring") != scoring_sha256(eval_dir):
+        problems.append(
+            "The checks or the scoring (validation.py, textnorm.py or the eval's own code) changed since these results "
+            "were scored. Score the stored answers again with the code that ships: "
+            "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
+        )
     if latest.get("dataset", {}).get("sha256") != dataset_sha256(eval_dir):
         problems.append(
             "The test set (eval/scripts, voices.toml or generate_audio.py) changed since the last eval run. Generate the "

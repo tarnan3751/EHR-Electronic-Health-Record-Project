@@ -14,7 +14,7 @@ instead, reasoning on at "low" capped at 256 tokens (and enable_thinking set, si
 doesn't check.
 
 The results go to eval/results/latest.json (--out), stamped with the models' hashes, the prompt, schema and parameters
-hash, the sidecar's code hash, the eval's own measurement hash, the test set's hash and the machine. Record the
+hash, the pipeline and scoring hashes (scripts.py), the test set's hash and the machine. Record the
 accepted baseline on the server machine only (README.md, "Dictation server hardware"): a run on another machine is for
 information.
 """
@@ -38,14 +38,13 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 from ehr_dictation import audio, prompt, provenance, validation  # noqa: E402
 from ehr_dictation.asr import MedAsr  # noqa: E402
 from ehr_dictation.llama import LlamaServer, StructuringFailed, Structurer  # noqa: E402
-from ehr_dictation.provenance import CODE_SHA256  # noqa: E402
 from ehr_dictation.sessions import Sessions  # noqa: E402
 from ehr_dictation.settings import Settings  # noqa: E402
 from ehr_dictation.transcriber import Progress, advance  # noqa: E402
 from ehr_dictation.transcript import assemble  # noqa: E402
 
 from . import scoring  # noqa: E402
-from .scripts import EVAL_DIR, dataset_sha256, load_all, measurement_sha256  # noqa: E402
+from .scripts import EVAL_DIR, dataset_sha256, load_all, pipeline_sha256, scoring_sha256  # noqa: E402
 
 REPO_ROOT = EVAL_DIR.parent
 SCHEMA_VERSION = 1
@@ -219,8 +218,8 @@ async def main_async(args: argparse.Namespace) -> int:
             "prompt": structuring.prompt_sha256,
             "schema": structuring.schema_sha256,
             "structuring": structuring.structuring_sha256,
-            "code": CODE_SHA256,
-            "measurement": measurement_sha256(),
+            "pipeline": pipeline_sha256(),
+            "scoring": scoring_sha256(),
         },
         "dataset": {
             "sha256": dataset_sha256(),

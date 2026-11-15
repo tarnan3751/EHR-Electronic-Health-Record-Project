@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -79,12 +80,22 @@ def _sha256(path: Path) -> str | None:
     return digest.hexdigest()
 
 
-def code_sha256(package: Path = PACKAGE) -> str:
-    """A hash over the package's Python files, by name and content (line endings normalized)."""
+def code_sha256(package: Path = PACKAGE, names: Collection[str] | None = None) -> str:
+    """A hash over the package's Python files (or those named), by name and content (line endings normalized)."""
     digest = hashlib.sha256()
     for path in sorted(package.glob("*.py")):
-        digest.update(path.name.encode() + b"\0" + path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+        if names is None or path.name in names:
+            digest.update(path.name.encode() + b"\0" + path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
     return digest.hexdigest()
 
 
 CODE_SHA256 = code_sha256()
+
+# For the eval: the files that check a proposal, which re-scoring stored answers may change (eval/ehr_eval/rescore.py),
+# and those that make the transcript and the model's answer, which it may not. Neither are the HTTP layer (api.py),
+# which the eval doesn't go through, or this file, since results record the models' own hashes.
+CHECKS = ("validation.py", "textnorm.py")
+CHECKS_CODE_SHA256 = code_sha256(names=CHECKS)
+PIPELINE_CODE_SHA256 = code_sha256(
+    names=[path.name for path in PACKAGE.glob("*.py") if path.name not in {*CHECKS, "api.py", "provenance.py"}]
+)

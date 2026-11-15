@@ -7,17 +7,16 @@ import json
 import pytest
 
 from ehr_dictation import prompt
-from ehr_dictation.provenance import CODE_SHA256
 from ehr_eval.gate import check
-from ehr_eval.scripts import dataset_sha256, measurement_sha256
+from ehr_eval.scripts import dataset_sha256, pipeline_sha256, scoring_sha256
 
 
 def results(eval_dir, **overrides) -> dict:
     data = {
         "baseline": False,
         "run": {"machine": {"label": "the server"}},
-        "provenance": {"structuring": prompt.load().structuring_sha256, "code": CODE_SHA256,
-                       "measurement": measurement_sha256(eval_dir)},
+        "provenance": {"structuring": prompt.load().structuring_sha256, "pipeline": pipeline_sha256(eval_dir),
+                       "scoring": scoring_sha256(eval_dir)},
         "dataset": {"sha256": dataset_sha256(eval_dir), "complete": True, "recordings": 2},
         "metrics": {"wer": {"overall": 0.1}, "fields": {"content": {"f1": 0.8}}, "dates": {"accuracy": 0.9},
                     "drugs": {"accuracy": 0.7}, "unsupported_content": {"shown": 0.02},
@@ -48,18 +47,27 @@ def test_no_results_says_to_run_the_eval(eval_dir):
     assert "no eval results" in problem and "Run the eval" in problem
 
 
-def test_results_from_another_prompt_code_measurement_or_test_set_fail(eval_dir):
+def test_results_from_another_prompt_pipeline_or_test_set_fail(eval_dir):
     stale = results(eval_dir)
-    stale["provenance"] = {"structuring": "0" * 64, "code": "1" * 64, "measurement": "2" * 64}
+    stale["provenance"] = {"structuring": "0" * 64, "pipeline": "1" * 64, "scoring": "2" * 64}
     save(eval_dir, "latest.json", stale)
     (eval_dir / "scripts" / "d01.toml").write_text(
         (eval_dir / "scripts" / "d01.toml").read_text() + "\n# edited\n")
 
     problems = check(eval_dir / "results", eval_dir)
 
-    assert len(problems) == 4
+    assert len(problems) == 3
     assert all("Run the eval" in p for p in problems)
-    assert any("re-score the stored answers" in p for p in problems)
+
+
+def test_results_scored_by_other_checks_need_only_scoring_again(eval_dir):
+    rescorable = results(eval_dir)
+    rescorable["provenance"]["scoring"] = "2" * 64
+    save(eval_dir, "latest.json", rescorable)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+
+    assert "Score the stored answers again" in problem and "Run the eval" not in problem
 
 
 def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):
