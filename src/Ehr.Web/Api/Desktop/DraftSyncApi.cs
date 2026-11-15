@@ -101,7 +101,11 @@ static class DraftSyncApi
         {
             current = new ClinicalDraft
             {
-                Id = request.Id, PatientId = request.PatientId, ClinicianId = owner, Body = request.Body, Version = 1,
+                Id = request.Id,
+                PatientId = request.PatientId,
+                ClinicianId = owner,
+                Body = request.Body,
+                Version = 1,
             };
             db.ClinicalDrafts.Add(current);
         }

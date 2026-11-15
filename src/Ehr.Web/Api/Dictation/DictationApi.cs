@@ -1,16 +1,16 @@
 using System.Globalization;
-using Ehr.Data;
-using Ehr.Domain.Phi;
-using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Domain.Accounts;
+using Ehr.Domain.Phi;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Web.Api.Dictation;
 
