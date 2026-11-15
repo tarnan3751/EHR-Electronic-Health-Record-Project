@@ -13,8 +13,9 @@
   must be 0) or retracted (a value the clinician corrected away; must be 0); how many of those the result reported as not carried over, so the screen can say they still need placing
   (recall against the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was
   legitimate (false discards), so the owner can judge where that rule draws its line.
-- sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took, separately for
-  the two-minute dictations, with the live transcript's time per chunk.
+- sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took and how many tokens
+  K2 Horizon read and wrote, separately for the two-minute and the five-minute dictations, with the live transcript's
+  time per chunk.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from .normalize import normalize, words
 from .scripts import Script
 
 TWO_MINUTES = 110.0  # seconds: the scripts written to run about two minutes
+FIVE_MINUTES = 270.0  # seconds: the max-length scripts, near the 5-minute limit
 ORDER_ALLERGY_TAGS = frozenset({"order-attempt", "allergy-change"})
 
 
@@ -262,6 +264,11 @@ def _timing(items: list[Item]) -> dict:
             values = [i.timings[stage] for i in group if stage in i.timings]
             if values:
                 out[stage] = _stats(values)
+        for count in ("prompt_n", "predicted_n"):
+            values = [i.tokens[count] + (i.tokens.get("cache_n", 0) if count == "prompt_n" else 0)
+                      for i in group if count in i.tokens]
+            if values:
+                out[f"tokens_{count.removesuffix('_n')}"] = _stats(values)
         return out
 
     chunks = [seconds for item in items for seconds in item.chunk_seconds]
@@ -272,7 +279,8 @@ def _timing(items: list[Item]) -> dict:
                  "max": round(ordered[-1], 3)}
     return {
         "all": summary(items),
-        "two_minute": summary([i for i in items if i.seconds >= TWO_MINUTES]),
+        "two_minute": summary([i for i in items if TWO_MINUTES <= i.seconds < FIVE_MINUTES]),
+        "five_minute": summary([i for i in items if i.seconds >= FIVE_MINUTES]),
         "live_chunk_seconds": live,
     }
 
