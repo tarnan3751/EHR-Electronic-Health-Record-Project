@@ -1,16 +1,24 @@
 """Shared by the sidecar's tests: synthetic audio (tones, silence and noise, never a voice), the containers browsers
-record it in, made with ffmpeg in memory, and a stand-in for MedASR. No test needs the models, a network or a GPU; the
-audio tests need ffmpeg on PATH, as the sidecar itself does.
+record it in, made with ffmpeg in memory, and stand-ins for MedASR and llama-server. No test needs the models, a
+network or a GPU; the audio tests need ffmpeg on PATH, as the sidecar itself does.
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
+from pathlib import Path
 
+import httpx2
 import numpy as np
 
+from ehr_dictation import prompt
 from ehr_dictation.asr import Recognition
 from ehr_dictation.audio import SAMPLE_RATE
+from ehr_dictation.llama import LlamaServer, Structurer
+from ehr_dictation.provenance import Models
+
+MODEL_FILE = "K2-Horizon-7B-Q4_K_M.gguf"
 
 
 def tone(seconds: float, level_db: float = -20.0, frequency: float = 220.0) -> np.ndarray:
@@ -65,3 +73,52 @@ class FakeRecognizer:
         self.calls.append(samples.size)
         count = int(samples.size / (SAMPLE_RATE / 2))
         return Recognition(" ".join([self.word] * count), self.confidence if count else None)
+
+
+def raw_decoder(data: bytes, *, partial: bool = False) -> np.ndarray:
+    """Stands in for ffmpeg in the session tests: the bytes are float32 samples already."""
+    return np.frombuffer(data[: len(data) // 4 * 4], dtype="<f4").astype(np.float32)
+
+
+def answer(history: tuple[str, list[str]] = ("", []), assessment=("", []), plan=("", []), **extra) -> str:
+    fields = {"history": history, "assessment": assessment, "plan": plan}
+    return json.dumps({name: {"value": v, "sources": s} for name, (v, s) in fields.items()} | extra)
+
+
+class FakeLlama:
+    """A llama-server on httpx2's mock transport: records each request and answers as told."""
+
+    def __init__(self, content: str | None = None, *, model_path: str = f"/models/{MODEL_FILE}", status: int = 200,
+                 delay: float = 0.0, finish_reason: str = "stop") -> None:
+        self.content = content if content is not None else answer()
+        self.model_path = model_path
+        self.status = status
+        self.delay = delay
+        self.finish_reason = finish_reason
+        self.requests: list[httpx2.Request] = []
+
+    async def handle(self, request: httpx2.Request) -> httpx2.Response:
+        import asyncio
+
+        self.requests.append(request)
+        if request.url.path == "/props":
+            return httpx2.Response(200, json={"model_path": self.model_path, "build_info": "b11669-620d2225"})
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        if self.status != 200:
+            return httpx2.Response(self.status, json={"error": {"message": "nope"}})
+        return httpx2.Response(200, json={
+            "choices": [{"finish_reason": self.finish_reason,
+                         "message": {"role": "assistant", "content": self.content, "reasoning_content": "thinking"}}],
+            "timings": {"prompt_n": 10, "predicted_n": 20},
+        })
+
+    def structurer(self, timeout: float = 5.0) -> Structurer:
+        server = LlamaServer("http://llama.test", "llama-key", transport=httpx2.MockTransport(self.handle))
+        return Structurer(server, prompt.load(), MODEL_FILE, timeout=timeout)
+
+
+MODELS = Models(
+    speech={"repository": "google/medasr", "commit": "a" * 40, "sha256": "b" * 64},
+    language={"repository": "IFM/K2-Horizon-7B-GGUF", "commit": "c" * 40, "file": MODEL_FILE, "sha256": "d" * 64},
+)

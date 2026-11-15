@@ -1,0 +1,75 @@
+"""Which models produced a result: the repository, commit and SHA-256 of MedASR's weights and of the K2 Horizon file,
+from the models-manifest.json setup_models.py wrote, for the provenance each dictated note will store (NFR-15).
+
+At startup MedASR's weights are hashed and compared with the manifest, and the sidecar refuses to start if they differ,
+so a result never claims a model it didn't use. The K2 Horizon file is llama-server's to load: llama.py checks that it
+serves the file the manifest names. The manifest's hashes are the ones Hugging Face publishes.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+MANIFEST = "models-manifest.json"
+MEDASR_DIR = "medasr"
+MEDASR_WEIGHTS = "model.safetensors"
+
+
+class ProvenanceError(Exception):
+    """The models on disk aren't the ones the manifest records, or there's no manifest."""
+
+
+@dataclass(frozen=True)
+class Models:
+    speech: dict
+    language: dict | None
+
+    @property
+    def language_file(self) -> str | None:
+        return self.language["file"] if self.language else None
+
+
+def load(models_dir: Path, *, verify: bool = True) -> Models:
+    path = models_dir / MANIFEST
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise ProvenanceError(f"No {MANIFEST} in {models_dir}: run src/Ehr.Dictation/setup_models.py.") from None
+    except json.JSONDecodeError:
+        raise ProvenanceError(f"{path} isn't valid JSON: run src/Ehr.Dictation/setup_models.py again.") from None
+
+    medasr = manifest.get("medasr")
+    weights = next((f for f in (medasr or {}).get("files", []) if f.get("path") == MEDASR_WEIGHTS), None)
+    if not medasr or not weights:
+        raise ProvenanceError(f"{MANIFEST} records no MedASR weights: run src/Ehr.Dictation/setup_models.py.")
+    if verify and _sha256(models_dir / MEDASR_DIR / MEDASR_WEIGHTS) != weights["sha256"]:
+        raise ProvenanceError(
+            f"MedASR's {MEDASR_WEIGHTS} doesn't match {MANIFEST}: run src/Ehr.Dictation/setup_models.py --verify."
+        )
+    speech = {"repository": medasr["repository"], "commit": medasr["commit"], "sha256": weights["sha256"]}
+
+    llm = manifest.get("llm")
+    language = (
+        {
+            "repository": llm["repository"],
+            "commit": llm["commit"],
+            "file": llm["file"],
+            "sha256": next((f["sha256"] for f in llm["files"] if f["path"] == llm["file"]), None),
+        }
+        if llm
+        else None
+    )
+    return Models(speech, language)
+
+
+def _sha256(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        while chunk := file.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
