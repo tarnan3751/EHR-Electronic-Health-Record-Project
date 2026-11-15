@@ -417,6 +417,21 @@ def test_a_family_member_who_tells_is_not_who_has_it():
     assert own("Maternal grandmother and mother had breast cancer.", "Mother had breast cancer.").pending
 
 
+@pytest.mark.parametrize(("said", "value"), [
+    ("Lives with her husband and has had a cough for 3 days.", "Has had a cough for 3 days."),
+    ("Seen today with her father, fever for 2 days.", "Fever for 2 days."),
+    ("History of present illness 45-year-old man with a cough for 3 days.", "45-year-old man with a cough for 3 days."),
+])
+def test_ordinary_words_are_not_qualifiers(said, value):
+    assert own(said, value, value.rstrip(".")).pending
+
+
+def test_a_family_member_who_is_the_subject_still_has_it():
+    assert own("Mother had a stroke and has diabetes.", "Has diabetes.", "has diabetes").reasons == [
+        "experiencer_dropped"]
+    assert own("She has a history of MI in 2019.", "MI in 2019.").reasons == ["history_dropped"]
+
+
 def test_a_qualifier_stops_at_a_new_subject():
     assert own("No fever she is eating well.", "She is eating well.").pending
     assert own("Mother had a stroke patient has hypertension.", "Patient has hypertension.").pending

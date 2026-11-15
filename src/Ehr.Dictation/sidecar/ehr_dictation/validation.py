@@ -921,6 +921,8 @@ FAMILY = (
     r"grandparents?|grandma|grandpa|aunts?|uncles?|cousins?|wife|husband|partner|spouse|nieces?|nephews?"
 )
 # Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
+# Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing.
+NOT_EXPERIENCER_AFTER = frozenset("with by to from for at about".split())
 EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
@@ -935,7 +937,8 @@ POST_CERTAINTY = re.compile(
     r"\b(?:suspected|likely|possible|probable|unlikely|questionable|presumed)\b(?=\s*(?:[.,;:!?\n]|$))", re.IGNORECASE
 )
 # In the past: "a history of MI in 2019", "status post appendectomy".
-HISTORY = re.compile(r"(?<!family )\b(?:history of|hx of|h/o|status post|s/p)\b", re.IGNORECASE)
+# Not the heading "history of present illness", said without its colon.
+HISTORY = re.compile(r"(?<!family )\b(?:history of(?! present illness)|hx of|h/o|status post|s/p)\b", re.IGNORECASE)
 # Where a cue's reach ends, besides punctuation: a contrast, or a new subject ("no fever, she is eating well").
 TERMINATORS = frozenset(
     """but however although though except apart aside yet which who whereas he she they i we you patient he's she's
@@ -971,10 +974,13 @@ def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern 
         return word in ends or any(mark in between for mark in ".,;:?!\n")
 
     for cue in before.finditer(text):
+        if before is EXPERIENCER and _object_of_a_preposition(text, cue.start()):
+            continue
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
         edge = cue.end()
         for k, i in enumerate([i for i, token in enumerate(words) if token.start >= cue.end()][:NEGATION_SCOPE]):
-            if stops(text[edge : words[i].start], words[i].text) or (k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"):
+            next_clause = k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"
+            if stops(text[edge : words[i].start], words[i].text) or next_clause:
                 break
             reached.add(i)
             edge = words[i].end
@@ -987,6 +993,14 @@ def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern 
             reached.add(i)
             edge = words[i].start
     return reached, cue_words
+
+
+def _object_of_a_preposition(text: str, start: int) -> bool:
+    """Whether the words before `start` are a preposition, and maybe a possessive: "with her", "by his"."""
+    before = [token.text for token in tokens(text[:start])][-2:]
+    if before and before[-1] in {"her", "his", "their", "the", "a"}:
+        before = before[:-1]
+    return bool(before) and before[-1] in NOT_EXPERIENCER_AFTER
 
 
 def _qualifiers(text: str, words: list[Token]) -> dict[str, set[int]]:
