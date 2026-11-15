@@ -74,8 +74,9 @@ MAX_QUOTE = 600
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
-DIRECTIVE_REACH = 10  # words after an instruction that still belong to it
-LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and")
+DIRECTIVE_REACH = 14  # at most, words after an instruction that still belong to it, when nothing ends its clause sooner
+LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and"), or its subject ("penicillin
+# should be added to her allergies")
 MAX_GAP = 1  # a source's own words allowed between two of a value's words (articles and doses are free)
 
 REASONS = (
@@ -456,11 +457,6 @@ _ALLERGY_CHANGES = [
     re.compile(rf"\badd\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\b(?:remove|delete|take)\b{_SAME_SENTENCE}{{0,40}}?\b(?:from|off)\s+(?:{_DET}\s+)?(?:drug\s+)?allerg", re.I),
     re.compile(rf"\b(?:remove|delete)\s+(?:{_DET}\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
-    re.compile(
-        rf"\b(?:added|removed|deleted|listed|taken|put)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?"
-        r"(?:drug\s+|medication\s+)?allerg",
-        re.IGNORECASE,
-    ),
     re.compile(rf"\b(?:update|change|edit|correct|amend)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\b(?:mark|flag)\b{_SAME_SENTENCE}{{0,40}}?\ballerg", re.IGNORECASE),
     re.compile(rf"\b(?:enter|document)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
@@ -471,6 +467,14 @@ _ALLERGY_CHANGES = [
         re.IGNORECASE,
     ),
     re.compile(rf"\ballerg\w*\s+list\b{_SAME_SENTENCE}{{0,30}}?\b(?:add|remove|update|change|delete)\b", re.IGNORECASE),
+]
+# Instructions whose subject comes first ("penicillin should be added to her allergies"): their span starts with it.
+_PASSIVE = [
+    ("allergy_change", re.compile(
+        rf"\b(?:added|removed|deleted|listed|taken|put)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?"
+        r"(?:drug\s+|medication\s+)?allerg",
+        re.IGNORECASE,
+    )),
 ]
 # What can lead up to an instruction ("go ahead and", "please", "I'll"); anything else ends its span, so the plan said
 # just before it ("start lisinopril 10 mg daily and order...") stays out of it.
@@ -484,9 +488,9 @@ def directive_spans(text: str) -> list[tuple[int, int]]:
 
 
 def directives(text: str) -> list[tuple[int, int, str]]:
-    """Each instruction to place an order ("order") or change the allergy list ("allergy_change"): from its lead-in to
-    the end of its sentence, or DIRECTIVE_REACH words on when there's no punctuation. Overlapping ones are merged, an
-    allergy change winning. Hyphens are ignored ("re-fill")."""
+    """Each instruction to place an order ("order") or change the allergy list ("allergy_change"), from its lead-in, or
+    its subject when that comes first, to the end of its clause (see _directive_end()). Overlapping ones are merged, an allergy
+    change winning. Hyphens are ignored ("re-fill")."""
     found = _directives(text)
     letters = [i for i, character in enumerate(text) if character != "-"]
     if len(letters) < len(text):
@@ -514,20 +518,56 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
     for kind, patterns in (("order", _ORDERS), ("allergy_change", _ALLERGY_CHANGES)):
         for pattern in patterns:
             matches += [(match.start(), match.end(), kind) for match in pattern.finditer(text)]
+    passive = [(match.start(), match.end(), kind) for kind, pattern in _PASSIVE for match in pattern.finditer(text)]
 
     spans = []
-    for start, end, kind in sorted(matches):
+    for start, end, kind in sorted(matches + passive):
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
         span_start = start
+        subject = (start, end, kind) in passive
         for token in reversed([token for token in words if token.end <= start][-LEAD_IN_REACH:]):
-            if token.text not in LEAD_IN or token.start < clause:
+            if token.start < clause or (token.text in CLAUSE_STARTS | {"and"} if subject else token.text not in LEAD_IN):
                 break
             span_start = token.start
-        sentence = _sentence_end(text, end)
-        reach = [token for token in words if token.start >= end][:DIRECTIVE_REACH]
-        span_end = min(sentence, reach[-1].end if reach else end)
-        spans.append((span_start, max(span_end, end), kind))
+        spans.append((span_start, _directive_end(text, words, end), kind))
     return spans
+
+
+# Words that start another clause, which ends an instruction's span.
+CLAUSE_STARTS = frozenset("then but so because although though while whereas also".split())
+# After "and" or a comma, a new subject or another step of the plan starts another clause; anything else ("order a CBC
+# and a BMP") is more of what is being ordered.
+NEW_CLAUSE = frozenset(
+    """i we she he they you patient let's i'll we'll i'm we're she's he's start continue stop increase decrease reduce
+    resume hold recheck return schedule refer avoid take use apply keep switch discontinue monitor counsel discuss
+    review encourage advise advised explained recommend recommended come""".split()
+)
+# After the allergy list or a pharmacy, these carry an instruction on ("add an allergy to codeine"); anything else ends it.
+CARRIES_ON = frozenset("to for of include includes including with as".split())
+TARGET = re.compile(r"(?:allerg\w*|list|record|pharmacy)$", re.IGNORECASE)
+# What can follow "allergy" and still name the list: "allergy list", "allergy record".
+LIST_WORDS = frozenset("list record".split())
+
+
+def _directive_end(text: str, words: list[Token], end: int) -> int:
+    """Where an instruction matched up to `end` stops: at the end of its sentence or a semicolon, at a word that starts
+    another clause, or DIRECTIVE_REACH words on, whichever comes first. One that already names the allergy list or the
+    pharmacy it goes to stops there ("take amoxicillin off her allergy list"), unless a word carries it on."""
+    stop = min(_sentence_end(text, end), (text.find(";", end) + 1 or len(text) + 1) - 1)
+    end += len(re.match(r"[\w'’]*", text[end:]).group())  # the whole of the word the match ended in ("allergies")
+    following = [word for word in words if word.start >= end and word.end <= stop]
+    if following and following[0].text in LIST_WORDS:
+        end, following = following[0].end, following[1:]
+    if TARGET.search(text[:end]) and not (following and following[0].text in CARRIES_ON):
+        return end
+    joined = False
+    for word in following[:DIRECTIVE_REACH]:
+        if word.text in CLAUSE_STARTS or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start])):
+            break
+        joined = word.text == "and"
+        if not joined:
+            end = word.end
+    return end
 
 
 SENTENCE = re.compile(r"(?<=[.!?;\n])\s+")

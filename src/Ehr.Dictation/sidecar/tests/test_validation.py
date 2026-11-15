@@ -555,3 +555,50 @@ def test_an_instruction_without_punctuation_reaches_only_its_own_words():
 
     assert field("Start lisinopril 10 mg daily.", "start lisinopril 10 mg daily", name="plan", text=text).pending
     assert [kind for _, _, kind in directives(text.text)] == ["order"]
+
+
+def said_instructions(text):
+    t = transcript(text)
+    return [t.text[r["start"] : r["end"]] for r in not_carried_over(t)]
+
+
+def test_an_instruction_naming_the_allergy_list_ends_there_without_punctuation():
+    text = transcript("the allergist cleared her last month so take amoxicillin off her allergy list strep pharyngitis "
+                      "amoxicillin 50 mg/kg once daily for 10 days")
+
+    assert said_instructions(text.text) == ["take amoxicillin off her allergy list"]
+    assert field("Strep pharyngitis.", "strep pharyngitis", name="assessment", text=text).pending
+    assert field("Amoxicillin 50 mg/kg once daily for 10 days.", "amoxicillin 50 mg/kg once daily for 10 days",
+                 name="plan", text=text).pending
+
+
+@pytest.mark.parametrize(("said", "instruction"), [
+    ("Please add an allergy to codeine today.", "Please add an allergy to codeine today"),
+    ("Update her allergies to include latex, recheck in 2 weeks.", "Update her allergies to include latex"),
+    ("Send a prescription for amoxicillin to her pharmacy.", "Send a prescription for amoxicillin to her pharmacy"),
+    ("Prescribe the patient amoxicillin 500 mg.", "Prescribe the patient amoxicillin 500 mg"),  # no "and" or comma
+    ("So update his allergy record to say low risk penicillin rash only.",
+     "update his allergy record to say low risk penicillin rash only"),
+])
+def test_an_instruction_goes_on_where_a_word_carries_it(said, instruction):
+    assert said_instructions(said) == [instruction]
+
+
+def test_an_instruction_whose_subject_comes_first_starts_with_its_subject():
+    said = "Continue the ointments as needed, and cephalexin should be added to her allergies."
+    text = transcript(said)
+
+    assert said_instructions(said) == ["cephalexin should be added to her allergies"]
+    assert field("Continue the ointments as needed.", "Continue the ointments as needed", name="plan",
+                 text=text).pending
+
+
+@pytest.mark.parametrize(("said", "instruction"), [
+    ("Order a CBC and a BMP and start metformin 500 mg daily.", "Order a CBC and a BMP"),
+    ("order a chest x-ray then recheck in 2 weeks", "order a chest x-ray"),
+    ("Call in amoxicillin 500 mg, recheck in 10 days.", "Call in amoxicillin 500 mg"),
+    ("Order a CBC, BMP and lipid panel, she will come fasting.", "Order a CBC, BMP and lipid panel"),
+    ("Order an MRI of the lumbar spine; continue naproxen.", "Order an MRI of the lumbar spine"),
+])
+def test_an_instruction_ends_with_its_clause(said, instruction):
+    assert said_instructions(said) == [instruction]
