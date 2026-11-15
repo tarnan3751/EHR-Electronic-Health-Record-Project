@@ -238,6 +238,28 @@ def test_and_or_or_must_be_where_the_clinician_said_it():
     assert own(said, "Ibuprofen and acetaminophen for fever or pain.").reasons == ["words_out_of_order"]
 
 
+@pytest.mark.parametrize(("said", "value"), [
+    ("Continue lisinopril 10 mg and metformin 500 mg daily.", "Continue lisinopril 500 mg daily."),
+    ("Continue lisinopril 10 mg, metformin 500 mg, atorvastatin 40 mg.", "Continue metformin 40 mg."),
+    ("Continue lisinopril and aspirin 81 mg daily.", "Continue lisinopril 81 mg daily."),  # aspirin has no drug stem
+    ("Blood pressure 98/60, heart rate 78.", "Blood pressure 78."),
+    ("Weight 82 kg, 180 cm tall.", "Weight 180 cm tall."),
+    ("Systolic over 160 at home.", "Systolic 160 at home."),  # "over" is a word unless it joins two numbers
+])
+def test_a_number_stays_with_the_word_it_follows(said, value):
+    assert own(said, value).reasons == ["words_out_of_order"]
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("Continue lisinopril 10 mg and metformin 500 mg daily.", "Metformin 500 mg daily."),
+    ("Takes lisinopril 10 mg daily.", "Takes lisinopril daily."),
+    ("Blood pressure 140 over 90.", "Blood pressure 140/90."),
+    ("Takes the 20 mg tablet.", "Takes 20 mg tablet."),
+])
+def test_a_number_may_lose_an_article_and_a_dose_may_be_left_out(said, value):
+    assert own(said, value).pending
+
+
 def test_the_owners_recombination_example():
     assert own("Left knee pain, right knee normal.", "Right knee pain.").reasons == ["words_out_of_order"]
 

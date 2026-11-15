@@ -7,8 +7,10 @@ Grounding is strict: every word of a value must be in that value's own sources, 
 the articles (FREE_WORDS). Nothing else may be added: not "twice", not "before" for "after", not "right" for "left", not
 "and" between two findings, not another drug, not a heading. Nor may words be recombined: the value is cut into
 segments at punctuation (not the point in "12.5"), and each segment's words must be found in order in one of its
-sources, with at most MAX_GAP of that source's own words between any two of them (articles and doses don't count). So "right knee pain" can't come from "left knee pain, right knee normal". A source with a correction in it is
-read as corrected.
+sources, with at most MAX_GAP of that source's own words between any two of them (articles and doses don't count), and
+none at all before a number but an article or a unit: a number stays with the word it follows. So "right knee pain"
+can't come from "left knee pain, right knee normal", nor "continue lisinopril 500 mg" from "continue lisinopril 10 mg
+and metformin 500 mg". A source with a correction in it is read as corrected.
 
 An instruction to order something or to change the allergy list is never carried into the note (FR-14), but the rest of
 a field is: each sentence of a value holding one is cut where the instruction starts, and sources quoting one are set
@@ -509,7 +511,8 @@ SEGMENT_BREAK = re.compile(r"(?:[;:!?()\n]|[.,](?!\d)|(?<!\d)[.,])+")
 
 
 def _sequence(text: str) -> list[str]:
-    """The text's words as compared: number words read together as digits, units in one spelling, words stemmed."""
+    """The text's words as compared: number words read together as digits, units in one spelling, words stemmed, and
+    "over" between two numbers left out, since "140 over 90" is "140/90"."""
     out: list[str] = []
     run: list[str] = []
 
@@ -529,7 +532,10 @@ def _sequence(text: str) -> list[str]:
         flush()
         out.extend(numbers(word) if word[0].isdigit() else [_word_key(word)])
     flush()
-    return out
+    return [
+        word for i, word in enumerate(out)
+        if not (word == "over" and 0 < i < len(out) - 1 and out[i - 1][:1].isdigit() and out[i + 1][:1].isdigit())
+    ]
 
 
 def _recombined(value: str, quotes: list[str]) -> bool:
@@ -567,8 +573,9 @@ def _skippable(word: str) -> bool:
 
 
 def _in_order(wanted: list[str], source: list[str]) -> bool:
-    """Whether `wanted` can be found in order in `source`, with at most MAX_GAP non-skippable words between two of them.
-    Each (word, position) pair is tried once, so repeated words can't make the search blow up."""
+    """Whether `wanted` can be found in order in `source`, with at most MAX_GAP non-skippable words between two of them,
+    and only articles and units before a number. Each (word, position) pair is tried once, so repeated words can't make
+    the search blow up."""
     tried: set[tuple[int, int]] = set()
 
     def onward(k: int, position: int) -> bool:
@@ -578,9 +585,12 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
             return False
         tried.add((k, position))
         skipped = 0
+        number = wanted[k][:1].isdigit()
         for j in range(position + 1, len(source)):
             if source[j] == wanted[k] and onward(k + 1, j):
                 return True
+            if number and source[j] not in FREE_WORDS and source[j] not in DOSE_WORDS:
+                return False
             if not _skippable(source[j]):
                 skipped += 1
                 if skipped > MAX_GAP:
