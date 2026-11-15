@@ -142,3 +142,20 @@ No item may be longer than five minutes, the dictation session limit; the genera
 **Reproducibility.** Seeds and the number of CPU threads are fixed, so the same machine with the same package versions makes the same files, byte for byte. Another machine, or another build of torch or ffmpeg, makes audio that sounds the same but differs in its last bits, so the SHA-256 values differ. Only kokoro and misaki are pinned exactly; the manifest records the versions of the rest.
 
 **Licences.** Kokoro-82M's weights and voices are Apache-2.0, as are the kokoro and misaki packages; spaCy and its `en_core_web_sm` model are MIT. Words outside misaki's dictionary, which here are mostly the newer drug names, are pronounced by espeak-ng (GPL-3.0), which the espeakng-loader package bundles (the loader itself is MIT), through phonemizer-fork (GPL-3.0). They run only inside the generator, on the machine making the audio, and are never shipped with anything. The French voice, `ff_siwis`, was trained partly on the SIWIS corpus (CC BY 4.0). Where each was checked is in `voices.toml`.
+
+## Recording the scripts yourself
+
+The synthetic voices stand in for accents and rooms; only people can show how MedASR does with real ones. To record the same scripts in your own voice:
+
+- **Only these scripts.** Record only the synthetic dictations in `scripts/`. Never record a real patient, a real dictation, or anything about a real person.
+- **What to read.** Print a script's spoken text and read it as printed, at your usual dictating pace, saying the spoken punctuation ("period", "comma", "new paragraph") and pausing briefly at each full stop and comma:
+
+  ```
+  uv run eval/dictation_scripts.py d07
+  ```
+
+  Numbers are written out as you'd say them. If you stumble, carry on as you would when dictating, but don't add corrections the script doesn't have; for a bad take, start a new recording.
+- **Microphone and room.** Use what you would dictate with: a laptop's built-in microphone, a headset, or a phone, held as you normally would. Record most in a quiet room, and a few with everyday noise (ventilation, a corridor) if you can.
+- **Format.** Whatever your browser or recorder produces (WebM, MP4 or M4A, WAV). Don't convert it: the pipeline normalizes every format with ffmpeg.
+- **File names.** `<script id>--<speaker code>-<microphone>-<room>.<extension>`, for example `d07-ppd-zuranolone--s02-laptop-quiet.webm`. The speaker code is a short code of your choosing, not your name; the microphone is `laptop`, `headset` or `phone`; the room is `quiet` or `noisy`.
+- **Where they go.** Recordings are never committed to Git. Keep them outside the repository folder, so they can't be added by accident. Where they are stored and shared is still to be decided by the project owner.
