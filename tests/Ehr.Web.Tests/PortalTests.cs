@@ -157,6 +157,46 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(queued, e => e.Action == AuditActions.SignOut && e.PatientId == patient && e.ActorId is not null && e.TableName is null);
     }
 
+    // TC-UC5-09 (Simar Rekhi): UC5's "email already registered" course offers to sign in instead, and the code stays
+    // unused, so the patient can register with another address.
+    [Fact]
+    public async Task An_address_that_already_has_an_account_is_offered_sign_in_and_the_code_stays_usable()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var (taken, _) = await apps.CreatePatientAccountAsync(await apps.InsertPatientAsync("Drew", "Registered"));
+        var patient = await apps.InsertPatientAsync("Ellis", "Newcomer");
+        var code = await IssueCodeAsync(clinician, patient);
+        var client = Client(apps.Cloud, new CookieContainer());
+        const string password = "a-patient-portal-password";
+
+        using var refused = await PostFormAsync(client, "/portal/register", "/portal/register",
+            ("Input.Code", code), ("Input.Email", taken), ("Input.Password", password), ("Input.Confirm", password));
+        var html = await ReadAsync(refused);
+        Assert.Contains("An account with this email address already exists.", html);
+        Assert.Contains("Sign in instead", html);
+
+        using var registered = await PostFormAsync(client, "/portal/register", "/portal/register",
+            ("Input.Code", code), ("Input.Email", WebApps.NewEmail()), ("Input.Password", password), ("Input.Confirm", password));
+        Assert.Contains("Check your email", await ReadAsync(registered));
+    }
+
+    // TC-UC5-10 (Simar Rekhi): invalid entries are named in place, and nothing is created.
+    [Fact]
+    public async Task A_short_password_or_a_mismatch_is_named_in_place()
+    {
+        var client = Client(apps.OnPrem, new CookieContainer());
+        var email = WebApps.NewEmail();
+
+        using var refused = await PostFormAsync(client, "/portal/register", "/portal/register",
+            ("Input.Code", "AAAA-BBBB-CCCC"), ("Input.Email", email), ("Input.Password", "short"), ("Input.Confirm", "different"));
+
+        var html = await ReadAsync(refused);
+        Assert.Contains("Use at least 12 characters.", html);
+        // The page's HTML encodes the apostrophe.
+        Assert.Contains("The passwords don&#x27;t match.", html);
+        Assert.DoesNotContain(apps.Emails.Sent, m => m.To == email);
+    }
+
     // A clinician issues one of their patients an enrollment code from the chart, and reads it off the page.
     async Task<string> IssueCodeAsync(StaffAccount clinician, Guid patient)
     {

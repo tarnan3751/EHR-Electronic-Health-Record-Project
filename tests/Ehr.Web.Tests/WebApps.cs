@@ -193,13 +193,13 @@ public sealed class WebApps : IAsyncLifetime
     }
 
     // A confirmed portal account for the patient, created through the same Identity services the app uses.
-    public async Task<(string Email, string Password)> CreatePatientAccountAsync(Guid patientId)
+    public async Task<(string Email, string Password)> CreatePatientAccountAsync(Guid patientId, bool confirmed = true)
     {
         await using var scope = OnPrem.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<PatientUser>>();
         var email = NewEmail();
         const string password = "a-patient-portal-password";
-        var user = new PatientUser { UserName = email, Email = email, EmailConfirmed = true, PatientId = patientId };
+        var user = new PatientUser { UserName = email, Email = email, EmailConfirmed = confirmed, PatientId = patientId };
         var created = await users.CreateAsync(user, password);
         Assert.True(created.Succeeded, string.Join(" ", created.Errors.Select(e => e.Description)));
         return (email, password);

@@ -29,7 +29,7 @@ public class SignInModel(PatientSignIn signIn) : PageModel
             case PatientSignInOutcome.SignedIn:
                 return LocalRedirect(Links.Local(Url, ReturnUrl, AccountSchemes.PortalPath));
             case PatientSignInOutcome.EmailNotConfirmed:
-                ModelState.AddModelError("", "Confirm your email address first: open the link we sent you when you registered.");
+                ModelState.AddModelError("", "Confirm your email address first: open the link we sent you when you registered. If it expired, ask for a new one below.");
                 return Page();
             case PatientSignInOutcome.LockedOut:
                 ModelState.AddModelError("", "This account is locked after too many failed attempts. Try again in 15 minutes.");

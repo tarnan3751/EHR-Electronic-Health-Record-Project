@@ -55,11 +55,14 @@ public static class AuditActions
 
     public const string EmailConfirmed = "email_confirmed";
 
+    // A patient whose confirmation link expired or got lost asked for a new one, and it was sent.
+    public const string ConfirmationResent = "confirmation_resent";
+
     // Every action, for the audit page's filter.
     public static readonly string[] All =
     [
         Read, Insert, Update, Delete, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
-        RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed,
+        RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
     ];
 }

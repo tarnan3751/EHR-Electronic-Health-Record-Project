@@ -27,6 +27,13 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
 
         var user = new PatientUser { UserName = address, Email = address, PatientId = enrollment.PatientId };
         var result = await users.CreateAsync(user, password);
+        // UC5's "email already registered" course (Simar Rekhi): the page offers to sign in instead. Only someone holding
+        // a valid enrollment code gets this far, so saying the address has an account tells a stranger nothing.
+        if (result.Errors.Any(e => e.Code is nameof(IdentityErrorDescriber.DuplicateEmail) or nameof(IdentityErrorDescriber.DuplicateUserName)))
+        {
+            return Registration.Taken;
+        }
+
         if (!result.Succeeded)
         {
             return new(false, false, [.. result.Errors.Select(e => e.Description)]);
@@ -36,8 +43,31 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
         audit.Record(AuditActions.PatientRegistered, patientId: enrollment.PatientId, actorId: user.Id);
         await db.SaveChangesAsync(cancellationToken);
 
+        await SendConfirmationAsync(user, confirmationLink, cancellationToken);
+        return Registration.Registered;
+    }
+
+    // UC5's other way through (Simar Rekhi): the confirmation link expired, or the email got lost, and the enrollment
+    // code is already used, so registering again can't help. A new link goes to an account whose address isn't
+    // confirmed yet; for any other address nothing is sent. The page answers the same either way, so it doesn't tell
+    // anyone which addresses have accounts.
+    public async Task ResendConfirmationAsync(string address, Func<Guid, string, string> confirmationLink, CancellationToken cancellationToken)
+    {
+        var user = await users.FindByEmailAsync(address);
+        if (user is null || user.EmailConfirmed)
+        {
+            return;
+        }
+
+        audit.Record(AuditActions.ConfirmationResent, patientId: user.PatientId, actorId: user.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        await SendConfirmationAsync(user, confirmationLink, cancellationToken);
+    }
+
+    async Task SendConfirmationAsync(PatientUser user, Func<Guid, string, string> confirmationLink, CancellationToken cancellationToken)
+    {
         var token = await users.GenerateEmailConfirmationTokenAsync(user);
-        await email.SendAsync(address, "Confirm your patient portal account",
+        await email.SendAsync(user.Email!, "Confirm your patient portal account",
             $"""
             Open this link to confirm your email address and finish setting up your patient portal account:
 
@@ -46,7 +76,6 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
             If you didn't register, you can ignore this message.
             """,
             cancellationToken);
-        return Registration.Registered;
     }
 
     public async Task<bool> ConfirmAsync(Guid userId, string token, CancellationToken cancellationToken)
@@ -68,9 +97,12 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
     }
 }
 
-public sealed record Registration(bool Succeeded, bool CodeInvalid, IReadOnlyList<string> Errors)
+public sealed record Registration(bool Succeeded, bool CodeInvalid, IReadOnlyList<string> Errors, bool AddressTaken = false)
 {
     public static readonly Registration Registered = new(true, false, []);
 
     public static readonly Registration InvalidCode = new(false, true, []);
+
+    // The address already has a portal account.
+    public static readonly Registration Taken = new(false, false, [], AddressTaken: true);
 }

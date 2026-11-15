@@ -10,6 +10,10 @@
 }
 else
 {
+    @if (Model.AddressTaken)
+    {
+        <p class="notice error">An account with this email address already exists. <a asp-page="SignIn">Sign in instead</a>, or <a asp-page="Forgot">reset your password</a> if you've forgotten it.</p>
+    }
     <p>You need the enrollment code the clinic gave you.</p>
     <form method="post" class="account-form">
         <label>Enrollment code <input asp-for="Input.Code" autocomplete="off" required autofocus placeholder="XXXX-XXXX-XXXX"></label>

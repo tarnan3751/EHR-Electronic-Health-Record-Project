@@ -1,0 +1,20 @@
+@page "/portal/resend"
+@model ResendModel
+@{
+    ViewData["Title"] = "Send a new confirmation link";
+}
+<h1>Send a new confirmation link</h1>
+@if (Model.Sent)
+{
+    <p class="notice">If that address has a portal account waiting to be confirmed, we have sent it a new link.</p>
+}
+else
+{
+    <p>Enter the email address you registered with. We will send a new link to confirm it.</p>
+    <form method="post" class="account-form">
+        <label>Email <input asp-for="Email" type="email" autocomplete="username" required autofocus></label>
+        <span asp-validation-for="Email" class="error"></span>
+        <button>Send a new link</button>
+    </form>
+}
+<p><a asp-page="SignIn">Back to sign in</a></p>
