@@ -21,8 +21,8 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - unknown_field: a key outside history, assessment and plan (the schema allows none; this is the backstop).
 - not_dictated: an empty value. Not a failure: the transcript said nothing for that field.
 - too_long: over the field's length limit, over 12 sources, or a source over 600 characters.
-- bad_format: control or format characters, characters NFKC would change, a letter the transcript never uses (a
-  look-alike from another alphabet), markup, a link, code or JSON.
+- bad_format: control or format characters, characters NFKC would change, a non-ASCII letter the transcript never uses
+  (a look-alike from another alphabet), markup, a link, code or JSON.
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
   its sources once those quoting an instruction were set aside. An instruction says to place an order, or that one is
   being placed now ("I'm ordering"), to send, call in, refill or renew a prescription, or to change the allergy list;
@@ -101,8 +101,9 @@ UNIT_SPELLINGS = {
     "milliliters": "ml", "millilitre": "ml", "millilitres": "ml", "kilogram": "kg", "kilograms": "kg", "kilo": "kg",
     "kilos": "kg", "gram": "g", "grams": "g",
 }
-# Characters a value may use whether or not the transcript does.
-NEUTRAL_CHARACTERS = frozenset(string.digits + string.whitespace + ".,;:!?'\"()-/%+&’‘“”–—")
+# Characters a value may use whether or not the transcript does: ASCII letters, digits and punctuation. Any other letter
+# must be one the transcript uses, so a look-alike from another alphabet stands out.
+NEUTRAL_CHARACTERS = frozenset(string.ascii_lowercase + string.digits + string.whitespace + ".,;:!?'\"()-/%+&’‘“”–—")
 
 
 @dataclass

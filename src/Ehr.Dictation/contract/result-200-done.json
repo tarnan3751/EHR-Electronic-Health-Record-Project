@@ -55,7 +55,6 @@
       "plan": {
         "status": "empty",
         "reasons": [
-          "bad_format",
           "order_or_allergy_change"
         ]
       }

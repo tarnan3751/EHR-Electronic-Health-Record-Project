@@ -238,6 +238,10 @@ def test_may_for_june_is_a_date_not_in_the_sources_too():
     assert "date_not_in_sources" in own("Symptoms started in June.", "Symptoms started in May.").reasons
 
 
+def test_an_ascii_letter_the_transcript_happens_not_to_use_is_fine():
+    assert own("Cough, fever.", "Cough with fever.").pending
+
+
 def test_look_alike_and_invisible_characters_are_bad_format():
     assert "bad_format" in own("Hypertension, improving.", "Hypеrtension, improving.").reasons  # Cyrillic e
     assert "bad_format" in own("Hypertension, improving.", "Hyper​tension, improving.").reasons
