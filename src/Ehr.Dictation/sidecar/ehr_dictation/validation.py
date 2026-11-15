@@ -878,10 +878,15 @@ def _skippable(word: str) -> bool:
     return word in FREE_WORDS or word in DOSE_WORDS or word[:1].isdigit()
 
 
+LIST_JOINS = frozenset({"and", "or"})
+
+
 def _in_order(wanted: list[str], source: list[str]) -> bool:
     """Whether `wanted` can be found in order in `source`, with at most MAX_GAP non-skippable words between two of them,
-    and only articles and units before a number. Each (word, position) pair is tried once, so repeated words can't make
-    the search blow up."""
+    and only articles and units before a number. Before a drug name, whole other items of a list may be left out, their
+    drug, dose and "and" ("continue metformin 500 mg" from "continue lisinopril 10 mg and metformin 500 mg"), but then
+    nothing else ("stop metformin" can't come from "stop lisinopril and start metformin"). Each (word, position) pair is
+    tried once, so repeated words can't make the search blow up."""
     tried: set[tuple[int, int]] = set()
 
     def onward(k: int, position: int) -> bool:
@@ -892,15 +897,19 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
         tried.add((k, position))
         skipped = 0
         number = wanted[k][:1].isdigit()
+        drug = _is_drug(wanted[k])
+        skipped_item = False
         for j in range(position + 1, len(source)):
             if source[j] == wanted[k] and onward(k + 1, j):
                 return True
             if number and source[j] not in FREE_WORDS and source[j] not in DOSE_WORDS:
                 return False
-            if not _skippable(source[j]):
+            if drug and (_is_drug(source[j]) or source[j] in LIST_JOINS):
+                skipped_item = True
+            elif not _skippable(source[j]):
                 skipped += 1
-                if skipped > MAX_GAP:
-                    return False
+            if skipped > MAX_GAP or (skipped_item and skipped):
+                return False
         return False
 
     return any(onward(1, i) for i, word in enumerate(source) if word == wanted[0])

@@ -336,6 +336,15 @@ def test_a_number_may_lose_an_article_and_a_dose_may_be_left_out(said, value):
     assert own(said, value).pending
 
 
+def test_a_value_may_leave_out_another_item_of_a_list_whole():
+    said = "Continue lisinopril 10 mg and metformin 500 mg daily."
+
+    assert own(said, "Continue metformin 500 mg daily.").pending
+    assert own(said, "Continue lisinopril 500 mg daily.").reasons == ["words_out_of_order"]
+    assert own("Stop lisinopril and start metformin.", "Stop metformin.").reasons == ["words_out_of_order"]
+    assert own("Continue lisinopril 10 mg daily and metformin.", "Continue metformin.").reasons == ["words_out_of_order"]
+
+
 def test_the_owners_recombination_example():
     assert own("Left knee pain, right knee normal.", "Right knee pain.").reasons == ["words_out_of_order"]
 
