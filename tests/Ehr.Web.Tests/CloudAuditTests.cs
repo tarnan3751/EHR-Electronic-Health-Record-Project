@@ -182,6 +182,43 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
+    // UC 2, step 4.
+    [Fact]
+    public async Task The_read_only_notice_goes_once_the_on_prem_app_is_back_and_the_reads_arrive()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Sky", "Comeback");
+        var signedIn = await CookieHeaderAsync(apps.Cloud, clinician);
+        await apps.AssignAsync(clinician, patient);
+        var shipper = ShipperOf(apps.CloudPrimaryDrill);
+        try
+        {
+            apps.PrimaryDown = true;
+            Assert.False(await shipper.ShipAsync(Cancel));
+            using (var during = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, $"/patients/{patient}", signedIn))
+            {
+                var html = await ReadAsync(during);
+                Assert.Contains("Read-only: the clinic's server can't be reached. You can look at records, but the newest changes may not appear yet", html);
+                Assert.DoesNotContain("handler=Unassign", html);
+            }
+
+            apps.PrimaryDown = false;
+            Assert.True(await shipper.ShipAsync(Cancel));
+            // The read made during the outage is on-prem now, as from the cloud.
+            Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.Cloud));
+
+            using var after = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, $"/patients/{patient}", signedIn);
+            var back = await ReadAsync(after);
+            Assert.DoesNotContain("Read-only", back);
+            Assert.Contains("handler=Unassign", back);
+            Assert.Contains("handler=Enroll", back);
+        }
+        finally
+        {
+            apps.PrimaryDown = false;
+        }
+    }
+
     [Fact]
     public async Task The_on_prem_app_takes_events_only_with_the_shared_key()
     {
@@ -273,10 +310,11 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.False(await RecordedAsync(good.Id));
         Assert.False(await RecordedAsync(bad.Id));
-        // A clock that runs ahead is told apart, for the cloud app's log.
+        // A clock that runs ahead is told apart, within what the cloud app's log keeps of the answer.
+        var answer = await response.Content.ReadAsStringAsync(Cancel);
         Assert.Contains(
             what == "an hour ahead" ? "more than 5 minutes ahead of this server's clock" : "each a read of one patient",
-            await response.Content.ReadAsStringAsync(Cancel));
+            answer[..Math.Min(answer.Length, CloudAuditShipper.MaxAnswerLength)]);
     }
 
     [Fact]

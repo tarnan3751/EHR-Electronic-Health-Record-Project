@@ -1,10 +1,15 @@
+using System.Net;
+using System.Text.Json;
 using Ehr.Data.Audit;
 using Ehr.Web.CloudAudit;
+using Ehr.Web.Forwarding;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Ehr.Web.Tests;
 
-// The cloud app's audit queue on disk: what survives a restart, what a crash leaves, and when the file starts over.
+// The cloud app's audit queue on disk: what survives a restart, what a crash leaves, and when the file starts over; and
+// that neither a queue it can't read nor a try that throws stops its shipper.
 public sealed class CloudAuditQueueTests : IDisposable
 {
     readonly string directory = Path.Combine(Path.GetTempPath(), $"ehr-queue-{Guid.NewGuid():N}");
@@ -79,6 +84,51 @@ public sealed class CloudAuditQueueTests : IDisposable
         Assert.Equal([kept.Id, next.Id], restarted.ReadPending(10).Events.Select(e => e.Id));
     }
 
+    [Fact]
+    public async Task A_queue_the_shipper_cant_read_still_lets_it_track_the_on_prem_app()
+    {
+        // A whole line that isn't an event, which only a damaged disk could leave.
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(Path.Combine(directory, "audit-events.jsonl"), "not an event\n", TestContext.Current.CancellationToken);
+        using var queue = new CloudAuditQueue(directory);
+        var answer = HttpStatusCode.InternalServerError;
+        var status = new OnPremStatus();
+        var log = new ErrorLog();
+        using var shipper = Shipper(queue, () => new HttpResponseMessage(answer), status, log);
+
+        // The primary down, then back: the check-in still goes, and the status follows it.
+        Assert.False(await shipper.ShipAsync(TestContext.Current.CancellationToken));
+        Assert.False(status.IsReachable);
+        answer = HttpStatusCode.NoContent;
+        Assert.False(await shipper.ShipAsync(TestContext.Current.CancellationToken));
+        Assert.True(status.IsReachable);
+
+        // Someone has to repair the queue, and the log says so; nothing in it was marked shipped.
+        Assert.True(log.Logged.Task.IsCompleted);
+        Assert.Throws<JsonException>(() => queue.ReadPending(10));
+    }
+
+    [Fact]
+    public async Task A_try_that_throws_doesnt_stop_the_shipper()
+    {
+        using var queue = new CloudAuditQueue(directory);
+        var log = new ErrorLog();
+        using var shipper = Shipper(queue, () => throw new InvalidOperationException("Not what the shipper expects."), new OnPremStatus(), log);
+
+        await shipper.StartAsync(TestContext.Current.CancellationToken);
+        await Task.WhenAny(log.Logged.Task, shipper.ExecuteTask!).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        // The try failed and was logged, and the shipper is waiting for the next one rather than stopped.
+        Assert.True(log.Logged.Task.IsCompleted);
+        Assert.False(shipper.ExecuteTask!.IsCompleted);
+        await shipper.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    // A shipper whose link to the on-prem app gives this answer to every request.
+    static CloudAuditShipper Shipper(CloudAuditQueue queue, Func<HttpResponseMessage> answer, OnPremStatus status, ErrorLog log) =>
+        new(queue, new OnPremApp("https://onprem.test", new HttpMessageInvoker(new Answers(answer))), status,
+            new CloudAuditKey(WebApps.CloudAuditKey), log);
+
     static AuditEvent Event() => new()
     {
         Id = Guid.CreateVersion7(),
@@ -89,4 +139,29 @@ public sealed class CloudAuditQueueTests : IDisposable
         PatientId = Guid.CreateVersion7(),
         TableName = "patients",
     };
+
+    sealed class Answers(Func<HttpResponseMessage> answer) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(answer());
+    }
+
+    // Completes at the first error logged.
+    sealed class ErrorLog : ILogger<CloudAuditShipper>
+    {
+        public TaskCompletionSource Logged { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Error)
+            {
+                Logged.TrySetResult();
+            }
+        }
+    }
 }

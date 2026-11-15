@@ -51,7 +51,7 @@
         @if (!OnPrem.IsReachable)
         {
             @* FR-34: off-site, with the clinic's server down, records can still be read but nothing can be saved. *@
-            <p class="notice read-only" role="status">Read-only: the clinic's server can't be reached. You can look at records, but changes can't be saved until it's back.</p>
+            <p class="notice read-only" role="status">Read-only: the clinic's server can't be reached. You can look at records, but the newest changes may not appear yet, and nothing can be saved until it's back.</p>
         }
         @RenderBody()
     </main>

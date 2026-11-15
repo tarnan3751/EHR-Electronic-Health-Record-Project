@@ -1,6 +1,8 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Ehr.Data.Audit;
 using Ehr.Web.Api.Audit;
 using Ehr.Web.Forwarding;
 
@@ -17,6 +19,9 @@ public sealed class CloudAuditShipper(
 
     static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
+    // How much of a refusal goes in the log: the on-prem app's own validation message.
+    public const int MaxAnswerLength = 300;
+
     readonly SemaphoreSlim oneAtATime = new(1, 1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -24,7 +29,15 @@ public sealed class CloudAuditShipper(
         using var timer = new PeriodicTimer(Interval);
         do
         {
-            await ShipAsync(stoppingToken);
+            try
+            {
+                await ShipAsync(stoppingToken);
+            }
+            catch (Exception e) when (!stoppingToken.IsCancellationRequested)
+            {
+                // A background service that throws stops the whole app, and the next try may work.
+                log.LogError(e, "Shipping audit events failed; they stay queued.");
+            }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
@@ -35,7 +48,7 @@ public sealed class CloudAuditShipper(
         await oneAtATime.WaitAsync(cancellationToken);
         try
         {
-            var (events, end) = queue.ReadPending(CloudAuditApi.MaxEvents);
+            var (events, end) = ReadPending();
             using var request = new HttpRequestMessage(HttpMethod.Post, onPrem.Url.TrimEnd('/') + CloudAuditApi.Path)
             {
                 Content = JsonContent.Create(events, options: JsonSerializerOptions.Web),
@@ -68,20 +81,55 @@ public sealed class CloudAuditShipper(
                     return false;
                 }
 
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    // Nothing on the page shows this: the on-prem app answers, so the site isn't read-only.
+                    log.LogError(
+                        "The on-prem app refused the cloud app's audit key: Ehr:CloudAudit:Key must be the same on both apps. {Count} audit events stay queued.",
+                        events.Count);
+                    return false;
+                }
+
                 if (!response.IsSuccessStatusCode)
                 {
-                    // Reachable but refused: a key that doesn't match, or a bug. The events stay queued for a fix.
-                    log.LogError("The on-prem app refused {Count} audit events with {Status}.", events.Count, (int)response.StatusCode);
+                    // Reachable but refused: its answer tells a clock too far ahead from a bug. The events stay queued
+                    // for a fix.
+                    var answer = await response.Content.ReadAsStringAsync(timeout.Token);
+                    log.LogError(
+                        "The on-prem app refused {Count} audit events with {Status}: {Answer}",
+                        events.Count, (int)response.StatusCode, answer.Length > MaxAnswerLength ? answer[..MaxAnswerLength] : answer);
                     return false;
                 }
             }
 
-            queue.MarkShipped(end);
+            // A queue that couldn't be read sent only the check-in, and has nothing to confirm.
+            if (end is not { } shipped)
+            {
+                return false;
+            }
+
+            queue.MarkShipped(shipped);
             return true;
         }
         finally
         {
             oneAtATime.Release();
+        }
+    }
+
+    // The queued events and where they end, or none if the queue can't be read. That needs someone to repair the queue,
+    // but the empty check-in still goes: this is the only thing that marks the on-prem app reachable again.
+    (List<AuditEvent> Events, long? End) ReadPending()
+    {
+        try
+        {
+            var (events, end) = queue.ReadPending(CloudAuditApi.MaxEvents);
+            return (events, end);
+        }
+        catch (Exception e)
+        {
+            log.LogError(e, "The cloud app's audit queue can't be read; nothing in it ships until someone repairs it.");
+            return ([], null);
         }
     }
 }
