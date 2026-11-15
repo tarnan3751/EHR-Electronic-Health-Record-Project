@@ -61,7 +61,6 @@ function renderStatus(status, waiting) {
     waiting === 0 ? 'Everything is sent.' : `${waiting} ${waiting === 1 ? 'change' : 'changes'} waiting to send.`;
   byId('checked').textContent = checked ? `Checked at ${new Date(status.checkedAt).toLocaleTimeString()}.` : '';
   show(byId('sync-problem'), status.problem);
-  show(byId('notice'), status.notice);
 }
 
 // Signed out, the page offers to sign in, and the phrases can be read but not changed (renderPhrases).

@@ -63,8 +63,6 @@ struct Status {
     problem: Option<String>,
     /// When the round ended, in milliseconds since 1970, for the page to show in local time.
     checked_at: Option<u64>,
-    /// Shown until the app closes, when the local database had to be started again.
-    notice: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -226,21 +224,15 @@ async fn sync_in_background(handle: AppHandle) {
     }
 }
 
-/// Opens the local database, with a notice when it had to start it again.
-fn open_store(app: &tauri::App) -> Result<(Store, Option<String>), String> {
-    let key = key::load()?;
-    let (store, started_again) = Store::open_or_start_again(&database_path(app)?, &key.bytes)?;
-    let notice = started_again.then(|| {
-        let why = if key.new {
-            "the key to this computer's copy was missing"
-        } else {
-            "this computer's copy was damaged"
-        };
-        format!(
-            "The app started its copy of the phrases again, because {why}. Changes that hadn't been sent were lost."
-        )
-    });
-    Ok((store, notice))
+/// Opens the encrypted database without replacing it if the key is missing or invalid.
+fn open_store(app: &tauri::App) -> Result<Store, String> {
+    let path = database_path(app)?;
+    let exists = path != std::path::Path::new(":memory:")
+        && path
+            .try_exists()
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+    let key = key::load(exists)?;
+    Store::open(&path, &key).map_err(Into::into)
 }
 
 /// In the app's data folder on macOS and Windows. Linux is for development only, and keeps its key in memory
@@ -262,18 +254,12 @@ fn database_path(app: &tauri::App) -> Result<PathBuf, String> {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let (store, notice) = match open_store(app) {
-                Ok((store, notice)) => (Ok(Mutex::new(store)), notice),
-                Err(problem) => (Err(problem), None),
-            };
+            let store = open_store(app).map(Mutex::new);
             app.manage(App {
                 store,
                 // After open_store, which chose the credential store that keeps the session.
                 sync: key::session_entry().and_then(sync::Sync::from_environment),
-                status: Mutex::new(Status {
-                    notice,
-                    ..Status::default()
-                }),
+                status: Mutex::new(Status::default()),
                 wake: Notify::new(),
             });
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));

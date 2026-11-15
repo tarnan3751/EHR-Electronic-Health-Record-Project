@@ -2,10 +2,8 @@
 //! phrases as the server last sent them, the outbox of changes not yet sent, the changes the server refused (for the
 //! person to choose), and the sync watermark. What the app shows is the server's copy with the outbox on top.
 
-use std::ffi::OsString;
 use std::fmt;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rusqlite::{Connection, OptionalExtension, params};
@@ -80,7 +78,6 @@ pub struct Conflict {
 #[derive(Debug)]
 pub enum Error {
     Database(rusqlite::Error),
-    File(PathBuf, io::Error),
     NotFound,
     /// The phrase changed while the person was editing it.
     ChangedSince,
@@ -98,7 +95,6 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Database(error) => write!(f, "local database: {error}"),
-            Error::File(path, error) => write!(f, "{}: {error}", path.display()),
             Error::NotFound => f.write_str("That phrase isn't here any more."),
             Error::ChangedSince => f.write_str("This phrase changed while you were editing it."),
             Error::Refused(reason) => f.write_str(reason),
@@ -130,32 +126,8 @@ impl Store {
         connection.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex::encode(key)))?;
         connection.query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(()))?;
         connection.execute_batch(SCHEMA)?;
+        ehr_desktop::drafts::initialize(&connection)?;
         Ok(Store { connection })
-    }
-
-    /// Opens the database at `path`, or starts it again when `key` can't open it: the key was lost, or the file is
-    /// damaged, and nothing can read it now. The server has every saved phrase; changes not yet sent are lost. Says
-    /// whether it started again. Any other failure leaves the file alone.
-    pub fn open_or_start_again(path: &Path, key: &[u8; 32]) -> Result<(Store, bool)> {
-        match Store::open(path, key) {
-            Ok(store) => Ok((store, false)),
-            Err(Error::Database(rusqlite::Error::SqliteFailure(error, _)))
-                if error.code == rusqlite::ErrorCode::NotADatabase =>
-            {
-                let mut journal = OsString::from(path);
-                journal.push("-journal");
-                for file in [path.to_path_buf(), PathBuf::from(journal)] {
-                    match std::fs::remove_file(&file) {
-                        Err(error) if error.kind() != io::ErrorKind::NotFound => {
-                            return Err(Error::File(file, error));
-                        }
-                        _ => {}
-                    }
-                }
-                Ok((Store::open(path, key)?, true))
-            }
-            Err(error) => Err(error),
-        }
     }
 
     pub fn phrases(&self) -> Result<Vec<Phrase>> {
@@ -585,32 +557,52 @@ mod tests {
     }
 
     #[test]
-    fn a_database_its_key_cant_open_is_started_again() {
-        let database = TempDatabase::new();
-        database.open().add(".nad", "Never sent").unwrap();
+    fn an_unreadable_database_keeps_pending_drafts() {
+        use ehr_desktop::drafts;
 
-        let (store, started_again) = Store::open_or_start_again(&database.0, &[8; 32]).unwrap();
-        assert!(started_again);
-        assert!(store.phrases().unwrap().is_empty());
+        let database = TempDatabase::new();
+        let clinician = Uuid::now_v7();
+        let patient = Uuid::now_v7();
+        let store = database.open();
+        let saved = drafts::save(&store.connection, clinician, patient, "Test note").unwrap();
         drop(store);
 
-        let (_, started_again) = Store::open_or_start_again(&database.0, &[8; 32]).unwrap();
-        assert!(!started_again, "the new key opens the new file");
+        let before = std::fs::read(&database.0).unwrap();
+        assert!(Store::open(&database.0, &[8; 32]).is_err());
+        assert_eq!(std::fs::read(&database.0).unwrap(), before);
+
+        let store = database.open();
+        assert_eq!(
+            drafts::pending(&store.connection, clinician).unwrap(),
+            vec![saved],
+        );
     }
 
     #[test]
-    fn a_database_that_fails_to_open_for_another_reason_is_left_alone() {
-        let folder = std::env::temp_dir().join(format!("ehr-desktop-test-{}", Uuid::now_v7()));
-        std::fs::create_dir(&folder).unwrap();
+    fn reopening_the_database_restores_only_this_clinicians_pending_drafts() {
+        use ehr_desktop::drafts;
 
-        let opened = Store::open_or_start_again(&folder, &KEY);
+        let database = TempDatabase::new();
+        let clinician = Uuid::now_v7();
+        let other_clinician = Uuid::now_v7();
+        let patient = Uuid::now_v7();
+        let store = database.open();
+        let first = drafts::save(&store.connection, clinician, patient, "First note").unwrap();
+        let other =
+            drafts::save(&store.connection, other_clinician, patient, "Other note").unwrap();
+        let second = drafts::save(&store.connection, clinician, patient, "Second note").unwrap();
+        drop(store);
 
-        assert!(
-            matches!(opened, Err(Error::Database(_))),
-            "it shouldn't try to delete anything"
+        let store = database.open();
+        assert_eq!(
+            drafts::pending(&store.connection, clinician).unwrap(),
+            vec![first, second],
         );
-        assert!(folder.is_dir());
-        std::fs::remove_dir(&folder).unwrap();
+        assert_eq!(
+            drafts::pending(&store.connection, other_clinician).unwrap(),
+            vec![other],
+        );
+        assert_eq!(store.waiting().unwrap(), 0, "Quick text has its own queue");
     }
 
     #[test]
