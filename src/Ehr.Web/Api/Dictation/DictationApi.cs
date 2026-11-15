@@ -1,4 +1,7 @@
 using System.Globalization;
+using Ehr.Data;
+using Ehr.Domain.Phi;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
@@ -102,6 +105,44 @@ public static partial class DictationApi
         return sessions;
     }
 
+    // The enclosing Desktop group authenticates a revocable bearer session. Web staff cookies and
+    // their form tokens stay on the original routes. Every desktop call checks the current panel.
+    public static void MapOfflineDictation(this RouteGroupBuilder desktop)
+    {
+        var sessions = desktop.MapGroup("/offline-dictation").AddEndpointFilter(RequireAssignedPatientAsync);
+        sessions.MapPost("/start", StartAsync);
+        sessions.MapPost("/{id}/audio", SendAudioAsync).WithMetadata(new RequestSizeLimitAttribute(MaxChunkBytes));
+        sessions.MapPost("/{id}/stop", StopAsync);
+        sessions.MapPost("/{id}/result", ResultAsync);
+    }
+
+    static async ValueTask<object?> RequireAssignedPatientAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    {
+        var http = context.HttpContext;
+        http.Response.Headers.CacheControl = "no-store";
+        if (!Guid.TryParse(http.User.FindFirstValue(ClaimTypes.NameIdentifier), out var owner)
+            || !Guid.TryParse(http.Request.Query["patient"], out var patient))
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        var services = http.RequestServices;
+        services.GetRequiredService<UserContext>().UserId = owner;
+        var db = services.GetRequiredService<EhrDbContext>();
+        var cancellationToken = http.RequestAborted;
+        await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
+        {
+            if (!await services.GetRequiredService<PhiReader>().IsAssignedAsync(patient, cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return await next(context);
+    }
+
     // The sign-in still holds: the account isn't disabled or locked out, and its security stamp hasn't changed.
     static async ValueTask<object?> RequireCurrentAccountAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
         await CookieSecurityStamp.CurrentAccountAsync<StaffUser>(context.HttpContext.RequestServices, context.HttpContext.User) is null
@@ -195,7 +236,7 @@ public static partial class DictationApi
             return Unavailable();
         }
 
-        // The policy has just authenticated the staff cookie: the owner is whoever that is, whatever the request says.
+        // The policy has just authenticated the clinician: the owner is whoever that is, whatever the request says.
         var owner = Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var aborted = context.RequestAborted;
         using var timer = new CancellationTokenSource(sidecar.Timeout);

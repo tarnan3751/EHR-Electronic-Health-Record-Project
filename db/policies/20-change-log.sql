@@ -24,3 +24,7 @@ REVOKE ALL ON FUNCTION ehr.log_change() FROM PUBLIC;
 CREATE OR REPLACE TRIGGER quick_texts_change_log
     AFTER INSERT OR UPDATE ON ehr.quick_texts
     FOR EACH ROW EXECUTE FUNCTION ehr.log_change();
+
+CREATE OR REPLACE TRIGGER clinical_drafts_change_log
+    AFTER INSERT OR UPDATE ON ehr.clinical_drafts
+    FOR EACH ROW EXECUTE FUNCTION ehr.log_change();

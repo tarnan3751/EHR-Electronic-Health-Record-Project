@@ -52,6 +52,7 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "medication_statements")] = ["SELECT"],
         [("ehr_app", "conditions")] = ["SELECT"],
         [("ehr_read", "conditions")] = ["SELECT"],
+        [("ehr_app", "clinical_drafts")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_app", "encounters")] = ["SELECT"],
         [("ehr_read", "encounters")] = ["SELECT"],
         [("ehr_app", "patient_enrollments")] = ["SELECT", "INSERT", "UPDATE"],

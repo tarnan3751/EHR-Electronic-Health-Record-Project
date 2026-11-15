@@ -12,7 +12,7 @@
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ehr_desktop::charts::Chart;
+use ehr_desktop::{charts::Chart, draft_sync};
 
 use keyring_core::Entry;
 use reqwest::{Client, RequestBuilder, Response, StatusCode, Url};
@@ -285,7 +285,7 @@ impl Sync {
         loop {
             let batch = store::lock(store).pending(BATCH)?;
             if batch.is_empty() {
-                return Ok(());
+                break;
             }
 
             let push: PushResponse = answer(
@@ -313,6 +313,281 @@ impl Sync {
                     Failure::Problem("The server didn't answer for every change.".to_owned())
                 })?;
             store::lock(store).apply_push(answered)?;
+        }
+        self.sync_clinical(server, token, store).await
+    }
+
+    async fn sync_clinical(
+        &self,
+        server: &str,
+        token: &str,
+        store: &Mutex<Store>,
+    ) -> Result<(), Failure> {
+        let Ok(owner) = self.with_clinician(Some(token), Ok) else {
+            return Ok(());
+        };
+        let (since, patients) = store::lock(store).clinical_pull_scope(owner)?;
+        if patients.is_empty() && store::lock(store).clinical_waiting(owner)? == 0 {
+            return Ok(());
+        }
+
+        let pending = store::lock(store).clinical_pending(owner)?;
+        for draft in pending {
+            if self.with_clinician(Some(token), Ok).is_err() {
+                return Ok(());
+            }
+            let result: draft_sync::PushResult = answer(
+                "send a clinical draft",
+                self.http
+                    .post(format!("{server}/api/desktop/drafts/push"))
+                    .bearer_auth(token)
+                    .json(&draft)
+                    .send()
+                    .await,
+            )
+            .await?;
+            let mut db = store::lock(store);
+            self.with_clinician(Some(token), |_| {
+                db.apply_clinical_answer(owner, &draft, result)
+                    .map_err(Into::into)
+            })
+            .map_err(Failure::Problem)?;
+        }
+
+        #[derive(serde::Deserialize)]
+        struct Pull {
+            watermark: String,
+            drafts: Vec<draft_sync::ServerDraft>,
+        }
+        let pull: Pull = answer(
+            "get clinical draft changes",
+            self.http
+                .post(format!("{server}/api/desktop/drafts/pull"))
+                .bearer_auth(token)
+                .json(&serde_json::json!({"since": since, "patients": patients}))
+                .send()
+                .await,
+        )
+        .await?;
+        {
+            let mut db = store::lock(store);
+            self.with_clinician(Some(token), |_| {
+                db.apply_clinical_pull(owner, &since, &patients, &pull.watermark, &pull.drafts)
+                    .map_err(Into::into)
+            })
+            .map_err(Failure::Problem)?;
+        }
+        self.sync_recording(server, token, owner, store).await
+    }
+
+    async fn sync_recording(
+        &self,
+        server: &str,
+        token: &str,
+        owner: Uuid,
+        store: &Mutex<Store>,
+    ) -> Result<(), Failure> {
+        let Some(mut recording) = store::lock(store).next_recording(owner)? else {
+            return Ok(());
+        };
+        let base = format!("{server}/api/desktop/offline-dictation");
+        let patient = recording.patient.clone();
+        let post = |route: &str, sequence: Option<usize>| -> Result<RequestBuilder, Failure> {
+            let mut url =
+                Url::parse_with_params(&format!("{base}/{route}"), [("patient", &patient)])
+                    .map_err(|_| Failure::Problem("The server address is invalid.".to_owned()))?;
+            if let Some(seq) = sequence {
+                url.query_pairs_mut().append_pair("seq", &seq.to_string());
+            }
+            self.with_clinician(Some(token), |_| Ok(self.http.post(url).bearer_auth(token)))
+                .map_err(Failure::Problem)
+        };
+        let save = |recording: &ehr_desktop::recordings::Recording| -> Result<(), Failure> {
+            let db = store::lock(store);
+            self.with_clinician(Some(token), |_| {
+                db.checkpoint_recording(owner, recording)
+                    .map_err(Into::into)
+            })
+            .map_err(Failure::Problem)
+        };
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Started {
+            session_id: String,
+            max_chunk_bytes: usize,
+        }
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Chunk {
+            received_seq: usize,
+        }
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Refused {
+            error: String,
+            expected_seq: Option<usize>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Transcript {
+            text: String,
+            #[serde(rename = "final")]
+            finished: bool,
+        }
+        #[derive(serde::Deserialize)]
+        struct ResultBody {
+            transcript: Transcript,
+            sorting: String,
+        }
+
+        if recording.session.is_none() {
+            let response = post("start", None)?.send().await;
+            if response
+                .as_ref()
+                .is_ok_and(|r| r.status() == StatusCode::FORBIDDEN)
+            {
+                let db = store::lock(store);
+                self.with_clinician(Some(token), |_| db.reject_recording(owner, &recording,
+                    "This recording's patient is no longer on your panel. The audio was kept on this device.").map_err(Into::into))
+                    .map_err(Failure::Problem)?;
+                return Ok(());
+            }
+            let session: Started = answer("start offline transcription", response).await?;
+            if session.max_chunk_bytes == 0
+                || !(16..=64).contains(&session.session_id.len())
+                || !session
+                    .session_id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+            {
+                return Err(Failure::Problem(
+                    "The transcription session wasn't understood.".to_owned(),
+                ));
+            }
+            recording.chunk_size = session.max_chunk_bytes.min(2 * 1024 * 1024);
+            recording.session = Some(session.session_id);
+            save(&recording)?;
+        }
+
+        let id = recording
+            .session
+            .clone()
+            .expect("a transcription session was started");
+        let total = recording.audio.len().div_ceil(recording.chunk_size);
+        loop {
+            let sequence = recording.next_seq;
+            let uploading = sequence < total;
+            let route = if uploading {
+                "audio"
+            } else if recording.stopped {
+                "result"
+            } else {
+                "stop"
+            };
+            let request = post(&format!("{id}/{route}"), uploading.then_some(sequence))?;
+            let response = if uploading {
+                let start = sequence * recording.chunk_size;
+                let end = (start + recording.chunk_size).min(recording.audio.len());
+                request
+                    .header(reqwest::header::CONTENT_TYPE, &recording.media_type)
+                    .body(recording.audio[start..end].to_vec())
+                    .send()
+                    .await
+            } else {
+                request.send().await
+            };
+            let status = response.as_ref().ok().map(Response::status);
+            if status == Some(StatusCode::NOT_FOUND) {
+                // The sidecar may restart. Keep all audio and start a fresh session next round.
+                recording.session = None;
+                recording.next_seq = 0;
+                recording.stopped = false;
+                save(&recording)?;
+                return Ok(());
+            }
+            if matches!(
+                status,
+                Some(
+                    StatusCode::FORBIDDEN
+                        | StatusCode::PAYLOAD_TOO_LARGE
+                        | StatusCode::UNSUPPORTED_MEDIA_TYPE
+                        | StatusCode::UNPROCESSABLE_ENTITY
+                )
+            ) {
+                let db = store::lock(store);
+                self.with_clinician(Some(token), |_| db.reject_recording(owner, &recording,
+                    "The server couldn't accept this recording. The audio was kept on this device.").map_err(Into::into))
+                    .map_err(Failure::Problem)?;
+                return Ok(());
+            }
+
+            if uploading {
+                if let Ok(refusal) = response.as_ref()
+                    && refusal.status() == StatusCode::CONFLICT
+                {
+                    let conflict = response
+                        .expect("HTTP conflict")
+                        .json::<Refused>()
+                        .await
+                        .map_err(|_| {
+                            Failure::Problem("The server couldn't resume the recording.".to_owned())
+                        })?;
+                    if conflict.error == "out_of_order"
+                        && let Some(next) = conflict.expected_seq
+                        && next <= total
+                        && next != sequence
+                    {
+                        recording.next_seq = next;
+                        save(&recording)?;
+                        return Ok(());
+                    }
+                    if conflict.error == "stopped" {
+                        recording.next_seq = total;
+                        recording.stopped = true;
+                        save(&recording)?;
+                        return Ok(());
+                    }
+                    return Err(Failure::Problem(
+                        "The server couldn't resume the recording.".to_owned(),
+                    ));
+                }
+                let chunk: Chunk = answer("send offline audio", response).await?;
+                if chunk.received_seq != sequence {
+                    return Err(Failure::Problem(
+                        "The server didn't confirm the audio chunk.".to_owned(),
+                    ));
+                }
+                recording.next_seq += 1;
+                save(&recording)?;
+                continue;
+            }
+
+            let result: ResultBody = answer("transcribe offline audio", response).await?;
+            recording.stopped = true;
+            save(&recording)?;
+            if result.sorting == "pending" {
+                return Ok(());
+            }
+            let mut db = store::lock(store);
+            let text = result.transcript.text.trim();
+            self.with_clinician(Some(token), |_| {
+                if !result.transcript.finished
+                    || text.is_empty()
+                    || text.len() > 65_536
+                    || text.contains('\0')
+                {
+                    db.reject_recording(
+                        owner,
+                        &recording,
+                        "No complete transcript was returned. The audio was kept on this device.",
+                    )
+                } else {
+                    db.finish_recording(owner, &recording, text)
+                }
+                .map_err(Into::into)
+            })
+            .map_err(Failure::Problem)?;
+            return Ok(());
         }
     }
 

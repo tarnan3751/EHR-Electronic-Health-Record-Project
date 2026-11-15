@@ -44,6 +44,10 @@ async function refresh() {
     renderStatus(view.status, view.waiting);
     renderAccount(view.status.account);
     renderOfflineAccess(view.offlineAvailable, signedIn);
+    byId('clinical-waiting').textContent = view.clinicalWaiting
+      ? `${view.clinicalWaiting} draft or recording changes need sync or review.`
+      : 'No draft or recording changes waiting.';
+    if (selectedPatient) void openChart(selectedPatient, false);
     renderConflicts(view.conflicts);
     renderPhrases(view.phrases, signedIn);
   }
@@ -294,8 +298,17 @@ let offlineSigningOut = false;
 let selectedPatient = null;
 let chartRequest = 0;
 let panelRequest = 0;
-
+let editingDraft = null;
 let recording = null;
+
+function resetDraftEditor() {
+  editingDraft = null;
+  draftForm.reset();
+  byId('draft-label').textContent = 'New draft';
+  byId('cancel-draft-edit').hidden = true;
+}
+
+byId('cancel-draft-edit').addEventListener('click', resetDraftEditor);
 
 function cancelRecording() {
   if (!recording) return;
@@ -308,9 +321,6 @@ function cancelRecording() {
 }
 
 function clearChart() {
-  cancelRecording();
-  byId('recording-message').textContent = '';
-  byId('saved-recordings').replaceChildren();
   chartRequest++;
   selectedPatient = null;
   byId('offline-chart').hidden = true;
@@ -318,7 +328,9 @@ function clearChart() {
   byId('chart-demographics').textContent = '';
   byId('chart-sections').replaceChildren();
   byId('saved-drafts').replaceChildren();
-  draftForm.reset();
+  byId('saved-recordings').replaceChildren();
+  cancelRecording();
+  resetDraftEditor();
   draftForm.querySelector('button').disabled = false;
 }
 
@@ -380,10 +392,7 @@ async function openChart(patient, reset = true) {
       v.systolicMmHg != null && v.diastolicMmHg != null ? `${v.systolicMmHg}/${v.diastolicMmHg} mmHg` : '',
       v.heartRatePerMinute != null ? `${v.heartRatePerMinute} bpm` : ''))),
   );
-  byId('saved-drafts').replaceChildren(...drafts.map((draft) =>
-    el('li', {}, el('p', { textContent: 'Saved on this device · Pending sync' }),
-      el('pre', { className: 'draft-body', textContent: draft.body })),
-  ));
+  byId('saved-drafts').replaceChildren(...drafts.map((draft) => renderDraft(patient, draft)));
   if (!drafts.length) byId('saved-drafts').append(el('li', { textContent: 'No saved drafts.' }));
   byId('saved-recordings').replaceChildren(...recordings.map(({ problem }) =>
     el('li', { textContent: problem ?? 'Recording saved on this device · Pending transcription' }),
@@ -403,17 +412,52 @@ downloadPanel.addEventListener('click', async () => {
   }
 });
 
+function renderDraft(patient, draft) {
+  const labels = {
+    synced: 'Synced · Unsigned draft',
+    pending: 'Saved on this device · Pending sync',
+    conflict: 'A newer version is on the server. Choose which to keep.',
+    invalid: draft.problem ?? 'This draft needs review.',
+  };
+  const row = el('li', {}, el('p', { textContent: labels[draft.state] }),
+    el('pre', { className: 'draft-body', textContent: draft.body }));
+  if (draft.state === 'synced' || draft.state === 'invalid') {
+    row.append(button('Edit draft', () => {
+      editingDraft = { id: draft.id, version: draft.version };
+      draftForm.elements.body.value = draft.body;
+      byId('draft-label').textContent = 'Edit draft';
+      byId('cancel-draft-edit').hidden = false;
+      draftForm.elements.body.focus();
+    }));
+  }
+  if (draft.state === 'conflict') {
+    const mine = el('div', {}, el('strong', { textContent: 'Mine' }), row.querySelector('pre'));
+    const theirs = el('div', {}, el('strong', { textContent: 'Theirs' }),
+      el('pre', { className: 'draft-body', textContent: draft.theirs }));
+    const choose = async (keepMine) => {
+      const answer = await call('resolve_clinical', {
+        patient, id: draft.id, version: draft.theirVersion, keepMine,
+      });
+      if (answer !== undefined && selectedPatient === patient) await openChart(patient, false);
+    };
+    row.append(el('div', { className: 'draft-versions' }, mine, theirs),
+      button('Keep mine', () => choose(true)), ' ', button('Keep theirs', () => choose(false)));
+  }
+  return row;
+}
+
 draftForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const patient = selectedPatient;
   if (!offlineAvailable || !patient) return;
-  const request = chartRequest;
+  const edit = editingDraft;
   const submit = draftForm.querySelector('button');
   submit.disabled = true;
   try {
-    const answer = await call('save_clinical_draft', { patient, body: draftForm.elements.body.value });
-    if (!offlineAvailable || request !== chartRequest || answer === undefined) return;
-    draftForm.reset();
+    const args = { patient, body: draftForm.elements.body.value, ...edit };
+    const answer = await call(edit ? 'edit_clinical' : 'save_clinical_draft', args);
+    if (!offlineAvailable || selectedPatient !== patient || answer === undefined) return;
+    resetDraftEditor();
     byId('offline-message').textContent = 'Draft saved on this device.';
     await openChart(patient, false);
   } finally {

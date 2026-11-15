@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ehr_desktop::{charts, drafts, recordings};
+use ehr_desktop::{charts, draft_sync, recordings};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -75,6 +75,7 @@ struct View {
     waiting: usize,
     status: Status,
     offline_available: bool,
+    clinical_waiting: usize,
 }
 
 #[tauri::command]
@@ -85,6 +86,10 @@ fn view(app: State<'_, App>) -> Result<View, String> {
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
         offline_available: app.sync().is_ok_and(sync::Sync::offline_available),
+        clinical_waiting: match app.sync().and_then(|sync| sync.with_clinician(None, Ok)) {
+            Ok(owner) => store.clinical_waiting(owner)?,
+            Err(_) => 0,
+        },
         status: Status {
             account: app.sync.as_ref().ok().and_then(sync::Sync::account),
             ..app.status().clone()
@@ -95,7 +100,7 @@ fn view(app: State<'_, App>) -> Result<View, String> {
 #[derive(Serialize)]
 struct OfflineChart {
     chart: charts::Chart,
-    drafts: Vec<drafts::PendingDraft>,
+    drafts: Vec<draft_sync::DraftView>,
     recordings: Vec<recordings::RecordingView>,
 }
 
@@ -106,7 +111,9 @@ async fn download_panel(app: State<'_, App>) -> Result<(), String> {
     let mut store = app.store()?;
     sync.with_clinician(Some(&token), |owner| {
         store.replace_panel(owner, &panel).map_err(Into::into)
-    })
+    })?;
+    app.wake.notify_one();
+    Ok(())
 }
 
 #[tauri::command]
@@ -137,7 +144,45 @@ fn save_clinical_draft(app: State<'_, App>, patient: Uuid, body: String) -> Resu
         store
             .save_clinical_draft(owner, patient, &body)
             .map_err(Into::into)
-    })
+    })?;
+    app.wake.notify_one();
+    Ok(())
+}
+
+#[tauri::command]
+fn edit_clinical(
+    app: State<'_, App>,
+    patient: Uuid,
+    id: Uuid,
+    version: Option<i64>,
+    body: String,
+) -> Result<(), String> {
+    let mut store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store
+            .edit_clinical(owner, patient, id, version, &body)
+            .map_err(Into::into)
+    })?;
+    app.wake.notify_one();
+    Ok(())
+}
+
+#[tauri::command]
+fn resolve_clinical(
+    app: State<'_, App>,
+    patient: Uuid,
+    id: Uuid,
+    version: i64,
+    keep_mine: bool,
+) -> Result<(), String> {
+    let mut store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store
+            .resolve_clinical(owner, patient, id, version, keep_mine)
+            .map_err(Into::into)
+    })?;
+    app.wake.notify_one();
+    Ok(())
 }
 
 #[tauri::command]
@@ -152,7 +197,9 @@ fn save_recording(
         store
             .save_recording(owner, patient, &media_type, &audio)
             .map_err(Into::into)
-    })
+    })?;
+    app.wake.notify_one();
+    Ok(())
 }
 
 /// What became of a save, for the page.
@@ -343,6 +390,8 @@ fn main() {
             offline_panel,
             offline_chart,
             save_clinical_draft,
+            edit_clinical,
+            resolve_clinical,
             save_recording,
         ])
         .run(tauri::generate_context!())

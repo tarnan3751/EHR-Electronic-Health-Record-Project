@@ -145,6 +145,37 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return charts;
     }
 
+    const string DraftsTable = "clinical_drafts";
+
+    public Task<bool> IsAssignedAsync(Guid patient, CancellationToken cancellationToken) =>
+        db.PatientAssignments.AnyAsync(a => a.PatientId == patient && a.ClinicianId == user.UserId && a.EndedAt == null, cancellationToken);
+
+    public async Task<ClinicalDraft?> ReadDraftAsync(Guid id, Guid patient, CancellationToken cancellationToken)
+    {
+        var draft = await db.ClinicalDrafts.SingleOrDefaultAsync(
+            d => d.Id == id && d.PatientId == patient && d.ClinicianId == user.UserId, cancellationToken);
+        if (draft is not null)
+        {
+            audit.Record(AuditActions.Read, draft.PatientId, DraftsTable, draft.Id);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return draft;
+    }
+
+    public async Task<IReadOnlyList<ClinicalDraft>> ChangedDraftsAsync(Guid[] patients, ulong since, ulong until, CancellationToken cancellationToken)
+    {
+        var drafts = await ChangeLog.ClinicalDraftsChanged(db, since, until).AsNoTracking()
+            .Where(d => d.ClinicianId == user.UserId && patients.Contains(d.PatientId)).ToListAsync(cancellationToken);
+        if (drafts.Count > 0)
+        {
+            audit.RecordReads(DraftsTable, drafts.Select(d => (d.PatientId, d.Id)));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return drafts;
+    }
+
     // A list of patients, in name order, each one a recorded read, and whether more match than the limit.
     async Task<PatientList> ReadAsync(IQueryable<Patient> query, int limit, CancellationToken cancellationToken)
     {

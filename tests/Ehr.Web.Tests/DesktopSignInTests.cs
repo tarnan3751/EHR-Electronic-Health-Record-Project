@@ -59,6 +59,54 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
+    public async Task Draft_sync_only_returns_the_authors_drafts_and_deduplicates_an_outdated_retry()
+    {
+        const string push = "/api/desktop/drafts/push";
+        const string pull = "/api/desktop/drafts/pull";
+        var author = await apps.CreateStaffAsync("Draft author", StaffRoles.Clinician);
+        var colleague = await apps.CreateStaffAsync("Draft colleague", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Demo", "Draft");
+        await apps.AssignAsync(author, patient);
+        await apps.AssignAsync(colleague, patient);
+        var token = await apps.DesktopSignInAsync(apps.OnPrem, author);
+        var otherToken = await apps.DesktopSignInAsync(apps.OnPrem, colleague);
+        var id = Guid.NewGuid();
+        var initial = new { Key = Guid.NewGuid(), Id = id, PatientId = patient, BaseVersion = (long?)null, Body = "First draft" };
+
+        using var unauthorized = await PostAsync(apps.OnPrem, push, "not-a-token");
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        var added = await PostJsonAsync(apps.OnPrem, push, token, initial);
+        Assert.Equal("applied", added.GetProperty("outcome").GetString());
+
+        var original = await PostJsonAsync(apps.Cloud, pull, token, new { Since = "0", Patients = new[] { patient } });
+        Assert.Equal(id, Assert.Single(original.GetProperty("drafts").EnumerateArray()).GetProperty("id").GetGuid());
+        var since = original.GetProperty("watermark").GetString();
+        var changed = await PostJsonAsync(apps.Cloud, push, token, initial with { Key = Guid.NewGuid(), BaseVersion = 1, Body = "Newer copy" });
+        Assert.Equal(2, changed.GetProperty("current").GetProperty("version").GetInt64());
+
+        var retry = await PostJsonAsync(apps.OnPrem, push, token, initial);
+        Assert.Equal("duplicate", retry.GetProperty("outcome").GetString());
+        Assert.Equal(2, retry.GetProperty("current").GetProperty("version").GetInt64());
+        var stale = await PostJsonAsync(apps.OnPrem, push, token, initial with { Key = Guid.NewGuid(), BaseVersion = 1, Body = "Stale edit" });
+        Assert.Equal("conflict", stale.GetProperty("outcome").GetString());
+        Assert.Equal("Newer copy", stale.GetProperty("current").GetProperty("body").GetString());
+
+        var delta = await PostJsonAsync(apps.OnPrem, pull, token, new { Since = since, Patients = new[] { patient } });
+        Assert.Equal("Newer copy", Assert.Single(delta.GetProperty("drafts").EnumerateArray()).GetProperty("body").GetString());
+        var unrelated = await PostJsonAsync(apps.OnPrem, pull, otherToken, new { Since = "0", Patients = new[] { patient } });
+        Assert.Empty(unrelated.GetProperty("drafts").EnumerateArray());
+    }
+
+    static async Task<JsonElement> PostJsonAsync(WebApplicationFactory<Program> app, string path, string token, object body)
+    {
+        using var client = CreateClient(app);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await client.PostAsJsonAsync(path, body, JsonSerializerOptions.Web, Cancel);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadFromJsonAsync<JsonElement>(JsonSerializerOptions.Web, Cancel);
+    }
+
+    [Fact]
     public async Task A_bad_token_is_refused_with_401_and_no_redirect()
     {
         using var response = await GetAsync(apps.OnPrem, Sync, "not-a-token");

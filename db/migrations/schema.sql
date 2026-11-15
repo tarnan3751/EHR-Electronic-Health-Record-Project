@@ -448,3 +448,24 @@ VALUES ('20261115104258_PatientSearchIndexes', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.clinical_drafts (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    clinician_id uuid NOT NULL,
+    body text NOT NULL,
+    version bigint NOT NULL,
+    CONSTRAINT pk_clinical_drafts PRIMARY KEY (id),
+    CONSTRAINT fk_clinical_drafts_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE CASCADE,
+    CONSTRAINT fk_clinical_drafts_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_clinical_drafts_clinician_id ON ehr.clinical_drafts (clinician_id);
+
+CREATE INDEX ix_clinical_drafts_patient_id ON ehr.clinical_drafts (patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261115202104_ClinicalDrafts', '10.0.13');
+
+COMMIT;
+

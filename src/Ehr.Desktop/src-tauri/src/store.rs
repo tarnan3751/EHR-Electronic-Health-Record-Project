@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::api::{Operation, Outcome, PullResponse, PushResult, QuickText};
 use crate::rules;
-use ehr_desktop::{charts, drafts, recordings};
+use ehr_desktop::{charts, draft_sync, drafts, recordings};
 
 const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS quick_texts (
@@ -119,6 +119,134 @@ pub fn lock(store: &Mutex<Store>) -> MutexGuard<'_, Store> {
 }
 
 impl Store {
+    /// Opens (or creates) the database at `path`, or in memory for ":memory:". A wrong key fails here, with
+    /// SQLCipher's "file is not a database".
+    pub fn open(path: &Path, key: &[u8; 32]) -> Result<Store> {
+        let connection = Connection::open(path)?;
+        // A raw key, so SQLCipher skips its password-based key derivation. hex::encode only emits [0-9a-f].
+        connection.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex::encode(key)))?;
+        connection.query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(()))?;
+        connection.execute_batch(SCHEMA)?;
+        drafts::initialize(&connection)?;
+        draft_sync::initialize(&connection)?;
+        recordings::initialize(&connection)?;
+        charts::initialize(&connection)?;
+        Ok(Store { connection })
+    }
+
+    pub fn replace_panel(&mut self, owner: Uuid, panel: &[charts::Chart]) -> Result<()> {
+        draft_sync::reset_watermark(&self.connection, owner)?;
+        charts::replace_panel(&mut self.connection, owner, panel)?;
+        Ok(())
+    }
+
+    pub fn offline_panel(&self, owner: Uuid) -> Result<Vec<charts::ChartSummary>> {
+        Ok(charts::panel(&self.connection, owner)?)
+    }
+
+    pub fn offline_chart(
+        &self,
+        owner: Uuid,
+        patient: Uuid,
+    ) -> Result<(charts::Chart, Vec<draft_sync::DraftView>)> {
+        let chart = charts::get(&self.connection, owner, patient)?
+            .ok_or(Error::Refused("This chart is only available online."))?;
+        let notes = draft_sync::list(&self.connection, owner, patient)?;
+        Ok((chart, notes))
+    }
+
+    pub fn save_clinical_draft(&self, owner: Uuid, patient: Uuid, body: &str) -> Result<()> {
+        if body.trim().is_empty() || body.len() > 65_536 || body.contains('\0') {
+            return Err(Error::Refused("Enter a draft of up to 64 KiB."));
+        }
+        if !charts::contains(&self.connection, owner, patient)? {
+            return Err(Error::Refused("This chart is only available online."));
+        }
+        drafts::save(&self.connection, owner, patient, body)?;
+        Ok(())
+    }
+
+    pub fn clinical_waiting(&self, owner: Uuid) -> Result<usize> {
+        Ok(draft_sync::waiting(&self.connection, owner)?
+            + recordings::waiting(&self.connection, owner)?)
+    }
+
+    pub fn clinical_pull_scope(&self, owner: Uuid) -> Result<(String, Vec<String>)> {
+        let patients = self
+            .offline_panel(owner)?
+            .into_iter()
+            .map(|chart| chart.id)
+            .collect();
+        Ok((draft_sync::watermark(&self.connection, owner)?, patients))
+    }
+
+    pub fn apply_clinical_pull(
+        &mut self,
+        owner: Uuid,
+        since: &str,
+        patients: &[String],
+        next: &str,
+        changes: &[draft_sync::ServerDraft],
+    ) -> Result<()> {
+        if self.clinical_pull_scope(owner)?.1 == patients {
+            draft_sync::pull(&mut self.connection, owner, since, next, changes)?;
+        }
+        Ok(())
+    }
+
+    pub fn clinical_pending(&self, owner: Uuid) -> Result<Vec<draft_sync::Change>> {
+        Ok(draft_sync::pending(&self.connection, owner)?)
+    }
+
+    pub fn apply_clinical_answer(
+        &mut self,
+        owner: Uuid,
+        change: &draft_sync::Change,
+        answer: draft_sync::PushResult,
+    ) -> Result<()> {
+        Ok(draft_sync::answer(
+            &mut self.connection,
+            owner,
+            change,
+            answer,
+        )?)
+    }
+
+    pub fn edit_clinical(
+        &mut self,
+        owner: Uuid,
+        patient: Uuid,
+        id: Uuid,
+        version: Option<i64>,
+        body: &str,
+    ) -> Result<()> {
+        if body.trim().is_empty() || body.len() > 65_536 || body.contains('\0') {
+            return Err(Error::Refused("Enter a draft of up to 64 KiB."));
+        }
+        if !charts::contains(&self.connection, owner, patient)?
+            || !draft_sync::edit(&mut self.connection, owner, patient, id, version, body)?
+        {
+            return Err(Error::ChangedSince);
+        }
+        Ok(())
+    }
+
+    pub fn resolve_clinical(
+        &mut self,
+        owner: Uuid,
+        patient: Uuid,
+        id: Uuid,
+        version: i64,
+        keep_mine: bool,
+    ) -> Result<()> {
+        if !charts::contains(&self.connection, owner, patient)?
+            || !draft_sync::resolve(&mut self.connection, owner, patient, id, version, keep_mine)?
+        {
+            return Err(Error::ChangedSince);
+        }
+        Ok(())
+    }
+
     pub fn save_recording(
         &self,
         owner: Uuid,
@@ -151,49 +279,45 @@ impl Store {
     pub fn recordings(&self, owner: Uuid, patient: Uuid) -> Result<Vec<recordings::RecordingView>> {
         Ok(recordings::list(&self.connection, owner, patient)?)
     }
-    /// Opens (or creates) the database at `path`, or in memory for ":memory:". A wrong key fails here, with
-    /// SQLCipher's "file is not a database".
-    pub fn open(path: &Path, key: &[u8; 32]) -> Result<Store> {
-        let connection = Connection::open(path)?;
-        // A raw key, so SQLCipher skips its password-based key derivation. hex::encode only emits [0-9a-f].
-        connection.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex::encode(key)))?;
-        connection.query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(()))?;
-        connection.execute_batch(SCHEMA)?;
-        drafts::initialize(&connection)?;
-        charts::initialize(&connection)?;
-        recordings::initialize(&connection)?;
-        Ok(Store { connection })
+
+    pub fn next_recording(&self, owner: Uuid) -> Result<Option<recordings::Recording>> {
+        Ok(recordings::next(&self.connection, owner)?)
     }
 
-    pub fn replace_panel(&mut self, owner: Uuid, panel: &[charts::Chart]) -> Result<()> {
-        charts::replace_panel(&mut self.connection, owner, panel)?;
-        Ok(())
-    }
-
-    pub fn offline_panel(&self, owner: Uuid) -> Result<Vec<charts::ChartSummary>> {
-        Ok(charts::panel(&self.connection, owner)?)
-    }
-
-    pub fn offline_chart(
+    pub fn checkpoint_recording(
         &self,
         owner: Uuid,
-        patient: Uuid,
-    ) -> Result<(charts::Chart, Vec<drafts::PendingDraft>)> {
-        let chart = charts::get(&self.connection, owner, patient)?
-            .ok_or(Error::Refused("This chart is only available online."))?;
-        let notes = drafts::pending(&self.connection, owner, Some(patient))?;
-        Ok((chart, notes))
+        recording: &recordings::Recording,
+    ) -> Result<()> {
+        Ok(recordings::checkpoint(&self.connection, owner, recording)?)
     }
 
-    pub fn save_clinical_draft(&self, owner: Uuid, patient: Uuid, body: &str) -> Result<()> {
-        if body.trim().is_empty() || body.len() > 65_536 {
-            return Err(Error::Refused("Enter a draft of up to 64 KiB."));
-        }
-        if !charts::contains(&self.connection, owner, patient)? {
-            return Err(Error::Refused("This chart is only available online."));
-        }
-        drafts::save(&self.connection, owner, patient, body)?;
-        Ok(())
+    pub fn reject_recording(
+        &self,
+        owner: Uuid,
+        recording: &recordings::Recording,
+        problem: &str,
+    ) -> Result<()> {
+        Ok(recordings::reject(
+            &self.connection,
+            owner,
+            recording,
+            problem,
+        )?)
+    }
+
+    pub fn finish_recording(
+        &mut self,
+        owner: Uuid,
+        recording: &recordings::Recording,
+        text: &str,
+    ) -> Result<()> {
+        Ok(recordings::finish(
+            &mut self.connection,
+            owner,
+            recording,
+            text,
+        )?)
     }
 
     pub fn phrases(&self) -> Result<Vec<Phrase>> {
@@ -716,9 +840,10 @@ mod tests {
 
         store.replace_panel(clinician, &[]).unwrap();
         assert!(store.offline_chart(clinician, patient).is_err());
+        assert_eq!(drafts[0].state, "pending");
         assert_eq!(
-            drafts::pending(&store.connection, clinician, None).unwrap(),
-            drafts,
+            drafts::pending(&store.connection, clinician, None).unwrap()[0].id,
+            drafts[0].id
         );
     }
 

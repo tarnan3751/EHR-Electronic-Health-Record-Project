@@ -37,8 +37,9 @@
 
     <section id="offline-charts" hidden>
       <h2>Offline charts</h2>
-      <p>Download up to 25 assigned charts while connected. Saved drafts and recordings stay on this device.</p>
+      <p>Download up to 25 assigned charts while connected. Drafts and audio wait here until they can sync.</p>
       <button type="button" id="download-panel">Download my charts</button>
+      <p id="clinical-waiting" role="status"></p>
       <p id="offline-message" role="status"></p>
       <ul id="offline-panel"></ul>
       <section id="offline-chart" hidden>
@@ -46,8 +47,9 @@
         <p id="chart-demographics"></p>
         <div id="chart-sections"></div>
         <form id="clinical-draft">
-          <label>New draft <textarea name="body" rows="5" required></textarea></label>
+          <label><span id="draft-label">New draft</span> <textarea name="body" rows="5" required></textarea></label>
           <button>Save draft</button>
+          <button type="button" id="cancel-draft-edit" hidden>Cancel edit</button>
         </form>
         <h4>Dictation</h4>
         <button type="button" id="record-audio">Record audio</button>

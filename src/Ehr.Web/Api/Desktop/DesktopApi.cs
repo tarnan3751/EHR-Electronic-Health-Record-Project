@@ -4,6 +4,7 @@ using Ehr.Data;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Authorization;
 using Ehr.Domain.Phi;
+using Ehr.Web.Api.Dictation;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Web.Api.Desktop;
@@ -25,6 +26,8 @@ public static class DesktopApi
         desktop.MapPost("/sign-in", SignInAsync).AllowAnonymous();
         desktop.MapPost("/sign-out", SignOutAsync);
         desktop.MapPost("/offline-panel", OfflinePanelAsync);
+        desktop.MapDraftSync();
+        desktop.MapOfflineDictation();
         return endpoints;
     }
 

@@ -153,3 +153,18 @@ CREATE POLICY audit_events_admin_select ON ehr.audit_events FOR SELECT USING ((S
 
 DROP POLICY IF EXISTS audit_events_insert ON ehr.audit_events;
 CREATE POLICY audit_events_insert ON ehr.audit_events FOR INSERT WITH CHECK (true);
+
+-- Drafts are private to their author and require an active panel assignment.
+ALTER TABLE ehr.clinical_drafts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.clinical_drafts FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS clinical_drafts_own ON ehr.clinical_drafts;
+CREATE POLICY clinical_drafts_own ON ehr.clinical_drafts FOR ALL
+    USING (
+        (SELECT ehr.is_clinician())
+        AND clinician_id = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = clinical_drafts.patient_id AND a.ended_at IS NULL
+        )
+    );

@@ -52,6 +52,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<Encounter> Encounters => Set<Encounter>();
 
+    public DbSet<ClinicalDraft> ClinicalDrafts => Set<ClinicalDraft>();
+
     // One-time portal enrollment codes, as hashes. Grants only: registration looks a code up before anyone is signed in.
     public DbSet<PatientEnrollment> PatientEnrollments => Set<PatientEnrollment>();
 
@@ -86,6 +88,13 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
             entry.Property(e => e.TransactionId).HasColumnType("xid8").HasDefaultValueSql("pg_current_xact_id()");
             entry.HasIndex(e => e.TransactionId);
             entry.Property(e => e.TableName).HasMaxLength(63);
+        });
+
+        modelBuilder.Entity<ClinicalDraft>(draft =>
+        {
+            draft.HasOne<Patient>().WithMany().HasForeignKey(d => d.PatientId);
+            draft.HasOne<StaffUser>().WithMany().HasForeignKey(d => d.ClinicianId);
+            draft.Property(d => d.Version).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<SyncOperation>().HasKey(o => o.IdempotencyKey);

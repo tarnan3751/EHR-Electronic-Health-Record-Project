@@ -625,6 +625,43 @@ namespace Ehr.Migrations
                     b.ToTable("break_glass_accesses", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.ClinicalDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("ClinicianId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_clinical_drafts");
+
+                    b.HasIndex("ClinicianId")
+                        .HasDatabaseName("ix_clinical_drafts_clinician_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_clinical_drafts_patient_id");
+
+                    b.ToTable("clinical_drafts", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1136,6 +1173,23 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_break_glass_accesses_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.ClinicalDraft", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_clinical_drafts_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_clinical_drafts_patients_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>

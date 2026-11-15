@@ -1,4 +1,5 @@
 using System.Globalization;
+using Ehr.Data.Patients;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Data;
@@ -23,6 +24,15 @@ public static class ChangeLog
             SELECT * FROM ehr.quick_texts WHERE id IN (
                 SELECT row_id FROM ehr.change_log
                 WHERE table_name = 'quick_texts'
+                  AND transaction_id >= {from.ToString(CultureInfo.InvariantCulture)}::xid8
+                  AND transaction_id < {to.ToString(CultureInfo.InvariantCulture)}::xid8)
+            """);
+    public static IQueryable<ClinicalDraft> ClinicalDraftsChanged(EhrDbContext db, ulong from, ulong to) =>
+        db.ClinicalDrafts.FromSql(
+            $"""
+            SELECT * FROM ehr.clinical_drafts WHERE id IN (
+                SELECT row_id FROM ehr.change_log
+                WHERE table_name = 'clinical_drafts'
                   AND transaction_id >= {from.ToString(CultureInfo.InvariantCulture)}::xid8
                   AND transaction_id < {to.ToString(CultureInfo.InvariantCulture)}::xid8)
             """);
