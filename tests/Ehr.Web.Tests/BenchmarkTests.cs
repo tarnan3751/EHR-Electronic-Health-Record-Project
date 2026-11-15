@@ -39,6 +39,20 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Fast", output);
     }
 
+    [Fact]
+    public void Its_gate_names_every_page_it_fails()
+    {
+        var (code, output) = Gate(
+            Row("First slow", (1_000, Total: 30, Audit: 2, Commit: 5)),
+            Row("Fast", (1_000, Total: 8, Audit: 1, Commit: 1)),
+            Row("Second slow", (1_000, Total: 40, Audit: 2, Commit: 5)));
+
+        Assert.Equal(1, code);
+        Assert.Contains($"--assert failed: First slow: p99 excluding the commit {25.0:F1} ms, not under 20 ms.", output);
+        Assert.Contains($"--assert failed: Second slow: p99 excluding the commit {35.0:F1} ms, not under 20 ms.", output);
+        Assert.DoesNotContain("Fast", output);
+    }
+
     // Without the audit insert too it would be 8 ms, and pass.
     [Fact]
     public void Its_gate_keeps_the_audit_insert_in()
