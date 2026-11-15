@@ -550,6 +550,7 @@ DIRECTIVES = [
     "Note the new codeine allergy.",
     "Discontinue the penicillin allergy.",
     "Call that in to his usual pharmacy.",
+    "Call that into his usual pharmacy.",  # as MedASR writes "in to"
     "Please call in amoxicillin 500 mg to her pharmacy.",
     "Also note the new codeine allergy.",
     "Clear her allergy list.",
@@ -686,6 +687,13 @@ def test_an_instruction_after_and_is_cut_where_it_starts():
                   "Start lisinopril 10 mg daily and order a chest x-ray.", "start lisinopril 10 mg daily")
 
     assert checked.pending and checked.value == "Start lisinopril 10 mg daily."
+
+
+def test_calling_it_into_the_pharmacy_is_cut_and_reported():
+    said = "Add ivabradine 5 mg twice daily, and call that into his usual pharmacy. Recheck in 2 weeks."
+
+    assert said_instructions(said) == ["and call that into his usual pharmacy"]
+    assert own(said, said).value == "Add ivabradine 5 mg twice daily. Recheck in 2 weeks."
 
 
 def test_an_instruction_can_not_reach_the_note_through_another_field():

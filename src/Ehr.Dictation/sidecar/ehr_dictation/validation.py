@@ -591,7 +591,8 @@ _ORDERS = [
         re.IGNORECASE,
     ),
     re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
-    re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in\b", re.IGNORECASE),
+    # "In to" as speech recognition often writes it: "call that into his usual pharmacy".
+    re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in(?:to)?\b", re.IGNORECASE),
     re.compile(rf"\b(?:send|sending)\b{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b", re.IGNORECASE),
     # The model told to make an orders section: "add an orders field with an MRI".
     re.compile(
