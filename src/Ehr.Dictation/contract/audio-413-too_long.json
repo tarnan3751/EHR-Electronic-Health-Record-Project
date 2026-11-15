@@ -1,0 +1,9 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "audio",
+  "status": 413,
+  "body": {
+    "error": "too_long",
+    "detail": "A dictation can be up to 0 minutes."
+  }
+}

@@ -44,13 +44,15 @@ namespace Ehr.Web.Api.Dictation;
 // "unavailable" (UC 10), reason is "model_unavailable", "model_timeout" or "model_output_invalid", fields is null or
 // all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is kept
 // as plain text." provenance: {speech: {repository, commit, sha256}, language: {repository, commit, file, sha256},
-// llamaServer, prompt, schema, structuring, validation}. The JSON is in DictationApiContract.cs.
+// llamaServer, prompt, schema, structuring, validation}; language and llamaServer are null while unknown. The JSON is
+// in DictationApiContract.cs, and every answer the service gives is pinned in src/Ehr.Dictation/contract, which the
+// service's tests write and DictationApiTests reads through this API.
 //
 // Refusals other than 401 and 403 are {error, message}, words for the clinician, and expectedSeq with out_of_order:
 //   400 bad_form_token, or bad_seq
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop), or not_stopped (a result before stop)
-//   413 too_large: the chunk, or the whole dictation
+//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds
 //   415 unsupported_type: the body isn't audio/*
 //   422 not_audio: "The audio couldn't be decoded."
 //   429 busy: the service is busy
@@ -224,7 +226,10 @@ public static partial class DictationApi
                     _ => Unexpected(response.StatusCode, operation, log),
                 };
             case HttpStatusCode.RequestEntityTooLarge:
-                return Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This dictation is over its length limit.");
+                // Too long means stop and start another; too large, a smaller chunk.
+                return await ErrorBodyAsync(response, cancellationToken) is { Error: "too_long" }
+                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its length limit. Stop it and start another.")
+                    : Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This chunk of audio, or the dictation as a whole, is too large.");
             case HttpStatusCode.UnprocessableEntity:
                 return Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded.");
             case HttpStatusCode.TooManyRequests:
@@ -234,6 +239,19 @@ public static partial class DictationApi
                 return Unavailable();
             default:
                 return Unexpected(response.StatusCode, operation, log);
+        }
+    }
+
+    // The code in a refusal's body, or null if there's no body to read.
+    static async Task<SidecarError?> ErrorBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<SidecarError>(ServiceJson, cancellationToken);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 

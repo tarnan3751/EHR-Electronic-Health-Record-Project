@@ -92,9 +92,11 @@ public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField;
 
 public sealed record SourceSpan(int Start, int End);
 
-// What produced the transcript and the fields, for the note to store with them.
+// What produced the transcript and the fields, for the note to store with them. Language is null when the service's
+// models folder records no K2 Horizon file, and LlamaServer until the service has reached llama-server, which is
+// always the case when it couldn't (model_unavailable).
 public sealed record Provenance(
-    SpeechModel Speech, LanguageModel Language, string LlamaServer, string Prompt, string Schema, string Structuring, int Validation);
+    SpeechModel Speech, LanguageModel? Language, string? LlamaServer, string Prompt, string Schema, string Structuring, int Validation);
 
 public sealed record SpeechModel(string Repository, string Commit, string Sha256);
 

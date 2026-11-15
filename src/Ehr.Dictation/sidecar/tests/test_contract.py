@@ -1,0 +1,175 @@
+"""The contract between the sidecar and the on-prem app (Ehr.Web, Api/Dictation), pinned in files both sides test.
+
+Each file in src/Ehr.Dictation/contract is one kind of answer the on-prem app can get: the route, the status and the
+body, produced here by the real sidecar code (its app, sessions, transcript and validation, with stand-ins only for
+MedASR and llama-server). This test fails if what the sidecar answers no longer matches the files; the on-prem app's
+DictationApiTests reads every file through its real reading path and fails if any would be refused. So a change on
+either side that the other can't read fails one suite or the other.
+
+After a deliberate change to what the sidecar answers, rewrite the files and commit them with the change:
+
+    UPDATE_CONTRACT=1 uv run --project src/Ehr.Dictation/sidecar pytest src/Ehr.Dictation/sidecar/tests/test_contract.py
+
+Values that vary from run to run, or with the prompt, are replaced with fixed ones: the session ID and the prompt,
+schema and structuring hashes.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import json
+import os
+from collections.abc import Callable
+from pathlib import Path
+
+import numpy as np
+from conftest import MODELS, FakeLlama, FakeRecognizer, answer, encode, noise, tone
+from fastapi.testclient import TestClient
+
+from ehr_dictation.api import create_app
+from ehr_dictation.audio import SAMPLE_RATE
+from ehr_dictation.settings import Settings
+
+CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
+SESSION_ID = "SESSION-ID-IN-THE-CONTRACT-FILES"
+HASH = "sha256:" + "0" * 64
+COMMENT = (
+    "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by "
+    "tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand."
+)
+OWNER = "11111111-1111-1111-1111-111111111111"
+HEADERS = {"Authorization": "Bearer dictation-key", "X-Dictation-Owner": OWNER}
+GROUNDED = answer(("Speech speech.", ["speech speech"]), plan=("Order a chest X-ray.", ["speech speech"]))
+
+
+def wav(samples: np.ndarray) -> bytes:
+    # PCM at the sidecar's own rate: no codec or resampler, so every ffmpeg decodes it to the same samples.
+    return encode(samples, "wav", rate=SAMPLE_RATE)
+
+
+def dictation() -> bytes:
+    """Speech, a pause, speech too quiet to trust, a pause, and speech still going: a live transcript with a passage
+    marked unclear and a tentative tail."""
+    parts = [tone(2), np.zeros(SAMPLE_RATE, np.float32), tone(2, level_db=-50), np.zeros(SAMPLE_RATE, np.float32), tone(4)]
+    samples = np.concatenate(parts)
+    return wav(samples + noise(samples.size / SAMPLE_RATE, -80))
+
+
+def client(settings: Settings, llama: FakeLlama, **limits) -> TestClient:
+    settings = dataclasses.replace(settings, **limits)
+    return TestClient(create_app(settings, recognizer=FakeRecognizer(), structurer=llama.structurer(0.5), models=MODELS))
+
+
+def start(http: TestClient) -> str:
+    return http.post("/v1/sessions", headers=HEADERS).json()["sessionId"]
+
+
+def stopped(http: TestClient, audio: bytes | None = None) -> str:
+    session = start(http)
+    http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=audio or dictation(), headers=HEADERS)
+    http.post(f"/v1/sessions/{session}/stop", headers=HEADERS)
+    return session
+
+
+def answers(settings: Settings) -> dict[str, dict]:
+    produced: dict[str, dict] = {}
+
+    def keep(name: str, route: str, response) -> None:  # noqa: ANN001
+        produced[name] = {"route": route, "status": response.status_code, "body": response.json()}
+
+    with client(settings, FakeLlama(GROUNDED)) as http:
+        keep("start-201", "start", http.post("/v1/sessions", headers=HEADERS))
+        session = start(http)
+        keep("audio-200-partial", "audio",
+             http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=dictation(), headers=HEADERS))
+        keep("audio-409-out_of_order", "audio",
+             http.post(f"/v1/sessions/{session}/audio", params={"seq": 5}, content=dictation(), headers=HEADERS))
+        keep("result-409-not_stopped", "result", http.post(f"/v1/sessions/{session}/result", headers=HEADERS))
+        http.post(f"/v1/sessions/{session}/stop", headers=HEADERS)
+        keep("result-200-done", "result", http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+        keep("audio-409-stopped", "audio",
+             http.post(f"/v1/sessions/{session}/audio", params={"seq": 1}, content=dictation(), headers=HEADERS))
+        keep("stop-404-not_found", "stop", http.post(f"/v1/sessions/{SESSION_ID}/stop", headers=HEADERS))
+        keep("start-401-unauthorized", "start",
+             http.post("/v1/sessions", headers={**HEADERS, "Authorization": "Bearer not-the-key"}))
+        session = start(http)
+        http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=b"not a recording " * 64, headers=HEADERS)
+        keep("stop-422-not_audio", "stop", http.post(f"/v1/sessions/{session}/stop", headers=HEADERS))
+
+    # K2 Horizon still working when stop gives up waiting; it hasn't even said which build it is yet.
+    with client(settings, FakeLlama(GROUNDED, delay=3, props_delay=3), stop_wait_seconds=0.05) as http:
+        session = start(http)
+        http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=dictation(), headers=HEADERS)
+        keep("stop-200-pending", "stop", http.post(f"/v1/sessions/{session}/stop", headers=HEADERS))
+
+    unavailable: dict[str, Callable[[], FakeLlama]] = {
+        "model_unavailable": lambda: FakeLlama(unreachable=True),
+        "model_timeout": lambda: FakeLlama(GROUNDED, delay=3),
+        "model_output_invalid": lambda: FakeLlama("Here are the fields you asked for."),
+    }
+    for reason, llama in unavailable.items():
+        with client(settings, llama()) as http:
+            session = stopped(http)
+            keep(f"result-200-unavailable-{reason}", "result",
+                 http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+
+    with client(settings, FakeLlama(GROUNDED), max_chunk_bytes=1000) as http:
+        session = start(http)
+        keep("audio-413-too_large", "audio",
+             http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=b"\0" * 2000, headers=HEADERS))
+    with client(settings, FakeLlama(GROUNDED), max_session_seconds=1) as http:
+        session = start(http)
+        keep("audio-413-too_long", "audio",
+             http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=dictation(), headers=HEADERS))
+    with client(settings, FakeLlama(GROUNDED), max_sessions=0) as http:
+        keep("start-429-busy", "start", http.post("/v1/sessions", headers=HEADERS))
+
+    return {name: {"$comment": COMMENT, **_fixed(value)} for name, value in produced.items()}
+
+
+def _fixed(value: object) -> object:
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            if key == "sessionId":
+                out[key] = SESSION_ID
+            elif key in ("prompt", "schema", "structuring") and isinstance(item, str) and item.startswith("sha256:"):
+                out[key] = HASH
+            else:
+                out[key] = _fixed(item)
+        return out
+    if isinstance(value, list):
+        return [_fixed(item) for item in value]
+    return value
+
+
+def test_the_contract_files_are_what_the_sidecar_answers(settings):
+    produced = answers(settings)
+
+    if os.environ.get("UPDATE_CONTRACT") == "1":
+        CONTRACT_DIR.mkdir(exist_ok=True)
+        for stale in CONTRACT_DIR.glob("*.json"):
+            stale.unlink()
+        for name, value in produced.items():
+            (CONTRACT_DIR / f"{name}.json").write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+    committed = {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in CONTRACT_DIR.glob("*.json")}
+    assert sorted(committed) == sorted(produced), "Rewrite the contract files: UPDATE_CONTRACT=1 (see this file's header)."
+    for name in produced:
+        assert committed[name] == produced[name], f"{name}.json no longer matches what the sidecar answers."
+
+
+def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
+    produced = answers(settings)
+    bodies = {name: value["body"] for name, value in produced.items()}
+
+    assert {value["status"] for value in produced.values()} == {200, 201, 401, 404, 409, 413, 422, 429}
+    assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in ("model_unavailable", "model_timeout",
+                                                                       "model_output_invalid")} == {
+        "model_unavailable", "model_timeout", "model_output_invalid"}
+    segments = bodies["audio-200-partial"]["transcript"]["segments"]
+    assert any(s["unclear"] for s in segments) and not segments[-1]["final"]
+    fields = bodies["result-200-done"]["fields"]
+    assert {f["status"] for f in fields.values()} == {"pending", "empty"}
+    assert bodies["stop-200-pending"]["sorting"] == "pending" and bodies["stop-200-pending"]["provenance"]["llamaServer"] is None
+    assert bodies["audio-409-out_of_order"]["expectedSeq"] == 1

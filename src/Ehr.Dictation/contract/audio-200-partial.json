@@ -1,0 +1,38 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "audio",
+  "status": 200,
+  "body": {
+    "receivedSeq": 0,
+    "transcript": {
+      "text": "speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech",
+      "final": false,
+      "segments": [
+        {
+          "start": 0,
+          "end": 27,
+          "startMs": 0,
+          "endMs": 2490,
+          "final": true,
+          "unclear": null
+        },
+        {
+          "start": 28,
+          "end": 69,
+          "startMs": 2490,
+          "endMs": 5490,
+          "final": true,
+          "unclear": "too_quiet"
+        },
+        {
+          "start": 70,
+          "end": 132,
+          "startMs": 5490,
+          "endMs": 10000,
+          "final": false,
+          "unclear": null
+        }
+      ]
+    }
+  }
+}

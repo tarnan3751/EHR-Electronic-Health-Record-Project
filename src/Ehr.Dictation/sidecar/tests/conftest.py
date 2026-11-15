@@ -91,19 +91,24 @@ class FakeLlama:
     """A llama-server on httpx2's mock transport: records each request and answers as told."""
 
     def __init__(self, content: str | None = None, *, model_path: str = f"/models/{MODEL_FILE}", status: int = 200,
-                 delay: float = 0.0, finish_reason: str = "stop") -> None:
+                 delay: float = 0.0, props_delay: float = 0.0, finish_reason: str = "stop", unreachable: bool = False) -> None:
         self.content = content if content is not None else answer()
         self.model_path = model_path
         self.status = status
         self.delay = delay
+        self.props_delay = props_delay
         self.finish_reason = finish_reason
+        self.unreachable = unreachable
         self.requests: list[httpx2.Request] = []
 
     async def handle(self, request: httpx2.Request) -> httpx2.Response:
         import asyncio
 
         self.requests.append(request)
+        if self.unreachable:
+            raise httpx2.ConnectError("Connection refused", request=request)
         if request.url.path == "/props":
+            await asyncio.sleep(self.props_delay)
             return httpx2.Response(200, json={"model_path": self.model_path, "build_info": "b11669-620d2225"})
         if self.delay:
             await asyncio.sleep(self.delay)

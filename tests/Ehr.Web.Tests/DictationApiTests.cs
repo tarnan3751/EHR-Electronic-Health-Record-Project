@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Ehr.Data.Accounts;
+using Ehr.Testing;
 using Ehr.Web.Api.Dictation;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -65,7 +66,7 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([new SourceSpan(22, 31)], assessment.Sources);
         Assert.Equal(["not_dictated"], Assert.IsType<EmptyField>(result.Fields.Plan).Reasons);
         Assert.Equal("google/medasr", result.Provenance.Speech.Repository);
-        Assert.Equal("K2-Horizon-7B-Q4_K_M.gguf", result.Provenance.Language.File);
+        Assert.Equal("K2-Horizon-7B-Q4_K_M.gguf", result.Provenance.Language?.File);
         Assert.Equal(1, result.Provenance.Validation);
         Assert.False((await JsonAsync(sorted)).AsObject().ContainsKey("message"));
         // The result waits for the fields, up to 10 seconds.
@@ -488,6 +489,48 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("detail", text);
         Assert.Equal(error, (string?)JsonNode.Parse(text)!["error"]);
     }
+
+    // Every answer the real service gives, pinned in src/Ehr.Dictation/contract by the service's own tests from its own
+    // code, is read and passed on: none is refused as a bad answer, each keeps its status and code (a refused key is
+    // this API's 503), and a result keeps its sorting.
+    [Theory]
+    [MemberData(nameof(ContractAnswers))]
+    public async Task Every_answer_the_real_service_gives_is_read_and_passed_on(string name)
+    {
+        var contract = JsonNode.Parse(await File.ReadAllTextAsync(ContractFile(name), Cancel))!;
+        var status = (int)contract["status"]!;
+        var body = contract["body"]!;
+        service.Answer = ((HttpStatusCode)status, body.ToJsonString());
+        var page = await OpenAsync(apps, apps.OnPrem);
+
+        using var response = (string?)contract["route"] switch
+        {
+            "start" => await SendAsync(page, HttpMethod.Post, Sessions),
+            "audio" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/audio?seq=0", Audio([1, 2, 3])),
+            "stop" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/stop"),
+            "result" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result"),
+            var route => throw new InvalidOperationException($"{name}.json has a route this test doesn't know: {route}."),
+        };
+
+        Assert.NotEqual(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal(status == 401 ? 503 : status, (int)response.StatusCode);
+        var answered = await JsonAsync(response);
+        if (status >= 400)
+        {
+            Assert.Equal(status == 401 ? "unavailable" : (string?)body["error"], (string?)answered["error"]);
+        }
+        else if (body["sorting"] is { } sorting)
+        {
+            Assert.Equal((string?)sorting, (string?)answered["sorting"]);
+            Assert.Equal((string?)body["transcript"]!["text"], (string?)answered["transcript"]!["text"]);
+        }
+    }
+
+    public static TheoryData<string> ContractAnswers() =>
+        [.. Directory.EnumerateFiles(ContractFile(""), "*.json").Select(path => System.IO.Path.GetFileNameWithoutExtension(path.AsSpan()).ToString()).Order(StringComparer.Ordinal)];
+
+    static string ContractFile(string name) =>
+        RepositoryRoot.Combine(name.Length == 0 ? "src/Ehr.Dictation/contract" : $"src/Ehr.Dictation/contract/{name}.json");
 
     static ByteArrayContent Audio(byte[] bytes, string type = "audio/webm; codecs=opus") =>
         new(bytes) { Headers = { ContentType = MediaTypeHeaderValue.Parse(type) } };

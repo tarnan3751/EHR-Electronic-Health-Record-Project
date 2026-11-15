@@ -1,0 +1,10 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "audio",
+  "status": 409,
+  "body": {
+    "error": "out_of_order",
+    "detail": "Send the chunks in order.",
+    "expectedSeq": 1
+  }
+}
