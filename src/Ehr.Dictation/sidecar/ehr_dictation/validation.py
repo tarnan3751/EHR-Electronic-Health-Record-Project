@@ -50,7 +50,7 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - negation_dropped, experiencer_dropped, certainty_dropped, history_dropped: in the transcript, a qualifier reaches
   words of the value's sources that the value uses without it, even where another source has them plain: a negation ("no
   chest pain" as "chest pain"), someone other than the patient having it ("family history of breast cancer", "mother had
-  a stroke", "diabetes in her father", "seen with her mother who has diabetes"), uncertainty ("possible pneumonia",
+  a stroke", "diabetes in her father", "seen with her mother, who has diabetes"), uncertainty ("possible pneumonia",
   "rule out appendicitis", "pneumonia suspected"), or the past ("a history of MI in 2019"). A cue reaches six words on
   (four back, for one that follows what it qualifies, such as "denied"), and stops at its clause: punctuation, a
   contrast ("but"), a new subject ("she", "patient"), a step of the plan or a heading after its first word ("no further
@@ -1017,9 +1017,9 @@ FAMILY = (
 )
 # Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
 # Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing,
-# unless a relative clause says what they have: "seen with her mother who has diabetes" (WHO_HAS).
+# unless a relative clause says what they have: "seen with her mother(,) who has diabetes" (WHO_HAS).
 NOT_EXPERIENCER_AFTER = frozenset("with by to from for at about".split())
-WHO_HAS = re.compile(r"\s+(?:who|that)\s+(?=(?:has|had|is|was)\b)", re.IGNORECASE)
+WHO_HAS = re.compile(r"\s*,?\s+(?:who|that)\s+(?=(?:has|had|is|was)\b)", re.IGNORECASE)
 EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE

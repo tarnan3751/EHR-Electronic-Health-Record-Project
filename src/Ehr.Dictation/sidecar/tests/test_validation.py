@@ -446,6 +446,7 @@ def test_a_family_member_who_tells_is_not_who_has_it():
 @pytest.mark.parametrize(("said", "value"), [
     ("Lives with her husband and has had a cough for 3 days.", "Has had a cough for 3 days."),
     ("Seen with her mother who wonders if the rash is spreading.", "The rash is spreading."),
+    ("Seen with her mother. That was a hard year for her.", "That was a hard year for her."),
     ("Seen today with her father, fever for 2 days.", "Fever for 2 days."),
     ("History of present illness 45-year-old man with a cough for 3 days.", "45-year-old man with a cough for 3 days."),
 ])
@@ -455,6 +456,7 @@ def test_ordinary_words_are_not_qualifiers(said, value):
 
 @pytest.mark.parametrize(("said", "value"), [
     ("Seen with her mother who has diabetes.", "Has diabetes."),
+    ("Seen with her mother, who has diabetes.", "Has diabetes."),
     ("Her father who had a stroke is well.", "Had a stroke."),
     ("Lives with her sister that is diabetic.", "Is diabetic."),
     ("Seen with his brother who was treated for gout.", "Was treated for gout."),
