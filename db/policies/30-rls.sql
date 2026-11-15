@@ -4,9 +4,15 @@
 --
 -- Who the current user is comes from app.user_id, which UserContextInterceptor (Ehr.Data) sets with
 -- set_config(..., true) as the first statement of every transaction. With nobody signed in it is '' rather than
--- NULL, which is why current_user_id() goes through NULLIF. The functions are STABLE, so PostgreSQL evaluates them
--- once per query rather than once per row, and they run as the caller: the account tables are not under RLS, and
--- both runtime roles may read them.
+-- NULL, which is why current_user_id() goes through NULLIF. The functions run as the caller: the account tables are
+-- not under RLS, and both runtime roles may read them.
+--
+-- Every policy calls them as scalar subqueries, (SELECT ehr.is_clinician()) rather than ehr.is_clinician(), so that
+-- PostgreSQL runs each once per statement, as an InitPlan. Called directly, they ran once for every row the statement
+-- looked at, since PostgreSQL can't inline a function whose body is a subquery: two lookups in the account tables per
+-- row, 200 ms for a search across 50,000 patients. It is the same answer either way: the functions are STABLE, take no
+-- arguments, and read only app.user_id and the account tables, never the row, so within a statement every call returns
+-- the same value. Ehr.Security.Tests fails if a policy calls one directly.
 --
 -- The access model: a clinician sees and writes every patient in the clinic, and keeps a panel of their own
 -- patients (patient_assignments), which is what they see first; a patient sees their own record; an admin manages
@@ -47,17 +53,17 @@ ALTER TABLE ehr.patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.patients FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS patients_clinician_select ON ehr.patients;
-CREATE POLICY patients_clinician_select ON ehr.patients FOR SELECT USING (ehr.is_clinician());
+CREATE POLICY patients_clinician_select ON ehr.patients FOR SELECT USING ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS patients_clinician_insert ON ehr.patients;
-CREATE POLICY patients_clinician_insert ON ehr.patients FOR INSERT WITH CHECK (ehr.is_clinician());
+CREATE POLICY patients_clinician_insert ON ehr.patients FOR INSERT WITH CHECK ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS patients_clinician_update ON ehr.patients;
 CREATE POLICY patients_clinician_update ON ehr.patients FOR UPDATE
-    USING (ehr.is_clinician()) WITH CHECK (ehr.is_clinician());
+    USING ((SELECT ehr.is_clinician())) WITH CHECK ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS patients_own_select ON ehr.patients;
-CREATE POLICY patients_own_select ON ehr.patients FOR SELECT USING (id = ehr.current_patient_id());
+CREATE POLICY patients_own_select ON ehr.patients FOR SELECT USING (id = (SELECT ehr.current_patient_id()));
 
 -- Patient assignments (PHI). Clinicians read every panel; a clinician puts patients on their own panel and ends their
 -- own assignments, nobody else's; a patient reads who their clinicians are. Nobody deletes (10-grants.sql).
@@ -65,20 +71,20 @@ ALTER TABLE ehr.patient_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.patient_assignments FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS patient_assignments_clinician_select ON ehr.patient_assignments;
-CREATE POLICY patient_assignments_clinician_select ON ehr.patient_assignments FOR SELECT USING (ehr.is_clinician());
+CREATE POLICY patient_assignments_clinician_select ON ehr.patient_assignments FOR SELECT USING ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS patient_assignments_own_insert ON ehr.patient_assignments;
 CREATE POLICY patient_assignments_own_insert ON ehr.patient_assignments FOR INSERT
-    WITH CHECK (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+    WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
 
 DROP POLICY IF EXISTS patient_assignments_own_update ON ehr.patient_assignments;
 CREATE POLICY patient_assignments_own_update ON ehr.patient_assignments FOR UPDATE
-    USING (ehr.is_clinician() AND clinician_id = ehr.current_user_id())
-    WITH CHECK (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+    USING ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()))
+    WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
 
 DROP POLICY IF EXISTS patient_assignments_patient_select ON ehr.patient_assignments;
 CREATE POLICY patient_assignments_patient_select ON ehr.patient_assignments FOR SELECT
-    USING (patient_id = ehr.current_patient_id());
+    USING (patient_id = (SELECT ehr.current_patient_id()));
 
 -- Emergency access (PHI). A clinician records and reads their own; admins review it in the audit log, where the
 -- break_glass event carries the same reason. Nothing updates or deletes (10-grants.sql).
@@ -87,11 +93,11 @@ ALTER TABLE ehr.break_glass_accesses FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS break_glass_accesses_own_select ON ehr.break_glass_accesses;
 CREATE POLICY break_glass_accesses_own_select ON ehr.break_glass_accesses FOR SELECT
-    USING (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+    USING ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
 
 DROP POLICY IF EXISTS break_glass_accesses_own_insert ON ehr.break_glass_accesses;
 CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR INSERT
-    WITH CHECK (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
+    WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
 
 -- The rest of the chart (PHI): allergies, medications, diagnoses and visits, each row one patient's. Clinicians read
 -- every patient's; a patient reads their own. There are no write policies: nothing at runtime writes these tables yet
@@ -100,41 +106,41 @@ ALTER TABLE ehr.allergy_intolerances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.allergy_intolerances FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS allergy_intolerances_clinician_select ON ehr.allergy_intolerances;
-CREATE POLICY allergy_intolerances_clinician_select ON ehr.allergy_intolerances FOR SELECT USING (ehr.is_clinician());
+CREATE POLICY allergy_intolerances_clinician_select ON ehr.allergy_intolerances FOR SELECT USING ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS allergy_intolerances_own_select ON ehr.allergy_intolerances;
 CREATE POLICY allergy_intolerances_own_select ON ehr.allergy_intolerances FOR SELECT
-    USING (patient_id = ehr.current_patient_id());
+    USING (patient_id = (SELECT ehr.current_patient_id()));
 
 ALTER TABLE ehr.medication_statements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.medication_statements FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS medication_statements_clinician_select ON ehr.medication_statements;
-CREATE POLICY medication_statements_clinician_select ON ehr.medication_statements FOR SELECT USING (ehr.is_clinician());
+CREATE POLICY medication_statements_clinician_select ON ehr.medication_statements FOR SELECT USING ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS medication_statements_own_select ON ehr.medication_statements;
 CREATE POLICY medication_statements_own_select ON ehr.medication_statements FOR SELECT
-    USING (patient_id = ehr.current_patient_id());
+    USING (patient_id = (SELECT ehr.current_patient_id()));
 
 ALTER TABLE ehr.conditions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.conditions FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS conditions_clinician_select ON ehr.conditions;
-CREATE POLICY conditions_clinician_select ON ehr.conditions FOR SELECT USING (ehr.is_clinician());
+CREATE POLICY conditions_clinician_select ON ehr.conditions FOR SELECT USING ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS conditions_own_select ON ehr.conditions;
 CREATE POLICY conditions_own_select ON ehr.conditions FOR SELECT
-    USING (patient_id = ehr.current_patient_id());
+    USING (patient_id = (SELECT ehr.current_patient_id()));
 
 ALTER TABLE ehr.encounters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.encounters FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS encounters_clinician_select ON ehr.encounters;
-CREATE POLICY encounters_clinician_select ON ehr.encounters FOR SELECT USING (ehr.is_clinician());
+CREATE POLICY encounters_clinician_select ON ehr.encounters FOR SELECT USING ((SELECT ehr.is_clinician()));
 
 DROP POLICY IF EXISTS encounters_own_select ON ehr.encounters;
 CREATE POLICY encounters_own_select ON ehr.encounters FOR SELECT
-    USING (patient_id = ehr.current_patient_id());
+    USING (patient_id = (SELECT ehr.current_patient_id()));
 
 -- Audit events (restricted). Admins read. Anyone the grants let insert may insert: the app role for read and
 -- sign-in events, and the write-audit trigger (40-audit.sql), which runs as the table's owner and is bound by this
@@ -143,7 +149,7 @@ ALTER TABLE ehr.audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.audit_events FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS audit_events_admin_select ON ehr.audit_events;
-CREATE POLICY audit_events_admin_select ON ehr.audit_events FOR SELECT USING (ehr.is_admin());
+CREATE POLICY audit_events_admin_select ON ehr.audit_events FOR SELECT USING ((SELECT ehr.is_admin()));
 
 DROP POLICY IF EXISTS audit_events_insert ON ehr.audit_events;
 CREATE POLICY audit_events_insert ON ehr.audit_events FOR INSERT WITH CHECK (true);
