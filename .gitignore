@@ -24,10 +24,12 @@ __pycache__/
 *.pem
 *.key
 
-# Local server stack: generated certificates and downloaded models (the certs folder itself is kept)
+# Local server stack: generated certificates and downloaded models (the certs folder itself is kept), and the test
+# accounts' authenticator secrets and recovery codes (test-accounts.cs)
 infra/compose/certs/*
 !infra/compose/certs/.gitkeep
 infra/compose/models/
+infra/compose/test-accounts.json*
 
 # Model weights are downloaded during setup, never committed
 *.gguf
