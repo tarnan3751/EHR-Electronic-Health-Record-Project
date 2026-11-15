@@ -22,11 +22,8 @@ public static class CookieSecurityStamp
         }
 
         var services = context.HttpContext.RequestServices;
-        var users = services.GetRequiredService<UserManager<TUser>>();
-        var id = context.Principal?.FindFirstValue(users.Options.ClaimsIdentity.UserIdClaimType);
-        var stamp = context.Principal?.FindFirstValue(users.Options.ClaimsIdentity.SecurityStampClaimType);
-        var user = id is null ? null : await users.FindByIdAsync(id);
-        if (user is null || await users.IsLockedOutAsync(user) || stamp != await users.GetSecurityStampAsync(user))
+        var user = await CurrentAccountAsync<TUser>(services, context.Principal);
+        if (user is null)
         {
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync(context.Scheme.Name);
@@ -36,5 +33,17 @@ public static class CookieSecurityStamp
         // Fresh claims (a changed role or display name), and a fresh issue time so the next check is an interval away.
         context.ReplacePrincipal(await services.GetRequiredService<IUserClaimsPrincipalFactory<TUser>>().CreateAsync(user));
         context.ShouldRenew = true;
+    }
+
+    // The account a sign-in is for, if the sign-in still holds: the account exists, isn't locked out, and has the
+    // security stamp the sign-in carries. Otherwise null.
+    public static async Task<TUser?> CurrentAccountAsync<TUser>(IServiceProvider services, ClaimsPrincipal? principal)
+        where TUser : IdentityUser<Guid>
+    {
+        var users = services.GetRequiredService<UserManager<TUser>>();
+        var id = principal?.FindFirstValue(users.Options.ClaimsIdentity.UserIdClaimType);
+        var stamp = principal?.FindFirstValue(users.Options.ClaimsIdentity.SecurityStampClaimType);
+        var user = id is null ? null : await users.FindByIdAsync(id);
+        return user is null || await users.IsLockedOutAsync(user) || stamp != await users.GetSecurityStampAsync(user) ? null : user;
     }
 }
