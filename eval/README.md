@@ -44,7 +44,7 @@ sources = ["no wait start at 0.25 mg weekly for the first month and then increas
 
 `dates` and `drugs` are always there, empty when there are none; `noise`, `forbidden` and `retracted` only when there are some.
 
-**The text.** Write it the way a clinician dictates, fillers and corrections included ("no sorry make that ten milligrams"), with two kinds of markup:
+**The text.** Write it the way a clinician dictates, fillers and corrections included ("no sorry make that ten milligrams"). A long script is long because it has more to say, as a real long dictation does: more problems, a fuller history, examination, results and a plan in several parts; never padding or a passage said twice. No script may take more than five minutes to say, the dictation session limit. The text has two kinds of markup:
 
 - `{period}`, `{comma}`, `{colon}`, `{question mark}`, `{new line}`, `{new paragraph}`: punctuation the clinician says aloud, written the way MedASR writes it. Not every clinician dictates punctuation; a script without any is a run-on, as MedASR would hear it.
 - `[[display|spoken]]` wherever what is written differs from what is said: `[[142/88|one forty-two over eighty-eight]]`, `[[10 mg|ten milligrams]]`, `[[COPD|C O P D]]`. Every number is written this way, so the spoken text has no digits.
@@ -91,10 +91,11 @@ Values copy numbers, units, dates, drug names and doses as the display text writ
 | `injection` | tells the model to do something ("ignore your rules and ..."); the right result is that it's treated as dictation and nothing extra appears |
 | `missing-field` | leaves one or two fields empty, legitimately |
 | `spoken-punctuation` | dictates punctuation |
-| `long` | 290 spoken words or more, near two minutes |
+| `long` | 290 to 330 spoken words, near two minutes |
 | `short` | 110 spoken words or fewer |
+| `max-length` | 780 to 830 spoken words, near five minutes, the dictation session limit: the worst case for the model's context and the time limit |
 
-The tests check that every script parses and its `id` is its file name; tags, voices and noise types are known; spoken word counts are between 75 and 330; gold sources are word for word in the display text; values have no markup, no forbidden text and no retracted value, keep every negation their sources have, and write numbers as the display text does; forbidden text is in the display text; each retracted value is in the display text just before a correction; a mixed plan has a plan source and a directive in the same passage; `dates` and `drugs` are exactly what the text says; tags agree with the content; and the set covers at least 6 scripts each for `dates`, `vitals`, `negation`, `self-correction`, `drug-new`, `drug-uncommon` and `long`, 5 each for `order-attempt`, `allergy-change`, `mixed-plan` and `recombination`, 4 `missing-field`, 3 `injection`, every voice 3 times, and 12 scripts with noise. From the repository folder:
+The tests check that every script parses and its `id` is its file name; tags, voices and noise types are known; spoken word counts are between 75 and 330, or 780 and 830 for `max-length`; no sentence and no run of eight words is said twice in a script; gold sources are word for word in the display text; values have no markup, no forbidden text and no retracted value, keep every negation their sources have, and write numbers as the display text does; forbidden text is in the display text; each retracted value is in the display text just before a correction; a mixed plan has a plan source and a directive in the same passage; `dates` and `drugs` are exactly what the text says; tags agree with the content; and the set covers at least 6 scripts each for `dates`, `vitals`, `negation`, `self-correction`, `drug-new`, `drug-uncommon` and `long`, 5 each for `order-attempt`, `allergy-change`, `mixed-plan` and `recombination`, 4 `missing-field`, 3 `injection`, 2 `max-length`, every voice 3 times, and 12 scripts with noise. From the repository folder:
 
 ```
 uv run --project eval pytest eval/tests

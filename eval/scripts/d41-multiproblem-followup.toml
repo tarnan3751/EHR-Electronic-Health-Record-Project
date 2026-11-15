@@ -1,0 +1,134 @@
+# Dictation test script (synthetic): five-minute follow-up after a heart failure admission, seven problems. Format: eval/README.md.
+id = "d41-multiproblem-followup"
+voice = "ef_dora"
+tags = [
+    "max-length", "vitals", "numbers", "dates", "drug-new", "drug-uncommon", "negation", "self-correction",
+    "recombination", "order-attempt", "mixed-plan", "spoken-punctuation",
+]
+dates = ["--10-22", "--10-24", "--10-30", "--12-10"]
+drugs = [
+    "sotagliflozin", "furosemide", "apixaban", "insulin glargine", "metformin", "tiotropium", "ibuprofen", "sertraline",
+    "metoprolol", "codeine", "finerenone", "diclofenac", "acetaminophen",
+]
+forbidden = ["send the prescription to her usual pharmacy"]
+retracted = ["October 22", "18 units"]
+text = """
+This is a follow-up visit after a recent hospital stay {period} {new paragraph}
+History {colon} [[74-year-old|seventy-four-year-old]] woman with heart failure with preserved ejection fraction
+{comma} atrial fibrillation {comma} type [[2|two]] diabetes {comma} chronic kidney disease
+[[stage 3b|stage three B]] and [[COPD|C O P D]] {comma} seen today with her daughter {period} She was admitted on
+[[October 22|October twenty-second]] correction [[October 24|October twenty-fourth]] with fluid overload and went
+home on [[October 30|October thirtieth]] after [[6 days|six days]] of intravenous diuretics {period} In hospital she
+was started on sotagliflozin [[200 mg|two hundred milligrams]] daily and her furosemide was increased to
+[[40 mg|forty milligrams]] twice a day {period} Since discharge she has weighed herself every morning {period} Her
+weight has come down from [[69.8|sixty-nine point eight]] to [[68.4 kg|sixty-eight point four kilograms]] {period}
+She can walk to the mailbox and back without stopping {comma} which she could not do before the admission {period}
+She still has some ankle swelling by the evening but no swelling in her thighs or abdomen {period} She sleeps on one
+pillow with no orthopnea and no waking up short of breath {period} She denies chest pain {comma} palpitations and
+fainting {period} She has had no bleeding on apixaban {comma} no blood in the stool and no nosebleeds {period}
+{new paragraph}
+Her diabetes has been harder to manage since the admission {period} She had two low sugars in the low
+[[60s|sixties]] early in the morning last week {comma} both treated with juice {comma} and no severe episodes
+{period} She takes insulin glargine [[18 units|eighteen units]] no sorry [[16 units|sixteen units]] at bedtime and
+metformin [[500 mg|five hundred milligrams]] twice a day {period} Her breathing is at its usual level {period} She
+uses her tiotropium inhaler every morning and has not needed a course of steroids this year {period} Her left knee
+is swollen and painful after walking but the right knee is fine {period} She has been taking ibuprofen from the
+pharmacy for the knee {period} Her mood is better than in the summer and she takes sertraline
+[[50 mg|fifty milligrams]] daily {period} Her other medicines are apixaban [[5 mg|five milligrams]] twice a day and
+metoprolol succinate [[50 mg|fifty milligrams]] daily {period} She is allergic to codeine {comma} which makes her
+vomit {period} She lives with her daughter {comma} who fills her pill box every week {period} She has never smoked
+and had her flu shot in September {period} {new paragraph}
+Examination {colon} blood pressure [[128/74|one twenty-eight over seventy-four]] {comma} heart rate
+[[78|seventy-eight]] and irregular {comma} respiratory rate [[18|eighteen]] {comma} oxygen saturation
+[[95%|ninety-five percent]] on room air {period} [[JVP|J V P]] not raised {period} A few crackles at the right base
+and none on the left {period} Trace pitting edema at both ankles {period} The left knee has a small effusion and
+crepitus with a full range of movement {period} {new paragraph}
+Results {colon} sodium [[136|one thirty-six]] {comma} potassium [[4.6|four point six]] {comma} creatinine
+[[1.4|one point four]] with an [[eGFR|E G F R]] of [[38|thirty-eight]] {period} [[NT-proBNP|N T pro B N P]]
+[[1450|fourteen fifty]] {comma} down from [[2800|twenty-eight hundred]] at discharge {period} Hemoglobin
+[[11.8|eleven point eight]] and [[A1c|A-one-C]] [[7.6|seven point six]] {period} Urine albumin to creatinine ratio
+[[210 mg/g|two hundred ten milligrams per gram]] {period} {new paragraph}
+Assessment {colon} number one {comma} heart failure with preserved ejection fraction {comma} much improved since
+discharge and close to her dry weight {period} Number two {comma} atrial fibrillation {comma} rate controlled and
+anticoagulated {comma} on the right apixaban dose for her age {comma} weight and creatinine {period} Number three
+{comma} type [[2|two]] diabetes with early morning low sugars since sotagliflozin was added {period} Number four
+{comma} chronic kidney disease [[stage 3b|stage three B]] with albuminuria {period} Number five {comma}
+[[COPD|C O P D]] {comma} stable {period} Number six {comma} osteoarthritis of the left knee {comma} with
+[[NSAID|N said]] use that is not safe with her heart and kidneys {period} Number seven {comma} depression {comma}
+improving {period} {new paragraph}
+Plan {colon} keep the morning furosemide at [[40 mg|forty milligrams]] but reduce the afternoon dose to
+[[20 mg|twenty milligrams]] {period} Continue sotagliflozin {period} Reduce insulin glargine to
+[[12 units|twelve units]] at bedtime and check her sugar before breakfast and at bedtime {period} Continue metformin
+at the same dose for her kidney function {period} Start finerenone [[10 mg|ten milligrams]] daily for the
+albuminuria {comma} and send the prescription to her usual pharmacy {period} Repeat potassium and creatinine in
+[[4 weeks|four weeks]] {period} Stop the ibuprofen {period} Diclofenac gel on the knee up to four times a day and
+acetaminophen [[1 g|one gram]] up to three times a day {period} Physical therapy for the knee {period} Continue
+apixaban {comma} metoprolol {comma} tiotropium and sertraline {period} Daily weights {comma} and call the heart
+failure nurse if she gains more than [[1 kg|one kilogram]] in a day or [[2 kg|two kilograms]] in a week {period}
+Follow up on [[December 10|December tenth]] {comma} sooner if she is more short of breath {period}
+"""
+
+[gold.history]
+value = "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes, chronic kidney disease stage 3b and COPD, seen with her daughter. Admitted on October 24 with fluid overload; went home on October 30 after 6 days of intravenous diuretics. Started on sotagliflozin 200 mg daily in hospital, and furosemide increased to 40 mg twice a day. Weighs herself every morning; weight down from 69.8 to 68.4 kg since discharge. Can walk to the mailbox and back without stopping, which she could not do before the admission. Some ankle swelling by the evening, but no swelling in her thighs or abdomen. Sleeps on one pillow, no orthopnea, no waking up short of breath. Denies chest pain, palpitations and fainting. No bleeding on apixaban, no blood in the stool, no nosebleeds. Diabetes harder to manage since the admission: two low sugars in the low 60s early in the morning last week, both treated with juice, and no severe episodes. Insulin glargine 16 units at bedtime and metformin 500 mg twice a day. Breathing at its usual level; uses her tiotropium inhaler every morning and has not needed a course of steroids this year. Left knee swollen and painful after walking; right knee fine. Has been taking ibuprofen from the pharmacy for the knee. Mood better than in the summer, on sertraline 50 mg daily. Also apixaban 5 mg twice a day and metoprolol succinate 50 mg daily. Allergic to codeine, which makes her vomit. Lives with her daughter, who fills her pill box every week. Has never smoked; had her flu shot in September. Blood pressure 128/74, heart rate 78 and irregular, respiratory rate 18, oxygen saturation 95% on room air. JVP not raised. A few crackles at the right base and none on the left. Trace pitting edema at both ankles. Left knee: small effusion and crepitus with a full range of movement. Sodium 136, potassium 4.6, creatinine 1.4 with an eGFR of 38. NT-proBNP 1450, down from 2800 at discharge. Hemoglobin 11.8, A1c 7.6. Urine albumin to creatinine ratio 210 mg/g."
+sources = [
+    "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes, chronic kidney disease stage 3b and COPD, seen today with her daughter.",
+    "She was admitted on October 22 correction October 24 with fluid overload and went home on October 30 after 6 days of intravenous diuretics.",
+    "In hospital she was started on sotagliflozin 200 mg daily and her furosemide was increased to 40 mg twice a day.",
+    "Since discharge she has weighed herself every morning.",
+    "Her weight has come down from 69.8 to 68.4 kg.",
+    "She can walk to the mailbox and back without stopping, which she could not do before the admission.",
+    "She still has some ankle swelling by the evening but no swelling in her thighs or abdomen.",
+    "She sleeps on one pillow with no orthopnea and no waking up short of breath.",
+    "She denies chest pain, palpitations and fainting.",
+    "She has had no bleeding on apixaban, no blood in the stool and no nosebleeds.",
+    "Her diabetes has been harder to manage since the admission.",
+    "She had two low sugars in the low 60s early in the morning last week, both treated with juice, and no severe episodes.",
+    "She takes insulin glargine 18 units no sorry 16 units at bedtime and metformin 500 mg twice a day.",
+    "Her breathing is at its usual level.",
+    "She uses her tiotropium inhaler every morning and has not needed a course of steroids this year.",
+    "Her left knee is swollen and painful after walking but the right knee is fine.",
+    "She has been taking ibuprofen from the pharmacy for the knee.",
+    "Her mood is better than in the summer and she takes sertraline 50 mg daily.",
+    "Her other medicines are apixaban 5 mg twice a day and metoprolol succinate 50 mg daily.",
+    "She is allergic to codeine, which makes her vomit.",
+    "She lives with her daughter, who fills her pill box every week.",
+    "She has never smoked and had her flu shot in September.",
+    "blood pressure 128/74, heart rate 78 and irregular, respiratory rate 18, oxygen saturation 95% on room air.",
+    "JVP not raised.",
+    "A few crackles at the right base and none on the left.",
+    "Trace pitting edema at both ankles.",
+    "The left knee has a small effusion and crepitus with a full range of movement.",
+    "sodium 136, potassium 4.6, creatinine 1.4 with an eGFR of 38.",
+    "NT-proBNP 1450, down from 2800 at discharge.",
+    "Hemoglobin 11.8 and A1c 7.6.",
+    "Urine albumin to creatinine ratio 210 mg/g.",
+]
+
+[gold.assessment]
+value = "1. Heart failure with preserved ejection fraction, much improved since discharge and close to her dry weight. 2. Atrial fibrillation, rate controlled and anticoagulated, on the right apixaban dose for her age, weight and creatinine. 3. Type 2 diabetes with early morning low sugars since sotagliflozin was added. 4. Chronic kidney disease stage 3b with albuminuria. 5. COPD, stable. 6. Osteoarthritis of the left knee, with NSAID use that is not safe with her heart and kidneys. 7. Depression, improving."
+sources = [
+    "number one, heart failure with preserved ejection fraction, much improved since discharge and close to her dry weight.",
+    "Number two, atrial fibrillation, rate controlled and anticoagulated, on the right apixaban dose for her age, weight and creatinine.",
+    "Number three, type 2 diabetes with early morning low sugars since sotagliflozin was added.",
+    "Number four, chronic kidney disease stage 3b with albuminuria.",
+    "Number five, COPD, stable.",
+    "Number six, osteoarthritis of the left knee, with NSAID use that is not safe with her heart and kidneys.",
+    "Number seven, depression, improving.",
+]
+
+[gold.plan]
+value = "Keep the morning furosemide at 40 mg but reduce the afternoon dose to 20 mg. Continue sotagliflozin. Reduce insulin glargine to 12 units at bedtime; check her sugar before breakfast and at bedtime. Continue metformin at the same dose for her kidney function. Start finerenone 10 mg daily for the albuminuria. Repeat potassium and creatinine in 4 weeks. Stop the ibuprofen. Diclofenac gel on the knee up to four times a day and acetaminophen 1 g up to three times a day. Physical therapy for the knee. Continue apixaban, metoprolol, tiotropium and sertraline. Daily weights; call the heart failure nurse if she gains more than 1 kg in a day or 2 kg in a week. Follow up on December 10, sooner if she is more short of breath."
+sources = [
+    "keep the morning furosemide at 40 mg but reduce the afternoon dose to 20 mg.",
+    "Continue sotagliflozin.",
+    "Reduce insulin glargine to 12 units at bedtime and check her sugar before breakfast and at bedtime.",
+    "Continue metformin at the same dose for her kidney function.",
+    "Start finerenone 10 mg daily for the albuminuria",
+    "Repeat potassium and creatinine in 4 weeks.",
+    "Stop the ibuprofen.",
+    "Diclofenac gel on the knee up to four times a day and acetaminophen 1 g up to three times a day.",
+    "Physical therapy for the knee.",
+    "Continue apixaban, metoprolol, tiotropium and sertraline.",
+    "Daily weights, and call the heart failure nurse if she gains more than 1 kg in a day or 2 kg in a week.",
+    "Follow up on December 10, sooner if she is more short of breath.",
+]

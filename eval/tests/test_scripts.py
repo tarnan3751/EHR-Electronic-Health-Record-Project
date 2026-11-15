@@ -23,7 +23,7 @@ VOICES = tomllib.loads((EVAL_DIR / "voices.toml").read_text(encoding="utf-8"))
 CONTENT_TAGS = {
     "dates", "numbers", "vitals", "drug-new", "drug-uncommon", "negation", "self-correction", "order-attempt",
     "allergy-change", "mixed-plan", "recombination", "injection", "missing-field", "spoken-punctuation", "long",
-    "short",
+    "short", "max-length",
 }  # fmt: skip
 ACCENTS = {"us", "gb", "hi-voice", "es-voice", "fr-voice"}
 
@@ -31,24 +31,26 @@ ACCENTS = {"us", "gb", "hi-voice", "es-voice", "fr-voice"}
 MIN_WORDS, MAX_WORDS = 75, 330
 LONG_WORDS = 290  # near two minutes when spoken
 SHORT_WORDS = 110
+MAX_LENGTH_WORDS = (780, 830)  # near five minutes, the dictation session limit: max-length scripts only
+REPEAT_WORDS = 8  # a run of this many words said twice in one script is a repeated passage
 
 # Drugs first approved by the FDA in 2023 to 2025, as named in the FDA's "Novel Drug Approvals" lists for those
 # years (checked 2026-11-15). A script naming one is tagged drug-new.
 NEW_DRUGS = {
     "acoramidis", "aprocitentan", "bexagliflozin", "crinecerfont", "donanemab", "ensifentrine", "fezolinetant",
     "gepotidacin", "lebrikizumab", "nirsevimab", "olezarsen", "resmetirom", "ritlecitinib", "sotatercept",
-    "sparsentan", "suzetrigine", "xanomeline", "zavegepant", "zuranolone",
+    "sotagliflozin", "sparsentan", "suzetrigine", "xanomeline", "zavegepant", "zuranolone",
 }  # fmt: skip
 # Older drugs that are rarely dictated or hard to spell. A script naming one is tagged drug-uncommon.
 UNCOMMON_DRUGS = {
-    "apremilast", "baloxavir", "denosumab", "dronedarone", "eplerenone", "febuxostat", "fludrocortisone",
+    "apremilast", "baloxavir", "denosumab", "dronedarone", "eplerenone", "febuxostat", "finerenone", "fludrocortisone",
     "guanfacine", "inclisiran", "isotretinoin", "ivabradine", "liothyronine", "midodrine", "vortioxetine",
 }  # fmt: skip
 
 MINIMUMS = {
     "dates": 6, "vitals": 6, "negation": 6, "self-correction": 6, "drug-new": 6, "drug-uncommon": 6,
     "order-attempt": 5, "allergy-change": 5, "mixed-plan": 5, "recombination": 5, "injection": 3, "missing-field": 4,
-    "long": 6,
+    "long": 6, "max-length": 2,
 }  # fmt: skip
 
 # How a dictation corrects itself; a retracted value comes just before one of these.
@@ -101,9 +103,24 @@ def test_tags_voice_and_noise_are_known(script):
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
 def test_word_count_is_in_range(script):
-    assert MIN_WORDS <= script.words <= MAX_WORDS
-    assert ("long" in script.tags) == (script.words >= LONG_WORDS)
+    if "max-length" in script.tags:
+        assert MAX_LENGTH_WORDS[0] <= script.words <= MAX_LENGTH_WORDS[1]
+    else:
+        assert MIN_WORDS <= script.words <= MAX_WORDS
+    assert ("long" in script.tags) == (LONG_WORDS <= script.words <= MAX_WORDS)
     assert ("short" in script.tags) == (script.words <= SHORT_WORDS)
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
+def test_nothing_is_said_twice(script):
+    """A script is long because it has more to say, never because a passage is repeated."""
+    sentences = [" ".join(s.lower().split()) for s in re.split(r"[.?:\n]", script.display) if len(s.split()) >= 4]
+    repeated = [s for s, n in Counter(sentences).items() if n > 1]
+    assert not repeated, f"repeated sentences: {repeated}"
+    words = re.findall(r"[a-z0-9]+(?:[./'-][a-z0-9]+)*", script.display.lower())
+    grams = Counter(tuple(words[i : i + REPEAT_WORDS]) for i in range(len(words) - REPEAT_WORDS + 1))
+    repeated = [" ".join(gram) for gram, n in grams.items() if n > 1]
+    assert not repeated, f"repeated {REPEAT_WORDS}-word runs: {repeated}"
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
