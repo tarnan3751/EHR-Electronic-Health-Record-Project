@@ -11,12 +11,14 @@ from pathlib import Path
 
 import httpx2
 import numpy as np
+import pytest
 
 from ehr_dictation import prompt
 from ehr_dictation.asr import Recognition
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.llama import LlamaServer, Structurer
 from ehr_dictation.provenance import Models
+from ehr_dictation.settings import Settings
 
 MODEL_FILE = "K2-Horizon-7B-Q4_K_M.gguf"
 
@@ -122,3 +124,8 @@ MODELS = Models(
     speech={"repository": "google/medasr", "commit": "a" * 40, "sha256": "b" * 64},
     language={"repository": "IFM/K2-Horizon-7B-GGUF", "commit": "c" * 40, "file": MODEL_FILE, "sha256": "d" * 64},
 )
+
+
+@pytest.fixture
+def settings(tmp_path: Path) -> Settings:
+    return Settings(api_key="dictation-key", llama_api_key="llama-key", models_dir=tmp_path)
