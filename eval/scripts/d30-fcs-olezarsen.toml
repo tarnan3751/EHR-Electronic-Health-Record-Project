@@ -41,3 +41,14 @@ sources = [
     "continue the diet and the dietitian visits",
     "repeat triglycerides in 3 months and seek urgent care for any severe abdominal pain",
 ]
+
+[gold_rules.history]
+value = "34-year-old woman with familial chylomicronemia syndrome confirmed on genetic testing. She has had four episodes of acute pancreatitis the last one on March 2, 2026 which needed 5 days in hospital. She follows a very low fat diet under 20 g of fat a day with the dietitian and does not drink alcohol olezarsen 80 mg by monthly injection was started on June 15, 2026. Her fasting triglycerides have come down from about 2400 to 880 mg/dL. No abdominal pain since starting. No injection site problems apart from some redness for a day."
+sources = [
+    "34-year-old woman with familial chylomicronemia syndrome confirmed on genetic testing",
+    "she has had four episodes of acute pancreatitis the last one on March 2, 2026 which needed 5 days in hospital",
+    "she follows a very low fat diet under 20 g of fat a day with the dietitian and does not drink alcohol olezarsen 80 mg by monthly injection was started on June 15, 2026",
+    "her fasting triglycerides have come down from about 2400 to 880 mg/dL",
+    "no abdominal pain since starting",
+    "no injection site problems apart from some redness for a day",
+]

@@ -42,3 +42,16 @@ sources = [
     "Continue clopidogrel.",
     "Follow up by phone after the blood test.",
 ]
+
+[gold_rules.history]
+value = "Spoke to the patient, a 67-year-old man, about his blood results from November 9. His cholesterol is 6.8 with LDL 4.4. His HbA1c is 44. He had a minor stroke in 2023 and stopped his atorvastatin last year because of muscle aches. The aches went away when he stopped it. He is not keen to try the same statin again. No chest pain and no new weakness or speech problems. He takes clopidogrel 75 mg daily."
+sources = [
+    "Spoke to the patient, a 67-year-old man, about his blood results from November 9.",
+    "His cholesterol is 6.8 with LDL 4.4.",
+    "His HbA1c is 44.",
+    "He had a minor stroke in 2023 and stopped his atorvastatin last year because of muscle aches.",
+    "The aches went away when he stopped it.",
+    "He is not keen to try the same statin again.",
+    "No chest pain and no new weakness or speech problems.",
+    "He takes clopidogrel 75 mg daily.",
+]

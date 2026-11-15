@@ -52,3 +52,16 @@ sources = [
     "Safety plan updated and she has the crisis team number.",
     "Review in 4 weeks.",
 ]
+
+[gold_rules.history]
+value = "44-year-old woman with recurrent depression. She took an overdose of paracetamol 3 years ago during a previous episode. Sertraline 150 mg helped her mood but caused sexual side effects and emotional blunting, so 6 weeks ago we switched to vortioxetine 10 mg daily. Her mood is a little better, PHQ-9 14, down from 19. Sleep and appetite are improving. She has mild nausea in the mornings. She has passive thoughts that life is not worth living on bad days but no plans or intent, and she has not harmed herself. Mental state: well kempt, good rapport, mood low, affect reactive, no psychotic features."
+sources = [
+    "44-year-old woman with recurrent depression.",
+    "She took an overdose of paracetamol 3 years ago during a previous episode.",
+    "Sertraline 150 mg helped her mood but caused sexual side effects and emotional blunting, so 6 weeks ago we switched to vortioxetine 10 mg daily.",
+    "Her mood is a little better, PHQ-9 14, down from 19.",
+    "Sleep and appetite are improving.",
+    "She has mild nausea in the mornings.",
+    "She has passive thoughts that life is not worth living on bad days but no plans or intent, and she has not harmed herself.",
+    "Mental state: well kempt, good rapport, mood low, affect reactive, no psychotic features.",
+]

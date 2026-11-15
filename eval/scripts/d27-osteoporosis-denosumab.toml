@@ -44,3 +44,16 @@ sources = [
     "Continue calcium and vitamin D.",
     "Balance exercises and a home safety check.",
 ]
+
+[gold_rules.history]
+value = "72-year-old woman with osteoporosis and a wrist fracture 2 years ago. Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip. She has had denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so she is due now. She takes calcium and vitamin D every day. Her mother broke her hip at 78. No new fractures, no jaw pain and no thigh pain. She has seen her dentist this year. Calcium 9.4, vitamin D 38."
+sources = [
+    "72-year-old woman with osteoporosis and a wrist fracture 2 years ago.",
+    "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip.",
+    "She has had denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so she is due now.",
+    "She takes calcium and vitamin D every day.",
+    "Her mother broke her hip at 78.",
+    "No new fractures, no jaw pain and no thigh pain.",
+    "She has seen her dentist this year.",
+    "Calcium 9.4, vitamin D 38.",
+]

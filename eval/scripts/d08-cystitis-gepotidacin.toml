@@ -34,3 +34,10 @@ sources = [
     "start gepotidacin 1500 mg twice daily for 5 days",
     "fluids and come back if she gets a fever or back pain or if it is not better in 48 hours",
 ]
+
+[gold_rules.plan]
+value = "Start gepotidacin 1500 mg twice daily for 5 days. Fluids and come back if she gets a fever or back pain or if it is not better in 48 hours."
+sources = [
+    "start gepotidacin 1500 mg twice daily for 5 days",
+    "fluids and come back if she gets a fever or back pain or if it is not better in 48 hours",
+]

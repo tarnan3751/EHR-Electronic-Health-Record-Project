@@ -65,3 +65,23 @@ sources = [
     "Continue macitentan and tadalafil.",
     "Review in 3 months with an echo.",
 ]
+
+[gold_rules.history]
+value = "47-year-old woman with idiopathic pulmonary arterial hypertension diagnosed 4 years ago, on macitentan 10 mg daily and tadalafil 40 mg daily. She started sotatercept 6 months ago, given as an injection under the skin every 3 weeks, and her last dose was on November 10. She feels much better. She can now climb two flights of stairs without stopping, which she could not do in the spring. No chest pain, no fainting, no ankle swelling. She has had a couple of nosebleeds and some small red spots on her cheeks. The nosebleeds are short and stop with pressure. She is back at work full time. On examination blood pressure 118/72, heart rate 76, saturation 96% at rest. A few telangiectasias on the cheeks. Heart sounds normal with a loud P2. No peripheral edema. Her 6-minute walk distance today was 452 meters, up from 371 before sotatercept. NT-proBNP is 310, down from 1240. Hemoglobin 15.1 and platelets 168."
+sources = [
+    "47-year-old woman with idiopathic pulmonary arterial hypertension diagnosed 4 years ago, on macitentan 10 mg daily and tadalafil 40 mg daily.",
+    "She started sotatercept 6 months ago, given as an injection under the skin every 3 weeks, and her last dose was on November 10.",
+    "She feels much better.",
+    "She can now climb two flights of stairs without stopping, which she could not do in the spring.",
+    "No chest pain, no fainting, no ankle swelling.",
+    "She has had a couple of nosebleeds and some small red spots on her cheeks.",
+    "The nosebleeds are short and stop with pressure.",
+    "She is back at work full time.",
+    "On examination blood pressure 118/72, heart rate 76, saturation 96% at rest.",
+    "A few telangiectasias on the cheeks.",
+    "Heart sounds normal with a loud P2.",
+    "No peripheral edema.",
+    "Her 6-minute walk distance today was 452 meters, up from 371 before sotatercept.",
+    "NT-proBNP is 310, down from 1240.",
+    "Hemoglobin 15.1 and platelets 168.",
+]

@@ -65,3 +65,33 @@ sources = [
     "Continue apixaban.",
     "Clinic review in 4 weeks.",
 ]
+
+[gold_rules.history]
+value = "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after he presented with heart failure and bilateral carpal tunnel syndrome. He has been on tafamidis, but his insurance will no longer cover it. He is short of breath walking about one block and has to rest on the stairs. He sleeps flat. No chest pain, no fainting, no palpitations. His ankles swell by the evening. He takes furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation. Blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit. JVP up to the angle of the jaw. Bibasal crackles. Pitting edema to the mid shins. NT-proBNP is 3400, up from 2100, and creatinine 1.5. His echo showed an ejection fraction of 45% with thick walls."
+sources = [
+    "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after he presented with heart failure and bilateral carpal tunnel syndrome.",
+    "He has been on tafamidis, but his insurance will no longer cover it",
+    "He is short of breath walking about one block and has to rest on the stairs.",
+    "He sleeps flat.",
+    "No chest pain, no fainting, no palpitations.",
+    "His ankles swell by the evening.",
+    "He takes furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation.",
+    "blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit.",
+    "JVP up to the angle of the jaw.",
+    "Bibasal crackles.",
+    "Pitting edema to the mid shins.",
+    "NT-proBNP is 3400, up from 2100, and creatinine 1.5.",
+    "His echo showed an ejection fraction of 45% with thick walls.",
+]
+
+[gold_rules.plan]
+value = "We are switching to acoramidis. Stop tafamidis and start acoramidis 712 mg twice daily. Increase furosemide to 80 mg in the morning and 40 mg in the afternoon for 5 days, then back to 40 mg twice daily. Kidney function and potassium on Friday. Daily weights, call the heart failure nurse if up more than 1 kg in a day. Continue apixaban. Clinic review in 4 weeks."
+sources = [
+    "so we are switching to acoramidis.",
+    "stop tafamidis and start acoramidis 712 mg twice daily.",
+    "Increase furosemide to 80 mg in the morning and 40 mg in the afternoon for 5 days, then back to 40 mg twice daily.",
+    "Kidney function and potassium on Friday.",
+    "Daily weights, call the heart failure nurse if up more than 1 kg in a day.",
+    "Continue apixaban.",
+    "Clinic review in 4 weeks.",
+]

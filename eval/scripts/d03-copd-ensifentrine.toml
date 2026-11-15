@@ -63,3 +63,30 @@ sources = [
     "Rescue pack of prednisolone and doxycycline to keep at home with a written action plan.",
     "Review in clinic in 3 months, sooner if he has another flare.",
 ]
+
+[gold_rules.history]
+value = "Follow-up after an exacerbation of COPD. This 71-year-old retired joiner was admitted on October 28 with an infective exacerbation and discharged after 4 days on a 5-day course of prednisolone 30 mg and doxycycline. He feels about back to his usual self. His wife says he is coping well at home. His breathlessness is MRC grade 3, so he stops for breath after about 100 meters on the flat. He still has a morning cough with white sputum but no green sputum, no fever and no chest pain. He has not smoked for 6 years. His inhalers are tiotropium and olodaterol once daily, and his technique was good when I watched him today. He had 3 exacerbations in the last year needing steroids. On examination his oxygen saturation is 94% on room air, respiratory rate 18, pulse 84 and temperature 36.8 degrees. There are scattered wheezes at both bases, no crackles. Spirometry from the summer showed an FEV1 of 1.4 liters, 48% predicted."
+sources = [
+    "follow-up after an exacerbation of COPD.",
+    "This 71-year-old retired joiner was admitted on October 28 with an infective exacerbation and discharged after 4 days on a 5-day course of prednisolone 30 mg and doxycycline.",
+    "He feels about back to his usual self.",
+    "His wife says he is coping well at home.",
+    "His breathlessness is MRC grade 3, so he stops for breath after about 100 meters on the flat.",
+    "He still has a morning cough with white sputum but no green sputum, no fever and no chest pain.",
+    "He has not smoked for 6 years.",
+    "His inhalers are tiotropium and olodaterol once daily, and his technique was good when I watched him today.",
+    "He had 3 exacerbations in the last year needing steroids.",
+    "On examination his oxygen saturation is 94% on room air, respiratory rate 18, pulse 84 and temperature 36.8 degrees.",
+    "There are scattered wheezes at both bases, no crackles.",
+    "Spirometry from the summer showed an FEV1 of 1.4 liters, 48% predicted.",
+]
+
+[gold_rules.plan]
+value = "Add ensifentrine 3 mg nebulized twice daily, alongside his current inhalers. I have explained it is a new kind of inhaled treatment and he may notice back pain or a mild headache at first. Refer to pulmonary rehabilitation. Rescue pack of prednisolone and doxycycline to keep at home with a written action plan. Review in clinic in 3 months, sooner if he has another flare."
+sources = [
+    "add ensifentrine 3 mg nebulized twice daily, alongside his current inhalers.",
+    "I have explained it is a new kind of inhaled treatment and he may notice back pain or a mild headache at first.",
+    "Refer to pulmonary rehabilitation.",
+    "Rescue pack of prednisolone and doxycycline to keep at home with a written action plan.",
+    "Review in clinic in 3 months, sooner if he has another flare.",
+]

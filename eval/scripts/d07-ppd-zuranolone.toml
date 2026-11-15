@@ -49,3 +49,16 @@ sources = [
     "Safety plan reviewed and crisis line number given.",
     "Follow up on October 29.",
 ]
+
+[gold_rules.history]
+value = "32-year-old woman who delivered her second baby on September 30. Since about two weeks after the delivery she has had low mood most of the day, poor sleep even when the baby sleeps, loss of interest and feelings of guilt. Her EPDS score today is 19. She denies thoughts of harming herself or the baby. No history of mania or psychosis. She is breastfeeding. Her partner is supportive and her mother is staying with them. Mental status: tearful, speech normal, thought content without suicidal ideation, insight good."
+sources = [
+    "32-year-old woman who delivered her second baby on September 30.",
+    "Since about two weeks after the delivery she has had low mood most of the day, poor sleep even when the baby sleeps, loss of interest and feelings of guilt.",
+    "Her EPDS score today is 21 no sorry 19.",
+    "She denies thoughts of harming herself or the baby.",
+    "No history of mania or psychosis.",
+    "She is breastfeeding.",
+    "Her partner is supportive and her mother is staying with them.",
+    "Mental status: tearful, speech normal, thought content without suicidal ideation, insight good.",
+]

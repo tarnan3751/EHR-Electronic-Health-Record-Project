@@ -49,3 +49,16 @@ sources = [
     "Monthly pregnancy tests to continue.",
     "Review on December 15.",
 ]
+
+[gold_rules.history]
+value = "19-year-old woman with nodular acne on her face and back, now in month 3 of isotretinoin. She started on August 18 at 20 mg daily and went up to 40 mg daily in September. Her skin is clearly better with only a few new spots. She has dry lips and some nosebleeds in the mornings. No headaches, no visual change, no joint pain and no low mood. She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative. On examination there are a few small papules on the chin and healing scars on the back, with cheilitis. Her fasting triglycerides last month were 1.9 and liver tests were normal."
+sources = [
+    "19-year-old woman with nodular acne on her face and back, now in month 3 of isotretinoin.",
+    "She started on August 18 at 20 mg daily and went up to 40 mg daily in September.",
+    "Her skin is clearly better with only a few new spots.",
+    "She has dry lips and some nosebleeds in the mornings.",
+    "No headaches, no visual change, no joint pain and no low mood.",
+    "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative.",
+    "On examination there are a few small papules on the chin and healing scars on the back, with cheilitis.",
+    "Her fasting triglycerides last month were 1.9 and liver tests were normal.",
+]

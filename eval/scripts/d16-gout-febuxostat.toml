@@ -51,3 +51,26 @@ sources = [
     "Recheck uric acid in 4 weeks.",
     "Cut down on beer and sugary drinks.",
 ]
+
+[gold_rules.history]
+value = "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped. He is now on febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting febuxostat 2 months ago. No chest pain or shortness of breath. No history of heart disease. Exam shows a small tophus on the right elbow, no joint swelling today. Uric acid is 7.4, down from 9.2. Creatinine 1.0."
+sources = [
+    "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee.",
+    "He had a widespread rash with allopurinol in the spring that settled when it was stopped",
+    "He is now on febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis.",
+    "No flare since starting febuxostat 2 months ago.",
+    "No chest pain or shortness of breath.",
+    "No history of heart disease.",
+    "Exam shows a small tophus on the right elbow, no joint swelling today.",
+    "Uric acid is 7.4, down from 9.2.",
+    "Creatinine 1.0.",
+]
+
+[gold_rules.plan]
+value = "Increase febuxostat to 80 mg daily. Continue colchicine for another 3 months. Recheck uric acid in 4 weeks. Cut down on beer and sugary drinks."
+sources = [
+    "increase febuxostat to 120 mg scratch that 80 mg daily.",
+    "Continue colchicine for another 3 months.",
+    "Recheck uric acid in 4 weeks.",
+    "Cut down on beer and sugary drinks.",
+]

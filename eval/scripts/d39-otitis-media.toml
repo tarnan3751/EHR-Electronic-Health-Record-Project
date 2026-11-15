@@ -33,3 +33,19 @@ sources = [
     "if he has one more infection before the spring we will refer him to the ear nose and throat team to talk about grommets",
     "he can go back to nursery when the fever settles and he is eating normally again",
 ]
+
+[gold_rules.assessment]
+value = "Left acute otitis media his third since the summer."
+sources = [
+    "left acute otitis media his third since the summer",
+]
+
+[gold_rules.plan]
+value = "Start amoxicillin 90 mg/kg a day split twice daily for 10 days. Ibuprofen with food for pain and fever. If he is not better in 48 to 72 hours mum should bring him back for review. If he has one more infection before the spring we will refer him to the ear nose and throat team to talk about grommets. He can go back to nursery when the fever settles and he is eating normally again."
+sources = [
+    "start amoxicillin 90 mg/kg a day split twice daily for 10 days",
+    "ibuprofen with food for pain and fever",
+    "if he is not better in 48 to 72 hours mum should bring him back for review",
+    "if he has one more infection before the spring we will refer him to the ear nose and throat team to talk about grommets",
+    "he can go back to nursery when the fever settles and he is eating normally again",
+]

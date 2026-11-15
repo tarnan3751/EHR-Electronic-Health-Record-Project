@@ -66,3 +66,21 @@ sources = [
     "Liver tests in 3 months and elastography again in a year.",
     "Return to clinic in 3 months.",
 ]
+
+[gold_rules.history]
+value = "This is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis. He has type 2 diabetes, high blood pressure and obesity. A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis. He drinks alcohol rarely, maybe one beer a month. No jaundice, no confusion, no swelling of the abdomen and no bleeding. His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg. He has lost 7 kg since starting semaglutide. No gallbladder problems, and his thyroid function was normal in the summer. Weight 104 kg, BMI 34, blood pressure 128/78. No stigmata of chronic liver disease. Liver edge not palpable. Labs from last week show ALT 64, AST 48, platelets 212 and albumin 4.2. Elastography gave a liver stiffness of 9.6 kPa."
+sources = [
+    "this is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis.",
+    "He has type 2 diabetes, high blood pressure and obesity.",
+    "A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis.",
+    "He drinks alcohol rarely, maybe one beer a month.",
+    "No jaundice, no confusion, no swelling of the abdomen and no bleeding.",
+    "His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg.",
+    "He has lost 7 kg since starting semaglutide.",
+    "No gallbladder problems, and his thyroid function was normal in the summer.",
+    "weight 104 kg, BMI 34, blood pressure 128/78.",
+    "No stigmata of chronic liver disease.",
+    "Liver edge not palpable.",
+    "Labs from last week show ALT 64, AST 48, platelets 212 and albumin 4.2.",
+    "Elastography gave a liver stiffness of 9.6 kPa.",
+]

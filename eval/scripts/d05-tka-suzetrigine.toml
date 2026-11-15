@@ -50,3 +50,18 @@ sources = [
     "Physiotherapy twice a week with a goal of 110 degrees of flexion.",
     "Review in 6 weeks with an X-ray.",
 ]
+
+[gold_rules.history]
+value = "66-year-old woman seen 12 days after a right total knee replacement done on November 3, 2026. Her pain is much better. She was discharged on suzetrigine 50 mg every 12 hours and now takes it about once a day, with paracetamol 1 g four times a day. She has not needed any opioid since discharge. No calf pain, no fever and no wound discharge. She is walking with one stick. The right knee is much better, but the left knee now aches more because she leans on it. The wound is clean and dry and the clips were removed today. Range of motion is 5 to 90 degrees. Calf is soft and non-tender."
+sources = [
+    "66-year-old woman seen 12 days after a right total knee replacement done on November 3, 2026.",
+    "Her pain is much better.",
+    "She was discharged on suzetrigine 50 mg every 12 hours and now takes it about once a day, with paracetamol 1 g four times a day.",
+    "She has not needed any opioid since discharge.",
+    "No calf pain, no fever and no wound discharge.",
+    "She is walking with one stick.",
+    "The right knee is much better, but the left knee now aches more because she leans on it.",
+    "The wound is clean and dry and the clips were removed today.",
+    "Range of motion is 5 to 95 degrees no sorry 5 to 90 degrees.",
+    "Calf is soft and non-tender.",
+]

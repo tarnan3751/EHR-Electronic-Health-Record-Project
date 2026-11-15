@@ -49,3 +49,12 @@ sources = [
     "Safety net advice given about the red flag symptoms.",
     "If he is not better in 6 weeks we will consider imaging and a nerve root injection.",
 ]
+
+[gold_rules.plan]
+value = "Continue physiotherapy and the naproxen for another 2 weeks then stop. Stay active and return to lighter duties. Safety net advice given about the red flag symptoms. If he is not better in 6 weeks we will consider imaging and a nerve root injection."
+sources = [
+    "continue physiotherapy and the naproxen for another 2 weeks then stop.",
+    "Stay active and return to lighter duties.",
+    "Safety net advice given about the red flag symptoms.",
+    "If he is not better in 6 weeks we will consider imaging and a nerve root injection.",
+]

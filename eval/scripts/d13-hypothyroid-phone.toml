@@ -33,3 +33,20 @@ sources = [
     "increase levothyroxine to 112 mcg daily and repeat the TSH in 6 weeks",
     "she asked about liothyronine and I said we would revisit that only if she still feels unwell once her TSH is normal",
 ]
+
+[gold_rules.history]
+value = "45-year-old woman with hypothyroidism after thyroid surgery. Her TSH came back at 7.8 on levothyroxine 100 mcg. She has been taking it with her coffee and calcium tablets in the morning. She still feels tired and cold."
+sources = [
+    "45-year-old woman with hypothyroidism after thyroid surgery",
+    "her TSH came back at 7.8 on levothyroxine 100 mcg",
+    "she has been taking it with her coffee and calcium tablets in the morning",
+    "she still feels tired and cold",
+]
+
+[gold_rules.plan]
+value = "We talked about taking it on an empty stomach an hour before breakfast and away from calcium. Increase levothyroxine to 112 mcg daily and repeat the TSH in 6 weeks. She asked about liothyronine and I said we would revisit that only if she still feels unwell once her TSH is normal."
+sources = [
+    "we talked about taking it on an empty stomach an hour before breakfast and away from calcium",
+    "increase levothyroxine to 112 mcg daily and repeat the TSH in 6 weeks",
+    "she asked about liothyronine and I said we would revisit that only if she still feels unwell once her TSH is normal",
+]

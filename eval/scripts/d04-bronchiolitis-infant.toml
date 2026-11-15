@@ -49,3 +49,14 @@ sources = [
     "Paracetamol for the fever if he is uncomfortable.",
     "Explained the expected course to mum.",
 ]
+
+[gold_rules.plan]
+value = "Admit for observation and nasogastric feeds if intake drops below half. Nasal suction before feeds. Saline drops. Target saturation above 92. Paracetamol for the fever if he is uncomfortable. Explained the expected course to mum."
+sources = [
+    "admit for observation and nasogastric feeds if intake drops below half.",
+    "Nasal suction before feeds.",
+    "Saline drops.",
+    "Target saturation above 92%.",
+    "Paracetamol for the fever if he is uncomfortable.",
+    "Explained the expected course to mum.",
+]

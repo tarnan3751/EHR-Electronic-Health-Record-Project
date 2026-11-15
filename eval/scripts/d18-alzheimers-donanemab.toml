@@ -50,3 +50,17 @@ sources = [
     "Driving to stop for now as discussed with them both.",
     "Review in 3 months.",
 ]
+
+[gold_rules.history]
+value = "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband. She has had 3 infusions of donanemab, the last on October 21. She tolerated them without any reaction. Her husband says she is about the same, still managing at home with prompts for appointments and medicines. No headaches, no confusion after the infusions, no falls and no change in vision. She is APOE4 heterozygous. MoCA today 21 out of 30, the same as in the summer. Neurological examination unchanged. Her MRI last week showed no ARIA."
+sources = [
+    "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband.",
+    "She has had 3 infusions of donanemab, the last on October 21.",
+    "She tolerated them without any reaction.",
+    "Her husband says she is about the same, still managing at home with prompts for appointments and medicines.",
+    "No headaches, no confusion after the infusions, no falls and no change in vision.",
+    "She is APOE4 heterozygous.",
+    "MoCA today 21 out of 30, the same as in the summer.",
+    "Neurological examination unchanged.",
+    "Her MRI last week showed no ARIA.",
+]

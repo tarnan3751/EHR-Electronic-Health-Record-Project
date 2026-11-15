@@ -51,3 +51,16 @@ sources = [
     "Sick day rules reviewed again with mum.",
     "Bone age X-ray and repeat hormone levels before the next visit in 3 months.",
 ]
+
+[gold_rules.history]
+value = "12-year-old boy with classic congenital adrenal hyperplasia due to 21-hydroxylase deficiency, seen with his mum. He has been on hydrocortisone 20 mg a day in three doses and fludrocortisone 100 mcg daily. His androgens have been hard to control without high steroid doses, so 3 months ago we added crinecerfont twice daily with meals, 50 mg twice daily, since he weighs under 55 kg. He feels well, no headaches, no tiredness and no salt craving. No illnesses needing stress doses since the last visit. Height 148 cm, weight 44 kg, blood pressure 110/68. Puberty Tanner stage 2. Morning 17-hydroxyprogesterone has fallen from 85 to 22 nanomoles per liter and androstenedione is now in the normal range."
+sources = [
+    "12-year-old boy with classic congenital adrenal hyperplasia due to 21-hydroxylase deficiency, seen with his mum.",
+    "He has been on hydrocortisone 20 mg a day in three doses and fludrocortisone 100 mcg daily.",
+    "His androgens have been hard to control without high steroid doses, so 3 months ago we added crinecerfont 100 mg twice daily with meals no sorry 50 mg twice daily, since he weighs under 55 kg.",
+    "He feels well, no headaches, no tiredness and no salt craving.",
+    "No illnesses needing stress doses since the last visit.",
+    "Height 148 cm, weight 44 kg, blood pressure 110/68.",
+    "Puberty Tanner stage 2.",
+    "Morning 17-hydroxyprogesterone has fallen from 85 to 22 nanomoles per liter and androstenedione is now in the normal range.",
+]

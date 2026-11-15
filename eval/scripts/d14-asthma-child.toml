@@ -46,3 +46,14 @@ sources = [
     "School inhaler form completed.",
     "Recheck in 3 months.",
 ]
+
+[gold_rules.history]
+value = "9-year-old boy with moderate persistent asthma, seen with his father. Since the last visit he has used his albuterol inhaler about twice a week, mostly with soccer, and woke at night with cough once in the last month. No emergency visits and no oral steroids this year. He takes budesonide formoterol 80/4.5 two puffs twice daily with a spacer. Respiratory rate 20, oxygen saturation 98%, peak flow 260 liters per minute, about 85% of his best. Chest clear, no wheeze."
+sources = [
+    "9-year-old boy with moderate persistent asthma, seen with his father.",
+    "Since the last visit he has used his albuterol inhaler about twice a week, mostly with soccer, and woke at night with cough once in the last month.",
+    "No emergency visits and no oral steroids this year.",
+    "He takes budesonide formoterol 80/4.5 two puffs twice daily with a spacer.",
+    "respiratory rate 20, oxygen saturation 98%, peak flow 260 liters per minute, about 85% of his best.",
+    "Chest clear, no wheeze.",
+]

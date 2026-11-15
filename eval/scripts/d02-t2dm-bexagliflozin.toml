@@ -46,3 +46,24 @@ sources = [
     "Reviewed hygiene to prevent yeast infections.",
     "Follow up in 3 months with a repeat A1c.",
 ]
+
+[gold_rules.history]
+value = "54-year-old man with type 2 diabetes for about 8 years. His A1c today is 8.4, down from 9.1 in the spring. He is taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, which he started 3 months ago. He has had one genital yeast infection since starting it, treated over the counter. No low blood sugars. No foot numbness. Weight is 96 kg, down 2 kg."
+sources = [
+    "54-year-old man with type 2 diabetes for about 8 years.",
+    "His A1c today is 8.4, down from 9.1 in the spring.",
+    "He is taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, which he started 3 months ago.",
+    "He has had one genital yeast infection since starting it, treated over the counter.",
+    "No low blood sugars.",
+    "No foot numbness.",
+    "Weight is 96 kg, down 2 kg.",
+]
+
+[gold_rules.plan]
+value = "Add semaglutide, start at 0.25 mg weekly for the first month and then increase as tolerated. Continue metformin and bexagliflozin. Reviewed hygiene to prevent yeast infections. Follow up in 3 months with a repeat A1c."
+sources = [
+    "add semaglutide 0.5 mg weekly no wait start at 0.25 mg weekly for the first month and then increase as tolerated.",
+    "Continue metformin and bexagliflozin",
+    "Reviewed hygiene to prevent yeast infections.",
+    "Follow up in 3 months with a repeat A1c.",
+]

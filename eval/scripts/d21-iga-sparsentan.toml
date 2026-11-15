@@ -64,3 +64,31 @@ sources = [
     "He knows to stop it and call if he is dizzy or lightheaded.",
     "Clinic review in 6 weeks.",
 ]
+
+[gold_rules.history]
+value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily. Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year. He feels well. No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains. He does not smoke and drinks very little. His father needed dialysis in his sixties and his mother has high blood pressure. He works as a teacher and wants to keep working full time. Blood pressure today 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8, ALT and AST normal."
+sources = [
+    "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection.",
+    "Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily.",
+    "Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year.",
+    "He feels well.",
+    "No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains.",
+    "He does not smoke and drinks very little.",
+    "His father needed dialysis in his sixties and his mother has high blood pressure.",
+    "He works as a teacher and wants to keep working full time.",
+    "Blood pressure today 136/84, pulse 70, weight 88 kg.",
+    "No edema.",
+    "Potassium 4.8, ALT and AST normal.",
+]
+
+[gold_rules.plan]
+value = "Stop losartan tomorrow and start sparsentan 200 mg once daily for 2 weeks, then 400 mg once daily. Continue dapagliflozin. Liver tests every month for the first year as required by the safety program, and potassium and creatinine in 2 weeks. Home blood pressure readings with a target below 125/75. Low salt diet, under 2 g of sodium a day. He knows to stop it and call if he is dizzy or lightheaded. Clinic review in 6 weeks."
+sources = [
+    "stop losartan tomorrow and start sparsentan 200 mg once daily for 2 weeks, then 400 mg once daily.",
+    "Continue dapagliflozin.",
+    "Liver tests every month for the first year as required by the safety program, and potassium and creatinine in 2 weeks.",
+    "Home blood pressure readings with a target below 125/75.",
+    "Low salt diet, under 2 g of sodium a day.",
+    "He knows to stop it and call if he is dizzy or lightheaded.",
+    "Clinic review in 6 weeks.",
+]

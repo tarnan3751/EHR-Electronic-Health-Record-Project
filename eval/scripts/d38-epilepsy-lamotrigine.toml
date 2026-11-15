@@ -51,3 +51,17 @@ sources = [
     "No driving until 12 months seizure free.",
     "Review in 3 months.",
 ]
+
+[gold_rules.history]
+value = "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily. She had a focal to bilateral tonic clonic seizure on August 19 and another on October 4, both after poor sleep. Since the levetiracetam she has felt irritable and low and her partner has noticed it too. No thoughts of self-harm. She is not driving. She is planning a pregnancy in the next year. Examination normal. MRI shows a small area of left hippocampal sclerosis. EEG showed left temporal sharp waves."
+sources = [
+    "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily.",
+    "She had a focal to bilateral tonic clonic seizure on August 19 and another on October 2 correction October 4, both after poor sleep.",
+    "Since the levetiracetam she has felt irritable and low and her partner has noticed it too.",
+    "No thoughts of self-harm.",
+    "She is not driving.",
+    "She is planning a pregnancy in the next year.",
+    "Examination normal.",
+    "MRI shows a small area of left hippocampal sclerosis.",
+    "EEG showed left temporal sharp waves.",
+]

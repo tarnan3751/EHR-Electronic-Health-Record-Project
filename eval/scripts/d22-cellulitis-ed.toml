@@ -54,3 +54,18 @@ sources = [
     "Return if the redness spreads past the line or he feels more unwell.",
     "GP review in 48 hours.",
 ]
+
+[gold_rules.history]
+value = "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening. He has felt shivery but has not measured a temperature. No calf pain before this, no recent travel, no history of clots. He has type 2 diabetes on metformin. He told me his reaction to penicillin as a child was only a mild rash, not hives or swelling. Temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air. Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus. The calf itself is not tender. I have marked the edge with a pen. Glucose 11.2."
+sources = [
+    "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening.",
+    "He has felt shivery but has not measured a temperature.",
+    "No calf pain before this, no recent travel, no history of clots.",
+    "He has type 2 diabetes on metoprolol I mean metformin.",
+    "He told me his reaction to penicillin as a child was only a mild rash, not hives or swelling",
+    "temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air.",
+    "Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus.",
+    "The calf itself is not tender.",
+    "I have marked the edge with a pen.",
+    "Glucose 11.2.",
+]

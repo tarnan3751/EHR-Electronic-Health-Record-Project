@@ -30,3 +30,12 @@ sources = [
     "Low potassium diet sheet posted out today.",
     "Continue the rest of his medicines unchanged, including the ramipril.",
 ]
+
+[gold_rules.plan]
+value = "Hold the spironolactone for now, repeat potassium and kidney function on Thursday at the surgery, and if the potassium is still above 5.5, stop the spironolactone altogether and let me know. The patient has been told by phone and understands. Low potassium diet sheet posted out today. Continue the rest of his medicines unchanged, including the ramipril."
+sources = [
+    "hold the spironolactone for now, repeat potassium and kidney function on Thursday at the surgery, and if the potassium is still above 5.5, stop the spironolactone altogether and let me know.",
+    "The patient has been told by phone and understands.",
+    "Low potassium diet sheet posted out today.",
+    "Continue the rest of his medicines unchanged, including the ramipril.",
+]
