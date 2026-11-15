@@ -22,9 +22,10 @@ license = "Apache-2.0 (model card front matter; the card says the weights are Ap
 # Not shipped and not committed: the weights stay in the Hugging Face cache, the audio in eval/audio/ (gitignored).
 # Packages, pinned in generate_audio.py: kokoro 0.9.4 and misaki 0.9.4 (Apache-2.0, PyPI classifiers),
 # spaCy (MIT) with en_core_web_sm 3.8.0 (MIT). misaki looks up English words in its own dictionaries; a word it
-# doesn't know, which here is mostly the newer drug names, is pronounced by espeak-ng instead, through
-# phonemizer-fork 3.3.2 and espeakng-loader 0.2.4, both GPL-3.0. They run only inside the generator, on the
-# machine making the audio, and are never shipped with anything.
+# doesn't know, which here is mostly the newer drug names, is pronounced by espeak-ng (GPL-3.0) instead, through
+# phonemizer-fork 3.3.2 (GPL-3.0, PyPI classifier) and espeakng-loader 0.2.4, which bundles espeak-ng's library and
+# data (the loader itself is MIT, per its GitHub repository; its PyPI metadata names no licence). They run only
+# inside the generator, on the machine making the audio, and are never shipped with anything.
 
 # Each voice: `accent` (the short form the manifest and the scoring use, as accent:<accent>), `english` (the
 # English pronunciation rules it reads with: "us" or "gb"), and where it comes from. Every voice file is
@@ -91,7 +92,8 @@ license = "Apache-2.0; trained in part on SIWIS (CC BY 4.0)"
 
 # ---- Noise --------------------------------------------------------------------------------------------------------
 # Every noise is generated at 24 kHz, as long as the clip, from a random generator seeded with the variant's id, so
-# the same variant gets the same noise on every run. Pink noise is white noise shaped to a 1/f power spectrum.
+# the same variant gets the same noise on every run. Pink noise is white noise shaped to a 1/f power spectrum from
+# 20 Hz up.
 
 [noise.hvac]
 description = "Ventilation and air handling: pink noise, low-passed"

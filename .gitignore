@@ -41,6 +41,9 @@ infra/compose/models/
 *.mp3
 *.flac
 
+# Dictation test set audio, regenerated from the synthetic scripts by eval/generate_audio.py
+eval/audio/
+
 # Local databases (the desktop cache is SQLCipher)
 *.db
 *.sqlite

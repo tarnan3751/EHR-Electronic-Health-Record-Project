@@ -7,6 +7,8 @@ The test set that dictation accuracy is measured on: about forty synthetic clini
 | `scripts/dNN-<slug>.toml` | One dictation each: what is said, and the gold note fields |
 | `dictation_scripts.py` | Reads the scripts and renders their text, as spoken and as written. Standard library only |
 | `voices.toml` | The synthetic voices the scripts name, the text-to-speech model, and the noise recipes |
+| `generate_audio.py` | Makes the audio from the scripts, into `audio/` |
+| `audio/` | The generated audio and its `manifest.json`. Gitignored |
 | `tests/test_scripts.py` | Checks every script against the rules below |
 
 ## Scripts
@@ -110,3 +112,33 @@ uv run eval/dictation_scripts.py              # every script: id, voice, spoken 
 uv run eval/dictation_scripts.py d07          # d07's spoken text
 uv run eval/dictation_scripts.py d07 --display
 ```
+
+## Synthetic audio
+
+`generate_audio.py` has a synthetic voice read every script, and writes the audio to `eval/audio/` with a `manifest.json` that lists each item for the scoring. The audio is never committed; anyone can make it again from the scripts. From the repository folder:
+
+```
+uv run eval/generate_audio.py                  # every item
+uv run eval/generate_audio.py --only d07 d12   # those scripts' items
+uv run eval/generate_audio.py --clean-only     # no noisy variants
+uv run eval/generate_audio.py --skip-existing  # keep items already made from the same text and versions
+uv run eval/generate_audio.py --dry-run        # list the items; make nothing
+```
+
+It needs ffmpeg on the `PATH`, built with libopus (`brew install ffmpeg`, or `winget install Gyan.FFmpeg`). The first run installs Python 3.12 if uv doesn't have it, and the generator's packages, torch among them, into uv's cache (about 2 GB); then it downloads Kokoro-82M (about 330 MB, no account needed) from Hugging Face at the commit `voices.toml` pins, into the Hugging Face cache, and checks it against the SHA-256 on the model card. After that it runs offline. The whole set is a little over 80 items, about two hours of audio and 80 MB, and takes 6 to 10 minutes on an Apple Silicon Mac.
+
+**Voices.** Kokoro-82M v1.0 reads each script in the voice it names: two American English voices, two British English, and Kokoro's Hindi, Spanish and French voices reading English, labelled `hi-voice`, `es-voice` and `fr-voice`. Those three are synthetic stand-ins, so the set isn't all one kind of voice. They are not real regional accents, and results on them say nothing about how MedASR handles a real accent: only recordings of people can show that (see below).
+
+**Items.** Every script gets a clean item. A script that lists `noise` also gets that noise mixed in at 20, 10 and 5 dB SNR, and four of them (`unusable` in `voices.toml`) one more at 0 dB, made to be too noisy to transcribe. SNR is measured over the frames where the speech is active. The noise is generated, not recorded:
+
+- `hvac`: ventilation, as low-passed pink noise.
+- `babble`: a busy room, as six other Kokoro voices reading unrelated everyday texts at once.
+- `monitor`: a patient monitor's pulse beeps over a pink noise floor.
+
+No item may be longer than five minutes, the dictation session limit; the generator stops if a script would read longer. The speech is read a little faster than Kokoro's default, at about 150 words a minute, with its active level at -26 dBFS and silence before and after. Items alternate between the two formats browsers record, 48 kHz mono: WebM with Opus, as Chrome and Edge write it (no duration in the header), and fragmented MP4 with AAC, as Safari writes it.
+
+**Manifest.** `audio/manifest.json` has two parts. `variants` lists the items, each with `id` (the script's id and the variant: `d01-htn-aprocitentan--clean`, `d01-htn-aprocitentan--hvac-10db`), `script` (the script's `id`), `file` (relative to `audio/`), `container` (`webm` or `mp4`), `voice`, `accent` (`us`, `gb`, `hi-voice`, `es-voice`, `fr-voice`), `noise` and `snr_db` (both `null` when clean), `seconds` and `sha256`. The scoring adds the script's tags and derives the variant's own. `generator` records what made them: the model's repository, commit and SHA-256, the package and ffmpeg versions, the machine's platform, the seed, the voices and noise recipes, and for each item a hash of the text read and the SNR measured. A run whose generator, `voices.toml` or package versions differ from the manifest's starts a new one, so every item listed was made the same way.
+
+**Reproducibility.** Seeds and the number of CPU threads are fixed, so the same machine with the same package versions makes the same files, byte for byte. Another machine, or another build of torch or ffmpeg, makes audio that sounds the same but differs in its last bits, so the SHA-256 values differ. Only kokoro and misaki are pinned exactly; the manifest records the versions of the rest.
+
+**Licences.** Kokoro-82M's weights and voices are Apache-2.0, as are the kokoro and misaki packages; spaCy and its `en_core_web_sm` model are MIT. Words outside misaki's dictionary, which here are mostly the newer drug names, are pronounced by espeak-ng (GPL-3.0), which the espeakng-loader package bundles (the loader itself is MIT), through phonemizer-fork (GPL-3.0). They run only inside the generator, on the machine making the audio, and are never shipped with anything. The French voice, `ff_siwis`, was trained partly on the SIWIS corpus (CC BY 4.0). Where each was checked is in `voices.toml`.
