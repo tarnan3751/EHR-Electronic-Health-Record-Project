@@ -167,6 +167,9 @@ services:
       - ./models:/models:ro
     read_only: true
     tmpfs: [/tmp]
+    # It decodes audio from outside: a cap, so nothing it's sent can take the server's memory. About 0.4 GB in use
+    # with MedASR loaded; a full house of five-minute dictations adds well under 1 GB.
+    mem_limit: 2g
     networks: [inference]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]

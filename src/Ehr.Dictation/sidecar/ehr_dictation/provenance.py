@@ -4,6 +4,9 @@ from the models-manifest.json setup_models.py wrote, for the provenance each dic
 At startup MedASR's weights are hashed and compared with the manifest, and the sidecar refuses to start if they differ,
 so a result never claims a model it didn't use. The K2 Horizon file is llama-server's to load: llama.py checks that it
 serves the file the manifest names. The manifest's hashes are the ones Hugging Face publishes.
+
+CODE_SHA256 is a hash over this package's source: every result names the code that transcribed and checked it, and
+the eval's results are tied to it, so any change to what is measured asks for a new eval run (eval/ehr_eval/gate.py).
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 MANIFEST = "models-manifest.json"
+PACKAGE = Path(__file__).resolve().parent
 MEDASR_DIR = "medasr"
 MEDASR_WEIGHTS = "model.safetensors"
 
@@ -73,3 +77,14 @@ def _sha256(path: Path) -> str | None:
         while chunk := file.read(1 << 20):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def code_sha256(package: Path = PACKAGE) -> str:
+    """A hash over the package's Python files, by name and content (line endings normalized)."""
+    digest = hashlib.sha256()
+    for path in sorted(package.glob("*.py")):
+        digest.update(path.name.encode() + b"\0" + path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    return digest.hexdigest()
+
+
+CODE_SHA256 = code_sha256()

@@ -7,18 +7,25 @@ app sets from the session and never from the request; a session is invisible to 
 
     GET    /health                           {"status": "ok"}, nothing more; no key needed
     POST   /v1/sessions                      201 {sessionId, maxSeconds, maxChunkBytes}
-    POST   /v1/sessions/{id}/audio?seq=N     body: the next chunk, any container; 200 {receivedSeq, transcript}
-    POST   /v1/sessions/{id}/stop            the final transcript, and the fields if they are ready within 8 s
+    POST   /v1/sessions/{id}/audio?seq=N     body: the next chunk, any container; 200 {receivedSeq, audioSeconds,
+                                             transcript}, audioSeconds being how much of maxSeconds the audio uses
+    POST   /v1/sessions/{id}/stop            the transcript, and the fields, as far as they get within 8 s
     POST   /v1/sessions/{id}/result?wait=S   the same, waiting up to S (at most 10) seconds for the fields
     DELETE /v1/sessions/{id}                 204; audio, transcript and fields are gone
 
 A transcript is {text, final, segments: [{start, end, startMs, endMs, final, unclear}]}, with UTF-16 offsets into text
 and unclear one of too_quiet, too_noisy, low_confidence or null. A result is {transcript, sorting, reason, fields,
-provenance}: sorting is pending, done (fields set) or unavailable (reason model_unavailable, model_timeout or
-model_output_invalid; the transcript stays as plain text). Each field is {status: "pending", value, sources: [{start,
+notCarriedOver, provenance}: the transcript is final once the rest of the audio is transcribed, and sorting is pending, done (fields
+set) or unavailable (reason model_unavailable, model_timeout, model_output_invalid or transcript_too_long; the
+transcript stays as plain text). notCarriedOver lists each instruction in the transcript to order something or change the allergy list, which no field
+carries: [{reason: "order" or "allergy_change", start, end}], the span of the clinician's own words in the transcript,
+never anything the model wrote. provenance is {speech, language, llamaServer, prompt, schema, structuring, code};
+language and llamaServer are null while unknown. Each field is {status: "pending", value, sources: [{start,
 end}]} or {status: "empty", reasons: [...]}: a value that failed a check is never sent, only why (validation.py).
 
-Errors are {error, detail} with 400 (no owner, or no seq), 401 (no key), 404 (no such session for this owner), 409
+The limits on all of it (sizes, sessions at once, how long things are kept and waited for) are in settings.py.
+
+Errors are {error, detail} with 400 (no owner, or a bad seq or wait), 401 (no key), 404 (no such session for this owner), 409
 (out_of_order with expectedSeq, stopped, not_stopped), 413 (too_large, too_long), 422 (not_audio) or 429 (busy).
 Nothing a request carries is logged.
 """
@@ -89,7 +96,9 @@ def create_app(
     # FastAPI's own answer would be a 422 echoing the input; 422 here means only audio that won't decode.
     @app.exception_handler(RequestValidationError)
     async def bad_request(_: Request, __: RequestValidationError) -> JSONResponse:
-        return JSONResponse({"error": "bad_request", "detail": "Send seq as a whole number from 0."}, status_code=400)
+        return JSONResponse(
+            {"error": "bad_request", "detail": "Send seq as a whole number from 0, and wait as seconds from 0."}, status_code=400
+        )
 
     @app.middleware("http")
     async def require_key(request: Request, call_next):  # noqa: ANN202

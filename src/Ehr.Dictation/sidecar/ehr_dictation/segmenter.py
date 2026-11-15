@@ -36,10 +36,11 @@ def levels(samples: np.ndarray) -> np.ndarray:
 
 
 def noise_floor(frame_levels: np.ndarray) -> float:
-    """The background: the 10th percentile of the frames, never below -90 dBFS."""
+    """The background: the 5th percentile of the frames, never below -90 dBFS. Low enough that a recording which is
+    nearly all speech, with only short pauses, still finds its background in them."""
     if frame_levels.size == 0:
         return -90.0
-    return max(-90.0, float(np.percentile(frame_levels, 10)))
+    return max(-90.0, float(np.percentile(frame_levels, 5)))
 
 
 def pause_threshold(frame_levels: np.ndarray) -> float:

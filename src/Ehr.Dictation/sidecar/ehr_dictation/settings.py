@@ -7,8 +7,21 @@ natively). Secrets come from the environment only, never from a file in the repo
     DICTATION_MODELS_DIR  where setup_models.py put the models (default /models, the ai profile's mount)
     DICTATION_DEVICE      where MedASR runs: cpu (default), mps on a Mac, cuda on an NVIDIA GPU
 
-The limits are fixed here rather than settings, so every server behaves the same; the on-prem app's 20-second ceiling on
-each call (Ehr.Web, Api/Dictation) is why the waits are short.
+The limits are fixed here rather than read from the environment, so every server behaves the same:
+
+    max_sessions, max_sessions_per_owner   8 and 2 sessions at once, counted until each one's result is ready
+    max_chunk_bytes, max_session_bytes     2 MB a chunk, 16 MB a dictation
+    max_session_seconds                    5 minutes of audio a dictation: what K2 Horizon can sort within its context
+                                           (4,096 tokens a request) and its 90 seconds, measured
+    idle_seconds                           a session no audio has reached for 10 minutes is discarded
+    result_seconds                         a result is discarded 10 minutes after it is ready
+    structuring_seconds                    K2 Horizon has 90 seconds, its wait for a turn included
+    sorting_at_once                        how many dictations K2 Horizon sorts at once (llama-server's slots)
+    call_seconds                           a chunk is answered within 15 seconds, transcript updated or not
+    stop_wait_seconds                      stop answers within 8 seconds, with whatever is ready
+    max_result_wait_seconds                result waits at most 10 seconds for the fields
+
+The on-prem app gives every call 20 seconds (Ehr.Web, Api/Dictation), so no answer here may take longer.
 """
 
 from __future__ import annotations
@@ -34,12 +47,14 @@ class Settings:
     max_sessions: int = 8
     max_sessions_per_owner: int = 2
     max_chunk_bytes: int = 2 * 1024 * 1024
-    max_session_bytes: int = 32 * 1024 * 1024
-    max_session_seconds: int = 600
+    max_session_bytes: int = 16 * 1024 * 1024
+    max_session_seconds: int = 300
     idle_seconds: float = 600.0  # a session no audio has reached for this long is discarded
     result_seconds: float = 600.0  # a finished result is discarded this long after it was ready
     structuring_seconds: float = 90.0  # K2 Horizon's time to answer, after which the fields are left unsorted
-    stop_wait_seconds: float = 8.0  # how long stop waits for the fields before answering without them
+    sorting_at_once: int = 2
+    call_seconds: float = 15.0
+    stop_wait_seconds: float = 8.0  # how long stop waits for the transcript and fields before answering without them
     max_result_wait_seconds: float = 10.0
 
     @classmethod

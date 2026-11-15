@@ -4,12 +4,22 @@ cancelled, when no audio has reached it for a while, or a while after its result
 A session belongs to the clinician who started it (the owner the on-prem app names); to anyone else it doesn't exist.
 Audio arrives in numbered chunks. A chunk sent again is ignored, so a client that lost an answer can resend; a chunk
 that skips ahead is refused with the number expected, so a client that lost its connection resends from there and the
-transcript carries on (FR-10). After each chunk the transcript is brought up to date (transcriber.py).
+transcript carries on (FR-10). After each chunk the transcript is brought up to date (transcriber.py), if MedASR is
+free in time; if not, the chunk is kept and the answer has the transcript as it was, and the next chunk catches up.
 
-Stop commits the rest of the transcript, drops the audio, and starts K2 Horizon on the transcript in the background;
-the result is collected with result(), which waits a few seconds for it. If K2 Horizon is unavailable or too slow, the
-result keeps the transcript and says why the fields are missing (UC 10). Its fields are checked (validation.py) and
-marked pending; a field that failed carries only its reason codes.
+Stop takes no more audio and, in the background, transcribes the rest, drops the audio, and has K2 Horizon sort the
+transcript. Stop and result answer within a few seconds whatever state that has reached: the transcript (final once
+transcribed), the fields once sorted, and every instruction in the transcript to order something or change the allergy
+list, which the note never carries (notCarriedOver), so the review screen can say what still needs placing. If K2 Horizon is unavailable or too slow, the result keeps the transcript and
+says why the fields are missing (UC 10). The fields are checked (validation.py) and marked pending; a field that failed
+carries only its reason codes.
+
+Cancelling discards everything at once (UC 9): the session is marked cancelled, its background work is cancelled,
+including a model call in flight, and anything still running checks the mark after each wait and stores nothing.
+
+Every call answers within its budget (settings.py), well inside the on-prem app's 20 seconds: waits for the session,
+for MedASR and for the fields are cut to what is left of it. A session counts against the limits on sessions at once
+until its result is ready, sorting included, and the time K2 Horizon has starts when the session starts waiting for it.
 
 Logs name the session (a random ID, not patient information), sizes, times and reason codes, never audio or text.
 """
@@ -17,10 +27,11 @@ Logs name the session (a random ID, not patient information), sizes, times and r
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import secrets
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -28,7 +39,8 @@ import numpy as np
 from . import audio, validation
 from .asr import Recognizer
 from .llama import StructuringFailed, Structurer
-from .provenance import Models
+from .prompt import FIELDS
+from .provenance import CODE_SHA256, Models
 from .settings import Settings
 from .transcriber import Progress, advance
 from .transcript import Transcript, assemble
@@ -52,6 +64,14 @@ def _not_found() -> SessionError:
     return SessionError(404, "not_found", "No such dictation: it was cancelled or expired, or it isn't yours.")
 
 
+def _busy() -> SessionError:
+    return SessionError(429, "busy", "Dictation is busy. Try again in a moment.")
+
+
+def _not_audio() -> SessionError:
+    return SessionError(422, "not_audio", "The audio couldn't be decoded.")
+
+
 @dataclass
 class Session:
     id: str
@@ -59,9 +79,12 @@ class Session:
     touched: float
     audio: bytearray = field(default_factory=bytearray)
     next_seq: int = 0
+    audio_seconds: float = 0.0
     progress: Progress = field(default_factory=Progress)
     transcript: Transcript = field(default_factory=lambda: assemble([], final=False))
     stopped: bool = False
+    cancelled: bool = False
+    failure: SessionError | None = None
     sorting: str = "pending"
     reason: str | None = None
     checks: validation.Checks | None = None
@@ -90,7 +113,7 @@ class Sessions:
         self._decode = decoder
         self._sessions: dict[str, Session] = {}
         self._transcribing = asyncio.Semaphore(1)
-        self._sorting = asyncio.Semaphore(2)
+        self._sorting = asyncio.Semaphore(settings.sorting_at_once)
 
     @property
     def count(self) -> int:
@@ -100,10 +123,11 @@ class Sessions:
 
     def start(self, owner: str) -> Session:
         self.sweep()
-        recording = [s for s in self._sessions.values() if not s.stopped]
-        if len(recording) >= self._settings.max_sessions:
+        # Until its result is ready, a session is using MedASR, K2 Horizon or both.
+        working = [s for s in self._sessions.values() if s.finished_at is None]
+        if len(working) >= self._settings.max_sessions:
             raise SessionError(429, "busy", "Too many dictations are in progress. Try again in a minute.")
-        if sum(1 for s in recording if s.owner == owner) >= self._settings.max_sessions_per_owner:
+        if sum(1 for s in working if s.owner == owner) >= self._settings.max_sessions_per_owner:
             raise SessionError(429, "busy", "Finish or cancel your other dictation first.")
         session = Session(id=secrets.token_urlsafe(24), owner=owner, touched=self._clock())
         self._sessions[session.id] = session
@@ -127,6 +151,7 @@ class Sessions:
                 log.info("session %s expired", session.id)
 
     def _discard(self, session: Session) -> None:
+        session.cancelled = True
         self._sessions.pop(session.id, None)
         if session.task is not None:
             session.task.cancel()
@@ -142,17 +167,25 @@ class Sessions:
             raise _not_found()
         return session
 
+    @staticmethod
+    def _still_there(session: Session) -> None:
+        """After every wait: a session cancelled meanwhile is gone, and nothing more is stored for it or sent."""
+        if session.cancelled:
+            raise _not_found()
+
     # ---- Audio ---------------------------------------------------------------------------------------------------
 
     async def add_audio(self, session_id: str, owner: str, seq: int, data: bytes) -> dict:
+        deadline = self._clock() + self._settings.call_seconds
         session = self._get(session_id, owner)
-        async with session.lock:
-            if session.id not in self._sessions:
-                raise _not_found()
+        async with _within(session.lock, self._left(deadline)) as locked:
+            if not locked:
+                raise _busy()
+            self._still_there(session)
             if session.stopped:
                 raise SessionError(409, "stopped", "This dictation has stopped; start another.")
             if seq < session.next_seq:
-                return {"receivedSeq": seq, "transcript": session.transcript.to_json()}
+                return self._received(session, seq)
             if seq > session.next_seq:
                 raise SessionError(409, "out_of_order", "Send the chunks in order.", expectedSeq=session.next_seq)
             if len(data) > self._settings.max_chunk_bytes or len(session.audio) + len(data) > self._settings.max_session_bytes:
@@ -160,58 +193,58 @@ class Sessions:
 
             started = time.perf_counter()
             candidate = bytes(session.audio) + data
-            samples = await asyncio.to_thread(self._decode, candidate, partial=True)
-            if samples.size == 0 and len(candidate) > UNDECODABLE_BYTES:
-                raise SessionError(422, "not_audio", "The audio couldn't be decoded.")
-            if samples.size > self._settings.max_session_seconds * audio.SAMPLE_RATE:
-                raise SessionError(
-                    413, "too_long", f"A dictation can be up to {self._settings.max_session_seconds // 60} minutes."
+            limit = self._settings.max_session_seconds
+            try:
+                samples = await asyncio.to_thread(
+                    self._decode, candidate, partial=True, max_seconds=limit + 1,
+                    timeout=min(audio.DECODE_SECONDS, self._left(deadline)),
                 )
+            except audio.AudioError:
+                raise _not_audio() from None
+            self._still_there(session)
+            if samples.size == 0 and len(candidate) > UNDECODABLE_BYTES:
+                raise _not_audio()
+            if samples.size > limit * audio.SAMPLE_RATE:
+                raise SessionError(413, "too_long", f"A dictation can be up to {limit // 60} minutes.")
             session.audio = bytearray(candidate)
+            session.audio_seconds = samples.size / audio.SAMPLE_RATE
             session.next_seq += 1
             session.touched = self._clock()
-            async with self._transcribing:
-                session.progress = await asyncio.to_thread(
-                    advance, samples, session.progress, self._recognizer, final=False
-                )
-            session.transcript = assemble(session.progress.all_segments, final=False)
+
+            # The transcript catches up if MedASR is free in time; otherwise the next chunk brings it up to date.
+            async with _within(self._transcribing, self._left(deadline)) as transcribing:
+                if transcribing:
+                    progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer, final=False)
+                    self._still_there(session)
+                    session.progress = progress
+                    session.transcript = assemble(progress.all_segments, final=False)
             log.info(
-                "session %s chunk %d: %d bytes, %.1f s of audio, %.2f s",
+                "session %s chunk %d: %d bytes, %.1f s of audio, %.2f s%s",
                 session.id, seq, len(data), samples.size / audio.SAMPLE_RATE, time.perf_counter() - started,
+                "" if transcribing else ", transcript not updated (MedASR busy)",
             )
-            return {"receivedSeq": seq, "transcript": session.transcript.to_json()}
+            return self._received(session, seq)
+
+    @staticmethod
+    def _received(session: Session, seq: int) -> dict:
+        # How much audio the dictation holds, so a screen can show what's left of maxSeconds before the cut-off.
+        return {"receivedSeq": seq, "audioSeconds": round(session.audio_seconds, 1), "transcript": session.transcript.to_json()}
 
     # ---- Stop and result -----------------------------------------------------------------------------------------
 
     async def stop(self, session_id: str, owner: str) -> dict:
+        deadline = self._clock() + self._settings.stop_wait_seconds
         session = self._get(session_id, owner)
-        async with session.lock:
-            if session.id not in self._sessions:
-                raise _not_found()
+        async with _within(session.lock, self._left(deadline)) as locked:
+            if not locked:
+                raise _busy()
+            self._still_there(session)
             if not session.stopped:
-                started = time.perf_counter()
-                try:
-                    samples = await asyncio.to_thread(self._decode, bytes(session.audio), partial=False)
-                except audio.AudioError:
-                    raise SessionError(422, "not_audio", "The audio couldn't be decoded.") from None
-                async with self._transcribing:
-                    session.progress = await asyncio.to_thread(
-                        advance, samples, session.progress, self._recognizer, final=True
-                    )
-                session.transcript = assemble(session.progress.segments, final=True)
                 session.stopped = True
-                session.audio = bytearray()
                 session.touched = self._clock()
-                log.info(
-                    "session %s stopped: %.1f s of audio, %d passages (%d unclear), %.2f s",
-                    session.id,
-                    samples.size / audio.SAMPLE_RATE,
-                    len(session.transcript.placed),
-                    len(session.transcript.unclear_ranges()),
-                    time.perf_counter() - started,
-                )
-                session.task = asyncio.create_task(self._sort(session))
-        return await self._result(session, self._settings.stop_wait_seconds)
+                recording, session.audio = bytes(session.audio), bytearray()
+                session.task = asyncio.create_task(self._finish(session, recording))
+        return await self._result(session, self._left(deadline))
 
     async def result(self, session_id: str, owner: str, wait: float) -> dict:
         session = self._get(session_id, owner)
@@ -221,41 +254,80 @@ class Sessions:
 
     async def _result(self, session: Session, wait: float) -> dict:
         if wait > 0 and not session.done.is_set():
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(asyncio.shield(session.done.wait()), timeout=wait)
-            except TimeoutError:
-                pass
+        self._still_there(session)
+        if session.failure is not None:
+            raise session.failure
         sorting = session.sorting if session.done.is_set() else "pending"
         return {
             "transcript": session.transcript.to_json(),
             "sorting": sorting,
             "reason": session.reason if sorting == "unavailable" else None,
             "fields": session.checks.to_json(session.transcript) if sorting == "done" and session.checks else None,
+            "notCarriedOver": validation.not_carried_over(session.transcript),
             "provenance": self.provenance(),
         }
+
+    async def _finish(self, session: Session, recording: bytes) -> None:
+        """After stop: the rest of the transcript, then the fields. Stores nothing once the session is cancelled."""
+        started = time.perf_counter()
+        try:
+            try:
+                samples = await asyncio.to_thread(
+                    self._decode, recording, partial=False, max_seconds=self._settings.max_session_seconds + 1
+                )
+            except audio.AudioError:
+                session.failure = _not_audio()
+                return
+            if session.cancelled:
+                return
+            async with self._transcribing:
+                progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer, final=True)
+            if session.cancelled:
+                return
+            session.progress = progress
+            session.transcript = assemble(progress.segments, final=True)
+            log.info(
+                "session %s stopped: %.1f s of audio, %d passages (%d unclear), %.2f s",
+                session.id,
+                samples.size / audio.SAMPLE_RATE,
+                len(session.transcript.placed),
+                len(session.transcript.unclear_ranges()),
+                time.perf_counter() - started,
+            )
+            await self._sort(session)
+        finally:
+            session.finished_at = self._clock()
+            session.done.set()
 
     async def _sort(self, session: Session) -> None:
         started = time.perf_counter()
         transcript = session.transcript
         try:
             if not transcript.text.strip():
-                fields = {name: {"value": "", "sources": []} for name in ("history", "assessment", "plan")}
-                session.checks = validation.check(fields, [], transcript)
+                checks = validation.check({name: {"value": "", "sources": []} for name in FIELDS}, [], transcript)
             else:
-                async with self._sorting:
+                # K2 Horizon's time starts now, waiting for a turn included.
+                async with asyncio.timeout(self._settings.structuring_seconds), self._sorting:
                     proposal = await self._structurer.propose(transcript.for_structuring())
-                session.checks = validation.check(proposal.fields, proposal.unknown, transcript)
-            session.sorting = "done"
+                checks = validation.check(proposal.fields, proposal.unknown, transcript)
+            if session.cancelled:
+                return
+            session.checks, session.sorting = checks, "done"
             log.info(
                 "session %s sorted in %.1f s: %s%s",
                 session.id,
                 time.perf_counter() - started,
                 ", ".join(
                     f"{name} {'pending' if checked.pending else '/'.join(checked.reasons)}"
-                    for name, checked in session.checks.fields.items()
+                    for name, checked in checks.fields.items()
                 ),
-                f"; unknown fields {len(session.checks.unknown)}" if session.checks.unknown else "",
+                f"; unknown fields {len(checks.unknown)}" if checks.unknown else "",
             )
+        except TimeoutError:
+            session.sorting, session.reason = "unavailable", "model_timeout"
+            log.warning("session %s not sorted: model_timeout", session.id)
         except StructuringFailed as error:
             session.sorting, session.reason = "unavailable", error.reason
             log.warning("session %s not sorted: %s", session.id, error.reason)
@@ -264,9 +336,9 @@ class Sessions:
         except Exception as error:  # noqa: BLE001 (the transcript still goes back, unsorted)
             session.sorting, session.reason = "unavailable", "model_output_invalid"
             log.error("session %s not sorted: %s", session.id, type(error).__name__)
-        finally:
-            session.finished_at = self._clock()
-            session.done.set()
+
+    def _left(self, deadline: float) -> float:
+        return max(0.0, deadline - self._clock())
 
     def provenance(self) -> dict:
         structuring = self._structurer.structuring
@@ -277,5 +349,19 @@ class Sessions:
             "prompt": f"sha256:{structuring.prompt_sha256}",
             "schema": f"sha256:{structuring.schema_sha256}",
             "structuring": f"sha256:{structuring.structuring_sha256}",
-            "validation": validation.VERSION,
+            "code": f"sha256:{CODE_SHA256}",
         }
+
+
+@contextlib.asynccontextmanager
+async def _within(lock: asyncio.Lock | asyncio.Semaphore, seconds: float) -> AsyncIterator[bool]:
+    """Holds the lock if it comes free within `seconds`, and says whether it did."""
+    try:
+        await asyncio.wait_for(lock.acquire(), timeout=max(seconds, 0.001))
+    except TimeoutError:
+        yield False
+        return
+    try:
+        yield True
+    finally:
+        lock.release()

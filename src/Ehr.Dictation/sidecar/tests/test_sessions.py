@@ -9,7 +9,11 @@ import dataclasses
 import pytest
 from conftest import MODELS, FakeLlama, FakeRecognizer, answer, raw_decoder, speech_and_pauses
 
-from ehr_dictation.audio import SAMPLE_RATE
+import threading
+import time
+
+from ehr_dictation.audio import SAMPLE_RATE, AudioError
+from ehr_dictation.provenance import CODE_SHA256
 from ehr_dictation.sessions import SessionError, Sessions
 
 ALICE = "11111111-1111-1111-1111-111111111111"
@@ -55,6 +59,7 @@ def test_chunks_in_order_build_a_live_transcript(settings):
     answers = asyncio.run(run())
 
     assert [a["receivedSeq"] for a in answers] == list(range(10))
+    assert [a["audioSeconds"] for a in answers] == [float(n) for n in range(1, 11)]
     last = answers[-1]["transcript"]
     assert last["text"].startswith("speech") and not last["final"]
     assert [s["final"] for s in last["segments"]] == [True, True, False]
@@ -254,5 +259,164 @@ def test_every_result_says_which_models_prompt_and_schema_made_it(settings):
 
     assert provenance["speech"] == MODELS.speech and provenance["language"] == MODELS.language
     assert provenance["llamaServer"] == "b11669-620d2225"
-    assert all(provenance[key].startswith("sha256:") for key in ("prompt", "schema", "structuring"))
-    assert provenance["validation"] == 1
+    assert all(provenance[key].startswith("sha256:") for key in ("prompt", "schema", "structuring", "code"))
+    assert provenance["code"] == f"sha256:{CODE_SHA256}"
+
+
+# ---- Cancel discards everything, whatever is running (UC 9) ------------------------------------------------------
+
+
+def test_cancel_during_the_final_transcription_sends_nothing_to_the_model_and_returns_nothing(settings):
+    async def run():
+        llama = FakeLlama(GROUNDED)
+        sessions, _ = make(settings, llama, stop_wait_seconds=0.2)
+        session_id = await dictate(sessions)
+        recognizer = sessions._recognizer
+        recognizer.hold = threading.Event()
+        stopped = await sessions.stop(session_id, ALICE)
+        session = sessions._sessions[session_id]
+        sessions.cancel(session_id, ALICE)
+        recognizer.hold.set()
+        await asyncio.sleep(0.3)
+        with pytest.raises(SessionError) as gone:
+            await sessions.result(session_id, ALICE, 0)
+        return stopped, session, llama, gone.value
+
+    stopped, session, llama, gone = asyncio.run(run())
+
+    assert stopped["sorting"] == "pending" and not stopped["transcript"]["final"]
+    assert gone.status == 404
+    assert llama.requests == [] and session.checks is None and session.transcript.text == ""
+
+
+def test_cancel_while_a_chunk_is_transcribed_stores_nothing(settings):
+    async def run():
+        sessions, _ = make(settings)
+        session = sessions.start(ALICE)
+        sessions._recognizer.hold = threading.Event()
+        chunk = asyncio.create_task(sessions.add_audio(session.id, ALICE, 0, b"".join(chunks()[:4])))
+        await asyncio.sleep(0.1)
+        sessions.cancel(session.id, ALICE)
+        sessions._recognizer.hold.set()
+        with pytest.raises(SessionError) as gone:
+            await chunk
+        return session, gone.value
+
+    session, gone = asyncio.run(run())
+
+    assert gone.status == 404
+    assert session.transcript.text == "" and session.progress.segments == [] and len(session.audio) == 0
+
+
+def test_cancel_stops_a_model_call_in_flight(settings):
+    async def run():
+        llama = FakeLlama(GROUNDED, delay=5)
+        sessions, _ = make(settings, llama, stop_wait_seconds=0.1)
+        session_id = await dictate(sessions)
+        await sessions.stop(session_id, ALICE)
+        while not any(r.url.path == "/v1/chat/completions" for r in llama.requests):
+            await asyncio.sleep(0.02)
+        task = sessions._sessions[session_id].task
+        sessions.cancel(session_id, ALICE)
+        await asyncio.sleep(0.1)
+        return llama, task
+
+    llama, task = asyncio.run(run())
+
+    assert llama.cancelled and task.done()
+
+
+# ---- Every call answers within its budget --------------------------------------------------------------------------
+
+
+def test_a_chunk_is_answered_in_time_while_medasr_is_busy_and_the_next_one_catches_up(settings):
+    async def run():
+        sessions, _ = make(settings, call_seconds=0.3)
+        session = sessions.start(ALICE)
+        parts = chunks()
+        await sessions._transcribing.acquire()
+        started = time.perf_counter()
+        busy = await sessions.add_audio(session.id, ALICE, 0, b"".join(parts[:4]))
+        took = time.perf_counter() - started
+        sessions._transcribing.release()
+        caught_up = await sessions.add_audio(session.id, ALICE, 1, b"".join(parts[4:8]))
+        return busy, took, caught_up
+
+    busy, took, caught_up = asyncio.run(run())
+
+    assert busy["receivedSeq"] == 0 and busy["transcript"]["text"] == "" and took < 1
+    assert caught_up["transcript"]["text"].startswith("speech")
+
+
+def test_stop_answers_within_its_budget_and_the_result_follows(settings):
+    async def run():
+        sessions, _ = make(settings, stop_wait_seconds=0.2)
+        session_id = await dictate(sessions)
+        sessions._recognizer.hold = threading.Event()
+        started = time.perf_counter()
+        stopped = await sessions.stop(session_id, ALICE)
+        took = time.perf_counter() - started
+        sessions._recognizer.hold.set()
+        later = await sessions.result(session_id, ALICE, wait=5)
+        return stopped, took, later
+
+    stopped, took, later = asyncio.run(run())
+
+    assert took < 1 and stopped["sorting"] == "pending" and not stopped["transcript"]["final"]
+    assert later["sorting"] == "done" and later["transcript"]["final"]
+
+
+def test_a_chunk_ffmpeg_cant_decode_in_time_is_refused_as_not_audio(settings):
+    def broken(data: bytes, **_: object):
+        raise AudioError("ffmpeg took too long to decode the audio.")
+
+    async def run():
+        sessions = Sessions(settings, FakeRecognizer(), FakeLlama(GROUNDED).structurer(), MODELS, decoder=broken)
+        session = sessions.start(ALICE)
+        with pytest.raises(SessionError) as refused:
+            await sessions.add_audio(session.id, ALICE, 0, b"\0" * 64)
+        return refused.value
+
+    refused = asyncio.run(run())
+
+    assert (refused.status, refused.code) == (422, "not_audio")
+
+
+# ---- Limits --------------------------------------------------------------------------------------------------------
+
+
+def test_a_dictation_still_being_sorted_counts_against_the_limits(settings):
+    async def run():
+        sessions, _ = make(settings, FakeLlama(GROUNDED, delay=0.5), max_sessions_per_owner=1, stop_wait_seconds=0.05)
+        first = await dictate(sessions)
+        await sessions.stop(first, ALICE)
+        with pytest.raises(SessionError) as busy:
+            sessions.start(ALICE)
+        await sessions.result(first, ALICE, wait=5)
+        sessions.start(ALICE)
+        return busy.value
+
+    assert asyncio.run(run()).status == 429
+
+
+def test_the_models_time_includes_waiting_for_a_turn(settings):
+    async def run():
+        sessions, _ = make(settings, FakeLlama(GROUNDED, delay=0.4), sorting_at_once=1, structuring_seconds=0.6,
+                           stop_wait_seconds=0.05)
+        first, second = await dictate(sessions, ALICE), await dictate(sessions, BOB)
+        await sessions.stop(first, ALICE)
+        await sessions.stop(second, BOB)
+        return await sessions.result(first, ALICE, wait=5), await sessions.result(second, BOB, wait=5)
+
+    first, second = asyncio.run(run())
+
+    assert first["sorting"] == "done"
+    assert (second["sorting"], second["reason"]) == ("unavailable", "model_timeout")
+
+
+def test_every_result_lists_the_instructions_not_carried_over(settings):
+    async def run():
+        sessions, _ = make(settings)
+        return await sessions.stop(await dictate(sessions), ALICE)
+
+    assert asyncio.run(run())["notCarriedOver"] == []

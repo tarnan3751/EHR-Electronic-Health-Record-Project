@@ -62,3 +62,21 @@ def test_nothing_is_written_to_disk(tmp_path, monkeypatch):
     decode(encode(tone(1.0), "webm")[:2000], partial=True)
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_hours_of_near_silence_in_a_small_file_decode_only_to_the_limit():
+    import subprocess
+    import time
+
+    flac = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "anullsrc=r=16000:cl=mono",
+         "-t", "10800", "-c:a", "flac", "-f", "flac", "pipe:1"],
+        capture_output=True, check=True,
+    ).stdout
+
+    started = time.perf_counter()
+    samples = decode(flac, max_seconds=11)
+
+    assert len(flac) < 3_000_000
+    assert samples.size <= 11 * SAMPLE_RATE + SAMPLE_RATE // 10
+    assert time.perf_counter() - started < 5

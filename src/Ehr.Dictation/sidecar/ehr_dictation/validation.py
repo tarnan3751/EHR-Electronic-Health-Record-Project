@@ -57,8 +57,6 @@ from .prompt import FIELDS
 from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, TENS, UNITS, Token, numbers, stem, tokens
 from .transcript import Transcript, utf16_offset
 
-VERSION = 2  # until results carry a hash of the code instead
-
 LIMITS = {"history": 2000, "assessment": 1200, "plan": 1200}
 MAX_SOURCES = 12
 MAX_QUOTE = 600
