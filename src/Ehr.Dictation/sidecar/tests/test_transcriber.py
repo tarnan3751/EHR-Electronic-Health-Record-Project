@@ -59,3 +59,16 @@ def test_silence_makes_no_passage_and_is_never_transcribed():
     progress = advance(silence, Progress(), recognizer, final=True)
 
     assert progress.segments == [] and recognizer.calls == []
+
+
+def test_a_passage_heard_as_only_a_spoken_command_is_not_unclear():
+    progress = advance(recording(), Progress(), CommandRecognizer(), final=True)
+
+    assert {s.unclear for s in progress.segments} == {None}
+
+
+class CommandRecognizer(FakeRecognizer):
+    def recognize(self, samples):
+        from ehr_dictation.asr import Recognition
+
+        return Recognition("{new paragraph}", 0.9)

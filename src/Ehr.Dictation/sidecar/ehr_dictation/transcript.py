@@ -55,7 +55,8 @@ def format(raw: str) -> str:  # noqa: A001 (the module's one job)
         elif word is not None:
             out, skip_colon = _word(out, word), False
         # Anything in angle brackets is a model token, such as </s>.
-    return out.strip()
+    # Line breaks at either end stay: a passage can be just "new paragraph".
+    return out.strip(" ")
 
 
 def _word(out: str, word: str) -> str:
@@ -64,8 +65,7 @@ def _word(out: str, word: str) -> str:
 
 def _mark(out: str, mark: str) -> str:
     if mark.startswith("\n"):
-        out = out.rstrip(" \n")
-        return out + mark if out else out
+        return out.rstrip(" \n") + mark
     if mark == "(":
         return out + ("(" if not out or out[-1] in " \n" else " (")
     return out.rstrip(" ") + mark
@@ -131,7 +131,7 @@ def assemble(segments: Sequence[Segment], *, final: bool) -> Transcript:
     text = ""
     placed: list[Placed] = []
     for segment in segments:
-        piece = segment.text
+        piece = segment.text if text else segment.text.lstrip("\n")
         if not piece:
             continue
         joined = _join(text, piece)

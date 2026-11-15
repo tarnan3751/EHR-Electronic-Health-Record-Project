@@ -69,3 +69,11 @@ def test_an_unclear_passage_with_no_text_still_shows_where_it_was():
 def test_offsets_count_utf16_code_units():
     assert utf16_offset("a\U0001F600b", 2) == 3
     assert utf16_offset("café", 4) == 4
+
+
+def test_a_passage_that_is_only_a_spoken_command_keeps_its_line_break():
+    assert format("{new paragraph}") == "\n\n"
+    transcript = assemble([segment("{new paragraph} History {colon}"), segment("Cough {period}"),
+                           segment("{new paragraph}"), segment("Plan {colon} rest {period}")], final=True)
+
+    assert transcript.text == "History: Cough.\n\nPlan: rest."
