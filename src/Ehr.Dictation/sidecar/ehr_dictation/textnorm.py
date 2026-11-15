@@ -1,5 +1,5 @@
 """Word-level text handling shared by validation and the eval: words with their positions, numbers read the same way
-whether written as digits or as words, and light stemming.
+whether written as digits or as words, and plurals read as the singular.
 
 MedASR writes most numbers as digits already. Number words still turn up, in what it leaves unformatted and in the eval's
 reference scripts, so both sides of every comparison go through numbers() and come out as the same digits.
@@ -111,17 +111,14 @@ def numbers(text: str) -> list[str]:
 
 
 def stem(word: str) -> str:
-    """A rough stem, so 'pressures', 'increased' and 'denies' meet 'pressure', 'increase' and 'denied'."""
+    """The word without a plural or possessive ending, so 'pressures' and 'allergies' meet 'pressure' and 'allergy'.
+    Nothing else is taken off: a tense or another ending can change what a word says ('rule' and 'ruled', 'resolving'
+    and 'resolved')."""
     word = word.lower().removesuffix("'s")
-    for suffix, replacement in (("ies", "y"), ("ied", "y")):
-        if word.endswith(suffix) and len(word) > 4:
-            return word[: -len(suffix)] + replacement
-    for suffix in ("ing", "ed", "s"):
-        if word.endswith(suffix) and not word.endswith("ss") and len(word) - len(suffix) >= 3:
-            word = word[: -len(suffix)]
-            break
-    if word.endswith("e") and len(word) >= 4:
-        word = word[:-1]
+    if word.endswith("ies") and len(word) > 4:
+        return word[:-3] + "y"
+    if word.endswith("s") and not word.endswith(("ss", "us", "is")) and len(word) > 3:
+        return word[:-1]
     return word
 
 

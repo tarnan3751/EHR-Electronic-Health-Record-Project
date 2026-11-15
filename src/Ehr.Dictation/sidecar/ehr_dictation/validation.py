@@ -3,8 +3,8 @@ shown and its field is left empty; only the reason codes go out, never the text.
 until a clinician approves it (FR-13), with the positions in the transcript of the passages it came from (FR-08).
 
 Grounding is strict: every word of a value must be in that value's own sources, compared after the shared reading
-(case, punctuation, numbers as digits whether written or spoken, a few unit spellings, and simple plural and tense
-endings), except for a short list of connecting words (REFORMULATION). Nothing else may be added: not "twice", not
+(case, punctuation, numbers as digits whether written or spoken, a few unit spellings, and plural endings), except for
+a short list of connecting words (REFORMULATION). Nothing else may be added: not "twice", not
 "right" for "left", not another drug, not a heading. Nor may words be recombined: the value is cut into segments at
 punctuation (not the point in "12.5") and at "and" and "or", and each segment's words must be found in order in one of
 its sources, with at most MAX_GAP of that source's own words between any two of them (connecting words and doses don't

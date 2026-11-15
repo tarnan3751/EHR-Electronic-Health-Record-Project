@@ -158,6 +158,19 @@ def test_a_word_the_sources_dont_have_is_discarded(said, value):
     assert "unsupported_content" in own(said, value).reasons
 
 
+@pytest.mark.parametrize(("said", "value"), [
+    ("Admitted to rule out pneumonia.", "Ruled out pneumonia."),
+    ("Rash resolving.", "Rash resolved."),
+    ("Blood pressure increasing.", "Blood pressure increased."),
+])
+def test_a_word_with_another_ending_is_another_word(said, value):
+    assert "unsupported_content" in own(said, value).reasons
+
+
+def test_a_plural_meets_its_singular():
+    assert own("Blood pressures stable. Allergies reviewed.", "Blood pressure stable. Allergy reviewed.").pending
+
+
 def test_june_for_may_is_a_date_not_in_the_sources():
     checked = own("Symptoms started in May.", "Symptoms started in June.")
 
@@ -225,7 +238,7 @@ def test_a_negation_counts_even_when_another_source_affirms_the_same_words():
 
 def test_a_negation_may_not_be_reworded():
     assert "unsupported_content" in own("Denies chest pain.", "No chest pain.").reasons
-    assert "words_out_of_order" in own("Denies chest pain.", "Chest pain denied.").reasons
+    assert "unsupported_content" in own("Denies chest pain.", "Chest pain denied.").reasons
 
 
 def test_too_long_fails():
