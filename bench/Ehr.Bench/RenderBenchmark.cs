@@ -32,8 +32,9 @@ namespace Ehr.Bench;
 // committing its transaction, which waits for them to reach the disk. That wait is only there when the database's
 // fsync, synchronous_commit and full_page_writes are on, as they are on the stack's primary and in the PostgreSQL the
 // benchmark starts itself (MigratedDatabase.Durable; the tests' own have them off). It prints the three as it read
-// them, and with any of them off it says so over the table and refuses --assert.
-// The app logs only warnings while it runs, so the console doesn't weigh on the times.
+// them, and with any of them off it says so over the table and refuses --assert. A kind of request whose full time's
+// p99, the commit included, isn't under the budget gets a warning, in its row and after the table (Warn), which never
+// fails the run. The app logs only warnings while it runs, so the console doesn't weigh on the times.
 //
 // By default it starts its own PostgreSQL 18, migrated as the tests' is, and seeds it. With --stack it uses the web
 // app's own settings instead, as `dotnet run --project src/Ehr.Web` does, against a primary already seeded with as many
@@ -42,7 +43,8 @@ namespace Ehr.Bench;
 // end. It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
 internal static partial class RenderBenchmark
 {
-    // AGENTS.md's gate: each kind of request's p99, excluding the commit, under this (Gate).
+    // AGENTS.md's gate: each kind of request's p99, excluding the commit, under this (Gate). The full time's p99 not
+    // under it only warns (Warn).
     public const double BudgetMilliseconds = 20;
 
     const int WarmUp = 100;
@@ -53,7 +55,7 @@ internal static partial class RenderBenchmark
 
     static readonly Uri Base = new("https://localhost");
 
-    // The exit code: with assert, Gate's.
+    // The exit code: with assert, Gate's. Warn's warnings never change it.
     public static async Task<int> RunAsync(int patients, bool stack, bool assert)
     {
         MigratedDatabase? database = null;
@@ -119,6 +121,7 @@ internal static partial class RenderBenchmark
                 };
 
                 await PrintAsync(app, patients, durability, results);
+                Warn(results, Console.Out);
                 return assert ? Gate(results, Console.Out) : 0;
             }
             finally
@@ -183,11 +186,40 @@ internal static partial class RenderBenchmark
         public double[] Rest => [.. Total.Select((total, i) => total - Audit[i] - Commit[i])];
 
         public bool OverBudget => Percentile(ExcludingCommit, 0.99) >= BudgetMilliseconds;
+
+        // The whole request's p99, the commit included, not under the budget: a warning (Warn), never a failure.
+        public bool FullTimeOverBudget => Percentile(Total, 0.99) >= BudgetMilliseconds;
+    }
+
+    // What the table writes at the end of a row: the gate's mark when its p99 excluding the commit isn't under the
+    // budget, and a warning when its full time's isn't. A row can have both.
+    internal static string Markers(Result result) =>
+        (result.OverBudget ? $"  not under {BudgetMilliseconds} ms excluding the commit" : "")
+        + (result.FullTimeOverBudget ? $"  warning: full time not under {BudgetMilliseconds} ms" : "");
+
+    // After the table, with or without --assert: a warning for each kind of request whose full time's p99, the commit
+    // included, isn't under the budget, and nothing when none is. It never fails the run: that target is checked on the
+    // clinic server.
+    internal static void Warn(IEnumerable<Result> results, TextWriter output)
+    {
+        var over = results.Where(result => result.FullTimeOverBudget).ToList();
+        if (over.Count == 0)
+        {
+            return;
+        }
+
+        output.WriteLine();
+        foreach (var result in over)
+        {
+            output.WriteLine($"warning: {result.Name}: p99 including the commit {Percentile(result.Total, 0.99):F1} ms, not under {BudgetMilliseconds} ms. "
+                + "This doesn't fail the run: the full time's target is checked on the clinic server.");
+        }
     }
 
     // --assert, after the table: every kind of request's p99 excluding the commit must be under the budget. The full
-    // time's p99, the commit included, isn't checked here: CI runners' shared disks make commit times unsteady, so that
-    // target is checked on the clinic server. Returns the exit code, 1 when a row is over, each of which it names.
+    // time's p99, the commit included, isn't checked here, only warned of (Warn): CI runners' shared disks make commit
+    // times unsteady, so that target is checked on the clinic server. Returns the exit code, 1 when a row is over, each
+    // of which it names.
     internal static int Gate(IEnumerable<Result> results, TextWriter output)
     {
         var over = results.Where(result => result.OverBudget).ToList();
@@ -326,7 +358,8 @@ internal static partial class RenderBenchmark
             ? "which waits for them to reach the disk. Rest: everything else, from authentication to rendering."
             : "which with durability off doesn't wait for the disk. Rest: everything else, from authentication to rendering.");
         Console.WriteLine($"--assert gates on the p99 excluding the commit, which must be under {BudgetMilliseconds} ms. The same target for the whole request,");
-        Console.WriteLine("the commit included, is checked on the clinic server, not on CI runners, whose shared disks make commit times unsteady.");
+        Console.WriteLine("the commit included, is checked on the clinic server, not on CI runners, whose shared disks make commit times unsteady:");
+        Console.WriteLine("here a row over it gets a warning, in the row and after the table, which never fails the run.");
         Console.WriteLine();
         Console.WriteLine($"{"",-36}{"p50",7}{"p95",7}{"p99",7}{"max",7}  excl. commit{"p50",6}{"p99",7}  audit{"p50",6}{"p99",7}"
             + $"  commit{"p50",6}{"p99",7}{"max",7}  rest{"p50",6}{"p99",7}");
@@ -337,7 +370,7 @@ internal static partial class RenderBenchmark
                 + $"       {Percentile(result.Audit, 0.5),6:F1}{Percentile(result.Audit, 0.99),7:F1}"
                 + $"        {Percentile(result.Commit, 0.5),6:F1}{Percentile(result.Commit, 0.99),7:F1}{result.Commit.Max(),7:F1}"
                 + $"      {Percentile(result.Rest, 0.5),6:F1}{Percentile(result.Rest, 0.99),7:F1}"
-                + (result.OverBudget ? $"  not under {BudgetMilliseconds} ms excluding the commit" : ""));
+                + Markers(result));
         }
     }
 

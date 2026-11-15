@@ -11,7 +11,7 @@ namespace Ehr.Web.Tests;
 // Data Protection key there, which would sit unencrypted in a key ring shared by both of the stack's apps. And --stack
 // refuses before it starts without the certificate. Its own database's commits wait for the disk, and it can tell a
 // database whose commits don't. --assert, on made-up times, gates each kind of request's p99 of each request less its
-// own commit, and nothing else.
+// own commit, and nothing else; a full time's p99 not under the budget only gets a warning.
 public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -73,9 +73,72 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(expected, code);
     }
 
+    [Fact]
+    public void It_warns_of_a_page_over_20_ms_only_with_its_commits_and_still_passes()
+    {
+        var row = Row("Slow commits", (1_000, Total: 30, Audit: 5, Commit: 15));
+
+        var (code, output) = WarnThenGate(row);
+
+        Assert.Equal(0, code);
+        Assert.Contains($"warning: Slow commits: p99 including the commit {30.0:F1} ms, not under 20 ms. "
+            + "This doesn't fail the run: the full time's target is checked on the clinic server.", output);
+        Assert.Contains("--assert passed", output);
+        Assert.Equal("  warning: full time not under 20 ms", RenderBenchmark.Markers(row));
+    }
+
+    [Fact]
+    public void It_warns_of_nothing_when_every_full_time_is_under_20_ms()
+    {
+        var row = Row("Fast", (1_000, Total: 8, Audit: 1, Commit: 1));
+
+        using var output = new StringWriter();
+        RenderBenchmark.Warn([row], output);
+
+        Assert.Equal("", output.ToString());
+        Assert.Equal("", RenderBenchmark.Markers(row));
+    }
+
+    [Theory]
+    [InlineData(19.5, false)]
+    [InlineData(20.0, true)]
+    public void It_warns_when_the_full_times_p99_is_20_ms_or_more(double total, bool expected)
+    {
+        var row = Row("Boundary", (1_000, Total: total, Audit: 1, Commit: 5));
+
+        var (code, output) = WarnThenGate(row);
+
+        Assert.Equal(0, code);
+        Assert.Equal(expected, row.FullTimeOverBudget);
+        Assert.Equal(expected, output.Contains("warning: Boundary:", StringComparison.Ordinal));
+        Assert.Equal(expected, RenderBenchmark.Markers(row).Contains("warning: full time not under 20 ms", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_page_over_20_ms_either_way_fails_the_gate_and_gets_the_warning()
+    {
+        var row = Row("Slow both", (1_000, Total: 40, Audit: 2, Commit: 10));
+
+        var (code, output) = WarnThenGate(row);
+
+        Assert.Equal(1, code);
+        Assert.Contains($"warning: Slow both: p99 including the commit {40.0:F1} ms, not under 20 ms.", output);
+        Assert.Contains($"--assert failed: Slow both: p99 excluding the commit {30.0:F1} ms, not under 20 ms.", output);
+        Assert.Equal("  not under 20 ms excluding the commit  warning: full time not under 20 ms", RenderBenchmark.Markers(row));
+    }
+
     static (int Code, string Output) Gate(params RenderBenchmark.Result[] results)
     {
         using var output = new StringWriter();
+        var code = RenderBenchmark.Gate(results, output);
+        return (code, output.ToString());
+    }
+
+    // After the table, as a run with --assert does: the warnings, then the gate, whose code is the exit code.
+    static (int Code, string Output) WarnThenGate(params RenderBenchmark.Result[] results)
+    {
+        using var output = new StringWriter();
+        RenderBenchmark.Warn(results, output);
         var code = RenderBenchmark.Gate(results, output);
         return (code, output.ToString());
     }
