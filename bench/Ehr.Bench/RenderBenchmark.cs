@@ -29,8 +29,10 @@ namespace Ehr.Bench;
 // authentication, the page's queries and the reads it records, and rendering, with no network in it. Each kind of
 // request is made 100 times to warm up, then 1,000 times one after another, and the times are reported as
 // percentiles, with two parts of each apart from the rest: inserting the audit events of the page's reads, and
-// committing its transaction, which is when the database flushes them to disk, a flush with a long tail on some
-// machines.
+// committing its transaction, which waits for them to reach the disk. That wait is only there when the database's
+// fsync, synchronous_commit and full_page_writes are on, as they are on the stack's primary and in the PostgreSQL the
+// benchmark starts itself (MigratedDatabase.Durable; the tests' own have them off). It prints the three as it read
+// them, and with any of them off it says so over the table and refuses --assert.
 // The app logs only warnings while it runs, so the console doesn't weigh on the times.
 //
 // By default it starts its own PostgreSQL 18, migrated as the tests' is, and seeds it. With --stack it uses the web
@@ -60,7 +62,7 @@ internal static partial class RenderBenchmark
             if (!stack)
             {
                 Console.WriteLine($"Starting PostgreSQL 18 and seeding {patients:N0} synthetic patients...");
-                database = new MigratedDatabase();
+                database = MigratedDatabase.Durable();
                 await database.InitializeAsync();
                 await Seeder.LoadAsync(database.OwnerConnectionString, new SyntheticClinic(patients), CancellationToken.None);
                 connectionString = database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
@@ -76,6 +78,13 @@ internal static partial class RenderBenchmark
 
             var times = new DatabaseTimes();
             await using var app = new BenchApp(connectionString, times);
+            var durability = await ReadDurabilityAsync(app);
+            if (assert && !durability.IsOn)
+            {
+                Console.Error.WriteLine($"--assert needs a database whose commits wait for the disk, and this one has {durability}.");
+                return 2;
+            }
+
             if (stack && !await StackIsReadyAsync(app, patients))
             {
                 return 2;
@@ -106,7 +115,7 @@ internal static partial class RenderBenchmark
                     await MeasureAsync(client, times, "As you type, first 3 letters", typing: true, () => $"/patients?handler=Results&name={Anyone().Patient.FamilyName[..3]}"),
                 };
 
-                await PrintAsync(app, patients, results);
+                await PrintAsync(app, patients, durability, results);
                 return assert && results.Any(result => Percentile(result.Total, 0.99) > BudgetMilliseconds) ? 1 : 0;
             }
             finally
@@ -231,7 +240,41 @@ internal static partial class RenderBenchmark
         }
     }
 
-    static async Task PrintAsync(BenchApp app, int patients, List<Result> results)
+    // The settings that decide whether a commit waits for the disk, as the app's own connection has them: fsync and
+    // full_page_writes for the server, synchronous_commit for the session, where every value but off waits for the
+    // local flush.
+    internal sealed record Durability(string Fsync, string SynchronousCommit, string FullPageWrites)
+    {
+        public bool IsOn => Fsync == "on" && SynchronousCommit != "off" && FullPageWrites == "on";
+
+        public override string ToString() => $"fsync={Fsync}, synchronous_commit={SynchronousCommit}, full_page_writes={FullPageWrites}";
+    }
+
+    static async Task<Durability> ReadDurabilityAsync(BenchApp app)
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var connection = (NpgsqlConnection)scope.ServiceProvider.GetRequiredService<EhrDbContext>().Database.GetDbConnection();
+        await connection.OpenAsync();
+        return await ReadDurabilityAsync(connection);
+    }
+
+    internal static async Task<Durability> ReadDurabilityAsync(NpgsqlConnection connection)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT name, setting FROM pg_settings WHERE name IN ('fsync', 'synchronous_commit', 'full_page_writes')", connection);
+        var settings = new Dictionary<string, string>();
+        await using (var reader = await command.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                settings[reader.GetString(0)] = reader.GetString(1);
+            }
+        }
+
+        return new Durability(settings["fsync"], settings["synchronous_commit"], settings["full_page_writes"]);
+    }
+
+    static async Task PrintAsync(BenchApp app, int patients, Durability durability, List<Result> results)
     {
         string postgres;
         await using (var scope = app.Services.CreateAsyncScope())
@@ -243,11 +286,14 @@ internal static partial class RenderBenchmark
         }
 
         Console.WriteLine();
-        Console.WriteLine($"Server render time, {patients:N0} synthetic patients, {Measured:N0} requests each after {WarmUp} to warm up");
+        Console.WriteLine($"Server render time, {patients:N0} synthetic patients, {Measured:N0} requests each after {WarmUp} to warm up"
+            + (durability.IsOn ? "" : ", durability off: commits don't wait for the disk"));
         Console.WriteLine($"{RuntimeInformation.OSDescription}, {RuntimeInformation.OSArchitecture}, {Environment.ProcessorCount} processors, "
-            + $"{RuntimeInformation.FrameworkDescription}, PostgreSQL {postgres}");
+            + $"{RuntimeInformation.FrameworkDescription}, PostgreSQL {postgres}, {durability}");
         Console.WriteLine("Milliseconds. Audit: inserting the audit events of the page's reads. Commit: committing the page's");
-        Console.WriteLine("transaction, which flushes them to disk. Rest: everything else, from authentication to rendering.");
+        Console.WriteLine(durability.IsOn
+            ? "transaction, which waits for them to reach the disk. Rest: everything else, from authentication to rendering."
+            : "transaction, which with durability off doesn't wait for the disk. Rest: everything else, from authentication to rendering.");
         Console.WriteLine();
         Console.WriteLine($"{"",-36}{"p50",7}{"p95",7}{"p99",7}{"max",7}  audit{"p50",6}{"p99",7}  commit{"p50",6}{"p99",7}{"max",7}  rest{"p50",6}{"p99",7}");
         foreach (var result in results)

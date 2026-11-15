@@ -9,10 +9,39 @@ namespace Ehr.Web.Tests;
 
 // The benchmark's app (bench/Ehr.Bench) against a database whose key ring it didn't make and can't read: never a new
 // Data Protection key there, which would sit unencrypted in a key ring shared by both of the stack's apps. And --stack
-// refuses before it starts without the certificate.
+// refuses before it starts without the certificate. Its own database's commits wait for the disk, and it can tell a
+// database whose commits don't.
 public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task Its_own_database_waits_for_the_disk_at_every_commit()
+    {
+        await using var database = MigratedDatabase.Durable();
+        await database.InitializeAsync();
+        await using var connection = new NpgsqlConnection(database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+        await connection.OpenAsync(Cancel);
+
+        var durability = await RenderBenchmark.ReadDurabilityAsync(connection);
+
+        Assert.Equal(new RenderBenchmark.Durability(Fsync: "on", SynchronousCommit: "on", FullPageWrites: "on"), durability);
+        Assert.True(durability.IsOn);
+    }
+
+    // The tests' own database, as Testcontainers starts PostgreSQL: the benchmark would mark its table and refuse
+    // --assert.
+    [Fact]
+    public async Task It_tells_a_database_whose_commits_dont_wait_for_the_disk()
+    {
+        await using var connection = new NpgsqlConnection(apps.Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+        await connection.OpenAsync(Cancel);
+
+        var durability = await RenderBenchmark.ReadDurabilityAsync(connection);
+
+        Assert.Equal(new RenderBenchmark.Durability(Fsync: "off", SynchronousCommit: "off", FullPageWrites: "off"), durability);
+        Assert.False(durability.IsOn);
+    }
 
     [Fact]
     public void Against_the_stack_without_the_certificate_it_refuses_before_starting()
