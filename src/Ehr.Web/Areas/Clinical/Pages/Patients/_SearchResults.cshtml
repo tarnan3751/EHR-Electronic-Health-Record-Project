@@ -49,5 +49,9 @@ else
     else
     {
         <partial name="_PatientTable" model="new PatientTable(Model.PanelPatients, Model.Panel, MarkPanel: false, SearchQuery.None)" />
+        @if (Model.PanelMore)
+        {
+            <p>More patients are on your panel than are listed here: these are the first @IndexModel.PanelLimit, in name order. Search to find the others.</p>
+        }
     }
 }

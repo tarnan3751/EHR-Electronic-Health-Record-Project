@@ -115,11 +115,12 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return ReadAsync(patients, limit, cancellationToken);
     }
 
-    // The patients on the signed-in clinician's panel (PatientAssignment), the ones the clinic's home shows first.
-    public async Task<IReadOnlyList<Patient>> PanelAsync(int limit, CancellationToken cancellationToken) =>
-        (await ReadAsync(
+    // The patients on the signed-in clinician's panel (PatientAssignment), the ones the clinic's home shows first, and
+    // whether more are on it than the limit.
+    public Task<PatientList> PanelAsync(int limit, CancellationToken cancellationToken) =>
+        ReadAsync(
             db.Patients.Where(p => db.PatientAssignments.Any(a => a.PatientId == p.Id && a.ClinicianId == user.UserId && a.EndedAt == null)),
-            limit, cancellationToken)).Patients;
+            limit, cancellationToken);
 
     // A list of patients, in name order, each one a recorded read, and whether more match than the limit.
     async Task<PatientList> ReadAsync(IQueryable<Patient> query, int limit, CancellationToken cancellationToken)

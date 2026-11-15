@@ -38,8 +38,10 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
     // Whether a search ran: then Results holds what it found, otherwise PanelPatients the panel.
     public bool Searched { get; private set; }
 
-    // The panel, when there is no search.
+    // The panel, when there is no search, and whether more patients are on it than are listed.
     public IReadOnlyList<Patient> PanelPatients { get; private set; } = [];
+
+    public bool PanelMore { get; private set; }
 
     // The search results, when there is one, and whether more patients matched than are listed.
     public IReadOnlyList<Patient> Results { get; private set; } = [];
@@ -73,7 +75,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
             // pause, and Clear brings it back.
             if (!Live)
             {
-                PanelPatients = await phi.PanelAsync(PanelLimit, HttpContext.RequestAborted);
+                (PanelPatients, PanelMore) = await phi.PanelAsync(PanelLimit, HttpContext.RequestAborted);
             }
 
             return;

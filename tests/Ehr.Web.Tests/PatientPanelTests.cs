@@ -51,6 +51,7 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         var panel = await session.Client.GetStringAsync("/patients", Cancel);
         Assert.Contains("My patients", panel);
         Assert.Contains($"/patients/{patient}", panel);
+        Assert.DoesNotContain("More patients are on your panel", panel);
         var search = await session.Client.GetStringAsync("/patients?name=Paneled", Cancel);
         Assert.Contains($"/patients/{patient}", search);
         Assert.Contains("Yours", search);
@@ -86,9 +87,10 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Yours", theirSearch);
     }
 
-    // A search lists at most 50; the panel, which can't be narrowed, lists 100, each one a recorded read.
+    // A search lists at most 50; the panel, which can't be narrowed, lists 100, each one a recorded read, and says how
+    // to reach the rest.
     [Fact]
-    public async Task A_panel_of_101_lists_100_and_reads_each_once()
+    public async Task A_panel_of_101_lists_100_reads_each_once_and_says_to_search_for_the_rest()
     {
         var clinician = await apps.CreateStaffAsync("Dr. Busy", StaffRoles.Clinician);
         var family = "Crowd" + Guid.NewGuid().ToString("N")[..6];
@@ -106,6 +108,7 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
 
         var listed = ChartLink().Matches(panel).Select(match => Guid.Parse(match.Groups[1].Value)).ToList();
         Assert.Equal(100, listed.Count);
+        Assert.Contains("More patients are on your panel than are listed here: these are the first 100, in name order. Search to find the others.", panel);
         Assert.Equal(before + 100, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
         // In name order the 101st is the last, never listed, and never read. Each one listed was read once for each
         // listing, the sign-in's and this one.
