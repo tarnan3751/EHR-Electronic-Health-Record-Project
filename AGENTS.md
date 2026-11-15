@@ -52,7 +52,7 @@ The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 - The local server stack: the migration job applies cleanly, and the stack serves all three sites, replicates, and backs up.
 - macOS and Windows desktop builds, with `cargo fmt --check` and `cargo clippy -D warnings`.
 - The tests for `src/Ehr.Dictation/setup_models.py`, the dictation sidecar and the eval, and the sidecar's image built for `linux/amd64` and `linux/arm64`.
-- The committed dictation eval results (`eval/results`) come from the current prompt, note schema, validation rules and test set, show no order or allergy change, and score no lower than the last accepted baseline.
+- The committed dictation eval results (`eval/results/latest.json`) come from the current prompt, note schema, generation parameters, sidecar code, eval code and test set, cover every script with every recording sorted, show no order, allergy change or retracted value, and score no lower than the last accepted baseline.
 
 Gates added to `ci` as the code they check appears:
 
