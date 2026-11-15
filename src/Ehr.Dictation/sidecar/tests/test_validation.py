@@ -664,15 +664,22 @@ def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_document
     ("There's no reason not to order an MRI of the knee.", "order an MRI of the knee"),
     ("I can't not order an MRI.", "order an MRI"),
     ("There's no good reason not to order an MRI.", "order an MRI"),
+    ("There's no reason we should not order an MRI.", "order an MRI"),
+    ("There is no good reason that we can not order a CT today.", "order a CT today"),
+    ("No real reason why the team would not order labs.", "order labs"),
+    ("There's no reason she could not order a lipid panel.", "order a lipid panel"),
 ])
 def test_two_negations_make_an_instruction_again(said, instruction):
     assert said_instructions(said) == [instruction]
     assert "MRI" not in own(said, said).value
 
 
-def test_a_negation_of_something_else_does_not_undo_an_instruction_not_to():
-    said = "She has no chest pain so no need to order a troponin."
-
+@pytest.mark.parametrize("said", [
+    "She has no chest pain so no need to order a troponin.",
+    "There is no reason she should worry so do not order an MRI.",
+    "No reason for concern since the scan was normal and we should not order an MRI.",
+])
+def test_a_negation_of_something_else_does_not_undo_an_instruction_not_to(said):
     assert said_instructions(said) == []
     assert own(said, said).value == said
 
