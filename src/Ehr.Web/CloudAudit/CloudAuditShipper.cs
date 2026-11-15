@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Ehr.Data.Audit;
@@ -53,7 +52,7 @@ public sealed class CloudAuditShipper(
             {
                 Content = JsonContent.Create(events, options: JsonSerializerOptions.Web),
             };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Value);
+            request.Headers.Add(CloudAuditApi.KeyHeader, key.Value);
 
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(Timeout);

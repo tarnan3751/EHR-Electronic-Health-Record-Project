@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ehr.Web.Api.Audit;
 
 // The on-prem app's door for the cloud app's audit events (CloudAuditShipper). POST /api/audit/cloud-events with up to
-// MaxEvents events and the shared key as a bearer token; the events are inserted with source "cloud" and their own IDs
+// MaxEvents events and the shared key in KeyHeader; the events are inserted with source "cloud" and their own IDs
 // and times, and one already here is skipped. An empty batch is how the cloud app checks the on-prem app can save. The
 // cloud app forwards anyone's POST here, so the key is checked before the body is read, and the body is capped at
 // MaxBodySize. The audit log is append-only, so only what the cloud app records is taken: reads of one patient by the
@@ -18,6 +18,10 @@ namespace Ehr.Web.Api.Audit;
 public static class CloudAuditApi
 {
     public const string Path = "/api/audit/cloud-events";
+
+    // Its own header, not a bearer token: the API paths' authentication (DesktopTokenHandler) would look a bearer token
+    // up as a desktop session on every check-in, and log that it isn't one.
+    public const string KeyHeader = "X-Cloud-Audit-Key";
 
     public const int MaxEvents = 500;
 
@@ -38,13 +42,8 @@ public static class CloudAuditApi
             .WithMetadata(new RequestSizeLimitAttribute(MaxBodySize));
     }
 
-    static bool IsAuthorized(HttpRequest request, byte[] expected)
-    {
-        var header = request.Headers.Authorization.ToString();
-        const string scheme = "Bearer ";
-        return header.StartsWith(scheme, StringComparison.Ordinal)
-            && CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(header[scheme.Length..])), expected);
-    }
+    static bool IsAuthorized(HttpRequest request, byte[] expected) =>
+        CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(request.Headers[KeyHeader].ToString())), expected);
 
     static async Task<IResult> ImportAsync(HttpRequest request, EhrDbContext db, CancellationToken cancellationToken)
     {
@@ -83,6 +82,7 @@ public static class CloudAuditApi
             e.Source = AuditSources.Cloud;
         }
 
+        // Even for an empty batch: the shipper's check-in has to fail while the primary is down.
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await AuditEventImport.ImportAsync(db, events, cancellationToken);
         await transaction.CommitAsync(CancellationToken.None);

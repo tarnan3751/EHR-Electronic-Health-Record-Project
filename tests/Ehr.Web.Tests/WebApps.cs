@@ -402,7 +402,7 @@ public sealed class WebApps : IAsyncLifetime
             var path = request.RequestUri!.AbsolutePath;
             // With its primary down the on-prem app still answers what doesn't need the database, such as a request to
             // the audit endpoint without the key, which it refuses before reading anything.
-            var needsDatabase = path != CloudAuditApi.Path || request.Headers.Authorization is not null;
+            var needsDatabase = path != CloudAuditApi.Path || request.Headers.Contains(CloudAuditApi.KeyHeader);
             return (down && needsDatabase) || path == brokenPath
                 ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError))
                 : base.SendAsync(request, cancellationToken);

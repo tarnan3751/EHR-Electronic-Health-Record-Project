@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using Ehr.Data;
+using Ehr.Web.Api.Audit;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Yarp.ReverseProxy.Forwarder;
 
@@ -17,7 +18,7 @@ public sealed class CloudForwardingMiddleware(
 {
     static readonly ForwarderRequestConfig RequestConfig = new() { ActivityTimeout = TimeSpan.FromSeconds(30) };
 
-    readonly HttpTransformer transformer = new KeepWalPosition(lastSave);
+    readonly HttpTransformer transformer = new OnPremTransformer(lastSave);
 
     public async Task InvokeAsync(HttpContext context, EhrDbContext db)
     {
@@ -114,9 +115,21 @@ public sealed class CloudForwardingMiddleware(
         </html>
         """;
 
-    // Moves the on-prem app's WAL position from the response into the browser's LastSaveCookie.
-    sealed class KeepWalPosition(LastSaveCookie lastSave) : HttpTransformer
+    // Keeps the cloud audit key off what is forwarded, and moves the on-prem app's WAL position from the response into
+    // the browser's LastSaveCookie.
+    sealed class OnPremTransformer(LastSaveCookie lastSave) : HttpTransformer
     {
+        public override async ValueTask TransformRequestAsync(
+            HttpContext httpContext, HttpRequestMessage proxyRequest, string destinationPrefix, CancellationToken cancellationToken)
+        {
+            await base.TransformRequestAsync(httpContext, proxyRequest, destinationPrefix, cancellationToken);
+
+            // Only the shipper sends the key, straight to the on-prem app. From the internet the on-prem app is reached
+            // only through here, so this closes that path: a leaked key can't be used from the internet, only from the
+            // cloud box or the clinic's network.
+            proxyRequest.Headers.Remove(CloudAuditApi.KeyHeader);
+        }
+
         public override async ValueTask<bool> TransformResponseAsync(
             HttpContext httpContext, HttpResponseMessage? proxyResponse, CancellationToken cancellationToken)
         {

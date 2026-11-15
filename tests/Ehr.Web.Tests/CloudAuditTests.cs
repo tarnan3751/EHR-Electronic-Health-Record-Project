@@ -227,10 +227,26 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
 
         using var none = await PostAsync(events, key: null);
         using var wrong = await PostAsync(events, key: "not-the-key-not-the-key-not-the-key");
+        // The right key, where it used to go: no longer taken.
+        using var bearer = await PostAsync(events, WebApps.CloudAuditKey, asBearer: true);
 
         Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, bearer.StatusCode);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, patientId: patient));
+    }
+
+    // The cloud app doesn't pass the key on, so a leaked key can't be used from the internet, only from the cloud box or
+    // the clinic's network.
+    [Fact]
+    public async Task The_cloud_app_does_not_forward_the_key()
+    {
+        var shipped = Event(Guid.CreateVersion7());
+
+        using var response = await PostAsync([shipped], WebApps.CloudAuditKey, via: apps.Cloud);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.False(await RecordedAsync(shipped.Id));
     }
 
     [Fact]
@@ -347,7 +363,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         {
             Content = new StringContent("[{\"id\":", Encoding.UTF8, "application/json"),
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", WebApps.CloudAuditKey);
+        request.Headers.Add(CloudAuditApi.KeyHeader, WebApps.CloudAuditKey);
 
         using var response = await client.SendAsync(request, Cancel);
 
@@ -412,16 +428,21 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         return await client.SendAsync(request, Cancel);
     }
 
-    async Task<HttpResponseMessage> PostAsync(AuditEvent?[] events, string? key)
+    // To the on-prem app's import, with the key in its header or as a bearer token, straight or through another app.
+    async Task<HttpResponseMessage> PostAsync(AuditEvent?[] events, string? key, bool asBearer = false, WebApplicationFactory<Program>? via = null)
     {
-        using var client = CreateClient(apps.OnPrem, handleCookies: false);
+        using var client = CreateClient(via ?? apps.OnPrem, handleCookies: false);
         using var request = new HttpRequestMessage(HttpMethod.Post, CloudAuditApi.Path)
         {
             Content = JsonContent.Create(events, options: JsonSerializerOptions.Web),
         };
-        if (key is not null)
+        if (key is not null && asBearer)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        }
+        else if (key is not null)
+        {
+            request.Headers.Add(CloudAuditApi.KeyHeader, key);
         }
 
         return await client.SendAsync(request, Cancel);
