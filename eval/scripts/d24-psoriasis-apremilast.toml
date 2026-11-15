@@ -1,0 +1,42 @@
+# Dictation test script (synthetic): psoriasis starting apremilast, no spoken punctuation. Format: eval/README.md.
+id = "d24-psoriasis-apremilast"
+voice = "hf_alpha"
+tags = ["numbers", "drug-uncommon", "negation", "self-correction"]
+dates = []
+drugs = ["calcipotriol", "betamethasone", "apremilast"]
+text = """
+Dermatology note for a [[38-year-old|thirty-eight-year-old]] man with plaque psoriasis on the elbows knees and scalp
+for about ten years he has used calcipotriol and betamethasone gel which helps the scalp but the plaques on his legs
+keep coming back he also gets some stiffness in his fingers in the mornings for about ten minutes no swollen joints
+no nail pitting he does not want injections today about [[8%|eight percent]] of the body surface is involved
+[[PASI 12|pasi twelve]] no sorry [[PASI 10|pasi ten]] moderate plaque psoriasis not controlled with topicals we
+discussed options and agreed to start apremilast with the starter pack going up over five days to
+[[30 mg|thirty milligrams]] twice daily warned him about loose stools nausea headache and low mood and to tell us if
+his mood drops continue the scalp gel review in [[16 weeks|sixteen weeks]] and refer to rheumatology if the finger
+stiffness gets worse
+"""
+
+[gold.history]
+value = "38-year-old man with plaque psoriasis on the elbows, knees and scalp for about ten years. Calcipotriol and betamethasone gel helps the scalp, but the plaques on his legs keep coming back. Stiffness in his fingers in the mornings for about ten minutes. No swollen joints, no nail pitting. Does not want injections. About 8% of the body surface involved, PASI 10."
+sources = [
+    "38-year-old man with plaque psoriasis on the elbows knees and scalp for about ten years",
+    "he has used calcipotriol and betamethasone gel which helps the scalp but the plaques on his legs keep coming back",
+    "he also gets some stiffness in his fingers in the mornings for about ten minutes",
+    "no swollen joints no nail pitting",
+    "he does not want injections",
+    "about 8% of the body surface is involved",
+    "PASI 12 no sorry PASI 10",
+]
+
+[gold.assessment]
+value = "Moderate plaque psoriasis not controlled with topicals."
+sources = ["moderate plaque psoriasis not controlled with topicals"]
+
+[gold.plan]
+value = "Start apremilast with the starter pack, going up over five days to 30 mg twice daily. Warned about loose stools, nausea, headache and low mood, and to report if his mood drops. Continue the scalp gel. Review in 16 weeks. Refer to rheumatology if the finger stiffness gets worse."
+sources = [
+    "agreed to start apremilast with the starter pack going up over five days to 30 mg twice daily",
+    "warned him about loose stools nausea headache and low mood and to tell us if his mood drops",
+    "continue the scalp gel",
+    "review in 16 weeks and refer to rheumatology if the finger stiffness gets worse",
+]

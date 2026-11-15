@@ -1,0 +1,46 @@
+# Dictation test script (synthetic): schizophrenia on xanomeline and trospium. Format: eval/README.md.
+id = "d17-schizophrenia-xanomeline"
+voice = "hm_omega"
+tags = ["numbers", "drug-new", "negation", "self-correction", "spoken-punctuation"]
+dates = []
+drugs = ["risperidone", "xanomeline", "trospium"]
+text = """
+Psychiatry outpatient review {period} [[26-year-old|twenty-six-year-old]] man with schizophrenia {comma} seen with
+his mother {period} He stopped risperidone in the summer because of weight gain and loss of libido {period}
+[[4 weeks|Four weeks]] ago we started xanomeline and trospium {comma} [[50 mg|fifty milligrams]] and
+[[20 mg|twenty milligrams]] twice daily {comma} and increased it after a week to [[100 mg|one hundred milligrams]]
+and [[30 mg|thirty milligrams]] no sorry [[100 mg|one hundred milligrams]] and [[20 mg|twenty milligrams]] twice
+daily {period} He takes it an hour before breakfast and before his evening meal {period} He has had some nausea and
+constipation but no vomiting {period} The voices are quieter and he is sleeping better {period} He denies thoughts
+of harming himself or anyone else {period} No urinary problems {period} {new paragraph}
+Mental state {colon} calm and engaged {comma} speech normal {comma} no formal thought disorder {comma} he describes
+occasional voices in the background {period} Insight partial {period} {new paragraph}
+Impression {colon} schizophrenia with a partial response to xanomeline trospium {comma} tolerating it with mild
+gastrointestinal side effects {period} {new paragraph}
+Plan {colon} continue the current dose {comma} increase fiber and fluids for the constipation {comma} and review in
+[[4 weeks|four weeks]] {comma} when we can consider going up to [[125 mg|one hundred and twenty-five milligrams]]
+and [[30 mg|thirty milligrams]] twice daily {period}
+"""
+
+[gold.history]
+value = "26-year-old man with schizophrenia, seen with his mother. Stopped risperidone in the summer because of weight gain and loss of libido. Started xanomeline and trospium 4 weeks ago, 50 mg and 20 mg twice daily, increased after a week to 100 mg and 20 mg twice daily. Takes it an hour before breakfast and before his evening meal. Some nausea and constipation, no vomiting. Voices quieter, sleeping better. Denies thoughts of harming himself or anyone else. No urinary problems. Mental state: calm and engaged, speech normal, no formal thought disorder, occasional voices in the background. Insight partial."
+sources = [
+    "26-year-old man with schizophrenia, seen with his mother.",
+    "He stopped risperidone in the summer because of weight gain and loss of libido.",
+    "4 weeks ago we started xanomeline and trospium, 50 mg and 20 mg twice daily, and increased it after a week to 100 mg and 30 mg no sorry 100 mg and 20 mg twice daily.",
+    "He takes it an hour before breakfast and before his evening meal.",
+    "He has had some nausea and constipation but no vomiting.",
+    "The voices are quieter and he is sleeping better.",
+    "He denies thoughts of harming himself or anyone else.",
+    "No urinary problems.",
+    "Mental state: calm and engaged, speech normal, no formal thought disorder, he describes occasional voices in the background.",
+    "Insight partial.",
+]
+
+[gold.assessment]
+value = "Schizophrenia with a partial response to xanomeline trospium, tolerating it with mild gastrointestinal side effects."
+sources = ["schizophrenia with a partial response to xanomeline trospium, tolerating it with mild gastrointestinal side effects."]
+
+[gold.plan]
+value = "Continue the current dose. Increase fiber and fluids for the constipation. Review in 4 weeks, when going up to 125 mg and 30 mg twice daily can be considered."
+sources = ["continue the current dose, increase fiber and fluids for the constipation, and review in 4 weeks, when we can consider going up to 125 mg and 30 mg twice daily."]

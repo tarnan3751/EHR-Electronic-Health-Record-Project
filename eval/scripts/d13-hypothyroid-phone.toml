@@ -1,0 +1,35 @@
+# Dictation test script (synthetic): short endocrine phone follow-up with no assessment dictated and no spoken punctuation. Format: eval/README.md.
+id = "d13-hypothyroid-phone"
+voice = "ff_siwis"
+tags = ["short", "numbers", "drug-uncommon", "missing-field"]
+dates = []
+drugs = ["levothyroxine", "liothyronine"]
+text = """
+Endocrine phone follow-up [[45-year-old|forty-five-year-old]] woman with hypothyroidism after thyroid surgery her
+[[TSH|T S H]] came back at [[7.8|seven point eight]] on levothyroxine [[100 mcg|one hundred micrograms]] she has
+been taking it with her coffee and calcium tablets in the morning she still feels tired and cold we talked about
+taking it on an empty stomach an hour before breakfast and away from calcium she asked about liothyronine and I
+said we would revisit that only if she still feels unwell once her [[TSH|T S H]] is normal increase levothyroxine
+to [[112 mcg|one hundred twelve micrograms]] daily and repeat the [[TSH|T S H]] in [[6 weeks|six weeks]]
+"""
+
+[gold.history]
+value = "45-year-old woman with hypothyroidism after thyroid surgery. TSH 7.8 on levothyroxine 100 mcg. Has been taking it with her coffee and calcium tablets in the morning. Still feels tired and cold."
+sources = [
+    "45-year-old woman with hypothyroidism after thyroid surgery",
+    "her TSH came back at 7.8 on levothyroxine 100 mcg",
+    "she has been taking it with her coffee and calcium tablets in the morning",
+    "she still feels tired and cold",
+]
+
+[gold.assessment]
+value = ""
+sources = []
+
+[gold.plan]
+value = "Take levothyroxine on an empty stomach an hour before breakfast and away from calcium. Increase levothyroxine to 112 mcg daily and repeat the TSH in 6 weeks. Liothyronine to be revisited only if she still feels unwell once her TSH is normal."
+sources = [
+    "we talked about taking it on an empty stomach an hour before breakfast and away from calcium",
+    "increase levothyroxine to 112 mcg daily and repeat the TSH in 6 weeks",
+    "she asked about liothyronine and I said we would revisit that only if she still feels unwell once her TSH is normal",
+]

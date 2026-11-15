@@ -1,0 +1,43 @@
+# Dictation test script (synthetic): lipid clinic, familial chylomicronemia on olezarsen, no spoken punctuation. Format: eval/README.md.
+id = "d30-fcs-olezarsen"
+voice = "hm_omega"
+tags = ["dates", "numbers", "drug-new", "negation"]
+dates = ["2026-03-02", "2026-06-15"]
+drugs = ["olezarsen"]
+text = """
+Lipid clinic review [[34-year-old|thirty-four-year-old]] woman with familial chylomicronemia syndrome confirmed on
+genetic testing she has had four episodes of acute pancreatitis the last one on
+[[March 2, 2026|the second of March twenty twenty-six]] which needed [[5 days|five days]] in hospital she follows a
+very low fat diet under [[20 g|twenty grams]] of fat a day with the dietitian and does not drink alcohol olezarsen
+[[80 mg|eighty milligrams]] by monthly injection was started on
+[[June 15, 2026|the fifteenth of June twenty twenty-six]] her fasting triglycerides have come down from about
+[[2400|two thousand four hundred]] to [[880 mg/dL|eight hundred and eighty milligrams per deciliter]] no abdominal
+pain since starting no injection site problems apart from some redness for a day familial chylomicronemia syndrome
+with a good triglyceride response to olezarsen and no further pancreatitis continue monthly olezarsen continue the
+diet and the dietitian visits repeat triglycerides in [[3 months|three months]] and seek urgent care for any severe
+abdominal pain
+"""
+
+[gold.history]
+value = "34-year-old woman with familial chylomicronemia syndrome confirmed on genetic testing. Four episodes of acute pancreatitis, the last on March 2, 2026, needing 5 days in hospital. Very low fat diet, under 20 g of fat a day, with the dietitian; does not drink alcohol. Olezarsen 80 mg by monthly injection started on June 15, 2026. Fasting triglycerides down from about 2400 to 880 mg/dL. No abdominal pain since starting. No injection site problems apart from some redness for a day."
+sources = [
+    "34-year-old woman with familial chylomicronemia syndrome confirmed on genetic testing",
+    "she has had four episodes of acute pancreatitis the last one on March 2, 2026 which needed 5 days in hospital",
+    "she follows a very low fat diet under 20 g of fat a day with the dietitian and does not drink alcohol",
+    "olezarsen 80 mg by monthly injection was started on June 15, 2026",
+    "her fasting triglycerides have come down from about 2400 to 880 mg/dL",
+    "no abdominal pain since starting",
+    "no injection site problems apart from some redness for a day",
+]
+
+[gold.assessment]
+value = "Familial chylomicronemia syndrome with a good triglyceride response to olezarsen and no further pancreatitis."
+sources = ["familial chylomicronemia syndrome with a good triglyceride response to olezarsen and no further pancreatitis"]
+
+[gold.plan]
+value = "Continue monthly olezarsen. Continue the diet and the dietitian visits. Repeat triglycerides in 3 months. Seek urgent care for any severe abdominal pain."
+sources = [
+    "continue monthly olezarsen",
+    "continue the diet and the dietitian visits",
+    "repeat triglycerides in 3 months and seek urgent care for any severe abdominal pain",
+]

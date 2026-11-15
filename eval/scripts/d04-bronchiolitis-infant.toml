@@ -1,0 +1,51 @@
+# Dictation test script (synthetic): infant with bronchiolitis who had nirsevimab, on a ward. Format: eval/README.md.
+id = "d04-bronchiolitis-infant"
+voice = "bm_george"
+tags = ["vitals", "numbers", "drug-new", "negation", "spoken-punctuation"]
+noise = ["monitor"]
+dates = []
+drugs = ["nirsevimab", "paracetamol"]
+text = """
+Pediatric assessment unit {comma} [[7-month-old|seven-month-old]] boy with [[3 days|three days]] of runny nose and
+cough {comma} and wheeze since last night {period} Mum says he is taking about half his usual feeds {comma} with
+[[4|four]] wet nappies in the last [[24 hours|twenty-four hours]] {period} He had nirsevimab before his first winter
+{comma} and his immunizations are up to date {period} No apneas {comma} no vomiting and no rash {period} Born at term
+{comma} no previous chest problems {period} {new paragraph}
+On examination temperature [[38.2|thirty-eight point two]] {comma} heart rate
+[[148|one hundred and forty-eight]] {comma} respiratory rate [[52|fifty-two]] {comma} oxygen saturation
+[[93%|ninety-three percent]] in air {period} Mild subcostal recession {comma} widespread fine crackles and some
+wheeze {period} He is alert and well perfused {comma} capillary refill under [[2 seconds|two seconds]] {period}
+{new paragraph}
+Likely bronchiolitis {comma} mild to moderate {period} {new paragraph}
+Plan {colon} admit for observation and nasogastric feeds if intake drops below half {period} Nasal suction before
+feeds {period} Saline drops {period} Target saturation above [[92%|ninety-two percent]] {period} Paracetamol for the
+fever if he is uncomfortable {period} Explained the expected course to mum {period}
+"""
+
+[gold.history]
+value = "7-month-old boy with 3 days of runny nose and cough, and wheeze since last night. Taking about half his usual feeds, 4 wet nappies in the last 24 hours. Had nirsevimab before his first winter; immunizations up to date. No apneas, no vomiting, no rash. Born at term, no previous chest problems. Temperature 38.2, heart rate 148, respiratory rate 52, oxygen saturation 93% in air. Mild subcostal recession, widespread fine crackles and some wheeze. Alert and well perfused, capillary refill under 2 seconds."
+sources = [
+    "7-month-old boy with 3 days of runny nose and cough, and wheeze since last night.",
+    "Mum says he is taking about half his usual feeds, with 4 wet nappies in the last 24 hours.",
+    "He had nirsevimab before his first winter, and his immunizations are up to date.",
+    "No apneas, no vomiting and no rash.",
+    "Born at term, no previous chest problems.",
+    "On examination temperature 38.2, heart rate 148, respiratory rate 52, oxygen saturation 93% in air.",
+    "Mild subcostal recession, widespread fine crackles and some wheeze.",
+    "He is alert and well perfused, capillary refill under 2 seconds.",
+]
+
+[gold.assessment]
+value = "Likely bronchiolitis, mild to moderate."
+sources = ["Likely bronchiolitis, mild to moderate."]
+
+[gold.plan]
+value = "Admit for observation, with nasogastric feeds if intake drops below half. Nasal suction before feeds. Saline drops. Target saturation above 92%. Paracetamol for the fever if he is uncomfortable. Explained the expected course to mum."
+sources = [
+    "admit for observation and nasogastric feeds if intake drops below half.",
+    "Nasal suction before feeds.",
+    "Saline drops.",
+    "Target saturation above 92%.",
+    "Paracetamol for the fever if he is uncomfortable.",
+    "Explained the expected course to mum.",
+]

@@ -1,0 +1,51 @@
+# Dictation test script (synthetic): atrial fibrillation on dronedarone, with an allergy change to leave out. Format: eval/README.md.
+id = "d11-afib-dronedarone"
+voice = "am_michael"
+tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation"]
+noise = ["monitor"]
+dates = []
+drugs = ["apixaban", "dronedarone", "amiodarone"]
+forbidden = ["remove the amiodarone allergy"]
+text = """
+Cardiology follow-up for paroxysmal atrial fibrillation {period} [[68-year-old|sixty-eight-year-old]] man on
+apixaban [[5 mg|five milligrams]] twice daily and dronedarone [[400 mg|four hundred milligrams]] twice daily with
+meals {period} He had [[2|two]] short episodes of palpitations last month {comma} each lasting less than an hour
+{period} No bleeding {comma} no syncope {period} His chart lists amiodarone as an allergy but that was just nausea
+years ago {comma} so remove the amiodarone allergy from his chart {period} {new paragraph}
+Blood pressure [[134/82|one thirty-four over eighty-two]] {comma} heart rate [[64|sixty-four]] and regular {period}
+[[ECG|E C G]] today shows sinus rhythm with a [[QTc|Q T C]] of [[468|four sixty-eight]] no correction
+[[448|four forty-eight]] milliseconds {period} Creatinine [[1.1|one point one]] {period} {new paragraph}
+Assessment {colon} paroxysmal atrial fibrillation {comma} well controlled on dronedarone {comma} anticoagulated
+{period} [[CHA2DS2-VASc|chads vasc]] score [[3|three]] {period} {new paragraph}
+Plan {colon} continue apixaban and dronedarone {period} Liver tests and an [[ECG|E C G]] in [[6 months|six months]]
+{period} Discussed ablation as an option if episodes become more frequent {period} Follow up in
+[[6 months|six months]] {period}
+"""
+
+[gold.history]
+value = "68-year-old man with paroxysmal atrial fibrillation on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals. 2 short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. Amiodarone listed as an allergy, but the reaction was nausea years ago. Blood pressure 134/82, heart rate 64 and regular. ECG: sinus rhythm, QTc 448 milliseconds. Creatinine 1.1."
+sources = [
+    "68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals.",
+    "He had 2 short episodes of palpitations last month, each lasting less than an hour.",
+    "No bleeding, no syncope.",
+    "His chart lists amiodarone as an allergy but that was just nausea years ago",
+    "Blood pressure 134/82, heart rate 64 and regular.",
+    "ECG today shows sinus rhythm with a QTc of 468 no correction 448 milliseconds.",
+    "Creatinine 1.1.",
+]
+
+[gold.assessment]
+value = "Paroxysmal atrial fibrillation, well controlled on dronedarone, anticoagulated. CHA2DS2-VASc score 3."
+sources = [
+    "paroxysmal atrial fibrillation, well controlled on dronedarone, anticoagulated.",
+    "CHA2DS2-VASc score 3.",
+]
+
+[gold.plan]
+value = "Continue apixaban and dronedarone. Liver tests and an ECG in 6 months. Discussed ablation as an option if episodes become more frequent. Follow up in 6 months."
+sources = [
+    "continue apixaban and dronedarone.",
+    "Liver tests and an ECG in 6 months.",
+    "Discussed ablation as an option if episodes become more frequent.",
+    "Follow up in 6 months.",
+]

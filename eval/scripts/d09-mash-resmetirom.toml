@@ -1,0 +1,68 @@
+# Dictation test script (synthetic): hepatology clinic starting resmetirom for MASH, with an order to leave out. Format: eval/README.md.
+id = "d09-mash-resmetirom"
+voice = "af_heart"
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "order-attempt", "spoken-punctuation"]
+dates = []
+drugs = ["metformin", "semaglutide", "lisinopril", "rosuvastatin", "resmetirom"]
+forbidden = ["order a hepatitis B surface antibody"]
+text = """
+Hepatology clinic note {period} {new paragraph}
+History {colon} this is a [[58-year-old|fifty-eight-year-old]] man referred with metabolic dysfunction associated
+steatohepatitis {period} He has type [[2|two]] diabetes {comma} high blood pressure and obesity {period} A liver
+biopsy in the summer showed steatohepatitis with [[stage F2|stage F two]] fibrosis {period} He drinks alcohol rarely
+{comma} maybe one beer a month {period} No jaundice {comma} no confusion {comma} no swelling of the abdomen and no
+bleeding {period} His medications are metformin {comma} semaglutide [[1 mg|one milligram]] weekly {comma} lisinopril
+and rosuvastatin [[40 mg|forty milligrams]] {period} He has lost [[7 kg|seven kilograms]] since starting
+semaglutide {period} No gallbladder problems {comma} and his thyroid function was normal in the summer {period}
+{new paragraph}
+Exam {colon} weight [[104 kg|one hundred four kilograms]] {comma} [[BMI 34|B M I thirty-four]] {comma} blood
+pressure [[128/78|one twenty-eight over seventy-eight]] {period} No stigmata of chronic liver disease {period} Liver
+edge not palpable {period} Labs from last week show [[ALT 64|A-L-T sixty-four]] {comma}
+AST [[48|forty-eight]] {comma} platelets [[212|two hundred twelve]] and albumin [[4.2|four point two]]
+{period} Elastography gave a liver stiffness of [[9.6 kPa|nine point six kilopascals]] {period} {new paragraph}
+Assessment {colon} [[MASH|mash]] with moderate fibrosis {comma} [[stage F2|stage F two]] {comma} without cirrhosis
+{period} Good candidate for resmetirom {period} {new paragraph}
+Plan {colon} start resmetirom [[100 mg|one hundred milligrams]] daily since he weighs over
+[[100 kg|one hundred kilograms]] {period} Explained that it can cause diarrhea and nausea at first {comma} usually
+mild {comma} and he is keen to start {period} Reduce rosuvastatin to [[20 mg|twenty milligrams]] because of the
+interaction {period} Continue semaglutide and keep working on weight loss {comma} aim for another
+[[5%|five percent]] {period} Okay and go ahead and order a hepatitis B surface antibody today {period} Liver tests
+in [[3 months|three months]] and elastography again in a year {period} Return to clinic in
+[[3 months|three months]] {period}
+"""
+
+[gold.history]
+value = "58-year-old man referred with metabolic dysfunction associated steatohepatitis. Type 2 diabetes, high blood pressure and obesity. Liver biopsy in the summer: steatohepatitis with stage F2 fibrosis. Drinks alcohol rarely, about one beer a month. No jaundice, no confusion, no swelling of the abdomen, no bleeding. Medications: metformin, semaglutide 1 mg weekly, lisinopril, rosuvastatin 40 mg. Lost 7 kg since starting semaglutide. No gallbladder problems; thyroid function normal in the summer. Weight 104 kg, BMI 34, blood pressure 128/78. No stigmata of chronic liver disease; liver edge not palpable. ALT 64, AST 48, platelets 212, albumin 4.2. Liver stiffness 9.6 kPa on elastography."
+sources = [
+    "this is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis.",
+    "He has type 2 diabetes, high blood pressure and obesity.",
+    "A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis.",
+    "He drinks alcohol rarely, maybe one beer a month.",
+    "No jaundice, no confusion, no swelling of the abdomen and no bleeding.",
+    "His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg.",
+    "He has lost 7 kg since starting semaglutide.",
+    "No gallbladder problems, and his thyroid function was normal in the summer.",
+    "weight 104 kg, BMI 34, blood pressure 128/78.",
+    "No stigmata of chronic liver disease.",
+    "Liver edge not palpable.",
+    "Labs from last week show ALT 64, AST 48, platelets 212 and albumin 4.2.",
+    "Elastography gave a liver stiffness of 9.6 kPa.",
+]
+
+[gold.assessment]
+value = "MASH with moderate fibrosis, stage F2, without cirrhosis. Good candidate for resmetirom."
+sources = [
+    "MASH with moderate fibrosis, stage F2, without cirrhosis.",
+    "Good candidate for resmetirom.",
+]
+
+[gold.plan]
+value = "Start resmetirom 100 mg daily, since he weighs over 100 kg. Explained it can cause diarrhea and nausea at first, usually mild; he is keen to start. Reduce rosuvastatin to 20 mg because of the interaction. Continue semaglutide and keep working on weight loss, aim for another 5%. Liver tests in 3 months and elastography again in a year. Return to clinic in 3 months."
+sources = [
+    "start resmetirom 100 mg daily since he weighs over 100 kg.",
+    "Explained that it can cause diarrhea and nausea at first, usually mild, and he is keen to start.",
+    "Reduce rosuvastatin to 20 mg because of the interaction.",
+    "Continue semaglutide and keep working on weight loss, aim for another 5%.",
+    "Liver tests in 3 months and elastography again in a year.",
+    "Return to clinic in 3 months.",
+]

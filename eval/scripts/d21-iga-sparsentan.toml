@@ -1,0 +1,65 @@
+# Dictation test script (synthetic): nephrology clinic switching losartan to sparsentan for IgA nephropathy. Format: eval/README.md.
+id = "d21-iga-sparsentan"
+voice = "am_michael"
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "spoken-punctuation"]
+dates = []
+drugs = ["losartan", "dapagliflozin", "sparsentan"]
+text = """
+Nephrology clinic note {period} {new paragraph}
+[[41-year-old|Forty-one-year-old]] man with biopsy proven [[IgA|IGA]] nephropathy diagnosed
+[[18 months|eighteen months]] ago after he noticed cola colored urine during a chest infection {period} Since then
+he has been on losartan [[100 mg|one hundred milligrams]] daily and dapagliflozin [[10 mg|ten milligrams]] daily
+{period} Despite that his protein to creatinine ratio is still [[1.4 g|one point four grams]] per gram {comma} and
+his [[eGFR|E G F R]] has drifted from [[68|sixty-eight]] to [[59|fifty-nine]] over the year {period} He feels well
+{period} No visible blood in the urine since the first episode {comma} no swelling {comma} no rashes and no joint
+pains {period} He does not smoke and drinks very little {period} His father needed dialysis in his sixties {period} He
+works as a teacher and wants to keep working full time {period} {new paragraph}
+Blood pressure today [[136/84|one thirty-six over eighty-four]] {comma} pulse [[70|seventy]] {comma} weight
+[[88 kg|eighty-eight kilograms]] {period} No edema {period} Potassium [[4.8|four point eight]] {comma}
+[[ALT|A-L-T]] and AST normal {period} {new paragraph}
+Assessment {colon} [[IgA|IGA]] nephropathy at high risk of progression {comma} with persistent proteinuria above
+[[1 g|one gram]] a day and blood pressure above target despite maximal losartan {period} He is a good candidate
+for sparsentan {comma} which replaces the losartan {period} {new paragraph}
+Plan {colon} stop losartan tomorrow and start sparsentan [[200 mg|two hundred milligrams]] once daily for
+[[2 weeks|two weeks]] {comma} then [[400 mg|four hundred milligrams]] once daily {period} Continue dapagliflozin
+{period} Liver tests every month for the first year as required by the safety program {comma} and potassium and
+creatinine in [[2 weeks|two weeks]] {period} Home blood pressure readings with a target below
+[[125/75|one twenty-five over seventy-five]] {period} Low salt diet {comma} under [[2 g|two grams]] of sodium a day
+{period} He knows to stop it and call if he is dizzy or lightheaded {period} Clinic review in [[6 weeks|six weeks]]
+{period}
+"""
+
+[gold.history]
+value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. On losartan 100 mg daily and dapagliflozin 10 mg daily. Protein to creatinine ratio still 1.4 g per gram; eGFR drifted from 68 to 59 over the year. Feels well. No visible blood in the urine since the first episode, no swelling, no rashes, no joint pains. Does not smoke, drinks very little. Father needed dialysis in his sixties. Works as a teacher and wants to keep working full time. Blood pressure 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8; ALT and AST normal."
+sources = [
+    "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection.",
+    "Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily.",
+    "Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year.",
+    "He feels well.",
+    "No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains.",
+    "He does not smoke and drinks very little.",
+    "His father needed dialysis in his sixties.",
+    "He works as a teacher and wants to keep working full time.",
+    "Blood pressure today 136/84, pulse 70, weight 88 kg.",
+    "No edema.",
+    "Potassium 4.8, ALT and AST normal.",
+]
+
+[gold.assessment]
+value = "IgA nephropathy at high risk of progression, with persistent proteinuria above 1 g a day and blood pressure above target despite maximal losartan. Good candidate for sparsentan, which replaces the losartan."
+sources = [
+    "IgA nephropathy at high risk of progression, with persistent proteinuria above 1 g a day and blood pressure above target despite maximal losartan.",
+    "He is a good candidate for sparsentan, which replaces the losartan.",
+]
+
+[gold.plan]
+value = "Stop losartan tomorrow and start sparsentan 200 mg once daily for 2 weeks, then 400 mg once daily. Continue dapagliflozin. Liver tests every month for the first year as required by the safety program; potassium and creatinine in 2 weeks. Home blood pressure readings, target below 125/75. Low salt diet, under 2 g of sodium a day. Stop it and call if dizzy or lightheaded. Clinic review in 6 weeks."
+sources = [
+    "stop losartan tomorrow and start sparsentan 200 mg once daily for 2 weeks, then 400 mg once daily.",
+    "Continue dapagliflozin.",
+    "Liver tests every month for the first year as required by the safety program, and potassium and creatinine in 2 weeks.",
+    "Home blood pressure readings with a target below 125/75.",
+    "Low salt diet, under 2 g of sodium a day.",
+    "He knows to stop it and call if he is dizzy or lightheaded.",
+    "Clinic review in 6 weeks.",
+]

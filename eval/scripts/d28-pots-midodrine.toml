@@ -1,0 +1,52 @@
+# Dictation test script (synthetic): postural tachycardia syndrome, switching fludrocortisone to midodrine. Format: eval/README.md.
+id = "d28-pots-midodrine"
+voice = "af_heart"
+tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "spoken-punctuation"]
+noise = ["monitor"]
+dates = []
+drugs = ["fludrocortisone", "midodrine"]
+text = """
+Autonomic clinic follow-up {period} [[24-year-old|twenty-four-year-old]] woman with postural orthostatic tachycardia
+syndrome since a viral illness last year {period} She gets lightheaded and her heart races within a few minutes of
+standing {comma} worse in the heat and after hot showers {period} She has not fainted {period} She is drinking about
+[[2.5 liters|two and a half liters]] a day and taking salt tablets {period} Fludrocortisone
+[[0.1 mg|point one milligrams]] helped a little but gave her headaches {period} {new paragraph}
+Orthostatic vitals {colon} lying heart rate [[68|sixty-eight]] {comma} blood pressure
+[[108/70|one oh eight over seventy]] {period} After [[10 minutes|ten minutes]] standing heart rate
+[[124|one twenty-four]] wait no [[118|one eighteen]] {comma} blood pressure [[104/72|one oh four over seventy-two]]
+{period} Hands a little mottled on standing {period} Otherwise normal exam {period} {new paragraph}
+Assessment {colon} postural orthostatic tachycardia syndrome {comma} with a heart rate rise of [[50|fifty]] on
+standing and no orthostatic hypotension {comma} still symptomatic {period} {new paragraph}
+Plan {colon} stop fludrocortisone {period} Start midodrine [[5 mg|five milligrams]] three times a day {comma} on
+waking {comma} at midday and mid afternoon {comma} never within [[4 hours|four hours]] of lying down for the night
+{period} Compression stockings to the waist {period} Recumbent exercise program {comma} building up slowly {period}
+Recheck in [[6 weeks|six weeks]] {period}
+"""
+
+[gold.history]
+value = "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year. Lightheaded with her heart racing within a few minutes of standing, worse in the heat and after hot showers. Has not fainted. Drinking about 2.5 liters a day and taking salt tablets. Fludrocortisone 0.1 mg helped a little but gave her headaches. Lying heart rate 68, blood pressure 108/70. After 10 minutes standing heart rate 118, blood pressure 104/72. Hands a little mottled on standing. Otherwise normal exam."
+sources = [
+    "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year.",
+    "She gets lightheaded and her heart races within a few minutes of standing, worse in the heat and after hot showers.",
+    "She has not fainted.",
+    "She is drinking about 2.5 liters a day and taking salt tablets.",
+    "Fludrocortisone 0.1 mg helped a little but gave her headaches.",
+    "Orthostatic vitals: lying heart rate 68, blood pressure 108/70.",
+    "After 10 minutes standing heart rate 124 wait no 118, blood pressure 104/72.",
+    "Hands a little mottled on standing.",
+    "Otherwise normal exam.",
+]
+
+[gold.assessment]
+value = "Postural orthostatic tachycardia syndrome, with a heart rate rise of 50 on standing and no orthostatic hypotension; still symptomatic."
+sources = ["postural orthostatic tachycardia syndrome, with a heart rate rise of 50 on standing and no orthostatic hypotension, still symptomatic."]
+
+[gold.plan]
+value = "Stop fludrocortisone. Start midodrine 5 mg three times a day, on waking, at midday and mid afternoon, never within 4 hours of lying down for the night. Compression stockings to the waist. Recumbent exercise program, building up slowly. Recheck in 6 weeks."
+sources = [
+    "stop fludrocortisone.",
+    "Start midodrine 5 mg three times a day, on waking, at midday and mid afternoon, never within 4 hours of lying down for the night.",
+    "Compression stockings to the waist.",
+    "Recumbent exercise program, building up slowly.",
+    "Recheck in 6 weeks.",
+]

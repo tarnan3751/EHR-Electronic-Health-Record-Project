@@ -1,0 +1,50 @@
+# Dictation test script (synthetic): postpartum depression starting zuranolone. Format: eval/README.md.
+id = "d07-ppd-zuranolone"
+voice = "ff_siwis"
+tags = ["dates", "numbers", "drug-new", "negation", "self-correction", "spoken-punctuation"]
+dates = ["--09-30", "--10-29"]
+drugs = ["zuranolone"]
+text = """
+Psychiatry consultation for postpartum depression {period} [[32-year-old|thirty-two-year-old]] woman who delivered
+her second baby on [[September 30|September thirtieth]] {period} Since about two weeks after the delivery she has
+had low mood most of the day {comma} poor sleep even when the baby sleeps {comma} loss of interest and feelings of
+guilt {period} Her [[EPDS|E P D S]] score today is [[21|twenty-one]] no sorry [[19|nineteen]] {period} She denies
+thoughts of harming herself or the baby {period} No history of mania or psychosis {period} She is breastfeeding
+{period} Her partner is supportive and her mother is staying with them {period} {new paragraph}
+Mental status {colon} tearful {comma} speech normal {comma} thought content without suicidal ideation {comma}
+insight good {period} {new paragraph}
+Assessment {colon} moderate to severe postpartum depression {period} {new paragraph}
+Plan {colon} start zuranolone [[50 mg|fifty milligrams]] once nightly with a fatty meal for
+[[14 days|fourteen days]] {period} She must not drive for at least [[12 hours|twelve hours]] after each dose {period}
+Discussed pausing breastfeeding during the course and she prefers to pump and discard {period} Weekly therapy with
+the perinatal team {period} Safety plan reviewed and crisis line number given {period} Follow up on
+[[October 29|October twenty-ninth]] {period}
+"""
+
+[gold.history]
+value = "32-year-old woman who delivered her second baby on September 30. Since about two weeks after the delivery: low mood most of the day, poor sleep even when the baby sleeps, loss of interest and feelings of guilt. EPDS score 19. Denies thoughts of harming herself or the baby. No history of mania or psychosis. Breastfeeding. Partner supportive; her mother is staying with them. Mental status: tearful, speech normal, no suicidal ideation, insight good."
+sources = [
+    "32-year-old woman who delivered her second baby on September 30.",
+    "Since about two weeks after the delivery she has had low mood most of the day, poor sleep even when the baby sleeps, loss of interest and feelings of guilt.",
+    "Her EPDS score today is 21 no sorry 19.",
+    "She denies thoughts of harming herself or the baby.",
+    "No history of mania or psychosis.",
+    "She is breastfeeding.",
+    "Her partner is supportive and her mother is staying with them.",
+    "Mental status: tearful, speech normal, thought content without suicidal ideation, insight good.",
+]
+
+[gold.assessment]
+value = "Moderate to severe postpartum depression."
+sources = ["moderate to severe postpartum depression."]
+
+[gold.plan]
+value = "Start zuranolone 50 mg once nightly with a fatty meal for 14 days. Must not drive for at least 12 hours after each dose. Discussed pausing breastfeeding during the course; she prefers to pump and discard. Weekly therapy with the perinatal team. Safety plan reviewed and crisis line number given. Follow up on October 29."
+sources = [
+    "start zuranolone 50 mg once nightly with a fatty meal for 14 days.",
+    "She must not drive for at least 12 hours after each dose.",
+    "Discussed pausing breastfeeding during the course and she prefers to pump and discard.",
+    "Weekly therapy with the perinatal team.",
+    "Safety plan reviewed and crisis line number given.",
+    "Follow up on October 29.",
+]

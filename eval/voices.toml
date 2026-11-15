@@ -1,0 +1,129 @@
+# Voices and background noise for the dictation test set's synthetic audio, read by eval/generate_audio.py.
+#
+# Every clip is synthesized by one text-to-speech model, Kokoro-82M v1.0, pinned below to a commit of its Hugging
+# Face repository. Each script names one of the voices here. The voices labelled `*-voice` are not English voices:
+# they are Kokoro's Hindi, Spanish and French voices reading English with the English pronunciation rules.
+# They are synthetic stand-ins for accented speech, so that the set isn't all one kind of voice. They are not
+# real regional accents and say nothing about how MedASR handles any real accent; only recordings of people can.
+#
+# Noise is made procedurally from seeded random numbers (recipes below), not from recordings, so it has no
+# licence to track. Checked on 2026-11-15: the licences below come from the model card (README.md) and VOICES.md
+# at the pinned commit, and from each package's metadata on PyPI.
+
+[model]
+name = "Kokoro-82M v1.0"
+repository = "hexgrad/Kokoro-82M"
+revision = "f3ff3571791e39611d31c381e3a41a3af07b4987"
+file = "kokoro-v1_0.pth"
+config = "config.json"
+# The SHA-256 the model card publishes for kokoro-v1_0.pth; the generator checks the downloaded file against it.
+sha256 = "496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4"
+license = "Apache-2.0 (model card front matter; the card says the weights are Apache-licensed)"
+# Not shipped and not committed: the weights stay in the Hugging Face cache, the audio in eval/audio/ (gitignored).
+# Packages, pinned in generate_audio.py: kokoro 0.9.4 and misaki 0.9.4 (Apache-2.0, PyPI classifiers),
+# spaCy (MIT) with en_core_web_sm 3.8.0 (MIT). misaki looks up English words in its own dictionaries; a word it
+# doesn't know, which here is mostly the newer drug names, is pronounced by espeak-ng instead, through
+# phonemizer-fork 3.3.2 and espeakng-loader 0.2.4, both GPL-3.0. They run only inside the generator, on the
+# machine making the audio, and are never shipped with anything.
+
+# Each voice: `accent` (the short form the manifest and the scoring use, as accent:<accent>), `english` (the
+# English pronunciation rules it reads with: "us" or "gb"), and where it comes from. Every voice file is
+# voices/<name>.pt in the repository above, at the pinned revision, under the repository's Apache-2.0 licence.
+# `grade` is VOICES.md's overall grade for the voice's training data (A best, F worst).
+
+[voices.af_heart]
+accent = "us"
+english = "us"
+description = "American English, female"
+grade = "A"
+license = "Apache-2.0"
+
+[voices.am_michael]
+accent = "us"
+english = "us"
+description = "American English, male"
+grade = "C+"
+license = "Apache-2.0"
+
+[voices.bf_emma]
+accent = "gb"
+english = "gb"
+description = "British English, female"
+grade = "B-"
+license = "Apache-2.0"
+
+[voices.bm_george]
+accent = "gb"
+english = "gb"
+description = "British English, male"
+grade = "C"
+license = "Apache-2.0"
+
+[voices.hf_alpha]
+accent = "hi-voice"
+english = "gb"
+description = "Kokoro's Hindi female voice reading English: a synthetic stand-in, not a real Indian English accent"
+grade = "C"
+license = "Apache-2.0"
+
+[voices.hm_omega]
+accent = "hi-voice"
+english = "gb"
+description = "Kokoro's Hindi male voice reading English: a synthetic stand-in, not a real Indian English accent"
+grade = "C"
+license = "Apache-2.0"
+
+[voices.ef_dora]
+accent = "es-voice"
+english = "us"
+description = "Kokoro's Spanish female voice reading English: a synthetic stand-in, not a real Spanish accent"
+grade = "not graded in VOICES.md"
+license = "Apache-2.0"
+
+[voices.ff_siwis]
+accent = "fr-voice"
+english = "us"
+description = "Kokoro's French female voice reading English: a synthetic stand-in, not a real French accent"
+grade = "B-"
+# The model card lists SIWIS (CC BY 4.0, https://datashare.ed.ac.uk/handle/10283/2353) among this voice's
+# training data. Credit it if audio made with this voice is ever shared outside the team.
+license = "Apache-2.0; trained in part on SIWIS (CC BY 4.0)"
+
+# ---- Noise --------------------------------------------------------------------------------------------------------
+# Every noise is generated at 24 kHz, as long as the clip, from a random generator seeded with the variant's id, so
+# the same variant gets the same noise on every run. Pink noise is white noise shaped to a 1/f power spectrum.
+
+[noise.hvac]
+description = "Ventilation and air handling: pink noise, low-passed"
+lowpass_hz = 350
+lowpass_order = 2
+
+[noise.babble]
+description = "A busy room: six other Kokoro voices reading the unrelated everyday texts below at once, at equal level, each looped from its own random starting point"
+voices = ["af_bella", "af_nicole", "am_fenrir", "am_puck", "bf_isabella", "bm_lewis"]
+texts = [
+    "The forecast for the weekend looks mixed. Saturday starts bright, with a light wind from the west, but clouds build through the afternoon and there may be a shower or two by the evening. Sunday should be drier and a little warmer, so if you were planning to walk along the river or visit the market, that is probably the better day for it.",
+    "For the bread, mix the flour, the salt and the yeast in a large bowl, then add the warm water a little at a time until the dough comes together. Knead it for about ten minutes, until it is smooth and springs back when you press it. Leave it somewhere warm until it has doubled in size, shape it gently, and bake it until the bottom sounds hollow when tapped.",
+    "Starting next month, the early train will leave the main station ten minutes later than it does now, and the last train in the evening will stop at every station on the line. The bus that meets the train at the bridge will wait for it if it runs late. New timetables are on the website and on the boards by the ticket office.",
+    "The tomatoes did well this year, but the beans were slow, probably because of the cold start to the season. Next spring I want to move the herbs closer to the kitchen door, build a second compost bin behind the shed, and try a row of sunflowers along the back fence where the light is best in the afternoon.",
+    "It was a close match all the way through. The home side scored early from a corner, the visitors equalised just before half time, and for most of the second half neither team could find a way through. Then, with only a few minutes left, a long pass over the top found the winger, who cut inside and curled it into the far corner.",
+    "The library is open late on Thursdays, until eight, and on Saturday mornings. You can return books at the desk or through the slot by the front door at any time. The reading group meets on the first Monday of each month, and this month they are talking about a novel set on a small island during a very long winter.",
+]
+
+[noise.monitor]
+description = "A patient monitor: short pulse beeps, with their pitch and rate set per variant, over a pink noise floor"
+beep_hz = [660, 990]          # each variant picks one pitch in this range, with its 2nd and 3rd harmonics
+beep_seconds = 0.12
+beats_per_minute = [60, 100]  # each variant picks a rate in this range; each beat is jittered by up to 3%
+floor_db = -24                # the pink floor, relative to the beeps
+
+# ---- Variants -----------------------------------------------------------------------------------------------------
+# Every script gets one clean item. A script that lists `noise` also gets each of its noise types mixed in at each
+# SNR below, measured on the frames where the clean speech is active. The scripts in `unusable` also get one more,
+# at `unusable_snr_db`, made to be too noisy to transcribe. Items alternate between the two containers browsers
+# record: WebM with Opus (Chromium) and fragmented MP4 with AAC (WebKit).
+
+[variants]
+snr_db = [20, 10, 5]
+unusable_snr_db = 0
+unusable = ["d01-htn-aprocitentan", "d11-afib-dronedarone", "d16-gout-febuxostat", "d19-migraine-zavegepant"]

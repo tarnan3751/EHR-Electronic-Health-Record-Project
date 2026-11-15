@@ -1,0 +1,30 @@
+# Dictation test script (synthetic): short plan-only addendum, with no history or assessment dictated. Format: eval/README.md.
+id = "d33-addendum-potassium"
+voice = "bm_george"
+tags = ["short", "numbers", "missing-field", "spoken-punctuation"]
+dates = []
+drugs = ["spironolactone", "ramipril"]
+text = """
+Addendum to this morning's clinic letter {period} Plan {colon} hold the spironolactone for now {comma} repeat
+potassium and kidney function on Thursday at the surgery {comma} and if the potassium is still above
+[[5.5|five point five]] {comma} stop the spironolactone altogether and let me know {period} The patient has been
+told by phone and understands {period} Low potassium diet sheet posted out today {period} Continue the rest of his
+medicines unchanged {comma} including the ramipril {period} End of addendum {period}
+"""
+
+[gold.history]
+value = ""
+sources = []
+
+[gold.assessment]
+value = ""
+sources = []
+
+[gold.plan]
+value = "Hold the spironolactone for now. Repeat potassium and kidney function on Thursday at the surgery; if the potassium is still above 5.5, stop the spironolactone altogether and let me know. Patient told by phone and understands. Low potassium diet sheet posted out today. Continue the rest of his medicines unchanged, including the ramipril."
+sources = [
+    "hold the spironolactone for now, repeat potassium and kidney function on Thursday at the surgery, and if the potassium is still above 5.5, stop the spironolactone altogether and let me know.",
+    "The patient has been told by phone and understands.",
+    "Low potassium diet sheet posted out today.",
+    "Continue the rest of his medicines unchanged, including the ramipril.",
+]

@@ -1,0 +1,67 @@
+# Dictation test script (synthetic): pulmonary arterial hypertension clinic on sotatercept. Format: eval/README.md.
+id = "d10-pah-sotatercept"
+voice = "bm_george"
+tags = ["long", "vitals", "numbers", "dates", "drug-new", "negation", "spoken-punctuation"]
+dates = ["--11-10", "--12-01"]
+drugs = ["macitentan", "tadalafil", "sotatercept"]
+text = """
+Pulmonary hypertension clinic {period} [[47-year-old|forty-seven-year-old]] woman with idiopathic pulmonary arterial
+hypertension diagnosed [[4 years|four years]] ago {comma} on macitentan [[10 mg|ten milligrams]] daily and tadalafil
+[[40 mg|forty milligrams]] daily {period} She started sotatercept [[6 months|six months]] ago {comma} given as an
+injection under the skin every [[3 weeks|three weeks]] {comma} and her last dose was on
+[[November 10|the tenth of November]] {period} She feels much better {period} She can now climb two flights of
+stairs without stopping {comma} which she could not do in the spring {period} No chest pain {comma} no fainting
+{comma} no ankle swelling {period} She has had a couple of nosebleeds and some small red spots on her cheeks {period}
+The nosebleeds are short and stop with pressure {period} She is back at work full time {period} {new paragraph}
+On examination blood pressure [[118/72|one hundred and eighteen over seventy-two]] {comma} heart rate
+[[76|seventy-six]] {comma} saturation [[96%|ninety-six percent]] at rest {period} A few telangiectasias on the
+cheeks {period} Heart sounds normal with a loud [[P2|P two]] {period} No peripheral edema {period} Her
+[[6-minute|six minute]] walk distance today was [[452 meters|four hundred and fifty-two meters]] {comma} up from
+[[371|three hundred and seventy-one]] before sotatercept {period} [[NT-proBNP|N T pro B N P]] is
+[[310|three hundred and ten]] {comma} down from [[1240|one thousand two hundred and forty]] {period} Hemoglobin
+[[15.1|fifteen point one]] and platelets [[168|one hundred and sixty-eight]] {period} {new paragraph}
+Impression {colon} pulmonary arterial hypertension {comma} now [[WHO functional class 2|W H O functional class two]]
+{comma} improving on triple therapy with sotatercept {period} Mild telangiectasias and nosebleeds {comma} likely
+related to sotatercept {period} {new paragraph}
+Plan {colon} continue sotatercept at the same dose {comma} next injection due on
+[[December 1|the first of December]] {period} Check hemoglobin and platelets before each of the next
+[[5|five]] doses {period} Saline nasal gel for the nosebleeds {period} Continue macitentan and tadalafil {period}
+Review in [[3 months|three months]] with an echo {period}
+"""
+
+[gold.history]
+value = "47-year-old woman with idiopathic pulmonary arterial hypertension diagnosed 4 years ago, on macitentan 10 mg daily and tadalafil 40 mg daily. Started sotatercept 6 months ago, injection under the skin every 3 weeks; last dose on November 10. Feels much better; can now climb two flights of stairs without stopping, which she could not do in the spring. No chest pain, no fainting, no ankle swelling. A couple of nosebleeds, short and stopping with pressure, and some small red spots on her cheeks. Back at work full time. Blood pressure 118/72, heart rate 76, saturation 96% at rest. A few telangiectasias on the cheeks. Heart sounds normal with a loud P2. No peripheral edema. 6-minute walk distance 452 meters, up from 371 before sotatercept. NT-proBNP 310, down from 1240. Hemoglobin 15.1, platelets 168."
+sources = [
+    "47-year-old woman with idiopathic pulmonary arterial hypertension diagnosed 4 years ago, on macitentan 10 mg daily and tadalafil 40 mg daily.",
+    "She started sotatercept 6 months ago, given as an injection under the skin every 3 weeks, and her last dose was on November 10.",
+    "She feels much better.",
+    "She can now climb two flights of stairs without stopping, which she could not do in the spring.",
+    "No chest pain, no fainting, no ankle swelling.",
+    "She has had a couple of nosebleeds and some small red spots on her cheeks.",
+    "The nosebleeds are short and stop with pressure.",
+    "She is back at work full time.",
+    "On examination blood pressure 118/72, heart rate 76, saturation 96% at rest.",
+    "A few telangiectasias on the cheeks.",
+    "Heart sounds normal with a loud P2.",
+    "No peripheral edema.",
+    "Her 6-minute walk distance today was 452 meters, up from 371 before sotatercept.",
+    "NT-proBNP is 310, down from 1240.",
+    "Hemoglobin 15.1 and platelets 168.",
+]
+
+[gold.assessment]
+value = "Pulmonary arterial hypertension, now WHO functional class 2, improving on triple therapy with sotatercept. Mild telangiectasias and nosebleeds, likely related to sotatercept."
+sources = [
+    "pulmonary arterial hypertension, now WHO functional class 2, improving on triple therapy with sotatercept.",
+    "Mild telangiectasias and nosebleeds, likely related to sotatercept.",
+]
+
+[gold.plan]
+value = "Continue sotatercept at the same dose; next injection due on December 1. Check hemoglobin and platelets before each of the next 5 doses. Saline nasal gel for the nosebleeds. Continue macitentan and tadalafil. Review in 3 months with an echo."
+sources = [
+    "continue sotatercept at the same dose, next injection due on December 1.",
+    "Check hemoglobin and platelets before each of the next 5 doses.",
+    "Saline nasal gel for the nosebleeds.",
+    "Continue macitentan and tadalafil.",
+    "Review in 3 months with an echo.",
+]

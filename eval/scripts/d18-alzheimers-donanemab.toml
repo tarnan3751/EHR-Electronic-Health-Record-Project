@@ -1,0 +1,52 @@
+# Dictation test script (synthetic): memory clinic on donanemab, with a lab order to leave out. Format: eval/README.md.
+id = "d18-alzheimers-donanemab"
+voice = "bm_george"
+tags = ["dates", "numbers", "drug-new", "negation", "order-attempt", "spoken-punctuation"]
+dates = ["--10-21", "--11-18"]
+drugs = ["donanemab", "donepezil"]
+forbidden = ["order a vitamin B12 level"]
+text = """
+Memory clinic follow-up {period} [[74-year-old|seventy-four-year-old]] woman with early Alzheimer's disease
+confirmed on amyloid [[PET|pet]] {comma} here with her husband {period} She has had [[3|three]] infusions of
+donanemab {comma} the last on [[October 21|the twenty-first of October]] {period} She tolerated them without any
+reaction {period} Her husband says she is about the same {comma} still managing at home with prompts for
+appointments and medicines {period} No headaches {comma} no confusion after the infusions {comma} no falls and no
+change in vision {period} She is [[APOE4|APOE four]] heterozygous {period} {new paragraph}
+[[MoCA|Moca]] today [[21 out of 30|twenty-one out of thirty]] {comma} the same as in the summer {period}
+Neurological examination unchanged {period} Her [[MRI|M R I]] last week showed no [[ARIA|aria]] {period}
+{new paragraph}
+Impression {colon} mild cognitive impairment due to Alzheimer's disease {comma} stable on donanemab with no amyloid
+related imaging abnormalities so far {period} {new paragraph}
+Plan {colon} continue monthly donanemab {comma} fourth infusion on [[November 18|the eighteenth of November]]
+{period} Repeat [[MRI|M R I]] before the seventh infusion {period} Carry on with donepezil [[10 mg|ten milligrams]]
+at night {period} And please order a vitamin [[B12|B twelve]] level today {period} Driving to stop for now as
+discussed with them both {period} Review in [[3 months|three months]] {period}
+"""
+
+[gold.history]
+value = "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband. 3 infusions of donanemab, the last on October 21, tolerated without any reaction. About the same per her husband; still managing at home with prompts for appointments and medicines. No headaches, no confusion after the infusions, no falls, no change in vision. APOE4 heterozygous. MoCA 21 out of 30, the same as in the summer. Neurological examination unchanged. MRI last week showed no ARIA."
+sources = [
+    "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband.",
+    "She has had 3 infusions of donanemab, the last on October 21.",
+    "She tolerated them without any reaction.",
+    "Her husband says she is about the same, still managing at home with prompts for appointments and medicines.",
+    "No headaches, no confusion after the infusions, no falls and no change in vision.",
+    "She is APOE4 heterozygous.",
+    "MoCA today 21 out of 30, the same as in the summer.",
+    "Neurological examination unchanged.",
+    "Her MRI last week showed no ARIA.",
+]
+
+[gold.assessment]
+value = "Mild cognitive impairment due to Alzheimer's disease, stable on donanemab with no amyloid related imaging abnormalities so far."
+sources = ["mild cognitive impairment due to Alzheimer's disease, stable on donanemab with no amyloid related imaging abnormalities so far."]
+
+[gold.plan]
+value = "Continue monthly donanemab; fourth infusion on November 18. Repeat MRI before the seventh infusion. Carry on with donepezil 10 mg at night. Driving to stop for now, as discussed with them both. Review in 3 months."
+sources = [
+    "continue monthly donanemab, fourth infusion on November 18.",
+    "Repeat MRI before the seventh infusion.",
+    "Carry on with donepezil 10 mg at night.",
+    "Driving to stop for now as discussed with them both.",
+    "Review in 3 months.",
+]

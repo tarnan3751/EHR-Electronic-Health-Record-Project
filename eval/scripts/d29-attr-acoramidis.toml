@@ -1,0 +1,67 @@
+# Dictation test script (synthetic): cardiac amyloidosis clinic switching tafamidis to acoramidis. Format: eval/README.md.
+id = "d29-attr-acoramidis"
+voice = "am_michael"
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "spoken-punctuation"]
+dates = []
+drugs = ["tafamidis", "acoramidis", "furosemide", "apixaban"]
+text = """
+Cardiology clinic {comma} cardiac amyloidosis follow-up {period} {new paragraph}
+History {colon} [[79-year-old|seventy-nine-year-old]] man with wild type transthyretin amyloid cardiomyopathy
+diagnosed last year on a technetium [[PYP|P Y P]] scan {comma} after he presented with heart failure and bilateral
+carpal tunnel syndrome {period} He has been on tafamidis {comma} but his insurance will no longer cover it {comma} so
+we are switching to acoramidis {period} He is short of breath walking about one block and has to rest on the stairs
+{period} He sleeps flat {period} No chest pain {comma} no fainting {comma} no palpitations {period} His ankles swell
+by the evening {period} He takes furosemide [[40 mg|forty milligrams]] twice daily and apixaban
+[[5 mg|five milligrams]] twice daily for atrial fibrillation {period} {new paragraph}
+Exam {colon} blood pressure [[106/64|one oh six over sixty-four]] {comma} heart rate [[72|seventy-two]] and
+irregular {comma} weight [[74 kg|seventy-four kilograms]] {comma} up [[2 kg|two kilograms]] from last visit {period}
+[[JVP|J V P]] up to the angle of the jaw {period} Bibasal crackles {period} Pitting edema to the mid shins {period}
+[[NT-proBNP|N T pro B N P]] is [[3400|thirty-four hundred]] {comma} up from [[2100|twenty-one hundred]] {comma} and
+creatinine [[1.5|one point five]] {period} His echo showed an ejection fraction of [[45%|forty-five percent]] with
+thick walls {period} {new paragraph}
+Assessment {colon} transthyretin amyloid cardiomyopathy {comma} NYHA [[class 3|class three]] {comma} with
+fluid overload today {period} Atrial fibrillation {comma} rate controlled {comma} anticoagulated {period}
+{new paragraph}
+Plan {colon} stop tafamidis and start acoramidis [[712 mg|seven hundred twelve milligrams]] twice daily {period}
+Increase furosemide to [[80 mg|eighty milligrams]] in the morning and [[40 mg|forty milligrams]] in the afternoon for
+[[5 days|five days]] {comma} then back to [[40 mg|forty milligrams]] twice daily {period} Kidney function and
+potassium on Friday {period} Daily weights {comma} call the heart failure nurse if up more than
+[[1 kg|one kilogram]] in a day {period} Continue apixaban {period} Clinic review in [[4 weeks|four weeks]] {period}
+"""
+
+[gold.history]
+value = "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after presenting with heart failure and bilateral carpal tunnel syndrome. On tafamidis, which his insurance will no longer cover. Short of breath walking about one block; has to rest on the stairs. Sleeps flat. No chest pain, no fainting, no palpitations. Ankles swell by the evening. Furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation. Blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit. JVP up to the angle of the jaw. Bibasal crackles. Pitting edema to the mid shins. NT-proBNP 3400, up from 2100; creatinine 1.5. Echo: ejection fraction 45% with thick walls."
+sources = [
+    "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after he presented with heart failure and bilateral carpal tunnel syndrome.",
+    "He has been on tafamidis, but his insurance will no longer cover it",
+    "He is short of breath walking about one block and has to rest on the stairs.",
+    "He sleeps flat.",
+    "No chest pain, no fainting, no palpitations.",
+    "His ankles swell by the evening.",
+    "He takes furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation.",
+    "blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit.",
+    "JVP up to the angle of the jaw.",
+    "Bibasal crackles.",
+    "Pitting edema to the mid shins.",
+    "NT-proBNP is 3400, up from 2100, and creatinine 1.5.",
+    "His echo showed an ejection fraction of 45% with thick walls.",
+]
+
+[gold.assessment]
+value = "Transthyretin amyloid cardiomyopathy, NYHA class 3, with fluid overload today. Atrial fibrillation, rate controlled, anticoagulated."
+sources = [
+    "transthyretin amyloid cardiomyopathy, NYHA class 3, with fluid overload today.",
+    "Atrial fibrillation, rate controlled, anticoagulated.",
+]
+
+[gold.plan]
+value = "Stop tafamidis and start acoramidis 712 mg twice daily, since insurance will no longer cover tafamidis. Increase furosemide to 80 mg in the morning and 40 mg in the afternoon for 5 days, then back to 40 mg twice daily. Kidney function and potassium on Friday. Daily weights; call the heart failure nurse if up more than 1 kg in a day. Continue apixaban. Clinic review in 4 weeks."
+sources = [
+    "so we are switching to acoramidis.",
+    "stop tafamidis and start acoramidis 712 mg twice daily.",
+    "Increase furosemide to 80 mg in the morning and 40 mg in the afternoon for 5 days, then back to 40 mg twice daily.",
+    "Kidney function and potassium on Friday.",
+    "Daily weights, call the heart failure nurse if up more than 1 kg in a day.",
+    "Continue apixaban.",
+    "Clinic review in 4 weeks.",
+]

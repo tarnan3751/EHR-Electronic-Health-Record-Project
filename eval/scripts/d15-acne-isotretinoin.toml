@@ -1,0 +1,49 @@
+# Dictation test script (synthetic): dermatology review of nodular acne on isotretinoin. Format: eval/README.md.
+id = "d15-acne-isotretinoin"
+voice = "bf_emma"
+tags = ["dates", "numbers", "drug-uncommon", "negation", "spoken-punctuation"]
+dates = ["--08-18", "--12-15"]
+drugs = ["isotretinoin"]
+text = """
+Dermatology review {period} [[19-year-old|nineteen-year-old]] woman with nodular acne on her face and back {comma}
+now in [[month 3|month three]] of isotretinoin {period} She started on [[August 18|the eighteenth of August]] at
+[[20 mg|twenty milligrams]] daily and went up to [[40 mg|forty milligrams]] daily in September {period} Her skin is
+clearly better with only a few new spots {period} She has dry lips and some nosebleeds in the mornings {period} No
+headaches {comma} no visual change {comma} no joint pain and no low mood {period} She uses two forms of
+contraception {comma} the implant and condoms {comma} and her pregnancy test today is negative {period}
+{new paragraph}
+On examination there are a few small papules on the chin and healing scars on the back {comma} with cheilitis
+{period} Her fasting triglycerides last month were [[1.9|one point nine]] and liver tests were normal {period}
+{new paragraph}
+Impression {colon} nodular acne responding well to isotretinoin with expected mucocutaneous side effects {period}
+{new paragraph}
+Plan {colon} continue isotretinoin [[40 mg|forty milligrams]] daily {period} Lip balm and petroleum jelly inside the
+nose {period} Monthly pregnancy tests to continue {period} Review on [[December 15|the fifteenth of December]]
+{period}
+"""
+
+[gold.history]
+value = "19-year-old woman with nodular acne on her face and back, in month 3 of isotretinoin. Started on August 18 at 20 mg daily, went up to 40 mg daily in September. Skin clearly better, only a few new spots. Dry lips and some nosebleeds in the mornings. No headaches, no visual change, no joint pain, no low mood. Two forms of contraception, the implant and condoms; pregnancy test today negative. A few small papules on the chin, healing scars on the back, cheilitis. Fasting triglycerides last month 1.9; liver tests normal."
+sources = [
+    "19-year-old woman with nodular acne on her face and back, now in month 3 of isotretinoin.",
+    "She started on August 18 at 20 mg daily and went up to 40 mg daily in September.",
+    "Her skin is clearly better with only a few new spots.",
+    "She has dry lips and some nosebleeds in the mornings.",
+    "No headaches, no visual change, no joint pain and no low mood.",
+    "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative.",
+    "On examination there are a few small papules on the chin and healing scars on the back, with cheilitis.",
+    "Her fasting triglycerides last month were 1.9 and liver tests were normal.",
+]
+
+[gold.assessment]
+value = "Nodular acne responding well to isotretinoin, with expected mucocutaneous side effects."
+sources = ["nodular acne responding well to isotretinoin with expected mucocutaneous side effects."]
+
+[gold.plan]
+value = "Continue isotretinoin 40 mg daily. Lip balm and petroleum jelly inside the nose. Monthly pregnancy tests to continue. Review on December 15."
+sources = [
+    "continue isotretinoin 40 mg daily.",
+    "Lip balm and petroleum jelly inside the nose.",
+    "Monthly pregnancy tests to continue.",
+    "Review on December 15.",
+]

@@ -1,0 +1,50 @@
+# Dictation test script (synthetic): alopecia areata starting ritlecitinib, with an allergy change to leave out. Format: eval/README.md.
+id = "d32-alopecia-ritlecitinib"
+voice = "ef_dora"
+tags = ["numbers", "drug-new", "negation", "allergy-change", "spoken-punctuation"]
+dates = []
+drugs = ["doxycycline", "ritlecitinib"]
+forbidden = ["put doxycycline on her allergy list"]
+text = """
+Dermatology visit for alopecia areata {period} [[17-year-old|seventeen-year-old]] girl with patchy hair loss for
+[[2 years|two years]] that has spread over the last [[6 months|six months]] {comma} now with about half of the scalp
+affected and some loss of the eyebrows {period} Steroid injections into the patches did not help {period} No nail
+changes {comma} no itching and no scalp pain {period} Her mother has hypothyroidism {period} The patient says the
+doxycycline she took for acne made her very sick to her stomach {comma} so put doxycycline on her allergy list as an
+allergy {period} Her vaccines are up to date {period} {new paragraph}
+[[SALT score 52|salt score fifty-two]] {period} Large smooth patches over the crown and both sides {comma} with
+exclamation mark hairs at the edges {period} Thyroid function and blood count from last month are normal {comma}
+and tuberculosis screening is negative {period} {new paragraph}
+Assessment {colon} severe alopecia areata {period} {new paragraph}
+Plan {colon} start ritlecitinib [[50 mg|fifty milligrams]] once daily {period} Discussed acne {comma} headache and the
+small risk of infections and blood clots {period} Blood count and liver tests at [[4 weeks|four weeks]] {period}
+Photos taken today for comparison {period} Return in [[12 weeks|twelve weeks]] {period}
+"""
+
+[gold.history]
+value = "17-year-old girl with patchy hair loss for 2 years, spreading over the last 6 months, now about half of the scalp affected and some loss of the eyebrows. Steroid injections into the patches did not help. No nail changes, no itching, no scalp pain. Mother has hypothyroidism. Doxycycline taken for acne made her very sick to her stomach. Vaccines up to date. SALT score 52. Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges. Thyroid function and blood count from last month normal; tuberculosis screening negative."
+sources = [
+    "17-year-old girl with patchy hair loss for 2 years that has spread over the last 6 months, now with about half of the scalp affected and some loss of the eyebrows.",
+    "Steroid injections into the patches did not help.",
+    "No nail changes, no itching and no scalp pain.",
+    "Her mother has hypothyroidism.",
+    "The patient says the doxycycline she took for acne made her very sick to her stomach",
+    "Her vaccines are up to date.",
+    "SALT score 52.",
+    "Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges.",
+    "Thyroid function and blood count from last month are normal, and tuberculosis screening is negative.",
+]
+
+[gold.assessment]
+value = "Severe alopecia areata."
+sources = ["severe alopecia areata."]
+
+[gold.plan]
+value = "Start ritlecitinib 50 mg once daily. Discussed acne, headache and the small risk of infections and blood clots. Blood count and liver tests at 4 weeks. Photos taken today for comparison. Return in 12 weeks."
+sources = [
+    "start ritlecitinib 50 mg once daily.",
+    "Discussed acne, headache and the small risk of infections and blood clots.",
+    "Blood count and liver tests at 4 weeks.",
+    "Photos taken today for comparison.",
+    "Return in 12 weeks.",
+]

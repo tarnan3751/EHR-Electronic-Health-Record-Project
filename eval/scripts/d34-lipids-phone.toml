@@ -1,0 +1,44 @@
+# Dictation test script (synthetic): telephone consultation about lipid results, with no assessment dictated. Format: eval/README.md.
+id = "d34-lipids-phone"
+voice = "hf_alpha"
+tags = ["dates", "numbers", "drug-uncommon", "negation", "missing-field", "spoken-punctuation"]
+dates = ["--11-09"]
+drugs = ["atorvastatin", "clopidogrel", "rosuvastatin", "ezetimibe", "inclisiran"]
+text = """
+Telephone consultation {period} Spoke to the patient {comma} a [[67-year-old|sixty-seven-year-old]] man {comma}
+about his blood results from [[November 9|the ninth of November]] {period} His cholesterol is
+[[6.8|six point eight]] with [[LDL 4.4|L D L four point four]] {period} His [[HbA1c|H B A-one-C]] is
+[[44|forty-four]] {period} He had a minor stroke in [[2023|twenty twenty-three]] and stopped his atorvastatin last
+year because of muscle aches {period} The aches went away when he stopped it {period} He is not keen to try the same
+statin again {period} No chest pain and no new weakness or speech problems {period} He takes clopidogrel
+[[75 mg|seventy-five milligrams]] daily {period} {new paragraph}
+Plan {colon} start rosuvastatin [[5 mg|five milligrams]] at night {comma} and if the aches come back we will
+discuss ezetimibe or inclisiran {period} Repeat lipids in [[3 months|three months]] {period} Continue clopidogrel
+{period} Follow up by phone after the blood test {period}
+"""
+
+[gold.history]
+value = "67-year-old man; blood results from November 9: cholesterol 6.8, LDL 4.4, HbA1c 44. Minor stroke in 2023. Stopped atorvastatin last year because of muscle aches, which went away when he stopped it; not keen to try the same statin again. No chest pain, no new weakness or speech problems. Takes clopidogrel 75 mg daily."
+sources = [
+    "Spoke to the patient, a 67-year-old man, about his blood results from November 9.",
+    "His cholesterol is 6.8 with LDL 4.4.",
+    "His HbA1c is 44.",
+    "He had a minor stroke in 2023 and stopped his atorvastatin last year because of muscle aches.",
+    "The aches went away when he stopped it.",
+    "He is not keen to try the same statin again.",
+    "No chest pain and no new weakness or speech problems.",
+    "He takes clopidogrel 75 mg daily.",
+]
+
+[gold.assessment]
+value = ""
+sources = []
+
+[gold.plan]
+value = "Start rosuvastatin 5 mg at night; if the aches come back, discuss ezetimibe or inclisiran. Repeat lipids in 3 months. Continue clopidogrel. Follow up by phone after the blood test."
+sources = [
+    "start rosuvastatin 5 mg at night, and if the aches come back we will discuss ezetimibe or inclisiran.",
+    "Repeat lipids in 3 months.",
+    "Continue clopidogrel.",
+    "Follow up by phone after the blood test.",
+]

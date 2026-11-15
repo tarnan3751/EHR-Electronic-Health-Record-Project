@@ -1,0 +1,49 @@
+# Dictation test script (synthetic): review after a knee replacement, on suzetrigine for pain. Format: eval/README.md.
+id = "d05-tka-suzetrigine"
+voice = "hf_alpha"
+tags = ["dates", "numbers", "drug-new", "negation", "self-correction", "spoken-punctuation"]
+dates = ["2026-11-03", "--11-24"]
+drugs = ["suzetrigine", "paracetamol", "enoxaparin"]
+text = """
+Orthopedic post-operative review {period} [[66-year-old|sixty-six-year-old]] woman seen [[12 days|twelve days]] after
+a right total knee replacement done on [[November 3, 2026|the third of November twenty twenty-six]] {period} Her
+pain is much better {period} She was discharged on suzetrigine [[50 mg|fifty milligrams]] every
+[[12 hours|twelve hours]] and now takes it about once a day {comma} with paracetamol [[1 g|one gram]] four times a
+day {period} She has not needed any opioid since discharge {period} No calf pain {comma} no fever and no wound
+discharge {period} She is walking with one stick {period} {new paragraph}
+The wound is clean and dry and the clips were removed today {period} Range of motion is [[5|five]] to
+[[95 degrees|ninety-five degrees]] no sorry [[5|five]] to [[90 degrees|ninety degrees]] {period} Calf is soft and
+non-tender {period} {new paragraph}
+She is recovering well from the knee replacement and pain is well controlled {period} {new paragraph}
+Plan {colon} stop the suzetrigine over the next week and carry on with paracetamol as needed {period} Continue
+enoxaparin until [[November 24|the twenty-fourth of November]] to complete [[3 weeks|three weeks]] {period}
+Physiotherapy twice a week with a goal of [[110 degrees|one hundred and ten degrees]] of flexion {period} Review in
+[[6 weeks|six weeks]] with an X-ray {period}
+"""
+
+[gold.history]
+value = "66-year-old woman 12 days after a right total knee replacement on November 3, 2026. Pain much better. Discharged on suzetrigine 50 mg every 12 hours, now taking it about once a day, with paracetamol 1 g four times a day. No opioid needed since discharge. No calf pain, no fever, no wound discharge. Walking with one stick. Wound clean and dry; clips removed today. Range of motion 5 to 90 degrees. Calf soft and non-tender."
+sources = [
+    "66-year-old woman seen 12 days after a right total knee replacement done on November 3, 2026.",
+    "Her pain is much better.",
+    "She was discharged on suzetrigine 50 mg every 12 hours and now takes it about once a day, with paracetamol 1 g four times a day.",
+    "She has not needed any opioid since discharge.",
+    "No calf pain, no fever and no wound discharge.",
+    "She is walking with one stick.",
+    "The wound is clean and dry and the clips were removed today.",
+    "Range of motion is 5 to 95 degrees no sorry 5 to 90 degrees.",
+    "Calf is soft and non-tender.",
+]
+
+[gold.assessment]
+value = "Recovering well from the knee replacement; pain well controlled."
+sources = ["She is recovering well from the knee replacement and pain is well controlled."]
+
+[gold.plan]
+value = "Stop the suzetrigine over the next week and carry on with paracetamol as needed. Continue enoxaparin until November 24 to complete 3 weeks. Physiotherapy twice a week with a goal of 110 degrees of flexion. Review in 6 weeks with an X-ray."
+sources = [
+    "stop the suzetrigine over the next week and carry on with paracetamol as needed.",
+    "Continue enoxaparin until November 24 to complete 3 weeks.",
+    "Physiotherapy twice a week with a goal of 110 degrees of flexion.",
+    "Review in 6 weeks with an X-ray.",
+]

@@ -1,0 +1,34 @@
+# Dictation test script (synthetic): short otitis media dictation with no history dictated and no spoken punctuation. Format: eval/README.md.
+id = "d39-otitis-media"
+voice = "bf_emma"
+tags = ["short", "numbers", "missing-field"]
+dates = []
+drugs = ["amoxicillin", "ibuprofen"]
+text = """
+Quick dictation for the [[3-year-old|three-year-old]] in room four left acute otitis media his third since the summer
+start amoxicillin [[90 mg/kg|ninety milligrams per kilogram]] a day split twice daily for [[10 days|ten days]]
+ibuprofen for pain and fever if he is not better in [[48 to 72 hours|forty-eight to seventy-two hours]] mum should
+bring him back for review and if he has one more infection before the spring we will refer him to the ear nose and
+throat team he can go back to nursery when the fever settles
+"""
+
+[gold.history]
+value = ""
+sources = []
+
+[gold.assessment]
+value = "Left acute otitis media in a 3-year-old, his third since the summer."
+sources = [
+    "the 3-year-old",
+    "left acute otitis media his third since the summer",
+]
+
+[gold.plan]
+value = "Start amoxicillin 90 mg/kg a day, split twice daily, for 10 days. Ibuprofen for pain and fever. If not better in 48 to 72 hours, mum to bring him back for review. If one more infection before the spring, refer to the ear nose and throat team. Back to nursery when the fever settles."
+sources = [
+    "start amoxicillin 90 mg/kg a day split twice daily for 10 days",
+    "ibuprofen for pain and fever",
+    "if he is not better in 48 to 72 hours mum should bring him back for review",
+    "if he has one more infection before the spring we will refer him to the ear nose and throat team",
+    "he can go back to nursery when the fever settles",
+]

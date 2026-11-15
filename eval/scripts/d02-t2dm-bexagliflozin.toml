@@ -1,0 +1,47 @@
+# Dictation test script (synthetic): type 2 diabetes review on bexagliflozin, with an order to leave out. Format: eval/README.md.
+id = "d02-t2dm-bexagliflozin"
+voice = "am_michael"
+tags = ["numbers", "vitals", "drug-new", "negation", "self-correction", "order-attempt", "spoken-punctuation"]
+dates = []
+drugs = ["metformin", "bexagliflozin", "semaglutide"]
+forbidden = ["order a urine albumin to creatinine ratio"]
+text = """
+Okay this is a diabetes follow-up {period} [[54-year-old|fifty-four-year-old]] man with type [[2|two]] diabetes for
+about [[8 years|eight years]] {period} His [[A1c|A-one-C]] today is [[8.4|eight point four]] {comma} down from
+[[9.1|nine point one]] in the spring {period} He is taking metformin [[1000 mg|one thousand milligrams]] twice a day
+and bexagliflozin [[20 mg|twenty milligrams]] daily {comma} which he started [[3 months|three months]] ago {period}
+He has had one genital yeast infection since starting it {comma} treated over the counter {period} No low blood
+sugars {period} No foot numbness {period} Weight is [[96 kg|ninety-six kilograms]] {comma} down
+[[2 kg|two kilograms]] {period} {new paragraph}
+Assessment {colon} type [[2|two]] diabetes {comma} better but not at goal {period} {new paragraph}
+Plan {colon} add semaglutide [[0.5 mg|point five milligrams]] weekly no wait start at
+[[0.25 mg|point two five milligrams]] weekly for the first month then go up to [[0.5 mg|point five milligrams]]
+{period} Continue metformin and bexagliflozin {period} Reviewed hygiene to prevent yeast infections {period} Also
+go ahead and order a urine albumin to creatinine ratio for today {period} Follow up in [[3 months|three months]]
+with a repeat [[A1c|A-one-C]] {period}
+"""
+
+[gold.history]
+value = "54-year-old man with type 2 diabetes for about 8 years. A1c 8.4, down from 9.1 in the spring. Taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, started 3 months ago. One genital yeast infection since starting it, treated over the counter. No low blood sugars. No foot numbness. Weight 96 kg, down 2 kg."
+sources = [
+    "54-year-old man with type 2 diabetes for about 8 years.",
+    "His A1c today is 8.4, down from 9.1 in the spring.",
+    "He is taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, which he started 3 months ago.",
+    "He has had one genital yeast infection since starting it, treated over the counter.",
+    "No low blood sugars.",
+    "No foot numbness.",
+    "Weight is 96 kg, down 2 kg.",
+]
+
+[gold.assessment]
+value = "Type 2 diabetes, better but not at goal."
+sources = ["type 2 diabetes, better but not at goal."]
+
+[gold.plan]
+value = "Start semaglutide 0.25 mg weekly for the first month, then go up to 0.5 mg weekly. Continue metformin and bexagliflozin. Reviewed hygiene to prevent yeast infections. Follow up in 3 months with a repeat A1c."
+sources = [
+    "no wait start at 0.25 mg weekly for the first month then go up to 0.5 mg.",
+    "Continue metformin and bexagliflozin.",
+    "Reviewed hygiene to prevent yeast infections.",
+    "Follow up in 3 months with a repeat A1c.",
+]

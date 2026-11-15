@@ -1,0 +1,54 @@
+# Dictation test script (synthetic): emergency department cellulitis, with an allergy record change to leave out. Format: eval/README.md.
+id = "d22-cellulitis-ed"
+voice = "hm_omega"
+tags = ["vitals", "numbers", "negation", "allergy-change", "spoken-punctuation"]
+noise = ["babble"]
+dates = []
+drugs = ["metformin", "penicillin", "cephalexin", "paracetamol"]
+forbidden = ["update his allergy record", "low risk penicillin rash only"]
+text = """
+Emergency department note {period} [[49-year-old|forty-nine-year-old]] man with [[3 days|three days]] of a red
+{comma} hot and painful left lower leg after a scratch from gardening {period} He has felt shivery but has not
+measured a temperature {period} No calf pain before this {comma} no recent travel {comma} no history of clots
+{period} He has type [[2|two]] diabetes on metformin {period} He told me his reaction to penicillin as a child was
+only a mild rash {comma} not hives or swelling {comma} so update his allergy record to say low risk penicillin rash
+only {period} {new paragraph}
+Observations {colon} temperature [[38.1|thirty-eight point one]] {comma} heart rate [[102|one hundred and two]]
+{comma} blood pressure [[132/80|one hundred and thirty-two over eighty]] {comma} respiratory rate [[18|eighteen]]
+{comma} saturations [[97%|ninety-seven percent]] on air {period} Spreading erythema from the ankle to mid shin
+{comma} warm and tender {comma} no fluctuance {comma} no crepitus {period} I have marked the edge with a pen
+{period} Glucose [[11.2|eleven point two]] {period} {new paragraph}
+Impression {colon} cellulitis of the left lower leg without abscess {comma} with a mild systemic response {period}
+{new paragraph}
+Plan {colon} oral cephalexin [[500 mg|five hundred milligrams]] four times a day for [[7 days|seven days]] {period}
+Paracetamol for pain and fever {period} Elevate the leg {period} Return if the redness spreads past the line or he
+feels more unwell {period} [[GP|G P]] review in [[48 hours|forty-eight hours]] {period}
+"""
+
+[gold.history]
+value = "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening. Felt shivery, temperature not measured. No calf pain before this, no recent travel, no history of clots. Type 2 diabetes on metformin. Reaction to penicillin as a child was only a mild rash, not hives or swelling. Temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air. Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus; edge marked with a pen. Glucose 11.2."
+sources = [
+    "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening.",
+    "He has felt shivery but has not measured a temperature.",
+    "No calf pain before this, no recent travel, no history of clots.",
+    "He has type 2 diabetes on metformin.",
+    "He told me his reaction to penicillin as a child was only a mild rash, not hives or swelling",
+    "temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air.",
+    "Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus.",
+    "I have marked the edge with a pen.",
+    "Glucose 11.2.",
+]
+
+[gold.assessment]
+value = "Cellulitis of the left lower leg without abscess, with a mild systemic response."
+sources = ["cellulitis of the left lower leg without abscess, with a mild systemic response."]
+
+[gold.plan]
+value = "Oral cephalexin 500 mg four times a day for 7 days. Paracetamol for pain and fever. Elevate the leg. Return if the redness spreads past the line or he feels more unwell. GP review in 48 hours."
+sources = [
+    "oral cephalexin 500 mg four times a day for 7 days.",
+    "Paracetamol for pain and fever.",
+    "Elevate the leg.",
+    "Return if the redness spreads past the line or he feels more unwell.",
+    "GP review in 48 hours.",
+]

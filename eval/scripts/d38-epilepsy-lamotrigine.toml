@@ -1,0 +1,52 @@
+# Dictation test script (synthetic): epilepsy clinic switching levetiracetam to lamotrigine, with a corrected date. Format: eval/README.md.
+id = "d38-epilepsy-lamotrigine"
+voice = "hf_alpha"
+tags = ["dates", "numbers", "negation", "self-correction", "spoken-punctuation"]
+dates = ["--08-19", "--10-02", "--10-04"]
+drugs = ["levetiracetam", "lamotrigine"]
+text = """
+Epilepsy clinic follow-up {period} [[31-year-old|thirty-one-year-old]] woman with focal epilepsy {comma} on
+levetiracetam [[750 mg|seven hundred and fifty milligrams]] twice daily {period} She had a focal to bilateral tonic
+clonic seizure on [[August 19|the nineteenth of August]] and another on [[October 2|the second of October]] no sorry
+[[October 4|the fourth of October]] {comma} both after poor sleep {period} Since the levetiracetam she has felt
+irritable and low and her partner has noticed it too {period} No thoughts of self-harm {period} She is not driving
+{period} She is planning a pregnancy in the next year {period} {new paragraph}
+Examination normal {period} [[MRI|M R I]] shows a small area of left hippocampal sclerosis {period} [[EEG|E E G]]
+showed left temporal sharp waves {period} {new paragraph}
+Impression {colon} left temporal lobe epilepsy with breakthrough seizures and mood side effects from levetiracetam
+{period} {new paragraph}
+Plan {colon} switch to lamotrigine {comma} [[25 mg|twenty-five milligrams]] daily for [[2 weeks|two weeks]] {comma}
+then [[50 mg|fifty milligrams]] daily for [[2 weeks|two weeks]] {comma} then up by [[50 mg|fifty milligrams]] every
+[[2 weeks|two weeks]] to [[100 mg|one hundred milligrams]] twice daily {comma} and then taper the levetiracetam
+{period} Warned about rash and to stop and call us if it appears {period} Folic acid [[5 mg|five milligrams]] daily
+because of the pregnancy plans {period} No driving until [[12 months|twelve months]] seizure free {period} Review in
+[[3 months|three months]] {period}
+"""
+
+[gold.history]
+value = "31-year-old woman with focal epilepsy on levetiracetam 750 mg twice daily. Focal to bilateral tonic clonic seizures on August 19 and October 4, both after poor sleep. Irritable and low since starting levetiracetam, noticed by her partner too. No thoughts of self-harm. Not driving. Planning a pregnancy in the next year. Examination normal. MRI: small area of left hippocampal sclerosis. EEG: left temporal sharp waves."
+sources = [
+    "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily.",
+    "She had a focal to bilateral tonic clonic seizure on August 19 and another on October 2 no sorry October 4, both after poor sleep.",
+    "Since the levetiracetam she has felt irritable and low and her partner has noticed it too.",
+    "No thoughts of self-harm.",
+    "She is not driving.",
+    "She is planning a pregnancy in the next year.",
+    "Examination normal.",
+    "MRI shows a small area of left hippocampal sclerosis.",
+    "EEG showed left temporal sharp waves.",
+]
+
+[gold.assessment]
+value = "Left temporal lobe epilepsy with breakthrough seizures and mood side effects from levetiracetam."
+sources = ["left temporal lobe epilepsy with breakthrough seizures and mood side effects from levetiracetam."]
+
+[gold.plan]
+value = "Switch to lamotrigine: 25 mg daily for 2 weeks, then 50 mg daily for 2 weeks, then up by 50 mg every 2 weeks to 100 mg twice daily, then taper the levetiracetam. Warned about rash; stop and call if it appears. Folic acid 5 mg daily because of the pregnancy plans. No driving until 12 months seizure free. Review in 3 months."
+sources = [
+    "switch to lamotrigine, 25 mg daily for 2 weeks, then 50 mg daily for 2 weeks, then up by 50 mg every 2 weeks to 100 mg twice daily, and then taper the levetiracetam.",
+    "Warned about rash and to stop and call us if it appears.",
+    "Folic acid 5 mg daily because of the pregnancy plans.",
+    "No driving until 12 months seizure free.",
+    "Review in 3 months.",
+]

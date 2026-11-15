@@ -1,0 +1,64 @@
+# Dictation test script (synthetic): respiratory clinic after a COPD exacerbation, adding ensifentrine. Format: eval/README.md.
+id = "d03-copd-ensifentrine"
+voice = "bf_emma"
+tags = ["long", "vitals", "numbers", "dates", "drug-new", "negation", "spoken-punctuation"]
+noise = ["babble"]
+dates = ["--10-28"]
+drugs = ["prednisolone", "doxycycline", "tiotropium", "olodaterol", "ensifentrine"]
+text = """
+Respiratory clinic letter {comma} follow-up after an exacerbation of [[COPD|C O P D]] {period} {new paragraph}
+This [[71-year-old|seventy-one-year-old]] retired joiner was admitted on [[October 28|the twenty-eighth of October]]
+with an infective exacerbation and discharged after [[4 days|four days]] on a [[5-day|five-day]] course of
+prednisolone [[30 mg|thirty milligrams]] and doxycycline {period} He feels about back to his usual self {period} His wife says he is
+coping well at home {period} His breathlessness is [[MRC grade 3|M R C grade three]] {comma} so he stops for breath after about
+[[100 meters|a hundred meters]] on the flat {period} He still has a morning cough with white sputum but no green
+sputum {comma} no fever and no chest pain {period} He has not smoked for [[6 years|six years]] {period} His
+inhalers are tiotropium and olodaterol once daily {comma} and his technique was good when I watched him today
+{period} He had [[3|three]] exacerbations in the last year needing steroids {period} {new paragraph}
+On examination his oxygen saturation is [[94%|ninety-four percent]] on room air {comma} respiratory rate
+[[18|eighteen]] {comma} pulse [[84|eighty-four]] and temperature [[36.8|thirty-six point eight]] degrees {period}
+There are scattered wheezes at both bases {comma} no crackles {period} Spirometry from the summer showed an
+[[FEV1|F E V one]] of [[1.4 liters|one point four liters]] {comma} [[48%|forty-eight percent]] predicted {period}
+{new paragraph}
+Impression {colon} moderate to severe [[COPD|C O P D]] with frequent exacerbations despite dual bronchodilator
+therapy {period} Recovering well from the October admission {period} {new paragraph}
+Plan {colon} add ensifentrine [[3 mg|three milligrams]] nebulized twice daily {comma} alongside his current inhalers
+{period} I have explained it is a new kind of inhaled treatment and he may notice back pain or a mild headache at
+first {period} Refer to pulmonary rehabilitation {period} Rescue pack of prednisolone and doxycycline to keep at home
+with a written action plan {period} Review in clinic in [[3 months|three months]] {comma} sooner if he has another
+flare {period}
+"""
+
+[gold.history]
+value = "71-year-old retired joiner admitted on October 28 with an infective exacerbation of COPD, discharged after 4 days on a 5-day course of prednisolone 30 mg and doxycycline. Feels about back to his usual self; his wife says he is coping well at home. Breathlessness MRC grade 3: stops for breath after about 100 meters on the flat. Morning cough with white sputum; no green sputum, no fever, no chest pain. Has not smoked for 6 years. Inhalers: tiotropium and olodaterol once daily, good technique. 3 exacerbations in the last year needing steroids. Oxygen saturation 94% on room air, respiratory rate 18, pulse 84, temperature 36.8 degrees. Scattered wheezes at both bases, no crackles. Spirometry from the summer: FEV1 1.4 liters, 48% predicted."
+sources = [
+    "follow-up after an exacerbation of COPD.",
+    "This 71-year-old retired joiner was admitted on October 28 with an infective exacerbation and discharged after 4 days on a 5-day course of prednisolone 30 mg and doxycycline.",
+    "He feels about back to his usual self.",
+    "His wife says he is coping well at home.",
+    "His breathlessness is MRC grade 3, so he stops for breath after about 100 meters on the flat.",
+    "He still has a morning cough with white sputum but no green sputum, no fever and no chest pain.",
+    "He has not smoked for 6 years.",
+    "His inhalers are tiotropium and olodaterol once daily, and his technique was good when I watched him today.",
+    "He had 3 exacerbations in the last year needing steroids.",
+    "On examination his oxygen saturation is 94% on room air, respiratory rate 18, pulse 84 and temperature 36.8 degrees.",
+    "There are scattered wheezes at both bases, no crackles.",
+    "Spirometry from the summer showed an FEV1 of 1.4 liters, 48% predicted.",
+]
+
+[gold.assessment]
+value = "Moderate to severe COPD with frequent exacerbations despite dual bronchodilator therapy. Recovering well from the October admission."
+sources = [
+    "moderate to severe COPD with frequent exacerbations despite dual bronchodilator therapy.",
+    "Recovering well from the October admission.",
+]
+
+[gold.plan]
+value = "Add ensifentrine 3 mg nebulized twice daily alongside his current inhalers; explained he may notice back pain or a mild headache at first. Refer to pulmonary rehabilitation. Rescue pack of prednisolone and doxycycline to keep at home with a written action plan. Review in clinic in 3 months, sooner if he has another flare."
+sources = [
+    "add ensifentrine 3 mg nebulized twice daily, alongside his current inhalers.",
+    "I have explained it is a new kind of inhaled treatment and he may notice back pain or a mild headache at first.",
+    "Refer to pulmonary rehabilitation.",
+    "Rescue pack of prednisolone and doxycycline to keep at home with a written action plan.",
+    "Review in clinic in 3 months, sooner if he has another flare.",
+]

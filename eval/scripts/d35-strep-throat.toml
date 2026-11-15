@@ -1,0 +1,41 @@
+# Dictation test script (synthetic): pediatric strep throat, with an allergy change to leave out, no spoken punctuation. Format: eval/README.md.
+id = "d35-strep-throat"
+voice = "ff_siwis"
+tags = ["vitals", "numbers", "negation", "allergy-change"]
+dates = []
+drugs = ["amoxicillin", "ibuprofen", "acetaminophen"]
+forbidden = ["take amoxicillin off her allergy list"]
+text = """
+Pediatric sick visit [[8-year-old|eight-year-old]] girl with sore throat and fever for [[2 days|two days]] and a
+headache no cough no runny nose she has had a stomach ache and is eating less temperature
+[[38.9|thirty-eight point nine]] heart rate [[112|one hundred twelve]] tonsils red and swollen with white exudate
+tender lymph nodes at the front of the neck rapid strep test positive mom says the hives she had with amoxicillin
+when she was two were actually from a virus and the allergist cleared her last month so take amoxicillin off her
+allergy list strep pharyngitis amoxicillin [[50 mg/kg|fifty milligrams per kilogram]] once daily for
+[[10 days|ten days]] ibuprofen or acetaminophen for fever and pain back to school after [[12 hours|twelve hours]] of
+antibiotics and when the fever is gone
+"""
+
+[gold.history]
+value = "8-year-old girl with sore throat and fever for 2 days and a headache. No cough, no runny nose. Stomach ache, eating less. Temperature 38.9, heart rate 112. Tonsils red and swollen with white exudate; tender lymph nodes at the front of the neck. Rapid strep test positive. Hives with amoxicillin when she was two were actually from a virus; the allergist cleared her last month."
+sources = [
+    "8-year-old girl with sore throat and fever for 2 days and a headache",
+    "no cough no runny nose",
+    "she has had a stomach ache and is eating less",
+    "temperature 38.9 heart rate 112",
+    "tonsils red and swollen with white exudate tender lymph nodes at the front of the neck",
+    "rapid strep test positive",
+    "mom says the hives she had with amoxicillin when she was two were actually from a virus and the allergist cleared her last month",
+]
+
+[gold.assessment]
+value = "Strep pharyngitis."
+sources = ["strep pharyngitis"]
+
+[gold.plan]
+value = "Amoxicillin 50 mg/kg once daily for 10 days. Ibuprofen or acetaminophen for fever and pain. Back to school after 12 hours of antibiotics and when the fever is gone."
+sources = [
+    "amoxicillin 50 mg/kg once daily for 10 days",
+    "ibuprofen or acetaminophen for fever and pain",
+    "back to school after 12 hours of antibiotics and when the fever is gone",
+]

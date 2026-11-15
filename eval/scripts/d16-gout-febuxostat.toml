@@ -1,0 +1,51 @@
+# Dictation test script (synthetic): gout on febuxostat, with an allergy change to leave out. Format: eval/README.md.
+id = "d16-gout-febuxostat"
+voice = "ef_dora"
+tags = ["numbers", "drug-uncommon", "negation", "allergy-change", "spoken-punctuation"]
+noise = ["babble"]
+dates = []
+drugs = ["allopurinol", "febuxostat", "colchicine"]
+forbidden = ["add allopurinol to his allergy list"]
+text = """
+Rheumatology follow-up for gout {period} [[57-year-old|fifty-seven-year-old]] man with tophaceous gout {comma}
+[[3|three]] flares this year in the left big toe and right knee {period} He had a widespread rash with allopurinol
+in the spring that settled when it was stopped {comma} so please add allopurinol to his allergy list {period} He is
+now on febuxostat [[40 mg|forty milligrams]] daily with colchicine [[0.5 mg|point five milligrams]] daily for
+prophylaxis {period} No flare since starting febuxostat [[2 months|two months]] ago {period} No chest pain or
+shortness of breath {period} No history of heart disease {period} {new paragraph}
+Exam shows a small tophus on the right elbow {comma} no joint swelling today {period} Uric acid is
+[[7.4|seven point four]] {comma} down from [[9.2|nine point two]] {period} Creatinine [[1.0|one point zero]]
+{period} {new paragraph}
+Assessment {colon} tophaceous gout improving on febuxostat but uric acid still above the target of [[6|six]]
+{period} {new paragraph}
+Plan {colon} increase febuxostat to [[80 mg|eighty milligrams]] daily {period} Continue colchicine for another
+[[3 months|three months]] {period} Recheck uric acid in [[4 weeks|four weeks]] {period} Cut down on beer and sugary
+drinks {period}
+"""
+
+[gold.history]
+value = "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee. Widespread rash with allopurinol in the spring that settled when it was stopped. On febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting febuxostat 2 months ago. No chest pain or shortness of breath. No history of heart disease. Small tophus on the right elbow, no joint swelling today. Uric acid 7.4, down from 9.2. Creatinine 1.0."
+sources = [
+    "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee.",
+    "He had a widespread rash with allopurinol in the spring that settled when it was stopped",
+    "He is now on febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis.",
+    "No flare since starting febuxostat 2 months ago.",
+    "No chest pain or shortness of breath.",
+    "No history of heart disease.",
+    "Exam shows a small tophus on the right elbow, no joint swelling today.",
+    "Uric acid is 7.4, down from 9.2.",
+    "Creatinine 1.0.",
+]
+
+[gold.assessment]
+value = "Tophaceous gout improving on febuxostat, but uric acid still above the target of 6."
+sources = ["tophaceous gout improving on febuxostat but uric acid still above the target of 6."]
+
+[gold.plan]
+value = "Increase febuxostat to 80 mg daily. Continue colchicine for another 3 months. Recheck uric acid in 4 weeks. Cut down on beer and sugary drinks."
+sources = [
+    "increase febuxostat to 80 mg daily.",
+    "Continue colchicine for another 3 months.",
+    "Recheck uric acid in 4 weeks.",
+    "Cut down on beer and sugary drinks.",
+]

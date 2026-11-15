@@ -1,0 +1,48 @@
+# Dictation test script (synthetic): resistant hypertension follow-up on aprocitentan. Format: eval/README.md.
+id = "d01-htn-aprocitentan"
+voice = "af_heart"
+tags = ["vitals", "numbers", "drug-new", "negation", "spoken-punctuation"]
+noise = ["hvac"]
+dates = []
+drugs = ["aprocitentan", "amlodipine", "chlorthalidone", "losartan"]
+text = """
+This is a follow-up visit for resistant hypertension {period} She is a [[63-year-old|sixty-three-year-old]] woman
+who was started on aprocitentan [[12.5 mg|twelve point five milligrams]] daily [[6 weeks|six weeks]] ago in addition
+to amlodipine [[10 mg|ten milligrams]] {comma} chlorthalidone [[25 mg|twenty-five milligrams]] and losartan
+[[100 mg|one hundred milligrams]] {period} She reports mild swelling in both ankles by the end of the day {period}
+She denies chest pain {comma} shortness of breath {comma} headaches or dizziness {period} Home readings have been
+running in the [[130s|one thirties]] over [[80s|eighties]] {period} {new paragraph}
+Blood pressure today is [[142/88|one forty-two over eighty-eight]] {comma} heart rate [[72|seventy-two]] {period}
+There is trace pitting edema at both ankles {period} Hemoglobin is [[12.9|twelve point nine]] {comma} down from
+[[13.6|thirteen point six]] {period} {new paragraph}
+Assessment {colon} resistant hypertension {comma} improving on aprocitentan {comma} with mild fluid retention and a
+small drop in hemoglobin {period} {new paragraph}
+Plan {colon} continue aprocitentan at the same dose {period} Recheck hemoglobin and a basic metabolic panel in
+[[4 weeks|four weeks]] {period} Elevate the legs and limit salt {period} Follow up in [[2 months|two months]] {period}
+"""
+
+[gold.history]
+value = "63-year-old woman with resistant hypertension, started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg. Mild swelling in both ankles by the end of the day. Denies chest pain, shortness of breath, headaches or dizziness. Home readings in the 130s over 80s. Blood pressure 142/88, heart rate 72. Trace pitting edema at both ankles. Hemoglobin 12.9, down from 13.6."
+sources = [
+    "This is a follow-up visit for resistant hypertension.",
+    "She is a 63-year-old woman who was started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg.",
+    "She reports mild swelling in both ankles by the end of the day.",
+    "She denies chest pain, shortness of breath, headaches or dizziness.",
+    "Home readings have been running in the 130s over 80s.",
+    "Blood pressure today is 142/88, heart rate 72.",
+    "There is trace pitting edema at both ankles.",
+    "Hemoglobin is 12.9, down from 13.6.",
+]
+
+[gold.assessment]
+value = "Resistant hypertension, improving on aprocitentan, with mild fluid retention and a small drop in hemoglobin."
+sources = ["resistant hypertension, improving on aprocitentan, with mild fluid retention and a small drop in hemoglobin."]
+
+[gold.plan]
+value = "Continue aprocitentan at the same dose. Recheck hemoglobin and a basic metabolic panel in 4 weeks. Elevate the legs and limit salt. Follow up in 2 months."
+sources = [
+    "continue aprocitentan at the same dose.",
+    "Recheck hemoglobin and a basic metabolic panel in 4 weeks.",
+    "Elevate the legs and limit salt.",
+    "Follow up in 2 months.",
+]

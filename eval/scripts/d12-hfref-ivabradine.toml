@@ -1,0 +1,63 @@
+# Dictation test script (synthetic): heart failure clinic adding ivabradine, with a prescription order to leave out. Format: eval/README.md.
+id = "d12-hfref-ivabradine"
+voice = "hf_alpha"
+tags = ["long", "vitals", "numbers", "drug-uncommon", "negation", "order-attempt", "spoken-punctuation"]
+noise = ["hvac"]
+dates = []
+drugs = ["sacubitril", "valsartan", "bisoprolol", "eplerenone", "dapagliflozin", "furosemide", "ivabradine"]
+forbidden = ["send a prescription for the ivabradine"]
+text = """
+Heart failure clinic review {period} {new paragraph}
+This is a [[61-year-old|sixty-one-year-old]] man with heart failure with reduced ejection fraction after an anterior
+myocardial infarction [[2 years|two years]] ago {comma} ejection fraction [[30%|thirty percent]] on his last echo
+{period} He is NYHA [[class 2|class two]] {comma} breathless on hills but fine on the flat {period} He sleeps
+on two pillows {comma} no paroxysmal nocturnal dyspnea {comma} no ankle swelling {comma} no chest pain and no
+dizziness {period} He weighs himself every morning and his weight has been steady {period} He had his flu and pneumonia vaccines this
+autumn {period} Current medications
+{colon} sacubitril valsartan [[49/51 mg|forty-nine fifty-one milligrams]] twice daily {comma} bisoprolol
+[[10 mg|ten milligrams]] daily {comma} eplerenone [[25 mg|twenty-five milligrams]] daily {comma} dapagliflozin
+[[10 mg|ten milligrams]] daily and furosemide [[40 mg|forty milligrams]] in the morning {period} {new paragraph}
+Examination {colon} blood pressure [[112/70|one hundred and twelve over seventy]] {comma} heart rate
+[[78|seventy-eight]] in sinus rhythm {comma} weight [[82 kg|eighty-two kilograms]] {period} [[JVP|J V P]] not raised
+{comma} chest clear {comma} no edema {period} Potassium [[4.6|four point six]] {comma} creatinine
+[[1.2|one point two]] {period} {new paragraph}
+Assessment {colon} heart failure with reduced ejection fraction {comma} stable and euvolemic {comma} with room to
+optimize therapy because his resting heart rate is still above [[70|seventy]] on the maximum bisoprolol dose
+{period} {new paragraph}
+Plan {colon} increase sacubitril valsartan to [[97/103 mg|ninety-seven one hundred and three milligrams]] twice daily
+{period} Add ivabradine [[5 mg|five milligrams]] twice daily {period} Explained that it can cause brief flashes of
+light in dim light that usually settle {comma} and to avoid grapefruit juice {period} Repeat potassium and kidney function in
+[[2 weeks|two weeks]] {period} Go ahead and send a prescription for the ivabradine to his usual pharmacy {period}
+Continue the other medications {period} Daily weights and call if he gains more than [[2 kg|two kilograms]] in
+three days {period} Review in [[6 weeks|six weeks]] {period}
+"""
+
+[gold.history]
+value = "61-year-old man with heart failure with reduced ejection fraction after an anterior myocardial infarction 2 years ago, ejection fraction 30% on his last echo. NYHA class 2: breathless on hills but fine on the flat. Sleeps on two pillows. No paroxysmal nocturnal dyspnea, no ankle swelling, no chest pain, no dizziness. Weighs himself every morning; weight steady. Had his flu and pneumonia vaccines this autumn. Medications: sacubitril valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozin 10 mg daily, furosemide 40 mg in the morning. Blood pressure 112/70, heart rate 78 in sinus rhythm, weight 82 kg. JVP not raised, chest clear, no edema. Potassium 4.6, creatinine 1.2."
+sources = [
+    "This is a 61-year-old man with heart failure with reduced ejection fraction after an anterior myocardial infarction 2 years ago, ejection fraction 30% on his last echo.",
+    "He is NYHA class 2, breathless on hills but fine on the flat.",
+    "He sleeps on two pillows, no paroxysmal nocturnal dyspnea, no ankle swelling, no chest pain and no dizziness.",
+    "He weighs himself every morning and his weight has been steady.",
+    "He had his flu and pneumonia vaccines this autumn.",
+    "Current medications: sacubitril valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozin 10 mg daily and furosemide 40 mg in the morning.",
+    "blood pressure 112/70, heart rate 78 in sinus rhythm, weight 82 kg.",
+    "JVP not raised, chest clear, no edema.",
+    "Potassium 4.6, creatinine 1.2.",
+]
+
+[gold.assessment]
+value = "Heart failure with reduced ejection fraction, stable and euvolemic, with room to optimize therapy because his resting heart rate is still above 70 on the maximum bisoprolol dose."
+sources = ["heart failure with reduced ejection fraction, stable and euvolemic, with room to optimize therapy because his resting heart rate is still above 70 on the maximum bisoprolol dose."]
+
+[gold.plan]
+value = "Increase sacubitril valsartan to 97/103 mg twice daily. Add ivabradine 5 mg twice daily; explained it can cause brief flashes of light in dim light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in 2 weeks. Continue the other medications. Daily weights; call if he gains more than 2 kg in three days. Review in 6 weeks."
+sources = [
+    "increase sacubitril valsartan to 97/103 mg twice daily.",
+    "Add ivabradine 5 mg twice daily.",
+    "Explained that it can cause brief flashes of light in dim light that usually settle, and to avoid grapefruit juice.",
+    "Repeat potassium and kidney function in 2 weeks.",
+    "Continue the other medications.",
+    "Daily weights and call if he gains more than 2 kg in three days.",
+    "Review in 6 weeks.",
+]

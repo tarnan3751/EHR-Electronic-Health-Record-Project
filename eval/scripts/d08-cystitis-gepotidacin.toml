@@ -1,0 +1,36 @@
+# Dictation test script (synthetic): short same-day visit for cystitis, gepotidacin, no spoken punctuation. Format: eval/README.md.
+id = "d08-cystitis-gepotidacin"
+voice = "hm_omega"
+tags = ["short", "numbers", "drug-new", "negation"]
+dates = []
+drugs = ["nitrofurantoin", "gepotidacin"]
+text = """
+Quick note for a same day visit [[24-year-old|twenty-four-year-old]] woman with [[2 days|two days]] of burning on
+urination and frequency no fever no flank pain no vaginal discharge not pregnant she had one similar episode
+[[2 years|two years]] ago urine dip positive for leukocytes and nitrites she is allergic to nitrofurantoin which
+gave her a rash uncomplicated cystitis start gepotidacin [[1500 mg|fifteen hundred milligrams]] twice daily for
+[[5 days|five days]] fluids and come back if she gets a fever or back pain or if it is not better in
+[[48 hours|forty-eight hours]]
+"""
+
+[gold.history]
+value = "24-year-old woman with 2 days of burning on urination and frequency. No fever, no flank pain, no vaginal discharge. Not pregnant. One similar episode 2 years ago. Urine dip positive for leukocytes and nitrites. Allergic to nitrofurantoin (rash)."
+sources = [
+    "24-year-old woman with 2 days of burning on urination and frequency",
+    "no fever no flank pain no vaginal discharge",
+    "not pregnant",
+    "she had one similar episode 2 years ago",
+    "urine dip positive for leukocytes and nitrites",
+    "she is allergic to nitrofurantoin which gave her a rash",
+]
+
+[gold.assessment]
+value = "Uncomplicated cystitis."
+sources = ["uncomplicated cystitis"]
+
+[gold.plan]
+value = "Start gepotidacin 1500 mg twice daily for 5 days. Fluids. Come back if she gets a fever or back pain, or if not better in 48 hours."
+sources = [
+    "start gepotidacin 1500 mg twice daily for 5 days",
+    "fluids and come back if she gets a fever or back pain or if it is not better in 48 hours",
+]

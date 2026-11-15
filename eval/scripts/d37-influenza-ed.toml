@@ -1,0 +1,66 @@
+# Dictation test script (synthetic): emergency department influenza with COPD, treated with baloxavir. Format: eval/README.md.
+id = "d37-influenza-ed"
+voice = "hm_omega"
+tags = ["long", "vitals", "numbers", "drug-uncommon", "negation", "spoken-punctuation"]
+noise = ["monitor"]
+dates = []
+drugs = ["tiotropium", "budesonide", "formoterol", "metformin", "gliclazide", "baloxavir", "salbutamol", "prednisolone"]
+text = """
+Emergency department {comma} adult majors {period} {new paragraph}
+[[63-year-old|Sixty-three-year-old]] woman with [[36 hours|thirty-six hours]] of fever {comma} aches {comma} dry
+cough and a sore throat {comma} which started suddenly the day before yesterday {period} Her grandson had flu last
+week {period} She has [[COPD|C O P D]] and type [[2|two]] diabetes {period} She is more breathless than usual but
+can still talk in full sentences {period} No chest pain {comma} no confusion {comma} no vomiting and she is passing
+urine normally {period} She has not had this year's flu vaccine {period} Her regular medicines are tiotropium
+{comma} a budesonide formoterol inhaler {comma} metformin and gliclazide {period} No known drug allergies {period}
+{new paragraph}
+On examination temperature [[38.6|thirty-eight point six]] {comma} heart rate [[104|one hundred and four]] {comma}
+blood pressure [[138/76|one hundred and thirty-eight over seventy-six]] {comma} respiratory rate
+[[22|twenty-two]] {comma} saturations [[93%|ninety-three percent]] on air {comma} which is her usual {period}
+Scattered wheeze {comma} no focal crackles {period} Chest X-ray clear {period} She tested positive for influenza A on the
+rapid test {period} [[CRP|C R P]] [[24|twenty-four]] {comma} white count [[7.1|seven point one]] {comma} glucose
+[[13.4|thirteen point four]] {comma} lactate [[1.2|one point two]] {period} {new paragraph}
+Impression {colon} influenza A in a patient with [[COPD|C O P D]] {comma} with a mild exacerbation {comma} no
+pneumonia and no sepsis {period} [[CURB-65 score 1|curb sixty-five score one]] {period} {new paragraph}
+Plan {colon} a single dose of baloxavir [[40 mg|forty milligrams]] now {comma} as she weighs under
+[[80 kg|eighty kilograms]] {period} Salbutamol nebulizer here then via spacer at home {period} Prednisolone
+[[30 mg|thirty milligrams]] for [[5 days|five days]] {period} Check her sugars twice a day while on steroids and hold
+the gliclazide if she is not eating {period} Discharge home with her daughter {period} Return if she gets more
+breathless {comma} drowsy or has chest pain {period}
+"""
+
+[gold.history]
+value = "63-year-old woman with 36 hours of fever, aches, dry cough and a sore throat, which started suddenly the day before yesterday. Grandson had flu last week. COPD and type 2 diabetes. More breathless than usual but can still talk in full sentences. No chest pain, no confusion, no vomiting; passing urine normally. Has not had this year's flu vaccine. Regular medicines: tiotropium, a budesonide formoterol inhaler, metformin and gliclazide. No known drug allergies. Temperature 38.6, heart rate 104, blood pressure 138/76, respiratory rate 22, saturations 93% on air, which is her usual. Scattered wheeze, no focal crackles. Chest X-ray clear. Positive for influenza A on the rapid test. CRP 24, white count 7.1, glucose 13.4, lactate 1.2."
+sources = [
+    "63-year-old woman with 36 hours of fever, aches, dry cough and a sore throat, which started suddenly the day before yesterday.",
+    "Her grandson had flu last week.",
+    "She has COPD and type 2 diabetes.",
+    "She is more breathless than usual but can still talk in full sentences.",
+    "No chest pain, no confusion, no vomiting and she is passing urine normally.",
+    "She has not had this year's flu vaccine.",
+    "Her regular medicines are tiotropium, a budesonide formoterol inhaler, metformin and gliclazide.",
+    "No known drug allergies.",
+    "On examination temperature 38.6, heart rate 104, blood pressure 138/76, respiratory rate 22, saturations 93% on air, which is her usual.",
+    "Scattered wheeze, no focal crackles.",
+    "Chest X-ray clear.",
+    "She tested positive for influenza A on the rapid test.",
+    "CRP 24, white count 7.1, glucose 13.4, lactate 1.2.",
+]
+
+[gold.assessment]
+value = "Influenza A in a patient with COPD, with a mild exacerbation; no pneumonia and no sepsis. CURB-65 score 1."
+sources = [
+    "influenza A in a patient with COPD, with a mild exacerbation, no pneumonia and no sepsis.",
+    "CURB-65 score 1.",
+]
+
+[gold.plan]
+value = "A single dose of baloxavir 40 mg now, as she weighs under 80 kg. Salbutamol nebulizer here, then via spacer at home. Prednisolone 30 mg for 5 days. Check her sugars twice a day while on steroids and hold the gliclazide if she is not eating. Discharge home with her daughter. Return if she gets more breathless, drowsy or has chest pain."
+sources = [
+    "a single dose of baloxavir 40 mg now, as she weighs under 80 kg.",
+    "Salbutamol nebulizer here then via spacer at home.",
+    "Prednisolone 30 mg for 5 days.",
+    "Check her sugars twice a day while on steroids and hold the gliclazide if she is not eating.",
+    "Discharge home with her daughter.",
+    "Return if she gets more breathless, drowsy or has chest pain.",
+]

@@ -1,0 +1,53 @@
+# Dictation test script (synthetic): pediatric endocrine clinic, congenital adrenal hyperplasia on crinecerfont. Format: eval/README.md.
+id = "d31-cah-crinecerfont"
+voice = "bf_emma"
+tags = ["vitals", "numbers", "drug-new", "drug-uncommon", "negation", "self-correction", "spoken-punctuation"]
+dates = []
+drugs = ["hydrocortisone", "fludrocortisone", "crinecerfont"]
+text = """
+Pediatric endocrine clinic {period} [[12-year-old|twelve-year-old]] boy with classic congenital adrenal hyperplasia
+due to [[21-hydroxylase|twenty-one hydroxylase]] deficiency {comma} seen with his mum {period} He has been on
+hydrocortisone [[20 mg|twenty milligrams]] a day in three doses and fludrocortisone
+[[100 mcg|one hundred micrograms]] daily {period} His androgens have been hard to control without high steroid doses
+{comma} so [[3 months|three months]] ago we added crinecerfont [[100 mg|one hundred milligrams]] twice daily with
+meals no sorry [[50 mg|fifty milligrams]] twice daily {comma} since he weighs under [[55 kg|fifty-five kilograms]]
+{period} He feels well {comma} no headaches {comma} no tiredness and no salt craving {period} No illnesses needing
+stress doses since the last visit {period} {new paragraph}
+Height [[148 cm|one hundred and forty-eight centimeters]] {comma} weight [[44 kg|forty-four kilograms]] {comma}
+blood pressure [[110/68|one hundred and ten over sixty-eight]] {period} Puberty
+[[Tanner stage 2|Tanner stage two]] {period} Morning [[17-hydroxyprogesterone|seventeen hydroxy progesterone]] has
+fallen from [[85|eighty-five]] to [[22|twenty-two]] nanomoles per liter and androstenedione is now in the normal
+range {period} {new paragraph}
+Impression {colon} good androgen control on crinecerfont {comma} allowing the hydrocortisone to come down {period}
+{new paragraph}
+Plan {colon} reduce hydrocortisone to [[15 mg|fifteen milligrams]] a day {comma} split [[7.5|seven and a half]]
+{comma} [[5|five]] and [[2.5 mg|two and a half milligrams]] {period} Continue crinecerfont and fludrocortisone
+{period} Sick day rules reviewed again with mum {period} Bone age X-ray and repeat hormone levels before the next
+visit in [[3 months|three months]] {period}
+"""
+
+[gold.history]
+value = "12-year-old boy with classic congenital adrenal hyperplasia due to 21-hydroxylase deficiency, seen with his mum. Hydrocortisone 20 mg a day in three doses and fludrocortisone 100 mcg daily. Androgens hard to control without high steroid doses; crinecerfont 50 mg twice daily with meals added 3 months ago, since he weighs under 55 kg. Feels well; no headaches, no tiredness, no salt craving. No illnesses needing stress doses since the last visit. Height 148 cm, weight 44 kg, blood pressure 110/68. Puberty Tanner stage 2. Morning 17-hydroxyprogesterone fallen from 85 to 22 nanomoles per liter; androstenedione now in the normal range."
+sources = [
+    "12-year-old boy with classic congenital adrenal hyperplasia due to 21-hydroxylase deficiency, seen with his mum.",
+    "He has been on hydrocortisone 20 mg a day in three doses and fludrocortisone 100 mcg daily.",
+    "His androgens have been hard to control without high steroid doses, so 3 months ago we added crinecerfont 100 mg twice daily with meals no sorry 50 mg twice daily, since he weighs under 55 kg.",
+    "He feels well, no headaches, no tiredness and no salt craving.",
+    "No illnesses needing stress doses since the last visit.",
+    "Height 148 cm, weight 44 kg, blood pressure 110/68.",
+    "Puberty Tanner stage 2.",
+    "Morning 17-hydroxyprogesterone has fallen from 85 to 22 nanomoles per liter and androstenedione is now in the normal range.",
+]
+
+[gold.assessment]
+value = "Good androgen control on crinecerfont, allowing the hydrocortisone to come down."
+sources = ["good androgen control on crinecerfont, allowing the hydrocortisone to come down."]
+
+[gold.plan]
+value = "Reduce hydrocortisone to 15 mg a day, split 7.5, 5 and 2.5 mg. Continue crinecerfont and fludrocortisone. Sick day rules reviewed again with mum. Bone age X-ray and repeat hormone levels before the next visit in 3 months."
+sources = [
+    "reduce hydrocortisone to 15 mg a day, split 7.5, 5 and 2.5 mg.",
+    "Continue crinecerfont and fludrocortisone.",
+    "Sick day rules reviewed again with mum.",
+    "Bone age X-ray and repeat hormone levels before the next visit in 3 months.",
+]
