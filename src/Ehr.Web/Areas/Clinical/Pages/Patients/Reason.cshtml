@@ -14,10 +14,11 @@
 else
 {
     <p>This patient is not on your panel. To open the chart, say why you need it. Your access and the reason are recorded and reviewed, and the chart stays open to you for @BreakGlass.Duration.TotalHours hours.</p>
+    @* No action: the form posts to this page's own address, the search's criteria included. *@
     <form method="post" class="account-form">
         <label>Reason <textarea asp-for="Reason" rows="3" required autofocus></textarea></label>
         <span asp-validation-for="Reason" class="error"></span>
         <button>Open the chart</button>
     </form>
 }
-<p><a asp-page="Index">Back to patients</a></p>
+<p><partial name="_BackToSearch" model="Model.Search" /></p>

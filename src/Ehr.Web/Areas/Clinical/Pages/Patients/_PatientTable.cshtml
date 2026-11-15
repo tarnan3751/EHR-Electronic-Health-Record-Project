@@ -8,10 +8,15 @@
         {
             <tr>
                 <td>
-                    <a asp-page="Chart" asp-route-id="@patient.Id">@patient.FamilyName, @patient.GivenName</a>
+                    @* The criteria first: asp-all-route-data replaces the route values, and asp-route-id then adds to them. *@
+                    <a asp-page="Chart" asp-all-route-data="Model.Search.RouteData()" asp-route-id="@patient.Id">@patient.FamilyName, @patient.GivenName</a>
                     @if (Model.MarkPanel && Model.Panel.Contains(patient.Id))
                     {
                         <span class="tag">Yours</span>
+                    }
+                    else if (Model.MarkPanel)
+                    {
+                        <span class="tag restricted">Restricted</span>
                     }
                 </td>
                 <td>@patient.Mrn</td>

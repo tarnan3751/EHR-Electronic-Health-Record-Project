@@ -1,0 +1,11 @@
+@* The way back from a chart, or from the reason it asks for: to the search it came from, with its criteria, or to the
+   clinician's panel when it didn't come from a search. *@
+@model SearchQuery
+@if (Model.IsEmpty)
+{
+    <a asp-page="Index">Back to my patients</a>
+}
+else
+{
+    <a asp-page="Index" asp-all-route-data="Model.RouteData()">Back to search</a>
+}

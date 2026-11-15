@@ -5,7 +5,7 @@
 @{
     ViewData["Title"] = $"{Model.Patient.FamilyName}, {Model.Patient.GivenName}";
 }
-<p><a asp-page="Index">Back to my patients</a></p>
+<p><partial name="_BackToSearch" model="Model.Search" /></p>
 <h1>@Model.Patient.FamilyName, @Model.Patient.GivenName @if (Model.OnPanel) { <span class="tag">Yours</span> }</h1>
 @if (Model.EmergencyUntil is { } until)
 {
@@ -24,13 +24,13 @@
     }
     else if (Model.OnPanel)
     {
-        <form method="post" asp-page-handler="Unassign">
+        <form method="post" asp-page-handler="Unassign" asp-all-route-data="Model.Search.RouteData()">
             <button>Remove from my patients</button>
         </form>
     }
     else
     {
-        <form method="post" asp-page-handler="Assign">
+        <form method="post" asp-page-handler="Assign" asp-all-route-data="Model.Search.RouteData()">
             <button>Add to my patients</button>
         </form>
     }
@@ -140,7 +140,7 @@ else if (!OnPrem.IsReachable)
 }
 else
 {
-    <form method="post" asp-page-handler="Enroll">
+    <form method="post" asp-page-handler="Enroll" asp-all-route-data="Model.Search.RouteData()">
         <button>Issue an enrollment code</button>
     </form>
 }

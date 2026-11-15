@@ -1,0 +1,44 @@
+@* What the patients page shows under the search form: what to correct, the search's results, or, with no search, the
+   clinician's panel. *@
+@model IndexModel
+@if (Model.Problems.Count > 0)
+{
+    <ul class="notice error" role="alert">
+        @foreach (var problem in Model.Problems)
+        {
+            <li>@problem</li>
+        }
+    </ul>
+}
+else if (Model.Searched)
+{
+    <h2>Search results</h2>
+    @if (Model.Results.Count == 0)
+    {
+        <p>No patients match.</p>
+    }
+    else
+    {
+        @if (Model.Results.Any(patient => !Model.Panel.Contains(patient.Id)))
+        {
+            <p><span class="tag restricted">Restricted</span> Not on your panel: opening the chart asks for a reason first.</p>
+        }
+        <partial name="_PatientTable" model="new PatientTable(Model.Results, Model.Panel, MarkPanel: true, Model.Search)" />
+        @if (Model.More)
+        {
+            <p>More patients match than are listed here. Add a date of birth, or more of the name, to narrow the search.</p>
+        }
+    }
+}
+else
+{
+    <h2>My patients</h2>
+    @if (Model.PanelPatients.Count == 0)
+    {
+        <p>No patients are on your panel yet. Search for a patient and add them from the chart.</p>
+    }
+    else
+    {
+        <partial name="_PatientTable" model="new PatientTable(Model.PanelPatients, Model.Panel, MarkPanel: false, SearchQuery.None)" />
+    }
+}

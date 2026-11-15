@@ -62,40 +62,67 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return new PatientChart(patient, allergies, medications, conditions, encounters);
     }
 
-    // Patients whose MRN is the query, or whose given or family name starts with it.
-    public async Task<IReadOnlyList<Patient>> SearchPatientsAsync(string query, int limit, CancellationToken cancellationToken)
+    // The shortest name a search takes. Every patient listed is a recorded read, and one letter matches hundreds.
+    public const int MinimumNameLength = 2;
+
+    // Patients matching every criterion given: a given or family name that starts with the name, in any case; the date
+    // of birth; the MRN, exactly. At least one is required, and a name of at least MinimumNameLength characters.
+    public Task<PatientList> SearchPatientsAsync(string? name, DateOnly? birthDate, string? mrn, int limit, CancellationToken cancellationToken)
     {
-        var term = query.Trim();
-        if (term.Length == 0)
+        if (name is null && birthDate is null && mrn is null)
         {
-            return [];
+            throw new ArgumentException("A search needs a name, a date of birth or an MRN.");
         }
 
-        var prefix = term.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
-        return await ReadAsync(
-            db.Patients.Where(p => p.Mrn == term || EF.Functions.ILike(p.FamilyName, prefix) || EF.Functions.ILike(p.GivenName, prefix)),
-            limit, cancellationToken);
+        if (name is { Length: < MinimumNameLength })
+        {
+            throw new ArgumentException($"A name to search for has at least {MinimumNameLength} characters.", nameof(name));
+        }
+
+        var patients = db.Patients.AsQueryable();
+        if (name is not null)
+        {
+            // The name's own wildcards and backslashes match only themselves. The escape character is named outright:
+            // without one, EF Core writes ESCAPE '', and a backslash would be a plain character.
+            var prefix = name.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
+            patients = patients.Where(p => EF.Functions.ILike(p.FamilyName, prefix, @"\") || EF.Functions.ILike(p.GivenName, prefix, @"\"));
+        }
+
+        if (birthDate is { } date)
+        {
+            patients = patients.Where(p => p.BirthDate == date);
+        }
+
+        if (mrn is not null)
+        {
+            patients = patients.Where(p => p.Mrn == mrn);
+        }
+
+        return ReadAsync(patients, limit, cancellationToken);
     }
 
     // The patients on the signed-in clinician's panel (PatientAssignment), the ones the clinic's home shows first.
-    public Task<IReadOnlyList<Patient>> PanelAsync(int limit, CancellationToken cancellationToken) =>
-        ReadAsync(
+    public async Task<IReadOnlyList<Patient>> PanelAsync(int limit, CancellationToken cancellationToken) =>
+        (await ReadAsync(
             db.Patients.Where(p => db.PatientAssignments.Any(a => a.PatientId == p.Id && a.ClinicianId == user.UserId && a.EndedAt == null)),
-            limit, cancellationToken);
+            limit, cancellationToken)).Patients;
 
-    // A list of patients, in name order, each one a recorded read.
-    async Task<IReadOnlyList<Patient>> ReadAsync(IQueryable<Patient> query, int limit, CancellationToken cancellationToken)
+    // A list of patients, in name order, each one a recorded read, and whether more match than the limit.
+    async Task<PatientList> ReadAsync(IQueryable<Patient> query, int limit, CancellationToken cancellationToken)
     {
-        var patients = await query.AsNoTracking()
-            .OrderBy(p => p.FamilyName).ThenBy(p => p.GivenName).ThenBy(p => p.Id)
-            .Take(limit)
-            .ToListAsync(cancellationToken);
+        var ordered = query.AsNoTracking().OrderBy(p => p.FamilyName).ThenBy(p => p.GivenName).ThenBy(p => p.Id);
+        var patients = await ordered.Take(limit).ToListAsync(cancellationToken);
+        // Only a yes or no comes back, nobody's data, so there is nothing more to record.
+        var more = patients.Count == limit && await ordered.Skip(limit).AnyAsync(cancellationToken);
         if (patients.Count > 0)
         {
             audit.RecordReads(PatientsTable, patients.Select(p => (p.Id, p.Id)));
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        return patients;
+        return new PatientList(patients, more);
     }
 }
+
+// Patients listed by PhiReader, each already recorded as a read, and whether more matched than were listed.
+public sealed record PatientList(IReadOnlyList<Patient> Patients, bool More);

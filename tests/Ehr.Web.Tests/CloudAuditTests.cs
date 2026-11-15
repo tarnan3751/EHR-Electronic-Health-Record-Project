@@ -160,7 +160,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         apps.PrimaryDown = true;
         try
         {
-            using var response = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, $"/patients?q={family}", signedIn);
+            using var response = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, $"/patients?name={family}", signedIn);
 
             var html = await ReadAsync(response);
             Assert.All(patients, patient => Assert.Contains($"/patients/{patient}", html));

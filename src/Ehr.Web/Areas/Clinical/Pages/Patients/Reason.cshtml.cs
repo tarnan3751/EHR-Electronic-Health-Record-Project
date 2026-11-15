@@ -9,8 +9,12 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 
 // Where the chart sends a clinician whose patient this isn't: the stated reason emergency access requires (BreakGlass).
 // Nothing about the patient is shown here; the search results the clinician came from already were a recorded read.
+// That search travels along to the chart (SearchQuery), for the way back to it.
 public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) : PageModel
 {
+    [BindProperty(SupportsGet = true)]
+    public SearchQuery Search { get; set; } = SearchQuery.None;
+
     [BindProperty]
     [Required(ErrorMessage = "Say why you need this chart.")]
     [MinLength(BreakGlass.MinimumReasonLength, ErrorMessage = "Use at least 10 characters.")]
@@ -19,7 +23,7 @@ public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) 
 
     public async Task<IActionResult> OnGetAsync(Guid id) =>
         await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted) || await breakGlass.ActiveUntilAsync(id, HttpContext.RequestAborted) is not null
-            ? RedirectToPage("Chart", new { id })
+            ? RedirectToPage("Chart", Search.ChartRouteValues(id))
             : Page();
 
     public async Task<IActionResult> OnPostAsync(Guid id)
@@ -39,6 +43,6 @@ public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) 
             return NotFound();
         }
 
-        return RedirectToPage("Chart", new { id });
+        return RedirectToPage("Chart", Search.ChartRouteValues(id));
     }
 }

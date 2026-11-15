@@ -212,26 +212,29 @@ public sealed class WebApps : IAsyncLifetime
             new SignInRequest(account.Email, account.Password, code, "test desktop"), JsonSerializerOptions.Web, TestContext.Current.CancellationToken);
 
     // A patient row, inserted as the superuser the way a seed would: row-level security doesn't apply, and the audit
-    // trigger records no actor.
-    public async Task<Guid> InsertPatientAsync(string givenName, string familyName)
+    // trigger records no actor. Born on 1980-01-01 unless the test says otherwise; the MRN is MrnOf the ID.
+    public async Task<Guid> InsertPatientAsync(string givenName, string familyName, DateOnly? birthDate = null)
     {
         var id = Guid.CreateVersion7();
         await using var connection = await OpenDatabaseAsync();
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO ehr.patients (id, mrn, given_name, family_name, birth_date, gender, version, updated_at)
-            VALUES (@id, @mrn, @given, @family, '1980-01-01', 'unknown', 1, now())
+            VALUES (@id, @mrn, @given, @family, @born, 'unknown', 1, now())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
-        // From the random end of the ID: the start of a version 7 GUID is the time, the same for two made in one
-        // millisecond.
-        command.Parameters.AddWithValue("mrn", id.ToString("N")[^12..]);
+        command.Parameters.AddWithValue("mrn", MrnOf(id));
         command.Parameters.AddWithValue("given", givenName);
         command.Parameters.AddWithValue("family", familyName);
+        command.Parameters.AddWithValue("born", birthDate ?? new DateOnly(1980, 1, 1));
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         return id;
     }
+
+    // The MRN InsertPatientAsync gives a patient: the random end of the ID, since the start of a version 7 GUID is the
+    // time, the same for two made in one millisecond.
+    public static string MrnOf(Guid patientId) => patientId.ToString("N")[^12..];
 
     // The rest of a patient's chart, inserted as the superuser the way a seed would: nothing at runtime writes it yet.
     // An allergy's recorded date is fixed, so a page can be checked for it.

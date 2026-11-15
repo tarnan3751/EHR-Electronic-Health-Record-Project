@@ -1,34 +1,19 @@
 @page "/patients"
+@using System.Globalization
 @model IndexModel
 @{
     ViewData["Title"] = "Patients";
 }
 <h1>Patients</h1>
-<form method="get" class="search-form">
-    <label>Name or MRN <input asp-for="Q" type="search" autocomplete="off" autofocus></label>
+@* A plain GET: it works without JavaScript and off-site from the replica, and the results' links carry the criteria
+   back from the chart. The fields' names are the query string's. *@
+<form method="get" class="search-form" role="search">
+    <label>Name <input type="search" name="name" value="@Model.Search.Name" autocomplete="off" autofocus></label>
+    <label>Date of birth <input type="date" name="birthdate" value="@Model.Search.Birthdate" max="@IndexModel.LatestBirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"></label>
+    <label>MRN <input type="search" name="mrn" value="@Model.Search.Mrn" autocomplete="off"></label>
     <button>Search</button>
+    <a asp-page="Index" class="button">Clear</a>
 </form>
-@if (Model.Q is { Length: > 0 })
-{
-    <h2>Search results</h2>
-    @if (Model.Results.Count == 0)
-    {
-        <p>No patients match.</p>
-    }
-    else
-    {
-        <partial name="_PatientTable" model="new PatientTable(Model.Results, Model.Panel, MarkPanel: true)" />
-    }
-}
-else
-{
-    <h2>My patients</h2>
-    @if (Model.PanelPatients.Count == 0)
-    {
-        <p>No patients are on your panel yet. Search for a patient and add them from the chart.</p>
-    }
-    else
-    {
-        <partial name="_PatientTable" model="new PatientTable(Model.PanelPatients, Model.Panel, MarkPanel: false)" />
-    }
-}
+<div id="search-results">
+    <partial name="_SearchResults" model="Model" />
+</div>

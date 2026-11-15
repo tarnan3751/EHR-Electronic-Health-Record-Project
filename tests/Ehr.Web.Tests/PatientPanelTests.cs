@@ -50,7 +50,7 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         var panel = await session.Client.GetStringAsync("/patients", Cancel);
         Assert.Contains("My patients", panel);
         Assert.Contains($"/patients/{patient}", panel);
-        var search = await session.Client.GetStringAsync("/patients?q=Paneled", Cancel);
+        var search = await session.Client.GetStringAsync("/patients?name=Paneled", Cancel);
         Assert.Contains($"/patients/{patient}", search);
         Assert.Contains("Yours", search);
 
@@ -78,7 +78,7 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
 
         var colleagueSession = await SignInAsync(apps.OnPrem, colleague);
         var theirPanel = await colleagueSession.Client.GetStringAsync("/patients", Cancel);
-        var theirSearch = await colleagueSession.Client.GetStringAsync("/patients?q=Separate", Cancel);
+        var theirSearch = await colleagueSession.Client.GetStringAsync("/patients?name=Separate", Cancel);
 
         Assert.DoesNotContain($"/patients/{patient}", theirPanel);
         Assert.Contains($"/patients/{patient}", theirSearch);
