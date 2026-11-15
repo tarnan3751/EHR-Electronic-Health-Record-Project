@@ -38,12 +38,12 @@ tests/
   Ehr.Architecture.Tests/  layering, and PHI reads only through the PHI reader
   Ehr.Web.Tests/           the web app, run in memory as each server, against real PostgreSQL 18
   Ehr.Data.Tests/          the data layer and migrations
-  Ehr.Testing/             shared by the test projects: a migrated PostgreSQL 18 in a container
+  Ehr.Testing/             shared by the test projects and the benchmark: a migrated PostgreSQL 18 in a container
 db/
   migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
   policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
 eval/               dictation gold set and scoring
-bench/              the synthetic clinic and its seed (Ehr.Seed, run through Ehr.Bench)
+bench/              the synthetic clinic and its seed (Ehr.Seed), and the render-time benchmark (Ehr.Bench)
 infra/              compose (local server stack), migrate (migration job), barman (backup image), tailscale (access rules)
 .github/            CI workflow and Dependabot settings
 .vscode/            shared settings, recommended extensions, and run tasks
@@ -178,7 +178,7 @@ Run `dotnet tool restore` for the pinned `dotnet-ef`: once, and again whenever `
 
 Tests fail if the model has changes no migration covers, if `schema.sql` is out of date, or if a table has no grant or protection decision. To undo a migration you haven't pushed, delete its two files and run `git restore db/migrations/EhrDbContextModelSnapshot.cs`. (`dotnet ef migrations remove` expects a database at the default port, which the local stack doesn't use.)
 
-## Synthetic data
+## Synthetic data and the benchmark
 
 `bench/` holds a synthetic clinic: patients with allergies, medications, diagnoses and visits, the same every time, and obviously synthetic (every name carries a number, every MRN starts `SYN`).
 
@@ -190,6 +190,14 @@ dotnet run -c Release --project bench/Ehr.Bench -- seed
 ```
 
 In PowerShell, set it with `$env:EHR_SEED_CONNECTION = "..."` instead. `--patients <n>` loads another number. The seed fills only a clinic with no patients; otherwise it refuses and changes nothing, and to start again you reset the stack (`docker compose --profile "*" down -v`). It runs as `ehr_owner` because nothing else may write these tables, and loads with binary COPY, which PostgreSQL refuses under forced row-level security: so, in one transaction, it lifts that and turns off the write-audit trigger on each table it fills, loads them, and turns both back on before it commits (`bench/Ehr.Seed/Seeder.cs`). No other session ever sees the tables unprotected, a failure leaves nothing behind, and the seeded rows have no write-audit events.
+
+The benchmark measures the server render time of the search and chart pages in a clinic of 50,000 patients, against AGENTS.md's budget of a p99 under 20 ms. It needs Docker, and from the repository folder:
+
+```
+dotnet run -c Release --project bench/Ehr.Bench
+```
+
+starts its own PostgreSQL 18, seeds it, runs the on-prem app in memory, and prints the p50, p95, p99 and slowest time of each kind of request: searches by name, date of birth and MRN, results as the clinician types, and charts. `--assert` exits with 1 when a p99 is over the budget, and `--patients <n>` seeds another number. With `--stack` it measures against the stack's primary instead, seeded already with as many patients, with the web app's own settings from "Running the apps"; it refuses to start, before the app does, without the Data Protection certificate among them, and once started when the database's statistics don't show a clinic of that size. It never writes a Data Protection key: its own cookies and form tokens use keys kept in memory, and it creates none in the key ring the stack's apps share. Each run creates a clinician of its own, with a password nobody keeps, and locks it at the end. A run against the stack leaves its writes there: that clinician, 100 panel assignments with their write-audit events, and an audit event for every patient each page listed, about 140,000 at 50,000 patients, which nothing deletes.
 
 ## Continuous integration
 

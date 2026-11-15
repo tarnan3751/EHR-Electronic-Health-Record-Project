@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The command line for the synthetic clinic: `seed` loads it into a database (README.md, "Synthetic data"). -->
+  <!-- The command line for the synthetic clinic: `seed` loads it into a database, and otherwise it measures the search
+       and chart pages' server render time with the web app in memory (README.md, "Synthetic data and the
+       benchmark"). -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,6 +10,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The web tests check that its app never writes a Data Protection key. -->
+    <InternalsVisibleTo Include="Ehr.Web.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Runs the web app in memory, as the web tests do. -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ehr.Web\Ehr.Web.csproj" />
+    <!-- A migrated PostgreSQL 18 of its own, and the authenticator codes for signing in. -->
+    <ProjectReference Include="..\..\tests\Ehr.Testing\Ehr.Testing.csproj" />
     <ProjectReference Include="..\Ehr.Seed\Ehr.Seed.csproj" />
   </ItemGroup>
 

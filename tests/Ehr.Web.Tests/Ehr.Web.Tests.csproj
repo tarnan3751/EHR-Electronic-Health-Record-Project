@@ -16,6 +16,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ehr.Web\Ehr.Web.csproj" />
     <ProjectReference Include="..\Ehr.Testing\Ehr.Testing.csproj" />
+    <!-- The benchmark's app, which must never write a Data Protection key (BenchmarkTests). -->
+    <ProjectReference Include="..\..\bench\Ehr.Bench\Ehr.Bench.csproj" />
   </ItemGroup>
 
 </Project>
