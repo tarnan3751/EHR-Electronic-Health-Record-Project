@@ -187,6 +187,13 @@ def test_a_term_superseded_in_one_source_but_said_in_another_is_fine():
     assert own("Fever 3 days, sorry, 2 days. Cough 3 days.", "Cough 3 days.", "Fever 3 days", "Cough 3 days").pending
 
 
+def test_a_correction_takes_back_the_unit_said_with_what_it_corrects():
+    said = "Range of motion is 5 to 95 degrees no sorry 5 to 90 degrees."
+
+    assert own(said, "Range of motion is 5 to 90 degrees.").pending
+    assert "source_superseded" in own(said, "Range of motion is 5 to 95 degrees.").reasons
+
+
 def test_a_side_the_clinician_corrected_is_superseded():
     said = "Pain in the left knee, sorry, right knee, for two weeks."
 

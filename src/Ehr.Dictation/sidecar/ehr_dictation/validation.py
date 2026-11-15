@@ -39,7 +39,8 @@ and every check reads the cleaned text. The checks, each with the reason code re
   "actually", "no,", "make it", "rather", "scratch that"), read across the whole transcript. A correction gives a
   number, date, drug name or side (left, right) within three words of its cue, and supersedes the last expression of the
   same kind said before the cue in its sentence (or in the sentence before, when the cue starts one), unless it says all
-  of it again. One expression is one measured thing: numbers joined only by units, articles or "over" ("150 over 90").
+  of it again. One expression is one measured thing: numbers joined only by units, articles or "over" ("150 over 90"),
+  with the one word after it when that is all that comes before the cue ("95 degrees, no sorry, 90 degrees").
   So "heart rate 78, no sorry 72" supersedes 78 and not the blood pressure said before it; "10 mg, sorry, 20 mg"
   supersedes 10 mg; and "lisinopril 10 mg, sorry, 20 mg" keeps lisinopril, since no drug replaces it. A source is read
   as corrected: without the cue and what it took back.
@@ -422,7 +423,9 @@ def _corrections(text: str, words: list[Token], terms: list[_Term]) -> tuple[set
             replaced = _run(preceding[::-1], words)
             if all(term.text in said_again for term in replaced):
                 continue  # said again unchanged: "lisinopril 10 mg, sorry, lisinopril 20 mg" keeps lisinopril
-            taken_back.update(range(replaced[-1].first, replaced[0].last + 1))
+            # With the one word between it and the cue, if there is just one: its unit ("95 degrees, no sorry, 90").
+            end = replaced[0].last + 1
+            taken_back.update(range(replaced[-1].first, end + 1 if first - end == 1 else end))
             superseded.update(replaced)
             cues.update(inside)
     return cues, taken_back, superseded
