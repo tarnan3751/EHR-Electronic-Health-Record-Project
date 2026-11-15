@@ -61,7 +61,8 @@ and every check reads the cleaned text. The checks, each with the reason code re
 A value that passes can still carry a warning, possible_correction, for each place where a correction may have been
 said that the checks didn't hear, such as a cue speech recognition got wrong ("10 mg no weight 20 mg"): the value uses
 a number, date or drug name from its sources, and the transcript says another of the same kind, in another expression,
-within WARNING_REACH words after it, past the end of the source if need be. The warning carries only that later item's
+within WARNING_REACH words after it, past the end of the source if need be, with a correction-like word between them
+(no, wait, sorry, scratch, mean, correction, actually, rather, make, change). The warning carries only that later item's
 place in the transcript, so the review screen can point at it; the value stays pending.
 
 The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of this
@@ -86,7 +87,12 @@ LIMITS = {"history": 3000, "assessment": 2000, "plan": 2000}
 MAX_SOURCES = 30
 MAX_QUOTE = 600
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
-WARNING_REACH = 8  # words after a value's number, date or drug in which another of its kind may be a correction
+# The possible-correction warning's rule, in one place: how far after a value's number, date or drug another of its
+# kind may be a correction, and the words one of which must come between them (None: any gap).
+WARNING_REACH = 8
+WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
+    "no wait sorry scratch mean correction actually rather make change".split()
+)
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
 DIRECTIVE_REACH = 14  # at most, words after an instruction that still belong to it, when nothing ends its clause sooner
@@ -495,8 +501,9 @@ def _expressions(terms: list[_Term], words: list[Token]) -> dict[_Term, int]:
 
 
 def _possible_corrections(value: str, spans: list[tuple[int, int]], transcript: _Transcript) -> list[tuple[int, int]]:
-    """Where a correction the checks didn't hear may be (see the module's header): each number, date or drug name, in
-    another expression, that the transcript says within WARNING_REACH words after one the value uses from its sources."""
+    """Where a correction the checks didn't hear may be (see the module's header): for each number, date or drug name the
+    value uses from its sources, the first of its kind, in another expression, that the transcript says within
+    WARNING_REACH words after it with a correction-like word between them (WARNING_GAP_WORDS)."""
     used = {term for term in _value_terms(value) if term[0] in WARNED_KINDS}
     words = transcript.words
     found: set[tuple[int, int]] = set()
@@ -504,11 +511,15 @@ def _possible_corrections(value: str, spans: list[tuple[int, int]], transcript: 
         if (term.kind, term.text) not in used or not any(_holds(span, term, words) for span in spans):
             continue
         for later in transcript.terms:
+            # A correction the checks heard is theirs to handle: its cue doesn't count as a correction-like word.
+            gap = [i for i in range(term.last + 1, later.first) if i not in transcript.cues]
             if (
                 later.kind == term.kind and later.text != term.text and term.last < later.first <= term.last + WARNING_REACH
                 and transcript.expressions[later] != transcript.expressions[term]
+                and (WARNING_GAP_WORDS is None or any(words[i].text in WARNING_GAP_WORDS for i in gap))
             ):
                 found.add((words[later.first].start, words[later.last].end))
+                break  # the first one after it: what may have replaced it
     return sorted(found)
 
 

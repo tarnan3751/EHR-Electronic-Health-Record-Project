@@ -764,17 +764,24 @@ def warned(said, value, *sources):
 @pytest.mark.parametrize(("said", "value", "later"), [
     ("Lisinopril ten milligrams no weight twenty milligrams daily.", "Lisinopril ten milligrams.", "twenty"),
     ("Add semaglutide 0.5 mg weekly no weight start at 0.25 mg weekly.", "Add semaglutide 0.5 mg weekly.", "0.25"),
-    ("After 10 minutes standing heart rate 124 weight no 118.", "Heart rate 124.", "118"),
+    ("After 10 minutes standing heart rate 124 weight no 118, blood pressure 104/72.", "Heart rate 124.", "118"),
     ("Increase febuxostat to 120 mg scratch the 80 mg daily.", "Increase febuxostat to 120 mg.", "80"),
 ])
 def test_a_correction_the_checks_did_not_hear_is_flagged_not_discarded(said, value, later):
     assert warned(said, value, value.rstrip(".")) == [later]
 
 
-def test_two_drugs_in_a_row_are_flagged():
-    # "I mean" heard as "and": the checks can't tell it from a list of two drugs, so every such list is flagged.
-    assert warned("Type 2 diabetes on metoprolol and metformin.", "Type 2 diabetes on metoprolol and metformin.") == [
-        "metformin"]
+@pytest.mark.parametrize("said", [
+    "Type 2 diabetes on metoprolol and metformin.",  # "I mean" heard as "and": not caught, a known limitation
+    "Continue metoprolol 25 mg and lisinopril 10 mg daily.",
+    "Increase lisinopril from 10 mg to 20 mg daily.",
+    "Blood pressure 142 over 88, heart rate 72.",
+    "Off work from March 3 to March 10.",
+    "Temperature 38.1, heart rate 102, respiratory rate 18.",
+    "Started aprocitentan 12.5 mg daily 6 weeks ago.",
+])
+def test_ordinary_lists_ranges_and_titrations_are_not_flagged(said):
+    assert warned(said, said) == []
 
 
 @pytest.mark.parametrize("said", ["Blood pressure 142 over 88.", "Blood pressure 142/88.", "Lisinopril 10 mg daily.",
@@ -795,6 +802,7 @@ def test_a_correction_the_checks_hear_still_discards_and_its_correction_is_not_f
 
     assert "source_superseded" in own(said, "Lisinopril 10 mg.", "Lisinopril 10 mg").reasons
     assert warned(said, "Lisinopril 20 mg daily.") == []
+    assert warned("Range of motion is 5 to 95 degrees no sorry 5 to 90 degrees.", "Range of motion is 5 to 90 degrees.") == []
 
 
 def test_a_warning_goes_out_with_the_pending_value_as_where_it_points():
