@@ -209,8 +209,8 @@ starts its own PostgreSQL 18, seeds it, runs the on-prem app in memory, and prin
 | Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that the clinic's home sends an anonymous browser to sign in, the sign-in pages load over HTTPS on all three sites, and the sync API refuses an anonymous request (the on-prem app reads the primary; the cloud app reads the replica), both databases accept connections over TLS only, the replica and Barman are streaming, and `barman check` passes |
 | Desktop | `cargo fmt --check`, `cargo clippy` (warnings count as errors) and `cargo build`, on macOS (Apple Silicon) and Windows (x64) |
 | Dictation scripts | The tests for `src/Ehr.Dictation/setup_models.py`, against a fake Hugging Face Hub |
+| Render-time benchmark | Runs the benchmark (`bench/Ehr.Bench`, see [Synthetic data and the benchmark](#synthetic-data-and-the-benchmark)) at 50,000 synthetic patients with `--assert`, and puts its times in the run's summary whether it passes or fails. It fails when a kind of request's p99 excluding the commit is 20 ms or more. The full time, commit included, is reported beside it but not checked here: its 20 ms target is checked on the clinic server. |
 | `ci` | Passes only when every job above passes. It's the one check `main` requires. |
-| Render-time benchmark | Runs the benchmark (`bench/Ehr.Bench`, see [Synthetic data and the benchmark](#synthetic-data-and-the-benchmark)) at 50,000 synthetic patients and puts its times in the run's summary. Informational for now: it never fails the run and isn't one of `ci`'s jobs. |
 | Publish image | On `main` only, after `ci` passes: pushes `ghcr.io/tarnan3751/ehr-web:<commit>` for `linux/amd64` and `linux/arm64` |
 
 The Windows desktop build is the slowest job: about 25 minutes when nothing is cached. Later runs reuse compiled dependencies and are faster.

@@ -224,14 +224,14 @@ jobs:
       - name: Test setup_models.py
         run: uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests
 
-  # Informational for now: the search and chart pages' server render time at 50,000 synthetic patients (bench/Ehr.Bench),
-  # in the run's summary. It never fails the run and isn't in ci's needs; once its numbers prove steady on these
-  # runners, --assert and a place in ci's needs make it AGENTS.md's p99 gate.
+  # AGENTS.md's render-time gate: the search and chart pages' server render time at 50,000 synthetic patients
+  # (bench/Ehr.Bench). --assert fails the job when a kind of request's p99 excluding the commit is 20 ms or more. The full
+  # time, the commit included, is only reported beside it in the run's summary: these runners' shared disks make commit
+  # times unsteady, so its 20 ms target is checked on the clinic server.
   bench:
     name: Render-time benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -241,13 +241,13 @@ jobs:
         with:
           global-json-file: global.json
 
-      # A benchmark that crashes fails the step, which shows, though the job's continue-on-error keeps the run green;
-      # and a run that printed no table says so in the summary.
+      # The table goes in the run's summary whether the gate passes or fails, and a run that printed no table says so;
+      # either way the step ends with the benchmark's exit code.
       - name: Server render time at 50,000 patients
         run: |
           set -o pipefail
           status=0
-          dotnet run --configuration Release --project bench/Ehr.Bench | tee bench.txt || status=$?
+          dotnet run --configuration Release --project bench/Ehr.Bench -- --assert | tee bench.txt || status=$?
           if grep -q '^Server render time' bench.txt; then
             { echo '```'; sed -n '/^Server render time/,$p' bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           else
@@ -261,7 +261,7 @@ jobs:
     # Branch protection requires a check by this name; renaming it means updating the ruleset.
     name: ci
     if: always()
-    needs: [web, stack, desktop, dictation]
+    needs: [web, stack, desktop, dictation, bench]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
