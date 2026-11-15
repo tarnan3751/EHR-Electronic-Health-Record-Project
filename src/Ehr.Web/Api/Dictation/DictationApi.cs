@@ -4,6 +4,8 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Ehr.Data.Accounts;
+using Ehr.Domain.Accounts;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,7 +19,9 @@ namespace Ehr.Web.Api.Dictation;
 //
 // Who: a clinician's staff cookie (the Clinician policy, on the whole group in Program.cs), plus the page's form token
 // in a RequestVerificationToken header. Not signed in as staff (a patient's sign-in isn't): 401. Staff, but not a
-// clinician: 403. Never a redirect. Where: the on-prem app only. Every route is a POST or a DELETE, so the cloud app
+// clinician: 403. Never a redirect. The cookie is checked against the account only every few minutes
+// (CookieSecurityStamp), so every call here checks it at once: an account disabled or locked out, or whose password or
+// authenticator has changed since it signed in, is refused with 401 on its next call. Where: the on-prem app only. Every route is a POST or a DELETE, so the cloud app
 // forwards each to the on-prem app, and while it can't reach it answers 503 with its usual text (Forwarding/).
 //
 // POST /api/dictation/sessions: 201 {sessionId, maxSeconds, maxChunkBytes}. The session takes up to maxSeconds of
@@ -86,7 +90,7 @@ public static partial class DictationApi
 
     public static RouteGroupBuilder MapDictationApi(this IEndpointRouteBuilder endpoints)
     {
-        var sessions = endpoints.MapGroup(Path).AddEndpointFilter(RequireFormTokenAsync);
+        var sessions = endpoints.MapGroup(Path).AddEndpointFilter(RequireCurrentAccountAsync).AddEndpointFilter(RequireFormTokenAsync);
         sessions.MapPost("/", StartAsync);
         sessions.MapPost("/{id}/audio", SendAudioAsync).WithMetadata(new RequestSizeLimitAttribute(MaxChunkBytes));
         sessions.MapPost("/{id}/stop", StopAsync);
@@ -94,6 +98,12 @@ public static partial class DictationApi
         sessions.MapDelete("/{id}", CancelAsync);
         return sessions;
     }
+
+    // The sign-in still holds: the account isn't disabled or locked out, and its security stamp hasn't changed.
+    static async ValueTask<object?> RequireCurrentAccountAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
+        await CookieSecurityStamp.CurrentAccountAsync<StaffUser>(context.HttpContext.RequestServices, context.HttpContext.User) is null
+            ? Results.Unauthorized()
+            : await next(context);
 
     // The same token every form post on the pages carries, here in a header. It runs after authorization, so a
     // request from nobody is a 401 first.

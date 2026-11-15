@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Ehr.Web.Api.Dictation;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -160,6 +161,43 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Null(response.Headers.Location);
         Assert.Empty(service.Received);
+    }
+
+    // The staff cookie itself is only checked every few minutes; dictation checks the account on every call.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_clinician_locked_out_or_whose_password_changed_is_refused_on_the_next_call(bool passwordChanged)
+    {
+        var account = await apps.CreateStaffAsync("Dr. Dictation Elsewhere", StaffRoles.Clinician);
+        var page = await OpenAsAsync(apps.OnPrem, account);
+        var session = await StartAsync(page);
+        var received = service.Received.Count;
+
+        if (passwordChanged)
+        {
+            await apps.UpdateSecurityStampAsync(account);
+        }
+        else
+        {
+            await LockOutAsync(account);
+        }
+
+        foreach (var (method, path, content) in new (HttpMethod, string, HttpContent?)[]
+                 {
+                     (HttpMethod.Post, Sessions, null),
+                     (HttpMethod.Post, $"{Sessions}/{session.SessionId}/audio?seq=0", Audio([1, 2, 3])),
+                     (HttpMethod.Post, $"{Sessions}/{session.SessionId}/stop", null),
+                     (HttpMethod.Post, $"{Sessions}/{session.SessionId}/result", null),
+                     (HttpMethod.Delete, $"{Sessions}/{session.SessionId}", null),
+                 })
+        {
+            using var refused = await SendAsync(page, method, path, content);
+            Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+            Assert.Null(refused.Headers.Location);
+        }
+
+        Assert.Equal(received, service.Received.Count);
     }
 
     [Fact]
@@ -574,6 +612,18 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
     {
         var session = await SignInAsync(app, account);
         return new Page(session.Client, Token(await session.Client.GetStringAsync(QuickTexts, Cancel)));
+    }
+
+    // Locks the account out for an hour, as too many wrong passwords do. Its security stamp stays as it was, so only the
+    // lockout can refuse it.
+    async Task LockOutAsync(StaffAccount account)
+    {
+        await using var scope = apps.OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        var user = (await users.FindByIdAsync(account.Id.ToString()))!;
+        var stamp = user.SecurityStamp;
+        Assert.True((await users.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddHours(1))).Succeeded);
+        Assert.Equal(stamp, (await users.FindByIdAsync(account.Id.ToString()))!.SecurityStamp);
     }
 
     static async Task<T> ReadJsonAsync<T>(HttpResponseMessage response)
