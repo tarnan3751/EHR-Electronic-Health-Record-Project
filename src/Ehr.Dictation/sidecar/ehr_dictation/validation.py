@@ -50,11 +50,12 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - negation_dropped, experiencer_dropped, certainty_dropped, history_dropped: in the transcript, a qualifier reaches
   words of the value's sources that the value uses without it, even where another source has them plain: a negation ("no
   chest pain" as "chest pain"), someone other than the patient having it ("family history of breast cancer", "mother had
-  a stroke", "diabetes in her father"), uncertainty ("possible pneumonia", "rule out appendicitis", "pneumonia
-  suspected"), or the past ("a history of MI in 2019"). A cue reaches six words on (four back, for one that follows what
-  it qualifies, such as "denied"), and stops at its clause: punctuation, a contrast ("but"), a new subject ("she",
-  "patient"), a step of the plan or a heading after its first word ("no further pancreatitis continue monthly
-  olezarsen"), and for someone else, a word of telling ("mom says the rash started Monday" is the patient's rash).
+  a stroke", "diabetes in her father", "seen with her mother who has diabetes"), uncertainty ("possible pneumonia",
+  "rule out appendicitis", "pneumonia suspected"), or the past ("a history of MI in 2019"). A cue reaches six words on
+  (four back, for one that follows what it qualifies, such as "denied"), and stops at its clause: punctuation, a
+  contrast ("but"), a new subject ("she", "patient"), a step of the plan or a heading after its first word ("no further
+  pancreatitis continue monthly olezarsen"), and for someone else, a word of telling ("mom says the rash started
+  Monday" is the patient's rash).
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -1011,8 +1012,10 @@ FAMILY = (
     r"grandparents?|grandma|grandpa|aunts?|uncles?|cousins?|wife|husband|partner|spouse|nieces?|nephews?"
 )
 # Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
-# Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing.
+# Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing,
+# unless a relative clause says what they have: "seen with her mother who has diabetes" (WHO_HAS).
 NOT_EXPERIENCER_AFTER = frozenset("with by to from for at about".split())
+WHO_HAS = re.compile(r"\s+(?:who|that)\s+(?=(?:has|had|is|was)\b)", re.IGNORECASE)
 EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
@@ -1064,11 +1067,12 @@ def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern 
         return word in ends or any(mark in between for mark in ".,;:?!\n")
 
     for cue in before.finditer(text):
-        if before is EXPERIENCER and _object_of_a_preposition(text, cue.start()):
+        relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
+        if before is EXPERIENCER and not relative and _object_of_a_preposition(text, cue.start()):
             continue
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
-        edge = cue.end()
-        for k, i in enumerate([i for i, token in enumerate(words) if token.start >= cue.end()][:NEGATION_SCOPE]):
+        edge = relative.end() if relative else cue.end()
+        for k, i in enumerate([i for i, token in enumerate(words) if token.start >= edge][:NEGATION_SCOPE]):
             next_clause = k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"
             if stops(text[edge : words[i].start], words[i].text) or next_clause:
                 break
