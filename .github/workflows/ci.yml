@@ -224,6 +224,37 @@ jobs:
       - name: Test setup_models.py
         run: uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests
 
+  # Informational for now: the search and chart pages' server render time at 50,000 synthetic patients (bench/Ehr.Bench),
+  # in the run's summary. It never fails the run and isn't in ci's needs; once its numbers prove steady on these
+  # runners, --assert and a place in ci's needs make it AGENTS.md's p99 gate.
+  bench:
+    name: Render-time benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # A benchmark that crashes fails the step, which shows, though the job's continue-on-error keeps the run green;
+      # and a run that printed no table says so in the summary.
+      - name: Server render time at 50,000 patients
+        run: |
+          set -o pipefail
+          status=0
+          dotnet run --configuration Release --project bench/Ehr.Bench | tee bench.txt || status=$?
+          if grep -q '^Server render time' bench.txt; then
+            { echo '```'; sed -n '/^Server render time/,$p' bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "**The render-time benchmark failed (exit code $status) and printed no table.**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
+
   # Fails if any job it needs failed or was cancelled. A skipped job counts as passing, so a job
   # can later be limited to runs where its files changed.
   ci:

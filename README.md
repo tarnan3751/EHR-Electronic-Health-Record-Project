@@ -210,6 +210,7 @@ starts its own PostgreSQL 18, seeds it, runs the on-prem app in memory, and prin
 | Desktop | `cargo fmt --check`, `cargo clippy` (warnings count as errors) and `cargo build`, on macOS (Apple Silicon) and Windows (x64) |
 | Dictation scripts | The tests for `src/Ehr.Dictation/setup_models.py`, against a fake Hugging Face Hub |
 | `ci` | Passes only when every job above passes. It's the one check `main` requires. |
+| Render-time benchmark | Runs the benchmark (`bench/Ehr.Bench`, see [Synthetic data and the benchmark](#synthetic-data-and-the-benchmark)) at 50,000 synthetic patients and puts its times in the run's summary. Informational for now: it never fails the run and isn't one of `ci`'s jobs. |
 | Publish image | On `main` only, after `ci` passes: pushes `ghcr.io/tarnan3751/ehr-web:<commit>` for `linux/amd64` and `linux/arm64` |
 
 The Windows desktop build is the slowest job: about 25 minutes when nothing is cached. Later runs reuse compiled dependencies and are faster.
