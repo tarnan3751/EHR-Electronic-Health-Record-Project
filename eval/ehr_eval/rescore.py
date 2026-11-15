@@ -3,7 +3,8 @@
     uv run --project eval python -m ehr_eval.rescore eval/results/latest.json [--out eval/results/latest.json]
 
 A run keeps, for each recording, MedASR's passages as heard and K2 Horizon's proposals as answered (run.py). This
-rebuilds each transcript from those passages exactly, runs validation.py over the proposals, and writes the results
+rebuilds each transcript from those passages exactly, runs validation.py over the proposals and over the transcript for
+the instructions it reports as not carried over, takes each script's tags as they are now, and writes the results
 again, stamped with the current scoring and gold hashes and everything else as the run recorded it: the model outputs
 are the same ones, and only what is checked and scored, and the gold it is scored against, have changed. It is how a change to the rules is measured on the same
 answers (for example strict against relaxed). It refuses a run made with another prompt, schema or parameters, with
@@ -37,13 +38,16 @@ def rescore(results: dict) -> dict:
             "These results came from other code making the transcript or the answers (the sidecar apart from its checks, "
             "or a lockfile): run the eval again instead."
         )
+    scripts = load_all()
     items = []
     for stored in results["items"]:
         item = scoring.Item(**{key: value for key, value in stored.items() if key != "fields"})
-        item.not_carried_over = [tuple(entry) for entry in item.not_carried_over]
         item.fields = {name: scoring.FieldOutcome(**outcome) for name, outcome in stored["fields"].items()}
+        # The recording's own tags (accent, noise, container: the first three, variant_tags()) are the run's.
+        item.tags = [*item.tags[:3], *scripts[item.script].tags]
+        transcript = assemble([Segment(**segment) for segment in item.segments], final=True)
+        item.not_carried_over = [(kind, start, end) for start, end, kind in validation.directives(transcript.text)]
         if item.sorting == "done" and item.fields:
-            transcript = assemble([Segment(**segment) for segment in item.segments], final=True)
             proposed = {name: {"value": outcome.proposed, "sources": outcome.sources} for name, outcome in item.fields.items()}
             checks = validation.check(proposed, item.unknown, transcript)
             for name, checked in checks.fields.items():
@@ -61,7 +65,7 @@ def rescore(results: dict) -> dict:
         "gold_sha256": results["dataset"].get("gold_sha256"),
         "structuring_outputs_reused": True,
     }
-    out["metrics"] = scoring.score(items, load_all())
+    out["metrics"] = scoring.score(items, scripts)
     out["items"] = [dataclasses.asdict(item) for item in items]
     return out
 

@@ -48,6 +48,20 @@ def test_the_same_rules_give_the_same_results(tmp_path, scripts, monkeypatch):
     assert again["dataset"]["gold_sha256"] == gold_sha256() and again["rescored_from"]["gold_sha256"] == "old"
 
 
+def test_the_instructions_reported_and_the_scripts_tags_are_the_current_ones(tmp_path, scripts, monkeypatch):
+    monkeypatch.setattr(rescore, "load_all", lambda: scripts)
+    results = a_run(tmp_path, scripts)
+    stored = results["items"][0]
+    expected = ([list(entry) for entry in stored["not_carried_over"]], stored["tags"])
+    assert expected[0] and len(expected[1]) > 3
+    stored["not_carried_over"] = []  # as rules that missed the instruction would have left it
+    stored["tags"] = [*stored["tags"][:3], "a-tag-since-removed"]
+
+    again = rescore.rescore(results)["items"][0]
+
+    assert ([list(entry) for entry in again["not_carried_over"]], again["tags"]) == expected
+
+
 def test_answers_from_other_recordings_are_refused(tmp_path, scripts):
     results = a_run(tmp_path, scripts)
     results["dataset"]["recordings_sha256"] = "0" * 64
