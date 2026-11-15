@@ -354,6 +354,14 @@ def test_a_value_may_leave_out_another_item_of_a_list_whole():
     assert own("Continue lisinopril 10 mg daily and metformin.", "Continue metformin.").reasons == ["words_out_of_order"]
 
 
+def test_only_before_a_drug_name_may_a_list_item_be_left_out():
+    # Before "started", a word that isn't a drug name, "and lisinopril" is two of the source's own words left out.
+    said = "Ankle swelling since amlodipine and lisinopril started."
+
+    assert own(said, "Ankle swelling since amlodipine started.").reasons == ["words_out_of_order"]
+    assert own(said, "Ankle swelling since lisinopril started.").pending
+
+
 def test_the_owners_recombination_example():
     assert own("Left knee pain, right knee normal.", "Right knee pain.").reasons == ["words_out_of_order"]
 
