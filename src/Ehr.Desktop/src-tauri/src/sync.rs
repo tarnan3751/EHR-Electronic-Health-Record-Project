@@ -10,11 +10,14 @@
 //! refuses the token (401) ends the session here too.
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use ehr_desktop::charts::Chart;
 
 use keyring_core::Entry;
 use reqwest::{Client, RequestBuilder, Response, StatusCode, Url};
 use serde::de::DeserializeOwned;
+use uuid::Uuid;
 
 use crate::api::{PullResponse, PushRequest, PushResponse, Refusal, Session, SignIn};
 use crate::key;
@@ -26,6 +29,7 @@ const DEFAULT_SERVERS: &str = "https://ehr.example.com:8443,https://ehr-remote.e
 const PATH: &str = "/api/sync/quick-texts";
 const SIGN_IN: &str = "/api/desktop/sign-in";
 const SIGN_OUT: &str = "/api/desktop/sign-out";
+const OFFLINE_PANEL: &str = "/api/desktop/offline-panel";
 /// The most the server takes in one push (QuickTextSync.MaxOperations).
 const BATCH: usize = 100;
 
@@ -103,6 +107,63 @@ impl Sync {
         self.session()
             .as_ref()
             .map(|session| session.display_name.clone())
+    }
+
+    pub fn offline_available(&self) -> bool {
+        self.with_clinician(None, |_| Ok(())).is_ok()
+    }
+
+    /// Hold the session lock during a local read or write so a concurrent sign-out
+    /// cannot change which clinician owns it. Callers acquire the store lock first.
+    pub fn with_clinician<T>(
+        &self,
+        token: Option<&str>,
+        action: impl FnOnce(Uuid) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let session = self.session();
+        let current = session
+            .as_ref()
+            .filter(|current| token.is_none_or(|token| token == current.token.as_str()))
+            .ok_or_else(|| "Sign in as a clinician to use offline charts.".to_owned())?;
+        let access = current.offline_access.as_ref().ok_or_else(|| {
+            "Sign out and sign in on the updated server to use offline charts.".to_owned()
+        })?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| "Check this computer's clock before using offline charts.".to_owned())?;
+        if now.as_secs() >= access.expires_unix_seconds {
+            return Err("The offline session expired. Sign in again.".to_owned());
+        }
+        action(access.clinician_id)
+    }
+
+    pub async fn download_panel(&self) -> Result<(String, Vec<Chart>), String> {
+        let token = self
+            .token()
+            .ok_or_else(|| "Sign in to download charts.".to_owned())?;
+        self.with_clinician(Some(&token), |_| Ok(()))?;
+        let response = self
+            .first_answer(|server| {
+                self.http
+                    .post(format!("{server}{OFFLINE_PANEL}"))
+                    .bearer_auth(&token)
+            })
+            .await?;
+        if response.status() == StatusCode::UNAUTHORIZED {
+            let _ = self.forget(&token);
+            return Err("The session ended. Sign in again to download charts.".to_owned());
+        }
+        if !response.status().is_success() {
+            return Err(format!(
+                "Couldn't download charts: the server answered {}.",
+                response.status()
+            ));
+        }
+        let panel = response
+            .json()
+            .await
+            .map_err(|_| "The server's chart response wasn't understood.".to_owned())?;
+        Ok((token, panel))
     }
 
     /// Signs in with the first server that answers, and keeps the session. That server's answer stands: trying the

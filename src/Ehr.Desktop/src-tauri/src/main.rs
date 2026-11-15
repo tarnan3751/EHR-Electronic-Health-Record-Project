@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use ehr_desktop::{charts, drafts};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -73,6 +74,7 @@ struct View {
     /// Changes saved here and not yet sent.
     waiting: usize,
     status: Status,
+    offline_available: bool,
 }
 
 #[tauri::command]
@@ -82,10 +84,52 @@ fn view(app: State<'_, App>) -> Result<View, String> {
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
+        offline_available: app.sync().is_ok_and(sync::Sync::offline_available),
         status: Status {
             account: app.sync.as_ref().ok().and_then(sync::Sync::account),
             ..app.status().clone()
         },
+    })
+}
+
+#[derive(Serialize)]
+struct OfflineChart {
+    chart: charts::Chart,
+    drafts: Vec<drafts::PendingDraft>,
+}
+
+#[tauri::command]
+async fn download_panel(app: State<'_, App>) -> Result<(), String> {
+    let sync = app.sync()?;
+    let (token, panel) = sync.download_panel().await?;
+    let mut store = app.store()?;
+    sync.with_clinician(Some(&token), |owner| {
+        store.replace_panel(owner, &panel).map_err(Into::into)
+    })
+}
+
+#[tauri::command]
+fn offline_panel(app: State<'_, App>) -> Result<Vec<charts::ChartSummary>, String> {
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store.offline_panel(owner).map_err(Into::into)
+    })
+}
+
+#[tauri::command]
+fn offline_chart(app: State<'_, App>, patient: Uuid) -> Result<OfflineChart, String> {
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        let (chart, drafts) = store.offline_chart(owner, patient)?;
+        Ok(OfflineChart { chart, drafts })
+    })
+}
+
+#[tauri::command]
+fn save_clinical_draft(app: State<'_, App>, patient: Uuid, body: String) -> Result<(), String> {
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store.save_clinical_draft(owner, patient, &body).map_err(Into::into)
     })
 }
 
@@ -266,7 +310,17 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            view, add, edit, resolve, sync_now, sign_in, sign_out
+            view,
+            add,
+            edit,
+            resolve,
+            sync_now,
+            sign_in,
+            sign_out,
+            download_panel,
+            offline_panel,
+            offline_chart,
+            save_clinical_draft,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");

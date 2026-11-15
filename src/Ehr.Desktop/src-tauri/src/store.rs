@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::api::{Operation, Outcome, PullResponse, PushResult, QuickText};
 use crate::rules;
+use ehr_desktop::{charts, drafts};
 
 const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS quick_texts (
@@ -126,8 +127,40 @@ impl Store {
         connection.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex::encode(key)))?;
         connection.query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(()))?;
         connection.execute_batch(SCHEMA)?;
-        ehr_desktop::drafts::initialize(&connection)?;
+        drafts::initialize(&connection)?;
+        charts::initialize(&connection)?;
         Ok(Store { connection })
+    }
+
+    pub fn replace_panel(&mut self, owner: Uuid, panel: &[charts::Chart]) -> Result<()> {
+        charts::replace_panel(&mut self.connection, owner, panel)?;
+        Ok(())
+    }
+
+    pub fn offline_panel(&self, owner: Uuid) -> Result<Vec<charts::ChartSummary>> {
+        Ok(charts::panel(&self.connection, owner)?)
+    }
+
+    pub fn offline_chart(
+        &self,
+        owner: Uuid,
+        patient: Uuid,
+    ) -> Result<(charts::Chart, Vec<drafts::PendingDraft>)> {
+        let chart = charts::get(&self.connection, owner, patient)?
+            .ok_or(Error::Refused("This chart is only available online."))?;
+        let notes = drafts::pending(&self.connection, owner, Some(patient))?;
+        Ok((chart, notes))
+    }
+
+    pub fn save_clinical_draft(&self, owner: Uuid, patient: Uuid, body: &str) -> Result<()> {
+        if body.trim().is_empty() || body.len() > 65_536 {
+            return Err(Error::Refused("Enter a draft of up to 64 KiB."));
+        }
+        if !charts::contains(&self.connection, owner, patient)? {
+            return Err(Error::Refused("This chart is only available online."));
+        }
+        drafts::save(&self.connection, owner, patient, body)?;
+        Ok(())
     }
 
     pub fn phrases(&self) -> Result<Vec<Phrase>> {
@@ -573,7 +606,7 @@ mod tests {
 
         let store = database.open();
         assert_eq!(
-            drafts::pending(&store.connection, clinician).unwrap(),
+            drafts::pending(&store.connection, clinician, None).unwrap(),
             vec![saved],
         );
     }
@@ -595,14 +628,65 @@ mod tests {
 
         let store = database.open();
         assert_eq!(
-            drafts::pending(&store.connection, clinician).unwrap(),
+            drafts::pending(&store.connection, clinician, None).unwrap(),
             vec![first, second],
         );
         assert_eq!(
-            drafts::pending(&store.connection, other_clinician).unwrap(),
+            drafts::pending(&store.connection, other_clinician, None).unwrap(),
             vec![other],
         );
         assert_eq!(store.waiting().unwrap(), 0, "Quick text has its own queue");
+    }
+
+    #[test]
+    fn an_assigned_chart_and_its_draft_reopen_without_a_connection() {
+        let database = TempDatabase::new();
+        let clinician = Uuid::now_v7();
+        let colleague = Uuid::now_v7();
+        let patient = Uuid::now_v7();
+        let another = Uuid::now_v7();
+        let mut store = database.open();
+        let chart = charts::Chart {
+            id: patient,
+            name: "Synthetic Patient".to_owned(),
+            mrn: "SYN1".to_owned(),
+            birth_date: "1980-01-01".to_owned(),
+            gender: "unknown".to_owned(),
+            allergies: vec![],
+            medications: vec![],
+            conditions: vec![],
+            visits: vec![],
+        };
+        store.replace_panel(clinician, &[chart]).unwrap();
+        assert!(
+            store
+                .save_clinical_draft(clinician, another, "Wrong chart")
+                .is_err()
+        );
+        assert!(
+            store
+                .save_clinical_draft(colleague, patient, "Wrong owner")
+                .is_err()
+        );
+        store
+            .save_clinical_draft(clinician, patient, "Offline draft")
+            .unwrap();
+        drop(store);
+
+        let mut store = database.open();
+        assert!(store.offline_panel(colleague).unwrap().is_empty());
+        assert!(store.offline_chart(colleague, patient).is_err());
+        let (chart, drafts) = store.offline_chart(clinician, patient).unwrap();
+        assert_eq!(chart.id, patient);
+        assert_eq!(drafts.len(), 1);
+        assert_eq!(drafts[0].body, "Offline draft");
+
+        store.replace_panel(clinician, &[]).unwrap();
+        assert!(store.offline_chart(clinician, patient).is_err());
+        assert_eq!(
+            drafts::pending(&store.connection, clinician, None).unwrap(),
+            drafts,
+        );
     }
 
     #[test]

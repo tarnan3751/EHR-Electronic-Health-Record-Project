@@ -3,6 +3,7 @@
 //! these changes.
 
 use rusqlite::{Connection, Result, params};
+use serde::Serialize;
 use uuid::Uuid;
 
 const SCHEMA: &str = "
@@ -21,9 +22,10 @@ const SCHEMA: &str = "
 const INSERT: &str = "INSERT INTO clinical_drafts
     (id, clinician_id, patient_id, body, pending_change_id) VALUES (?1, ?2, ?3, ?4, ?5)";
 const SELECT_PENDING: &str = "SELECT id, patient_id, body, pending_change_id FROM clinical_drafts
-    WHERE clinician_id = ?1 ORDER BY seq";
+    WHERE clinician_id = ?1 AND (?2 IS NULL OR patient_id = ?2) ORDER BY seq";
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PendingDraft {
     pub id: String,
     pub patient_id: String,
@@ -62,9 +64,16 @@ pub fn save(
     Ok(draft)
 }
 
-pub fn pending(connection: &Connection, clinician_id: Uuid) -> Result<Vec<PendingDraft>> {
+pub fn pending(
+    connection: &Connection,
+    clinician_id: Uuid,
+    patient_id: Option<Uuid>,
+) -> Result<Vec<PendingDraft>> {
     let mut statement = connection.prepare(SELECT_PENDING)?;
-    let rows = statement.query_map([clinician_id.to_string()], |row| {
+    let clinician_id = clinician_id.to_string();
+    let patient_id = patient_id.map(|id| id.to_string());
+    let ids = params![clinician_id, patient_id];
+    let rows = statement.query_map(ids, |row| {
         Ok(PendingDraft {
             id: row.get(0)?,
             patient_id: row.get(1)?,

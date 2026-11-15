@@ -43,6 +43,7 @@ async function refresh() {
     const signedIn = view.status.account != null;
     renderStatus(view.status, view.waiting);
     renderAccount(view.status.account);
+    renderOfflineAccess(view.offlineAvailable, signedIn);
     renderConflicts(view.conflicts);
     renderPhrases(view.phrases, signedIn);
   }
@@ -58,7 +59,7 @@ function renderStatus(status, waiting) {
   connection.textContent = !signedIn ? 'Signed out' : !checked ? 'Connecting…' : online ? `Online: ${host(status.server)}` : 'Offline';
 
   byId('waiting').textContent =
-    waiting === 0 ? 'Everything is sent.' : `${waiting} ${waiting === 1 ? 'change' : 'changes'} waiting to send.`;
+    waiting === 0 ? 'No Quick text changes waiting.' : `${waiting} ${waiting === 1 ? 'change' : 'changes'} waiting to send.`;
   byId('checked').textContent = checked ? `Checked at ${new Date(status.checkedAt).toLocaleTimeString()}.` : '';
   show(byId('sync-problem'), status.problem);
 }
@@ -276,8 +277,130 @@ signInForm.addEventListener('submit', async (event) => {
 });
 
 byId('sign-out').addEventListener('click', async () => {
-  await call('sign_out');
-  await refresh();
+  offlineSigningOut = true;
+  renderOfflineAccess(false, false);
+  try {
+    await call('sign_out');
+  } finally {
+    offlineSigningOut = false;
+    await refresh();
+  }
+});
+
+const downloadPanel = byId('download-panel');
+const draftForm = byId('clinical-draft');
+let offlineAvailable = false;
+let offlineSigningOut = false;
+let selectedPatient = null;
+let chartRequest = 0;
+let panelRequest = 0;
+
+function clearChart() {
+  chartRequest++;
+  selectedPatient = null;
+  byId('offline-chart').hidden = true;
+  byId('chart-name').textContent = '';
+  byId('chart-demographics').textContent = '';
+  byId('chart-sections').replaceChildren();
+  byId('saved-drafts').replaceChildren();
+  draftForm.reset();
+  draftForm.querySelector('button').disabled = false;
+}
+
+function renderOfflineAccess(available, signedIn) {
+  if (offlineSigningOut) {
+    available = false;
+    signedIn = false;
+  }
+  byId('offline-sign-in').hidden = available || !signedIn;
+  byId('offline-charts').hidden = !available;
+  if (available === offlineAvailable) return;
+  offlineAvailable = available;
+  if (available) {
+    loadPanel();
+  } else {
+    panelRequest++;
+    byId('offline-panel').replaceChildren();
+    byId('offline-message').textContent = '';
+    clearChart();
+  }
+}
+
+async function loadPanel() {
+  const request = ++panelRequest;
+  const panel = await call('offline_panel');
+  if (!offlineAvailable || request !== panelRequest || !panel) return;
+  const list = byId('offline-panel');
+  list.replaceChildren(...panel.map((patient) =>
+    el('li', {}, button(`${patient.name} · MRN ${patient.mrn}`, () => openChart(patient.id))),
+  ));
+  if (panel.length === 0) {
+    list.append(el('li', { textContent: 'No charts downloaded. Add patients to your panel in the web app, then download here.' }));
+  }
+  if (selectedPatient && !panel.some((patient) => patient.id === selectedPatient)) clearChart();
+}
+
+function chartSection(title, rows) {
+  return el('section', {}, el('h4', { textContent: title }),
+    rows.length ? el('ul', {}, ...rows.map((text) => el('li', { textContent: text })))
+      : el('p', { textContent: 'None recorded.' }));
+}
+
+async function openChart(patient, reset = true) {
+  if (reset) clearChart();
+  const request = ++chartRequest;
+  const result = await call('offline_chart', { patient });
+  if (!offlineAvailable || request !== chartRequest || !result) return;
+  selectedPatient = patient;
+  const { chart, drafts } = result;
+  byId('offline-chart').hidden = false;
+  byId('chart-name').textContent = chart.name;
+  byId('chart-demographics').textContent = `MRN ${chart.mrn} · Born ${chart.birthDate} · ${chart.gender}`;
+  const details = (main, ...parts) => [main, ...parts.filter(Boolean)].join(' · ');
+  byId('chart-sections').replaceChildren(
+    chartSection('Allergies', chart.allergies.map((a) => details(a.display, a.reaction, a.criticality))),
+    chartSection('Medications', chart.medications.map((m) => details(m.display, m.dosage))),
+    chartSection('Conditions', chart.conditions.map((c) => details(c.display, c.onsetDate))),
+    chartSection('Recent visits', chart.visits.map((v) => details(v.periodStart.slice(0, 10), v.reason,
+      v.systolicMmHg != null && v.diastolicMmHg != null ? `${v.systolicMmHg}/${v.diastolicMmHg} mmHg` : '',
+      v.heartRatePerMinute != null ? `${v.heartRatePerMinute} bpm` : ''))),
+  );
+  byId('saved-drafts').replaceChildren(...drafts.map((draft) =>
+    el('li', {}, el('p', { textContent: 'Saved on this device · Pending sync' }),
+      el('pre', { className: 'draft-body', textContent: draft.body })),
+  ));
+  if (!drafts.length) byId('saved-drafts').append(el('li', { textContent: 'No saved drafts.' }));
+}
+
+downloadPanel.addEventListener('click', async () => {
+  downloadPanel.disabled = true;
+  byId('offline-message').textContent = 'Downloading charts…';
+  try {
+    const answer = await call('download_panel');
+    if (!offlineAvailable) return;
+    byId('offline-message').textContent = answer === undefined ? 'Download failed.' : 'Downloaded charts updated.';
+    if (answer !== undefined) await loadPanel();
+  } finally {
+    downloadPanel.disabled = false;
+  }
+});
+
+draftForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const patient = selectedPatient;
+  if (!offlineAvailable || !patient) return;
+  const request = chartRequest;
+  const submit = draftForm.querySelector('button');
+  submit.disabled = true;
+  try {
+    const answer = await call('save_clinical_draft', { patient, body: draftForm.elements.body.value });
+    if (!offlineAvailable || request !== chartRequest || answer === undefined) return;
+    draftForm.reset();
+    byId('offline-message').textContent = 'Draft saved on this device.';
+    await openChart(patient, false);
+  } finally {
+    submit.disabled = false;
+  }
 });
 
 byId('sync-now').addEventListener('click', () => call('sync_now'));

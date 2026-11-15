@@ -95,3 +95,9 @@ textarea {
   opacity: 0.7;
   white-space: nowrap;
 }
+
+.draft-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}

@@ -86,6 +86,16 @@ pub struct Session {
     pub token: String,
     pub display_name: String,
     pub expires_at: String,
+    // Older servers and previously saved sessions lack this data. Quick text still works.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offline_access: Option<OfflineAccess>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfflineAccess {
+    pub clinician_id: Uuid,
+    pub expires_unix_seconds: u64,
 }
 
 /// Why the server refused a sign-in, in words for the person.
