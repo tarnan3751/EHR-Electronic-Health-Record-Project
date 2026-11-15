@@ -62,9 +62,9 @@ Written forms are the same in every script, whoever is speaking: numerals with u
 
 **Gold fields.** `value` is what a careful clinician would accept in that field; `sources` quote the display text it comes from, a phrase or a sentence each, word for word. A field the dictation says nothing about has `value = ""` and `sources = []`.
 
-- `history`: the reason for the visit, symptoms and their timing, relevant past history, the medicines and allergies the patient reports, and today's findings: vital signs, examination and results.
-- `assessment`: the clinician's impression: diagnoses, differentials, how each problem is doing.
-- `plan`: what happens next: treatment, medicine changes ("start lisinopril 10 mg daily" belongs here, and is not an order), tests, referrals, follow-up, advice.
+- `history`: the history of present illness (the reason for the visit, symptoms and their timing, relevant past history, the medicines and allergies the patient reports), including results the clinician has already reviewed (labs, ECG, imaging). Today's vital signs and examination findings go here too, since the note has only these three fields.
+- `assessment`: the clinician's impression: diagnoses, differentials, how each problem is doing, and their reading of a result ("consistent with ...", "so this is ...").
+- `plan`: what happens next: treatment, medicine changes ("start lisinopril 10 mg daily" belongs here, and is not an order), tests and imaging the clinician says they will get, referrals, follow-up, advice. A statement that they are ordering a test now is a directive: it is left out, and listed in `forbidden` (below).
 
 Values copy numbers, units, dates, drug names and doses as the display text writes them, and keep each attribute with what it belongs to ("right knee much better; left knee aches more").
 
