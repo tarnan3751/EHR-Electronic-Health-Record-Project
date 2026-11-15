@@ -76,7 +76,7 @@ public class WriteAuditTests(MigratedDatabase database) : IClassFixture<Migrated
             INSERT INTO ehr.patients (id, mrn, given_name, family_name, birth_date, gender, version, updated_at)
             VALUES (@id, @mrn, 'Seeded', 'Patient', '1980-01-01', 'unknown', 1, now())
             """,
-            ("id", id), ("mrn", id.ToString("N")[..12]));
+            ("id", id), ("mrn", id.ToString("N")[^12..]));
 
         var actors = await Accounts.QueryAsync(database.SuperuserConnectionString, null,
             "SELECT coalesce(actor_id::text, 'none') FROM ehr.audit_events WHERE row_id = @id", ("id", id));

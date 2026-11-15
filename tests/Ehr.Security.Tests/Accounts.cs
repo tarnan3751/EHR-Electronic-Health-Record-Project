@@ -54,7 +54,7 @@ static class Accounts
             INSERT INTO ehr.patients (id, mrn, given_name, family_name, birth_date, gender, version, updated_at)
             VALUES (@id, @mrn, 'Test', 'Patient', '1980-01-01', 'unknown', 1, now())
             """,
-            ("id", id), ("mrn", id.ToString("N")[..12]));
+            ("id", id), ("mrn", id.ToString("N")[^12..]));
         return id;
     }
 
