@@ -60,6 +60,10 @@ public static class AccountServiceCollectionExtensions
                 options.LogoutPath = "/sign-out";
                 options.AccessDeniedPath = "/denied";
                 options.Events.OnValidatePrincipal = CookieSecurityStamp.ValidateAsync<StaffUser>;
+                // A refused request under /api gets 401 (not signed in as staff) or 403 (signed in, but not allowed),
+                // never a redirect, as with the desktop app's token; a page is still sent to sign in, or to denied.
+                options.Events.OnRedirectToLogin = StatusOnApiPaths(options.Events.OnRedirectToLogin, StatusCodes.Status401Unauthorized);
+                options.Events.OnRedirectToAccessDenied = StatusOnApiPaths(options.Events.OnRedirectToAccessDenied, StatusCodes.Status403Forbidden);
             })
             .AddCookie(AccountSchemes.Patient, options =>
             {
@@ -108,4 +112,18 @@ public static class AccountServiceCollectionExtensions
         options.ExpireTimeSpan = lifetime;
         options.SlidingExpiration = true;
     }
+
+    // Under /api, the status instead of the redirect; anywhere else, the redirect as before.
+    static Func<RedirectContext<CookieAuthenticationOptions>, Task> StatusOnApiPaths(
+        Func<RedirectContext<CookieAuthenticationOptions>, Task> redirect, int status) =>
+        context =>
+        {
+            if (!context.Request.Path.StartsWithSegments(AccountSchemes.ApiPath))
+            {
+                return redirect(context);
+            }
+
+            context.Response.StatusCode = status;
+            return Task.CompletedTask;
+        };
 }
