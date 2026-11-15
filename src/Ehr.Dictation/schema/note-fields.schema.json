@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "The note fields K2 Horizon may propose from one dictated transcript (FR-11), sent to llama-server as the response format, so the model can't answer in any other shape (the sidecar's prompt.py strips $schema and $comment first). History, Assessment and Plan only: there is no field for orders or allergies (FR-14). Each field is a value and the passages of the transcript it came from, copied word for word; an empty value with no sources means the transcript said nothing for that field. Changing this file needs line-by-line human review (AGENTS.md) and a new eval run (eval/README.md).",
+  "$comment": "The note fields K2 Horizon may propose from one dictated transcript (FR-11), sent to llama-server as the response format, so the model can't answer in any other shape (the sidecar's prompt.py strips $schema and $comment first). History, Assessment and Plan only: there is no field for orders or allergies (FR-14). Each field is a value and the passages of the transcript it came from, copied word for word; an empty value with no sources means the transcript said nothing for that field. Each field's description is the one statement of what it holds: the prompt repeats it word for word (a test checks), and the note editor (UC 13, UC 14) is to use the same definitions. The descriptions go to llama-server with the rest of the schema, which turns it into a grammar and ignores them; the model reads them in the prompt. Changing this file needs line-by-line human review (AGENTS.md) and a new eval run (eval/README.md).",
   "type": "object",
   "additionalProperties": false,
   "required": ["history", "assessment", "plan"],
   "properties": {
     "history": {
+      "description": "The history of present illness: the reason for the visit, the symptoms and their timing, and the relevant past history, medications and allergies the patient reports; with today's vital signs and examination findings, and the results the clinician has already reviewed (labs, ECG, imaging).",
       "type": "object",
       "additionalProperties": false,
       "required": ["value", "sources"],
@@ -15,6 +16,7 @@
       }
     },
     "assessment": {
+      "description": "The clinician's impression: diagnoses, differential diagnoses, and how each problem is doing.",
       "type": "object",
       "additionalProperties": false,
       "required": ["value", "sources"],
@@ -24,6 +26,7 @@
       }
     },
     "plan": {
+      "description": "What the clinician says happens next: treatment, medication changes, tests, referrals, follow-up and advice.",
       "type": "object",
       "additionalProperties": false,
       "required": ["value", "sources"],

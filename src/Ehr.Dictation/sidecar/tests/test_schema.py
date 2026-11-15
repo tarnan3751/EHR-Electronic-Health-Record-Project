@@ -48,3 +48,18 @@ def test_llama_py_accepts_exactly_what_the_schema_does():
         jsonschema.validate(json.loads(missing), SCHEMA)
     with pytest.raises(ModelOutputInvalid):
         parse_answer(missing)
+
+
+def test_each_fields_definition_in_the_prompt_is_the_schemas_description_word_for_word():
+    system = prompt.load().system
+
+    for name, field in SCHEMA["properties"].items():
+        assert field["description"], f"{name} has no definition"
+        assert f"- {name}: {field['description']}\n" in system + "\n", f"the prompt's definition of {name} differs"
+
+
+def test_history_is_the_history_of_present_illness_with_findings_and_reviewed_results():
+    history = SCHEMA["properties"]["history"]["description"]
+
+    assert history.startswith("The history of present illness")
+    assert "vital signs and examination findings" in history and "(labs, ECG, imaging)" in history
