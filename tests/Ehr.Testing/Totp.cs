@@ -1,11 +1,11 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 
-namespace Ehr.Web.Tests;
+namespace Ehr.Testing;
 
 // The codes an authenticator app would show, from the key Identity stores (RFC 6238: HMAC-SHA1, 30-second steps, six
-// digits, the key in RFC 4648 base32). The tests stand in for the phone.
-static class Totp
+// digits, the key in RFC 4648 base32). The tests, and the benchmark when it signs in, stand in for the phone.
+public static class Totp
 {
     const string Base32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 

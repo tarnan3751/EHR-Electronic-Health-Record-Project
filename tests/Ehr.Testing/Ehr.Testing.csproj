@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Shared by the test projects, and not a test project itself: a real PostgreSQL 18 set up the way
-       infra/migrate sets up the primary, and the repository root. -->
+       infra/migrate sets up the primary, the repository root, and the codes an authenticator app would show. -->
 
   <ItemGroup>
     <PackageReference Include="xunit.v3.extensibility.core" />

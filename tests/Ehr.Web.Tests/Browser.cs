@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Ehr.Testing;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using Xunit;

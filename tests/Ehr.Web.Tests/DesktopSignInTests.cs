@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Testing;
 using Ehr.Web.Api.Desktop;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;

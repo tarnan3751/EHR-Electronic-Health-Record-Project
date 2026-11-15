@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Testing;
 using Ehr.Web.CloudAudit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
