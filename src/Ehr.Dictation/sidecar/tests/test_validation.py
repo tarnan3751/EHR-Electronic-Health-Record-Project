@@ -342,15 +342,67 @@ def test_a_negation_a_source_applies_must_be_kept(negated):
     assert own(negated, negated).pending
 
 
+@pytest.mark.parametrize(("said", "quote", "reason"), [
+    ("No chest pain.", "chest pain", "negation_dropped"),
+    ("Chest pain denied.", "Chest pain", "negation_dropped"),
+    ("Mother had a stroke.", "had a stroke", "experiencer_dropped"),
+    ("Possible community acquired pneumonia.", "community acquired pneumonia", "certainty_dropped"),
+])
+def test_a_source_can_not_leave_its_qualifier_out(said, quote, reason):
+    assert own(said, quote.capitalize() + ".", quote).reasons == [reason]
+
+
 def test_a_negation_counts_even_when_another_source_affirms_the_same_words():
     text = transcript("No fever yesterday. Fever today.")
 
     assert "negation_dropped" in field("Fever today.", "No fever yesterday", "Fever today", text=text).reasons
+    assert field("No fever yesterday. Fever today.", "No fever yesterday", "Fever today", text=text).pending
 
 
 def test_a_negation_may_not_be_reworded():
     assert "unsupported_content" in own("Denies chest pain.", "No chest pain.").reasons
     assert "unsupported_content" in own("Denies chest pain.", "Chest pain denied.").reasons
+
+
+@pytest.mark.parametrize(("said", "value", "reason"), [
+    ("Mother had a stroke.", "Stroke.", "experiencer_dropped"),
+    ("Family history of breast cancer.", "Breast cancer.", "experiencer_dropped"),
+    ("Type 2 diabetes in her father.", "Type 2 diabetes.", "experiencer_dropped"),
+    ("Possible community acquired pneumonia.", "Community acquired pneumonia.", "certainty_dropped"),
+    ("Admitted to rule out appendicitis.", "Appendicitis.", "certainty_dropped"),
+    ("Community acquired pneumonia suspected.", "Community acquired pneumonia.", "certainty_dropped"),
+    ("She has a history of MI in 2019.", "MI in 2019.", "history_dropped"),
+    ("Status post appendectomy.", "Appendectomy.", "history_dropped"),
+])
+def test_who_has_it_how_sure_and_when_must_be_kept(said, value, reason):
+    assert own(said, value).reasons == [reason]
+    assert own(said, said).pending
+
+
+def test_the_owners_experiencer_examples():
+    assert own("Mother had a stroke.", "Stroke.").reasons == ["experiencer_dropped"]
+    assert own("Mother had a stroke.", "Mother had a stroke.").pending
+    said = "Father has diabetes, patient has hypertension."
+    assert own(said, "Diabetes.", "Father has diabetes").reasons == ["experiencer_dropped"]
+    assert own(said, "Hypertension.", "patient has hypertension").pending
+
+
+def test_a_family_member_who_tells_is_not_who_has_it():
+    assert own("Mom says the rash started Monday.", "The rash started Monday.").pending
+    assert own("Maternal grandmother and mother had breast cancer.", "Mother had breast cancer.").pending
+
+
+def test_a_qualifier_stops_at_a_new_subject():
+    assert own("No fever she is eating well.", "She is eating well.").pending
+    assert own("Mother had a stroke patient has hypertension.", "Patient has hypertension.").pending
+    assert own("No fever she is eating well.", "Fever.", "No fever").reasons == ["negation_dropped"]
+
+
+def test_a_certainty_word_reaches_back_only_from_the_end_of_its_clause():
+    said = "Sore throat likely viral pharyngitis."
+
+    assert own(said, "Sore throat.", "Sore throat likely").pending
+    assert own(said, "Viral pharyngitis.").reasons == ["certainty_dropped"]
 
 
 def test_too_long_fails():

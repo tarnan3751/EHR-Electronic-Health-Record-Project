@@ -36,14 +36,19 @@ and every check reads the cleaned text. The checks, each with the reason code re
   "make it", "rather", "scratch that"), read across the whole transcript. A correction gives a number, date, drug name
   or side (left, right) within three words of its cue, and supersedes the last expression of the same kind said before
   the cue in its sentence (or in the sentence before, when the cue starts one), unless it says all of it again. One
-  expression is one measured thing: numbers joined only by units, articles or "over" ("150 over 90"). So "heart rate 78, no sorry 72" supersedes 78 and not the blood pressure said before it; "10 mg, sorry,
-  20 mg" supersedes 10 mg; and "lisinopril 10 mg, sorry, 20 mg" keeps lisinopril, since no drug replaces it. A source
-  is read as corrected: without the cue and what it took back.
-- number_not_in_sources, date_not_in_sources, drug_not_in_sources: the specific cases of a word not in the sources,
-  kept for what they say: a number, a date word ("may" counts as one after a preposition or before a day), a drug-like
-  name.
-- negation_dropped: a negation one of its sources applies to words the value uses isn't kept ("no chest pain" as
-  "chest pain").
+  expression is one measured thing: numbers joined only by units, articles or "over" ("150 over 90"). So "heart rate 78,
+  no sorry 72" supersedes 78 and not the blood pressure said before it; "10 mg, sorry, 20 mg" supersedes 10 mg; and
+  "lisinopril 10 mg, sorry, 20 mg" keeps lisinopril, since no drug replaces it. A source is read as corrected: without
+  the cue and what it took back.
+- number_not_in_sources, date_not_in_sources, drug_not_in_sources: the specific cases of a word not in the sources, kept
+  for what they say: a number, a date word ("may" counts as one after a preposition or before a day), a drug-like name.
+- negation_dropped, experiencer_dropped, certainty_dropped, history_dropped: in the transcript, a qualifier reaches
+  words of the value's sources that the value uses without it, even where another source has them plain: a negation ("no
+  chest pain" as "chest pain"), someone other than the patient having it ("family history of breast cancer", "mother had
+  a stroke", "diabetes in her father"), uncertainty ("possible pneumonia", "rule out appendicitis", "pneumonia
+  suspected"), or the past ("a history of MI in 2019"). A cue reaches six words on (four back, for one that follows what
+  it qualifies, such as "denied"), and stops at its clause: punctuation, a contrast ("but"), a new subject ("she",
+  "patient"), and for someone else, a word of telling ("mom says the rash started Monday" is the patient's rash).
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -67,8 +72,8 @@ LIMITS = {"history": 2000, "assessment": 1200, "plan": 1200}
 MAX_SOURCES = 12
 MAX_QUOTE = 600
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
-NEGATION_SCOPE = 6  # words after a negation cue
-POST_SCOPE = 4  # words before a cue that negates what precedes it
+NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
+POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
 DIRECTIVE_REACH = 10  # words after an instruction that still belong to it
 LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and")
 MAX_GAP = 1  # a source's own words allowed between two of a value's words (articles and doses are free)
@@ -88,6 +93,9 @@ REASONS = (
     "date_not_in_sources",
     "drug_not_in_sources",
     "negation_dropped",
+    "experiencer_dropped",
+    "certainty_dropped",
+    "history_dropped",
     "words_out_of_order",
     "unsupported_content",
 )
@@ -173,6 +181,7 @@ class _Transcript:
     cues: set[int]  # word indices
     taken_back: set[int]
     superseded: set[_Term]
+    qualified: dict[str, set[int]]  # by reason code: the words each kind of qualifier reaches
 
 
 def not_carried_over(transcript: Transcript) -> list[dict]:
@@ -198,6 +207,7 @@ def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript) -
         cues=cues,
         taken_back=taken_back,
         superseded=superseded,
+        qualified=_qualifiers(transcript.text, words),
     )
     checked = {name: _check_field(name, fields[name]["value"], fields[name]["sources"], context) for name in FIELDS}
     return Checks(checked, list(unknown))
@@ -261,8 +271,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         reasons.add("date_not_in_sources")
     if not _drug_terms(value) <= {token.text for token in tokens(sources)}:
         reasons.add("drug_not_in_sources")
-    if _negation_dropped(value, quotes):
-        reasons.add("negation_dropped")
+    reasons |= _dropped(value, spans, transcript)
     if _ungrounded(value, sources):
         reasons.add("unsupported_content")
     elif quotes and _recombined(value, [_reading(span, transcript) for span in spans]):
@@ -688,51 +697,111 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
     return any(onward(1, i) for i, word in enumerate(source) if word == wanted[0])
 
 
+# ---- Negation, who has it, and how sure ----------------------------------------------------------------------------
+
 NEGATION = re.compile(
-    r"\b(?:no(?![\s,]+(?:sorry|wait)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|free of|ruled out|rules out|"
-    r"doesn't|does not|didn't|did not|isn't|is not|wasn't|was not|hasn't|has not|haven't|have not|non)\b",
+    r"\b(?:no(?![\s,]+(?:sorry|wait)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
+    r"free of|ruled out|rules out|doesn't|does not|didn't|did not|isn't|is not|wasn't|was not|hasn't|has not|haven't|"
+    r"have not|non)\b",
     re.IGNORECASE,
 )
 # Cues that negate what comes before them: "chest pain denied", "fracture ruled out".
 POST_NEGATION = re.compile(r"\b(?:denied|ruled out|negative|absent|not present|not seen)\b", re.IGNORECASE)
-TERMINATORS = frozenset("but however although though except apart aside yet which who whereas".split())
+FAMILY = (
+    r"mother|mom|father|dad|brothers?|sisters?|siblings?|sons?|daughters?|parents?|grandmothers?|grandfathers?|"
+    r"grandparents?|grandma|grandpa|aunts?|uncles?|cousins?|wife|husband|partner|spouse|nieces?|nephews?"
+)
+# Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
+EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
+POST_EXPERIENCER = re.compile(
+    rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
+)
+# Not certain: "possible community acquired pneumonia", "rule out appendicitis", "pneumonia suspected".
+CERTAINTY = re.compile(
+    r"\b(?:possible|possibly|probable|probably|suspected|suspect|suspicious for|suspicion of|likely|unlikely|"
+    r"rule out|r/o|risk of|risk for|concern for|concerning for|questionable|presumed)\b",
+    re.IGNORECASE,
+)
+POST_CERTAINTY = re.compile(
+    r"\b(?:suspected|likely|possible|probable|unlikely|questionable|presumed)\b(?=\s*(?:[.,;:!?\n]|$))", re.IGNORECASE
+)
+# In the past: "a history of MI in 2019", "status post appendectomy".
+HISTORY = re.compile(r"(?<!family )\b(?:history of|hx of|h/o|status post|s/p)\b", re.IGNORECASE)
+# Where a cue's reach ends, besides punctuation: a contrast, or a new subject ("no fever, she is eating well").
+TERMINATORS = frozenset(
+    """but however although though except apart aside yet which who whereas he she they i we you patient he's she's
+    they're i'm we're i've""".split()
+)
+# Someone telling, not having: "mom says the rash started Monday".
+REPORTING = frozenset(
+    "says said reports reported states stated notes noted thinks feels felt tells told mentions mentioned asks asked "
+    "worries worried brought brings called calls".split()
+)
+# Each kind of qualifier, with its reason code: cues before the words they qualify, cues after them, and what ends
+# their reach.
+QUALIFIERS = (
+    ("negation_dropped", NEGATION, POST_NEGATION, TERMINATORS),
+    ("experiencer_dropped", EXPERIENCER, POST_EXPERIENCER, TERMINATORS | REPORTING),
+    ("certainty_dropped", CERTAINTY, POST_CERTAINTY, TERMINATORS),
+    ("history_dropped", HISTORY, None, TERMINATORS),
+)
 
 
-def _negated(text: str) -> tuple[set[str], set[str]]:
-    """Content-word stems the text negates, and those it mentions without a negation."""
-    words = tokens(text)
-    negated: set[int] = set()
+def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern | None,
+           ends: frozenset[str]) -> tuple[set[int], set[int]]:
+    """The words the text's cues of one kind reach, and the cues' own words (which are neither reached nor plain:
+    "mother" in "mother had a stroke" is who had it)."""
+    reached: set[int] = set()
+    cue_words: set[int] = set()
 
     def stops(between: str, word: str) -> bool:
-        return word in TERMINATORS or any(mark in between for mark in ".,;:?!\n")
+        return word in ends or any(mark in between for mark in ".,;:?!\n")
 
-    for cue in NEGATION.finditer(text):
+    for cue in before.finditer(text):
+        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
         edge = cue.end()
         for i in [i for i, token in enumerate(words) if token.start >= cue.end()][:NEGATION_SCOPE]:
             if stops(text[edge : words[i].start], words[i].text):
                 break
-            negated.add(i)
+            reached.add(i)
             edge = words[i].end
-    for cue in POST_NEGATION.finditer(text):
+    for cue in after.finditer(text) if after else ():
+        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
         edge = cue.start()
         for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()][-POST_SCOPE:]):
             if stops(text[words[i].end : edge], words[i].text):
                 break
-            negated.add(i)
+            reached.add(i)
             edge = words[i].start
-    content = [(i, token) for i, token in enumerate(words) if _is_content(token.text)]
-    return (
-        {stem(token.text) for i, token in content if i in negated},
-        {stem(token.text) for i, token in content if i not in negated},
-    )
+    return reached, cue_words
 
 
-def _negation_dropped(value: str, quotes: list[str]) -> bool:
-    """Whether the value affirms what any one of its sources negates, even if another source affirms it."""
-    value_negated, value_affirmed = _negated(value)
-    affirmed = value_affirmed - value_negated
-    return any(_negated(quote)[0] & affirmed for quote in quotes)
+def _qualifiers(text: str, words: list[Token]) -> dict[str, set[int]]:
+    """For each kind of qualifier, by its reason code, the words its cues reach in the text."""
+    return {reason: _reach(text, words, before, after, ends)[0] for reason, before, after, ends in QUALIFIERS}
+
+
+def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) -> set[str]:
+    """The qualifiers that reach words of the value's sources, in the transcript, which the value uses without them,
+    even if another source has those words plain: a negation, someone else having it, uncertainty, or the past. Read
+    in the transcript, so a source can't leave its qualifier out ("chest pain" quoted from "no chest pain")."""
+    words = tokens(value)
+    found = set()
+    for reason, before, after, ends in QUALIFIERS:
+        reached, cues = _reach(value, words, before, after, ends)
+        plain = {stem(word.text) for i, word in enumerate(words) if _is_content(word.text) and i not in reached | cues}
+        plain -= {stem(words[i].text) for i in reached if _is_content(words[i].text)}
+        qualified = {
+            stem(transcript.words[i].text)
+            for i in transcript.qualified[reason]
+            if _is_content(transcript.words[i].text)
+            and any(start <= transcript.words[i].start and transcript.words[i].end <= end for start, end in spans)
+        }
+        if qualified & plain:
+            found.add(reason)
+    return found
 
 
 def _is_content(word: str) -> bool:
-    return word.isalpha() and len(word) >= 3 and word not in STOPWORDS
+    """A word a qualifier can apply to: not a number or a function word, but "MI" or "PE" is one."""
+    return word.isalpha() and len(word) >= 2 and word not in STOPWORDS
