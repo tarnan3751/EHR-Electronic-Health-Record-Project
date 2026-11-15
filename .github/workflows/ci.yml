@@ -210,9 +210,9 @@ jobs:
         run: cargo build --locked
 
   dictation:
-    name: Dictation scripts
+    name: Dictation
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -223,6 +223,52 @@ jobs:
       # The command in README.md. The tests use a fake Hugging Face Hub, so they need no network.
       - name: Test setup_models.py
         run: uv run --no-project --python 3.12 --with pytest --with "huggingface_hub>=2.2,<3" python -m pytest src/Ehr.Dictation/tests
+
+      # The sidecar decodes audio with ffmpeg, as its image does.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      # The packages exactly as each uv.lock pins them. Stand-ins replace MedASR and llama-server: no model is needed.
+      - name: Test the dictation sidecar
+        run: uv run --project src/Ehr.Dictation/sidecar --locked --python 3.12 pytest src/Ehr.Dictation/sidecar/tests
+
+      - name: Test the dictation eval
+        run: uv run --project eval --locked --python 3.12 pytest eval/tests
+
+      # CI can't run the models, so it checks the committed results: they come from this commit's prompt, schema,
+      # validation rules and test set, show no order or allergy change, and score no lower than the accepted baseline.
+      - name: Check the committed eval results
+        run: uv run --project eval --locked --python 3.12 python -m ehr_eval.gate
+
+  # The dictation sidecar's image, on a runner of each server architecture, so nothing is emulated. Built to show it
+  # builds and starts as it should; nothing is pushed.
+  dictation-image:
+    name: Dictation image (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: docker build --file src/Ehr.Dictation/sidecar/Dockerfile --tag ehr-dictation:ci src/Ehr.Dictation
+
+      # Runs as its own non-root user, with ffmpeg and the note schema and prompt, and refuses to start without its keys.
+      - name: Check the image
+        run: |
+          [ "$(docker run --rm --network none ehr-dictation:ci id -u)" = 10001 ]
+          docker run --rm --network none ehr-dictation:ci ffmpeg -version | head -1
+          docker run --rm --network none ehr-dictation:ci python -c "import ehr_dictation.api, ehr_dictation.prompt as p; p.load()"
+          if docker run --rm --network none ehr-dictation:ci; then echo "It started without DICTATION_API_KEY"; exit 1; fi
 
   # Informational for now: the search and chart pages' server render time at 50,000 synthetic patients (bench/Ehr.Bench),
   # in the run's summary. It never fails the run and isn't in ci's needs; once its numbers prove steady on these
@@ -261,7 +307,7 @@ jobs:
     # Branch protection requires a check by this name; renaming it means updating the ruleset.
     name: ci
     if: always()
-    needs: [web, stack, desktop, dictation]
+    needs: [web, stack, desktop, dictation, dictation-image]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

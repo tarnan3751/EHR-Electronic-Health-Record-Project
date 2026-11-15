@@ -25,8 +25,8 @@ from .scripts import EVAL_DIR, dataset_sha256
 
 RESULTS_DIR = EVAL_DIR / "results"
 RUN_IT = (
-    "Run the eval again (eval/README.md: uv run --project eval python -m ehr_eval.run ...) and commit the "
-    "eval/results/latest.json it writes."
+    "Run the eval on the server machine (eval/README.md: uv run --project eval python -m ehr_eval.run ...) and commit "
+    "the eval/results/latest.json it writes."
 )
 
 # metric path, higher is better

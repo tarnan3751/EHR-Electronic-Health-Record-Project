@@ -51,12 +51,12 @@ The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 - Every model change has a migration, and `db/migrations/schema.sql` matches the migrations (`Ehr.Data.Tests`).
 - The local server stack: the migration job applies cleanly, and the stack serves all three sites, replicates, and backs up.
 - macOS and Windows desktop builds, with `cargo fmt --check` and `cargo clippy -D warnings`.
-- The tests for `src/Ehr.Dictation/setup_models.py`.
+- The tests for `src/Ehr.Dictation/setup_models.py`, the dictation sidecar and the eval, and the sidecar's image built for `linux/amd64` and `linux/arm64`.
+- The committed dictation eval results (`eval/results`) come from the current prompt, note schema, validation rules and test set, show no order or allergy change, and score no lower than the last accepted baseline.
 
 Gates added to `ci` as the code they check appears:
 
 - p99 server render under 20 ms on 50,000 seeded patients; page JavaScript under 50 KB, compressed, as served; first contentful paint under 500 ms.
-- Dictation eval scores do not drop below the last accepted baseline.
 
 Run `dotnet format` (and `cargo fmt` for the desktop app) before pushing.
 
