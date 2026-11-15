@@ -1,9 +1,11 @@
 @page "/patients/{id:guid}"
+@using Ehr.Data.Patients
 @model ChartModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = $"{Model.Patient.FamilyName}, {Model.Patient.GivenName}";
 }
+<p><a asp-page="Index">Back to my patients</a></p>
 <h1>@Model.Patient.FamilyName, @Model.Patient.GivenName @if (Model.OnPanel) { <span class="tag">Yours</span> }</h1>
 @if (Model.EmergencyUntil is { } until)
 {
@@ -33,6 +35,96 @@
         </form>
     }
 </div>
+
+@* Read only for now: nothing here is edited yet. *@
+<h2>Allergies</h2>
+@if (Model.KnownAllergies.Count > 0)
+{
+    <ul>
+        @foreach (var allergy in Model.KnownAllergies)
+        {
+            <li>
+                <strong>@allergy.Display</strong>@if (allergy.Reaction is { } reaction) { <text>: @reaction</text> }
+                @if (allergy.Criticality == AllergyCriticality.High)
+                {
+                    <span class="tag">High risk</span>
+                }
+            </li>
+        }
+    </ul>
+}
+else if (Model.NoKnownAllergies is { } none)
+{
+    <p>No known allergies (recorded @none.RecordedAt.UtcDateTime.ToString("yyyy-MM-dd")).</p>
+}
+else
+{
+    <p>No allergy information recorded.</p>
+}
+
+<h2>Medications</h2>
+@if (Model.Chart.Medications.Count > 0)
+{
+    <ul>
+        @foreach (var medication in Model.Chart.Medications)
+        {
+            <li><strong>@medication.Display</strong>@if (medication.Dosage is { } dosage) { <text>: @dosage</text> }</li>
+        }
+    </ul>
+}
+else
+{
+    <p>No active medications recorded.</p>
+}
+
+<h2>Diagnoses</h2>
+@if (Model.Chart.Conditions.Count > 0)
+{
+    <ul>
+        @foreach (var condition in Model.Chart.Conditions)
+        {
+            <li>
+                <strong>@condition.Display</strong>
+                @if (condition.Code is { } diagnosisCode) { <text>(@diagnosisCode)</text> }
+                @if (condition.OnsetDate is { } onset) { <text>since @onset.ToString("yyyy-MM-dd")</text> }
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <p>No active diagnoses recorded.</p>
+}
+
+<h2>Recent visits</h2>
+@if (Model.Chart.Visits.Count > 0)
+{
+    var latest = Model.Chart.Visits[0];
+    <p class="latest-visit">
+        Latest visit, @latest.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd"):
+        blood pressure @(ChartModel.BloodPressure(latest) ?? "not taken"), heart rate @(ChartModel.HeartRate(latest) ?? "not taken").
+    </p>
+    <table>
+        <thead>
+            <tr><th>Date</th><th>Reason</th><th>Blood pressure</th><th>Heart rate</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var visit in Model.Chart.Visits)
+            {
+                <tr>
+                    <td>@visit.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd")</td>
+                    <td>@visit.Reason</td>
+                    <td>@ChartModel.BloodPressure(visit)</td>
+                    <td>@ChartModel.HeartRate(visit)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>No visits recorded.</p>
+}
 
 <h2>Patient portal</h2>
 @if (Model.EnrollmentCode is { } code)

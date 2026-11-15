@@ -38,4 +38,7 @@ public static class ConditionClinicalStatus
     public const string Resolved = "resolved";
 
     public static readonly string[] All = [Active, Recurrence, Relapse, Inactive, Remission, Resolved];
+
+    // The ones that mean the patient has it now.
+    public static readonly string[] Current = [Active, Recurrence, Relapse];
 }

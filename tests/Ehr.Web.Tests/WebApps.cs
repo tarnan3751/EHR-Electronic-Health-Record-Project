@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Ehr.Data.Accounts;
+using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Testing;
 using Ehr.Web.Api.Audit;
@@ -230,6 +231,53 @@ public sealed class WebApps : IAsyncLifetime
         command.Parameters.AddWithValue("family", familyName);
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         return id;
+    }
+
+    // The rest of a patient's chart, inserted as the superuser the way a seed would: nothing at runtime writes it yet.
+    // An allergy's recorded date is fixed, so a page can be checked for it.
+    public Task InsertAllergyAsync(
+        Guid patientId, string display, string status = AllergyClinicalStatus.Active, string? code = null, string? criticality = null,
+        string? reaction = null) =>
+        InsertChartRowAsync(
+            """
+            INSERT INTO ehr.allergy_intolerances (id, patient_id, code, display, clinical_status, criticality, reaction, recorded_at)
+            VALUES (@id, @patient, @code, @display, @status, @criticality, @reaction, '2025-03-04T10:00:00Z')
+            """,
+            ("patient", patientId), ("code", code), ("display", display), ("status", status), ("criticality", criticality), ("reaction", reaction));
+
+    public Task InsertMedicationAsync(Guid patientId, string display, string status = MedicationStatementStatus.Active, string? dosage = null) =>
+        InsertChartRowAsync(
+            "INSERT INTO ehr.medication_statements (id, patient_id, display, dosage, status) VALUES (@id, @patient, @display, @dosage, @status)",
+            ("patient", patientId), ("display", display), ("dosage", dosage), ("status", status));
+
+    public Task InsertConditionAsync(
+        Guid patientId, string display, string status = ConditionClinicalStatus.Active, string? code = null, DateOnly? onset = null) =>
+        InsertChartRowAsync(
+            "INSERT INTO ehr.conditions (id, patient_id, code, display, clinical_status, onset_date) VALUES (@id, @patient, @code, @display, @status, @onset)",
+            ("patient", patientId), ("code", code), ("display", display), ("status", status), ("onset", onset));
+
+    public Task InsertVisitAsync(
+        Guid patientId, DateTimeOffset start, string status = EncounterStatus.Finished, string? reason = null, short? systolic = null,
+        short? diastolic = null, short? heartRate = null) =>
+        InsertChartRowAsync(
+            """
+            INSERT INTO ehr.encounters (id, patient_id, status, class_code, reason, period_start, systolic_mm_hg, diastolic_mm_hg, heart_rate_per_minute)
+            VALUES (@id, @patient, @status, 'AMB', @reason, @start, @systolic, @diastolic, @heart_rate)
+            """,
+            ("patient", patientId), ("status", status), ("reason", reason), ("start", start.ToUniversalTime()), ("systolic", systolic),
+            ("diastolic", diastolic), ("heart_rate", heartRate));
+
+    async Task InsertChartRowAsync(string sql, params (string Name, object? Value)[] parameters)
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        }
+
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     // The patient on the clinician's panel, inserted as the superuser the way a seed would, so the chart opens without

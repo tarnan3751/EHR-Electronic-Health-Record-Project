@@ -54,6 +54,9 @@ public static class EncounterStatus
     public const string Unknown = "unknown";
 
     public static readonly string[] All = [Planned, Arrived, Triaged, InProgress, OnLeave, Finished, Cancelled, EnteredInError, Unknown];
+
+    // Visits that haven't happened, or never did.
+    public static readonly string[] NotHeld = [Planned, Cancelled, EnteredInError];
 }
 
 // The HL7 v3 encounter class codes this clinic uses.
