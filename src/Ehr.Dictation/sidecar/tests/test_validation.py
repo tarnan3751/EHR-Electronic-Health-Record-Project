@@ -194,6 +194,16 @@ def test_a_correction_takes_back_the_unit_said_with_what_it_corrects():
     assert "source_superseded" in own(said, "Range of motion is 5 to 95 degrees.").reasons
 
 
+@pytest.mark.parametrize(("wrong", "right"), [("metoprolol", "metformin"), ("warfarin", "paracetamol"),
+                                             ("prednisone", "tacrolimus"), ("lamotrigine", "levetiracetam")])
+def test_a_common_drug_no_stem_covers_is_still_a_drug(wrong, right):
+    said = f"Type 2 diabetes on {wrong} I mean {right}."
+
+    assert own(said, f"Type 2 diabetes on {right}.").pending
+    assert "source_superseded" in own(said, f"Type 2 diabetes on {wrong}.", f"Type 2 diabetes on {wrong}").reasons
+    assert "drug_not_in_sources" in own("Type 2 diabetes.", f"Type 2 diabetes on {right}.", "Type 2 diabetes").reasons
+
+
 def test_a_side_the_clinician_corrected_is_superseded():
     said = "Pain in the left knee, sorry, right knee, for two weeks."
 

@@ -682,14 +682,16 @@ def _date_terms(text: str) -> set[str]:
                     and word in PERIODS}
 
 
-# USAN stems: most drug names end in one, including new ones no list has heard of yet. Any other drug name a value adds
-# is caught as ungrounded content.
+# USAN stems: most drug names end in one, including new ones no list has heard of yet; and a few endings of common
+# older drugs no stem covers (metformin, warfarin, paracetamol, prednisone, tacrolimus, levetiracetam, lamotrigine). Any
+# other drug name a value adds is caught as ungrounded content.
 DRUG_STEMS = tuple(
     """mab nib tinib ciclib parib rafenib pril sartan olol alol dipine statin gliflozin gliptin glutide glinide tide
     parin xaban gatran prazole tidine azole conazole cillin cycline floxacin mycin micin vir navir previr asvir buvir
     tegravir semide thiazide lukast terol sonide olone betasol pam zolam oxetine triptan setron profen coxib caine
     dronate lutamide relin tropin kinra cept umab ximab zumab tecan platin rubicin mustine fungin bactam penem
-    entan sentan gepant tirom vastatin dapsone zepine apine idone peridol pramine triptyline afil lol""".split()
+    entan sentan gepant tirom vastatin dapsone zepine apine idone peridol pramine triptyline afil lol formin farin
+    amol sone olimus racetam trigine""".split()
 )
 # Ordinary words that happen to end in a stem.
 NOT_DRUGS = frozenset("except accept concept intercept precept april cholesterol riptide".split())
