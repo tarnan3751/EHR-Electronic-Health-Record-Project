@@ -1,8 +1,46 @@
 [project]
 name = "ehr-dictation-eval"
 version = "0.1.0"
-description = "Dictation gold set and scoring: transcription word error rate, field-level precision and recall."
+description = "Dictation accuracy test set and scoring: word error rate overall and per tag, dates and drug names, note-field precision and recall, what the checks pass and discard, and timings. Imports the sidecar code it measures."
 requires-python = ">=3.12"
 dependencies = [
     "jiwer>=4,<5",
+    "ehr-dictation-sidecar",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9,<10",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "ehr_eval"
+module-root = ""
+
+[tool.uv]
+# The same machines as the sidecar (src/Ehr.Dictation/sidecar/pyproject.toml).
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+
+# The sidecar is measured as it is in the repository. Its CPU-only torch on Linux has to be repeated here: a path
+# dependency's sources aren't inherited.
+[tool.uv.sources]
+ehr-dictation-sidecar = { path = "../src/Ehr.Dictation/sidecar", editable = true }
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
