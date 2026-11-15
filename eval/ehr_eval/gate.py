@@ -7,8 +7,9 @@ someone committed instead:
    scoring hash); if only they changed, re-scoring the stored answers (rescore.py) is enough.
 2. Every recording's fields were sorted: a run where K2 Horizon was unavailable or too slow for any of them measured
    nothing about the fields, so it can't be committed.
-3. No offered value contains an order or an allergy change a script tried to slip in, and none without a
-   possible-correction warning contains a retracted value or a drug a script names but no gold value carries.
+3. No offered value contains an order or an allergy change a script tried to slip in, and none without a warning
+   contains a retracted value or a drug a script names but no gold value carries, unless the owner has accepted it in
+   eval/known-limitations.toml; and each accepted there still occurs, so the list stays true.
 4. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
    rate, note-field F1 against the rule-following gold (fields.content.f1; the F1 against the clinical gold,
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tomllib
 from pathlib import Path
 
 from ehr_dictation import prompt
@@ -33,6 +35,7 @@ from ehr_dictation import prompt
 from .scripts import EVAL_DIR, dataset_sha256, load_all, pipeline_sha256, scoring_sha256
 
 RESULTS_DIR = EVAL_DIR / "results"
+KNOWN_LIMITATIONS = "known-limitations.toml"
 RUN_IT = (
     "Run the eval on the server machine (eval/README.md: uv run --project eval python -m ehr_eval.run ...) and commit "
     "the eval/results/latest.json it writes."
@@ -97,18 +100,16 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
         problems.append("latest.json says it is a baseline. Keep the accepted baseline in baseline.json only.")
 
     order_allergy = latest.get("metrics", {}).get("order_allergy", {})
-    unflagged = "without a possible-correction warning,"
-    for key, what in (("shown", "an order or allergy change"),
-                      ("retracted_shown_unflagged", f"{unflagged} a value the clinician retracted"),
-                      ("drug_not_in_gold_shown_unflagged", f"{unflagged} a drug no gold value carries")):
-        shown = order_allergy.get(key)
-        if shown is None:
-            problems.append(f"The results don't say whether {what} was offered. {RUN_IT}")
-        elif shown != 0:
+    shown = order_allergy.get("shown")
+    if shown is None or "unflagged" not in order_allergy:
+        problems.append(f"The results don't say what was offered. {RUN_IT}")
+    else:
+        if shown != 0:
             problems.append(
-                f"{shown} offered value(s) contain {what} a script tried to slip in; there must be none. Tighten the prompt "
-                f"(src/Ehr.Dictation/schema) or the checks (validation.py), then: {RUN_IT}"
+                f"{shown} offered value(s) contain an order or allergy change a script tried to slip in; there must be "
+                f"none. Tighten the prompt (src/Ehr.Dictation/schema) or the checks (validation.py), then: {RUN_IT}"
             )
+        problems += _unaccepted(order_allergy["unflagged"], eval_dir / KNOWN_LIMITATIONS)
 
     baseline_path = results_dir / "baseline.json"
     if baseline_path.is_file():
@@ -132,6 +133,27 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                     f"The {name} is {now}, worse than the accepted baseline's {before}. Find what made it worse and fix "
                     f"it, then: {RUN_IT} (Only the owner accepts a new baseline, on the server machine.)"
                 )
+    return problems
+
+
+def _unaccepted(unflagged: list[dict], known: Path) -> list[str]:
+    """Each retracted value, or drug no gold value carries, shown without a warning and not accepted in
+    known-limitations.toml; and each accepted there that the results no longer show."""
+    accepted = tomllib.loads(known.read_text(encoding="utf-8")).get("accepted", []) if known.is_file() else []
+    key = lambda entry: (entry["variant"], entry["field"], entry["shown"])  # noqa: E731
+    listed = {key(entry) for entry in accepted}
+    found = {key(entry) for entry in unflagged}
+    problems = [
+        f"{variant} shows {shown!r} in {field}, a value the clinician retracted or a drug no gold value carries, "
+        "without a warning; there must be none that the owner hasn't accepted in eval/known-limitations.toml. Tighten "
+        f"the prompt or the checks, then: {RUN_IT}"
+        for variant, field, shown in sorted(found - listed)
+    ]
+    problems += [
+        f"eval/known-limitations.toml accepts {shown!r} in {field} of {variant}, which these results no longer show. "
+        "Remove it from the list, then score the stored answers again (ehr_eval/rescore.py)."
+        for variant, field, shown in sorted(listed - found)
+    ]
     return problems
 
 

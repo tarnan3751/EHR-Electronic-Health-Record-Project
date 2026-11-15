@@ -21,7 +21,8 @@ def results(eval_dir, **overrides) -> dict:
         "metrics": {"wer": {"overall": 0.1}, "fields": {"content": {"f1": 0.8}}, "dates": {"accuracy": 0.9},
                     "drugs": {"accuracy": 0.7}, "unsupported_content": {"shown": 0.02},
                     "order_allergy": {"shown": 0, "retracted_shown": 2, "retracted_shown_unflagged": 0,
-                                      "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0},
+                                      "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0,
+                                      "unflagged": []},
                     "sorting": {"done": 2, "unavailable": {}}},
         "items": [{"script": "d01"}, {"script": "d02"}],
     }
@@ -87,7 +88,8 @@ def test_results_that_dont_say_what_was_shown_fail(eval_dir):
     silent["metrics"]["order_allergy"] = {}
     save(eval_dir, "latest.json", silent)
 
-    assert len(check(eval_dir / "results", eval_dir)) == 3
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "don't say what was offered" in problem
 
 
 def test_partial_results_or_a_baseline_flag_fail(eval_dir):
@@ -107,14 +109,39 @@ def test_an_order_or_allergy_change_shown_fails(eval_dir):
     assert "there must be none" in problem
 
 
-@pytest.mark.parametrize("key", ["retracted_shown_unflagged", "drug_not_in_gold_shown_unflagged"])
-def test_a_retracted_value_or_drug_shown_without_a_warning_fails(eval_dir, key):
+UNFLAGGED = {"variant": "d01--babble-5db", "field": "plan", "shown": "metoprolol"}
+ACCEPTED = """
+[[accepted]]
+variant = "d01--babble-5db"
+field = "plan"
+shown = "metoprolol"
+reason = "misheard cue"
+accepted = "2026-11-15"
+by = "the owner"
+"""
+
+
+def test_a_retracted_value_shown_without_a_warning_fails_unless_accepted(eval_dir):
     shown = results(eval_dir)
-    shown["metrics"]["order_allergy"][key] = 1
+    shown["metrics"]["order_allergy"]["unflagged"] = [UNFLAGGED]
     save(eval_dir, "latest.json", shown)
 
     (problem,) = check(eval_dir / "results", eval_dir)
-    assert "without a possible-correction warning" in problem
+    assert "without a warning" in problem and "d01--babble-5db" in problem
+
+    (eval_dir / "known-limitations.toml").write_text(ACCEPTED, encoding="utf-8")
+    shown["provenance"]["scoring"] = scoring_sha256(eval_dir)
+    save(eval_dir, "latest.json", shown)
+
+    assert check(eval_dir / "results", eval_dir) == []
+
+
+def test_an_accepted_limitation_the_results_no_longer_show_is_stale(eval_dir):
+    (eval_dir / "known-limitations.toml").write_text(ACCEPTED, encoding="utf-8")
+    save(eval_dir, "latest.json", results(eval_dir))
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "no longer show" in problem
 
 
 def test_a_metric_the_baseline_has_and_the_results_lack_fails(eval_dir):

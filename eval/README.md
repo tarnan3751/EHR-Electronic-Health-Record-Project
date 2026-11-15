@@ -11,6 +11,7 @@ The test set that dictation accuracy is measured on: about forty synthetic clini
 | `audio/` | The generated audio and its `manifest.json`. Gitignored |
 | `tests/test_scripts.py` | Checks every script against the rules below |
 | `tests/test_gold.py` | Checks the gold against the sidecar's own checks (`validation.py`) |
+| `known-limitations.toml` | Retracted values the pipeline shows without a warning that the owner has accepted, each with its reason; the eval's gate fails on any other |
 | `clinical-gold.md` | The clinical gold values those checks would discard, and why. `ehr_eval/goldreport.py` writes it |
 
 ## Scripts

@@ -28,7 +28,7 @@ PIPELINE_FILES = ("uv.lock", "../src/Ehr.Dictation/sidecar/uv.lock")
 # What checks and scores those answers, beside the sidecar's checks: a change means scoring the stored answers again
 # (rescore.py), which the gate also asks for when the list of accepted limitations changes.
 SCORING_FILES = ("ehr_eval/scripts.py", "ehr_eval/normalize.py", "ehr_eval/dates.py", "ehr_eval/scoring.py",
-                 "ehr_eval/run.py", "ehr_eval/rescore.py")
+                 "ehr_eval/run.py", "ehr_eval/rescore.py", "known-limitations.toml")
 
 
 def load_all(directory: Path = SCRIPTS_DIR) -> dict[str, Script]:

@@ -1,0 +1,17 @@
+# Retracted values, or drugs no gold value carries, that the dictation pipeline shows without a warning, which the
+# owner has accepted as known limitations. The eval's gate (ehr_eval/gate.py) fails on any such value not listed here,
+# and on any listed here that the results no longer show, so the list stays true. Changing it means scoring the stored
+# answers again (ehr_eval/rescore.py), since the scoring hash covers it. Each entry: the recording (variant), the field,
+# the value shown as the eval normalizes it (shown), why it gets through (reason), and when and by whom it was accepted.
+#
+# The clinician's review of each value against the transcript is the safety net for these (README.md, Dictation).
+
+[[accepted]]
+variant = "d22-cellulitis-ed--babble-5db"
+field = "history"
+shown = "metoprolol"
+reason = """At 5 dB of babble MedASR heard "on metoprolol I mean metformin" as "on metoprolol and metformin": no \
+correction cue, no correction-like word between the two drug names, and no passage marked unclear beside them, so \
+neither warning fires. Two drugs joined by "and" are an ordinary list."""
+accepted = "2026-11-15"
+by = "the owner"
