@@ -22,9 +22,10 @@ notCarriedOver lists each instruction in the transcript to order something or ch
 carries: [{reason: "order" or "allergy_change", start, end}], the span of the clinician's own words in the transcript,
 never anything the model wrote. provenance is {speech, language, llamaServer, prompt, schema, structuring, code};
 language and llamaServer are null while unknown. Each field is {status: "pending", value, sources: [{start, end}],
-warnings: [{code: "possible_correction", start, end}]} or {status: "empty", reasons: [...]}: a value that failed a
-check is never sent, only why, and a warning points at a later number, date or drug in the transcript that may be a
-correction the checks didn't hear (validation.py).
+warnings: [{code, start, end}]} or {status: "empty", reasons: [...]}: a value that failed a check is never sent, only
+why; a warning is possible_correction, pointing at a later number, date or drug in the transcript that may be a
+correction the checks didn't hear, or near_unclear_passage, pointing at a passage marked unclear beside one of the
+value's sources (validation.py).
 
 The limits on all of it (sizes, sessions at once, how long things are kept and waited for) are in settings.py.
 

@@ -97,6 +97,14 @@ def test_a_possible_correction_is_flagged_within_8_words():
     assert field("Heart rate 124.", "Heart rate 124", text=transcript(nine)).warnings == []
 
 
+def test_an_unclear_passage_within_5_words_flags_the_value():
+    five = transcript("Cough for three days a b c d e.", ("Fever since Tuesday.", "too_noisy"))
+    six = transcript("Cough for three days a b c d e f.", ("Fever since Tuesday.", "too_noisy"))
+
+    assert field("Cough for three days.", "Cough for three days", text=five).warnings != []
+    assert field("Cough for three days.", "Cough for three days", text=six).warnings == []
+
+
 def test_field_and_source_limits():
     words = "cough " * 599
     text = transcript(words)

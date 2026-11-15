@@ -45,7 +45,13 @@
             "end": 13
           }
         ],
-        "warnings": []
+        "warnings": [
+          {
+            "code": "near_unclear_passage",
+            "start": 28,
+            "end": 69
+          }
+        ]
       },
       "assessment": {
         "status": "empty",

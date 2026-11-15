@@ -191,7 +191,11 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                         status = "pending",
                         value = Sentences[1],
                         sources = new[] { new { start = 22, end = 31 } },
-                        warnings = new[] { new { code = "possible_correction", start = 0, end = 5 } },
+                        warnings = new[]
+                        {
+                            new { code = "possible_correction", start = 0, end = 5 },
+                            new { code = "near_unclear_passage", start = 6, end = 9 },
+                        },
                     },
                     plan = new { status = "empty", reasons = new[] { "not_dictated" } },
                 },

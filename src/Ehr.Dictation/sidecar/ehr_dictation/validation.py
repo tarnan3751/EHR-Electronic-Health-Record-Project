@@ -58,12 +58,14 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
-A value that passes can still carry a warning, possible_correction, for each place where a correction may have been
-said that the checks didn't hear, such as a cue speech recognition got wrong ("10 mg no weight 20 mg"): the value uses
-a number, date or drug name from its sources, and the transcript says another of the same kind, in another expression,
-within WARNING_REACH words after it, past the end of the source if need be, with a correction-like word between them
-(no, wait, sorry, scratch, mean, correction, actually, rather, make, change). The warning carries only that later item's
-place in the transcript, so the review screen can point at it; the value stays pending.
+A value that passes can still carry warnings, each a code and the place in the transcript it points at, never text; the
+value stays pending, and the review screen shows them beside it. possible_correction, for each place where a correction
+may have been said that the checks didn't hear, such as a cue speech recognition got wrong ("10 mg no weight 20 mg"):
+the value uses a number, date or drug name from its sources, and the transcript says another of the same kind, in
+another expression, within WARNING_REACH words after it, past the end of the source if need be, with a correction-like
+word between them (no, wait, sorry, scratch, mean, correction, actually, rather, make, change); it points at the later
+item. near_unclear_passage, for each passage marked unclear within NEAR_UNCLEAR words of one of the value's sources: the
+value was sorted from words right beside something speech recognition couldn't hear; it points at that passage.
 
 The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of this
 package's code, so a change to any rule asks for a new run.
@@ -90,6 +92,7 @@ CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected
 # The possible-correction warning's rule, in one place: how far after a value's number, date or drug another of its
 # kind may be a correction, and the words one of which must come between them (None: any gap).
 WARNING_REACH = 8
+NEAR_UNCLEAR = 5  # words between a source and an unclear passage that put a near_unclear_passage warning on the value
 WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
     "no wait sorry scratch mean correction actually rather make change".split()
 )
@@ -150,8 +153,8 @@ class Checked:
     quotes: list[str]
     reasons: list[str]
     spans: list[tuple[int, int]] = field(default_factory=list)  # code points in the transcript, for pending values
-    # Possible corrections (see the module's header): where the later number, date or drug is, for pending values.
-    warnings: list[tuple[int, int]] = field(default_factory=list)
+    # For pending values (see the module's header): each warning's code, and the place in the transcript it points at.
+    warnings: list[tuple[str, int, int]] = field(default_factory=list)
 
     @property
     def pending(self) -> bool:
@@ -168,9 +171,8 @@ class Checked:
                 for start, end in self.spans
             ],
             "warnings": [
-                {"code": POSSIBLE_CORRECTION, "start": utf16_offset(transcript.text, start),
-                 "end": utf16_offset(transcript.text, end)}
-                for start, end in self.warnings
+                {"code": code, "start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end)}
+                for code, start, end in self.warnings
             ],
         }
 
@@ -311,7 +313,9 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
     ordered = [reason for reason in REASONS if reason in reasons]
     if ordered:
         return Checked(name, value, quotes, ordered)
-    return Checked(name, value, quotes, ordered, spans, _possible_corrections(value, spans, transcript))
+    warnings = [(POSSIBLE_CORRECTION, start, end) for start, end in _possible_corrections(value, spans, transcript)]
+    warnings += [(NEAR_UNCLEAR_PASSAGE, start, end) for start, end in _near_unclear(spans, transcript)]
+    return Checked(name, value, quotes, ordered, spans, warnings)
 
 
 # ---- Quotes --------------------------------------------------------------------------------------------------------
@@ -377,6 +381,7 @@ MEASURES = DOSE_WORDS | frozenset(
 )
 WARNED_KINDS = ("number", "date", "drug")
 POSSIBLE_CORRECTION = "possible_correction"
+NEAR_UNCLEAR_PASSAGE = "near_unclear_passage"
 SIDES = frozenset({"left", "right"})
 # What can sit inside one expression of a kind: "150 over 90", "10 mg", "the 20".
 RUN_GLUE = FREE_WORDS | DOSE_WORDS | {"over"}
@@ -521,6 +526,23 @@ def _possible_corrections(value: str, spans: list[tuple[int, int]], transcript: 
                 found.add((words[later.first].start, words[later.last].end))
                 break  # the first one after it: what may have replaced it
     return sorted(found)
+
+
+def _near_unclear(spans: list[tuple[int, int]], transcript: _Transcript) -> list[tuple[int, int]]:
+    """Each unclear passage within NEAR_UNCLEAR words of one of the value's sources (see the module's header)."""
+    words = transcript.words
+    found = []
+    for start, end in transcript.unclear:
+        unclear = [i for i, word in enumerate(words) if start <= word.start < end]
+        for span in spans:
+            source = [i for i, word in enumerate(words) if span[0] <= word.start and word.end <= span[1]]
+            if not unclear or not source:
+                continue
+            between = unclear[0] - source[-1] - 1 if unclear[0] > source[-1] else source[0] - unclear[-1] - 1
+            if between <= NEAR_UNCLEAR:
+                found.append((start, end))
+                break
+    return found
 
 
 def _holds(span: tuple[int, int], term: _Term, words: list[Token]) -> bool:

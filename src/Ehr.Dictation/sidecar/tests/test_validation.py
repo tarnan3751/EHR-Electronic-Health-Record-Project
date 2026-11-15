@@ -758,7 +758,7 @@ def warned(said, value, *sources):
     text = transcript(said)
     checked = field(value, *(sources or (said,)), name="plan", text=text)
     assert checked.pending, checked.reasons
-    return [text.text[start:end] for start, end in checked.warnings]
+    return [text.text[start:end] for code, start, end in checked.warnings if code == "possible_correction"]
 
 
 @pytest.mark.parametrize(("said", "value", "later"), [
@@ -812,3 +812,23 @@ def test_a_warning_goes_out_with_the_pending_value_as_where_it_points():
 
     assert checked.to_json(text)["warnings"] == [{"code": "possible_correction", "start": 25, "end": 28}]
     assert "warnings" not in field("Heart rate 99.", "Heart rate 99", text=text).to_json(text)
+
+
+def test_a_value_next_to_an_unclear_passage_is_flagged():
+    text = transcript("Cough for three days.", ("Fever since Tuesday.", "too_noisy"), "Recheck in a week.")
+
+    checked = field("Cough for three days.", "Cough for three days", text=text)
+
+    assert checked.pending
+    assert [(code, text.text[start:end]) for code, start, end in checked.warnings] == [
+        ("near_unclear_passage", "Fever since Tuesday.")]
+    assert checked.to_json(text)["warnings"][0]["code"] == "near_unclear_passage"
+
+
+def test_a_value_far_from_an_unclear_passage_is_not_flagged():
+    text = transcript("Cough for three days, worse at night when lying flat.", ("Fever since Tuesday.", "too_noisy"))
+
+    assert field("Cough for three days.", "Cough for three days", text=text).warnings == []
+    earlier = transcript(("Fever since Tuesday.", "too_noisy"), "She says it is worse at night and lying flat. Cough for "
+                                                                 "three days.")
+    assert field("Cough for three days.", "Cough for three days", text=earlier).warnings == []

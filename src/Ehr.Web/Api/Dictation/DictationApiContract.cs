@@ -120,16 +120,22 @@ public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField;
 public sealed record SourceSpan(int Start, int End);
 
 // A place in the transcript (offsets as in TranscriptSegment) the review screen must point to beside the field: the
-// value is still a proposal, but the clinician may have corrected it there in words speech recognition got wrong
-// ("no weight" for "no wait"). A code and a place, never text from the model.
+// value is still a proposal, but something there may have changed it. A code and a place, never text from the model.
 public sealed record FieldWarning(WarningCode Code, int Start, int End);
 
 [JsonConverter(typeof(JsonStringEnumConverter<WarningCode>))]
 public enum WarningCode
 {
-    // The transcript says another number, date or drug name, of the same kind, just after one the value uses.
+    // The transcript says another number, date or drug name of the same kind just after one the value uses, with a
+    // correction-like word between: the clinician may have corrected it in words speech recognition got wrong
+    // ("no weight" for "no wait").
     [JsonStringEnumMemberName("possible_correction")]
     PossibleCorrection,
+
+    // A passage marked unclear sits beside one of the value's sources: speech recognition couldn't hear something
+    // right next to what the value was sorted from.
+    [JsonStringEnumMemberName("near_unclear_passage")]
+    NearUnclearPassage,
 }
 
 // What produced the transcript and the fields, for the note to store with them. Language is null when the service's

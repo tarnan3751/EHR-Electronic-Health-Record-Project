@@ -235,6 +235,8 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     assert bodies["stop-200-pending"]["sorting"] == "pending" and bodies["stop-200-pending"]["provenance"]["llamaServer"] is None
     assert bodies["audio-409-out_of_order"]["expectedSeq"] == 1
     warned = bodies["result-200-done-possible_correction"]["fields"]["plan"]
-    assert warned["status"] == "pending" and [w["code"] for w in warned["warnings"]] == ["possible_correction"]
+    assert warned["status"] == "pending" and "possible_correction" in [w["code"] for w in warned["warnings"]]
+    near = bodies["result-200-done"]["fields"]["history"]
+    assert [w["code"] for w in near["warnings"]] == ["near_unclear_passage"]
     failed = bodies["result-200-unavailable-transcription_failed"]
     assert failed["transcript"]["text"] and not failed["transcript"]["final"]

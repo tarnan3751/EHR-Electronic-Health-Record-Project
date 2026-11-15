@@ -66,7 +66,9 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         var assessment = Assert.IsType<PendingField>(result.Fields.Assessment);
         Assert.Equal("No fever.", assessment.Value);
         Assert.Equal([new SourceSpan(22, 31)], assessment.Sources);
-        Assert.Equal([new FieldWarning(WarningCode.PossibleCorrection, 0, 5)], assessment.Warnings);
+        Assert.Equal(
+            [new FieldWarning(WarningCode.PossibleCorrection, 0, 5), new FieldWarning(WarningCode.NearUnclearPassage, 6, 9)],
+            assessment.Warnings);
         Assert.Equal(["not_dictated"], Assert.IsType<EmptyField>(result.Fields.Plan).Reasons);
         Assert.Equal("google/medasr", result.Provenance.Speech.Repository);
         Assert.Equal("K2-Horizon-7B-Q4_K_M.gguf", result.Provenance.Language?.File);
