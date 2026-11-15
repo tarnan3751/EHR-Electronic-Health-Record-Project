@@ -45,7 +45,12 @@ def rescore(results: dict) -> dict:
         items.append(item)
     out = dict(results)
     out["provenance"] = results["provenance"] | {"code": CODE_SHA256, "measurement": measurement_sha256()}
-    out["rescored_from"] = {"code": results["provenance"]["code"], "measurement": results["provenance"]["measurement"]}
+    # The model's answers are the run's own; only the checks and the scoring are this code's.
+    out["rescored_from"] = {
+        "code": results["provenance"]["code"],
+        "measurement": results["provenance"]["measurement"],
+        "structuring_outputs_reused": True,
+    }
     out["metrics"] = scoring.score(items, load_all())
     out["items"] = [dataclasses.asdict(item) for item in items]
     return out

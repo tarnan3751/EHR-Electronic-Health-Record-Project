@@ -60,7 +60,11 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
             f"(results {str(recorded.get('structuring'))[:12]}, now {structuring.structuring_sha256[:12]}). {RUN_IT}"
         )
     if recorded.get("code") != CODE_SHA256:
-        problems.append(f"The sidecar's code (src/Ehr.Dictation/sidecar/ehr_dictation) changed since the last eval run. {RUN_IT}")
+        problems.append(
+            "The sidecar's code (src/Ehr.Dictation/sidecar/ehr_dictation, validation.py and the rest) changed since these "
+            "results were made. If only the checks changed, re-score the stored answers with the code that ships: "
+            "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json. Otherwise: " + RUN_IT
+        )
     if recorded.get("measurement") != measurement_sha256(eval_dir):
         problems.append(f"The eval's own code or a lockfile changed since the last eval run. {RUN_IT}")
     if latest.get("dataset", {}).get("sha256") != dataset_sha256(eval_dir):

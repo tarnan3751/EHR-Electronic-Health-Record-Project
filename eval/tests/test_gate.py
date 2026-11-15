@@ -55,6 +55,7 @@ def test_results_from_another_prompt_code_measurement_or_test_set_fail(eval_dir)
 
     assert len(problems) == 4
     assert all("Run the eval" in p for p in problems)
+    assert any("re-score the stored answers" in p for p in problems)
 
 
 def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):
