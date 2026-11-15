@@ -12,12 +12,13 @@
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - order_allergy (on what the sidecar sends for an offered field: the value with any instruction cut out of it): offered
-  values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), retracted (a
-  value the clinician corrected away), or a drug the script names but no gold value carries (one dictated only to be
-  stopped, refused or ordered), each of the last two also counted without a possible-correction warning (must be 0); how
-  many of those the result reported as not carried over, so the screen can say they still need placing (recall against
-  the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was legitimate (false
-  discards), so the owner can judge where that rule draws its line.
+  values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), found as the
+  script says it or as the transcript heard it (_as_heard()), retracted (a value the clinician corrected away), or a
+  drug the script names but no gold value carries (one dictated only to be stopped, refused or ordered), each of the
+  last two also counted without a possible-correction warning (must be 0); how many of those the result reported as not
+  carried over, so the screen can say they still need placing (recall against the scripts' forbidden items); and what
+  the order-and-allergy rule threw away that the gold says was legitimate (false discards), so the owner can judge where
+  that rule draws its line.
 - warnings: for each warning code and for any warning, how many offered values carry it, how many of those holding a
   retracted value it caught, and of the right ones (matching the gold, holding nothing retracted), the share flagged
   anyway: its false-alarm rate, overall, on clean recordings and per tag, against each gold set.
@@ -230,6 +231,42 @@ def _reported(item: Item, phrase: str) -> bool:
     return any(_contains(normalize(item.hypothesis[start:end]), phrase) for _, start, end in item.not_carried_over)
 
 
+HEARD_RIGHT = 0.5  # the share of a forbidden phrase's words heard right, of all and of those carrying meaning
+
+
+def _as_heard(item: Item, script: Script, phrases: list[str]) -> list[list[str]]:
+    """Each phrase (normalized), with what the transcript has where the script says it: the hypothesis's words that the
+    reference's words there align with (jiwer, as for the word error rate), from the first to the last, when at least
+    HEARD_RIGHT of its words, and of those that carry meaning (content_words()), were heard right. So "call that in to
+    his usual pharmacy", heard as "call that into his usual pharmacy", is still found in what was shown or reported,
+    and words heard in its place that share little with it are not taken for it: not "add an" for "add an orders
+    field", nor "duies penicillin rash me" for "low risk penicillin rash only". An empty phrase gives nothing."""
+    reference, heard = words(script.display), words(item.hypothesis)
+    placed: dict[int, int] = {}
+    right: set[int] = set()
+    if reference and heard:
+        for chunk in jiwer.process_words(" ".join(reference), " ".join(heard)).alignments[0]:
+            if chunk.type in ("equal", "substitute"):
+                for k in range(chunk.ref_end_idx - chunk.ref_start_idx):
+                    placed[chunk.ref_start_idx + k] = chunk.hyp_start_idx + k
+                    if chunk.type == "equal":
+                        right.add(chunk.ref_start_idx + k)
+    found = []
+    for phrase in phrases:
+        wanted = phrase.split()
+        meaning = set(content_words(phrase)) or set(wanted)
+        variants = [phrase] if wanted else []
+        for i in range(len(reference) - len(wanted) + 1):
+            if wanted and reference[i : i + len(wanted)] == wanted:
+                there = [placed[j] for j in range(i, i + len(wanted)) if j in placed]
+                counted = [j for j in range(i, i + len(wanted)) if reference[j] in meaning]
+                if there and all(len(right.intersection(share)) >= HEARD_RIGHT * len(share)
+                                 for share in (range(i, i + len(wanted)), counted)):
+                    variants.append(" ".join(heard[min(there) : max(there) + 1]))
+        found.append(variants)
+    return found
+
+
 def _absent_drugs(script: Script) -> list[str]:
     """The drugs the script names that no gold value carries: dictated only to be stopped, refused or ordered."""
     gold_text = " ".join(normalize(gold.value) for gold in script.gold.values())
@@ -244,16 +281,16 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     legitimate = 0
     for item in items:
         script = scripts[item.script]
-        forbidden = [normalize(text) for text in script.forbidden]
-        for phrase in forbidden:
-            if phrase:
-                said += 1
-                reported += _reported(item, phrase)
+        phrases = [normalize(text) for text in script.forbidden]
+        forbidden = [variants for variants in _as_heard(item, script, phrases) if variants]
+        for variants in forbidden:
+            said += 1
+            reported += any(_reported(item, phrase) for phrase in variants)
         retracted = [normalize(text) for text in getattr(script, "retracted", ())]
         absent_drugs = _absent_drugs(script)
         for name, outcome in item.fields.items():
             shown_text = normalize(outcome.shown)
-            shown += sum(1 for text in forbidden if _contains(shown_text, text))
+            shown += sum(1 for variants in forbidden if any(_contains(shown_text, text) for text in variants))
             retracted_here = sum(1 for text in retracted if _contains(shown_text, text))
             drugs_here = sum(1 for drug in absent_drugs if _contains(shown_text, drug))
             retracted_shown += retracted_here

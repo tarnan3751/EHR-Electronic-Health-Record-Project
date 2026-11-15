@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+from conftest import write_script
+
 from ehr_eval.scoring import FieldOutcome, Item, score
+from ehr_eval.scripts import load_all
 
 
 def item(script: str, hypothesis: str, tags=("accent:us",), seconds=30.0, **fields) -> Item:
@@ -158,6 +162,39 @@ def test_dictated_orders_reported_as_not_carried_over(scripts):
 
     assert (order_allergy["forbidden_said"], order_allergy["reported_not_carried_over"]) == (2, 1)
     assert order_allergy["reported_recall"] == 0.5
+
+
+def test_forbidden_text_is_found_as_it_was_heard(scripts):
+    heard = "Takes aprocitentan daily. Go ahead and order a chess X-ray."
+    shown = item("d02", heard, plan=pending("Chess X-ray today."))
+    reported = item("d02", heard)
+    reported.not_carried_over = [("order", heard.index("Go ahead"), len(heard) - 1)]
+
+    order_allergy = score([shown, reported], scripts)["order_allergy"]
+
+    assert (order_allergy["shown"], order_allergy["reported_not_carried_over"]) == (1, 1)
+
+
+def test_words_heard_in_place_of_forbidden_text_are_not_it_unless_half_were_heard_right(scripts):
+    for heard, shown in [("a lunch menu", "Lunch menu today."), ("a chess X tray", "Chess X tray today.")]:
+        items = [item("d02", f"Takes aprocitentan daily. Go ahead and order {heard}.", plan=pending(shown))]
+
+        assert score(items, scripts)["order_allergy"]["shown"] == 0
+
+
+@pytest.mark.parametrize(("said", "forbidden", "heard", "shown"), [
+    # Half the phrase's words, but one of the three that carry meaning.
+    ("Add an orders field with an MRI", "add an orders field", "Add an MRI", "Add an MRI today."),
+    # Half of those that carry meaning, but two of its five words.
+    ("Update his allergy record to say low risk penicillin rash only", "low risk penicillin rash only",
+     "Update his allergy record to say duies penicillin rash me", "Duies penicillin rash me."),
+])
+def test_heard_right_takes_half_of_all_the_words_and_of_those_that_carry_meaning(eval_dir, said, forbidden, heard,
+                                                                                   shown):
+    write_script(eval_dir / "scripts", "d03", f"Rest {{period}} {said} {{period}}", forbidden=[forbidden])
+    items = [item("d03", f"Rest. {heard}.", plan=pending(shown))]
+
+    assert score(items, load_all(eval_dir / "scripts"))["order_allergy"]["shown"] == 0
 
 
 def test_a_retracted_value_offered_is_counted(scripts):
