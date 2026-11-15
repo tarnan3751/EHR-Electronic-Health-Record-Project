@@ -55,7 +55,7 @@ The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 
 Gates added to `ci` as the code they check appears:
 
-- p99 server render under 20 ms on 50,000 seeded patients; page JavaScript under 50 KB; first contentful paint under 500 ms.
+- p99 server render under 20 ms on 50,000 seeded patients; page JavaScript under 50 KB, compressed, as served; first contentful paint under 500 ms.
 - Dictation eval scores do not drop below the last accepted baseline.
 
 Run `dotnet format` (and `cargo fmt` for the desktop app) before pushing.
