@@ -32,14 +32,14 @@ and every check reads the cleaned text. The checks, each with the reason code re
   the past or by someone else ("her cardiologist ordered an echo last year"), pass.
 - no_sources, source_too_short (under two words, without a number), source_not_in_transcript (compared word by word,
   ignoring case and punctuation), source_in_unclear_passage.
-- source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "I mean", "actually", "no,",
-  "make it", "rather", "scratch that"), read across the whole transcript. A correction gives a number, date, drug name
-  or side (left, right) within three words of its cue, and supersedes the last expression of the same kind said before
-  the cue in its sentence (or in the sentence before, when the cue starts one), unless it says all of it again. One
-  expression is one measured thing: numbers joined only by units, articles or "over" ("150 over 90"). So "heart rate 78,
-  no sorry 72" supersedes 78 and not the blood pressure said before it; "10 mg, sorry, 20 mg" supersedes 10 mg; and
-  "lisinopril 10 mg, sorry, 20 mg" keeps lisinopril, since no drug replaces it. A source is read as corrected: without
-  the cue and what it took back.
+- source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "no correction", "I mean",
+  "actually", "no,", "make it", "rather", "scratch that"), read across the whole transcript. A correction gives a
+  number, date, drug name or side (left, right) within three words of its cue, and supersedes the last expression of the
+  same kind said before the cue in its sentence (or in the sentence before, when the cue starts one), unless it says all
+  of it again. One expression is one measured thing: numbers joined only by units, articles or "over" ("150 over 90").
+  So "heart rate 78, no sorry 72" supersedes 78 and not the blood pressure said before it; "10 mg, sorry, 20 mg"
+  supersedes 10 mg; and "lisinopril 10 mg, sorry, 20 mg" keeps lisinopril, since no drug replaces it. A source is read
+  as corrected: without the cue and what it took back.
 - number_not_in_sources, date_not_in_sources, drug_not_in_sources: the specific cases of a word not in the sources, kept
   for what they say: a number, a date word ("may" counts as one after a preposition or before a day), a drug-like name.
 - negation_dropped, experiencer_dropped, certainty_dropped, history_dropped: in the transcript, a qualifier reaches
@@ -314,7 +314,7 @@ def _overlaps(a: tuple[int, int], b: tuple[int, int]) -> bool:
 # ---- Corrections --------------------------------------------------------------------------------------------------
 
 CORRECTION = re.compile(
-    r"\b(?:no sorry|no wait|wait no|sorry|i mean|i meant|correction|scratch that|strike that|make that|make it|"
+    r"\b(?:no sorry|no wait|no correction|wait no|sorry|i mean|i meant|correction|scratch that|strike that|make that|make it|"
     r"i misspoke|actually|rather)\b|\bno\s*,",
     re.IGNORECASE,
 )
@@ -700,7 +700,7 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
 # ---- Negation, who has it, and how sure ----------------------------------------------------------------------------
 
 NEGATION = re.compile(
-    r"\b(?:no(?![\s,]+(?:sorry|wait)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
+    r"\b(?:no(?![\s,]+(?:sorry|wait|correction)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
     r"free of|ruled out|rules out|doesn't|does not|didn't|did not|isn't|is not|wasn't|was not|hasn't|has not|haven't|"
     r"have not|non)\b",
     re.IGNORECASE,

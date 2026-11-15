@@ -158,6 +158,13 @@ def test_a_correction_supersedes_only_the_measurement_it_corrects():
     assert own(said, "Heart rate 72.", "heart rate 78, no sorry 72").pending
 
 
+def test_no_correction_is_a_correction_not_a_negation():
+    said = "ECG shows sinus rhythm with a QTc of 468 no correction 448 milliseconds."
+
+    assert own(said, "QTc of 448 milliseconds.", "QTc of 468 no correction 448 milliseconds").pending
+    assert "source_superseded" in own(said, "QTc of 468.", "QTc of 468").reasons
+
+
 def test_no_sorry_is_a_correction_not_a_negation():
     said = "Psoriasis improving, PASI 12 no sorry PASI 10."
 
