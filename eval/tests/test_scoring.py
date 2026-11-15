@@ -12,7 +12,7 @@ def item(script: str, hypothesis: str, tags=("accent:us",), seconds=30.0, **fiel
 
 
 def pending(value: str) -> FieldOutcome:
-    return FieldOutcome(proposed=value, sources=[value], status="pending")
+    return FieldOutcome(proposed=value, sources=[value], status="pending", value=value)
 
 
 def failed(value: str, *reasons: str) -> FieldOutcome:

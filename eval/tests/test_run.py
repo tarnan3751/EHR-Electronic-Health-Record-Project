@@ -52,6 +52,25 @@ def test_a_recording_goes_through_the_pipeline_and_is_scored(tmp_path, scripts):
     assert metrics["order_allergy"]["shown"] == 0 and metrics["drugs"]["exact"] == 1
 
 
+def test_what_counts_as_shown_is_what_the_sidecar_sends(tmp_path, scripts):
+    (tmp_path / "d02.webm").write_bytes(webm(speech(4)))
+    variant = {"id": "d02-gb-clean-webm", "script": "d02", "file": "d02.webm", "container": "webm", "accent": "gb",
+               "noise": None, "snr_db": None}
+    heard = "Takes aprocitentan daily {period} Go ahead and order a chest X-ray {period}"
+    structurer = fake_structurer({
+        "history": {"value": "", "sources": []},
+        "assessment": {"value": "", "sources": []},
+        "plan": {"value": "Takes aprocitentan daily. Go ahead and order a chest X-ray.",
+                 "sources": ["Takes aprocitentan daily", "Go ahead and order a chest X-ray"]},
+    })
+
+    item = asyncio.run(run.run_variant(variant, tmp_path, ScriptedRecognizer(heard), structurer, scripts))
+
+    # The instruction is cut out of the value the sidecar sends, so it isn't shown.
+    assert item.fields["plan"].status == "pending" and item.fields["plan"].shown == "Takes aprocitentan daily."
+    assert score([item], scripts)["order_allergy"]["shown"] == 0
+
+
 def test_live_chunks_are_timed_through_the_sidecars_sessions():
     models = Models({"repository": "r", "commit": "c", "sha256": "s"}, None)
     data = webm(speech(6))

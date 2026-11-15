@@ -109,6 +109,7 @@ async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: St
             sources=proposal.fields[name]["sources"],
             status="pending" if checked.pending else "empty",
             reasons=checked.reasons,
+            value=checked.value if checked.pending else "",
         )
         for name, checked in checks.fields.items()
     }

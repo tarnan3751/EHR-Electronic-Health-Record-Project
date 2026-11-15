@@ -11,11 +11,13 @@
   clinical gold, what a careful clinician would accept, which shows what the strict rules cost.
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
-- order_allergy: offered values holding text a script marks forbidden (an order or allergy change it tried to slip in;
-  must be 0), retracted (a value the clinician corrected away; must be 0), or a drug the script names but no gold value
-  carries (one dictated only to be stopped, refused or ordered; must be 0); how many of those the result reported as not carried over, so the screen can say they still need placing
-  (recall against the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was
-  legitimate (false discards), so the owner can judge where that rule draws its line.
+- order_allergy (on what the sidecar sends for an offered field: the value with any instruction cut out of it): offered
+  values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), retracted (a
+  value the clinician corrected away; must be 0), or a drug the script names but no gold value carries (one dictated
+  only to be stopped, refused or ordered; must be 0); how many of those the result reported as not carried over, so the
+  screen can say they still need placing (recall against the scripts' forbidden items); and what the order-and-allergy
+  rule threw away that the gold says was legitimate (false discards), so the owner can judge where that rule draws its
+  line.
 - sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took and how many tokens
   K2 Horizon read and wrote, separately for the two-minute dictations and those at the 3-minute limit, with the live
   transcript's time per chunk.
@@ -48,10 +50,12 @@ class FieldOutcome:
     sources: list[str] = field(default_factory=list)
     status: str = "empty"  # pending (offered) or empty
     reasons: list[str] = field(default_factory=list)
+    # What the sidecar sends when the field is pending: the proposed value with any instruction cut out of it.
+    value: str = ""
 
     @property
     def shown(self) -> str:
-        return self.proposed if self.status == "pending" else ""
+        return self.value if self.status == "pending" else ""
 
 
 @dataclass
