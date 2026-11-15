@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using Ehr.Data;
 using Ehr.Data.Audit;
-using Ehr.Domain.Phi;
 using Ehr.Web.CloudAudit;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,9 +12,9 @@ namespace Ehr.Web.Api.Audit;
 // MaxEvents events and the shared key in KeyHeader; the events are inserted with source "cloud" and their own IDs
 // and times, and one already here is skipped. An empty batch is how the cloud app checks the on-prem app can save. The
 // cloud app forwards anyone's POST here, so the key is checked before the body is read, and the body is capped at
-// MaxBodySize. The audit log is append-only, so only what the cloud app records is taken: reads of one patient by the
-// PHI reader, and sign-outs, which the cloud app handles itself. Every other event is recorded on a POST, which the
-// cloud app forwards to the on-prem app rather than queues.
+// MaxBodySize. The audit log is append-only, so only what the cloud app records is taken (CloudAuditEvents): reads of
+// one patient by the PHI reader, and sign-outs, which the cloud app handles itself. Every other event is recorded on a
+// POST, which the cloud app forwards to the on-prem app rather than queues.
 public static class CloudAuditApi
 {
     public const string Path = "/api/audit/cloud-events";
@@ -65,7 +64,7 @@ public static class CloudAuditApi
 
         // A bad event refuses the whole batch: the cloud app sends it again until it's taken, so nothing in it can be
         // half-stored.
-        if (events is null || events.Count > MaxEvents || events.Any(e => !IsCloudEvent(e)))
+        if (events is null || events.Count > MaxEvents || events.Any(e => !CloudAuditEvents.IsAllowed(e)))
         {
             return Refused($"Send up to {MaxEvents} events, each a read of one patient or a sign-out by a signed-in account, with no reason or details, and not from the future.");
         }
@@ -92,22 +91,4 @@ public static class CloudAuditApi
 
     static IResult Refused(string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { ["events"] = [message] });
-
-    // What the cloud app records, exactly: a read of the patient's row as PhiReader records it (row-level security
-    // returns no patient to anyone but a signed-in account), or a sign-out as StaffSignIn and PatientSignIn record it,
-    // with the patient for a patient's. Both by an actor, neither with a reason or details. The cloud app never
-    // produces anything else. The JSON can hold null where an event should be.
-    static bool IsCloudEvent(AuditEvent? e) =>
-        e is not null
-        && e.Id != Guid.Empty
-        && e.ActorId is { } actor && actor != Guid.Empty
-        && e.Reason is null
-        && e.Details is null
-        && e.OccurredAt != default
-        && e.Action switch
-        {
-            AuditActions.Read => e.TableName == PhiReader.PatientsTable && e.PatientId is { } patient && patient != Guid.Empty && e.RowId == patient,
-            AuditActions.SignOut => e.TableName is null && e.RowId is null && e.PatientId != Guid.Empty,
-            _ => false,
-        };
 }

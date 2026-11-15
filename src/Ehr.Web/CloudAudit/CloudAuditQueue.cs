@@ -39,9 +39,20 @@ public sealed class CloudAuditQueue : IAuditQueue, IDisposable
 
     public void Enqueue(AuditEvent auditEvent) => Enqueue([auditEvent]);
 
-    // A request's events go to disk together: one write and one flush, however many patients a page listed.
+    // A request's events go to disk together: one write and one flush, however many patients a page listed. Only what
+    // the on-prem app will take (CloudAuditEvents): anything else fails the request now, with nothing written, rather
+    // than jamming the queue later.
     public void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents)
     {
+        foreach (var auditEvent in auditEvents)
+        {
+            if (!CloudAuditEvents.IsAllowed(auditEvent))
+            {
+                throw new InvalidOperationException(
+                    $"The cloud app may record only what the on-prem app takes (CloudAuditEvents); a '{auditEvent.Action}' event in this shape isn't.");
+            }
+        }
+
         using var lines = new MemoryStream();
         foreach (var auditEvent in auditEvents)
         {

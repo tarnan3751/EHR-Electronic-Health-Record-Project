@@ -52,8 +52,8 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
 }
 
 // Where the cloud site keeps the events it records until the on-prem app has them. Enqueue stores all the events it is
-// given, in order, and returns only once they are stored durably; otherwise it throws and stores none of them, so a
-// read is never shown without its record.
+// given, in order, and returns only once they are stored durably; otherwise, including when one is an event the on-prem
+// app wouldn't take, it throws and stores none of them, so a read is never shown without its record.
 public interface IAuditQueue
 {
     void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents);
