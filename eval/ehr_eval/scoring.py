@@ -5,11 +5,12 @@
 - dates and drugs: of the dates and drug names the scripts say, how many the transcript has right (drugs also within
   two letters, to tell a near miss from a miss).
 - fields: whether each note field was offered when it should have been (detection) and how much of the gold value an
-  offered value holds (content: precision, recall and F1 over the words that carry meaning).
+  offered value holds (content: precision, recall and F1 over the words that carry meaning), overall, per field and per
+  tag (such as recombination, mixed-plan and self-correction).
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - order_allergy: offered values holding text a script marks forbidden (an order or allergy change it tried to slip in;
-  must be 0); how many of those the result reported as not carried over, so the screen can say they still need placing
+  must be 0) or retracted (a value the clinician corrected away; must be 0); how many of those the result reported as not carried over, so the screen can say they still need placing
   (recall against the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was
   legitimate (false discards), so the owner can judge where that rule draws its line.
 - sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took, separately for
@@ -135,10 +136,10 @@ def content_words(text: str) -> list[str]:
 
 
 def _fields(items: list[Item], scripts: dict[str, Script]) -> dict:
-    def measure(names: tuple[str, ...]) -> dict:
+    def measure(names: tuple[str, ...], group: list[Item]) -> dict:
         tp = fp = fn = 0
         overlap = shown_words = gold_words = 0
-        for item in items:
+        for item in group:
             for name in names:
                 gold = scripts[item.script].gold[name].value.strip()
                 shown = item.fields.get(name, FieldOutcome()).shown.strip()
@@ -156,8 +157,11 @@ def _fields(items: list[Item], scripts: dict[str, Script]) -> dict:
             "content": {"precision": content_p, "recall": content_r, "f1": _f1(content_p, content_r)},
         }
 
-    overall = measure(FIELDS)
-    return overall | {"by_field": {name: measure((name,)) for name in FIELDS}}
+    tags = sorted({tag for item in items for tag in item.tags})
+    return measure(FIELDS, items) | {
+        "by_field": {name: measure((name,), items) for name in FIELDS},
+        "by_tag": {tag: measure(FIELDS, [item for item in items if tag in item.tags]) for tag in tags},
+    }
 
 
 def _f1(precision: float | None, recall: float | None) -> float | None:
@@ -207,7 +211,7 @@ def _reported(item: Item, phrase: str) -> bool:
 
 
 def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
-    shown = 0
+    shown = retracted_shown = 0
     reported = said = 0
     discarded = lost = lost_without_attempt = 0
     legitimate = 0
@@ -218,9 +222,11 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
             if phrase:
                 said += 1
                 reported += _reported(item, phrase)
+        retracted = [normalize(text) for text in getattr(script, "retracted", ())]
         for name, outcome in item.fields.items():
             shown_text = normalize(outcome.shown)
             shown += sum(1 for text in forbidden if _contains(shown_text, text))
+            retracted_shown += sum(1 for text in retracted if _contains(shown_text, text))
             gold = script.gold[name].value.strip()
             legitimate += bool(gold)
             if outcome.status != "pending" and "order_or_allergy_change" in outcome.reasons:
@@ -230,6 +236,7 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
                     lost_without_attempt += not (ORDER_ALLERGY_TAGS & set(script.tags))
     return {
         "shown": shown,
+        "retracted_shown": retracted_shown,
         "forbidden_said": said,
         "reported_not_carried_over": reported,
         "reported_recall": _ratio(reported, said),

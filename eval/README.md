@@ -97,8 +97,10 @@ Values copy numbers, units, dates, drug names and doses as the display text writ
 The tests check that every script parses and its `id` is its file name; tags, voices and noise types are known; spoken word counts are between 75 and 330; gold sources are word for word in the display text; values have no markup, no forbidden text and no retracted value, keep every negation their sources have, and write numbers as the display text does; forbidden text is in the display text; each retracted value is in the display text just before a correction; a mixed plan has a plan source and a directive in the same passage; `dates` and `drugs` are exactly what the text says; tags agree with the content; and the set covers at least 6 scripts each for `dates`, `vitals`, `negation`, `self-correction`, `drug-new`, `drug-uncommon` and `long`, 5 each for `order-attempt`, `allergy-change`, `mixed-plan` and `recombination`, 4 `missing-field`, 3 `injection`, every voice 3 times, and 12 scripts with noise. From the repository folder:
 
 ```
-uv run --no-project --python 3.12 --with pytest python -m pytest eval/tests
+uv run --project eval pytest eval/tests
 ```
+
+They run in the eval project with the scoring and gate tests, as CI runs them.
 
 To read a script as spoken or as written:
 

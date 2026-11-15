@@ -142,3 +142,22 @@ def test_dictated_orders_reported_as_not_carried_over(scripts):
 
     assert (order_allergy["forbidden_said"], order_allergy["reported_not_carried_over"]) == (2, 1)
     assert order_allergy["reported_recall"] == 0.5
+
+
+def test_a_retracted_value_offered_is_counted(scripts):
+    import dataclasses
+
+    retracting = {"d01": dataclasses.replace(scripts["d01"], retracted=("4 days",)), "d02": scripts["d02"]}
+    items = [item("d01", "x", history=pending("Cough for 4 days."))]
+
+    assert score(items, retracting)["order_allergy"]["retracted_shown"] == 1
+
+
+def test_fields_are_scored_per_tag(scripts):
+    items = [item("d01", "x", tags=["recombination"], history=pending("Cough for 3 days."), plan=pending("Rest.")),
+             item("d02", "x", tags=["mixed-plan"])]
+
+    by_tag = score(items, scripts)["fields"]["by_tag"]
+
+    assert by_tag["recombination"]["detection"]["recall"] == 1.0
+    assert by_tag["mixed-plan"]["detection"]["recall"] == 0.0
