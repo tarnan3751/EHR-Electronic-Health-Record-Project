@@ -627,16 +627,18 @@ _ALLERGY_CHANGES = [
     re.compile(rf"\ballerg\w*\s+list\b{_SAME_SENTENCE}{{0,30}}?\b(?:add|remove|update|change|delete)\b", re.IGNORECASE),
 ]
 # Instructions only in some places, each with the test of its place:
-# - "call in" anything ("call in an antibiotic", "call in something for her nausea"), but not calling in sick, about
-#   something, to say something or for an appointment, nor yesterday ("she will call in sick", "mom will call in about
-#   the rash"), unless a drug or a prescription comes first ("call in amoxicillin, she asked about the cost"); nor
-#   someone else calling in, in the past ("her husband did call in");
+# - "call in" anything ("call in an antibiotic", "call in something about her nausea"), but not calling in sick, about
+#   something, to say something or for an appointment, nor yesterday, said right after "call in", or after a word for
+#   when ("she will call in sick", "mom will call in tomorrow about the rash"); nor someone else calling in, in the past
+#   ("her husband did call in");
 # - "note" or "record" an allergy as an instruction: at the start of its clause, or after asking for it ("we need to
 #   record", "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy" is
 #   documentation).
 _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
-_NOT_AN_ORDER = re.compile(r"\b(?:sick|about|yesterday|to say|for an? appointment)\b", re.IGNORECASE)
-_TO_ORDER = re.compile(r"\b(?:prescriptions?|scripts?|rx|refills?|pharmacy)\b", re.IGNORECASE)
+_NOT_AN_ORDER = re.compile(
+    r"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|about|yesterday|to say|for an? appointment)\b",
+    re.IGNORECASE,
+)
 _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|had|was|were)\b", re.IGNORECASE)
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
 _NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
@@ -644,12 +646,8 @@ _ASKING = re.compile(r"\b(?:need to|make sure(?: to)?|remember to|be sure to|don
 
 
 def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
-    rest = text[match.end() : _sentence_end(text, match.end())]
-    excluded = _NOT_AN_ORDER.search(rest)
-    if excluded:
-        first = rest[: excluded.start()]
-        if not (_TO_ORDER.search(first) or any(_is_drug(token.text) for token in tokens(first))):
-            return False
+    if _NOT_AN_ORDER.match(text, match.end()):
+        return False
     before = text[clause : match.start()]
     return not (_SOMEONE_ELSE_DID.search(before) and not any(token.text in _SPEAKER for token in tokens(before)))
 

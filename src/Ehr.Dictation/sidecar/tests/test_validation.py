@@ -579,6 +579,8 @@ DIRECTIVES = [
     "Please call in an antibiotic for her sinusitis.",
     "Can you call in something for her nausea.",
     "Call in amoxicillin, she asked about the cost.",
+    "Please call in an antibiotic, she asked about the cost.",
+    "Can you call in something about her nausea.",
     "We need to record the new codeine allergy.",
     "Make sure to note her latex allergy.",
     "Don't forget to note her latex allergy.",
@@ -619,6 +621,8 @@ DOCUMENTATION = [
     "She can call in for an appointment next week.",
     "Her husband did call in to check on her.",
     "Calling in yesterday, mom said the rash was worse.",
+    "Her son will call in later to say how she is.",
+    "She may call in today for an appointment.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",
