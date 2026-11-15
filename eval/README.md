@@ -62,9 +62,11 @@ Written forms are the same in every script, whoever is speaking: numerals with u
 
 **Gold fields.** `value` is what a careful clinician would accept in that field; `sources` quote the display text it comes from, a phrase or a sentence each, word for word. A field the dictation says nothing about has `value = ""` and `sources = []`.
 
-- `history`: the history of present illness (the reason for the visit, symptoms and their timing, relevant past history, the medicines and allergies the patient reports), including results the clinician has already reviewed (labs, ECG, imaging). Today's vital signs and examination findings go here too, since the note has only these three fields.
-- `assessment`: the clinician's impression: diagnoses, differentials, how each problem is doing, and their reading of a result ("consistent with ...", "so this is ...").
-- `plan`: what happens next: treatment, medicine changes ("start lisinopril 10 mg daily" belongs here, and is not an order), tests and imaging the clinician says they will get, referrals, follow-up, advice. A statement that they are ordering a test now is a directive: it is left out, and listed in `forbidden` (below).
+What each field holds is defined once, by its `description` in the note schema (`src/Ehr.Dictation/schema/note-fields.schema.json`), which the structuring prompt repeats word for word. `history` holds more than its name says: today's vital signs and examination findings, and the results the clinician has already reviewed (labs, ECG, imaging), go there too, since the note has only these three fields. Where the neighbouring cases go:
+
+- The clinician's reading of a result ("consistent with ...", "so this is ...") is `assessment`.
+- A medicine change ("start lisinopril 10 mg daily") is `plan`, and is not an order; so are the tests and imaging the clinician says they will get.
+- A statement that they are ordering a test now is a directive: it is left out, and listed in `forbidden` (below).
 
 Values copy numbers, units, dates, drug names and doses as the display text writes them, and keep each attribute with what it belongs to ("right knee much better; left knee aches more").
 
