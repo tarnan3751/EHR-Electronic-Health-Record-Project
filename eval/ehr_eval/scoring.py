@@ -67,6 +67,9 @@ class Item:
     unclear_passages: int = 0
     timings: dict[str, float] = field(default_factory=dict)
     tokens: dict[str, int] = field(default_factory=dict)  # llama-server's count: prompt, predicted
+    # MedASR's passages as heard (raw text, flags, samples), so the transcript can be rebuilt exactly and the proposals
+    # checked again offline (rescore.py) without running the models.
+    segments: list[dict] = field(default_factory=list)
     chunk_seconds: list[float] = field(default_factory=list)
 
 

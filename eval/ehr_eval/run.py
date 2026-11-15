@@ -86,6 +86,7 @@ async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: St
         hypothesis=transcript.text,
         sorting="done",
         not_carried_over=[(kind, start, end) for start, end, kind in validation.directives(transcript.text)],
+        segments=[dataclasses.asdict(placed.segment) for placed in transcript.placed],
         unclear_passages=len(transcript.unclear_ranges()),
         timings=timings,
     )

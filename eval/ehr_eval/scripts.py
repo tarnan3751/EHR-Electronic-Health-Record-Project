@@ -20,7 +20,7 @@ from dictation_scripts import spoken_text as render_spoken  # noqa: F401
 EVAL_DIR = Path(__file__).resolve().parents[1]
 DATASET_FILES = ("dictation_scripts.py", "voices.toml", "generate_audio.py")
 MEASUREMENT_FILES = ("ehr_eval/scripts.py", "ehr_eval/normalize.py", "ehr_eval/dates.py", "ehr_eval/scoring.py",
-                     "ehr_eval/run.py", "uv.lock", "../src/Ehr.Dictation/sidecar/uv.lock")
+                     "ehr_eval/run.py", "ehr_eval/rescore.py", "uv.lock", "../src/Ehr.Dictation/sidecar/uv.lock")
 
 
 def load_all(directory: Path = SCRIPTS_DIR) -> dict[str, Script]:
