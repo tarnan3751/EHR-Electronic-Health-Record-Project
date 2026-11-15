@@ -4,11 +4,10 @@ until a clinician approves it (FR-13), with the positions in the transcript of t
 
 Grounding is strict: every word of a value must be in that value's own sources, compared after the shared reading
 (case, punctuation, numbers as digits whether written or spoken, a few unit spellings, and plural endings), except for
-a short list of connecting words (REFORMULATION). Nothing else may be added: not "twice", not
-"right" for "left", not another drug, not a heading. Nor may words be recombined: the value is cut into segments at
-punctuation (not the point in "12.5") and at "and" and "or", and each segment's words must be found in order in one of
-its sources, with at most MAX_GAP of that source's own words between any two of them (connecting words and doses don't
-count). So "right knee pain" can't come from "left knee pain, right knee normal". A source with a correction in it is
+the articles (FREE_WORDS). Nothing else may be added: not "twice", not "before" for "after", not "right" for "left", not
+"and" between two findings, not another drug, not a heading. Nor may words be recombined: the value is cut into
+segments at punctuation (not the point in "12.5"), and each segment's words must be found in order in one of its
+sources, with at most MAX_GAP of that source's own words between any two of them (articles and doses don't count). So "right knee pain" can't come from "left knee pain, right knee normal". A source with a correction in it is
 read as corrected.
 
 An instruction to order something or to change the allergy list is never carried into the note (FR-14), but the rest of
@@ -55,7 +54,7 @@ import unicodedata
 from dataclasses import dataclass, field
 
 from .prompt import FIELDS
-from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, TENS, UNITS, Token, numbers, stem, tokens
+from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, STOPWORDS, TENS, UNITS, Token, numbers, stem, tokens
 from .transcript import Transcript, utf16_offset
 
 LIMITS = {"history": 2000, "assessment": 1200, "plan": 1200}
@@ -66,7 +65,7 @@ NEGATION_SCOPE = 6  # words after a negation cue
 POST_SCOPE = 4  # words before a cue that negates what precedes it
 DIRECTIVE_REACH = 10  # words after an instruction that still belong to it
 LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and")
-MAX_GAP = 1  # a source's own words allowed between two of a value's words (connecting words and doses are free)
+MAX_GAP = 1  # a source's own words allowed between two of a value's words (articles and doses are free)
 
 REASONS = (
     "unknown_field",
@@ -87,14 +86,12 @@ REASONS = (
     "unsupported_content",
 )
 
-# The only words a value may add to its sources: articles, copulas, conjunctions, prepositions and a few framing words.
-# No negation, side, direction, quantity or time word is here, so none can be slipped in.
-REFORMULATION = frozenset(
-    """a an the is are was were be been being am has have had and or but also as of in on at to for with by from per
-    about over after before into than then this that these those which who patient patients pt reports reported
-    reporting report states stated says said presents presenting presented complains complaining notes noted describes
-    described""".split()
-)
+# The only words a value may add to its sources: the articles. Adding or leaving one out never changes what a sentence
+# says ("cough for three days", "a cough for three days"). Nothing else is free, since any other short word can: a time
+# (before, after, since, until), a place or side (left, right, over, under), a quantity (more, all, twice, half), a
+# negation, "with" or "without", or "and" and "or", which can join a finding to another's negation ("no cough and
+# fever") or turn a choice into both ("ibuprofen and acetaminophen").
+FREE_WORDS = frozenset({"a", "an", "the"})
 NUMBER_WORDS = frozenset(UNITS) | frozenset(TENS) | frozenset(ORDINAL_UNITS) | frozenset(ORDINAL_TENS) | {
     "hundred", "thousand"}
 UNIT_SPELLINGS = {
@@ -436,7 +433,7 @@ def _without_instructions(value: str) -> tuple[str, int]:
             continue
         cut += len(found)
         head = TRAILING_CONNECTOR.sub("", sentence[: found[0][0]])
-        if any(token.text not in LEAD_IN and token.text not in REFORMULATION for token in tokens(head)):
+        if any(token.text not in LEAD_IN and token.text not in STOPWORDS for token in tokens(head)):
             kept.append(head + ".")
     return " ".join(kept).strip(), cut
 
@@ -496,20 +493,19 @@ def _word_key(word: str) -> str:
 
 
 def _ungrounded(value: str, sources: str) -> bool:
-    """Whether the value has a word its sources don't: numbers are left to the number check, and the reformulation
-    words are allowed."""
+    """Whether the value has a word its sources don't: numbers are left to the number check, and the articles are
+    allowed."""
     available = {_word_key(token.text) for token in tokens(sources)}
     for token in tokens(value):
         word = token.text
-        if word[0].isdigit() or word in NUMBER_WORDS or word in REFORMULATION:
+        if word[0].isdigit() or word in NUMBER_WORDS or word in FREE_WORDS:
             continue
         if _word_key(word) not in available:
             return True
     return False
 
 
-SEGMENT_BREAK = re.compile(r"(?:[;:!?()\n]|[.,](?!\d)|(?<!\d)[.,])+|\b(?:and|or)\b", re.IGNORECASE)
-CONNECTING = frozenset(_word_key(word) for word in REFORMULATION)
+SEGMENT_BREAK = re.compile(r"(?:[;:!?()\n]|[.,](?!\d)|(?<!\d)[.,])+")
 
 
 def _sequence(text: str) -> list[str]:
@@ -541,7 +537,7 @@ def _recombined(value: str, quotes: list[str]) -> bool:
     with a correction in it is read as corrected: without the cue, and without what the correction replaced."""
     sources = [_corrected_sequence(quote) for quote in quotes]
     for segment in SEGMENT_BREAK.split(value):
-        wanted = [word for word in _sequence(segment) if word not in CONNECTING]
+        wanted = [word for word in _sequence(segment) if word not in FREE_WORDS]
         if wanted and not any(_in_order(wanted, source) for source in sources):
             return True
     return False
@@ -561,13 +557,13 @@ def _corrected_sequence(quote: str) -> list[str]:
     return [word for word in _sequence(before) if word not in replaced] + _sequence(after)
 
 
-# Skipped freely between a value's words, like connecting words: a value may leave out a dose ("takes lisinopril
-# daily" from "takes lisinopril 10 mg daily"), though never a word that changes what it says.
+# Skipped freely between a value's words, like the articles: a value may leave out a dose ("takes lisinopril daily"
+# from "takes lisinopril 10 mg daily").
 DOSE_WORDS = frozenset({"mg", "mcg", "ml", "kg", "g", "unit", "percent"})
 
 
 def _skippable(word: str) -> bool:
-    return word in CONNECTING or word in DOSE_WORDS or word[:1].isdigit()
+    return word in FREE_WORDS or word in DOSE_WORDS or word[:1].isdigit()
 
 
 def _in_order(wanted: list[str], source: list[str]) -> bool:
@@ -641,4 +637,4 @@ def _negation_dropped(value: str, quotes: list[str]) -> bool:
 
 
 def _is_content(word: str) -> bool:
-    return word.isalpha() and len(word) >= 3 and word not in REFORMULATION
+    return word.isalpha() and len(word) >= 3 and word not in STOPWORDS

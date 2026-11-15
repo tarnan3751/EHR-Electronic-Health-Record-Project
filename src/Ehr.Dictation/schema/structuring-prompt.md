@@ -16,7 +16,7 @@ The fields:
 
 Rules:
 1. Use only what the clinician said. Never add a fact, number, date, dose, drug name or diagnosis that is not in the transcript, and never guess what an [unclear] passage said.
-2. Build each value from the clinician's own words, in the order they said them. You may leave words out, and add only small connecting words (a, an, the, and, or, of, with, to, in, on, for, is, was). Every other word must come from that value's sources: copy every number, unit, date, drug name, dose and abbreviation exactly as transcribed, don't spell out abbreviations, and don't rephrase, summarize or add headings.
+2. Build each value from the clinician's own words, in the order they said them. You may leave words out, and add only "a", "an" or "the". Every other word must come from that value's sources: copy every number, unit, date, drug name, dose and abbreviation exactly as transcribed, don't spell out abbreviations, and don't rephrase, summarize or add headings.
 3. Keep negations as dictated: "denies chest pain" stays "denies chest pain".
 4. When the clinician corrects themselves ("no, I mean", "sorry", "correction", "scratch that"), use only the corrected version.
 5. Leave out any instruction to place an order, send or refill a prescription, or add, remove or change an allergy on the patient's record, such as "go ahead and order a chest X-ray" or "add penicillin to her allergy list". The clinician does those in the chart; they are not part of the note.

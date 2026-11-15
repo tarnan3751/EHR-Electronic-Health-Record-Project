@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from ehr_dictation.transcript import Segment, assemble
-from ehr_dictation.validation import REASONS, check, directive_spans, directives, not_carried_over
+from ehr_dictation.validation import FREE_WORDS, REASONS, check, directive_spans, directives, not_carried_over
 
 DICTATION = (
     "Fifty-eight-year-old man here for blood pressure follow up. He takes lisinopril 10 mg daily. "
@@ -118,7 +118,7 @@ def test_a_passage_said_twice_is_highlighted_where_each_source_was_said():
 def test_a_source_the_clinician_corrected_fails_and_the_correction_passes():
     assert "source_superseded" in field("Blood pressure 150/90.", "Blood pressure today 150 over 90").reasons
     assert field("140/90.", "140 over 90").pending
-    assert field("Blood pressure 140/90.", "Blood pressure today 150 over 90, sorry, 140 over 90").pending
+    assert field("Blood pressure today 140 over 90.", "Blood pressure today 150 over 90, sorry, 140 over 90").pending
     assert "source_superseded" in field(
         "Blood pressure 150/90.", "Blood pressure today 150 over 90, sorry, 140 over 90").reasons
 
@@ -195,9 +195,47 @@ def test_an_instruction_reaches_past_a_decimal_point():
     assert [text.text[r["start"] : r["end"]] for r in not_carried_over(text)] == ["Prescribe semaglutide 0.25 mg weekly"]
 
 
-def test_connecting_and_framing_words_may_be_added_but_nothing_else():
-    assert own("He takes lisinopril 10 mg daily.", "Patient reports he takes lisinopril daily.").pending
+def test_only_an_article_may_be_added():
+    assert own("Cough for three days.", "A cough for the three days.").pending
     assert "unsupported_content" in own("Cough for three days.", "She has a cough for three days.").reasons
+    assert "unsupported_content" in own("He takes lisinopril 10 mg daily.",
+                                        "Patient reports he takes lisinopril daily.").reasons
+
+
+# Words that can change what a value says, by class; none may be free (the owner's list).
+CAN_CHANGE_MEANING = {
+    "time": "before after until since during then later earlier prior",
+    "place or side": "left right up down over under above below bilateral",
+    "quantity": "more less all some few each both twice half once most",
+    "negation": "no not without never none nor",
+    "with": "with",
+    "joining": "and or but",
+}
+
+
+@pytest.mark.parametrize("kind", CAN_CHANGE_MEANING)
+def test_no_word_that_can_change_meaning_is_free(kind):
+    assert not FREE_WORDS & set(CAN_CHANGE_MEANING[kind].split())
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("Take with food after meals.", "Take with food before meals."),
+    ("Keep systolic under 160.", "Keep systolic over 160."),
+    ("Knee pain for two weeks.", "Left knee pain for two weeks."),
+    ("Cough for three days.", "Cough for more than three days."),
+    ("Cough with fever.", "Cough without fever."),
+    ("No cough. Fever since Monday.", "No cough and fever since Monday."),
+    ("Ibuprofen or acetaminophen for pain.", "Ibuprofen and acetaminophen for pain."),
+])
+def test_a_word_that_changes_meaning_can_not_be_added(said, value):
+    assert "unsupported_content" in own(said, value).reasons
+
+
+def test_and_or_or_must_be_where_the_clinician_said_it():
+    said = "Ibuprofen or acetaminophen for fever and pain."
+
+    assert own(said, "Ibuprofen or acetaminophen for fever and pain.").pending
+    assert own(said, "Ibuprofen and acetaminophen for fever or pain.").reasons == ["words_out_of_order"]
 
 
 def test_the_owners_recombination_example():
@@ -208,12 +246,13 @@ def test_words_may_skip_one_of_the_sources_words_but_not_two():
     assert own("Denies any chest pain.", "Denies chest pain.").pending
     assert own("Right knee normal, pain.", "Right pain.").reasons == ["words_out_of_order"]
     assert own("Right knee normal pain.", "Right normal pain.").pending
+    assert own("Swelling of the right ankle.", "Swelling right ankle.").pending  # an article never counts
 
 
 def test_a_value_drawing_on_two_sources_takes_each_part_from_one():
     text = transcript("Cough for three days. Fever since Monday.")
 
-    assert field("Cough for three days and fever since Monday.", "Cough for three days", "Fever since Monday",
+    assert field("Cough for three days. Fever since Monday.", "Cough for three days", "Fever since Monday",
                  text=text).pending
     assert "words_out_of_order" in field("Cough since Monday.", "Cough for three days", "Fever since Monday",
                                          text=text).reasons
@@ -264,7 +303,7 @@ def test_may_for_june_is_a_date_not_in_the_sources_too():
 
 
 def test_an_ascii_letter_the_transcript_happens_not_to_use_is_fine():
-    assert own("Cough, fever.", "Cough with fever.").pending
+    assert own("Cough, fever.", "A cough, fever.").pending
 
 
 def test_look_alike_and_invisible_characters_are_bad_format():
