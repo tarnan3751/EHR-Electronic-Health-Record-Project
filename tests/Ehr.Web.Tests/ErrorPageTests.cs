@@ -1,0 +1,199 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using Ehr.Data.Accounts;
+using Ehr.Data.Audit;
+using Ehr.Web.Api.Audit;
+using Npgsql;
+using Xunit;
+using static Ehr.Web.Tests.Browser;
+
+namespace Ehr.Web.Tests;
+
+// When a page fails (ErrorPages): the search and the chart say so in fixed words with a way back, and nothing about the
+// failure or the patient; the APIs and htmx requests keep their bare statuses; in Development the developer exception
+// page stays. A database error is made by revoking a privilege from the app's role. Only this class's own database sees
+// that: a class fixture is the class's alone, xunit runs a class's tests one at a time, and each test grants the
+// privilege back before it ends.
+public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
+{
+    static CancellationToken Cancel => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task A_database_error_says_the_search_could_not_be_completed()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Unlucky", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPremProduction, clinician);
+
+        await RevokedAsync("patients", async () =>
+        {
+            using var response = await session.Client.GetAsync("/patients?name=Ada&birthdate=1980-01-01", Cancel);
+
+            var html = await response.Content.ReadAsStringAsync(Cancel);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+            Assert.Contains("The search couldn't be completed. Try again in a moment.", html);
+            Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+            AssertNothingAbout(html, "Ada", "1980-01-01");
+        });
+    }
+
+    [Fact]
+    public async Task A_database_error_says_the_chart_could_not_be_loaded_and_records_no_read()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Unlucky", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Ada", "Failing");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPremProduction, clinician);
+        // Signing in lands on the panel, which lists the patient: one read already.
+        var before = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
+
+        await RevokedAsync("encounters", async () =>
+        {
+            using var response = await session.Client.GetAsync($"/patients/{patient}?name=Failing", Cancel);
+
+            var html = await response.Content.ReadAsStringAsync(Cancel);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+            Assert.Contains("The chart couldn't be loaded. Try again in a moment.", html);
+            Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+            AssertNothingAbout(html, "Failing", patient.ToString());
+        });
+
+        // The read failed with the rest of the page's transaction.
+        Assert.Equal(before, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+    }
+
+    // A change that fails may still have been saved, such as when the transaction commits and what follows fails, so
+    // the page says it may not have been.
+    [Fact]
+    public async Task A_change_that_fails_says_it_may_not_have_been_saved()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Unsaved", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Ada", "Unsaved");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPremProduction, clinician);
+
+        await RevokedAsync("UPDATE", "patient_assignments", async () =>
+        {
+            using var response = await PostFormAsync(session.Client, $"/patients/{patient}?handler=Unassign", $"/patients/{patient}");
+
+            var html = await response.Content.ReadAsStringAsync(Cancel);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+            Assert.Contains("Something went wrong, and your change may not have been saved. Check before you try again.", html);
+            Assert.DoesNotContain("loaded", html);
+            Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+            AssertNothingAbout(html, "Unsaved", patient.ToString());
+        });
+    }
+
+    // A chart that doesn't exist asks for a reason first, like any chart off the panel, and then says it couldn't be
+    // loaded. In Development too: only failures keep the developer exception page.
+    [Fact]
+    public async Task A_chart_that_does_not_exist_says_it_could_not_be_loaded()
+    {
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+        var nobody = Guid.CreateVersion7();
+
+        using var response = await PostFormAsync(session.Client, $"/patients/{nobody}/reason", $"/patients/{nobody}", ("Reason", "Covering the night shift"));
+
+        var html = await response.Content.ReadAsStringAsync(Cancel);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("The chart couldn't be loaded: there is no patient with this ID.", html);
+        Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+    }
+
+    [Fact]
+    public async Task In_development_a_failing_page_still_shows_the_developer_exception_page()
+    {
+        var session = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Dr. Developer", StaffRoles.Clinician));
+
+        await RevokedAsync("patients", async () =>
+        {
+            using var response = await session.Client.GetAsync("/patients?name=Ada", Cancel);
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+            Assert.DoesNotContain("The search couldn't be completed", await response.Content.ReadAsStringAsync(Cancel));
+        });
+    }
+
+    // request-errors.js reads only the status, and says the results couldn't be loaded. A failure nothing handles is the
+    // server's to answer with a bare 500, as before; the in-memory server hands the exception to the caller instead.
+    [Fact]
+    public async Task A_failing_htmx_request_is_left_bare()
+    {
+        var session = await SignInAsync(apps.OnPremProduction, await apps.CreateStaffAsync("Dr. Typist", StaffRoles.Clinician));
+
+        await RevokedAsync("patients", async () =>
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/patients?handler=Results&name=Ada");
+            request.Headers.Add("HX-Request", "true");
+
+            await Assert.ThrowsAsync<PostgresException>(() => session.Client.SendAsync(request, Cancel));
+        });
+    }
+
+    // What the desktop app and the cloud app's audit shipper read stays as it was: refusals keep their bare statuses and
+    // empty bodies, and a failure inside an API is left to the server, as before.
+    [Fact]
+    public async Task Api_refusals_and_failures_are_left_bare()
+    {
+        using var client = CreateClient(apps.OnPremProduction, handleCookies: false);
+
+        using var anonymous = await client.GetAsync("/api/sync/quick-texts?since=0", Cancel);
+        using var nowhere = await client.GetAsync("/api/nothing-here", Cancel);
+        using var noKey = await client.PostAsync(CloudAuditApi.Path, new StringContent("[]", Encoding.UTF8, "application/json"), Cancel);
+
+        // Nothing anonymous gets past the fallback policy, a path that leads nowhere included: under /api, that is the
+        // desktop token's bare 401.
+        Assert.All([anonymous, nowhere, noKey], response => Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode));
+        foreach (var response in new[] { anonymous, nowhere, noKey })
+        {
+            Assert.Equal("", await response.Content.ReadAsStringAsync(Cancel));
+        }
+
+        var token = await apps.DesktopSignInAsync(apps.OnPremProduction, await apps.CreateStaffAsync("Dr. Desktop", StaffRoles.Clinician));
+        await RevokedAsync("quick_texts", async () =>
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/sync/quick-texts?since=0");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            await Assert.ThrowsAsync<PostgresException>(() => client.SendAsync(request, Cancel));
+        });
+    }
+
+    // The page says nothing of the database, the exception, or what was asked for.
+    static void AssertNothingAbout(string html, params string[] asked)
+    {
+        foreach (var detail in new[] { "Exception", "Npgsql", "Postgres", "permission denied", "SELECT " })
+        {
+            Assert.DoesNotContain(detail, html, StringComparison.OrdinalIgnoreCase);
+        }
+
+        foreach (var detail in asked)
+        {
+            Assert.DoesNotContain(detail, html);
+        }
+    }
+
+    // Runs the action with SELECT on the table revoked from the on-prem app's role, and grants it back after.
+    Task RevokedAsync(string table, Func<Task> action) => RevokedAsync("SELECT", table, action);
+
+    async Task RevokedAsync(string privilege, string table, Func<Task> action)
+    {
+        await ExecuteAsync($"REVOKE {privilege} ON ehr.{table} FROM ehr_app");
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            await ExecuteAsync($"GRANT {privilege} ON ehr.{table} TO ehr_app");
+        }
+    }
+
+    async Task ExecuteAsync(string sql)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(Cancel);
+    }
+}

@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Xunit;
 
@@ -43,6 +44,10 @@ public sealed class WebApps : IAsyncLifetime
     public MigratedDatabase Database { get; } = new();
 
     public WebApplicationFactory<Program> OnPrem { get; private set; } = null!;
+
+    // The on-prem app as it runs outside Development, where a failing page gets the error pages (ErrorPages) rather
+    // than the developer exception page. Like the others, it starts when a test first uses it.
+    public WebApplicationFactory<Program> OnPremProduction { get; private set; } = null!;
 
     public WebApplicationFactory<Program> Cloud { get; private set; } = null!;
 
@@ -96,6 +101,7 @@ public sealed class WebApps : IAsyncLifetime
 
         await Database.InitializeAsync();
         OnPrem = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, this, bootstrapAdmin: true);
+        OnPremProduction = new App(Site.OnPrem, Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), Emails, this, environment: Environments.Production);
 
         // Starting the on-prem app first also creates the Data Protection key, which the cloud app can't create.
         var link = new RecordingLink(OnPrem.Server.CreateHandler(), Forwarded);
@@ -122,6 +128,11 @@ public sealed class WebApps : IAsyncLifetime
         if (Cloud is not null)
         {
             await Cloud.DisposeAsync();
+        }
+
+        if (OnPremProduction is not null)
+        {
+            await OnPremProduction.DisposeAsync();
         }
 
         if (OnPrem is not null)
@@ -378,11 +389,19 @@ public sealed class WebApps : IAsyncLifetime
         return connection;
     }
 
-    sealed class App(Site site, string connectionString, RecordingEmailSender emails, WebApps apps, OnPremApp? onPrem = null, bool bootstrapAdmin = false)
+    sealed class App(
+        Site site, string connectionString, RecordingEmailSender emails, WebApps apps, OnPremApp? onPrem = null, bool bootstrapAdmin = false,
+        string? environment = null)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            // Development otherwise, as WebApplicationFactory runs it.
+            if (environment is not null)
+            {
+                builder.UseEnvironment(environment);
+            }
+
             builder
                 .UseSetting("Ehr:Site", site.ToString())
                 .UseSetting("ConnectionStrings:Ehr", connectionString)

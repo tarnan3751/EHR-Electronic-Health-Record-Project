@@ -114,6 +114,8 @@ if (site == Site.Cloud)
     app.UseMiddleware<CloudForwardingMiddleware>();
 }
 
+// A page that fails says so, after forwarding, so forwarded responses pass by untouched (ErrorPages).
+app.UseErrorPages();
 app.UseAuthentication();
 app.UseMiddleware<UserContextMiddleware>();
 app.UseAuthorization();
