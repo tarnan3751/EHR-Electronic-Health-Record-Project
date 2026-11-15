@@ -96,7 +96,7 @@ class FakeLlama:
 
     def __init__(self, content: str | None = None, *, model_path: str = f"/models/{MODEL_FILE}", status: int = 200,
                  delay: float = 0.0, props_delay: float = 0.0, finish_reason: str = "stop", unreachable: bool = False,
-                 n_ctx: int = 4096) -> None:
+                 n_ctx: int | None = 4096) -> None:
         self.content = content if content is not None else answer()
         self.model_path = model_path
         self.status = status
@@ -116,8 +116,9 @@ class FakeLlama:
             raise httpx2.ConnectError("Connection refused", request=request)
         if request.url.path == "/props":
             await asyncio.sleep(self.props_delay)
+            settings = {"n_ctx": self.n_ctx} if self.n_ctx is not None else {}
             return httpx2.Response(200, json={"model_path": self.model_path, "build_info": "b11669-620d2225",
-                                              "default_generation_settings": {"n_ctx": self.n_ctx}})
+                                              "default_generation_settings": settings})
         if request.url.path == "/tokenize":
             # One token a word: near enough for the context check.
             return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})

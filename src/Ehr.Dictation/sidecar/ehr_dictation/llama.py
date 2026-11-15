@@ -7,10 +7,11 @@ model's reasoning comes back separately and is dropped unread. Nothing in a requ
 is checked before every request, not just the first, so a llama-server restarted with another file is noticed.
 
 A request that wouldn't fit the context llama-server gives each request (its n_ctx per slot, from /props), the prompt
-counted by llama-server's own tokenizer plus the most the answer may take, is never sent: it would only be cut off.
+counted by llama-server's own tokenizer plus the most the answer may take, is never sent: it would only be cut off. Nor
+is any request while llama-server doesn't say what that context is.
 
 When the model can't answer, the session keeps its transcript and says the fields couldn't be sorted (UC 10): the
-reason is model_unavailable (no connection, an error, a refused key, the wrong model), model_timeout,
+reason is model_unavailable (no connection, an error, a refused key, the wrong model, no context size), model_timeout,
 model_output_invalid (an answer that isn't the schema's JSON, or one cut off at the token limit), or
 transcript_too_long (it wouldn't fit the context).
 """
@@ -142,7 +143,7 @@ class Structurer:
 
     async def _check_fits(self, request: dict) -> None:
         if self.context is None:
-            return
+            raise ModelUnavailable("llama-server didn't say how much context a request has.")
         prompt = sum([await self._llama.tokens(message["content"]) for message in request["messages"]])
         if prompt + TEMPLATE_TOKENS + int(request.get("max_tokens", 0)) > self.context:
             raise TranscriptTooLong(f"{prompt} prompt tokens don't leave room for the answer in {self.context}.")

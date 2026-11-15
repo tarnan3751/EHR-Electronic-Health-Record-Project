@@ -79,7 +79,10 @@ class ScriptedRecognizer:
 def fake_structurer(content: dict) -> Structurer:
     async def handle(request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/props":
-            return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test"})
+            return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
+                                              "default_generation_settings": {"n_ctx": 4096}})
+        if request.url.path == "/tokenize":
+            return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
         return httpx2.Response(200, json={"choices": [{"finish_reason": "stop",
                                                        "message": {"content": json.dumps(content)}}]})
 

@@ -95,6 +95,15 @@ def test_a_transcript_that_would_not_fit_the_context_is_never_sent():
     assert "/v1/chat/completions" not in [r.url.path for r in llama.requests]
 
 
+def test_nothing_is_sent_while_llama_server_does_not_say_its_context():
+    llama = FakeLlama(answer(("Cough.", ["cough"])), n_ctx=None)
+
+    with pytest.raises(ModelUnavailable):
+        asyncio.run(llama.structurer().propose("Cough for three days."))
+
+    assert "/v1/chat/completions" not in [r.url.path for r in llama.requests]
+
+
 def test_the_model_file_is_checked_before_every_request():
     llama = FakeLlama(answer(("Cough.", ["cough"])))
     structurer = llama.structurer()
