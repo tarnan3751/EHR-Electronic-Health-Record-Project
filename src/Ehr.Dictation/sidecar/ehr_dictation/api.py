@@ -21,8 +21,10 @@ and the transcript stays as plain text; or transcription_failed, and it stays as
 notCarriedOver lists each instruction in the transcript to order something or change the allergy list, which no field
 carries: [{reason: "order" or "allergy_change", start, end}], the span of the clinician's own words in the transcript,
 never anything the model wrote. provenance is {speech, language, llamaServer, prompt, schema, structuring, code};
-language and llamaServer are null while unknown. Each field is {status: "pending", value, sources: [{start,
-end}]} or {status: "empty", reasons: [...]}: a value that failed a check is never sent, only why (validation.py).
+language and llamaServer are null while unknown. Each field is {status: "pending", value, sources: [{start, end}],
+warnings: [{code: "possible_correction", start, end}]} or {status: "empty", reasons: [...]}: a value that failed a
+check is never sent, only why, and a warning points at a later number, date or drug in the transcript that may be a
+correction the checks didn't hear (validation.py).
 
 The limits on all of it (sizes, sessions at once, how long things are kept and waited for) are in settings.py.
 

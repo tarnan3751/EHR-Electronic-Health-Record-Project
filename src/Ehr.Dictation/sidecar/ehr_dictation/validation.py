@@ -57,6 +57,12 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
+A value that passes can still carry a warning, possible_correction, for each place where a correction may have been
+said that the checks didn't hear, such as a cue speech recognition got wrong ("10 mg no weight 20 mg"): the value uses
+a number, date or drug name from its sources, and the transcript says another of the same kind, in another expression,
+within WARNING_REACH words after it, past the end of the source if need be. The warning carries only that later item's
+place in the transcript, so the review screen can point at it; the value stays pending.
+
 The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of this
 package's code, so a change to any rule asks for a new run.
 """
@@ -79,6 +85,7 @@ LIMITS = {"history": 3000, "assessment": 2000, "plan": 2000}
 MAX_SOURCES = 30
 MAX_QUOTE = 600
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
+WARNING_REACH = 8  # words after a value's number, date or drug in which another of its kind may be a correction
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
 DIRECTIVE_REACH = 14  # at most, words after an instruction that still belong to it, when nothing ends its clause sooner
@@ -136,6 +143,8 @@ class Checked:
     quotes: list[str]
     reasons: list[str]
     spans: list[tuple[int, int]] = field(default_factory=list)  # code points in the transcript, for pending values
+    # Possible corrections (see the module's header): where the later number, date or drug is, for pending values.
+    warnings: list[tuple[int, int]] = field(default_factory=list)
 
     @property
     def pending(self) -> bool:
@@ -150,6 +159,11 @@ class Checked:
             "sources": [
                 {"start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end)}
                 for start, end in self.spans
+            ],
+            "warnings": [
+                {"code": POSSIBLE_CORRECTION, "start": utf16_offset(transcript.text, start),
+                 "end": utf16_offset(transcript.text, end)}
+                for start, end in self.warnings
             ],
         }
 
@@ -190,6 +204,7 @@ class _Transcript:
     taken_back: set[int]
     superseded: set[_Term]
     qualified: dict[str, set[int]]  # by reason code: the words each kind of qualifier reaches
+    expressions: dict[_Term, int]  # which expression each term belongs to
 
 
 def not_carried_over(transcript: Transcript) -> list[dict]:
@@ -216,6 +231,7 @@ def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript) -
         taken_back=taken_back,
         superseded=superseded,
         qualified=_qualifiers(transcript.text, words),
+        expressions=_expressions(terms, words),
     )
     checked = {name: _check_field(name, fields[name]["value"], fields[name]["sources"], context) for name in FIELDS}
     return Checks(checked, list(unknown))
@@ -286,7 +302,9 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         reasons.add("words_out_of_order")
 
     ordered = [reason for reason in REASONS if reason in reasons]
-    return Checked(name, value, quotes, ordered, spans if not ordered else [])
+    if ordered:
+        return Checked(name, value, quotes, ordered)
+    return Checked(name, value, quotes, ordered, spans, _possible_corrections(value, spans, transcript))
 
 
 # ---- Quotes --------------------------------------------------------------------------------------------------------
@@ -345,6 +363,8 @@ CORRECTION = re.compile(
     re.IGNORECASE,
 )
 KINDS = ("number", "date", "drug", "side")
+WARNED_KINDS = ("number", "date", "drug")
+POSSIBLE_CORRECTION = "possible_correction"
 SIDES = frozenset({"left", "right"})
 # What can sit inside one expression of a kind: "150 over 90", "10 mg", "the 20".
 RUN_GLUE = FREE_WORDS | DOSE_WORDS | {"over"}
@@ -429,6 +449,37 @@ def _corrections(text: str, words: list[Token], terms: list[_Term]) -> tuple[set
             superseded.update(replaced)
             cues.update(inside)
     return cues, taken_back, superseded
+
+
+def _expressions(terms: list[_Term], words: list[Token]) -> dict[_Term, int]:
+    """Numbers a run of glue joins ("150 over 90", "10 mg") are one expression, one measured thing; every other term is
+    its own."""
+    found: dict[_Term, int] = {}
+    previous: dict[str, _Term] = {}
+    for term in terms:
+        last = previous.get(term.kind)
+        joined = last is not None and all(_word_key(words[i].text) in RUN_GLUE for i in range(last.last + 1, term.first))
+        found[term] = found[last] if joined else len(found)
+        previous[term.kind] = term
+    return found
+
+
+def _possible_corrections(value: str, spans: list[tuple[int, int]], transcript: _Transcript) -> list[tuple[int, int]]:
+    """Where a correction the checks didn't hear may be (see the module's header): each number, date or drug name, in
+    another expression, that the transcript says within WARNING_REACH words after one the value uses from its sources."""
+    used = {term for term in _value_terms(value) if term[0] in WARNED_KINDS}
+    words = transcript.words
+    found: set[tuple[int, int]] = set()
+    for term in transcript.terms:
+        if (term.kind, term.text) not in used or not any(_holds(span, term, words) for span in spans):
+            continue
+        for later in transcript.terms:
+            if (
+                later.kind == term.kind and later.text != term.text and term.last < later.first <= term.last + WARNING_REACH
+                and transcript.expressions[later] != transcript.expressions[term]
+            ):
+                found.add((words[later.first].start, words[later.last].end))
+    return sorted(found)
 
 
 def _holds(span: tuple[int, int], term: _Term, words: list[Token]) -> bool:

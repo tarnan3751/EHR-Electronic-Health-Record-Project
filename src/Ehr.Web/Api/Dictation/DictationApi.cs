@@ -45,8 +45,10 @@ namespace Ehr.Web.Api.Dictation;
 //
 // The result: {transcript, sorting, reason?, message?, fields, notCarriedOver, provenance}, with sorting "pending",
 // "done" or "unavailable". fields is null, or {history, assessment, plan}, each either {status: "pending", value, sources:
-// [{start, end}]}, a proposal for the clinician to approve, or {status: "empty", reasons: [code, ...]}: nothing
-// dictated, or discarded by validation, with the reasons' codes and never the discarded text. When sorting is
+// [{start, end}], warnings: [{code: "possible_correction", start, end}]}, a proposal for the clinician to approve, or
+// {status: "empty", reasons: [code, ...]}: nothing dictated, or discarded by validation, with the reasons' codes and
+// never the discarded text. A warning points at a later number, date or drug in the transcript that may be a correction
+// the checks didn't hear; the review screen shows it beside the field. When sorting is
 // "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid",
 // "transcript_too_long" or "transcription_failed" (the transcript is then as it was live, not final), fields is null
 // or all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is

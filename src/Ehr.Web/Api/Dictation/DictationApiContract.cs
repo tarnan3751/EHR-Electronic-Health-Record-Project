@@ -110,13 +110,27 @@ public sealed record NoteFields(NoteField History, NoteField Assessment, NoteFie
 [JsonDerivedType(typeof(EmptyField), "empty")]
 public abstract record NoteField;
 
-// The model's proposal, with the parts of the transcript it came from (offsets as in TranscriptSegment).
-public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Sources) : NoteField;
+// The model's proposal, with the parts of the transcript it came from (offsets as in TranscriptSegment), and where the
+// clinician may have corrected what it says.
+public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Sources, IReadOnlyList<FieldWarning> Warnings) : NoteField;
 
 // Nothing dictated, or what was proposed failed validation: the reasons' codes, never the text.
 public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField;
 
 public sealed record SourceSpan(int Start, int End);
+
+// A place in the transcript (offsets as in TranscriptSegment) the review screen must point to beside the field: the
+// value is still a proposal, but the clinician may have corrected it there in words speech recognition got wrong
+// ("no weight" for "no wait"). A code and a place, never text from the model.
+public sealed record FieldWarning(WarningCode Code, int Start, int End);
+
+[JsonConverter(typeof(JsonStringEnumConverter<WarningCode>))]
+public enum WarningCode
+{
+    // The transcript says another number, date or drug name, of the same kind, just after one the value uses.
+    [JsonStringEnumMemberName("possible_correction")]
+    PossibleCorrection,
+}
 
 // What produced the transcript and the fields, for the note to store with them. Language is null when the service's
 // models folder records no K2 Horizon file, and LlamaServer until the service has reached llama-server, which is

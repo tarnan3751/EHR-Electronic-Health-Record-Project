@@ -67,6 +67,13 @@ class FailingAtTheEnd(FakeRecognizer):
         return super().recognize(samples)
 
 
+class Misheard(FakeRecognizer):
+    """Hears a correction whose cue speech recognition got wrong ("no weight" for "no wait")."""
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        return Recognition("Lisinopril 10 mg no weight 20 mg daily {period}", 0.9)
+
+
 class Instructing(FakeRecognizer):
     """Hears a plan with an order and an allergy change in it, in every passage."""
 
@@ -131,6 +138,14 @@ def answers(settings: Settings) -> dict[str, dict]:
     with client(settings, FakeLlama(planned), Instructing()) as http:
         session = stopped(http)
         keep("result-200-done-not_carried_over", "result",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+
+    # A value whose transcript says another dose just after the one it uses: pending, with a possible_correction
+    # warning that points at the later dose.
+    flagged = answer(plan=("Lisinopril 10 mg.", ["Lisinopril 10 mg"]))
+    with client(settings, FakeLlama(flagged), Misheard()) as http:
+        session = stopped(http)
+        keep("result-200-done-possible_correction", "result",
              http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
 
     unavailable: dict[str, Callable[[], FakeLlama]] = {
@@ -219,5 +234,7 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     assert {f["status"] for f in fields.values()} == {"pending", "empty"}
     assert bodies["stop-200-pending"]["sorting"] == "pending" and bodies["stop-200-pending"]["provenance"]["llamaServer"] is None
     assert bodies["audio-409-out_of_order"]["expectedSeq"] == 1
+    warned = bodies["result-200-done-possible_correction"]["fields"]["plan"]
+    assert warned["status"] == "pending" and [w["code"] for w in warned["warnings"]] == ["possible_correction"]
     failed = bodies["result-200-unavailable-transcription_failed"]
     assert failed["transcript"]["text"] and not failed["transcript"]["final"]

@@ -62,9 +62,11 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         var history = Assert.IsType<PendingField>(result.Fields!.History);
         Assert.Equal("Cough for three days.", history.Value);
         Assert.Equal([new SourceSpan(0, 21)], history.Sources);
+        Assert.Empty(history.Warnings);
         var assessment = Assert.IsType<PendingField>(result.Fields.Assessment);
         Assert.Equal("No fever.", assessment.Value);
         Assert.Equal([new SourceSpan(22, 31)], assessment.Sources);
+        Assert.Equal([new FieldWarning(WarningCode.PossibleCorrection, 0, 5)], assessment.Warnings);
         Assert.Equal(["not_dictated"], Assert.IsType<EmptyField>(result.Fields.Plan).Reasons);
         Assert.Equal("google/medasr", result.Provenance.Speech.Repository);
         Assert.Equal("K2-Horizon-7B-Q4_K_M.gguf", result.Provenance.Language?.File);
@@ -334,7 +336,8 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["final", "segments", "text"], Names(json["transcript"]!));
         Assert.Equal(["end", "endMs", "final", "start", "startMs", "unclear"], Names(json["transcript"]!["segments"]![0]!));
         Assert.Equal("too_noisy", (string?)json["transcript"]!["segments"]![2]!["unclear"]);
-        Assert.Equal(["sources", "status", "value"], Names(json["fields"]!["history"]!));
+        Assert.Equal(["sources", "status", "value", "warnings"], Names(json["fields"]!["history"]!));
+        Assert.Equal(["code", "end", "start"], Names(json["fields"]!["history"]!["warnings"]![0]!));
         Assert.Equal(["reasons", "status"], Names(json["fields"]!["plan"]!));
         Assert.Equal("not_in_transcript", (string?)json["fields"]!["plan"]!["reasons"]![0]);
     }

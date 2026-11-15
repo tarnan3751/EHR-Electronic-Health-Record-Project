@@ -87,6 +87,14 @@ def test_an_instruction_reaches_at_most_14_words_when_nothing_ends_its_clause():
     assert text.text[instruction["start"] : instruction["end"]].split() == ["order"] + words.split()[:14]
 
 
+def test_a_possible_correction_is_flagged_within_8_words():
+    eight = "Heart rate 124 then a b c d e f 118."
+    nine = "Heart rate 124 then a b c d e f g 118."
+
+    assert field("Heart rate 124.", "Heart rate 124", text=transcript(eight)).warnings != []
+    assert field("Heart rate 124.", "Heart rate 124", text=transcript(nine)).warnings == []
+
+
 def test_field_and_source_limits():
     words = "cough " * 599
     text = transcript(words)

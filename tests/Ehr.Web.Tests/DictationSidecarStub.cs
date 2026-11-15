@@ -185,8 +185,14 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 sorting = "done",
                 fields = (object?)new
                 {
-                    history = new { status = "pending", value = Sentences[0], sources = new[] { new { start = 0, end = 21 } } },
-                    assessment = new { status = "pending", value = Sentences[1], sources = new[] { new { start = 22, end = 31 } } },
+                    history = new { status = "pending", value = Sentences[0], sources = new[] { new { start = 0, end = 21 } }, warnings = Array.Empty<object>() },
+                    assessment = new
+                    {
+                        status = "pending",
+                        value = Sentences[1],
+                        sources = new[] { new { start = 22, end = 31 } },
+                        warnings = new[] { new { code = "possible_correction", start = 0, end = 5 } },
+                    },
                     plan = new { status = "empty", reasons = new[] { "not_dictated" } },
                 },
                 notCarriedOver,
@@ -225,7 +231,14 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 sorting = "done",
                 fields = (object?)new
                 {
-                    history = new { value = Sentences[0], sources = new[] { new { start = 0, end = 21 } }, status = "pending", note = DiscardedText },
+                    history = new
+                    {
+                        value = Sentences[0],
+                        sources = new[] { new { start = 0, end = 21 } },
+                        warnings = new[] { new { code = "possible_correction", start = 0, end = 5, note = DiscardedText } },
+                        status = "pending",
+                        note = DiscardedText,
+                    },
                     assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
                     plan = new { status = "empty", reasons = new[] { "not_in_transcript" }, value = DiscardedText, discarded = new[] { DiscardedText } },
                 },
