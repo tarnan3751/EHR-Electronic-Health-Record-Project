@@ -64,20 +64,24 @@ def encode(samples: np.ndarray, container: str, rate: int = 48_000) -> bytes:
 
 
 class FakeRecognizer:
-    """Stands in for MedASR: one word per half second of audio it's given, and a fixed confidence."""
+    """Stands in for MedASR: one word per half second of audio it's given, and a fixed confidence. Set `hold` to make
+    it wait, in its thread, until the event is set: a transcription still running."""
 
     def __init__(self, word: str = "speech", confidence: float = 0.9) -> None:
         self.word = word
         self.confidence = confidence
         self.calls: list[int] = []
+        self.hold = None
 
     def recognize(self, samples: np.ndarray) -> Recognition:
+        if self.hold is not None:
+            self.hold.wait(10)
         self.calls.append(samples.size)
         count = int(samples.size / (SAMPLE_RATE / 2))
         return Recognition(" ".join([self.word] * count), self.confidence if count else None)
 
 
-def raw_decoder(data: bytes, *, partial: bool = False) -> np.ndarray:
+def raw_decoder(data: bytes, *, partial: bool = False, **_: object) -> np.ndarray:
     """Stands in for ffmpeg in the session tests: the bytes are float32 samples already."""
     return np.frombuffer(data[: len(data) // 4 * 4], dtype="<f4").astype(np.float32)
 
@@ -91,7 +95,8 @@ class FakeLlama:
     """A llama-server on httpx2's mock transport: records each request and answers as told."""
 
     def __init__(self, content: str | None = None, *, model_path: str = f"/models/{MODEL_FILE}", status: int = 200,
-                 delay: float = 0.0, props_delay: float = 0.0, finish_reason: str = "stop", unreachable: bool = False) -> None:
+                 delay: float = 0.0, props_delay: float = 0.0, finish_reason: str = "stop", unreachable: bool = False,
+                 n_ctx: int = 4096) -> None:
         self.content = content if content is not None else answer()
         self.model_path = model_path
         self.status = status
@@ -99,6 +104,8 @@ class FakeLlama:
         self.props_delay = props_delay
         self.finish_reason = finish_reason
         self.unreachable = unreachable
+        self.n_ctx = n_ctx
+        self.cancelled = False
         self.requests: list[httpx2.Request] = []
 
     async def handle(self, request: httpx2.Request) -> httpx2.Response:
@@ -109,9 +116,17 @@ class FakeLlama:
             raise httpx2.ConnectError("Connection refused", request=request)
         if request.url.path == "/props":
             await asyncio.sleep(self.props_delay)
-            return httpx2.Response(200, json={"model_path": self.model_path, "build_info": "b11669-620d2225"})
+            return httpx2.Response(200, json={"model_path": self.model_path, "build_info": "b11669-620d2225",
+                                              "default_generation_settings": {"n_ctx": self.n_ctx}})
+        if request.url.path == "/tokenize":
+            # One token a word: near enough for the context check.
+            return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
         if self.delay:
-            await asyncio.sleep(self.delay)
+            try:
+                await asyncio.sleep(self.delay)
+            except asyncio.CancelledError:
+                self.cancelled = True
+                raise
         if self.status != 200:
             return httpx2.Response(self.status, json={"error": {"message": "nope"}})
         return httpx2.Response(200, json={

@@ -137,8 +137,9 @@ services:
       - -c
       - '[ -n "$${LLAMA_API_KEY}" ] || { echo "Set LLAMA_API_KEY in infra/compose/.env" >&2; exit 1; }; exec /app/llama-server "$$@"'
       - llama-server
-    # K2 Horizon thinks at full effort by default, which is slow; low is enough to fill in a note.
-    command: ["--no-webui", "--no-slots", "--chat-template-kwargs", "{\"reasoning_effort\":\"low\"}"]
+    # Reasoning off, as the dictation sidecar asks on every request: K2 Horizon's template reasons at length at every
+    # effort it offers (high, medium or low), and a two-minute dictation then takes over a minute to sort on a GPU.
+    command: ["--no-webui", "--no-slots", "--reasoning", "off"]
     environment:
       LLAMA_ARG_MODEL: /models/${LLAMA_MODEL_FILE:-K2-Horizon-7B-Q4_K_M.gguf}
       LLAMA_ARG_CTX_SIZE: "8192"

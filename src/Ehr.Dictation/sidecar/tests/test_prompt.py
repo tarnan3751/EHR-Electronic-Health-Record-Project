@@ -26,7 +26,9 @@ def test_generation_is_fixed_low_effort_and_held_to_the_schema():
     request = structuring.request("text")
 
     assert request["temperature"] == 0 and request["seed"] == 0
-    assert request["reasoning_effort"] == "low" and request["reasoning_budget_tokens"] > 0
+    # Reasoning off: llama-server turns "none" into the chat template's enable_thinking false.
+    assert request["reasoning_effort"] == "none" and "reasoning_budget_tokens" not in request
+    assert request["max_tokens"] == 2048
     assert request["response_format"] == {
         "type": "json_schema", "json_schema": {"name": "note_fields", "schema": structuring.schema}
     }
@@ -65,6 +67,15 @@ def test_the_hash_changes_with_the_prompt_the_schema_or_the_parameters(tmp_path,
     shutil.copy(prompt.SCHEMA_DIRECTORY / prompt.SCHEMA_FILE, schema)
     monkeypatch.setitem(prompt.PARAMETERS, "temperature", 0.7)
     assert prompt.load(tmp_path).structuring_sha256 != original.structuring_sha256
+
+
+def test_the_eval_can_compare_other_parameters_under_their_own_hash():
+    reasoning = prompt.PARAMETERS | {"reasoning_effort": "low", "reasoning_budget_tokens": 256}
+
+    compared = prompt.load(parameters=reasoning)
+
+    assert compared.request("text")["reasoning_budget_tokens"] == 256
+    assert compared.structuring_sha256 != prompt.load().structuring_sha256
 
 
 def test_editing_only_the_comment_for_people_keeps_the_hash(tmp_path):

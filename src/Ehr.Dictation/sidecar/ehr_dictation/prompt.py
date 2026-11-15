@@ -7,10 +7,12 @@ The prompt file's opening <!-- comment --> and the schema's $schema and $comment
 The transcript is untrusted input: it goes between <transcript> markers, any marker inside it is neutralized, and the
 prompt says to treat all of it as dictation. Passages marked unclear arrive as [unclear] (transcript.py).
 
-Generation is fixed: temperature 0 and a fixed seed, reasoning effort low (K2 Horizon thinks at full effort by default,
-which is slow) with a token budget for it, and a cap on the answer. No tools are ever offered. The structuring hash
-covers everything sent except the transcript, so the eval can tell when a result came from a different prompt, schema
-or set of parameters (eval/README.md).
+Generation is fixed: temperature 0 and a fixed seed, a cap on the answer, and K2 Horizon's reasoning off
+(reasoning_effort "none", which llama-server turns into the chat template's enable_thinking false: an empty think
+block). Its template's other settings, high, medium and low, all reason at length on this task: at "low", over 1,000
+tokens for a two-minute dictation, measured, where off answers in about 30 seconds on a GPU. No tools are ever offered.
+The structuring hash covers everything sent except the transcript, so the eval can tell when a result came from a
+different prompt, schema or set of parameters (eval/README.md), such as its comparison run with reasoning on.
 """
 
 from __future__ import annotations
@@ -31,8 +33,7 @@ PARAMETERS = {
     "temperature": 0,
     "seed": 0,
     "max_tokens": 2048,
-    "reasoning_effort": "low",
-    "reasoning_budget_tokens": 1024,
+    "reasoning_effort": "none",
 }
 USER_TEMPLATE = "<transcript>\n{transcript}\n</transcript>"
 
@@ -44,6 +45,7 @@ MARKER = re.compile(r"<\s*/?\s*transcript\s*>", re.IGNORECASE)
 class Structuring:
     system: str
     schema: dict
+    parameters: dict
     prompt_sha256: str
     schema_sha256: str
     structuring_sha256: str
@@ -57,14 +59,16 @@ class Structuring:
                 {"role": "system", "content": self.system},
                 {"role": "user", "content": self.user_message(transcript)},
             ],
-            **PARAMETERS,
+            **self.parameters,
             "response_format": {"type": "json_schema", "json_schema": {"name": "note_fields", "schema": self.schema}},
             "stream": False,
             "cache_prompt": True,
         }
 
 
-def load(directory: Path = SCHEMA_DIRECTORY) -> Structuring:
+def load(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None) -> Structuring:
+    """The prompt and schema as sent, with PARAMETERS unless the eval asks for others to compare."""
+    parameters = dict(PARAMETERS if parameters is None else parameters)
     system = HEADER.sub("", (directory / PROMPT_FILE).read_text(encoding="utf-8")).strip()
     schema = json.loads((directory / SCHEMA_FILE).read_text(encoding="utf-8"))
     for key in ("$schema", "$comment"):
@@ -72,10 +76,11 @@ def load(directory: Path = SCHEMA_DIRECTORY) -> Structuring:
     return Structuring(
         system=system,
         schema=schema,
+        parameters=parameters,
         prompt_sha256=_sha256(system),
         schema_sha256=_sha256(_canonical(schema)),
         structuring_sha256=_sha256(
-            _canonical({"system": system, "schema": schema, "parameters": PARAMETERS, "user": USER_TEMPLATE})
+            _canonical({"system": system, "schema": schema, "parameters": parameters, "user": USER_TEMPLATE})
         ),
     )
 

@@ -1,13 +1,18 @@
 """Asks K2 Horizon, in llama-server, for the note fields (FR-11), and reads its answer.
 
-Every request carries llama-server's API key (being on the inference network proves nothing). Before the first request,
-and until it matches, the sidecar checks that llama-server serves the model file models-manifest.json records, so the
-provenance on each result is true. The answer is the message content, which the response format makes bare JSON; the
-model's reasoning comes back separately and is dropped unread. Nothing in a request or an answer is logged.
+Every request carries llama-server's API key (being on the inference network proves nothing). Before each request
+the sidecar checks that llama-server serves the model file models-manifest.json records, so the provenance on each
+result is true. The answer is the message content, which the response format makes bare JSON; the
+model's reasoning comes back separately and is dropped unread. Nothing in a request or an answer is logged. The model
+is checked before every request, not just the first, so a llama-server restarted with another file is noticed.
+
+A request that wouldn't fit the context llama-server gives each request (its n_ctx per slot, from /props), the prompt
+counted by llama-server's own tokenizer plus the most the answer may take, is never sent: it would only be cut off.
 
 When the model can't answer, the session keeps its transcript and says the fields couldn't be sorted (UC 10): the
-reason is model_unavailable (no connection, an error, a refused key, the wrong model), model_timeout, or
-model_output_invalid (an answer that isn't the schema's JSON, or one cut off at the token limit).
+reason is model_unavailable (no connection, an error, a refused key, the wrong model), model_timeout,
+model_output_invalid (an answer that isn't the schema's JSON, or one cut off at the token limit), or
+transcript_too_long (it wouldn't fit the context).
 """
 
 from __future__ import annotations
@@ -38,6 +43,14 @@ class ModelOutputInvalid(StructuringFailed):
     reason = "model_output_invalid"
 
 
+class TranscriptTooLong(StructuringFailed):
+    reason = "transcript_too_long"
+
+
+# What the chat template wraps around the messages, beyond their own tokens.
+TEMPLATE_TOKENS = 64
+
+
 @dataclass
 class Proposal:
     """What the model proposed: each field's value and quoted sources, and any keys outside the schema."""
@@ -62,6 +75,12 @@ class LlamaServer:
             raise ModelUnavailable(f"llama-server answered /props with {response.status_code}.")
         return response.json()
 
+    async def tokens(self, text: str) -> int:
+        response = await self._client.post("/tokenize", json={"content": text})
+        if response.status_code != 200:
+            raise ModelUnavailable(f"llama-server answered /tokenize with {response.status_code}.")
+        return len(response.json().get("tokens", []))
+
     async def chat(self, body: dict) -> dict:
         response = await self._client.post("/v1/chat/completions", json=body)
         if response.status_code != 200:
@@ -79,6 +98,7 @@ class Structurer:
         self._model_file = model_file
         self._timeout = timeout
         self.build: str | None = None
+        self.context: int | None = None
 
     @property
     def structuring(self) -> Structuring:
@@ -88,7 +108,9 @@ class Structurer:
         try:
             async with asyncio.timeout(self._timeout):
                 await self._check_model()
-                answer = await self._llama.chat(self._structuring.request(transcript))
+                request = self._structuring.request(transcript)
+                await self._check_fits(request)
+                answer = await self._llama.chat(request)
         except TimeoutError:
             raise ModelTimeout(f"No answer within {self._timeout:.0f} s.") from None
         except httpx2.TimeoutException:
@@ -107,15 +129,23 @@ class Structurer:
         return Proposal(fields, unknown, answer.get("timings"))
 
     async def _check_model(self) -> None:
-        if self.build is not None:
-            return
         if not self._model_file:
             raise ModelUnavailable("models-manifest.json records no K2 Horizon file.")
         props = await self._llama.props()
         served = posixpath.basename(str(props.get("model_path", "")).replace("\\", "/"))
         if served != self._model_file:
+            self.build = None
             raise ModelUnavailable("llama-server serves a different model file than models-manifest.json records.")
         self.build = str(props.get("build_info") or "unknown")
+        context = props.get("default_generation_settings", {}).get("n_ctx")
+        self.context = int(context) if isinstance(context, int) and context > 0 else None
+
+    async def _check_fits(self, request: dict) -> None:
+        if self.context is None:
+            return
+        prompt = sum([await self._llama.tokens(message["content"]) for message in request["messages"]])
+        if prompt + TEMPLATE_TOKENS + int(request.get("max_tokens", 0)) > self.context:
+            raise TranscriptTooLong(f"{prompt} prompt tokens don't leave room for the answer in {self.context}.")
 
 
 def parse_answer(content: object) -> tuple[dict[str, dict], list[str]]:
