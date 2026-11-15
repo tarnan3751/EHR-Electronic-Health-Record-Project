@@ -622,7 +622,8 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
     spans = []
     for start, end, kind in sorted(matches + passive):
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
-        if NEGATED_INSTRUCTION.search(text[clause:start]):
+        negated = NEGATED_INSTRUCTION.search(text[clause:start])
+        if negated and not ANY_NEGATION.search(text[clause : clause + negated.start()]):
             continue
         span_start = start
         subject = (start, end, kind) in passive
@@ -635,12 +636,15 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
 
 
 # An instruction not to: "don't order an A1c", "no need to order labs", "hold off on ordering an MRI", "sulfa should not
-# be added". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value.
+# be added". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value. Unless
+# another negation comes before it in its clause, which makes it one again: "no reason not to order an MRI", "I can't
+# not order an MRI" (ANY_NEGATION).
 NEGATED_INSTRUCTION = re.compile(
     r"\b(?:not|don't|dont|never|won't|no need(?: to| for)?|hold off(?: on)?|no)\s+(?:(?:be|to|on|going|any|further|yet)\s+)"
     r"{0,3}$",
     re.IGNORECASE,
 )
+ANY_NEGATION = re.compile(r"\b(?:no|not|never|nothing|none|cannot)\b|n't\b", re.IGNORECASE)
 # Words that start another clause, which ends an instruction's span.
 CLAUSE_STARTS = frozenset("then but so because although though while whereas also".split())
 # After "and" or a comma, a new subject or another step of the plan starts another clause; anything else ("order a CBC

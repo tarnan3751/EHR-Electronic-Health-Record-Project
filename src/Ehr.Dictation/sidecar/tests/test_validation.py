@@ -574,6 +574,15 @@ def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_document
     assert own(said, said).value == "She is not allergic to sulfa after all."
 
 
+@pytest.mark.parametrize(("said", "instruction"), [
+    ("There's no reason not to order an MRI of the knee.", "order an MRI of the knee"),
+    ("I can't not order an MRI.", "order an MRI"),
+])
+def test_two_negations_make_an_instruction_again(said, instruction):
+    assert said_instructions(said) == [instruction]
+    assert "MRI" not in own(said, said).value
+
+
 def test_an_instruction_not_to_must_keep_its_negation():
     said = "Start naproxen and don't order an MRI."
 
