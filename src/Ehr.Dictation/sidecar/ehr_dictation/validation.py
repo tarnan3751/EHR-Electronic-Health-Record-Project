@@ -99,6 +99,7 @@ WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
 DIRECTIVE_REACH = 14  # at most, words after an instruction that still belong to it, when nothing ends its clause sooner
+UNDOES_REACH = 3  # words before an instruction not to within which another negation makes it an instruction again
 LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and"), or its subject ("penicillin
 # should be added to her allergies")
 MAX_GAP = 1  # a source's own words allowed between two of a value's words (articles and doses are free)
@@ -745,7 +746,9 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
     for start, end, kind in sorted(matches + passive):
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
         negated = NEGATED_INSTRUCTION.search(text[clause:start])
-        if negated and not ANY_NEGATION.search(text[clause : clause + negated.start()]):
+        if negated and not any(
+            ANY_NEGATION.search(token.text) for token in tokens(text[clause : clause + negated.start()])[-UNDOES_REACH:]
+        ):
             continue
         span_start = start
         subject = (start, end, kind) in passive
@@ -759,8 +762,9 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
 
 # An instruction not to: "don't order an A1c", "no need to order labs", "hold off on ordering an MRI", "sulfa should not
 # be added". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value. Unless
-# another negation comes before it in its clause, which makes it one again: "no reason not to order an MRI", "I can't
-# not order an MRI" (ANY_NEGATION).
+# another negation comes right before it, within UNDOES_REACH words, which makes it one again: "no reason not to order
+# an MRI", "I can't not order an MRI" (ANY_NEGATION); not one further back that negates something else ("she has no
+# chest pain so no need to order a troponin").
 NEGATED_INSTRUCTION = re.compile(
     r"\b(?:not|don't|dont|never|won't|no need(?: to| for)?|hold off(?: on)?|no)\s+(?:(?:be|to|on|going|any|further|yet)\s+)"
     r"{0,3}$",

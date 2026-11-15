@@ -18,7 +18,7 @@ def test_the_values():
     assert (quality.SILENCE_DBFS, quality.MIN_SOUND_FRAMES) == (-60.0, 50)
     assert (segmenter.MIN_PAUSE, segmenter.KEEP, segmenter.MAX_SEGMENT) == (40, 300, 2000)
     assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 30, 600)
-    assert (validation.DIRECTIVE_REACH, validation.LEAD_IN_REACH) == (14, 5)
+    assert (validation.DIRECTIVE_REACH, validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (14, 5, 3)
     assert validation.LIMITS == {"history": 3000, "assessment": 2000, "plan": 2000}
     limits = settings.Settings(api_key="k", llama_api_key="k")
     assert (limits.max_session_seconds, limits.max_session_bytes, limits.max_chunk_bytes) == (180, 10 << 20, 2 << 20)
@@ -85,6 +85,14 @@ def test_an_instruction_reaches_at_most_14_words_when_nothing_ends_its_clause():
 
     (instruction,) = not_carried_over(text)
     assert text.text[instruction["start"] : instruction["end"]].split() == ["order"] + words.split()[:14]
+
+
+def test_a_negation_within_3_words_makes_an_instruction_not_to_one_again():
+    three = transcript("No b c not order an MRI.")
+    four = transcript("No b c d not order an MRI.")
+
+    assert [three.text[r["start"] : r["end"]] for r in not_carried_over(three)] == ["order an MRI"]
+    assert not_carried_over(four) == []
 
 
 def test_a_possible_correction_is_flagged_within_8_words():
