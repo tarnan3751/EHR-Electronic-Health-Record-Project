@@ -124,9 +124,9 @@ sealed class Options
                 case "--patient-password": options.PatientPassword = Password(args[i], value); break;
                 case "--mrn": options.Mrn = value; break;
                 case "--admin-password": options.AdminPassword = Password(args[i], value); break;
-                case "--clinical-url": options.Clinical = Local(args[i], value); break;
-                case "--portal-url": options.Portal = Local(args[i], value); break;
-                case "--mailpit-url": options.Mailpit = Local(args[i], value); break;
+                case "--clinical-url": options.Clinical = Local(args[i], value, https: true); break;
+                case "--portal-url": options.Portal = Local(args[i], value, https: true); break;
+                case "--mailpit-url": options.Mailpit = Local(args[i], value, https: false); break;
                 case "--env-file": options.EnvFile = Path.GetFullPath(value); break;
                 case "--ca": options.RootCertificate = Path.GetFullPath(value); break;
                 case "--accounts": options.AccountsFile = Path.GetFullPath(value); break;
@@ -141,10 +141,13 @@ sealed class Options
         ? value
         : throw new ArgumentException($"{option}: the app needs at least {Defaults.MinimumPasswordLength} characters.");
 
-    static Uri Local(string option, string value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) && StackHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase)
-            ? uri
-            : throw new ArgumentException($"{option}: {value} isn't the local stack. This script is for the local stack only.");
+    // The sites are HTTPS only; Mailpit's API is plain HTTP on this machine.
+    static Uri Local(string option, string value, bool https) =>
+        !Uri.TryCreate(value, UriKind.Absolute, out var uri) || !StackHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase)
+            ? throw new ArgumentException($"{option}: {value} isn't the local stack. This script is for the local stack only.")
+            : https && uri.Scheme != Uri.UriSchemeHttps
+                ? throw new ArgumentException($"{option}: the stack's sites are HTTPS only.")
+                : uri;
 
     // This script's folder, wherever it is run from.
     static string Here([CallerFilePath] string path = "") => Path.GetDirectoryName(path)!;
@@ -157,6 +160,13 @@ sealed class Setup(Options options)
     bool failed;
 
     string FileName => Path.GetFileName(options.AccountsFile);
+
+    string ResetAdvice => $"reset the stack (docker compose --profile \"*\" down -v, which deletes all its data, the seeded " +
+        $"clinic included), delete {FileName}, and seed the clinic again";
+
+    // An admin's reset makes the account enroll again at its next sign-in, which setup does with the password in the file.
+    string AuthenticatorAdvice => "An admin can reset its authenticator at Staff, and the next setup enrolls it again; " +
+        $"or, to start again, {ResetAdvice}.";
 
     public async Task<int> RunAsync()
     {
@@ -261,13 +271,10 @@ sealed class Setup(Options options)
                 account = accounts.Add(new() { Role = "admin", Email = email, Password = password });
                 Save();
                 break;
-            case "/sign-in/code":
-                throw new Failure($"{email} has an authenticator already, but {FileName} doesn't have its secret. " +
-                    "Another admin can reset its authenticator at Staff; or reset the stack (docker compose --profile \"*\" down -v) to start again.");
-            case "/sign-in":
-                throw new Failure($"the bootstrap admin {email} has been set up already (the password in .env no longer signs in), " +
-                    $"and {FileName} doesn't have it. Another admin can give it a new setup link at Staff; or reset the stack " +
-                    "(docker compose --profile \"*\" down -v, which deletes all its data) to start again.");
+            case "/sign-in/code" or "/sign-in":
+                // Someone signed in as the bootstrap admin by hand: its password or authenticator is theirs, not the file's.
+                throw new Failure($"the bootstrap admin {email} was set up by hand already, and {FileName} doesn't have it, so " +
+                    $"setup can't take it over. To start again, {ResetAdvice}, and run setup before anyone signs in as the admin.");
             default:
                 throw Unexpected(page, "the admin's first sign-in");
         }
@@ -294,8 +301,8 @@ sealed class Setup(Options options)
         Expect(staff, "/admin/staff", "opening Staff as the admin");
         if (StaffStatus(staff, email) is { } status)
         {
-            throw new Failure($"the stack has this staff account already ({status}), but {FileName} doesn't. An admin can give it " +
-                $"a new setup link, or reset its authenticator, at Staff ({Clinical("/admin/staff")}); or choose another address with --clinician-email.");
+            throw new Failure($"the stack has this staff account already ({status}), but {FileName} doesn't, so setup can't sign " +
+                $"in as it. Choose another address with --clinician-email; or, to start again, {ResetAdvice}.");
         }
 
         var invited = await admin.PostAsync(Clinical("/admin/staff"), staff, ("Input.Email", email),
@@ -379,8 +386,8 @@ sealed class Setup(Options options)
         {
             throw page.Html.Contains("enrollment code is not valid", StringComparison.Ordinal)
                 ? new Failure($"MRN {mrn} has a portal account on the stack already (the code issued just now was refused), but " +
-                    $"{FileName} doesn't have it. The patient can reset its password at {Portal("/portal/forgot")}, with the email " +
-                    "in Mailpit; or choose another patient with --mrn.")
+                    $"{FileName} doesn't have it, so setup can't sign in as it. Choose another patient with --mrn and another " +
+                    $"address with --patient-email; or, to start again, {ResetAdvice}.")
                 : Unexpected(page, "registering at the portal");
         }
 
@@ -403,11 +410,13 @@ sealed class Setup(Options options)
                 page = await browser.PostAsync(Clinical("/sign-in/code"), page, ("Code", Totp.Code(secret, DateTimeOffset.UtcNow)));
                 if (page.Path.StartsWith("/sign-in", StringComparison.Ordinal))
                 {
-                    throw new Failure($"the authenticator code from {FileName} was refused: was its authenticator reset at Staff? " +
-                        "If so, an admin's reset makes it enroll again at its next sign-in, which setup then does.");
+                    throw new Failure($"the authenticator code from {FileName} was refused. Check this computer's clock; otherwise " +
+                        $"the secret in the file isn't this account's. {AuthenticatorAdvice}");
                 }
 
                 break;
+            case "/sign-in/code":
+                throw new Failure($"the stack asks for its authenticator code, but {FileName} has no authenticator secret for it. {AuthenticatorAdvice}");
             case "/sign-in/enroll":
                 // Its authenticator was reset at Staff, or its enrollment never finished: it enrolls, as at a first sign-in.
                 await EnrollAsync(browser, page, account);
@@ -415,7 +424,7 @@ sealed class Setup(Options options)
                 break;
             case "/sign-in":
                 throw new Failure($"can't sign in with the password in {FileName} ({string.Join(" ", page.Problems)}). If the stack " +
-                    $"was reset (down -v), its accounts went with it: delete {FileName} and run setup again.");
+                    $"was reset (down -v), its accounts and the seeded clinic went with it: delete {FileName}, seed the clinic, and run setup again.");
             default:
                 throw Unexpected(page, "signing in");
         }
@@ -444,7 +453,7 @@ sealed class Setup(Options options)
         if (page.Path != "/portal")
         {
             throw new Failure($"can't sign in to the portal with the password in {FileName} ({string.Join(" ", page.Problems)}). " +
-                $"If the stack was reset (down -v), its accounts went with it: delete {FileName} and run setup again.");
+                $"If the stack was reset (down -v), its accounts and the seeded clinic went with it: delete {FileName}, seed the clinic, and run setup again.");
         }
 
         if (account.Mrn is { } mrn && !page.Html.Contains($"<dd>{mrn}</dd>", StringComparison.Ordinal))
@@ -470,13 +479,16 @@ sealed class Setup(Options options)
             throw Unexpected(page, "enrolling an authenticator");
         }
 
+        // Saved first, so a key the stack accepts is never lost. If enrollment doesn't finish, the next sign-in offers a
+        // new key, which setup then enrolls.
+        account.AuthenticatorSecret = secret.Groups[1].Value;
+        Save();
         var done = await browser.PostAsync(Clinical("/sign-in/enroll"), page, ("Code", Totp.Code(secret.Groups[1].Value, DateTimeOffset.UtcNow)));
         if (!done.Html.Contains("Your recovery codes", StringComparison.Ordinal))
         {
             throw Unexpected(done, "enrolling an authenticator");
         }
 
-        account.AuthenticatorSecret = secret.Groups[1].Value;
         account.RecoveryCodes = [.. Regex.Matches(done.Html, @"<li class=""code"">\s*([^<]+?)\s*</li>").Select(m => WebUtility.HtmlDecode(m.Groups[1].Value))];
         Save();
     }
@@ -530,7 +542,7 @@ sealed class Setup(Options options)
 
     async Task<string> MailpitAsync(string path)
     {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        using var client = new HttpClient(new SocketsHttpHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(10) };
         return await client.GetStringAsync(new Uri(options.Mailpit, path));
     }
 
@@ -598,7 +610,7 @@ sealed class Setup(Options options)
             "nothing answers there. Is the stack running? (docker compose up -d, in infra/compose)",
         HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError } =>
             "its certificate isn't one the stack's rootCA.pem vouches for (infra/compose/README.md, One-time setup).",
-        TaskCanceledException => "no answer within a minute.",
+        TaskCanceledException => "it didn't answer in time.",
         _ => e.Message,
     };
 }
@@ -661,15 +673,16 @@ static class Totp
     }
 }
 
-// A browser for the script: cookies, redirects followed, and HTTPS checked against the stack's own root certificate,
-// whatever the operating system trusts. The host name must match, as always.
+// A browser for the script: cookies, redirects followed, no proxy, and HTTPS checked against the stack's own root
+// certificate, whatever the operating system trusts. The host name must match, as always.
 sealed class Browser : IDisposable
 {
     readonly HttpClient client;
 
     public Browser(X509Certificate2 root)
     {
-        var handler = new SocketsHttpHandler { CookieContainer = new CookieContainer(), ConnectTimeout = TimeSpan.FromSeconds(10) };
+        // The stack is on this machine: a system proxy would only get in the way.
+        var handler = new SocketsHttpHandler { CookieContainer = new CookieContainer(), ConnectTimeout = TimeSpan.FromSeconds(10), UseProxy = false };
         handler.SslOptions.RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
         {
             if (certificate is not X509Certificate2 presented || (errors & ~SslPolicyErrors.RemoteCertificateChainErrors) != 0)
