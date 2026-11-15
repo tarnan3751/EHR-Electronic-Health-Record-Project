@@ -338,6 +338,30 @@ def test_cancel_while_a_chunk_is_transcribed_stores_nothing(settings):
     assert session.transcript.text == "" and session.progress.segments == [] and len(session.audio) == 0
 
 
+def test_cancel_while_a_chunk_is_decoded_stores_nothing(settings):
+    release = threading.Event()
+
+    def held(data: bytes, **options: object):
+        release.wait(10)
+        return raw_decoder(data, **options)
+
+    async def run():
+        sessions = Sessions(settings, FakeRecognizer(), FakeLlama(GROUNDED).structurer(), MODELS, decoder=held)
+        session = sessions.start(ALICE)
+        chunk = asyncio.create_task(sessions.add_audio(session.id, ALICE, 0, b"".join(chunks()[:4])))
+        await asyncio.sleep(0.1)
+        sessions.cancel(session.id, ALICE)
+        release.set()
+        with pytest.raises(SessionError) as gone:
+            await chunk
+        return session, gone.value
+
+    session, gone = asyncio.run(run())
+
+    assert gone.status == 404
+    assert len(session.audio) == 0 and session.next_seq == 0 and session.audio_seconds == 0
+
+
 def test_cancel_stops_a_model_call_in_flight(settings):
     async def run():
         llama = FakeLlama(GROUNDED, delay=5)

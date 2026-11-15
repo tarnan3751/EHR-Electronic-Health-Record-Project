@@ -3,15 +3,19 @@ the transcript kept when the model fails, discarded values never sent, and refus
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import json
 
 import pytest
 from conftest import MODELS, FakeLlama, FakeRecognizer, answer, encode, speech_and_pauses
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
+from ehr_dictation import api
 from ehr_dictation.api import create_app
 from ehr_dictation.provenance import ProvenanceError
+from ehr_dictation.sessions import SessionError
 from ehr_dictation.settings import Settings, SettingsError
 
 OWNER = "11111111-1111-1111-1111-111111111111"
@@ -115,6 +119,33 @@ def test_bytes_that_are_not_audio_are_refused_at_stop(settings):
         refused = http.post(f"/v1/sessions/{session_id}/stop", headers=HEADERS)
 
     assert (refused.status_code, refused.json()["error"]) == (422, "not_audio")
+
+
+def test_a_chunk_over_the_limit_without_a_length_is_refused(settings):
+    def pieces():
+        for _ in range(4):
+            yield b"\0" * (settings.max_chunk_bytes // 2)
+
+    with client(settings) as http:
+        session_id = http.post("/v1/sessions", headers=HEADERS).json()["sessionId"]
+        refused = http.post(f"/v1/sessions/{session_id}/audio", params={"seq": 0}, content=pieces(), headers=HEADERS)
+
+    assert (refused.status_code, refused.json()["error"]) == (413, "too_large")
+
+
+def test_a_body_without_a_length_is_read_only_until_it_passes_the_limit():
+    pulled = 0
+
+    async def receive():
+        nonlocal pulled
+        pulled += 1
+        return {"type": "http.request", "body": b"\0" * 1000, "more_body": pulled < 10}
+
+    request = Request({"type": "http", "method": "POST", "headers": []}, receive)
+    with pytest.raises(SessionError) as refused:
+        asyncio.run(api._read(request, 2500))
+
+    assert (refused.value.status, refused.value.code, pulled) == (413, "too_large", 3)
 
 
 def test_a_chunk_over_the_limit_is_refused_before_it_is_read(settings):

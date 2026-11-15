@@ -16,8 +16,9 @@ MedASR fails on the rest of the recording, or ffmpeg can't decode it in time twi
 was live, not final, with the reason transcription_failed. The fields are checked (validation.py) and marked pending; a field that failed
 carries only its reason codes.
 
-Cancelling discards everything at once (UC 9): the session is marked cancelled, its background work is cancelled,
-including a model call in flight, and anything still running checks the mark after each wait and stores nothing.
+Cancelling discards everything at once (UC 9): the session is marked cancelled, and its background work is cancelled,
+including a model call in flight, so it stores nothing more; a call still waiting on the session checks the mark after
+each wait and stores nothing either.
 
 Every call answers within its budget (settings.py), well inside the on-prem app's 20 seconds: waits for the session,
 for MedASR and for the fields are cut to what is left of it. A session counts against the limits on sessions at once
@@ -274,7 +275,7 @@ class Sessions:
         }
 
     async def _finish(self, session: Session, recording: bytes) -> None:
-        """After stop: the rest of the transcript, then the fields. Stores nothing once the session is cancelled."""
+        """After stop: the rest of the transcript, then the fields. Cancelling the session cancels this task."""
         started = time.perf_counter()
         try:
             try:
@@ -285,15 +286,11 @@ class Sessions:
             except audio.AudioError:
                 session.failure = _not_audio()
                 return
-            if session.cancelled:
-                return
             try:
                 async with self._transcribing:
                     progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer, final=True)
             except Exception as error:  # noqa: BLE001 (the live transcript still goes back)
                 self._unfinished(session, type(error).__name__)
-                return
-            if session.cancelled:
                 return
             session.progress = progress
             session.transcript = assemble(progress.segments, final=True)
@@ -338,8 +335,6 @@ class Sessions:
                 async with asyncio.timeout(self._settings.structuring_seconds), self._sorting:
                     proposal = await self._structurer.propose(transcript.for_structuring())
                 checks = validation.check(proposal.fields, proposal.unknown, transcript)
-            if session.cancelled:
-                return
             session.checks, session.sorting = checks, "done"
             log.info(
                 "session %s sorted in %.1f s: %s%s",

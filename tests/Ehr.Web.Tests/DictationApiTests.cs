@@ -501,8 +501,8 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
     {
         var contract = JsonNode.Parse(await File.ReadAllTextAsync(ContractFile(name), Cancel))!;
         var status = (int)contract["status"]!;
-        var body = contract["body"]!;
-        service.Answer = ((HttpStatusCode)status, body.ToJsonString());
+        var body = contract["body"];
+        service.Answer = ((HttpStatusCode)status, body?.ToJsonString() ?? "");
         var page = await OpenAsync(apps, apps.OnPrem);
 
         using var response = (string?)contract["route"] switch
@@ -511,11 +511,18 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
             "audio" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/audio?seq=0", Audio([1, 2, 3])),
             "stop" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/stop"),
             "result" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result"),
+            "cancel" => await SendAsync(page, HttpMethod.Delete, $"{Sessions}/{SomeSessionId}"),
             var route => throw new InvalidOperationException($"{name}.json has a route this test doesn't know: {route}."),
         };
 
         Assert.NotEqual(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(status == 401 ? 503 : status, (int)response.StatusCode);
+        if (body is null)
+        {
+            Assert.Empty(await response.Content.ReadAsStringAsync(Cancel));
+            return;
+        }
+
         var answered = await JsonAsync(response);
         if (status >= 400)
         {

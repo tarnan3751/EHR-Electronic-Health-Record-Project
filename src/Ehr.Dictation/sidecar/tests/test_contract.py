@@ -95,7 +95,7 @@ def answers(settings: Settings) -> dict[str, dict]:
     produced: dict[str, dict] = {}
 
     def keep(name: str, route: str, response) -> None:  # noqa: ANN001
-        produced[name] = {"route": route, "status": response.status_code, "body": response.json()}
+        produced[name] = {"route": route, "status": response.status_code, "body": response.json() if response.content else None}
 
     with client(settings, FakeLlama(GROUNDED)) as http:
         keep("start-201", "start", http.post("/v1/sessions", headers=HEADERS))
@@ -110,6 +110,9 @@ def answers(settings: Settings) -> dict[str, dict]:
         keep("audio-409-stopped", "audio",
              http.post(f"/v1/sessions/{session}/audio", params={"seq": 1}, content=dictation(), headers=HEADERS))
         keep("stop-404-not_found", "stop", http.post(f"/v1/sessions/{SESSION_ID}/stop", headers=HEADERS))
+        session = start(http)
+        keep("cancel-204", "cancel", http.delete(f"/v1/sessions/{session}", headers=HEADERS))
+        keep("cancel-404-not_found", "cancel", http.delete(f"/v1/sessions/{session}", headers=HEADERS))
         keep("start-401-unauthorized", "start",
              http.post("/v1/sessions", headers={**HEADERS, "Authorization": "Bearer not-the-key"}))
         session = start(http)
@@ -202,7 +205,8 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     produced = answers(settings)
     bodies = {name: value["body"] for name, value in produced.items()}
 
-    assert {value["status"] for value in produced.values()} == {200, 201, 401, 404, 409, 413, 422, 429}
+    assert {value["status"] for value in produced.values()} == {200, 201, 204, 401, 404, 409, 413, 422, 429}
+    assert {value["route"] for value in produced.values()} == {"start", "audio", "stop", "result", "cancel"}
     reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long", "transcription_failed")
     assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in reasons} == set(reasons)
     planned = bodies["result-200-done-not_carried_over"]
