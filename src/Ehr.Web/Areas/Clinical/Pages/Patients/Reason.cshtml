@@ -1,14 +1,23 @@
 @page "/patients/{id:guid}/reason"
 @using Ehr.Domain.Patients
 @model ReasonModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = "Emergency access";
 }
 <h1>Emergency access</h1>
-<p>This patient is not on your panel. To open the chart, say why you need it. Your access and the reason are recorded and reviewed, and the chart stays open to you for @BreakGlass.Duration.TotalHours hours.</p>
-<form method="post" class="account-form">
-    <label>Reason <textarea asp-for="Reason" rows="3" required autofocus></textarea></label>
-    <span asp-validation-for="Reason" class="error"></span>
-    <button>Open the chart</button>
-</form>
+@if (!OnPrem.IsReachable)
+{
+    @* Off-site with the clinic's server down, the grant couldn't be saved (UC 2). *@
+    <p>This patient is not on your panel. Emergency access can't be granted until the clinic's server is back, since the reason has to be recorded there first.</p>
+}
+else
+{
+    <p>This patient is not on your panel. To open the chart, say why you need it. Your access and the reason are recorded and reviewed, and the chart stays open to you for @BreakGlass.Duration.TotalHours hours.</p>
+    <form method="post" class="account-form">
+        <label>Reason <textarea asp-for="Reason" rows="3" required autofocus></textarea></label>
+        <span asp-validation-for="Reason" class="error"></span>
+        <button>Open the chart</button>
+    </form>
+}
 <p><a asp-page="Index">Back to patients</a></p>

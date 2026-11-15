@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,8 +9,9 @@ using static Ehr.Web.Tests.Browser;
 namespace Ehr.Web.Tests;
 
 // The cloud app's forwarding to the on-prem app: saves always, and a person's reads until the replica has their
-// latest save. The tests in this class run one at a time, so each can count what crossed the link.
-public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
+// latest save; a save that can't be forwarded is told why. The tests in this class run one at a time, so each can
+// count what crossed the link.
+public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 {
     const string LastSaveCookieName = "__Host-Ehr.LastSave";
 
@@ -104,6 +106,51 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
+    public async Task A_form_post_that_cannot_be_forwarded_gets_a_page_that_explains()
+    {
+        var patient = await apps.InsertPatientAsync("Lane", "Unsaved");
+        var signedIn = await CookieHeaderAsync(apps.OnPrem, await apps.ClinicianAsync());
+        using var client = CreateClient(apps.CloudCutOff, handleCookies: false);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/patients/{patient}/reason")
+        {
+            Content = Form(("Reason", "Covering the night shift")),
+        };
+        request.Headers.Add("Cookie", signedIn);
+
+        using var response = await client.SendAsync(request, Cancel);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+        var html = await response.Content.ReadAsStringAsync(Cancel);
+        Assert.Contains("Nothing was saved, because the clinic's server can't be reached.", html);
+        // Back to the form, by the browser's history where JavaScript runs, by its address where it doesn't.
+        Assert.Contains($"<a href=\"/patients/{patient}/reason\" data-back>Back</a>", html);
+        var assets = PageAssets().Matches(html).Select(match => match.Groups[1].Value).ToList();
+        Assert.Equal(["/_content/Ehr.Design/css/ehr.css", "/_content/Ehr.Design/js/back-link.js"], assets);
+        foreach (var asset in assets)
+        {
+            using var file = await client.GetAsync(asset, Cancel);
+            Assert.Equal(HttpStatusCode.OK, file.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task An_htmx_post_that_cannot_be_forwarded_still_gets_the_short_message()
+    {
+        var page = await OpenAsync(apps, apps.CloudCutOff, via: apps.Cloud);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{QuickTexts}?handler=Add")
+        {
+            Content = Form(("Shortcut", WebApps.NewShortcut()), ("Body", "Text"), ("__RequestVerificationToken", page.Token)),
+        };
+        request.Headers.Add("HX-Request", "true");
+
+        using var response = await page.Client.SendAsync(request, Cancel);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("Not saved: the on-prem server can't be reached.", await response.Content.ReadAsStringAsync(Cancel));
+    }
+
+    [Fact]
     public async Task With_the_on_prem_app_unreachable_reads_come_from_the_replica()
     {
         await apps.InsertAsync(WebApps.NewShortcut(), "Still readable");
@@ -137,6 +184,9 @@ public class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
         var setCookie = context.Response.Headers.SetCookie.ToString();
         return setCookie[..setCookie.IndexOf(';')];
     }
+
+    [GeneratedRegex("(?:href|src)=\"(/_content/[^\"]+)\"")]
+    private static partial Regex PageAssets();
 
     static bool RemovesLastSaveCookie(HttpResponseMessage response) =>
         response.Headers.TryGetValues("Set-Cookie", out var cookies)

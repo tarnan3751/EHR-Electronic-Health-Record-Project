@@ -1,5 +1,6 @@
 @page "/patients/{id:guid}"
 @model ChartModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = $"{Model.Patient.FamilyName}, {Model.Patient.GivenName}";
 }
@@ -13,8 +14,13 @@
     <dt>Born</dt><dd>@Model.Patient.BirthDate.ToString("yyyy-MM-dd")</dd>
     <dt>Gender</dt><dd>@Model.Patient.Gender</dd>
 </dl>
+@* Off-site with the clinic's server down nothing can be saved, so no change is offered (UC 2). *@
 <div class="actions">
-    @if (Model.OnPanel)
+    @if (!OnPrem.IsReachable)
+    {
+        <p>Your panel can't be changed while the clinic's server can't be reached.</p>
+    }
+    else if (Model.OnPanel)
     {
         <form method="post" asp-page-handler="Unassign">
             <button>Remove from my patients</button>
@@ -35,6 +41,10 @@
         <p>Give the patient this code. It lets them register for the portal once, within 14 days, and isn't shown again.</p>
         <p class="code">@code</p>
     </section>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p>Enrollment codes can be issued once the clinic's server is back.</p>
 }
 else
 {

@@ -1,13 +1,16 @@
 using System.Net;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Web.CloudAudit;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
 namespace Ehr.Web.Tests;
 
 // A clinician's panel (Areas/Clinical/Pages/Patients, PatientAssignments): the clinic's home shows their own patients
-// first, a search covers the clinic and marks theirs, and the chart puts a patient on the panel or takes them off.
+// first, a search covers the clinic and marks theirs, and the chart puts a patient on the panel or takes them off,
+// except off-site while the clinic's server can't be reached.
 public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -80,5 +83,38 @@ public class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain($"/patients/{patient}", theirPanel);
         Assert.Contains($"/patients/{patient}", theirSearch);
         Assert.DoesNotContain("Yours", theirSearch);
+    }
+
+    [Fact]
+    public async Task With_the_on_prem_app_unreachable_the_chart_offers_no_changes()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Offsite", StaffRoles.Clinician);
+        var own = await apps.InsertPatientAsync("Hale", "Panelonly");
+        var other = await apps.InsertPatientAsync("Ira", "Emergencyonly");
+        await apps.AssignAsync(clinician, own);
+        // Emergency access to the other one, granted on-site before the link went down.
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        using (var reasoned = await PostFormAsync(session.Client, $"/patients/{other}/reason", $"/patients/{other}/reason", ("Reason", "Covering the night shift")))
+        {
+            Assert.Equal($"/patients/{other}", PathOf(reasoned));
+        }
+
+        // The cloud app finds out within a couple of seconds; this is that check, now.
+        Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
+        var offSite = Client(apps.CloudCutOff, session.Jar);
+
+        var onPanel = await offSite.GetStringAsync($"/patients/{own}", Cancel);
+        var underEmergency = await offSite.GetStringAsync($"/patients/{other}", Cancel);
+
+        Assert.Contains("Panelonly, Hale", onPanel);
+        Assert.Contains("Emergencyonly, Ira", underEmergency);
+        Assert.All([onPanel, underEmergency], chart =>
+        {
+            Assert.DoesNotContain("handler=Assign", chart);
+            Assert.DoesNotContain("handler=Unassign", chart);
+            Assert.DoesNotContain("handler=Enroll", chart);
+            Assert.Contains("Your panel can't be changed while the clinic's server can't be reached.", chart);
+            Assert.Contains("Enrollment codes can be issued once the clinic's server is back.", chart);
+        });
     }
 }

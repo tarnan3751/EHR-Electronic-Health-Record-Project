@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using Ehr.Data;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Yarp.ReverseProxy.Forwarder;
@@ -20,21 +21,30 @@ public sealed class CloudForwardingMiddleware(
     public async Task InvokeAsync(HttpContext context, EhrDbContext db)
     {
         var method = context.Request.Method;
+        var isPage = context.GetEndpoint()?.Metadata.GetMetadata<PageActionDescriptor>() is not null;
         if (!HttpMethods.IsGet(method) && !HttpMethods.IsHead(method))
         {
             if (await ForwardAsync(context) != ForwarderError.None && !context.Response.HasStarted)
             {
                 context.Response.Clear();
                 context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                await context.Response.WriteAsync("Not saved: the on-prem server can't be reached.", CancellationToken.None);
+                if (isPage && !context.Request.Headers.ContainsKey("HX-Request"))
+                {
+                    // A plain form post replaces the whole page, so it gets a page that says why, with a way back to
+                    // the form. htmx shows its own message (request-errors.js), and the APIs read the status.
+                    context.Response.ContentType = "text/html; charset=utf-8";
+                    await context.Response.WriteAsync(NotSavedPage(context.Request.Path), CancellationToken.None);
+                }
+                else
+                {
+                    await context.Response.WriteAsync("Not saved: the on-prem server can't be reached.", CancellationToken.None);
+                }
             }
 
             return;
         }
 
         // Only pages read data. Static files are the same on both servers.
-        var endpoint = context.GetEndpoint();
-        var isPage = endpoint?.Metadata.GetMetadata<PageActionDescriptor>() is not null;
         if (!isPage || !lastSave.TryRead(context, out var position))
         {
             await next(context);
@@ -69,6 +79,30 @@ public sealed class CloudForwardingMiddleware(
 
         return error;
     }
+
+    // Back goes back in the browser's history (back-link.js), where the form may still have what was typed, though a
+    // browser may reload it instead; without JavaScript the link opens the form's page again. No inline script, so a
+    // strict CSP can be added later.
+    static string NotSavedPage(PathString formPage) =>
+        $$"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Not saved</title>
+            <link rel="stylesheet" href="/_content/Ehr.Design/css/ehr.css">
+            <script src="/_content/Ehr.Design/js/back-link.js" defer></script>
+        </head>
+        <body>
+            <main>
+                <h1>Not saved</h1>
+                <p class="notice read-only" role="alert">Nothing was saved, because the clinic's server can't be reached. Go back and try again once it's back; what you entered may still be there.</p>
+                <p><a href="{{HtmlEncoder.Default.Encode(formPage.ToString())}}" data-back>Back</a></p>
+            </main>
+        </body>
+        </html>
+        """;
 
     // Moves the on-prem app's WAL position from the response into the browser's LastSaveCookie.
     sealed class KeepWalPosition(LastSaveCookie lastSave) : HttpTransformer

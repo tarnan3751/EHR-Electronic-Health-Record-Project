@@ -1,13 +1,16 @@
 using System.Net;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Web.CloudAudit;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
 namespace Ehr.Web.Tests;
 
 // Emergency access (Areas/Clinical/Pages/Patients/Reason, BreakGlass): a chart off the clinician's panel asks for a
-// reason, records it, and stays open to them afterwards; a chart on their panel never asks.
+// reason, records it, and stays open to them afterwards; a chart on their panel never asks. Off-site, while the clinic's
+// server can't be reached, nothing can be recorded, so emergency access isn't offered.
 public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -68,5 +71,24 @@ public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
         using var response = await PostFormAsync(session.Client, $"/patients/{nobody}/reason", $"/patients/{nobody}/reason", ("Reason", "Looking for a record"));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task With_the_on_prem_app_unreachable_emergency_access_is_not_offered()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Away", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Kit", "Elsewhere");
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        // The cloud app finds out within a couple of seconds; this is that check, now.
+        Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
+
+        // The chart sends them here, as on-site.
+        using var response = await Client(apps.CloudCutOff, session.Jar).GetAsync($"/patients/{patient}", Cancel);
+
+        var html = await ReadAsync(response);
+        Assert.Equal($"/patients/{patient}/reason", PathOf(response));
+        Assert.Contains("Emergency access can't be granted until the clinic's server is back", html);
+        Assert.DoesNotContain("<textarea", html);
+        Assert.DoesNotContain("Open the chart", html);
     }
 }
