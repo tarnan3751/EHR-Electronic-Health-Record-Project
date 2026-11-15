@@ -36,7 +36,7 @@ def rescore(results: dict) -> dict:
     if results["provenance"].get("pipeline") != pipeline_sha256():
         raise ValueError(
             "These results came from other code making the transcript or the answers (the sidecar apart from its checks, "
-            "or a lockfile): run the eval again instead."
+            "the eval's answers.py, or a lockfile): run the eval again instead."
         )
     scripts = load_all()
     items = []

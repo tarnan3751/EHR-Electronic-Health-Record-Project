@@ -1,5 +1,5 @@
-"""run.py: one recording through the sidecar's own pipeline, with stand-in models, comes back as a scored item, and a
-two-minute recording is also timed chunk by chunk as a live dictation is."""
+"""run.py and answers.py: one recording through the sidecar's own pipeline, with stand-in models, comes back as a
+scored item, and a two-minute recording is also timed chunk by chunk as a live dictation is."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from conftest import ScriptedRecognizer, fake_structurer
 
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.provenance import Models
-from ehr_eval import run
+from ehr_eval import answers, run
 from ehr_eval.scoring import score
 
 
@@ -75,6 +75,6 @@ def test_live_chunks_are_timed_through_the_sidecars_sessions():
     models = Models({"repository": "r", "commit": "c", "sha256": "s"}, None)
     data = webm(speech(6))
 
-    times = asyncio.run(run.live_chunks(data, 6.0, ScriptedRecognizer("speech"), fake_structurer({}), models))
+    times = asyncio.run(answers.live_chunks(data, 6.0, ScriptedRecognizer("speech"), fake_structurer({}), models))
 
     assert len(times) >= 6 and all(t >= 0 for t in times)

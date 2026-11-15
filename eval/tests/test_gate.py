@@ -8,7 +8,15 @@ import pytest
 
 from ehr_dictation import prompt
 from ehr_eval.gate import check
-from ehr_eval.scripts import gold_sha256, pipeline_sha256, recordings_sha256, scoring_sha256
+from ehr_eval.scripts import (
+    EVAL_DIR,
+    PIPELINE_FILES,
+    SCORING_FILES,
+    gold_sha256,
+    pipeline_sha256,
+    recordings_sha256,
+    scoring_sha256,
+)
 
 
 def results(eval_dir, **overrides) -> dict:
@@ -82,6 +90,30 @@ def test_results_scored_by_other_checks_need_only_scoring_again(eval_dir):
     (problem,) = check(eval_dir / "results", eval_dir)
 
     assert "Score the stored answers again" in problem and "Run the eval" not in problem
+
+
+def test_the_code_feeding_the_models_needs_a_new_run_and_the_rest_only_scoring_again(eval_dir):
+    (eval_dir / "ehr_eval").mkdir()
+    save(eval_dir, "latest.json", results(eval_dir))
+    (eval_dir / "ehr_eval" / "answers.py").write_text("feeds the recordings to the models another way")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "Run the eval" in problem
+
+    save(eval_dir, "latest.json", results(eval_dir))
+    (eval_dir / "ehr_eval" / "run.py").write_text("checks what they answer another way")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "Score the stored answers again" in problem and "Run the eval" not in problem
+
+
+def test_every_eval_module_is_hashed_with_the_answers_or_the_scoring():
+    modules = {f"ehr_eval/{path.name}" for path in (EVAL_DIR / "ehr_eval").glob("*.py")}
+
+    # Neither the package, the gate nor the clinical gold report makes or scores an answer.
+    assert modules - set(PIPELINE_FILES) - set(SCORING_FILES) == {
+        "ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/goldreport.py"}
+    assert not set(PIPELINE_FILES) & set(SCORING_FILES)
 
 
 def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):

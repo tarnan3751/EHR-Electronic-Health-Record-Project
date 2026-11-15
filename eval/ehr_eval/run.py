@@ -4,9 +4,9 @@
 
 with llama-server's key in LLAMA_API_KEY, the models where setup_models.py put them (--models-dir, default
 infra/compose/models), and the recordings generate_audio.py made, or a teammate's (--audio, default eval/audio). Each
-recording goes through the sidecar's own code: ffmpeg decoding, MedASR transcription cut at pauses, K2 Horizon, and the
-checks, timed stage by stage. The two-minute recordings are also fed in one-second chunks, as a live dictation is, to
-time the transcript's update after each chunk. Nothing reaches the network but llama-server.
+recording goes through the sidecar's own code (answers.py): ffmpeg decoding, MedASR transcription cut at pauses and K2
+Horizon, timed stage by stage, and then the checks. The two-minute recordings are also fed in one-second chunks, as a
+live dictation is, to time the transcript's update after each chunk. Nothing reaches the network but llama-server.
 
 It runs K2 Horizon as the sidecar ships it, reasoning off. --reasoning low256 runs the comparison the owner asked for
 instead, reasoning on at "low" capped at 256 tokens (and enable_thinking set, since a llama-server started with
@@ -29,77 +29,28 @@ import os
 import platform
 import subprocess
 import sys
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
-from ehr_dictation import audio, prompt, provenance, validation  # noqa: E402
-from ehr_dictation.asr import MedAsr  # noqa: E402
-from ehr_dictation.llama import LlamaServer, StructuringFailed, Structurer  # noqa: E402
-from ehr_dictation.sessions import Sessions  # noqa: E402
-from ehr_dictation.settings import Settings  # noqa: E402
-from ehr_dictation.transcriber import Progress, advance  # noqa: E402
-from ehr_dictation.transcript import assemble  # noqa: E402
+from ehr_dictation import validation  # noqa: E402
+from ehr_dictation.llama import Structurer  # noqa: E402
 
 from . import scoring  # noqa: E402
+from .answers import REASONING, answer, live_chunks, open_pipeline  # noqa: E402
 from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256  # noqa: E402
 
 REPO_ROOT = EVAL_DIR.parent
 SCHEMA_VERSION = 1
 
-# The settings a run can use: what ships, and the comparison.
-REASONING = {
-    "off": prompt.PARAMETERS,
-    "low256": prompt.PARAMETERS | {"reasoning_effort": "low", "reasoning_budget_tokens": 256,
-                                   "chat_template_kwargs": {"enable_thinking": True}},
-}
 OUT = {"off": "latest.json", "low256": "compare-low256.json"}
 
 
-def variant_tags(variant: dict, script_tags: list[str]) -> list[str]:
-    noise = f"noise:{variant['noise']}@{variant['snr_db']}dB" if variant.get("noise") else "noise:none"
-    return [f"accent:{variant.get('accent', 'unknown')}", noise, f"container:{variant.get('container', 'unknown')}", *script_tags]
-
-
 async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: Structurer, scripts) -> scoring.Item:  # noqa: ANN001
-    script = scripts[variant["script"]]
-    data = (audio_dir / variant["file"]).read_bytes()
-    timings: dict[str, float] = {}
-
-    started = time.perf_counter()
-    samples = audio.decode(data)
-    timings["decode"] = time.perf_counter() - started
-
-    started = time.perf_counter()
-    progress = advance(samples, Progress(), recognizer, final=True)
-    transcript = assemble(progress.segments, final=True)
-    timings["transcribe"] = time.perf_counter() - started
-
-    item = scoring.Item(
-        variant=variant["id"],
-        script=script.id,
-        tags=variant_tags(variant, script.tags),
-        seconds=samples.size / audio.SAMPLE_RATE,
-        hypothesis=transcript.text,
-        sorting="done",
-        not_carried_over=[(kind, start, end) for start, end, kind in validation.directives(transcript.text)],
-        segments=[dataclasses.asdict(placed.segment) for placed in transcript.placed],
-        unclear_passages=len(transcript.unclear_ranges()),
-        timings=timings,
-    )
-    started = time.perf_counter()
-    try:
-        proposal = await structurer.propose(transcript.for_structuring())
-    except StructuringFailed as error:
-        item.sorting, item.reason = "unavailable", error.reason
-        timings["structure"] = time.perf_counter() - started
+    item, transcript, proposal = await answer(variant, audio_dir, recognizer, structurer, scripts)
+    if proposal is None:
         return item
-    timings["structure"] = time.perf_counter() - started
-    item.tokens = {key: int(proposal.timings[key]) for key in ("prompt_n", "cache_n", "predicted_n")
-                   if proposal.timings and isinstance(proposal.timings.get(key), int)}
-
     checks = validation.check(proposal.fields, proposal.unknown, transcript)
     item.unknown = list(checks.unknown)
     item.fields = {
@@ -114,21 +65,6 @@ async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: St
         for name, checked in checks.fields.items()
     }
     return item
-
-
-async def live_chunks(data: bytes, seconds: float, recognizer, structurer: Structurer, models) -> list[float]:  # noqa: ANN001
-    """The time to bring the transcript up to date after each one-second chunk, through the sidecar's sessions."""
-    settings = Settings(api_key="eval", llama_api_key="eval", max_session_seconds=3600, max_session_bytes=1 << 30)
-    sessions = Sessions(settings, recognizer, structurer, models)
-    session = sessions.start("eval")
-    size = max(1, int(len(data) / max(seconds, 1.0)))
-    times = []
-    for seq, offset in enumerate(range(0, len(data), size)):
-        started = time.perf_counter()
-        await sessions.add_audio(session.id, "eval", seq, data[offset : offset + size])
-        times.append(time.perf_counter() - started)
-    sessions.cancel(session.id, "eval")
-    return times
 
 
 def machine(label: str | None, device: str) -> dict:
@@ -182,11 +118,7 @@ async def main_async(args: argparse.Namespace) -> int:
     scripts = load_all()
     variants = [v for v in manifest["variants"] if not args.only or v["script"] in args.only]
 
-    models = provenance.load(args.models_dir)
-    recognizer = MedAsr(args.models_dir / provenance.MEDASR_DIR, args.device)
-    llama = LlamaServer(args.llama_url, api_key)
-    structuring = prompt.load(parameters=REASONING[args.reasoning])
-    structurer = Structurer(llama, structuring, models.language_file, timeout=Settings.structuring_seconds)
+    models, recognizer, llama, structuring, structurer = open_pipeline(args, api_key)
     out = args.out or EVAL_DIR / "results" / OUT[args.reasoning]
     started_at = datetime.now(UTC).isoformat(timespec="seconds")
 

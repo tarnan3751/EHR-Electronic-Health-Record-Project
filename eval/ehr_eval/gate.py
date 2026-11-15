@@ -70,8 +70,8 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
         )
     if recorded.get("pipeline") != pipeline_sha256(eval_dir):
         problems.append(
-            "What makes the transcript and the model's answers (the sidecar's code apart from its checks, or a lockfile) "
-            f"changed since the last eval run. {RUN_IT}"
+            "What makes the transcript and the model's answers (the sidecar's code apart from its checks, the eval's "
+            f"answers.py, or a lockfile) changed since the last eval run. {RUN_IT}"
         )
     elif recorded.get("scoring") != scoring_sha256(eval_dir):
         problems.append(
