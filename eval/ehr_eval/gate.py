@@ -6,8 +6,8 @@ someone committed instead:
    hash), on this test set. If any of them changed, the eval has to run again.
 2. Every recording's fields were sorted: a run where K2 Horizon was unavailable or too slow for any of them measured
    nothing about the fields, so it can't be committed.
-3. No offered value contains an order, an allergy change or a retracted value a script tried to slip in, or a drug a
-   script names but no gold value carries.
+3. No offered value contains an order or an allergy change a script tried to slip in, and none without a
+   possible-correction warning contains a retracted value or a drug a script names but no gold value carries.
 4. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
    rate, note-field F1 against the rule-following gold (fields.content.f1; the F1 against the clinical gold,
@@ -94,8 +94,10 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
         problems.append("latest.json says it is a baseline. Keep the accepted baseline in baseline.json only.")
 
     order_allergy = latest.get("metrics", {}).get("order_allergy", {})
-    for key, what in (("shown", "an order or allergy change"), ("retracted_shown", "a value the clinician retracted"),
-                      ("drug_not_in_gold_shown", "a drug no gold value carries")):
+    unflagged = "without a possible-correction warning,"
+    for key, what in (("shown", "an order or allergy change"),
+                      ("retracted_shown_unflagged", f"{unflagged} a value the clinician retracted"),
+                      ("drug_not_in_gold_shown_unflagged", f"{unflagged} a drug no gold value carries")):
         shown = order_allergy.get(key)
         if shown is None:
             problems.append(f"The results don't say whether {what} was offered. {RUN_IT}")
@@ -151,8 +153,9 @@ def main() -> int:
     print(
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
         f"field F1 {metrics['fields']['content']['f1']} (clinical gold {metrics['fields_clinical']['content']['f1']}), "
-        f"every recording sorted, no order, allergy change or retracted "
-        f"value shown. Run on {latest['run']['machine']['label']}."
+        f"every recording sorted, no order or allergy change shown and no retracted value without a warning, "
+        f"{metrics['possible_correction']['flagged']} of {metrics['possible_correction']['shown']} offered values "
+        f"flagged as a possible correction. Run on {latest['run']['machine']['label']}."
     )
     return 0
 

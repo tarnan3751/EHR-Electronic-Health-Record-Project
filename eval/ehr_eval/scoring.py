@@ -13,11 +13,14 @@
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - order_allergy (on what the sidecar sends for an offered field: the value with any instruction cut out of it): offered
   values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), retracted (a
-  value the clinician corrected away; must be 0), or a drug the script names but no gold value carries (one dictated
-  only to be stopped, refused or ordered; must be 0); how many of those the result reported as not carried over, so the
-  screen can say they still need placing (recall against the scripts' forbidden items); and what the order-and-allergy
-  rule threw away that the gold says was legitimate (false discards), so the owner can judge where that rule draws its
-  line.
+  value the clinician corrected away), or a drug the script names but no gold value carries (one dictated only to be
+  stopped, refused or ordered), each of the last two also counted without a possible-correction warning (must be 0); how
+  many of those the result reported as not carried over, so the screen can say they still need placing (recall against
+  the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was legitimate (false
+  discards), so the owner can judge where that rule draws its line.
+- possible_correction: how many offered values carry a possible-correction warning, and of the right ones (matching
+  the gold, holding nothing retracted), the share flagged anyway: the warning's false-alarm rate, overall and per tag,
+  against each gold set.
 - sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took and how many tokens
   K2 Horizon read and wrote, separately for the two-minute dictations and those at the 3-minute limit, with the live
   transcript's time per chunk.
@@ -33,7 +36,7 @@ from dataclasses import dataclass, field
 import jiwer
 
 from ehr_dictation.prompt import FIELDS
-from ehr_dictation.textnorm import STOPWORDS
+from ehr_dictation.textnorm import STOPWORDS, numbers
 
 from .dates import said_right
 from .normalize import normalize, words
@@ -50,8 +53,10 @@ class FieldOutcome:
     sources: list[str] = field(default_factory=list)
     status: str = "empty"  # pending (offered) or empty
     reasons: list[str] = field(default_factory=list)
-    # What the sidecar sends when the field is pending: the proposed value with any instruction cut out of it.
+    # What the sidecar sends when the field is pending: the proposed value with any instruction cut out of it, and
+    # where its possible-correction warnings point (code points in the transcript).
     value: str = ""
+    warnings: list[list[int]] = field(default_factory=list)
 
     @property
     def shown(self) -> str:
@@ -91,6 +96,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "validation": _validation(items),
         "unsupported_content": _unsupported(items),
         "order_allergy": _order_allergy(items, scripts),
+        "possible_correction": _possible_correction(items, scripts),
         "sorting": _sorting(items),
         "timing": _timing(items),
     }
@@ -224,8 +230,14 @@ def _reported(item: Item, phrase: str) -> bool:
     return any(_contains(normalize(item.hypothesis[start:end]), phrase) for _, start, end in item.not_carried_over)
 
 
+def _absent_drugs(script: Script) -> list[str]:
+    """The drugs the script names that no gold value carries: dictated only to be stopped, refused or ordered."""
+    gold_text = " ".join(normalize(gold.value) for gold in script.gold.values())
+    return [normalize(drug) for drug in script.drugs if not _contains(gold_text, normalize(drug))]
+
+
 def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
-    shown = retracted_shown = drug_shown = 0
+    shown = retracted_shown = drug_shown = retracted_unflagged = drug_unflagged = 0
     reported = said = 0
     discarded = lost = lost_without_attempt = 0
     legitimate = 0
@@ -237,13 +249,17 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
                 said += 1
                 reported += _reported(item, phrase)
         retracted = [normalize(text) for text in getattr(script, "retracted", ())]
-        gold_text = " ".join(normalize(gold.value) for gold in script.gold.values())
-        absent_drugs = [normalize(drug) for drug in script.drugs if not _contains(gold_text, normalize(drug))]
+        absent_drugs = _absent_drugs(script)
         for name, outcome in item.fields.items():
             shown_text = normalize(outcome.shown)
             shown += sum(1 for text in forbidden if _contains(shown_text, text))
-            retracted_shown += sum(1 for text in retracted if _contains(shown_text, text))
-            drug_shown += sum(1 for drug in absent_drugs if _contains(shown_text, drug))
+            retracted_here = sum(1 for text in retracted if _contains(shown_text, text))
+            drugs_here = sum(1 for drug in absent_drugs if _contains(shown_text, drug))
+            retracted_shown += retracted_here
+            drug_shown += drugs_here
+            if not outcome.warnings:
+                retracted_unflagged += retracted_here
+                drug_unflagged += drugs_here
             gold = script.gold[name].value.strip()
             legitimate += bool(gold)
             if outcome.status != "pending" and "order_or_allergy_change" in outcome.reasons:
@@ -254,7 +270,9 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     return {
         "shown": shown,
         "retracted_shown": retracted_shown,
+        "retracted_shown_unflagged": retracted_unflagged,
         "drug_not_in_gold_shown": drug_shown,
+        "drug_not_in_gold_shown_unflagged": drug_unflagged,
         "forbidden_said": said,
         "reported_not_carried_over": reported,
         "reported_recall": _ratio(reported, said),
@@ -263,6 +281,40 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
         "lost_where_nothing_was_attempted": lost_without_attempt,
         "false_discard_rate": _ratio(lost, legitimate),
     }
+
+
+def _possible_correction(items: list[Item], scripts: dict[str, Script]) -> dict:
+    """How often a right value is flagged as a possible correction: of the values shown whose gold field has a value,
+    and which hold no retracted value, no forbidden text and no drug the gold leaves out, and whose numbers and drug
+    names are all in the gold value, the share that carry a warning. Overall and per tag, against each gold set. Also
+    how many values were flagged at all."""
+
+    def right(value: str, gold: str, script: Script) -> bool:
+        text, gold_text = normalize(value), normalize(gold)
+        wrong = [normalize(t) for t in (*script.retracted, *script.forbidden)] + _absent_drugs(script)
+        drugs = [normalize(drug) for drug in script.drugs if _contains(text, normalize(drug))]
+        return (
+            bool(gold.strip()) and not any(_contains(text, t) for t in wrong if t)
+            and set(numbers(text)) <= set(numbers(gold_text)) and all(_contains(gold_text, drug) for drug in drugs)
+        )
+
+    def measure(golds: Callable[[Script], dict[str, Gold]], group: list[Item]) -> dict:
+        right_values = flagged = 0
+        for item in group:
+            script = scripts[item.script]
+            for name, outcome in item.fields.items():
+                if outcome.shown.strip() and right(outcome.shown, golds(script)[name].value, script):
+                    right_values += 1
+                    flagged += bool(outcome.warnings)
+        return {"right": right_values, "flagged": flagged, "false_alarm_rate": _ratio(flagged, right_values)}
+
+    tags = sorted({tag for item in items for tag in item.tags})
+    by_gold = {}
+    for key, golds in (("rules", lambda script: script.gold_rules), ("clinical", lambda script: script.gold)):
+        by_gold[key] = measure(golds, items) | {
+            "by_tag": {tag: measure(golds, [item for item in items if tag in item.tags]) for tag in tags}}
+    shown = [outcome for item in items for outcome in item.fields.values() if outcome.shown.strip()]
+    return {"shown": len(shown), "flagged": sum(1 for outcome in shown if outcome.warnings)} | by_gold
 
 
 def _sorting(items: list[Item]) -> dict:

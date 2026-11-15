@@ -43,6 +43,7 @@ def rescore(results: dict) -> dict:
                 item.fields[name].status = "pending" if checked.pending else "empty"
                 item.fields[name].reasons = checked.reasons
                 item.fields[name].value = checked.value if checked.pending else ""
+                item.fields[name].warnings = [list(span) for span in checked.warnings]
         items.append(item)
     out = dict(results)
     out["provenance"] = results["provenance"] | {"code": CODE_SHA256, "measurement": measurement_sha256()}

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from ehr_dictation import prompt
 from ehr_dictation.provenance import CODE_SHA256
 from ehr_eval.gate import check
@@ -19,7 +21,8 @@ def results(eval_dir, **overrides) -> dict:
         "dataset": {"sha256": dataset_sha256(eval_dir), "complete": True, "recordings": 2},
         "metrics": {"wer": {"overall": 0.1}, "fields": {"content": {"f1": 0.8}}, "dates": {"accuracy": 0.9},
                     "drugs": {"accuracy": 0.7}, "unsupported_content": {"shown": 0.02},
-                    "order_allergy": {"shown": 0, "retracted_shown": 0, "drug_not_in_gold_shown": 0},
+                    "order_allergy": {"shown": 0, "retracted_shown": 2, "retracted_shown_unflagged": 0,
+                                      "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0},
                     "sorting": {"done": 2, "unavailable": {}}},
         "items": [{"script": "d01"}, {"script": "d02"}],
     }
@@ -94,6 +97,16 @@ def test_an_order_or_allergy_change_shown_fails(eval_dir):
 
     (problem,) = check(eval_dir / "results", eval_dir)
     assert "there must be none" in problem
+
+
+@pytest.mark.parametrize("key", ["retracted_shown_unflagged", "drug_not_in_gold_shown_unflagged"])
+def test_a_retracted_value_or_drug_shown_without_a_warning_fails(eval_dir, key):
+    shown = results(eval_dir)
+    shown["metrics"]["order_allergy"][key] = 1
+    save(eval_dir, "latest.json", shown)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "without a possible-correction warning" in problem
 
 
 def test_a_metric_the_baseline_has_and_the_results_lack_fails(eval_dir):

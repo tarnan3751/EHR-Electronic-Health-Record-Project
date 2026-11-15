@@ -167,6 +167,34 @@ def test_a_retracted_value_offered_is_counted(scripts):
     items = [item("d01", "x", history=pending("Cough for 4 days."))]
 
     assert score(items, retracting)["order_allergy"]["retracted_shown"] == 1
+    assert score(items, retracting)["order_allergy"]["retracted_shown_unflagged"] == 1
+
+
+def test_a_retracted_value_with_a_warning_is_counted_apart(scripts):
+    import dataclasses
+
+    retracting = {"d01": dataclasses.replace(scripts["d01"], retracted=("4 days",)), "d02": scripts["d02"]}
+    warned = dataclasses.replace(pending("Cough for 4 days."), warnings=[[9, 15]])
+
+    order_allergy = score([item("d01", "x", history=warned)], retracting)["order_allergy"]
+
+    assert (order_allergy["retracted_shown"], order_allergy["retracted_shown_unflagged"]) == (1, 0)
+
+
+def test_the_warnings_false_alarms_are_the_right_values_flagged(scripts):
+    import dataclasses
+
+    items = [
+        item("d01", "x", tags=["vitals"], history=dataclasses.replace(pending("Cough for 3 days."), warnings=[[0, 1]])),
+        item("d01", "x", tags=["vitals"], history=pending("Cough for 3 days.")),
+        item("d01", "x", history=dataclasses.replace(pending("Cough for 4 days."), warnings=[[0, 1]])),  # wrong anyway
+    ]
+
+    warning = score(items, scripts)["possible_correction"]
+
+    assert (warning["shown"], warning["flagged"]) == (3, 2)
+    assert warning["rules"]["right"] == 2 and warning["rules"]["false_alarm_rate"] == 0.5
+    assert warning["clinical"]["by_tag"]["vitals"]["false_alarm_rate"] == 0.5
 
 
 def test_fields_are_scored_per_tag(scripts):

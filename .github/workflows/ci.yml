@@ -236,7 +236,8 @@ jobs:
         run: uv run --project eval --locked --python 3.12 pytest eval/tests
 
       # CI can't run the models, so it checks the committed results: they come from this commit's prompt, schema,
-      # validation rules and test set, show no order or allergy change, and score no lower than the accepted baseline.
+      # validation rules and test set, show no order or allergy change and no retracted value without a
+      # possible-correction warning, and score no lower than the accepted baseline.
       - name: Check the committed eval results
         run: uv run --project eval --locked --python 3.12 python -m ehr_eval.gate
 
