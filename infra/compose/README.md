@@ -16,9 +16,12 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | `wan-latency` | | One-shot job that sets the latency each time the stack starts; "Exited (0)" means it worked. `cloud-app` starts only after it. |
 | `mail` | The clinic's mail relay | [Mailpit](https://mailpit.axllent.org/): catches every email the on-prem app sends and shows them at http://127.0.0.1:8025; delivers nothing |
 | `llama` | K2 Horizon 7B in llama.cpp's `llama-server`, on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
+| `dictation` | The dictation sidecar on the on-prem server: MedASR, then K2 Horizon through `llama`, then the checks on what it proposes (`src/Ehr.Dictation/sidecar`) | Opt-in `ai` profile, on the same network as `llama`; only the on-prem app reaches it, with a key. Keeps nothing: its file system is read-only apart from a tmpfs |
 | `restore-db` | A restored copy of the primary | Opt-in `restore` profile, for the restore drill |
 
-Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. Pages that read patient data come from the replica as well; the cloud app records those reads in its own audit queue and ships them to the on-prem app. The MedASR sidecar joins the `ai` profile once its code exists.
+Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. Pages that read patient data come from the replica as well; the cloud app records those reads in its own audit queue and ships them to the on-prem app.
+
+Dictation is on-prem only: the cloud app forwards its requests to the on-prem app, which calls the `dictation` sidecar, which calls `llama`.
 
 **Signing in.** On its first start the on-prem app creates one admin account from `EHR_BOOTSTRAP_ADMIN_EMAIL` and `EHR_BOOTSTRAP_ADMIN_PASSWORD` in `.env`. Sign in with it at https://ehr.example.com:8443: it asks for a new password, then for an authenticator app (any TOTP app; the page shows the key), then shows recovery codes once. From **Staff** it creates the other accounts, each with a one-time setup link. Patients register at https://portal.example.com:9443/portal/register with the enrollment code a clinician issues from the chart; the confirmation email lands in Mailpit.
 
@@ -130,16 +133,16 @@ Barman takes a base backup about a minute after its first start, streams WAL con
 
 ## AI profile
 
-1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/` and prints the `LLAMA_MODEL_FILE` value. Set that and `LLAMA_API_KEY` in `.env`. The models folder is gitignored; `llama` refuses to start without an API key.
-2. Start with `docker compose --profile ai up -d`.
+1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/`, MedASR in `infra/compose/models/medasr/`, and prints the `LLAMA_MODEL_FILE` value. Set that, `LLAMA_API_KEY` and `DICTATION_API_KEY` in `.env`. The models folder is gitignored; `llama` refuses to start without its key, and `dictation` without both keys or with a MedASR that isn't the one `models-manifest.json` records.
+2. Start with `docker compose --profile ai up -d --build`. `dictation` is healthy once MedASR has loaded; the on-prem app's dictation API answers that dictation is unavailable until then, and whenever the profile isn't running.
 3. On a machine with an NVIDIA GPU, add the override file:
-   `docker compose -f compose.yaml -f compose.nvidia.yaml --profile ai up -d`
+   `docker compose -f compose.yaml -f compose.nvidia.yaml --profile ai up -d --build`
 
-Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. The root README's "Dictation server hardware" section covers the faster native options.
+Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. The root README's "Dictation server hardware" section covers the faster native options. MedASR runs on the CPU in every case; it's small.
 
 ## Encryption
 
-**In transit.** Every connection in the stack is TLS with the certificate from the one-time setup, verified against its root: browsers and the desktop app to the three sites; both apps and the migration job to their databases (`SSL Mode=VerifyFull`); the replica's and Barman's streams from the primary across the WAN link; and the cloud app's forwarding to the on-prem app. The databases refuse anything else: `hostssl` is the only kind of network line in `postgres/*/pg_hba.conf`, and `postgres/tls.sh` hands PostgreSQL the certificate in the form it accepts. To see it:
+**In transit.** These connections are TLS with the certificate from the one-time setup, verified against its root: browsers and the desktop app to the three sites; both apps and the migration job to their databases (`SSL Mode=VerifyFull`); the replica's and Barman's streams from the primary across the WAN link; and the cloud app's forwarding to the on-prem app. The databases refuse anything else: `hostssl` is the only kind of network line in `postgres/*/pg_hba.conf`, and `postgres/tls.sh` hands PostgreSQL the certificate in the form it accepts. The `ai` profile is the exception: the on-prem app's calls to `dictation`, and `dictation`'s to `llama`, are plain HTTP with an API key, on the `inference` network inside the on-prem server, which has no route out and nothing else on it. To see the database connections:
 
 ```
 docker compose exec -u postgres onprem-db psql -c "select a.usename, a.client_addr, s.ssl, s.version from pg_stat_ssl s join pg_stat_activity a using (pid) where a.client_addr is not null"

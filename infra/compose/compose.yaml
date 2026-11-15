@@ -105,6 +105,10 @@ services:
       Ehr__Smtp__Host: mail
       Ehr__Smtp__Port: "1025"
       Ehr__Smtp__From: no-reply@example.com
+      # The dictation sidecar, in the ai profile, over plain HTTP on the inference network with its key (see the
+      # dictation service). Without the profile running, the dictation API says dictation is unavailable.
+      Ehr__Dictation__Url: http://dictation:8000
+      Ehr__Dictation__ApiKey: ${DICTATION_API_KEY:-}
     ports:
       - "127.0.0.1:${ONPREM_HTTPS_PORT:-8443}:8443"
     networks: [onprem, inference]
@@ -143,6 +147,32 @@ services:
     volumes:
       - ./models:/models:ro
     networks: [inference]
+
+  # Opt-in (--profile ai). MedASR transcribes, llama sorts the transcript into note fields, and every proposed value is
+  # checked (src/Ehr.Dictation/sidecar). Reachable only from the on-prem app, with no internet access. It refuses to
+  # start without DICTATION_API_KEY and LLAMA_API_KEY, which are optional here, not required, for the same reason as
+  # llama's. It keeps nothing: audio and transcripts stay in memory, and its only writable place is a tmpfs.
+  dictation:
+    profiles: [ai]
+    build:
+      context: ../../src/Ehr.Dictation
+      dockerfile: sidecar/Dockerfile
+    image: ehr-dictation:dev
+    environment:
+      DICTATION_API_KEY: ${DICTATION_API_KEY:-}
+      LLAMA_API_KEY: ${LLAMA_API_KEY:-}
+      DICTATION_LLAMA_URL: http://llama:8080
+    volumes:
+      - ./models:/models:ro
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [inference]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
 
   # ---- Cloud site --------------------------------------------------------------------------
 

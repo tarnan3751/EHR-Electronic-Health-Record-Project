@@ -1,0 +1,7 @@
+# The sidecar image (sidecar/Dockerfile) needs only the package, its lockfile and the note schema and prompt.
+*
+!sidecar/pyproject.toml
+!sidecar/uv.lock
+!sidecar/ehr_dictation/
+!schema/
+**/__pycache__/
