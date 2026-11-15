@@ -12,7 +12,7 @@ from test_run import speech, webm
 
 from ehr_dictation import prompt
 from ehr_eval import rescore, run, scoring
-from ehr_eval.scripts import pipeline_sha256, scoring_sha256
+from ehr_eval.scripts import gold_sha256, pipeline_sha256, recordings_sha256, scoring_sha256
 
 
 def a_run(tmp_path, scripts) -> dict:
@@ -29,6 +29,7 @@ def a_run(tmp_path, scripts) -> dict:
     return {
         "run": {"parameters": prompt.PARAMETERS},
         "provenance": {"structuring": prompt.load().structuring_sha256, "pipeline": pipeline_sha256(), "scoring": "old"},
+        "dataset": {"recordings_sha256": recordings_sha256(), "gold_sha256": "old"},
         "metrics": scoring.score([item], scripts),
         "items": [dataclasses.asdict(item)],
     }
@@ -44,6 +45,15 @@ def test_the_same_rules_give_the_same_results(tmp_path, scripts, monkeypatch):
     assert [i["fields"] for i in again["items"]] == [i["fields"] for i in results["items"]]
     assert again["provenance"]["scoring"] == scoring_sha256() and again["rescored_from"]["scoring"] == "old"
     assert again["provenance"]["pipeline"] == pipeline_sha256()
+    assert again["dataset"]["gold_sha256"] == gold_sha256() and again["rescored_from"]["gold_sha256"] == "old"
+
+
+def test_answers_from_other_recordings_are_refused(tmp_path, scripts):
+    results = a_run(tmp_path, scripts)
+    results["dataset"]["recordings_sha256"] = "0" * 64
+
+    with pytest.raises(ValueError, match="other recordings"):
+        rescore.rescore(results)
 
 
 def test_answers_from_other_code_making_them_are_refused(tmp_path, scripts):

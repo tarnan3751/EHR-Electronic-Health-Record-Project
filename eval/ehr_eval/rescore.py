@@ -4,11 +4,11 @@
 
 A run keeps, for each recording, MedASR's passages as heard and K2 Horizon's proposals as answered (run.py). This
 rebuilds each transcript from those passages exactly, runs validation.py over the proposals, and writes the results
-again, stamped with the current scoring hash and everything else as the run recorded it: the model outputs are the
-same ones, and only what is checked and scored has changed. It is how a change to the rules is measured on the same
-answers (for example strict against relaxed). It refuses a run made with another prompt, schema or parameters, or
-with other code making the transcript and the answers (the pipeline hash), whose answers the current code would never
-have given.
+again, stamped with the current scoring and gold hashes and everything else as the run recorded it: the model outputs
+are the same ones, and only what is checked and scored, and the gold it is scored against, have changed. It is how a change to the rules is measured on the same
+answers (for example strict against relaxed). It refuses a run made with another prompt, schema or parameters, with
+other code making the transcript and the answers (the pipeline hash), or from other recordings (the recordings hash),
+whose answers the current code would never have given.
 """
 
 from __future__ import annotations
@@ -23,13 +23,15 @@ from ehr_dictation import prompt, validation
 from ehr_dictation.transcript import Segment, assemble
 
 from . import scoring
-from .scripts import load_all, pipeline_sha256, scoring_sha256
+from .scripts import gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256
 
 
 def rescore(results: dict) -> dict:
     structuring = prompt.load(parameters=results["run"]["parameters"])
     if results["provenance"]["structuring"] != structuring.structuring_sha256:
         raise ValueError("These results came from another prompt, schema or parameters: run the eval again instead.")
+    if results.get("dataset", {}).get("recordings_sha256") != recordings_sha256():
+        raise ValueError("These results came from other recordings: generate the audio and run the eval again instead.")
     if results["provenance"].get("pipeline") != pipeline_sha256():
         raise ValueError(
             "These results came from other code making the transcript or the answers (the sidecar apart from its checks, "
@@ -52,8 +54,13 @@ def rescore(results: dict) -> dict:
         items.append(item)
     out = dict(results)
     out["provenance"] = results["provenance"] | {"scoring": scoring_sha256()}
-    # The model's answers are the run's own; only the checks and the scoring are this code's.
-    out["rescored_from"] = {"scoring": results["provenance"].get("scoring"), "structuring_outputs_reused": True}
+    out["dataset"] = results["dataset"] | {"gold_sha256": gold_sha256()}
+    # The model's answers are the run's own; only the checks, the gold and the scoring are this code's.
+    out["rescored_from"] = {
+        "scoring": results["provenance"].get("scoring"),
+        "gold_sha256": results["dataset"].get("gold_sha256"),
+        "structuring_outputs_reused": True,
+    }
     out["metrics"] = scoring.score(items, load_all())
     out["items"] = [dataclasses.asdict(item) for item in items]
     return out

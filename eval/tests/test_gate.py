@@ -8,7 +8,7 @@ import pytest
 
 from ehr_dictation import prompt
 from ehr_eval.gate import check
-from ehr_eval.scripts import dataset_sha256, pipeline_sha256, scoring_sha256
+from ehr_eval.scripts import gold_sha256, pipeline_sha256, recordings_sha256, scoring_sha256
 
 
 def results(eval_dir, **overrides) -> dict:
@@ -17,7 +17,8 @@ def results(eval_dir, **overrides) -> dict:
         "run": {"machine": {"label": "the server"}},
         "provenance": {"structuring": prompt.load().structuring_sha256, "pipeline": pipeline_sha256(eval_dir),
                        "scoring": scoring_sha256(eval_dir)},
-        "dataset": {"sha256": dataset_sha256(eval_dir), "complete": True, "recordings": 2},
+        "dataset": {"recordings_sha256": recordings_sha256(eval_dir), "gold_sha256": gold_sha256(eval_dir),
+                    "complete": True, "recordings": 2},
         "metrics": {"wer": {"overall": 0.1}, "fields": {"content": {"f1": 0.8}}, "dates": {"accuracy": 0.9},
                     "drugs": {"accuracy": 0.7}, "unsupported_content": {"shown": 0.02},
                     "order_allergy": {"shown": 0, "retracted_shown": 2, "retracted_shown_unflagged": 0,
@@ -53,12 +54,22 @@ def test_results_from_another_prompt_pipeline_or_test_set_fail(eval_dir):
     stale["provenance"] = {"structuring": "0" * 64, "pipeline": "1" * 64, "scoring": "2" * 64}
     save(eval_dir, "latest.json", stale)
     (eval_dir / "scripts" / "d01.toml").write_text(
-        (eval_dir / "scripts" / "d01.toml").read_text() + "\n# edited\n")
+        (eval_dir / "scripts" / "d01.toml").read_text().replace("Cough for", "Coughing for", 1))
 
     problems = check(eval_dir / "results", eval_dir)
 
     assert len(problems) == 3
     assert all("Run the eval" in p for p in problems)
+
+
+def test_results_scored_against_other_gold_need_only_scoring_again(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    script = eval_dir / "scripts" / "d01.toml"
+    script.write_text(script.read_text().replace('value = "Rest."', 'value = "Rest at home."'))
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+
+    assert "Score the stored answers again" in problem and "Run the eval" not in problem
 
 
 def test_results_scored_by_other_checks_need_only_scoring_again(eval_dir):

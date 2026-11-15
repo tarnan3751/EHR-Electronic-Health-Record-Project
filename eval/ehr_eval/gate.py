@@ -2,9 +2,10 @@
 someone committed instead:
 
 1. eval/results/latest.json exists, covers every script, and was produced by this commit's prompt, schema and
-   generation parameters, its code making the transcript and the answers (the pipeline hash), and on this test set; if
-   any of them changed, the eval has to run again. And it was scored by this commit's checks and scoring code (the
-   scoring hash); if only they changed, re-scoring the stored answers (rescore.py) is enough.
+   generation parameters, its code making the transcript and the answers (the pipeline hash), and from this test set's
+   recordings (the recordings hash); if any of them changed, the eval has to run again. And it was scored by this
+   commit's checks and scoring code and against its gold (the scoring and gold hashes); if only they changed,
+   re-scoring the stored answers (rescore.py) is enough.
 2. Every recording's fields were sorted: a run where K2 Horizon was unavailable or too slow for any of them measured
    nothing about the fields, so it can't be committed.
 3. No offered value contains an order or an allergy change a script tried to slip in, and none without a warning
@@ -32,7 +33,7 @@ from pathlib import Path
 
 from ehr_dictation import prompt
 
-from .scripts import EVAL_DIR, dataset_sha256, load_all, pipeline_sha256, scoring_sha256
+from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256
 
 RESULTS_DIR = EVAL_DIR / "results"
 KNOWN_LIMITATIONS = "known-limitations.toml"
@@ -76,10 +77,15 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
             "were scored. Score the stored answers again with the code that ships: "
             "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
         )
-    if latest.get("dataset", {}).get("sha256") != dataset_sha256(eval_dir):
+    if latest.get("dataset", {}).get("recordings_sha256") != recordings_sha256(eval_dir):
         problems.append(
-            "The test set (eval/scripts, voices.toml or generate_audio.py) changed since the last eval run. Generate the "
-            f"audio again, then: {RUN_IT}"
+            "What the test set's recordings say (a script's text, voice or noise, voices.toml or generate_audio.py) "
+            f"changed since the last eval run. Generate the audio again, then: {RUN_IT}"
+        )
+    elif latest.get("dataset", {}).get("gold_sha256") != gold_sha256(eval_dir):
+        problems.append(
+            "The test set's gold, tags or lists changed since these results were scored. Score the stored answers again: "
+            "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
         )
     scripts = set(load_all(eval_dir / "scripts"))
     covered = {item.get("script") for item in latest.get("items", [])}

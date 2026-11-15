@@ -44,7 +44,7 @@ from ehr_dictation.transcriber import Progress, advance  # noqa: E402
 from ehr_dictation.transcript import assemble  # noqa: E402
 
 from . import scoring  # noqa: E402
-from .scripts import EVAL_DIR, dataset_sha256, load_all, pipeline_sha256, scoring_sha256  # noqa: E402
+from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256  # noqa: E402
 
 REPO_ROOT = EVAL_DIR.parent
 SCHEMA_VERSION = 1
@@ -222,7 +222,8 @@ async def main_async(args: argparse.Namespace) -> int:
             "scoring": scoring_sha256(),
         },
         "dataset": {
-            "sha256": dataset_sha256(),
+            "recordings_sha256": recordings_sha256(),
+            "gold_sha256": gold_sha256(),
             "scripts": len({v["script"] for v in variants}),
             "recordings": len(variants),
             "complete": not args.only,
