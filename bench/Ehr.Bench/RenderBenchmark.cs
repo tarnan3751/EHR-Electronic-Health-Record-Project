@@ -24,9 +24,9 @@ using Npgsql;
 
 namespace Ehr.Bench;
 
-// Server render time for the patient search and the chart in a clinic of 50,000 synthetic patients (NFR-01, NFR-04;
-// AGENTS.md's gate is a p99 under 20 ms). The on-prem app runs in memory, so a request's time is the server's own:
-// authentication, the page's queries and the reads it records, and rendering, with no network in it. Each kind of
+// Server render time for the patient search, the panel and the chart in a clinic of 50,000 synthetic patients (NFR-01,
+// NFR-04; AGENTS.md's gate is a p99 under 20 ms). The on-prem app runs in memory, so a request's time is the server's
+// own: authentication, the page's queries and the reads it records, and rendering, with no network in it. Each kind of
 // request is made 100 times to warm up, then 1,000 times one after another, and the times are reported as
 // percentiles, with two parts of each apart from the rest: inserting the audit events of the page's reads, and
 // committing its transaction, which waits for them to reach the disk. That wait is only there when the database's
@@ -103,6 +103,8 @@ internal static partial class RenderBenchmark
                 {
                     // The chart first, before the searches have written their many audit events.
                     await MeasureAsync(client, times, "Chart, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}"),
+                    // The clinic's home with no search: all PanelSize patients on the panel, each a recorded read.
+                    await MeasureAsync(client, times, $"Panel, {PanelSize} patients", typing: false, () => "/patients"),
                     await MeasureAsync(client, times, "Search, first 3 letters of a name", typing: false, () => $"/patients?name={Anyone().Patient.FamilyName[..3]}"),
                     await MeasureAsync(client, times, "Search, a whole family name", typing: false, () => $"/patients?name={Anyone().Patient.FamilyName}"),
                     await MeasureAsync(client, times, "Search, date of birth", typing: false, () => $"/patients?birthdate={Date(Anyone())}"),
@@ -355,7 +357,7 @@ internal static partial class RenderBenchmark
         Console.WriteLine(
             $"Writing to {target.Host}:{target.Port}/{target.Database} as {target.Username}: one staff account, locked at the end; "
             + $"{PanelSize} panel assignments, each with its write-audit event; and an audit event for every patient each page lists, "
-            + "about 140,000 at 50,000 patients. Nothing deletes them.");
+            + "about 250,000 at 50,000 patients. Nothing deletes them.");
         return true;
     }
 
