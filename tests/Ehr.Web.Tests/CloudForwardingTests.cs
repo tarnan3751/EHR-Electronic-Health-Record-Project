@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Ehr.Data.Audit;
+using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,8 +11,8 @@ using static Ehr.Web.Tests.Browser;
 namespace Ehr.Web.Tests;
 
 // The cloud app's forwarding to the on-prem app: saves always, and a person's reads until the replica has their
-// latest save; a save that can't be forwarded is told why. The tests in this class run one at a time, so each can
-// count what crossed the link.
+// latest save, unless the on-prem app can't save just then; a save that can't be forwarded is told why. The tests in
+// this class run one at a time, so each can count what crossed the link.
 public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 {
     const string LastSaveCookieName = "__Host-Ehr.LastSave";
@@ -148,6 +150,38 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("Not saved: the on-prem server can't be reached.", await response.Content.ReadAsStringAsync(Cancel));
+    }
+
+    [Fact]
+    public async Task During_an_outage_reads_after_a_save_come_from_the_replica()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Remy", "Justsaved");
+        await apps.AssignAsync(clinician, patient);
+        var signedIn = await CookieHeaderAsync(apps.OnPrem, clinician);
+        apps.PrimaryDown = true;
+        try
+        {
+            Assert.False(await apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
+            using var client = CreateClient(apps.CloudPrimaryDrill, handleCookies: false);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/patients/{patient}");
+            // A save the replica doesn't have yet, which would otherwise send this read to the on-prem app.
+            request.Headers.Add("Cookie", $"{signedIn}; {LastSaveCookie(position: "FFFFFFFF/FFFFFFFF")}");
+
+            using var response = await client.SendAsync(request, Cancel);
+
+            var html = await ReadAsync(response);
+            Assert.Contains("Justsaved, Remy", html);
+            Assert.Contains("Read-only: the clinic's server can't be reached", html);
+            Assert.False(RemovesLastSaveCookie(response));
+            // The read is recorded in the queue, for the on-prem app once it's back.
+            var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
+            Assert.Contains(queued, e => e.Action == AuditActions.Read && e.PatientId == patient && e.ActorId == clinician.Id);
+        }
+        finally
+        {
+            apps.PrimaryDown = false;
+        }
     }
 
     [Fact]

@@ -8,9 +8,10 @@ namespace Ehr.Web.Forwarding;
 // The cloud app's write path. The replica can't take writes, so every request that could change data goes to the
 // on-prem app, which saves and renders the response; it comes back in one WAN round trip. The on-prem app reports
 // the save's WAL position, which LastSaveCookie keeps. Until the replica has replayed that far, the same browser's
-// page requests go to the on-prem app too, so people always see their own saves. Other reads, PHI included, come from
-// the replica; the PHI reader records them in the cloud app's audit queue (CloudAudit). A forward that can't reach the
-// on-prem app marks OnPremStatus unreachable; only CloudAuditShipper marks it reachable again.
+// page requests go to the on-prem app too, so people see their own saves, unless the on-prem app can't save just then
+// (OnPremStatus) and the replica's copy is all there is. Other reads, PHI included, come from the replica; the PHI
+// reader records them in the cloud app's audit queue (CloudAudit). A forward that can't reach the on-prem app marks
+// OnPremStatus unreachable; only CloudAuditShipper marks it reachable again.
 public sealed class CloudForwardingMiddleware(
     RequestDelegate next, IHttpForwarder forwarder, OnPremApp onPrem, LastSaveCookie lastSave, OnPremStatus status)
 {
@@ -54,6 +55,15 @@ public sealed class CloudForwardingMiddleware(
         if (await WalPosition.HasReachedAsync(db, position, context.RequestAborted))
         {
             lastSave.Remove(context);
+            await next(context);
+            return;
+        }
+
+        // While the on-prem app can't save, its answer would be an error page (its database down) or a wait for the
+        // link to time out: the replica's copy, with the read-only notice, is better. The cookie stays, so these reads
+        // go to on-prem again once it's back, until the replica has the save.
+        if (!status.IsReachable)
+        {
             await next(context);
             return;
         }
