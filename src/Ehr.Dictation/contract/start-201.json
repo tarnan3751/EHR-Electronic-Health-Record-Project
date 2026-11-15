@@ -4,7 +4,7 @@
   "status": 201,
   "body": {
     "sessionId": "SESSION-ID-IN-THE-CONTRACT-FILES",
-    "maxSeconds": 600,
+    "maxSeconds": 300,
     "maxChunkBytes": 2097152
   }
 }

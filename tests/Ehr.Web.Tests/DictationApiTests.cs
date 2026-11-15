@@ -42,7 +42,7 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         using var stopped = await SendAsync(page, HttpMethod.Post, $"{Sessions}/{session.SessionId}/stop");
         using var sorted = await SendAsync(page, HttpMethod.Post, $"{Sessions}/{session.SessionId}/result");
 
-        Assert.Equal((600, 1024 * 1024), (session.MaxSeconds, session.MaxChunkBytes));
+        Assert.Equal((300, 1024 * 1024), (session.MaxSeconds, session.MaxChunkBytes));
         // The transcript comes back while the clinician speaks.
         Assert.Equal("Cough for three days.", (await ReadJsonAsync<AudioReceived>(first)).Transcript.Text);
         var received = await ReadJsonAsync<AudioReceived>(second);
@@ -67,7 +67,8 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["not_dictated"], Assert.IsType<EmptyField>(result.Fields.Plan).Reasons);
         Assert.Equal("google/medasr", result.Provenance.Speech.Repository);
         Assert.Equal("K2-Horizon-7B-Q4_K_M.gguf", result.Provenance.Language?.File);
-        Assert.Equal(1, result.Provenance.Validation);
+        Assert.StartsWith("sha256:", result.Provenance.Code);
+        Assert.Equal([new NotCarriedOver(Instruction.Order, 0, 5)], result.NotCarriedOver);
         Assert.False((await JsonAsync(sorted)).AsObject().ContainsKey("message"));
         // The result waits for the fields, up to 10 seconds.
         Assert.Contains(service.Received, request => request.PathAndQuery == $"/v1/sessions/{session.SessionId}/result?wait=10");
@@ -290,7 +291,8 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         var text = await ReadAsync(stopped);
         Assert.DoesNotContain(DictationSidecarStub.DiscardedText, text);
         var json = JsonNode.Parse(text)!;
-        Assert.Equal(["fields", "provenance", "sorting", "transcript"], Names(json));
+        Assert.Equal(["fields", "notCarriedOver", "provenance", "sorting", "transcript"], Names(json));
+        Assert.Equal(["end", "reason", "start"], Names(json["notCarriedOver"]![0]!));
         Assert.Equal(["final", "segments", "text"], Names(json["transcript"]!));
         Assert.Equal(["end", "endMs", "final", "start", "startMs", "unclear"], Names(json["transcript"]!["segments"]![0]!));
         Assert.Equal("too_noisy", (string?)json["transcript"]!["segments"]![2]!["unclear"]);

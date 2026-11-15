@@ -27,6 +27,7 @@ from conftest import MODELS, FakeLlama, FakeRecognizer, answer, encode, noise, t
 from fastapi.testclient import TestClient
 
 from ehr_dictation.api import create_app
+from ehr_dictation.asr import Recognition
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.settings import Settings
 
@@ -55,9 +56,17 @@ def dictation() -> bytes:
     return wav(samples + noise(samples.size / SAMPLE_RATE, -80))
 
 
-def client(settings: Settings, llama: FakeLlama, **limits) -> TestClient:
+class Instructing(FakeRecognizer):
+    """Hears a plan with an order and an allergy change in it, in every passage."""
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        return Recognition("Start metformin {period} Go ahead and order an A1c {period} Add sulfa to her allergy list {period}", 0.9)
+
+
+def client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, **limits) -> TestClient:
     settings = dataclasses.replace(settings, **limits)
-    return TestClient(create_app(settings, recognizer=FakeRecognizer(), structurer=llama.structurer(0.5), models=MODELS))
+    return TestClient(create_app(settings, recognizer=recognizer or FakeRecognizer(), structurer=llama.structurer(0.5),
+                                 models=MODELS))
 
 
 def start(http: TestClient) -> str:
@@ -102,10 +111,19 @@ def answers(settings: Settings) -> dict[str, dict]:
         http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=dictation(), headers=HEADERS)
         keep("stop-200-pending", "stop", http.post(f"/v1/sessions/{session}/stop", headers=HEADERS))
 
+    # The clinician dictated an order and an allergy change: the plan keeps "Start metformin", and both instructions
+    # are listed as not carried over.
+    planned = answer(plan=("Start metformin. Go ahead and order an A1c.", ["Start metformin", "Go ahead and order an A1c"]))
+    with client(settings, FakeLlama(planned), Instructing()) as http:
+        session = stopped(http)
+        keep("result-200-done-not_carried_over", "result",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+
     unavailable: dict[str, Callable[[], FakeLlama]] = {
         "model_unavailable": lambda: FakeLlama(unreachable=True),
         "model_timeout": lambda: FakeLlama(GROUNDED, delay=3),
         "model_output_invalid": lambda: FakeLlama("Here are the fields you asked for."),
+        "transcript_too_long": lambda: FakeLlama(GROUNDED, n_ctx=2048),
     }
     for reason, llama in unavailable.items():
         with client(settings, llama()) as http:
@@ -133,7 +151,7 @@ def _fixed(value: object) -> object:
         for key, item in value.items():
             if key == "sessionId":
                 out[key] = SESSION_ID
-            elif key in ("prompt", "schema", "structuring") and isinstance(item, str) and item.startswith("sha256:"):
+            elif key in ("prompt", "schema", "structuring", "code") and isinstance(item, str) and item.startswith("sha256:"):
                 out[key] = HASH
             else:
                 out[key] = _fixed(item)
@@ -164,9 +182,12 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     bodies = {name: value["body"] for name, value in produced.items()}
 
     assert {value["status"] for value in produced.values()} == {200, 201, 401, 404, 409, 413, 422, 429}
-    assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in ("model_unavailable", "model_timeout",
-                                                                       "model_output_invalid")} == {
-        "model_unavailable", "model_timeout", "model_output_invalid"}
+    reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long")
+    assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in reasons} == set(reasons)
+    planned = bodies["result-200-done-not_carried_over"]
+    assert planned["fields"]["plan"]["value"] == "Start metformin."
+    assert {item["reason"] for item in planned["notCarriedOver"]} == {"order", "allergy_change"}
+    assert bodies["audio-200-partial"]["audioSeconds"] > 0
     segments = bodies["audio-200-partial"]["transcript"]["segments"]
     assert any(s["unclear"] for s in segments) and not segments[-1]["final"]
     fields = bodies["result-200-done"]["fields"]

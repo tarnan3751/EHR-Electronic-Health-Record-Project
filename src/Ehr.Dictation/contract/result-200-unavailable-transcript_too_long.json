@@ -1,0 +1,59 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "result",
+  "status": 200,
+  "body": {
+    "transcript": {
+      "text": "speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech",
+      "final": true,
+      "segments": [
+        {
+          "start": 0,
+          "end": 27,
+          "startMs": 0,
+          "endMs": 2490,
+          "final": true,
+          "unclear": null
+        },
+        {
+          "start": 28,
+          "end": 69,
+          "startMs": 2490,
+          "endMs": 5490,
+          "final": true,
+          "unclear": "too_quiet"
+        },
+        {
+          "start": 70,
+          "end": 132,
+          "startMs": 5490,
+          "endMs": 10000,
+          "final": true,
+          "unclear": null
+        }
+      ]
+    },
+    "sorting": "unavailable",
+    "reason": "transcript_too_long",
+    "fields": null,
+    "notCarriedOver": [],
+    "provenance": {
+      "speech": {
+        "repository": "google/medasr",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "language": {
+        "repository": "IFM/K2-Horizon-7B-GGUF",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "K2-Horizon-7B-Q4_K_M.gguf",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "llamaServer": "b11669-620d2225",
+      "prompt": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "schema": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "structuring": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "code": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
+}

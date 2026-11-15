@@ -4,6 +4,7 @@
   "status": 200,
   "body": {
     "receivedSeq": 0,
+    "audioSeconds": 10.0,
     "transcript": {
       "text": "speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech speech",
       "final": false,

@@ -26,25 +26,30 @@ namespace Ehr.Web.Api.Dictation;
 //
 // POST /api/dictation/sessions/{id}/audio?seq=N, the body one chunk of the recording, numbered from 0, in the audio/*
 // type the browser records (passed on as it came; WebKit and Chromium record different ones): 200 {receivedSeq,
-// transcript}. 409 out_of_order carries expectedSeq, the chunk to send next: after a dropped connection, the client
-// sends again from there and the transcript carries on.
+// audioSeconds, transcript}, audioSeconds being how much of maxSeconds (5 minutes) the dictation holds, so the screen
+// can warn before the cut-off; the transcript may lag a chunk when the service is busy. 409 out_of_order carries
+// expectedSeq, the chunk to send next: after a dropped connection, the client sends again from there and the transcript
+// carries on.
 //
-// POST /api/dictation/sessions/{id}/stop: 200 with the result. The service waits up to 8 seconds for the fields, so
-// sorting may still be pending. POST /api/dictation/sessions/{id}/result: 200 with the result, after waiting up to 10
+// POST /api/dictation/sessions/{id}/stop: 200 with the result. The service answers within 8 seconds with whatever is
+// ready, so the transcript may not be final yet and sorting may still be pending. POST /api/dictation/sessions/{id}/result: 200 with the result, after waiting up to 10
 // seconds for sorting to finish; ask again while it is pending. DELETE /api/dictation/sessions/{id}: 204, and the
 // dictation is cancelled, its audio and transcript discarded.
 //
 // The transcript: {text, final, segments: [{start, end, startMs, endMs, final, unclear}]}. start and end are half-open
 // UTF-16 offsets into text; unclear is null, "too_quiet", "too_noisy" or "low_confidence".
 //
-// The result: {transcript, sorting, reason?, message?, fields, provenance}, with sorting "pending", "done" or
-// "unavailable". fields is null, or {history, assessment, plan}, each either {status: "pending", value, sources:
+// The result: {transcript, sorting, reason?, message?, fields, notCarriedOver, provenance}, with sorting "pending",
+// "done" or "unavailable". fields is null, or {history, assessment, plan}, each either {status: "pending", value, sources:
 // [{start, end}]}, a proposal for the clinician to approve, or {status: "empty", reasons: [code, ...]}: nothing
 // dictated, or discarded by validation, with the reasons' codes and never the discarded text. When sorting is
-// "unavailable" (UC 10), reason is "model_unavailable", "model_timeout" or "model_output_invalid", fields is null or
-// all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is kept
-// as plain text." provenance: {speech: {repository, commit, sha256}, language: {repository, commit, file, sha256},
-// llamaServer, prompt, schema, structuring, validation}; language and llamaServer are null while unknown. The JSON is
+// "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid" or
+// "transcript_too_long", fields is null or all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is kept
+// as plain text." notCarriedOver: [{reason: "order" or "allergy_change", start, end}], each instruction in the
+// transcript to order something or change the allergy list, which no field carries (FR-14): the screen says it still
+// has to be placed, and can highlight the clinician's own words at start and end. provenance: {speech: {repository,
+// commit, sha256}, language: {repository, commit, file, sha256}, llamaServer, prompt, schema, structuring, code};
+// language and llamaServer are null while unknown. The JSON is
 // in DictationApiContract.cs, and every answer the service gives is pinned in src/Ehr.Dictation/contract, which the
 // service's tests write and DictationApiTests reads through this API.
 //
@@ -52,7 +57,7 @@ namespace Ehr.Web.Api.Dictation;
 //   400 bad_form_token, or bad_seq
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop), or not_stopped (a result before stop)
-//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds
+//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (5 minutes)
 //   415 unsupported_type: the body isn't audio/*
 //   422 not_audio: "The audio couldn't be decoded."
 //   429 busy: the service is busy
@@ -228,7 +233,7 @@ public static partial class DictationApi
             case HttpStatusCode.RequestEntityTooLarge:
                 // Too long means stop and start another; too large, a smaller chunk.
                 return await ErrorBodyAsync(response, cancellationToken) is { Error: "too_long" }
-                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its length limit. Stop it and start another.")
+                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its 5-minute limit. Stop it and start another.")
                     : Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This chunk of audio, or the dictation as a whole, is too large.");
             case HttpStatusCode.UnprocessableEntity:
                 return Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded.");

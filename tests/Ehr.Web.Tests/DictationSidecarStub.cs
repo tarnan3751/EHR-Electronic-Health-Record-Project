@@ -90,7 +90,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         {
             var id = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(24));
             sessions[id] = new StubSession(owner);
-            return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds = 600, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
+            return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds = 300, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
         }
 
         if (path is not ["v1", "sessions", var sessionId, ..] || !sessions.TryGetValue(sessionId, out var session) || session.Owner != owner)
@@ -115,7 +115,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     }
 
                     session.Chunks++;
-                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, transcript = Transcript(session) });
+                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, audioSeconds = session.Chunks * 2.0, transcript = Transcript(session) });
 
                 case ([_, _, _, "stop"], "POST"):
                     if (Undecodable)
@@ -172,11 +172,13 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             prompt = "note-prompt-1",
             schema = "note-schema-1",
             structuring = "structuring-1",
-            validation = 1,
+            code = "sha256:" + new string('c', 64),
         };
+        // The clinician's own instruction, in the transcript: where to find it, never the words themselves.
+        var notCarriedOver = new[] { new { reason = "order", start = 0, end = 5 } };
         return sorting switch
         {
-            StubSorting.Pending => new { transcript, sorting = "pending", fields = (object?)null, provenance },
+            StubSorting.Pending => new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver, provenance },
             StubSorting.Done => new
             {
                 transcript,
@@ -187,6 +189,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     assessment = new { status = "pending", value = Sentences[1], sources = new[] { new { start = 22, end = 31 } } },
                     plan = new { status = "empty", reasons = new[] { "not_dictated" } },
                 },
+                notCarriedOver,
                 provenance,
             },
             StubSorting.Timeout => new
@@ -197,6 +200,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 // The service's own words, which the API doesn't pass on.
                 message = "llama-server took longer than 60 seconds",
                 fields = (object?)null,
+                notCarriedOver,
                 provenance,
             },
             StubSorting.Unavailable => new
@@ -210,6 +214,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     assessment = new { status = "empty", reasons = new[] { "model_unavailable" } },
                     plan = new { status = "empty", reasons = new[] { "model_unavailable" } },
                 },
+                notCarriedOver,
                 provenance,
             },
             // What validation discarded, where a careless copy would pass it on: beside the reasons, and in
@@ -224,6 +229,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
                     plan = new { status = "empty", reasons = new[] { "not_in_transcript" }, value = DiscardedText, discarded = new[] { DiscardedText } },
                 },
+                notCarriedOver,
                 provenance,
                 debug = new { modelOutput = DiscardedText },
             },

@@ -10,8 +10,9 @@ namespace Ehr.Web.Api.Dictation;
 // What the service allows a session: up to MaxSeconds of audio, in chunks of up to MaxChunkBytes each.
 public sealed record DictationSession(string SessionId, int MaxSeconds, int MaxChunkBytes);
 
-// The chunk just taken, and the transcript so far.
-public sealed record AudioReceived(long ReceivedSeq, Transcript Transcript);
+// The chunk just taken, how many seconds of audio the dictation now holds (of the session's MaxSeconds, so a screen can
+// warn before the cut-off), and the transcript so far.
+public sealed record AudioReceived(long ReceivedSeq, double AudioSeconds, Transcript Transcript);
 
 // Final once the dictation has stopped and every segment is final.
 public sealed record Transcript(string Text, bool Final, IReadOnlyList<TranscriptSegment> Segments);
@@ -34,10 +35,13 @@ public enum Unclear
 }
 
 // After stop, and from result. Fields is null until the model has sorted the transcript, or when it couldn't.
+// NotCarriedOver lists every instruction in the transcript to order something or change the allergy list, which no field
+// carries (FR-14), so the screen can say what still has to be placed in Orders or the allergy list.
 public sealed record DictationResult(
     Transcript Transcript,
     Sorting Sorting,
     NoteFields? Fields,
+    IReadOnlyList<NotCarriedOver> NotCarriedOver,
     Provenance Provenance,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SortingFailure? Reason = null)
 {
@@ -74,6 +78,24 @@ public enum SortingFailure
 
     [JsonStringEnumMemberName("model_output_invalid")]
     ModelOutputInvalid,
+
+    // The transcript wouldn't fit the model's context, so it was never sent: a dictation over the session's limit.
+    [JsonStringEnumMemberName("transcript_too_long")]
+    TranscriptTooLong,
+}
+
+// An instruction the clinician dictated that the note doesn't carry: its kind, and where they said it in the transcript
+// (offsets as in TranscriptSegment). The clinician's own words, already in the transcript; never anything the model wrote.
+public sealed record NotCarriedOver(Instruction Reason, int Start, int End);
+
+[JsonConverter(typeof(JsonStringEnumConverter<Instruction>))]
+public enum Instruction
+{
+    [JsonStringEnumMemberName("order")]
+    Order,
+
+    [JsonStringEnumMemberName("allergy_change")]
+    AllergyChange,
 }
 
 public sealed record NoteFields(NoteField History, NoteField Assessment, NoteField Plan);
@@ -94,9 +116,9 @@ public sealed record SourceSpan(int Start, int End);
 
 // What produced the transcript and the fields, for the note to store with them. Language is null when the service's
 // models folder records no K2 Horizon file, and LlamaServer until the service has reached llama-server, which is
-// always the case when it couldn't (model_unavailable).
+// always the case when it couldn't (model_unavailable). Code is a hash of the service's own code.
 public sealed record Provenance(
-    SpeechModel Speech, LanguageModel? Language, string? LlamaServer, string Prompt, string Schema, string Structuring, int Validation);
+    SpeechModel Speech, LanguageModel? Language, string? LlamaServer, string Prompt, string Schema, string Structuring, string Code);
 
 public sealed record SpeechModel(string Repository, string Commit, string Sha256);
 

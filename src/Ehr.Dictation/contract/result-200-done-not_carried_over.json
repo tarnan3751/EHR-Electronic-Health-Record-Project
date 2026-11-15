@@ -1,0 +1,113 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "result",
+  "status": 200,
+  "body": {
+    "transcript": {
+      "text": "Start metformin. Go ahead and order an A1c. Add sulfa to her allergy list. Start metformin. Go ahead and order an A1c. Add sulfa to her allergy list. Start metformin. Go ahead and order an A1c. Add sulfa to her allergy list.",
+      "final": true,
+      "segments": [
+        {
+          "start": 0,
+          "end": 74,
+          "startMs": 0,
+          "endMs": 2490,
+          "final": true,
+          "unclear": null
+        },
+        {
+          "start": 75,
+          "end": 149,
+          "startMs": 2490,
+          "endMs": 5490,
+          "final": true,
+          "unclear": "too_quiet"
+        },
+        {
+          "start": 150,
+          "end": 224,
+          "startMs": 5490,
+          "endMs": 10000,
+          "final": true,
+          "unclear": null
+        }
+      ]
+    },
+    "sorting": "done",
+    "reason": null,
+    "fields": {
+      "history": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "assessment": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "plan": {
+        "status": "pending",
+        "value": "Start metformin.",
+        "sources": [
+          {
+            "start": 0,
+            "end": 15
+          }
+        ]
+      }
+    },
+    "notCarriedOver": [
+      {
+        "reason": "order",
+        "start": 17,
+        "end": 42
+      },
+      {
+        "reason": "allergy_change",
+        "start": 44,
+        "end": 73
+      },
+      {
+        "reason": "order",
+        "start": 92,
+        "end": 117
+      },
+      {
+        "reason": "allergy_change",
+        "start": 119,
+        "end": 148
+      },
+      {
+        "reason": "order",
+        "start": 167,
+        "end": 192
+      },
+      {
+        "reason": "allergy_change",
+        "start": 194,
+        "end": 223
+      }
+    ],
+    "provenance": {
+      "speech": {
+        "repository": "google/medasr",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "language": {
+        "repository": "IFM/K2-Horizon-7B-GGUF",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "K2-Horizon-7B-Q4_K_M.gguf",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "llamaServer": "b11669-620d2225",
+      "prompt": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "schema": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "structuring": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "code": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
+}
