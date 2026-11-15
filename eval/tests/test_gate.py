@@ -24,6 +24,8 @@ def results(eval_dir, **overrides) -> dict:
                     "order_allergy": {"shown": 0, "retracted_shown": 2, "retracted_shown_unflagged": 0,
                                       "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0,
                                       "unflagged": []},
+                    "warnings": {"shown": 3, "possible_correction": {"flagged": 1}, "near_unclear_passage": {"flagged": 0},
+                                 "any": {"flagged": 1}},
                     "sorting": {"done": 2, "unavailable": {}}},
         "items": [{"script": "d01"}, {"script": "d02"}],
     }
@@ -101,6 +103,19 @@ def test_results_that_dont_say_what_was_shown_fail(eval_dir):
 
     (problem,) = check(eval_dir / "results", eval_dir)
     assert "don't say what was offered" in problem
+
+
+@pytest.mark.parametrize("missing", [None, "shown", "possible_correction", "near_unclear_passage", "any"])
+def test_results_that_dont_say_which_values_carry_a_warning_fail(eval_dir, missing):
+    silent = results(eval_dir)
+    if missing:
+        del silent["metrics"]["warnings"][missing]
+    else:
+        del silent["metrics"]["warnings"]
+    save(eval_dir, "latest.json", silent)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "don't say which offered values carry a warning" in problem
 
 
 def test_partial_results_or_a_baseline_flag_fail(eval_dir):

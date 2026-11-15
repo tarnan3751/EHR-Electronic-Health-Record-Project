@@ -10,7 +10,8 @@ someone committed instead:
    nothing about the fields, so it can't be committed.
 3. No offered value contains an order or an allergy change a script tried to slip in, and none without a warning
    contains a retracted value or a drug a script names but no gold value carries, unless the owner has accepted it in
-   eval/known-limitations.toml; and each accepted there still occurs, so the list stays true.
+   eval/known-limitations.toml; and each accepted there still occurs, so the list stays true. The results say which
+   offered values carry each warning.
 4. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
    rate, note-field F1 against the rule-following gold (fields.content.f1; the F1 against the clinical gold,
@@ -33,6 +34,7 @@ from pathlib import Path
 
 from ehr_dictation import prompt
 
+from .scoring import WARNING_CODES
 from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256
 
 RESULTS_DIR = EVAL_DIR / "results"
@@ -116,6 +118,9 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                 f"none. Tighten the prompt (src/Ehr.Dictation/schema) or the checks (validation.py), then: {RUN_IT}"
             )
         problems += _unaccepted(order_allergy["unflagged"], eval_dir / KNOWN_LIMITATIONS)
+    warnings = latest.get("metrics", {}).get("warnings", {})
+    if "shown" not in warnings or any("flagged" not in warnings.get(key, {}) for key in (*WARNING_CODES, "any")):
+        problems.append(f"The results don't say which offered values carry a warning. {RUN_IT}")
 
     baseline_path = results_dir / "baseline.json"
     if baseline_path.is_file():
