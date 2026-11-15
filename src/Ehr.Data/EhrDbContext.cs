@@ -42,6 +42,16 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // Emergency access to a chart off the clinician's panel, with its reason. PHI; written once, never changed.
     public DbSet<BreakGlassAccess> BreakGlassAccesses => Set<BreakGlassAccess>();
 
+    // The rest of a patient's chart, shaped on FHIR: allergies, the medications they take, diagnoses, and visits with
+    // their vital signs. PHI, like patients: read them only through the PHI reader.
+    public DbSet<AllergyIntolerance> AllergyIntolerances => Set<AllergyIntolerance>();
+
+    public DbSet<MedicationStatement> MedicationStatements => Set<MedicationStatement>();
+
+    public DbSet<Condition> Conditions => Set<Condition>();
+
+    public DbSet<Encounter> Encounters => Set<Encounter>();
+
     // One-time portal enrollment codes, as hashes. Grants only: registration looks a code up before anyone is signed in.
     public DbSet<PatientEnrollment> PatientEnrollments => Set<PatientEnrollment>();
 

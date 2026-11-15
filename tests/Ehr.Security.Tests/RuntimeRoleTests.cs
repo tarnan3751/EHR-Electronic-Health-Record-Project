@@ -46,6 +46,14 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "patient_assignments")] = ["SELECT"],
         [("ehr_app", "break_glass_accesses")] = ["SELECT", "INSERT"],
         [("ehr_read", "break_glass_accesses")] = ["SELECT"],
+        [("ehr_app", "allergy_intolerances")] = ["SELECT"],
+        [("ehr_read", "allergy_intolerances")] = ["SELECT"],
+        [("ehr_app", "medication_statements")] = ["SELECT"],
+        [("ehr_read", "medication_statements")] = ["SELECT"],
+        [("ehr_app", "conditions")] = ["SELECT"],
+        [("ehr_read", "conditions")] = ["SELECT"],
+        [("ehr_app", "encounters")] = ["SELECT"],
+        [("ehr_read", "encounters")] = ["SELECT"],
         [("ehr_app", "patient_enrollments")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_read", "patient_enrollments")] = ["SELECT"],
         [("ehr_app", "audit_events")] = ["SELECT", "INSERT"],
@@ -138,6 +146,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT * FROM ehr.sync_operations")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.patients")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.staff_users")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "INSERT INTO ehr.allergy_intolerances (id, patient_id, display, clinical_status, recorded_at) VALUES (gen_random_uuid(), gen_random_uuid(), 'x', 'active', now())")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.medication_statements SET display = 'changed'")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.conditions")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (gen_random_uuid(), gen_random_uuid(), 'finished', 'AMB', now())")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.audit_events SET reason = 'changed'")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.audit_events")]
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.audit_events (id, occurred_at, action, source) VALUES (uuidv7(), now(), 'read', 'cloud')")]

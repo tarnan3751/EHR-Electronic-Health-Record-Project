@@ -49,6 +49,23 @@ public class WriteAuditTests(MigratedDatabase database) : IClassFixture<Migrated
         Assert.Equal([$"insert patient_assignments {clinician} {patient}"], events);
     }
 
+    [Theory]
+    [InlineData("allergy_intolerances")]
+    [InlineData("medication_statements")]
+    [InlineData("conditions")]
+    [InlineData("encounters")]
+    public async Task A_chart_section_row_is_recorded_against_its_patient(string table)
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+
+        var row = await Accounts.ChartRowAsync(database, table, patient);
+
+        var events = await Accounts.QueryAsync(database.SuperuserConnectionString, null,
+            "SELECT action || ' ' || table_name || ' ' || patient_id FROM ehr.audit_events WHERE row_id = @id", ("id", row));
+        Assert.Equal([$"insert {table} {patient}"], events);
+    }
+
     [Fact]
     public async Task A_write_without_a_user_is_recorded_with_no_actor()
     {

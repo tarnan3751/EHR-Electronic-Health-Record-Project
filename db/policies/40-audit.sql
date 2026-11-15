@@ -58,3 +58,19 @@ CREATE OR REPLACE TRIGGER patient_assignments_audit
 CREATE OR REPLACE TRIGGER break_glass_accesses_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.break_glass_accesses
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER allergy_intolerances_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.allergy_intolerances
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER medication_statements_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.medication_statements
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER conditions_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.conditions
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER encounters_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.encounters
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();

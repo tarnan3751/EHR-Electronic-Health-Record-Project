@@ -161,6 +161,37 @@ public class RowLevelSecurityTests(MigratedDatabase database) : IClassFixture<Mi
             "SELECT action || ' ' || table_name || ' ' || actor_id || ' ' || patient_id FROM ehr.audit_events WHERE row_id = @id", ("id", id)));
     }
 
+    [Theory]
+    [InlineData("allergy_intolerances")]
+    [InlineData("medication_statements")]
+    [InlineData("conditions")]
+    [InlineData("encounters")]
+    public async Task Chart_sections_are_read_by_clinicians_and_by_their_own_patient_only(string table)
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var lockedOut = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.LockOutAsync(database, lockedOut);
+        var own = await Accounts.PatientAsync(database, clinician);
+        var other = await Accounts.PatientAsync(database, clinician);
+        var ownAccount = await Accounts.PatientAccountAsync(database, own);
+        var otherAccount = await Accounts.PatientAccountAsync(database, other);
+        var row = await Accounts.ChartRowAsync(database, table, own);
+
+        var count = $"SELECT count(*) FROM ehr.{table} WHERE id = @id";
+        foreach (var connectionString in new[] { App, Read })
+        {
+            Assert.Equal(["1"], await Accounts.QueryAsync(connectionString, clinician, count, ("id", row)));
+            Assert.Equal(["1"], await Accounts.QueryAsync(connectionString, ownAccount, count, ("id", row)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, otherAccount, count, ("id", row)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, admin, count, ("id", row)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, lockedOut, count, ("id", row)));
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, null, count, ("id", row)));
+            // A user ID that is no account at all.
+            Assert.Equal(["0"], await Accounts.QueryAsync(connectionString, Guid.CreateVersion7(), count, ("id", row)));
+        }
+    }
+
     [Fact]
     public async Task A_locked_out_clinician_sees_nothing()
     {

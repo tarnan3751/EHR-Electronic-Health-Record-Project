@@ -93,6 +93,49 @@ DROP POLICY IF EXISTS break_glass_accesses_own_insert ON ehr.break_glass_accesse
 CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR INSERT
     WITH CHECK (ehr.is_clinician() AND clinician_id = ehr.current_user_id());
 
+-- The rest of the chart (PHI): allergies, medications, diagnoses and visits, each row one patient's. Clinicians read
+-- every patient's; a patient reads their own. There are no write policies: nothing at runtime writes these tables yet
+-- (10-grants.sql), and with row-level security forced a write that got past the grants would still be refused.
+ALTER TABLE ehr.allergy_intolerances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.allergy_intolerances FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS allergy_intolerances_clinician_select ON ehr.allergy_intolerances;
+CREATE POLICY allergy_intolerances_clinician_select ON ehr.allergy_intolerances FOR SELECT USING (ehr.is_clinician());
+
+DROP POLICY IF EXISTS allergy_intolerances_own_select ON ehr.allergy_intolerances;
+CREATE POLICY allergy_intolerances_own_select ON ehr.allergy_intolerances FOR SELECT
+    USING (patient_id = ehr.current_patient_id());
+
+ALTER TABLE ehr.medication_statements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.medication_statements FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS medication_statements_clinician_select ON ehr.medication_statements;
+CREATE POLICY medication_statements_clinician_select ON ehr.medication_statements FOR SELECT USING (ehr.is_clinician());
+
+DROP POLICY IF EXISTS medication_statements_own_select ON ehr.medication_statements;
+CREATE POLICY medication_statements_own_select ON ehr.medication_statements FOR SELECT
+    USING (patient_id = ehr.current_patient_id());
+
+ALTER TABLE ehr.conditions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.conditions FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS conditions_clinician_select ON ehr.conditions;
+CREATE POLICY conditions_clinician_select ON ehr.conditions FOR SELECT USING (ehr.is_clinician());
+
+DROP POLICY IF EXISTS conditions_own_select ON ehr.conditions;
+CREATE POLICY conditions_own_select ON ehr.conditions FOR SELECT
+    USING (patient_id = ehr.current_patient_id());
+
+ALTER TABLE ehr.encounters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.encounters FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS encounters_clinician_select ON ehr.encounters;
+CREATE POLICY encounters_clinician_select ON ehr.encounters FOR SELECT USING (ehr.is_clinician());
+
+DROP POLICY IF EXISTS encounters_own_select ON ehr.encounters;
+CREATE POLICY encounters_own_select ON ehr.encounters FOR SELECT
+    USING (patient_id = ehr.current_patient_id());
+
 -- Audit events (restricted). Admins read. Anyone the grants let insert may insert: the app role for read and
 -- sign-in events, and the write-audit trigger (40-audit.sql), which runs as the table's owner and is bound by this
 -- policy too because RLS is forced. Nothing updates or deletes (10-grants.sql).

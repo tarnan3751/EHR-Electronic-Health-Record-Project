@@ -68,6 +68,23 @@ static class Accounts
         return id;
     }
 
+    // The chart's other tables, each with the smallest row it takes. Nothing at runtime writes them yet, so rows are
+    // inserted as the superuser, the way a seed would.
+    public static readonly Dictionary<string, string> ChartTables = new()
+    {
+        ["allergy_intolerances"] = "INSERT INTO ehr.allergy_intolerances (id, patient_id, display, clinical_status, recorded_at) VALUES (@id, @patient, 'Penicillin', 'active', now())",
+        ["medication_statements"] = "INSERT INTO ehr.medication_statements (id, patient_id, display, status) VALUES (@id, @patient, 'Lisinopril 10 mg tablet', 'active')",
+        ["conditions"] = "INSERT INTO ehr.conditions (id, patient_id, display, clinical_status) VALUES (@id, @patient, 'Essential (primary) hypertension', 'active')",
+        ["encounters"] = "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (@id, @patient, 'finished', 'AMB', now())",
+    };
+
+    public static async Task<Guid> ChartRowAsync(MigratedDatabase database, string table, Guid patientId)
+    {
+        var id = Guid.CreateVersion7();
+        await ExecuteAsync(database.SuperuserConnectionString, null, ChartTables[table], ("id", id), ("patient", patientId));
+        return id;
+    }
+
     public static async Task ExecuteAsync(string connectionString, Guid? userId, string sql, params (string Name, object Value)[] parameters)
     {
         await using var connection = new NpgsqlConnection(connectionString);

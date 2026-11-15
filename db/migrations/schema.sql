@@ -340,3 +340,77 @@ VALUES ('20261027102835_DesktopSessions', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.allergy_intolerances (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    code character varying(20),
+    display character varying(200) NOT NULL,
+    clinical_status character varying(20) NOT NULL,
+    category character varying(20),
+    criticality character varying(20),
+    reaction character varying(200),
+    recorded_at timestamp with time zone NOT NULL,
+    CONSTRAINT pk_allergy_intolerances PRIMARY KEY (id),
+    CONSTRAINT ck_allergy_intolerances_category CHECK (category IN ('food', 'medication', 'environment', 'biologic')),
+    CONSTRAINT ck_allergy_intolerances_clinical_status CHECK (clinical_status IN ('active', 'inactive', 'resolved')),
+    CONSTRAINT ck_allergy_intolerances_criticality CHECK (criticality IN ('low', 'high', 'unable-to-assess')),
+    CONSTRAINT fk_allergy_intolerances_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.conditions (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    code character varying(20),
+    display character varying(200) NOT NULL,
+    clinical_status character varying(20) NOT NULL,
+    onset_date date,
+    CONSTRAINT pk_conditions PRIMARY KEY (id),
+    CONSTRAINT ck_conditions_clinical_status CHECK (clinical_status IN ('active', 'recurrence', 'relapse', 'inactive', 'remission', 'resolved')),
+    CONSTRAINT fk_conditions_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.encounters (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    status character varying(20) NOT NULL,
+    class_code character varying(10) NOT NULL,
+    reason character varying(200),
+    period_start timestamp with time zone NOT NULL,
+    period_end timestamp with time zone,
+    systolic_mm_hg smallint,
+    diastolic_mm_hg smallint,
+    heart_rate_per_minute smallint,
+    CONSTRAINT pk_encounters PRIMARY KEY (id),
+    CONSTRAINT ck_encounters_status CHECK (status IN ('planned', 'arrived', 'triaged', 'in-progress', 'onleave', 'finished', 'cancelled', 'entered-in-error', 'unknown')),
+    CONSTRAINT ck_encounters_vital_signs CHECK (systolic_mm_hg > 0 AND diastolic_mm_hg > 0 AND heart_rate_per_minute > 0),
+    CONSTRAINT fk_encounters_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.medication_statements (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    code character varying(20),
+    display character varying(200) NOT NULL,
+    dosage character varying(200),
+    status character varying(20) NOT NULL,
+    effective_start date,
+    effective_end date,
+    CONSTRAINT pk_medication_statements PRIMARY KEY (id),
+    CONSTRAINT ck_medication_statements_status CHECK (status IN ('active', 'completed', 'entered-in-error', 'intended', 'stopped', 'on-hold', 'unknown', 'not-taken')),
+    CONSTRAINT fk_medication_statements_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_allergy_intolerances_patient_id ON ehr.allergy_intolerances (patient_id);
+
+CREATE INDEX ix_conditions_patient_id ON ehr.conditions (patient_id);
+
+CREATE INDEX ix_encounters_patient_id ON ehr.encounters (patient_id);
+
+CREATE INDEX ix_medication_statements_patient_id ON ehr.medication_statements (patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261115092953_ChartSections', '10.0.13');
+
+COMMIT;
+

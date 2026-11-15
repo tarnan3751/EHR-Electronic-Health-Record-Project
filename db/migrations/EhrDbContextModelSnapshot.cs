@@ -521,6 +521,69 @@ namespace Ehr.Migrations
                     b.ToTable("change_log", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.AllergyIntolerance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("ClinicalStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("clinical_status");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Criticality")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("criticality");
+
+                    b.Property<string>("Display")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("Reaction")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reaction");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allergy_intolerances");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_allergy_intolerances_patient_id");
+
+                    b.ToTable("allergy_intolerances", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_allergy_intolerances_category", "category IN ('food', 'medication', 'environment', 'biologic')");
+
+                            t.HasCheckConstraint("ck_allergy_intolerances_clinical_status", "clinical_status IN ('active', 'inactive', 'resolved')");
+
+                            t.HasCheckConstraint("ck_allergy_intolerances_criticality", "criticality IN ('low', 'high', 'unable-to-assess')");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.BreakGlassAccess", b =>
                 {
                     b.Property<Guid>("Id")
@@ -560,6 +623,165 @@ namespace Ehr.Migrations
                         .HasDatabaseName("ix_break_glass_accesses_clinician_id_patient_id_expires_at");
 
                     b.ToTable("break_glass_accesses", "ehr");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClinicalStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("clinical_status");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Display")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display");
+
+                    b.Property<DateOnly?>("OnsetDate")
+                        .HasColumnType("date")
+                        .HasColumnName("onset_date");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_conditions");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_conditions_patient_id");
+
+                    b.ToTable("conditions", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_conditions_clinical_status", "clinical_status IN ('active', 'recurrence', 'relapse', 'inactive', 'remission', 'resolved')");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.Encounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClassCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("class_code");
+
+                    b.Property<short?>("DiastolicMmHg")
+                        .HasColumnType("smallint")
+                        .HasColumnName("diastolic_mm_hg");
+
+                    b.Property<short?>("HeartRatePerMinute")
+                        .HasColumnType("smallint")
+                        .HasColumnName("heart_rate_per_minute");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<DateTimeOffset?>("PeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateTimeOffset>("PeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_start");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<short?>("SystolicMmHg")
+                        .HasColumnType("smallint")
+                        .HasColumnName("systolic_mm_hg");
+
+                    b.HasKey("Id")
+                        .HasName("pk_encounters");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_encounters_patient_id");
+
+                    b.ToTable("encounters", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_encounters_status", "status IN ('planned', 'arrived', 'triaged', 'in-progress', 'onleave', 'finished', 'cancelled', 'entered-in-error', 'unknown')");
+
+                            t.HasCheckConstraint("ck_encounters_vital_signs", "systolic_mm_hg > 0 AND diastolic_mm_hg > 0 AND heart_rate_per_minute > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.MedicationStatement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Display")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display");
+
+                    b.Property<string>("Dosage")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dosage");
+
+                    b.Property<DateOnly?>("EffectiveEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_end");
+
+                    b.Property<DateOnly?>("EffectiveStart")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_start");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_medication_statements");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_medication_statements_patient_id");
+
+                    b.ToTable("medication_statements", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_medication_statements_status", "status IN ('active', 'completed', 'entered-in-error', 'intended', 'stopped', 'on-hold', 'unknown', 'not-taken')");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.Patient", b =>
@@ -864,6 +1086,16 @@ namespace Ehr.Migrations
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.AllergyIntolerance", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_allergy_intolerances_patients_patient_id");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.BreakGlassAccess", b =>
                 {
                     b.HasOne("Ehr.Data.Accounts.StaffUser", null)
@@ -879,6 +1111,36 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_break_glass_accesses_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_conditions_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.Encounter", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_encounters_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.MedicationStatement", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_medication_statements_patients_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.PatientAssignment", b =>
