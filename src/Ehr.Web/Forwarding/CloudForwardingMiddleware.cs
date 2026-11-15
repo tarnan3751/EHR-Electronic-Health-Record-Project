@@ -8,8 +8,8 @@ namespace Ehr.Web.Forwarding;
 // on-prem app, which saves and renders the response; it comes back in one WAN round trip. The on-prem app reports
 // the save's WAL position, which LastSaveCookie keeps. Until the replica has replayed that far, the same browser's
 // page requests go to the on-prem app too, so people always see their own saves. Other reads, PHI included, come from
-// the replica; the PHI reader records them in the cloud app's audit queue (CloudAudit). Each attempt to reach the
-// on-prem app updates OnPremStatus.
+// the replica; the PHI reader records them in the cloud app's audit queue (CloudAudit). A forward that can't reach the
+// on-prem app marks OnPremStatus unreachable; only CloudAuditShipper marks it reachable again.
 public sealed class CloudForwardingMiddleware(
     RequestDelegate next, IHttpForwarder forwarder, OnPremApp onPrem, LastSaveCookie lastSave, OnPremStatus status)
 {
@@ -59,9 +59,12 @@ public sealed class CloudForwardingMiddleware(
     async ValueTask<ForwarderError> ForwardAsync(HttpContext context)
     {
         var error = await forwarder.SendAsync(context, onPrem.Url, onPrem.Client, RequestConfig, transformer);
-        if (error is ForwarderError.None or ForwarderError.Request or ForwarderError.RequestTimedOut)
+        // Only no answer at all says something here. An answer doesn't prove the on-prem app can save: with its
+        // database down it still answers whatever doesn't need it (a refused key, a sign-in redirect, a bad form
+        // token), and a server error may be one page's bug. The shipper's check every couple of seconds decides.
+        if (error is ForwarderError.Request or ForwarderError.RequestTimedOut)
         {
-            status.Report(reachable: error == ForwarderError.None);
+            status.Report(reachable: false);
         }
 
         return error;

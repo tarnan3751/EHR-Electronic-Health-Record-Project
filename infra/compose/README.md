@@ -98,7 +98,7 @@ These follow the failure table in the project overview.
 | Backup host down | `docker compose stop barman` | `docker compose start barman` |
 | Cloud box compromised | `docker compose stop cloud-app cloud-db` | `docker compose start cloud-db cloud-app` |
 
-With the internet link or the primary down, off-site pages still load from the replica, and a save shows "Not saved: the server is unavailable". With the primary down, saving on-site shows the same.
+With the internet link or the primary down, off-site pages still load from the replica and, within a couple of seconds, say the system is read-only; a save shows "Not saved: the server is unavailable". With the primary down, saving on-site shows the same.
 
 To see the effect:
 

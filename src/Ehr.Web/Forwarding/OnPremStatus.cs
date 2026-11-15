@@ -1,8 +1,10 @@
 namespace Ehr.Web.Forwarding;
 
-// Whether the cloud app last reached the on-prem app, from its forwarding and from CloudAuditShipper, which tries every
-// couple of seconds. While it can't, every page says the system is read-only (Pages/Shared/_Layout.cshtml). The
-// on-prem app registers one too, which nothing ever marks unreachable.
+// Whether the on-prem app can save, as the cloud app last found. CloudAuditShipper decides, every couple of seconds:
+// an answer that isn't a server error (which is how the on-prem app answers with its database down) means it can.
+// Forwarding only marks it unreachable, when a request gets no answer at all. While it can't, every page says the
+// system is read-only (Pages/Shared/_Layout.cshtml). The on-prem app registers one too, which nothing ever marks
+// unreachable.
 public sealed class OnPremStatus
 {
     volatile bool reachable = true;

@@ -8,7 +8,7 @@ namespace Ehr.Web.CloudAudit;
 
 // Sends the cloud app's queued audit events to the on-prem app every couple of seconds, a batch at a time, and marks
 // them shipped once it has confirmed them. With nothing queued it still sends an empty batch: that's how the cloud app
-// knows whether the on-prem app is reachable, which OnPremStatus shows on every page.
+// knows whether the on-prem app can save, which OnPremStatus shows on every page.
 public sealed class CloudAuditShipper(
     CloudAuditQueue queue, OnPremApp onPrem, OnPremStatus status, CloudAuditKey key, ILogger<CloudAuditShipper> log)
     : BackgroundService
@@ -58,7 +58,16 @@ public sealed class CloudAuditShipper(
 
             using (response)
             {
-                status.Report(reachable: true);
+                // A server error means the on-prem app is up but can't save, as with its database down: read-only all
+                // the same.
+                var canSave = (int)response.StatusCode < 500;
+                status.Report(reachable: canSave);
+                if (!canSave)
+                {
+                    log.LogWarning("The on-prem app can't take audit events now ({Status}); they stay queued.", (int)response.StatusCode);
+                    return false;
+                }
+
                 if (!response.IsSuccessStatusCode)
                 {
                     // Reachable but refused: a key that doesn't match, or a bug. The events stay queued for a fix.

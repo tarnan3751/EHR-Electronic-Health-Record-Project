@@ -48,6 +48,25 @@ public sealed class WebApps : IAsyncLifetime
     // The cloud app with its link to the on-prem app down.
     public WebApplicationFactory<Program> CloudCutOff { get; private set; } = null!;
 
+    // The cloud app linked to an on-prem app that can be made to fail. While PrimaryDown is set, the on-prem app still
+    // answers, but with 500 to whatever needs its database, as in the "Primary down" drill (infra/compose/README.md);
+    // BrokenOnPremPage answers that one path with 500, as a page with a bug would, while the rest works.
+    public WebApplicationFactory<Program> CloudPrimaryDrill { get; private set; } = null!;
+
+    FaultLink faultLink = null!;
+
+    public bool PrimaryDown
+    {
+        get => faultLink.Down;
+        set => faultLink.Down = value;
+    }
+
+    public string? BrokenOnPremPage
+    {
+        get => faultLink.BrokenPath;
+        set => faultLink.BrokenPath = value;
+    }
+
     // Each request the cloud app forwarded, as "METHOD /path?query".
     public ConcurrentQueue<string> Forwarded { get; } = new();
 
@@ -82,11 +101,18 @@ public sealed class WebApps : IAsyncLifetime
         var readOnly = Database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
         Cloud = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
         CloudCutOff = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())));
+        faultLink = new FaultLink(OnPrem.Server.CreateHandler());
+        CloudPrimaryDrill = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(faultLink)));
     }
 
     public async ValueTask DisposeAsync()
     {
         // Whatever got as far as starting.
+        if (CloudPrimaryDrill is not null)
+        {
+            await CloudPrimaryDrill.DisposeAsync();
+        }
+
         if (CloudCutOff is not null)
         {
             await CloudCutOff.DisposeAsync();
@@ -351,6 +377,36 @@ public sealed class WebApps : IAsyncLifetime
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             throw new HttpRequestException("Connection refused", new SocketException((int)SocketError.ConnectionRefused));
+    }
+
+    sealed class FaultLink(HttpMessageHandler onPrem) : DelegatingHandler(onPrem)
+    {
+        volatile bool down;
+
+        volatile string? brokenPath;
+
+        public bool Down
+        {
+            get => down;
+            set => down = value;
+        }
+
+        public string? BrokenPath
+        {
+            get => brokenPath;
+            set => brokenPath = value;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            // With its primary down the on-prem app still answers what doesn't need the database, such as a request to
+            // the audit endpoint without the key, which it refuses before reading anything.
+            var needsDatabase = path != CloudAuditApi.Path || request.Headers.Authorization is not null;
+            return (down && needsDatabase) || path == brokenPath
+                ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError))
+                : base.SendAsync(request, cancellationToken);
+        }
     }
 }
 

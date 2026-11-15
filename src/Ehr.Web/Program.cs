@@ -54,7 +54,7 @@ if (keyCertificatePath is { Length: > 0 })
     dataProtection.ProtectKeysWithCertificate(keyCertificate).UnprotectKeysWithAnyCertificate(keyCertificate);
 }
 
-// Whether the on-prem app can be reached; only the cloud app ever finds that it can't. Every page shows it.
+// Whether the on-prem app can save; only the cloud app ever finds that it can't. Every page shows it.
 builder.Services.AddSingleton<OnPremStatus>();
 
 if (site == Site.OnPrem)
