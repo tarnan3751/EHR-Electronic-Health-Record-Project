@@ -633,8 +633,8 @@ _ALLERGY_CHANGES = [
 #   ("her husband did call in", "she was calling in from work"), though someone asked to is an instruction ("the nurse
 #   was asked to call in amoxicillin");
 # - "note" or "record" an allergy as an instruction: at the start of its clause, or after asking for it ("we need to
-#   record", "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy" is
-#   documentation).
+#   record", "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy", "I note
+#   a penicillin allergy in her chart" are documentation).
 _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
 _NOT_AN_ORDER = re.compile(
     r"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|about|yesterday|to say|for an? appointment)\b",
@@ -644,6 +644,7 @@ _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|was|were|had been)\s+$", re.IGNORECASE
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
 _NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
 _ASKING = re.compile(r"\b(?:need to|make sure(?: to)?|remember to|be sure to|don't forget to|do not forget to)\b", re.I)
+_NOTING = frozenset({"i", "we"})
 
 
 def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
@@ -654,6 +655,9 @@ def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
 
 
 def _at_clause_start(text: str, match: re.Match, clause: int) -> bool:
+    before = tokens(text[clause : match.start()])
+    if before and before[-1].text in _NOTING:
+        return False
     return all(token.text in LEAD_IN for token in tokens(_ASKING.sub(" ", text[clause : match.start()])))
 
 
