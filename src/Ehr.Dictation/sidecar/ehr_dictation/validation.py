@@ -38,12 +38,13 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "no correction", "I mean",
   "actually", "no,", "make it", "rather", "scratch that"), read across the whole transcript. A correction gives a
   number, date, drug name or side (left, right) within three words of its cue, and supersedes the last expression of the
-  same kind said before the cue in its sentence (or in the sentence before, when the cue starts one), unless it says all
-  of it again. One expression is one measured thing: numbers joined only by units, articles or "over" ("150 over 90"),
-  with the one word after it when that is all that comes before the cue ("95 degrees, no sorry, 90 degrees").
-  So "heart rate 78, no sorry 72" supersedes 78 and not the blood pressure said before it; "10 mg, sorry, 20 mg"
-  supersedes 10 mg; and "lisinopril 10 mg, sorry, 20 mg" keeps lisinopril, since no drug replaces it. A source is read
-  as corrected: without the cue and what it took back.
+  same kind said before the cue in its sentence, unless it says all of it again. A cue that starts a sentence looks back
+  up to three sentences for the nearest one, in the same unit if the correction gives one ("10 mg daily. Recheck in 2
+  weeks. Actually, 20 mg" corrects the 10 mg). One expression is one measured thing: numbers joined only by units,
+  articles or "over" ("150 over 90"), with the one word after it when that is all that comes before the cue ("95
+  degrees, no sorry, 90 degrees"). So "heart rate 78, no sorry 72" supersedes 78 and not the blood pressure said before
+  it; "10 mg, sorry, 20 mg" supersedes 10 mg; and "lisinopril 10 mg, sorry, 20 mg" keeps lisinopril, since no drug
+  replaces it. A source is read as corrected: without the cue and what it took back.
 - number_not_in_sources, date_not_in_sources, drug_not_in_sources: the specific cases of a word not in the sources, kept
   for what they say: a number, a date word ("may" counts as one after a preposition or before a day), a drug-like name.
 - negation_dropped, experiencer_dropped, certainty_dropped, history_dropped: in the transcript, a qualifier reaches
@@ -363,6 +364,11 @@ CORRECTION = re.compile(
     re.IGNORECASE,
 )
 KINDS = ("number", "date", "drug", "side")
+SENTENCES_BACK = 3  # how far back a correction that starts a sentence looks for what it corrects
+# Units that tell one measured thing from another, as read (_word_key).
+MEASURES = DOSE_WORDS | frozenset(
+    "day week month year hour minute second degree cm mm mmhg liter tablet puff drop pound step beat".split()
+)
 WARNED_KINDS = ("number", "date", "drug")
 POSSIBLE_CORRECTION = "possible_correction"
 SIDES = frozenset({"left", "right"})
@@ -431,16 +437,24 @@ def _corrections(text: str, words: list[Token], terms: list[_Term]) -> tuple[set
         if not inside:
             continue
         first, after = inside[0], inside[-1] + 1
-        before = [i for i in range(first) if sentence[i] == sentence[first]]
-        if not before and first:
-            before = [i for i in range(first) if sentence[i] == sentence[first - 1]]
+        before = {i for i in range(first) if sentence[i] == sentence[first]}
+        starts_sentence = not before
+        if starts_sentence and first:
+            before = {i for i in range(first) if sentence[first - 1] - SENTENCES_BACK < sentence[i] <= sentence[first - 1]}
         for kind in KINDS:
             following = [term for term in terms if term.kind == kind and term.first >= after]
             preceding = [term for term in terms if term.kind == kind and term.last < first and term.first in before]
             if not following or following[0].first >= after + CORRECTION_WINDOW or not preceding:
                 continue
-            said_again = {term.text for term in _run(following, words)}
+            correction = _run(following, words)
+            said_again = {term.text for term in correction}
             replaced = _run(preceding[::-1], words)
+            if starts_sentence:
+                # The nearest expression of the kind said before, in the same unit if the correction gives one
+                # ("Start lisinopril 10 mg daily. Recheck in 2 weeks. Actually, make that 20 mg." corrects the 10 mg).
+                unit = _unit(correction[-1], words)
+                runs = _runs_backward(preceding, words)
+                replaced = next((run for run in runs if unit is None or _unit(run[0], words) == unit), runs[0])
             if all(term.text in said_again for term in replaced):
                 continue  # said again unchanged: "lisinopril 10 mg, sorry, lisinopril 20 mg" keeps lisinopril
             # With the one word between it and the cue, if there is just one: its unit ("95 degrees, no sorry, 90").
@@ -449,6 +463,22 @@ def _corrections(text: str, words: list[Token], terms: list[_Term]) -> tuple[set
             superseded.update(replaced)
             cues.update(inside)
     return cues, taken_back, superseded
+
+
+def _runs_backward(terms: list[_Term], words: list[Token]) -> list[list[_Term]]:
+    """The terms' expressions, the last first, each from its last term back (as _run gives it)."""
+    runs: list[list[_Term]] = []
+    remaining = terms[::-1]
+    while remaining:
+        runs.append(_run(remaining, words))
+        remaining = remaining[len(runs[-1]) :]
+    return runs
+
+
+def _unit(term: _Term, words: list[Token]) -> str | None:
+    """The unit said right after a number ("mg", "week"), if the word after it is one."""
+    following = _word_key(words[term.last + 1].text) if term.last + 1 < len(words) else None
+    return following if following in MEASURES else None
 
 
 def _expressions(terms: list[_Term], words: list[Token]) -> dict[_Term, int]:

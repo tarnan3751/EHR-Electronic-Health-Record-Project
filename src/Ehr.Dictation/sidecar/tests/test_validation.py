@@ -151,6 +151,15 @@ def test_a_correction_at_the_start_of_the_next_sentence_counts():
                "Start lisinopril 10 mg daily").pending
 
 
+def test_a_correction_that_starts_a_sentence_finds_the_same_unit_further_back():
+    said = "Start lisinopril 10 mg daily. Recheck in 2 weeks. Actually, make that 20 mg."
+
+    assert "source_superseded" in own(said, "Start lisinopril 10 mg daily.", "Start lisinopril 10 mg daily").reasons
+    assert own(said, "Recheck in 2 weeks.", "Recheck in 2 weeks").pending
+    assert "source_superseded" in own("Lisinopril 10 mg daily. Recheck in 2 weeks. Sorry, 3 weeks.",
+                                      "Recheck in 2 weeks.", "Recheck in 2 weeks").reasons
+
+
 def test_a_correction_supersedes_only_the_measurement_it_corrects():
     said = "Blood pressure 98/60, heart rate 78, no sorry 72."
 
