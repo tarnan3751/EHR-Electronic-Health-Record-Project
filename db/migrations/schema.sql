@@ -414,3 +414,37 @@ VALUES ('20261115092953_ChartSections', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.patients ADD family_name_key text COLLATE "C" GENERATED ALWAYS AS (lower(family_name)) STORED NOT NULL;
+
+ALTER TABLE ehr.patients ADD given_name_key text COLLATE "C" GENERATED ALWAYS AS (lower(given_name)) STORED NOT NULL;
+
+CREATE INDEX ix_patients_birth_date ON ehr.patients (birth_date);
+
+CREATE INDEX ix_patients_family_name_key ON ehr.patients (family_name_key);
+
+CREATE INDEX ix_patients_given_name_key ON ehr.patients (given_name_key);
+
+CREATE FUNCTION ehr.name_key_after(prefix text) RETURNS text
+    LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
+AS $$
+DECLARE
+    head text := prefix;
+    last integer;
+BEGIN
+    WHILE head <> '' LOOP
+        last := ascii(right(head, 1));
+        head := left(head, -1);
+        IF last < 1114111 THEN
+            RETURN head || chr(CASE WHEN last = 55295 THEN 57344 ELSE last + 1 END);
+        END IF;
+    END LOOP;
+    RETURN NULL;
+END
+$$;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261115104258_PatientSearchIndexes', '10.0.13');
+
+COMMIT;
+

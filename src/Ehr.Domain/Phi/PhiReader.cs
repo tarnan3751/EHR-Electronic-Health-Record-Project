@@ -82,10 +82,24 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         var patients = db.Patients.AsQueryable();
         if (name is not null)
         {
-            // The name's own wildcards and backslashes match only themselves. The escape character is named outright:
-            // without one, EF Core writes ESCAPE '', and a backslash would be a plain character.
-            var prefix = name.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
-            patients = patients.Where(p => EF.Functions.ILike(p.FamilyName, prefix, @"\") || EF.Functions.ILike(p.GivenName, prefix, @"\"));
+            // A name that starts with the prefix, in any case, is a key from the lower-cased prefix up to, not including,
+            // the first string after all those that start with it (PatientConfiguration keeps the keys, in the C
+            // collation, which the comparisons take from the column). What was typed is lower-cased in the database,
+            // by the lower() that keeps the keys, and the range's end is worked out there from that (NameKeys): made
+            // from the query's parameter alone, both are constants to the plan. The range is a condition of its own,
+            // plain comparisons, which are leakproof, so under row-level security the keys' indexes can answer it. The
+            // prefix check that decides, a second condition, isn't leakproof, so it runs on the rows the range found.
+            // When nothing comes after the prefix, for a name of nothing but U+10FFFF, a noncharacter no name holds,
+            // the end is null and the range finds nobody. Left so on purpose: an open end (IS NULL OR ...) keeps the
+            // index's upper bound only in a custom plan, and in a generic one, as prepared statements get, the scan runs
+            // from the prefix to the end of the index (22.7 ms rather than 1.8 at 50,000 patients).
+            patients = patients
+                .Where(p =>
+                    (string.Compare(p.FamilyNameKey, NameKeys.Lower(name)) >= 0
+                        && string.Compare(p.FamilyNameKey, NameKeys.After(NameKeys.Lower(name))) < 0)
+                    || (string.Compare(p.GivenNameKey, NameKeys.Lower(name)) >= 0
+                        && string.Compare(p.GivenNameKey, NameKeys.After(NameKeys.Lower(name))) < 0))
+                .Where(p => p.FamilyNameKey.StartsWith(NameKeys.Lower(name)) || p.GivenNameKey.StartsWith(NameKeys.Lower(name)));
         }
 
         if (birthDate is { } date)

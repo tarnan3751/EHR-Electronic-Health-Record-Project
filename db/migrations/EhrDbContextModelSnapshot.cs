@@ -801,6 +801,14 @@ namespace Ehr.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("family_name");
 
+                    b.Property<string>("FamilyNameKey")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("family_name_key")
+                        .HasComputedColumnSql("lower(family_name)", true)
+                        .UseCollation("C");
+
                     b.Property<string>("Gender")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -812,6 +820,14 @@ namespace Ehr.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("given_name");
+
+                    b.Property<string>("GivenNameKey")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("given_name_key")
+                        .HasComputedColumnSql("lower(given_name)", true)
+                        .UseCollation("C");
 
                     b.Property<string>("Mrn")
                         .IsRequired()
@@ -830,6 +846,15 @@ namespace Ehr.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_patients");
+
+                    b.HasIndex("BirthDate")
+                        .HasDatabaseName("ix_patients_birth_date");
+
+                    b.HasIndex("FamilyNameKey")
+                        .HasDatabaseName("ix_patients_family_name_key");
+
+                    b.HasIndex("GivenNameKey")
+                        .HasDatabaseName("ix_patients_given_name_key");
 
                     b.HasIndex("Mrn")
                         .IsUnique()

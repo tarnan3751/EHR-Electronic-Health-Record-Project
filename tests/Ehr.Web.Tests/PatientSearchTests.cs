@@ -143,7 +143,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Search results", html);
     }
 
-    // The name is a prefix, whatever it holds: LIKE's wildcards and its escape character match only themselves.
+    // The name is a prefix, whatever it holds: %, _ and \ match only themselves.
     [Fact]
     public async Task Wildcards_in_a_name_match_only_themselves()
     {
@@ -162,6 +162,116 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([underscore], Listed(byUnderscore));
         Assert.Equal([backslash], Listed(byBackslash));
         Assert.DoesNotContain($"/patients/{plain}", byPercent + byUnderscore + byBackslash);
+    }
+
+    // A prefix is a range of lower-cased keys up to the first string after it (PhiReader). A name ending in the last
+    // letter takes the range to the character after z; the one just past the range is left out.
+    [Fact]
+    public async Task A_name_ending_in_z_matches_up_to_the_end_of_its_range_and_no_further()
+    {
+        var stem = Unique("Ortiz");
+        var ending = await apps.InsertPatientAsync("Ada", stem + "z");
+        var longer = await apps.InsertPatientAsync("Ada", stem + "zabc");
+        var after = await apps.InsertPatientAsync("Ada", stem + "{");
+        var before = await apps.InsertPatientAsync("Ada", stem + "y");
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var html = await session.Client.GetStringAsync($"/patients?name={Uri.EscapeDataString(stem + "Z")}", Cancel);
+
+        Assert.Equal(new[] { ending, longer }.Order(), Listed(html).Order());
+        Assert.DoesNotContain($"/patients/{after}", html);
+        Assert.DoesNotContain($"/patients/{before}", html);
+    }
+
+    // Lower-cased the same way by the database, for the keys, and by the app, for what was typed, letters outside ASCII
+    // included.
+    [Theory]
+    [InlineData("Ångström", "ÅNGS")]
+    [InlineData("Ångström", "ångs")]
+    [InlineData("Øvergård", "øverg")]
+    [InlineData("Çelik", "ÇEL")]
+    [InlineData("Ελένη", "ελέ")]
+    public async Task Names_beyond_ASCII_match_in_any_case(string name, string typed)
+    {
+        var patient = await apps.InsertPatientAsync("Ada", name + Guid.NewGuid().ToString("N")[..8]);
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var html = await session.Client.GetStringAsync($"/patients?name={Uri.EscapeDataString(typed)}", Cancel);
+
+        Assert.Contains($"/patients/{patient}", html);
+    }
+
+    // Punctuation, spaces and accents count, as they would in a prefix: "o'b" is not "ob", and "nun" is not "nún".
+    [Theory]
+    [InlineData("O'B", "O'Brien", "Obama")]
+    [InlineData("smith-", "Smith-Jones", "Smithers")]
+    [InlineData("de la", "De La Cruz", "Delacroix")]
+    [InlineData("núñ", "Núñez", "Nunez")]
+    [InlineData("nun", "Nunez", "Núñez")]
+    public async Task Punctuation_spaces_and_accents_in_a_name_count(string typed, string matching, string other)
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var match = await apps.InsertPatientAsync("Ada", matching + suffix);
+        var miss = await apps.InsertPatientAsync("Ada", other + suffix);
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var html = await session.Client.GetStringAsync($"/patients?name={Uri.EscapeDataString(typed)}", Cancel);
+
+        Assert.Contains($"/patients/{match}", html);
+        Assert.DoesNotContain($"/patients/{miss}", html);
+    }
+
+    // The capital dotted I, which .NET's invariant lowering leaves alone and PostgreSQL's lower() makes i: typed as the
+    // name is written, in capitals, or lower-cased.
+    [Theory]
+    [InlineData("İnce", "İnce")]
+    [InlineData("İnce", "İNCE")]
+    [InlineData("İnce", "ince")]
+    [InlineData("İsmail", "İsmail")]
+    [InlineData("İsmail", "İSM")]
+    public async Task A_name_with_a_capital_dotted_I_is_found(string name, string typed)
+    {
+        var patient = await apps.InsertPatientAsync("Ada", name + Guid.NewGuid().ToString("N")[..8]);
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var html = await session.Client.GetStringAsync($"/patients?name={Uri.EscapeDataString(typed)}", Cancel);
+
+        Assert.Contains($"/patients/{patient}", html);
+    }
+
+    // The database lower-cases the key under the name's own collation and only stores and compares it as "C": lowered
+    // under "C", an all-caps accented name would keep its accented capitals and never be found by what was typed.
+    [Theory]
+    [InlineData("ñú")]
+    [InlineData("ÑÚ")]
+    public async Task An_all_caps_accented_name_is_found_in_either_case(string typed)
+    {
+        var patient = await apps.InsertPatientAsync("Ada", "ÑÚÑEZ" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant());
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var html = await session.Client.GetStringAsync($"/patients?name={Uri.EscapeDataString(typed)}", Cancel);
+
+        Assert.Contains($"/patients/{patient}", html);
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var key = new Npgsql.NpgsqlCommand("SELECT family_name_key FROM ehr.patients WHERE id = @id", connection);
+        key.Parameters.AddWithValue("id", patient);
+        Assert.StartsWith("ñúñez", (string)(await key.ExecuteScalarAsync(Cancel))!, StringComparison.Ordinal);
+    }
+
+    // A character beyond the Basic Multilingual Plane, two UTF-16 units, ends the range at the next character, not
+    // half-way through it.
+    [Fact]
+    public async Task A_name_ending_beyond_the_basic_plane_matches_up_to_the_next_character()
+    {
+        var stem = Unique("Star");
+        var grinning = await apps.InsertPatientAsync("Ada", stem + "\U0001F600x");
+        var next = await apps.InsertPatientAsync("Ada", stem + "\U0001F601x");
+        var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
+
+        var html = await session.Client.GetStringAsync($"/patients?name={Uri.EscapeDataString(stem + "\U0001F600")}", Cancel);
+
+        Assert.Equal([grinning], Listed(html));
+        Assert.DoesNotContain($"/patients/{next}", html);
     }
 
     [Fact]

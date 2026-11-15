@@ -15,6 +15,11 @@ public class Patient
 
     public required string FamilyName { get; set; }
 
+    // The names as the search compares them, lower-cased, kept by the database (PatientConfiguration): nobody writes them.
+    public string GivenNameKey { get; private set; } = "";
+
+    public string FamilyNameKey { get; private set; } = "";
+
     public DateOnly BirthDate { get; set; }
 
     // One of AdministrativeGender.

@@ -89,5 +89,9 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
         });
 
         modelBuilder.Entity<SyncOperation>().HasKey(o => o.IdempotencyKey);
+
+        // The name search's functions on what was typed (NameKeys).
+        modelBuilder.HasDbFunction(typeof(NameKeys).GetMethod(nameof(NameKeys.Lower))!).HasName("lower").IsBuiltIn();
+        modelBuilder.HasDbFunction(typeof(NameKeys).GetMethod(nameof(NameKeys.After))!).HasName("name_key_after").HasSchema(Schema);
     }
 }
