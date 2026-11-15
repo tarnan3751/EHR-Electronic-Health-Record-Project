@@ -135,6 +135,28 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient));
     }
 
+    [Fact]
+    public async Task Off_site_a_patient_signs_out_while_the_on_prem_app_is_unreachable()
+    {
+        var patient = await apps.InsertPatientAsync("Quinn", "Leaving");
+        var (email, password) = await apps.CreatePatientAccountAsync(patient);
+        var jar = new CookieContainer();
+        using (var signedIn = await PostFormAsync(Client(apps.Cloud, jar), "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password)))
+        {
+            Assert.Equal("/portal", PathOf(signedIn));
+        }
+
+        Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
+
+        using var signedOut = await PostFormAsync(Client(apps.CloudCutOff, jar), "/portal/sign-out", "/portal");
+
+        Assert.Contains("Signed out", await ReadAsync(signedOut));
+        using var record = await Client(apps.CloudCutOff, jar, followRedirects: false).GetAsync("/portal", Cancel);
+        Assert.Equal("/portal/sign-in", new Uri(Base, record.Headers.Location!).AbsolutePath);
+        var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
+        Assert.Contains(queued, e => e.Action == AuditActions.SignOut && e.PatientId == patient && e.ActorId is not null && e.TableName is null);
+    }
+
     // A clinician issues one of their patients an enrollment code from the chart, and reads it off the page.
     async Task<string> IssueCodeAsync(StaffAccount clinician, Guid patient)
     {

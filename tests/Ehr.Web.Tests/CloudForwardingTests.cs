@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
@@ -150,6 +151,37 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("Not saved: the on-prem server can't be reached.", await response.Content.ReadAsStringAsync(Cancel));
+    }
+
+    [Fact]
+    public async Task Signing_out_off_site_is_done_by_the_cloud_app_and_recorded_from_there()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Done", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.Cloud, account);
+        var forwarded = apps.Forwarded.Count;
+
+        using var signedOut = await PostFormAsync(session.Client, "/sign-out", QuickTexts);
+
+        Assert.Contains("Signed out", await ReadAsync(signedOut));
+        Assert.Empty(apps.Forwarded.Skip(forwarded));
+        await apps.ShipCloudAuditAsync();
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignOut, actorId: account.Id, source: AuditSources.Cloud));
+    }
+
+    [Fact]
+    public async Task A_sign_out_off_site_without_its_form_token_is_refused()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Staying", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.Cloud, account);
+
+        using var refused = await session.Client.PostAsync("/sign-out", Form(), Cancel);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        // Still signed in: the clinic's home sends them to their patients, not to sign in.
+        using var home = await Client(apps.Cloud, session.Jar, followRedirects: false).GetAsync("/", Cancel);
+        Assert.Equal("/patients", new Uri(Base, home.Headers.Location!).AbsolutePath);
+        await apps.ShipCloudAuditAsync();
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignOut, actorId: account.Id));
     }
 
     [Fact]

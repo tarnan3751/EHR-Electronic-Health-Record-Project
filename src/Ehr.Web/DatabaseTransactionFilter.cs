@@ -4,9 +4,11 @@ using Microsoft.AspNetCore.Mvc.Filters;
 namespace Ehr.Web;
 
 // Runs each page handler in one database transaction, committed if the handler succeeds. UserContextInterceptor
-// (Ehr.Data) makes setting the user context its first statement. After a request that can change data, the response
-// reports how far the primary's WAL has got, so the cloud app can tell when its replica has the change.
-public sealed class DatabaseTransactionFilter(EhrDbContext db) : IAsyncPageFilter
+// (Ehr.Data) makes setting the user context its first statement. On-prem, after a request that can change data, the
+// response reports how far the primary's WAL has got, so the cloud app can tell when its replica has the change. The
+// cloud app reports nothing: the POSTs it handles itself save nothing (HandledOffSiteAttribute), and a replica has no
+// WAL position of its own to report (the query fails on a standby).
+public sealed class DatabaseTransactionFilter(EhrDbContext db, bool reportWalPosition) : IAsyncPageFilter
 {
     public const string WalPositionHeader = "Ehr-Wal-Position";
 
@@ -24,7 +26,7 @@ public sealed class DatabaseTransactionFilter(EhrDbContext db) : IAsyncPageFilte
             await transaction.CommitAsync(CancellationToken.None);
 
             var method = context.HttpContext.Request.Method;
-            if (!HttpMethods.IsGet(method) && !HttpMethods.IsHead(method))
+            if (reportWalPosition && !HttpMethods.IsGet(method) && !HttpMethods.IsHead(method))
             {
                 context.HttpContext.Response.Headers[WalPositionHeader] =
                     await WalPosition.OfPrimaryAsync(db, CancellationToken.None);

@@ -289,6 +289,11 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("details")]
     [InlineData("an hour ahead")]
     [InlineData("null")]
+    [InlineData("a sign-out with a table")]
+    [InlineData("a sign-out with a row")]
+    [InlineData("a sign-out with details")]
+    [InlineData("a sign-out with no actor")]
+    [InlineData("a sign-out of an empty patient")]
     public async Task Only_reads_of_one_patient_by_a_signed_in_account_are_taken(string what)
     {
         var good = Event(Guid.CreateVersion7());
@@ -319,6 +324,25 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
             case "an hour ahead":
                 bad.OccurredAt = DateTimeOffset.UtcNow.AddHours(1);
                 break;
+            case "a sign-out with a table":
+                bad = SignOutEvent();
+                bad.TableName = "staff_users";
+                break;
+            case "a sign-out with a row":
+                bad = SignOutEvent();
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            case "a sign-out with details":
+                bad = SignOutEvent();
+                bad.Details = "{}";
+                break;
+            case "a sign-out with no actor":
+                bad = SignOutEvent();
+                bad.ActorId = null;
+                break;
+            case "a sign-out of an empty patient":
+                bad = SignOutEvent(Guid.Empty);
+                break;
         }
 
         using var response = await PostAsync(what == "null" ? [good, null] : [good, bad], WebApps.CloudAuditKey);
@@ -331,6 +355,19 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(
             what == "an hour ahead" ? "more than 5 minutes ahead of this server's clock" : "each a read of one patient",
             answer[..Math.Min(answer.Length, CloudAuditShipper.MaxAnswerLength)]);
+    }
+
+    [Fact]
+    public async Task Sign_outs_as_the_cloud_app_records_them_are_taken()
+    {
+        var staff = SignOutEvent();
+        var patient = SignOutEvent(Guid.CreateVersion7());
+
+        using var response = await PostAsync([staff, patient], WebApps.CloudAuditKey);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(await RecordedAsync(staff.Id));
+        Assert.True(await RecordedAsync(patient.Id));
     }
 
     [Fact]
@@ -388,6 +425,17 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.DoesNotContain("Read-only", await session.Client.GetStringAsync(QuickTexts, Cancel));
     }
+
+    // A sign-out as StaffSignIn records one; PatientSignIn's carries the patient too.
+    static AuditEvent SignOutEvent(Guid? patient = null) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        OccurredAt = DateTimeOffset.UtcNow,
+        Action = AuditActions.SignOut,
+        Source = AuditSources.Cloud,
+        ActorId = Guid.CreateVersion7(),
+        PatientId = patient,
+    };
 
     // A read as the PHI reader records one.
     static AuditEvent Event(Guid patient) => new()

@@ -13,6 +13,7 @@ using Ehr.Web.CloudAudit;
 using Ehr.Web.Email;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -93,7 +94,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeAreaFolder("Portal", "/", EhrPolicies.Patient);
     options.Conventions.AllowAnonymousToAreaFolder("Portal", "/Account");
 })
-    .AddMvcOptions(options => options.Filters.Add<DatabaseTransactionFilter>())
+    // Only the on-prem app reports its WAL position after a POST (DatabaseTransactionFilter).
+    .AddMvcOptions(options => options.Filters.Add(new TypeFilterAttribute(typeof(DatabaseTransactionFilter)) { Arguments = [site == Site.OnPrem] }))
     // Validation runs on the server only, so pages don't need the jQuery validation attributes.
     .AddViewOptions(options => options.HtmlHelperOptions.ClientValidationEnabled = false);
 

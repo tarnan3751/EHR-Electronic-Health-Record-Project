@@ -7,12 +7,13 @@ using Yarp.ReverseProxy.Forwarder;
 namespace Ehr.Web.Forwarding;
 
 // The cloud app's write path. The replica can't take writes, so every request that could change data goes to the
-// on-prem app, which saves and renders the response; it comes back in one WAN round trip. The on-prem app reports
-// the save's WAL position, which LastSaveCookie keeps. Until the replica has replayed that far, the same browser's
-// page requests go to the on-prem app too, so people see their own saves, unless the on-prem app can't save just then
-// (OnPremStatus) and the replica's copy is all there is. Other reads, PHI included, come from the replica; the PHI
-// reader records them in the cloud app's audit queue (CloudAudit). A forward that can't reach the on-prem app marks
-// OnPremStatus unreachable; only CloudAuditShipper marks it reachable again.
+// on-prem app, which saves and renders the response; it comes back in one WAN round trip. Signing out, which saves
+// nothing, is handled here instead (HandledOffSiteAttribute). The on-prem app reports the save's WAL position, which
+// LastSaveCookie keeps. Until the replica has replayed that far, the same browser's page requests go to the on-prem
+// app too, so people see their own saves, unless the on-prem app can't save just then (OnPremStatus) and the
+// replica's copy is all there is. Other reads, PHI included, come from the replica; the PHI reader records them in the
+// cloud app's audit queue (CloudAudit). A forward that can't reach the on-prem app marks OnPremStatus unreachable;
+// only CloudAuditShipper marks it reachable again.
 public sealed class CloudForwardingMiddleware(
     RequestDelegate next, IHttpForwarder forwarder, OnPremApp onPrem, LastSaveCookie lastSave, OnPremStatus status)
 {
@@ -23,9 +24,16 @@ public sealed class CloudForwardingMiddleware(
     public async Task InvokeAsync(HttpContext context, EhrDbContext db)
     {
         var method = context.Request.Method;
-        var isPage = context.GetEndpoint()?.Metadata.GetMetadata<PageActionDescriptor>() is not null;
+        var endpoint = context.GetEndpoint();
+        var isPage = endpoint?.Metadata.GetMetadata<PageActionDescriptor>() is not null;
         if (!HttpMethods.IsGet(method) && !HttpMethods.IsHead(method))
         {
+            if (endpoint?.Metadata.GetMetadata<HandledOffSiteAttribute>() is not null)
+            {
+                await next(context);
+                return;
+            }
+
             if (await ForwardAsync(context) != ForwarderError.None && !context.Response.HasStarted)
             {
                 context.Response.Clear();

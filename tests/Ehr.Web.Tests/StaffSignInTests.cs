@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Web.CloudAudit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -143,6 +144,37 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         await using var scope = apps.OnPrem.Services.CreateAsyncScope();
         var admin = await scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>().FindByEmailAsync(WebApps.BootstrapAdminEmail);
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.MfaEnrolled, actorId: admin!.Id));
+    }
+
+    // Off-site, the cloud app signs the person out itself and queues the event, so it works however the on-prem app
+    // is down.
+    [Theory]
+    [InlineData("link down")]
+    [InlineData("primary down")]
+    public async Task Off_site_signing_out_works_while_the_on_prem_app_cant_save(string outage)
+    {
+        var account = await apps.CreateStaffAsync("Dr. Leaving", StaffRoles.Clinician);
+        var app = outage == "link down" ? apps.CloudCutOff : apps.CloudPrimaryDrill;
+        var session = await SignInAsync(app, account, via: apps.Cloud);
+        apps.PrimaryDown = outage == "primary down";
+        try
+        {
+            Assert.False(await app.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
+
+            using var signedOut = await PostFormAsync(session.Client, "/sign-out", QuickTexts);
+
+            Assert.Contains("Signed out", await ReadAsync(signedOut));
+            // The replica has no WAL position of its own, and asking for one would fail.
+            Assert.False(signedOut.Headers.Contains(DatabaseTransactionFilter.WalPositionHeader));
+            using var home = await Client(app, session.Jar, followRedirects: false).GetAsync("/", Cancel);
+            Assert.Equal("/sign-in", new Uri(Base, home.Headers.Location!).AbsolutePath);
+            var (queued, _) = app.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
+            Assert.Contains(queued, e => e.Action == AuditActions.SignOut && e.ActorId == account.Id && e.PatientId is null && e.TableName is null);
+        }
+        finally
+        {
+            apps.PrimaryDown = false;
+        }
     }
 
     [Fact]
