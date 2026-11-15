@@ -103,7 +103,7 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         var session = await SignInAsync(apps.OnPrem, clinician);
 
         var byName = await session.Client.GetStringAsync("/patients?q=Searchable", Cancel);
-        var byMrn = await session.Client.GetStringAsync($"/patients?q={patient.ToString("N")[..12]}", Cancel);
+        var byMrn = await session.Client.GetStringAsync($"/patients?q={patient.ToString("N")[^12..]}", Cancel);
 
         Assert.Contains($"/patients/{patient}", byName);
         Assert.Contains($"/patients/{patient}", byMrn);

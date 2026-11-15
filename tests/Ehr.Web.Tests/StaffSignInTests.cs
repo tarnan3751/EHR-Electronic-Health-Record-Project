@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -137,7 +139,10 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("/denied", new Uri(Base, patients.Headers.Location!).AbsolutePath);
 
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.BootstrapAdmin));
-        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.MfaEnrolled));
+        // The admin's own: other tests in this class enroll accounts too.
+        await using var scope = apps.OnPrem.Services.CreateAsyncScope();
+        var admin = await scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>().FindByEmailAsync(WebApps.BootstrapAdminEmail);
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.MfaEnrolled, actorId: admin!.Id));
     }
 
     [Fact]

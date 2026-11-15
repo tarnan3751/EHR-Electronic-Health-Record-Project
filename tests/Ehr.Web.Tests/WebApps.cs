@@ -197,7 +197,9 @@ public sealed class WebApps : IAsyncLifetime
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
-        command.Parameters.AddWithValue("mrn", id.ToString("N")[..12]);
+        // From the random end of the ID: the start of a version 7 GUID is the time, the same for two made in one
+        // millisecond.
+        command.Parameters.AddWithValue("mrn", id.ToString("N")[^12..]);
         command.Parameters.AddWithValue("given", givenName);
         command.Parameters.AddWithValue("family", familyName);
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
