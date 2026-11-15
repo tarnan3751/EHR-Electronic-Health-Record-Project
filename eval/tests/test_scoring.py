@@ -43,6 +43,22 @@ def test_dates_and_drug_names_right_wrong_and_nearly_right(scripts):
     assert metrics["drugs"] == {"said": 3, "exact": 1, "accuracy": round(1 / 3, 4), "within_2_letters": 2}
 
 
+def test_fields_are_scored_against_the_rule_following_gold_and_the_clinical_gold_beside_it(eval_dir):
+    from conftest import write_script
+    from ehr_eval.scripts import load_all
+
+    write_script(eval_dir / "scripts", "d03", "Mother had a stroke at [[70|seventy]] {period}",
+                 history="Stroke at age 70 in her mother.", history_sources=["Mother had a stroke at 70"],
+                 rules='\n[gold_rules.history]\nvalue = "Mother had a stroke at 70."\nsources = ["Mother had a stroke at 70"]\n')
+    scripts = load_all(eval_dir / "scripts")
+
+    metrics = score([item("d03", "x", history=pending("Mother had a stroke at 70."))], scripts)
+
+    assert metrics["fields"]["content"]["f1"] == 1.0
+    clinical = metrics["fields_clinical"]["content"]
+    assert (clinical["precision"], clinical["recall"]) == (1.0, 0.75)  # the clinical gold also says "age"
+
+
 def test_fields_detection_and_content(scripts):
     items = [
         item("d01", "x", history=pending("Cough for 3 days."), plan=pending("Rest.")),

@@ -10,7 +10,9 @@ someone committed instead:
    script names but no gold value carries.
 4. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
-   rate, note-field F1, date and drug-name accuracy, and the share of offered words the transcript doesn't support.
+   rate, note-field F1 against the rule-following gold (fields.content.f1; the F1 against the clinical gold,
+   fields_clinical, is reported beside it and not gated), date and drug-name accuracy, and the share of offered words
+   the transcript doesn't support.
 
 Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
@@ -39,7 +41,7 @@ RUN_IT = (
 # metric path, higher is better
 GATED = [
     (("wer", "overall"), False, "word error rate"),
-    (("fields", "content", "f1"), True, "note-field F1"),
+    (("fields", "content", "f1"), True, "note-field F1 against the rule-following gold"),
     (("dates", "accuracy"), True, "date accuracy"),
     (("drugs", "accuracy"), True, "drug-name accuracy"),
     (("unsupported_content", "shown"), False, "share of offered words the transcript doesn't support"),
@@ -148,7 +150,8 @@ def main() -> int:
     baseline = "against the accepted baseline" if (RESULTS_DIR / "baseline.json").is_file() else "(no accepted baseline yet)"
     print(
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
-        f"field F1 {metrics['fields']['content']['f1']}, every recording sorted, no order, allergy change or retracted "
+        f"field F1 {metrics['fields']['content']['f1']} (clinical gold {metrics['fields_clinical']['content']['f1']}), "
+        f"every recording sorted, no order, allergy change or retracted "
         f"value shown. Run on {latest['run']['machine']['label']}."
     )
     return 0

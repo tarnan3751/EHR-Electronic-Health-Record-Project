@@ -39,13 +39,13 @@ sources = {plan_sources}
 
 
 def write_script(directory: Path, id: str, text: str, *, tags=("dates",), dates=(), drugs=(), forbidden=(),
-                 history="", history_sources=(), plan="", plan_sources=()) -> None:
+                 history="", history_sources=(), plan="", plan_sources=(), rules: str = "") -> None:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / f"{id}.toml").write_text(SCRIPT.format(
         id=id, text=text, tags=json.dumps(list(tags)), dates=json.dumps(list(dates)), drugs=json.dumps(list(drugs)),
         forbidden=json.dumps(list(forbidden)), history=history, history_sources=json.dumps(list(history_sources)),
         plan=plan, plan_sources=json.dumps(list(plan_sources)),
-    ), encoding="utf-8")
+    ) + rules, encoding="utf-8")
 
 
 @pytest.fixture

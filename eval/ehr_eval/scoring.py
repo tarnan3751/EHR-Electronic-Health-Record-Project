@@ -6,7 +6,9 @@
   two letters, to tell a near miss from a miss).
 - fields: whether each note field was offered when it should have been (detection) and how much of the gold value an
   offered value holds (content: precision, recall and F1 over the words that carry meaning), overall, per field and per
-  tag (such as recombination, mixed-plan and self-correction).
+  tag (such as recombination, mixed-plan and self-correction), against the rule-following gold: the best the
+  sidecar's own rules allow, so this measures the pipeline against its design. fields_clinical: the same against the
+  clinical gold, what a careful clinician would accept, which shows what the strict rules cost.
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - order_allergy: offered values holding text a script marks forbidden (an order or allergy change it tried to slip in;
@@ -23,6 +25,7 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import jiwer
@@ -32,7 +35,7 @@ from ehr_dictation.textnorm import STOPWORDS
 
 from .dates import said_right
 from .normalize import normalize, words
-from .scripts import Script
+from .scripts import Gold, Script
 
 TWO_MINUTES = 110.0  # seconds: the scripts written to run about two minutes
 AT_THE_LIMIT = 165.0  # seconds: the max-length scripts, near the 3-minute limit
@@ -79,7 +82,8 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "wer": _wer(items, scripts),
         "dates": _dates(items, scripts),
         "drugs": _drugs(items, scripts),
-        "fields": _fields(items, scripts),
+        "fields": _fields(items, scripts, lambda script: script.gold_rules),
+        "fields_clinical": _fields(items, scripts, lambda script: script.gold),
         "validation": _validation(items),
         "unsupported_content": _unsupported(items),
         "order_allergy": _order_allergy(items, scripts),
@@ -141,13 +145,13 @@ def content_words(text: str) -> list[str]:
     return [w for w in words(text) if w not in STOPWORDS and (w[0].isdigit() or len(w) >= 2)]
 
 
-def _fields(items: list[Item], scripts: dict[str, Script]) -> dict:
+def _fields(items: list[Item], scripts: dict[str, Script], golds: Callable[[Script], dict[str, Gold]]) -> dict:
     def measure(names: tuple[str, ...], group: list[Item]) -> dict:
         tp = fp = fn = 0
         overlap = shown_words = gold_words = 0
         for item in group:
             for name in names:
-                gold = scripts[item.script].gold[name].value.strip()
+                gold = golds(scripts[item.script])[name].value.strip()
                 shown = item.fields.get(name, FieldOutcome()).shown.strip()
                 tp += bool(gold and shown)
                 fp += bool(shown and not gold)
