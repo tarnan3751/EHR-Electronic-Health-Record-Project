@@ -10,8 +10,10 @@ free in time; if not, the chunk is kept and the answer has the transcript as it 
 Stop takes no more audio and, in the background, transcribes the rest, drops the audio, and has K2 Horizon sort the
 transcript. Stop and result answer within a few seconds whatever state that has reached: the transcript (final once
 transcribed), the fields once sorted, and every instruction in the transcript to order something or change the allergy
-list, which the note never carries (notCarriedOver), so the review screen can say what still needs placing. If K2 Horizon is unavailable or too slow, the result keeps the transcript and
-says why the fields are missing (UC 10). The fields are checked (validation.py) and marked pending; a field that failed
+list, which the note never carries (notCarriedOver), so the review screen can say what still needs placing. If K2
+Horizon is unavailable or too slow, the result keeps the transcript and says why the fields are missing (UC 10); if
+MedASR fails on the rest of the recording, it keeps the transcript as it was live, not final, with the reason
+transcription_failed. The fields are checked (validation.py) and marked pending; a field that failed
 carries only its reason codes.
 
 Cancelling discards everything at once (UC 9): the session is marked cancelled, its background work is cancelled,
@@ -282,8 +284,12 @@ class Sessions:
                 return
             if session.cancelled:
                 return
-            async with self._transcribing:
-                progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer, final=True)
+            try:
+                async with self._transcribing:
+                    progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer, final=True)
+            except Exception as error:  # noqa: BLE001 (the live transcript still goes back)
+                self._unfinished(session, type(error).__name__)
+                return
             if session.cancelled:
                 return
             session.progress = progress
@@ -300,6 +306,12 @@ class Sessions:
         finally:
             session.finished_at = self._clock()
             session.done.set()
+
+    @staticmethod
+    def _unfinished(session: Session, cause: str) -> None:
+        """The rest of the transcript couldn't be made: the live one stays, not final, and nothing is sorted."""
+        session.sorting, session.reason = "unavailable", "transcription_failed"
+        log.warning("session %s not transcribed: %s", session.id, cause)
 
     async def _sort(self, session: Session) -> None:
         started = time.perf_counter()

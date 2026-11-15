@@ -56,6 +56,17 @@ def dictation() -> bytes:
     return wav(samples + noise(samples.size / SAMPLE_RATE, -80))
 
 
+class FailingAtTheEnd(FakeRecognizer):
+    """Transcribes the chunks, and fails on the rest of the recording after stop."""
+
+    final = False
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        if self.final:
+            raise RuntimeError("MedASR failed")
+        return super().recognize(samples)
+
+
 class Instructing(FakeRecognizer):
     """Hears a plan with an order and an allergy change in it, in every passage."""
 
@@ -131,6 +142,16 @@ def answers(settings: Settings) -> dict[str, dict]:
             keep(f"result-200-unavailable-{reason}", "result",
                  http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
 
+    # MedASR failed on the rest of the recording: the live transcript stays, not final, and nothing is sorted.
+    failing = FailingAtTheEnd()
+    with client(settings, FakeLlama(GROUNDED), failing) as http:
+        session = start(http)
+        http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=dictation(), headers=HEADERS)
+        failing.final = True
+        http.post(f"/v1/sessions/{session}/stop", headers=HEADERS)
+        keep("result-200-unavailable-transcription_failed", "result",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+
     with client(settings, FakeLlama(GROUNDED), max_chunk_bytes=1000) as http:
         session = start(http)
         keep("audio-413-too_large", "audio",
@@ -182,7 +203,7 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     bodies = {name: value["body"] for name, value in produced.items()}
 
     assert {value["status"] for value in produced.values()} == {200, 201, 401, 404, 409, 413, 422, 429}
-    reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long")
+    reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long", "transcription_failed")
     assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in reasons} == set(reasons)
     planned = bodies["result-200-done-not_carried_over"]
     assert planned["fields"]["plan"]["value"] == "Start metformin."
@@ -194,3 +215,5 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     assert {f["status"] for f in fields.values()} == {"pending", "empty"}
     assert bodies["stop-200-pending"]["sorting"] == "pending" and bodies["stop-200-pending"]["provenance"]["llamaServer"] is None
     assert bodies["audio-409-out_of_order"]["expectedSeq"] == 1
+    failed = bodies["result-200-unavailable-transcription_failed"]
+    assert failed["transcript"]["text"] and not failed["transcript"]["final"]

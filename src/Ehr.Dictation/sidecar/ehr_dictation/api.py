@@ -15,9 +15,10 @@ app sets from the session and never from the request; a session is invisible to 
 
 A transcript is {text, final, segments: [{start, end, startMs, endMs, final, unclear}]}, with UTF-16 offsets into text
 and unclear one of too_quiet, too_noisy, low_confidence or null. A result is {transcript, sorting, reason, fields,
-notCarriedOver, provenance}: the transcript is final once the rest of the audio is transcribed, and sorting is pending, done (fields
-set) or unavailable (reason model_unavailable, model_timeout, model_output_invalid or transcript_too_long; the
-transcript stays as plain text). notCarriedOver lists each instruction in the transcript to order something or change the allergy list, which no field
+notCarriedOver, provenance}: the transcript is final once the rest of the audio is transcribed, and sorting is pending,
+done (fields set) or unavailable (reason model_unavailable, model_timeout, model_output_invalid or transcript_too_long,
+and the transcript stays as plain text; or transcription_failed, and it stays as it was live, not final).
+notCarriedOver lists each instruction in the transcript to order something or change the allergy list, which no field
 carries: [{reason: "order" or "allergy_change", start, end}], the span of the clinician's own words in the transcript,
 never anything the model wrote. provenance is {speech, language, llamaServer, prompt, schema, structuring, code};
 language and llamaServer are null while unknown. Each field is {status: "pending", value, sources: [{start,

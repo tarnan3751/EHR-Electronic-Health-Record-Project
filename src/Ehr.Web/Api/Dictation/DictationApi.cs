@@ -43,9 +43,10 @@ namespace Ehr.Web.Api.Dictation;
 // "done" or "unavailable". fields is null, or {history, assessment, plan}, each either {status: "pending", value, sources:
 // [{start, end}]}, a proposal for the clinician to approve, or {status: "empty", reasons: [code, ...]}: nothing
 // dictated, or discarded by validation, with the reasons' codes and never the discarded text. When sorting is
-// "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid" or
-// "transcript_too_long", fields is null or all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is kept
-// as plain text." notCarriedOver: [{reason: "order" or "allergy_change", start, end}], each instruction in the
+// "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid",
+// "transcript_too_long" or "transcription_failed" (the transcript is then as it was live, not final), fields is null
+// or all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is
+// kept as plain text." notCarriedOver: [{reason: "order" or "allergy_change", start, end}], each instruction in the
 // transcript to order something or change the allergy list, which no field carries (FR-14): the screen says it still
 // has to be placed, and can highlight the clinician's own words at start and end. provenance: {speech: {repository,
 // commit, sha256}, language: {repository, commit, file, sha256}, llamaServer, prompt, schema, structuring, code};

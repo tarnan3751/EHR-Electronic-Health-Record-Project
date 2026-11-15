@@ -82,6 +82,10 @@ public enum SortingFailure
     // The transcript wouldn't fit the model's context, so it was never sent: a dictation over the session's limit.
     [JsonStringEnumMemberName("transcript_too_long")]
     TranscriptTooLong,
+
+    // Speech recognition failed on the rest of the recording after stop: the transcript is as it was live, not final.
+    [JsonStringEnumMemberName("transcription_failed")]
+    TranscriptionFailed,
 }
 
 // An instruction the clinician dictated that the note doesn't carry: its kind, and where they said it in the transcript

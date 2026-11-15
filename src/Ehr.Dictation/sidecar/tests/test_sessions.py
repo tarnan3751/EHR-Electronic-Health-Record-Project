@@ -263,6 +263,36 @@ def test_every_result_says_which_models_prompt_and_schema_made_it(settings):
     assert provenance["code"] == f"sha256:{CODE_SHA256}"
 
 
+def test_when_medasr_fails_on_the_rest_the_live_transcript_stays_and_says_why(settings, caplog):
+    class Failing(FakeRecognizer):
+        final = False
+
+        def recognize(self, samples):
+            if self.final:
+                raise RuntimeError("speech speech")  # what an exception might say: it must not be logged
+            return super().recognize(samples)
+
+    async def run():
+        llama = FakeLlama(GROUNDED)
+        recognizer = Failing()
+        sessions = Sessions(settings, recognizer, llama.structurer(), MODELS, decoder=raw_decoder)
+        session = sessions.start(ALICE)
+        for seq, chunk in enumerate(chunks()):
+            await sessions.add_audio(session.id, ALICE, seq, chunk)
+        live = session.transcript.text
+        recognizer.final = True
+        await sessions.stop(session.id, ALICE)
+        return live, await sessions.result(session.id, ALICE, wait=5), llama
+
+    with caplog.at_level("INFO", logger="ehr_dictation"):
+        live, result, llama = asyncio.run(run())
+
+    assert (result["sorting"], result["reason"], result["fields"]) == ("unavailable", "transcription_failed", None)
+    assert result["transcript"]["text"] == live and live and not result["transcript"]["final"]
+    assert llama.requests == []
+    assert "RuntimeError" in caplog.text and "speech speech" not in caplog.text
+
+
 # ---- Cancel discards everything, whatever is running (UC 9) ------------------------------------------------------
 
 
