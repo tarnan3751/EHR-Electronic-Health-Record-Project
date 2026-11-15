@@ -620,6 +620,12 @@ def test_an_instruction_inside_a_source_splits_it_in_two():
     assert own(said, "MRI, recheck in 3 months.").reasons == ["unsupported_content"]
 
 
+@pytest.mark.parametrize("said", ["Do not start metformin until we order an A1c.",
+                                  "There's no reason not to order an MRI of the knee."])
+def test_a_sentence_whose_rest_needs_the_instruction_goes_whole(said):
+    assert own(said, said).reasons == ["order_or_allergy_change"]
+
+
 def test_an_instruction_after_and_is_cut_where_it_starts():
     checked = own("Start lisinopril 10 mg daily and order a chest x-ray.",
                   "Start lisinopril 10 mg daily and order a chest x-ray.", "start lisinopril 10 mg daily")

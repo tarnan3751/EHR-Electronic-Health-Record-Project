@@ -684,11 +684,18 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
 
 SENTENCE = re.compile(r"(?<=[.!?;\n])\s+")
 TRAILING_CONNECTOR = re.compile(r"(?:[\s,;:-]|\b(?:and|or|then|also|so)\b)+$", re.IGNORECASE)
+# Words a cut sentence can't end on: what came before them depends on the instruction cut after them ("Do not start
+# metformin until we order an A1c" is not "Do not start metformin"), so the whole sentence goes.
+DANGLING = frozenset(
+    """until till before after unless if when whenever once because since while as that which who whom whose where to
+    for of with without by from than about not no never""".split()
+)
 
 
 def _without_instructions(value: str) -> tuple[str, int]:
     """The value with each instruction cut out: a sentence is cut where its instruction starts ("Start metformin, and
-    order an A1c." keeps "Start metformin."), and dropped if the instruction is all it holds. Also how many were cut."""
+    order an A1c." keeps "Start metformin."), and dropped if the instruction is all it holds or what is left would end
+    on a word that needs it (DANGLING). Also how many were cut."""
     kept: list[str] = []
     cut = 0
     for sentence in SENTENCE.split(value):
@@ -698,7 +705,10 @@ def _without_instructions(value: str) -> tuple[str, int]:
             continue
         cut += len(found)
         head = TRAILING_CONNECTOR.sub("", sentence[: found[0][0]])
-        if any(token.text not in LEAD_IN and token.text not in STOPWORDS for token in tokens(head)):
+        words = tokens(head)
+        if words and words[-1].text not in DANGLING and any(
+            token.text not in LEAD_IN and token.text not in STOPWORDS for token in words
+        ):
             kept.append(head + ".")
     return " ".join(kept).strip(), cut
 
