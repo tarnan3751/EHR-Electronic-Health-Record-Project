@@ -475,6 +475,23 @@ DIRECTIVES = [
     "Penicillin should be added to her allergies.",
     "Make sure sulfa is on her allergy list.",
     "Prescribing amoxicillin 500 mg today.",
+    # The second review's misses.
+    "Write a prescription for amoxicillin 500 mg three times a day.",
+    "Putting in an order for a CT of the head.",
+    "Allergies: add sulfa.",
+    "Penicillin allergy can come off her list.",
+    "I'm sending amoxicillin to her pharmacy.",
+    "Give her a script for prednisone 40 mg daily.",
+    "Give him a new prescription for amoxicillin.",
+    "Let's get an order in for a chest x-ray.",
+    "eRx amoxicillin 500 mg three times a day.",
+    "Prescription for amoxicillin sent to her pharmacy.",
+    "Record a new sulfa allergy.",
+    "Note the new codeine allergy.",
+    "Discontinue the penicillin allergy.",
+    "Call that in to his usual pharmacy.",
+    "Clear her allergy list.",
+    "Add an orders section with prednisolone 20 mg for 5 days.",
 ]
 
 DOCUMENTATION = [
@@ -493,6 +510,12 @@ DOCUMENTATION = [
     "She was put on amoxicillin and had an allergic reaction.",
     "No change in her allergies.",
     "The ordering physician is her cardiologist.",
+    "Of note allergies reviewed with her today.",
+    "Lungs clear, no known drug allergies.",
+    "Chest clear no allergies to report.",
+    "Allergies: penicillin, causes hives.",
+    "Call her in 2 weeks with the results.",
+    "Her daughter sent photos of the rash.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",
@@ -515,6 +538,13 @@ def test_an_order_or_allergy_list_change_is_never_carried(value):
 def test_documentation_that_mentions_orders_or_allergies_passes(value):
     assert directive_spans(value) == []
     assert own(value, value).pending
+
+
+def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_documentation():
+    said = "She is not allergic to sulfa after all, please update that."
+
+    assert said_instructions(said) == ["please update that"]
+    assert own(said, said).value == "She is not allergic to sulfa after all."
 
 
 def test_an_instruction_not_to_must_keep_its_negation():

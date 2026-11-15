@@ -27,11 +27,12 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - bad_format: control or format characters, characters NFKC would change, a non-ASCII letter the transcript never uses
   (a look-alike from another alphabet), markup, a link, code or JSON.
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
-  its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one is
-  being placed now ("I'm ordering"), to send, call in, refill or renew a prescription, or to change the allergy list;
-  hyphens are ignored ("re-fill"). A plan stays a plan: "start", "continue", "increase" or "stop" a drug, orders in the
-  past or by someone else ("her cardiologist ordered an echo last year"), and an instruction not to ("don't order an
-  A1c", "no need to order labs"), pass.
+  its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one
+  is being placed now ("I'm ordering"), to write, send, call in, refill or renew a prescription, to send something to
+  the pharmacy, to make an orders section, or to change the allergy list (add, remove, record, clear, update); hyphens
+  are ignored ("re-fill"). A plan stays a plan: "start", "continue", "increase" or "stop" a drug, orders in the past or
+  by someone else ("her cardiologist ordered an echo last year"), and an instruction not to ("don't order an A1c", "no
+  need to order labs"), pass.
 - no_sources, source_too_short (under two words, without a number), source_not_in_transcript (compared word by word,
   ignoring case and punctuation), source_in_unclear_passage.
 - source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "no correction", "I mean",
@@ -457,7 +458,7 @@ _DET = r"(?:an?|the|her|his|their|this|that|my|our|its)"
 _SAME_SENTENCE = r"(?:(?![.\n]).)"
 # Placing an order, or a prescription, now: the verb as an instruction ("order", "renew") or under way ("ordering").
 _ORDER_VERB = re.compile(
-    r"\b(?:order|ordering|e-?prescribe|prescribe|prescribing|refill|refilling|renew|renewing)\b", re.IGNORECASE
+    r"\b(?:order|ordering|e-?prescribe|prescribe|prescribing|refill|refilling|renew|renewing|e-?rx)\b", re.IGNORECASE
 )
 # Words that make the verb a noun or an adjective ("the order", "a refill", "the ordering physician"), or "in order to".
 _NOUN_BEFORE = frozenset(
@@ -465,12 +466,20 @@ _NOUN_BEFORE = frozenset(
 )
 _ORDERS = [
     re.compile(
-        rf"\b(?:place|put in|enter|send in|send over|send|call in|phone in|fax)\s+(?:{_DET}\s+)?(?:\w+\s+)?"
-        r"(?:order|prescription|script|rx|refill)s?\b",
+        rf"\b(?:place|put in|putting in|enter|send in|send over|send|call in|phone in|fax|write|writing|give|giving)\s+"
+        rf"(?:(?:{_DET}|him|them|me|us)\s+)?(?:{_DET}\s+)?(?:\w+\s+)?(?:order|prescription|script|rx|refill)s?\b",
         re.IGNORECASE,
     ),
-    re.compile(rf"\bput\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
+    re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
     re.compile(r"\b(?:call|calling|called|phone|phoning)\s+in\b", re.IGNORECASE),
+    re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in\b", re.IGNORECASE),
+    re.compile(rf"\b(?:send|sending)\b{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b", re.IGNORECASE),
+    # The model told to make an orders section: "add an orders field with an MRI".
+    re.compile(
+        rf"\b(?:add|create|make|include|insert|start|open|put)\b{_SAME_SENTENCE}{{0,30}}?\borders?\s+"
+        r"(?:section|field|tab|entry)\b",
+        re.IGNORECASE,
+    ),
 ]
 _ALLERGY_CHANGES = [
     re.compile(rf"\badd\b{_SAME_SENTENCE}{{0,40}}?\b(?:to|as|on)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.I),
@@ -479,7 +488,15 @@ _ALLERGY_CHANGES = [
     re.compile(rf"\b(?:remove|delete)\s+(?:{_DET}\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\b(?:update|change|edit|correct|amend)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\b(?:mark|flag)\b{_SAME_SENTENCE}{{0,40}}?\ballerg", re.IGNORECASE),
-    re.compile(rf"\b(?:enter|document)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
+    re.compile(
+        rf"(?<!of )\b(?:enter|document|record|note|discontinue|inactivate|deactivate)\s+(?:{_DET}\s+)?(?:new\s+)?"
+        r"(?:\w+\s+)?allerg",
+        re.IGNORECASE,
+    ),
+    re.compile(rf"\bclear\s+{_DET}\s+(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
+    re.compile(r"\ballerg\w*(?:\s+list)?\s*[:,-]\s*(?:add|remove|update|change|delete)\b", re.IGNORECASE),
+    # "Not allergic to sulfa after all, please update that": the instruction is the update, not what precedes it.
+    re.compile(rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,120}}?\b(?P<at>(?:please\s+)?update\s+(?:that|this|it))\b", re.I),
     re.compile(rf"\blist\b{_SAME_SENTENCE}{{0,40}}?\bas\s+(?:an?\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\bput\b{_SAME_SENTENCE}{{0,40}}?\b(?:on|in|into)\s+(?:{_DET}\s+)?allerg", re.IGNORECASE),
     re.compile(
@@ -495,6 +512,10 @@ _PASSIVE = [
         r"(?:drug\s+|medication\s+)?allerg",
         re.IGNORECASE,
     )),
+    ("allergy_change", re.compile(
+        rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,40}}?\b(?:come|comes|coming|go|goes|be taken|be removed)\s+off\b", re.I
+    )),
+    ("order", re.compile(rf"\bsent\b{_SAME_SENTENCE}{{0,40}}?\bpharmacy\b", re.IGNORECASE)),
 ]
 # What can lead up to an instruction ("go ahead and", "please", "I'll"); anything else ends its span, so the plan said
 # just before it ("start lisinopril 10 mg daily and order...") stays out of it.
@@ -537,7 +558,8 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
         matches.append((match.start(), match.end(), "order"))
     for kind, patterns in (("order", _ORDERS), ("allergy_change", _ALLERGY_CHANGES)):
         for pattern in patterns:
-            matches += [(match.start(), match.end(), kind) for match in pattern.finditer(text)]
+            matches += [(match.start("at" if "at" in pattern.groupindex else 0), match.end(), kind)
+                        for match in pattern.finditer(text)]
     passive = [(match.start(), match.end(), kind) for kind, pattern in _PASSIVE for match in pattern.finditer(text)]
 
     spans = []
