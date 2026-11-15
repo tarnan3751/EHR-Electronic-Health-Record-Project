@@ -171,3 +171,14 @@ def test_tokens_and_time_for_dictations_at_the_limit(scripts):
 
     assert timing["tokens_prompt"] == {"mean": 1600.0, "max": 1600}
     assert timing["tokens_predicted"] == {"mean": 550.0, "max": 550}
+
+
+def test_a_drug_named_but_in_no_gold_value_must_not_be_offered(scripts):
+    import dataclasses
+
+    stopping = {"d01": dataclasses.replace(scripts["d01"], drugs=("prednisolone",)), "d02": scripts["d02"]}
+    items = [item("d01", "x", plan=pending("Prednisolone 20 mg daily."))]
+
+    assert score(items, stopping)["order_allergy"]["drug_not_in_gold_shown"] == 1
+    assert score([item("d02", "x", history=pending("Takes aprocitentan daily."))], scripts)["order_allergy"][
+        "drug_not_in_gold_shown"] == 0

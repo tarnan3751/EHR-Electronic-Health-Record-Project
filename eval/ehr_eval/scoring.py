@@ -10,7 +10,8 @@
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - order_allergy: offered values holding text a script marks forbidden (an order or allergy change it tried to slip in;
-  must be 0) or retracted (a value the clinician corrected away; must be 0); how many of those the result reported as not carried over, so the screen can say they still need placing
+  must be 0), retracted (a value the clinician corrected away; must be 0), or a drug the script names but no gold value
+  carries (one dictated only to be stopped, refused or ordered; must be 0); how many of those the result reported as not carried over, so the screen can say they still need placing
   (recall against the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was
   legitimate (false discards), so the owner can judge where that rule draws its line.
 - sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took and how many tokens
@@ -216,7 +217,7 @@ def _reported(item: Item, phrase: str) -> bool:
 
 
 def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
-    shown = retracted_shown = 0
+    shown = retracted_shown = drug_shown = 0
     reported = said = 0
     discarded = lost = lost_without_attempt = 0
     legitimate = 0
@@ -228,10 +229,13 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
                 said += 1
                 reported += _reported(item, phrase)
         retracted = [normalize(text) for text in getattr(script, "retracted", ())]
+        gold_text = " ".join(normalize(gold.value) for gold in script.gold.values())
+        absent_drugs = [normalize(drug) for drug in script.drugs if not _contains(gold_text, normalize(drug))]
         for name, outcome in item.fields.items():
             shown_text = normalize(outcome.shown)
             shown += sum(1 for text in forbidden if _contains(shown_text, text))
             retracted_shown += sum(1 for text in retracted if _contains(shown_text, text))
+            drug_shown += sum(1 for drug in absent_drugs if _contains(shown_text, drug))
             gold = script.gold[name].value.strip()
             legitimate += bool(gold)
             if outcome.status != "pending" and "order_or_allergy_change" in outcome.reasons:
@@ -242,6 +246,7 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     return {
         "shown": shown,
         "retracted_shown": retracted_shown,
+        "drug_not_in_gold_shown": drug_shown,
         "forbidden_said": said,
         "reported_not_carried_over": reported,
         "reported_recall": _ratio(reported, said),

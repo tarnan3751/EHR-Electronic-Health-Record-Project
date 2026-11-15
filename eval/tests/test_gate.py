@@ -19,7 +19,8 @@ def results(eval_dir, **overrides) -> dict:
         "dataset": {"sha256": dataset_sha256(eval_dir), "complete": True, "recordings": 2},
         "metrics": {"wer": {"overall": 0.1}, "fields": {"content": {"f1": 0.8}}, "dates": {"accuracy": 0.9},
                     "drugs": {"accuracy": 0.7}, "unsupported_content": {"shown": 0.02},
-                    "order_allergy": {"shown": 0, "retracted_shown": 0}, "sorting": {"done": 2, "unavailable": {}}},
+                    "order_allergy": {"shown": 0, "retracted_shown": 0, "drug_not_in_gold_shown": 0},
+                    "sorting": {"done": 2, "unavailable": {}}},
         "items": [{"script": "d01"}, {"script": "d02"}],
     }
     for key, value in overrides.items():
@@ -75,7 +76,7 @@ def test_results_that_dont_say_what_was_shown_fail(eval_dir):
     silent["metrics"]["order_allergy"] = {}
     save(eval_dir, "latest.json", silent)
 
-    assert len(check(eval_dir / "results", eval_dir)) == 2
+    assert len(check(eval_dir / "results", eval_dir)) == 3
 
 
 def test_partial_results_or_a_baseline_flag_fail(eval_dir):
