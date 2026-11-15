@@ -78,13 +78,24 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
     {
         var row = Row("Slow commits", (1_000, Total: 30, Audit: 5, Commit: 15));
 
-        var (code, output) = WarnThenGate(row);
+        var (code, output) = Finish(assert: true, row);
 
         Assert.Equal(0, code);
-        Assert.Contains($"warning: Slow commits: p99 including the commit {30.0:F1} ms, not under 20 ms. "
-            + "This doesn't fail the run: the full time's target is checked on the clinic server.", output);
+        Assert.Contains($"warning: Slow commits: p99 including the commit {30.0:F1} ms, not under 20 ms. This doesn't fail the run. "
+            + "On the clinic server, this is the target to meet; on CI runners, shared disks make commit times unsteady.", output);
         Assert.Contains("--assert passed", output);
         Assert.Equal("  warning: full time not under 20 ms", RenderBenchmark.Markers(row));
+    }
+
+    // Over both ways, so that the gate, had it run, would have failed.
+    [Fact]
+    public void Without_assert_it_still_warns_and_exits_0()
+    {
+        var (code, output) = Finish(assert: false, Row("Slow both", (1_000, Total: 40, Audit: 2, Commit: 10)));
+
+        Assert.Equal(0, code);
+        Assert.Contains($"warning: Slow both: p99 including the commit {40.0:F1} ms, not under 20 ms.", output);
+        Assert.DoesNotContain("--assert", output);
     }
 
     [Fact]
@@ -92,10 +103,10 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
     {
         var row = Row("Fast", (1_000, Total: 8, Audit: 1, Commit: 1));
 
-        using var output = new StringWriter();
-        RenderBenchmark.Warn([row], output);
+        var (code, output) = Finish(assert: false, row);
 
-        Assert.Equal("", output.ToString());
+        Assert.Equal(0, code);
+        Assert.Equal("", output);
         Assert.Equal("", RenderBenchmark.Markers(row));
     }
 
@@ -106,7 +117,7 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
     {
         var row = Row("Boundary", (1_000, Total: total, Audit: 1, Commit: 5));
 
-        var (code, output) = WarnThenGate(row);
+        var (code, output) = Finish(assert: true, row);
 
         Assert.Equal(0, code);
         Assert.Equal(expected, row.FullTimeOverBudget);
@@ -119,7 +130,7 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
     {
         var row = Row("Slow both", (1_000, Total: 40, Audit: 2, Commit: 10));
 
-        var (code, output) = WarnThenGate(row);
+        var (code, output) = Finish(assert: true, row);
 
         Assert.Equal(1, code);
         Assert.Contains($"warning: Slow both: p99 including the commit {40.0:F1} ms, not under 20 ms.", output);
@@ -134,12 +145,11 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
         return (code, output.ToString());
     }
 
-    // After the table, as a run with --assert does: the warnings, then the gate, whose code is the exit code.
-    static (int Code, string Output) WarnThenGate(params RenderBenchmark.Result[] results)
+    // After the table, as a run does, with or without --assert: what it prints and its exit code.
+    static (int Code, string Output) Finish(bool assert, params RenderBenchmark.Result[] results)
     {
         using var output = new StringWriter();
-        RenderBenchmark.Warn(results, output);
-        var code = RenderBenchmark.Gate(results, output);
+        var code = RenderBenchmark.Finish(results, assert, output);
         return (code, output.ToString());
     }
 

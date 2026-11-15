@@ -55,7 +55,7 @@ internal static partial class RenderBenchmark
 
     static readonly Uri Base = new("https://localhost");
 
-    // The exit code: with assert, Gate's. Warn's warnings never change it.
+    // The exit code: Finish's.
     public static async Task<int> RunAsync(int patients, bool stack, bool assert)
     {
         MigratedDatabase? database = null;
@@ -121,8 +121,7 @@ internal static partial class RenderBenchmark
                 };
 
                 await PrintAsync(app, patients, durability, results);
-                Warn(results, Console.Out);
-                return assert ? Gate(results, Console.Out) : 0;
+                return Finish(results, assert, Console.Out);
             }
             finally
             {
@@ -197,9 +196,17 @@ internal static partial class RenderBenchmark
         (result.OverBudget ? $"  not under {BudgetMilliseconds} ms excluding the commit" : "")
         + (result.FullTimeOverBudget ? $"  warning: full time not under {BudgetMilliseconds} ms" : "");
 
+    // After the table: the warnings, then, with --assert, the gate. Returns the exit code, Gate's with --assert and 0
+    // without; the warnings never change it.
+    internal static int Finish(IEnumerable<Result> results, bool assert, TextWriter output)
+    {
+        Warn(results, output);
+        return assert ? Gate(results, output) : 0;
+    }
+
     // After the table, with or without --assert: a warning for each kind of request whose full time's p99, the commit
-    // included, isn't under the budget, and nothing when none is. It never fails the run: that target is checked on the
-    // clinic server.
+    // included, isn't under the budget, and nothing when none is. It never fails the run: on the clinic server it is the
+    // target to meet, and on CI runners shared disks make commit times unsteady.
     internal static void Warn(IEnumerable<Result> results, TextWriter output)
     {
         var over = results.Where(result => result.FullTimeOverBudget).ToList();
@@ -212,7 +219,7 @@ internal static partial class RenderBenchmark
         foreach (var result in over)
         {
             output.WriteLine($"warning: {result.Name}: p99 including the commit {Percentile(result.Total, 0.99):F1} ms, not under {BudgetMilliseconds} ms. "
-                + "This doesn't fail the run: the full time's target is checked on the clinic server.");
+                + "This doesn't fail the run. On the clinic server, this is the target to meet; on CI runners, shared disks make commit times unsteady.");
         }
     }
 
@@ -358,8 +365,8 @@ internal static partial class RenderBenchmark
             ? "which waits for them to reach the disk. Rest: everything else, from authentication to rendering."
             : "which with durability off doesn't wait for the disk. Rest: everything else, from authentication to rendering.");
         Console.WriteLine($"--assert gates on the p99 excluding the commit, which must be under {BudgetMilliseconds} ms. The same target for the whole request,");
-        Console.WriteLine("the commit included, is checked on the clinic server, not on CI runners, whose shared disks make commit times unsteady:");
-        Console.WriteLine("here a row over it gets a warning, in the row and after the table, which never fails the run.");
+        Console.WriteLine("the commit included, is checked on the clinic server, not on CI runners, whose shared disks make commit times unsteady.");
+        Console.WriteLine("A row over it gets a warning, in the row and after the table, which never fails the run.");
         Console.WriteLine();
         Console.WriteLine($"{"",-36}{"p50",7}{"p95",7}{"p99",7}{"max",7}  excl. commit{"p50",6}{"p99",7}  audit{"p50",6}{"p99",7}"
             + $"  commit{"p50",6}{"p99",7}{"max",7}  rest{"p50",6}{"p99",7}");
