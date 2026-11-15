@@ -26,7 +26,7 @@ namespace Ehr.Web.Api.Dictation;
 //
 // POST /api/dictation/sessions/{id}/audio?seq=N, the body one chunk of the recording, numbered from 0, in the audio/*
 // type the browser records (passed on as it came; WebKit and Chromium record different ones): 200 {receivedSeq,
-// audioSeconds, transcript}, audioSeconds being how much of maxSeconds (5 minutes) the dictation holds, so the screen
+// audioSeconds, transcript}, audioSeconds being how much of maxSeconds (3 minutes) the dictation holds, so the screen
 // can warn before the cut-off; the transcript may lag a chunk when the service is busy. 409 out_of_order carries
 // expectedSeq, the chunk to send next: after a dropped connection, the client sends again from there and the transcript
 // carries on.
@@ -57,7 +57,7 @@ namespace Ehr.Web.Api.Dictation;
 //   400 bad_form_token, or bad_seq
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop), or not_stopped (a result before stop)
-//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (5 minutes)
+//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes)
 //   415 unsupported_type: the body isn't audio/*
 //   422 not_audio: "The audio couldn't be decoded."
 //   429 busy: the service is busy
@@ -233,7 +233,7 @@ public static partial class DictationApi
             case HttpStatusCode.RequestEntityTooLarge:
                 // Too long means stop and start another; too large, a smaller chunk.
                 return await ErrorBodyAsync(response, cancellationToken) is { Error: "too_long" }
-                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its 5-minute limit. Stop it and start another.")
+                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its 3-minute limit. Stop it and start another.")
                     : Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This chunk of audio, or the dictation as a whole, is too large.");
             case HttpStatusCode.UnprocessableEntity:
                 return Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded.");

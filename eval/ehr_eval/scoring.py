@@ -14,8 +14,8 @@
   (recall against the scripts' forbidden items); and what the order-and-allergy rule threw away that the gold says was
   legitimate (false discards), so the owner can judge where that rule draws its line.
 - sorting and timing: how often the fields couldn't be sorted and why, and how long each stage took and how many tokens
-  K2 Horizon read and wrote, separately for the two-minute and the five-minute dictations, with the live transcript's
-  time per chunk.
+  K2 Horizon read and wrote, separately for the two-minute dictations and those at the 3-minute limit, with the live
+  transcript's time per chunk.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from .normalize import normalize, words
 from .scripts import Script
 
 TWO_MINUTES = 110.0  # seconds: the scripts written to run about two minutes
-FIVE_MINUTES = 270.0  # seconds: the max-length scripts, near the 5-minute limit
+AT_THE_LIMIT = 165.0  # seconds: the max-length scripts, near the 3-minute limit
 ORDER_ALLERGY_TAGS = frozenset({"order-attempt", "allergy-change"})
 
 
@@ -282,8 +282,8 @@ def _timing(items: list[Item]) -> dict:
                  "max": round(ordered[-1], 3)}
     return {
         "all": summary(items),
-        "two_minute": summary([i for i in items if TWO_MINUTES <= i.seconds < FIVE_MINUTES]),
-        "five_minute": summary([i for i in items if i.seconds >= FIVE_MINUTES]),
+        "two_minute": summary([i for i in items if TWO_MINUTES <= i.seconds < AT_THE_LIMIT]),
+        "at_the_limit": summary([i for i in items if i.seconds >= AT_THE_LIMIT]),
         "live_chunk_seconds": live,
     }
 

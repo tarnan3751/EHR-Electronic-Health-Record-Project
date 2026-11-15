@@ -90,7 +90,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         {
             var id = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(24));
             sessions[id] = new StubSession(owner);
-            return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds = 300, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
+            return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds = 180, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
         }
 
         if (path is not ["v1", "sessions", var sessionId, ..] || !sessions.TryGetValue(sessionId, out var session) || session.Owner != owner)

@@ -19,7 +19,7 @@ def test_the_values():
     assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 12, 600)
     assert validation.LIMITS == {"history": 2000, "assessment": 1200, "plan": 1200}
     limits = settings.Settings(api_key="k", llama_api_key="k")
-    assert (limits.max_session_seconds, limits.max_session_bytes, limits.max_chunk_bytes) == (300, 16 << 20, 2 << 20)
+    assert (limits.max_session_seconds, limits.max_session_bytes, limits.max_chunk_bytes) == (180, 10 << 20, 2 << 20)
     assert (limits.call_seconds, limits.stop_wait_seconds, limits.structuring_seconds) == (15.0, 8.0, 90.0)
 
 

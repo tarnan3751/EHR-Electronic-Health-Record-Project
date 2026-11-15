@@ -108,7 +108,7 @@ def test_timing_for_two_minute_dictations_and_live_chunks(scripts):
 
     timing = score([item("d01", "x"), long], scripts)["timing"]
 
-    assert timing["all"]["items"] == 2 and timing["two_minute"]["items"] == 1 and timing["five_minute"]["items"] == 0
+    assert timing["all"]["items"] == 2 and timing["two_minute"]["items"] == 1 and timing["at_the_limit"]["items"] == 0
     assert timing["two_minute"]["structure"] == {"mean": 10.0, "max": 10.0}
     assert timing["live_chunk_seconds"] == {"chunks": 4, "p50": 0.35, "p95": 0.4, "max": 1.5}
 
@@ -163,11 +163,11 @@ def test_fields_are_scored_per_tag(scripts):
     assert by_tag["mixed-plan"]["detection"]["recall"] == 0.0
 
 
-def test_tokens_and_time_for_five_minute_dictations(scripts):
-    five = item("d01", "x", seconds=290)
+def test_tokens_and_time_for_dictations_at_the_limit(scripts):
+    five = item("d01", "x", seconds=178)
     five.tokens = {"prompt_n": 600, "cache_n": 1000, "predicted_n": 550}
 
-    timing = score([five], scripts)["timing"]["five_minute"]
+    timing = score([five], scripts)["timing"]["at_the_limit"]
 
     assert timing["tokens_prompt"] == {"mean": 1600.0, "max": 1600}
     assert timing["tokens_predicted"] == {"mean": 550.0, "max": 550}

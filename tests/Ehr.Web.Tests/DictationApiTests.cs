@@ -42,7 +42,7 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         using var stopped = await SendAsync(page, HttpMethod.Post, $"{Sessions}/{session.SessionId}/stop");
         using var sorted = await SendAsync(page, HttpMethod.Post, $"{Sessions}/{session.SessionId}/result");
 
-        Assert.Equal((300, 1024 * 1024), (session.MaxSeconds, session.MaxChunkBytes));
+        Assert.Equal((180, 1024 * 1024), (session.MaxSeconds, session.MaxChunkBytes));
         // The transcript comes back while the clinician speaks.
         Assert.Equal("Cough for three days.", (await ReadJsonAsync<AudioReceived>(first)).Transcript.Text);
         var received = await ReadJsonAsync<AudioReceived>(second);

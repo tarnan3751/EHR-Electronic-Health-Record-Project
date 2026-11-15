@@ -10,9 +10,10 @@ natively). Secrets come from the environment only, never from a file in the repo
 The limits are fixed here rather than read from the environment, so every server behaves the same:
 
     max_sessions, max_sessions_per_owner   8 and 2 sessions at once, counted until each one's result is ready
-    max_chunk_bytes, max_session_bytes     2 MB a chunk, 16 MB a dictation
-    max_session_seconds                    5 minutes of audio a dictation: what K2 Horizon can sort within its context
-                                           (4,096 tokens a request) and its 90 seconds, measured
+    max_chunk_bytes, max_session_bytes     2 MB a chunk, 10 MB a dictation
+    max_session_seconds                    3 minutes of audio a dictation. K2 Horizon repeats each value's sources in its
+                                           answer, so a genuine 5-minute dictation took 98-114 s to sort on an M5's GPU,
+                                           over its 90 seconds, and outran its 2,048-token answer; 3 minutes leaves room
     idle_seconds                           a session no audio has reached for 10 minutes is discarded
     result_seconds                         a result is discarded 10 minutes after it is ready
     structuring_seconds                    K2 Horizon has 90 seconds, its wait for a turn included
@@ -47,8 +48,8 @@ class Settings:
     max_sessions: int = 8
     max_sessions_per_owner: int = 2
     max_chunk_bytes: int = 2 * 1024 * 1024
-    max_session_bytes: int = 16 * 1024 * 1024
-    max_session_seconds: int = 300
+    max_session_bytes: int = 10 * 1024 * 1024
+    max_session_seconds: int = 180
     idle_seconds: float = 600.0  # a session no audio has reached for this long is discarded
     result_seconds: float = 600.0  # a finished result is discarded this long after it was ready
     structuring_seconds: float = 90.0  # K2 Horizon's time to answer, after which the fields are left unsorted
