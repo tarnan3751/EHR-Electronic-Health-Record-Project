@@ -428,7 +428,10 @@ public sealed class WebApps : IAsyncLifetime
                 .UseSetting("Ehr:DataProtection:Certificate", apps.KeyCertificatePath)
                 .UseSetting("Ehr:DataProtection:CertificateKey", apps.KeyCertificateKeyPath)
                 .UseSetting("Ehr:CloudAudit:Key", CloudAuditKey)
-                .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")));
+                .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")))
+                // Every test client has the same address, so the limits are out of reach (RateLimitTests lowers them).
+                .UseSetting("RateLimits:PermitLimit", "1000000")
+                .UseSetting("RateLimits:EmailsPerAddressPerHour", "1000000");
             if (bootstrapAdmin)
             {
                 builder
