@@ -80,6 +80,9 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
                 await users.SetUserNameAsync(existing, address),
                 await users.RemovePasswordAsync(existing),
                 await users.AddPasswordAsync(existing, password),
+                // Wrong guesses at the old password don't lock the new owner out.
+                await users.ResetAccessFailedCountAsync(existing),
+                await users.SetLockoutEndDateAsync(existing, null),
             };
             if (changes.FirstOrDefault(c => !c.Succeeded) is { } failed)
             {
