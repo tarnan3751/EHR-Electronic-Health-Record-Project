@@ -136,6 +136,14 @@ public sealed class CloudForwardingMiddleware(
             // only through here, so this closes that path: a leaked key can't be used from the internet, only from the
             // cloud box or the clinic's network.
             proxyRequest.Headers.Remove(CloudAuditApi.KeyHeader);
+
+            // Whatever a client sent under this name goes; the cloud app's own proof replaces it, so the on-prem app
+            // doesn't limit forwarded requests as one client (AccountRateLimits).
+            proxyRequest.Headers.Remove(AccountRateLimits.ForwardedHeader);
+            if (httpContext.RequestServices.GetRequiredService<IConfiguration>()["Ehr:CloudAudit:Key"] is { Length: > 0 } sharedKey)
+            {
+                proxyRequest.Headers.TryAddWithoutValidation(AccountRateLimits.ForwardedHeader, AccountRateLimits.ForwardedProof(sharedKey));
+            }
         }
 
         public override async ValueTask<bool> TransformResponseAsync(

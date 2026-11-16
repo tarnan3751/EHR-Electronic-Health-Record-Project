@@ -47,6 +47,43 @@ public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
+    public void Two_clients_are_limited_separately()
+    {
+        static string KeyFor(string address)
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Path = "/portal/register";
+            context.Connection.RemoteIpAddress = IPAddress.Parse(address);
+            return AccountRateLimits.Partition(context, new RateLimitOptions()).PartitionKey;
+        }
+
+        Assert.NotEqual(KeyFor("192.0.2.10"), KeyFor("192.0.2.11"));
+    }
+
+    // The on-prem app doesn't count what the cloud app forwards, which the cloud app has limited already; anyone
+    // else sending the header, or X-Forwarded-For, is counted by their own address.
+    [Fact]
+    public async Task Requests_the_cloud_app_forwards_are_not_limited_on_prem_and_a_forged_header_is()
+    {
+        await using var app = apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting("RateLimits:PermitLimit", "1"));
+        var forwarded = app.CreateClient();
+        forwarded.DefaultRequestHeaders.Add(AccountRateLimits.ForwardedHeader, AccountRateLimits.ForwardedProof(WebApps.CloudAuditKey));
+        for (var i = 0; i < 5; i++)
+        {
+            using var allowed = await forwarded.PostAsync("/portal/sign-in", new FormUrlEncodedContent([]), Cancel);
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, allowed.StatusCode);
+        }
+
+        var forged = app.CreateClient();
+        forged.DefaultRequestHeaders.Add(AccountRateLimits.ForwardedHeader, "not-the-proof");
+        forged.DefaultRequestHeaders.Add("X-Forwarded-For", "198.51.100.7");
+        using var first = await forged.PostAsync("/portal/sign-in", new FormUrlEncodedContent([]), Cancel);
+        using var second = await forged.PostAsync("/portal/sign-in", new FormUrlEncodedContent([]), Cancel);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+    }
+
+    [Fact]
     public async Task An_address_gets_three_emails_an_hour_then_none()
     {
         var inner = new RecordingEmailSender();

@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -19,8 +21,8 @@ public sealed class RateLimitOptions
 
 // Limits the anonymous account POSTs per client address, a fixed window each, and nothing else. The address is the
 // socket's (Connection.RemoteIpAddress), never X-Forwarded-For, which anyone can send. The cloud app limits before it
-// forwards (Program.cs), so off-site clients are counted there by their own address. Over the limit: 429 with a page
-// saying so, or JSON on /api.
+// forwards (Program.cs), so off-site clients are counted there by their own address, and the on-prem app doesn't count
+// what the cloud app forwards (ForwardedHeader). Over the limit: 429 with a page saying so, or JSON on /api.
 public static class AccountRateLimits
 {
     static readonly string[] AccountPaths =
@@ -29,16 +31,26 @@ public static class AccountRateLimits
         "/portal/confirm", "/api/desktop/sign-in",
     ];
 
-    public static IServiceCollection AddAccountRateLimits(this IServiceCollection services, RateLimitOptions limits) =>
+    // The header the cloud app puts on a request it forwards, so the on-prem app doesn't count every off-site client
+    // under the cloud app's one address: the cloud app has already limited each by their own. Its value is derived
+    // from the secret both apps share (Ehr:CloudAudit:Key), so nobody else can make it, and it isn't the audit key
+    // itself, which is never forwarded. The cloud app removes the header from what a client sends before adding its own.
+    public const string ForwardedHeader = "X-Cloud-Forwarded";
+
+    public static string ForwardedProof(string sharedKey) =>
+        Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(sharedKey), "forwarded account request"u8));
+
+    // forwardedProof: what the on-prem app expects in ForwardedHeader; null on the cloud app, which exempts nobody.
+    public static IServiceCollection AddAccountRateLimits(this IServiceCollection services, RateLimitOptions limits, string? forwardedProof) =>
         services.AddRateLimiter(options =>
         {
-            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context => Partition(context, limits));
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context => Partition(context, limits, forwardedProof));
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = (rejected, cancellationToken) => new ValueTask(WriteRejectedAsync(rejected.HttpContext, cancellationToken));
         });
 
-    public static RateLimitPartition<string> Partition(HttpContext context, RateLimitOptions limits) =>
-        IsAccountPost(context.Request)
+    public static RateLimitPartition<string> Partition(HttpContext context, RateLimitOptions limits, string? forwardedProof = null) =>
+        IsAccountPost(context.Request) && !IsForwarded(context.Request, forwardedProof)
             ? RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions
@@ -48,6 +60,10 @@ public static class AccountRateLimits
                     QueueLimit = 0,
                 })
             : RateLimitPartition.GetNoLimiter(string.Empty);
+
+    static bool IsForwarded(HttpRequest request, string? forwardedProof) =>
+        forwardedProof is not null && CryptographicOperations.FixedTimeEquals(
+            SHA256.HashData(Encoding.UTF8.GetBytes(request.Headers[ForwardedHeader].ToString())), SHA256.HashData(Encoding.UTF8.GetBytes(forwardedProof)));
 
     static bool IsAccountPost(HttpRequest request) =>
         HttpMethods.IsPost(request.Method) && AccountPaths.Any(path => request.Path.StartsWithSegments(path));

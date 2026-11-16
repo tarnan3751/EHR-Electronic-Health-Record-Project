@@ -33,7 +33,8 @@ builder.Services.AddSingleton(new AuditSource(site == Site.OnPrem ? AuditSources
 
 // The anonymous account POSTs are limited per client address, and account emails per recipient (AccountRateLimits).
 var rateLimits = builder.Configuration.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>() ?? new RateLimitOptions();
-builder.Services.AddAccountRateLimits(rateLimits);
+builder.Services.AddAccountRateLimits(rateLimits,
+    site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 } sharedKey ? AccountRateLimits.ForwardedProof(sharedKey) : null);
 
 // The portal's emails: through the mail server in Ehr:Smtp when there is one, otherwise into the log, for development.
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.Section));
