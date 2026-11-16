@@ -10,14 +10,8 @@ const SERVICE: &str = "com.example.ehr";
 const USER: &str = "local-database-key";
 const SESSION_USER: &str = "server-session";
 
-pub struct Key {
-    pub bytes: [u8; 32],
-    /// Made just now. A database file already on disk was made with another key, and nothing can open it.
-    pub new: bool,
-}
-
-/// Reads the key from the credential store, or makes and saves one.
-pub fn load() -> Result<Key, String> {
+/// Reads the key from the credential store. Only a new database can start with a new key.
+pub fn load(database_exists: bool) -> Result<[u8; 32], String> {
     use_platform_store().map_err(|error| format!("credential store: {error}"))?;
     let entry = Entry::new(SERVICE, USER).map_err(|error| format!("credential store: {error}"))?;
 
@@ -27,7 +21,10 @@ pub fn load() -> Result<Key, String> {
             hex::decode_to_slice(hex.trim(), &mut bytes).map_err(|_| {
                 format!("the {SERVICE} entry in the credential store isn't a database key")
             })?;
-            Ok(Key { bytes, new: false })
+            Ok(bytes)
+        }
+        Err(Error::NoEntry) if database_exists => {
+            Err("The local database key is missing. The database was kept.".to_owned())
         }
         Err(Error::NoEntry) => {
             let mut bytes = [0; 32];
@@ -36,7 +33,7 @@ pub fn load() -> Result<Key, String> {
             entry
                 .set_password(&hex::encode(bytes))
                 .map_err(|error| format!("credential store: {error}"))?;
-            Ok(Key { bytes, new: true })
+            Ok(bytes)
         }
         Err(error) => Err(format!("credential store: {error}")),
     }

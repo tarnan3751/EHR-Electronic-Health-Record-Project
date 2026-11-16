@@ -122,6 +122,29 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             db.Patients.Where(p => db.PatientAssignments.Any(a => a.PatientId == p.Id && a.ClinicianId == user.UserId && a.EndedAt == null)),
             limit, cancellationToken);
 
+    // Called in one repeatable-read transaction so the assignments and chart data are from the same snapshot.
+    // Read only actively assigned charts; emergency access never enters the offline cache.
+    public async Task<IReadOnlyList<PatientChart>> OfflinePanelAsync(int limit, int visits, CancellationToken cancellationToken)
+    {
+        var ids = await db.Patients.AsNoTracking()
+            .Where(p => db.PatientAssignments.Any(a => a.PatientId == p.Id && a.ClinicianId == user.UserId && a.EndedAt == null))
+            .OrderBy(p => p.FamilyName).ThenBy(p => p.GivenName).ThenBy(p => p.Id)
+            .Select(p => p.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        var charts = new List<PatientChart>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (await ChartAsync(id, visits, cancellationToken) is { } chart)
+            {
+                charts.Add(chart);
+            }
+        }
+
+        return charts;
+    }
+
     // A list of patients, in name order, each one a recorded read, and whether more match than the limit.
     async Task<PatientList> ReadAsync(IQueryable<Patient> query, int limit, CancellationToken cancellationToken)
     {

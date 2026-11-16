@@ -35,6 +35,30 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
+    public async Task Offline_download_only_includes_the_clinicians_assigned_charts()
+    {
+        const string offlinePanel = "/api/desktop/offline-panel";
+        var clinician = await apps.CreateStaffAsync("Dr. Offline", StaffRoles.Clinician);
+        var colleague = await apps.CreateStaffAsync("Dr. Colleague", StaffRoles.Clinician);
+        var own = await apps.InsertPatientAsync("Demo", "Assigned");
+        var other = await apps.InsertPatientAsync("Demo", "OtherPanel");
+        await apps.AssignAsync(clinician, own);
+        await apps.AssignAsync(colleague, other);
+
+        var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
+        using var rejected = await PostAsync(apps.OnPrem, offlinePanel, "not-a-token");
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+
+        using var response = await PostAsync(apps.OnPrem, offlinePanel, token);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore == true);
+        var charts = await response.Content.ReadFromJsonAsync<CachedChart[]>(JsonSerializerOptions.Web, Cancel);
+        Assert.Equal(own, Assert.Single(charts!).Id);
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: own));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: other));
+    }
+
+    [Fact]
     public async Task A_bad_token_is_refused_with_401_and_no_redirect()
     {
         using var response = await GetAsync(apps.OnPrem, Sync, "not-a-token");

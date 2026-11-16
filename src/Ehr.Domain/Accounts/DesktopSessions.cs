@@ -59,7 +59,7 @@ public sealed class DesktopSessions(UserManager<StaffUser> users, StaffSignIn si
         db.DesktopSessions.Add(session);
         audit.Record(AuditActions.SignIn, actorId: user.Id, details: Details(session));
         await db.SaveChangesAsync(cancellationToken);
-        return new(DesktopSignInOutcome.SignedIn, token, session.ExpiresAt, user.DisplayName);
+        return new(DesktopSignInOutcome.SignedIn, token, session.ExpiresAt, user.DisplayName, user.Id);
     }
 
     // The session behind a token and its account, or null when the session is over: no such token, expired, signed
@@ -123,6 +123,6 @@ public enum DesktopSignInOutcome
 }
 
 // The outcome and, when signed in, the token the app keeps, until when it works, and whose it is.
-public sealed record DesktopSignIn(DesktopSignInOutcome Outcome, string? Token = null, DateTimeOffset? ExpiresAt = null, string? DisplayName = null);
+public sealed record DesktopSignIn(DesktopSignInOutcome Outcome, string? Token = null, DateTimeOffset? ExpiresAt = null, string? DisplayName = null, Guid? ClinicianId = null);
 
 public sealed record DesktopSignedIn(DesktopSession Session, StaffUser User);

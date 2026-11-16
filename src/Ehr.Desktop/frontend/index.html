@@ -33,8 +33,31 @@
       <button>Sign in</button>
     </form>
 
-    <p id="notice" class="notice" role="alert" hidden></p>
     <p id="request-error" class="notice error" role="alert" hidden></p>
+
+    <section id="offline-charts" hidden>
+      <h2>Offline charts</h2>
+      <p>Download up to 25 assigned charts while connected. Saved drafts and recordings stay on this device.</p>
+      <button type="button" id="download-panel">Download my charts</button>
+      <p id="offline-message" role="status"></p>
+      <ul id="offline-panel"></ul>
+      <section id="offline-chart" hidden>
+        <h3 id="chart-name"></h3>
+        <p id="chart-demographics"></p>
+        <div id="chart-sections"></div>
+        <form id="clinical-draft">
+          <label>New draft <textarea name="body" rows="5" required></textarea></label>
+          <button>Save draft</button>
+        </form>
+        <h4>Dictation</h4>
+        <button type="button" id="record-audio">Record audio</button>
+        <p id="recording-message" role="status"></p>
+        <ul id="saved-recordings"></ul>
+        <h4>Saved drafts</h4>
+        <ul id="saved-drafts"></ul>
+      </section>
+    </section>
+    <p id="offline-sign-in" hidden>Sign out and sign in on the updated server to use offline charts.</p>
 
     <section id="conflicts" hidden>
       <h2>Changes not saved</h2>

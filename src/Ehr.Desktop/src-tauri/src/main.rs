@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use ehr_desktop::{charts, drafts, recordings};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -63,8 +64,6 @@ struct Status {
     problem: Option<String>,
     /// When the round ended, in milliseconds since 1970, for the page to show in local time.
     checked_at: Option<u64>,
-    /// Shown until the app closes, when the local database had to be started again.
-    notice: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -75,6 +74,7 @@ struct View {
     /// Changes saved here and not yet sent.
     waiting: usize,
     status: Status,
+    offline_available: bool,
 }
 
 #[tauri::command]
@@ -84,10 +84,74 @@ fn view(app: State<'_, App>) -> Result<View, String> {
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
+        offline_available: app.sync().is_ok_and(sync::Sync::offline_available),
         status: Status {
             account: app.sync.as_ref().ok().and_then(sync::Sync::account),
             ..app.status().clone()
         },
+    })
+}
+
+#[derive(Serialize)]
+struct OfflineChart {
+    chart: charts::Chart,
+    drafts: Vec<drafts::PendingDraft>,
+    recordings: Vec<recordings::RecordingView>,
+}
+
+#[tauri::command]
+async fn download_panel(app: State<'_, App>) -> Result<(), String> {
+    let sync = app.sync()?;
+    let (token, panel) = sync.download_panel().await?;
+    let mut store = app.store()?;
+    sync.with_clinician(Some(&token), |owner| {
+        store.replace_panel(owner, &panel).map_err(Into::into)
+    })
+}
+
+#[tauri::command]
+fn offline_panel(app: State<'_, App>) -> Result<Vec<charts::ChartSummary>, String> {
+    let store = app.store()?;
+    app.sync()?
+        .with_clinician(None, |owner| store.offline_panel(owner).map_err(Into::into))
+}
+
+#[tauri::command]
+fn offline_chart(app: State<'_, App>, patient: Uuid) -> Result<OfflineChart, String> {
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        let (chart, drafts) = store.offline_chart(owner, patient)?;
+        let recordings = store.recordings(owner, patient)?;
+        Ok(OfflineChart {
+            chart,
+            drafts,
+            recordings,
+        })
+    })
+}
+
+#[tauri::command]
+fn save_clinical_draft(app: State<'_, App>, patient: Uuid, body: String) -> Result<(), String> {
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store
+            .save_clinical_draft(owner, patient, &body)
+            .map_err(Into::into)
+    })
+}
+
+#[tauri::command]
+fn save_recording(
+    app: State<'_, App>,
+    patient: Uuid,
+    media_type: String,
+    audio: Vec<u8>,
+) -> Result<(), String> {
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store
+            .save_recording(owner, patient, &media_type, &audio)
+            .map_err(Into::into)
     })
 }
 
@@ -226,21 +290,15 @@ async fn sync_in_background(handle: AppHandle) {
     }
 }
 
-/// Opens the local database, with a notice when it had to start it again.
-fn open_store(app: &tauri::App) -> Result<(Store, Option<String>), String> {
-    let key = key::load()?;
-    let (store, started_again) = Store::open_or_start_again(&database_path(app)?, &key.bytes)?;
-    let notice = started_again.then(|| {
-        let why = if key.new {
-            "the key to this computer's copy was missing"
-        } else {
-            "this computer's copy was damaged"
-        };
-        format!(
-            "The app started its copy of the phrases again, because {why}. Changes that hadn't been sent were lost."
-        )
-    });
-    Ok((store, notice))
+/// Opens the encrypted database without replacing it if the key is missing or invalid.
+fn open_store(app: &tauri::App) -> Result<Store, String> {
+    let path = database_path(app)?;
+    let exists = path != std::path::Path::new(":memory:")
+        && path
+            .try_exists()
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+    let key = key::load(exists)?;
+    Store::open(&path, &key).map_err(Into::into)
 }
 
 /// In the app's data folder on macOS and Windows. Linux is for development only, and keeps its key in memory
@@ -262,25 +320,30 @@ fn database_path(app: &tauri::App) -> Result<PathBuf, String> {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let (store, notice) = match open_store(app) {
-                Ok((store, notice)) => (Ok(Mutex::new(store)), notice),
-                Err(problem) => (Err(problem), None),
-            };
+            let store = open_store(app).map(Mutex::new);
             app.manage(App {
                 store,
                 // After open_store, which chose the credential store that keeps the session.
                 sync: key::session_entry().and_then(sync::Sync::from_environment),
-                status: Mutex::new(Status {
-                    notice,
-                    ..Status::default()
-                }),
+                status: Mutex::new(Status::default()),
                 wake: Notify::new(),
             });
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            view, add, edit, resolve, sync_now, sign_in, sign_out
+            view,
+            add,
+            edit,
+            resolve,
+            sync_now,
+            sign_in,
+            sign_out,
+            download_panel,
+            offline_panel,
+            offline_chart,
+            save_clinical_draft,
+            save_recording,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");
