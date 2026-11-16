@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ehr_desktop::{charts, drafts};
+use ehr_desktop::{charts, drafts, recordings};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -96,6 +96,7 @@ fn view(app: State<'_, App>) -> Result<View, String> {
 struct OfflineChart {
     chart: charts::Chart,
     drafts: Vec<drafts::PendingDraft>,
+    recordings: Vec<recordings::RecordingView>,
 }
 
 #[tauri::command]
@@ -111,9 +112,8 @@ async fn download_panel(app: State<'_, App>) -> Result<(), String> {
 #[tauri::command]
 fn offline_panel(app: State<'_, App>) -> Result<Vec<charts::ChartSummary>, String> {
     let store = app.store()?;
-    app.sync()?.with_clinician(None, |owner| {
-        store.offline_panel(owner).map_err(Into::into)
-    })
+    app.sync()?
+        .with_clinician(None, |owner| store.offline_panel(owner).map_err(Into::into))
 }
 
 #[tauri::command]
@@ -121,7 +121,12 @@ fn offline_chart(app: State<'_, App>, patient: Uuid) -> Result<OfflineChart, Str
     let store = app.store()?;
     app.sync()?.with_clinician(None, |owner| {
         let (chart, drafts) = store.offline_chart(owner, patient)?;
-        Ok(OfflineChart { chart, drafts })
+        let recordings = store.recordings(owner, patient)?;
+        Ok(OfflineChart {
+            chart,
+            drafts,
+            recordings,
+        })
     })
 }
 
@@ -129,7 +134,24 @@ fn offline_chart(app: State<'_, App>, patient: Uuid) -> Result<OfflineChart, Str
 fn save_clinical_draft(app: State<'_, App>, patient: Uuid, body: String) -> Result<(), String> {
     let store = app.store()?;
     app.sync()?.with_clinician(None, |owner| {
-        store.save_clinical_draft(owner, patient, &body).map_err(Into::into)
+        store
+            .save_clinical_draft(owner, patient, &body)
+            .map_err(Into::into)
+    })
+}
+
+#[tauri::command]
+fn save_recording(
+    app: State<'_, App>,
+    patient: Uuid,
+    media_type: String,
+    audio: Vec<u8>,
+) -> Result<(), String> {
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store
+            .save_recording(owner, patient, &media_type, &audio)
+            .map_err(Into::into)
     })
 }
 
@@ -321,6 +343,7 @@ fn main() {
             offline_panel,
             offline_chart,
             save_clinical_draft,
+            save_recording,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");

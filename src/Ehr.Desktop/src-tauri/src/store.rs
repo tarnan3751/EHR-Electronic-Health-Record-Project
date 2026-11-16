@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::api::{Operation, Outcome, PullResponse, PushResult, QuickText};
 use crate::rules;
-use ehr_desktop::{charts, drafts};
+use ehr_desktop::{charts, drafts, recordings};
 
 const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS quick_texts (
@@ -119,6 +119,38 @@ pub fn lock(store: &Mutex<Store>) -> MutexGuard<'_, Store> {
 }
 
 impl Store {
+    pub fn save_recording(
+        &self,
+        owner: Uuid,
+        patient: Uuid,
+        media_type: &str,
+        audio: &[u8],
+    ) -> Result<()> {
+        if !media_type.starts_with("audio/")
+            || media_type.len() > 128
+            || reqwest::header::HeaderValue::from_str(media_type).is_err()
+            || audio.is_empty()
+            || audio.len() > recordings::MAX_BYTES
+        {
+            return Err(Error::Refused(
+                "The recording is empty, too large, or can't be played.",
+            ));
+        }
+        if !charts::contains(&self.connection, owner, patient)? {
+            return Err(Error::Refused("This chart is only available online."));
+        }
+        Ok(recordings::save(
+            &self.connection,
+            owner,
+            patient,
+            media_type,
+            audio,
+        )?)
+    }
+
+    pub fn recordings(&self, owner: Uuid, patient: Uuid) -> Result<Vec<recordings::RecordingView>> {
+        Ok(recordings::list(&self.connection, owner, patient)?)
+    }
     /// Opens (or creates) the database at `path`, or in memory for ":memory:". A wrong key fails here, with
     /// SQLCipher's "file is not a database".
     pub fn open(path: &Path, key: &[u8; 32]) -> Result<Store> {
@@ -129,6 +161,7 @@ impl Store {
         connection.execute_batch(SCHEMA)?;
         drafts::initialize(&connection)?;
         charts::initialize(&connection)?;
+        recordings::initialize(&connection)?;
         Ok(Store { connection })
     }
 

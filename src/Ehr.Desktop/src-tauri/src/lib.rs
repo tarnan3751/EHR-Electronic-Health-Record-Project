@@ -2,3 +2,4 @@
 
 pub mod charts;
 pub mod drafts;
+pub mod recordings;

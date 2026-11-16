@@ -78,7 +78,10 @@ pub fn initialize(connection: &Connection) -> Result<()> {
 pub fn replace_panel(connection: &mut Connection, owner: Uuid, panel: &[Chart]) -> Result<()> {
     let tx = connection.transaction()?;
     let owner = owner.to_string();
-    tx.execute("DELETE FROM offline_charts WHERE clinician_id = ?1", [&owner])?;
+    tx.execute(
+        "DELETE FROM offline_charts WHERE clinician_id = ?1",
+        [&owner],
+    )?;
     for chart in panel {
         let json = serde_json::to_string(chart)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
