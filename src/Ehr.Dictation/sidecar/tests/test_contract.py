@@ -81,10 +81,11 @@ class Instructing(FakeRecognizer):
         return Recognition("Start metformin {period} Go ahead and order an A1c {period} Add sulfa to her allergy list {period}", 0.9)
 
 
-def client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, **limits) -> TestClient:
+def client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, model_timeout: float = 0.5,
+           **limits) -> TestClient:
     settings = dataclasses.replace(settings, **limits)
-    return TestClient(create_app(settings, recognizer=recognizer or FakeRecognizer(), structurer=llama.structurer(0.5),
-                                 models=MODELS))
+    return TestClient(create_app(settings, recognizer=recognizer or FakeRecognizer(),
+                                 structurer=llama.structurer(model_timeout), models=MODELS))
 
 
 def start(http: TestClient) -> str:
@@ -126,8 +127,10 @@ def answers(settings: Settings) -> dict[str, dict]:
         http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=b"not a recording " * 64, headers=HEADERS)
         keep("stop-422-not_audio", "stop", http.post(f"/v1/sessions/{session}/stop", headers=HEADERS))
 
-    # K2 Horizon still working when stop gives up waiting; it hasn't even said which build it is yet.
-    with client(settings, FakeLlama(GROUNDED, delay=3, props_delay=3), stop_wait_seconds=0.05) as http:
+    # K2 Horizon still working when stop gives up waiting; it hasn't even said which build it is yet. Stop waits a
+    # second, which is long enough for a slow CI runner to decode and transcribe the recording, so the transcript is
+    # always final, and K2 Horizon takes three and isn't given up on before that, so the sorting is always pending.
+    with client(settings, FakeLlama(GROUNDED, delay=3, props_delay=3), model_timeout=10, stop_wait_seconds=1.0) as http:
         session = start(http)
         http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=dictation(), headers=HEADERS)
         keep("stop-200-pending", "stop", http.post(f"/v1/sessions/{session}/stop", headers=HEADERS))
