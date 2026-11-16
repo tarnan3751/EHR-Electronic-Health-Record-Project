@@ -352,6 +352,17 @@ public sealed class WebApps : IAsyncLifetime
         Assert.True(await Cloud.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(TestContext.Current.CancellationToken));
 
     // How many audit events match, read as the superuser.
+    // Events an anonymous request recorded: the patient, and no actor.
+    public async Task<long> AuditEventsWithoutActorAsync(string action, Guid patientId)
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM ehr.audit_events WHERE action = @action AND patient_id = @patient AND actor_id IS NULL", connection);
+        command.Parameters.AddWithValue("action", action);
+        command.Parameters.AddWithValue("patient", patientId);
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
     public async Task<long> AuditEventsAsync(string action, Guid? actorId = null, Guid? patientId = null, string? source = null)
     {
         await using var connection = await OpenDatabaseAsync();

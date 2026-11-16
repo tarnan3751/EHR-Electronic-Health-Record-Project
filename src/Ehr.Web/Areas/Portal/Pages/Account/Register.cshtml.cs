@@ -15,9 +15,6 @@ public class RegisterModel(PatientRegistration registration, IOptions<SiteAddres
 
     public bool Registered { get; private set; }
 
-    // The address already has a portal account: the page offers to sign in instead (UC5; Simar Rekhi).
-    public bool AddressTaken { get; private set; }
-
     public void OnGet()
     {
     }
@@ -31,6 +28,7 @@ public class RegisterModel(PatientRegistration registration, IOptions<SiteAddres
 
         var result = await registration.RegisterAsync(Input.Email!, Input.Password!, Input.Code!,
             (userId, token) => Links.Build(links.Value.PortalBaseUrl, Request, $"/portal/confirm?user={userId}&token={Uri.EscapeDataString(token)}"),
+            Links.Build(links.Value.PortalBaseUrl, Request, "/portal/sign-in"), Links.Build(links.Value.PortalBaseUrl, Request, "/portal/forgot"),
             HttpContext.RequestAborted);
         if (result.CodeInvalid)
         {
@@ -38,7 +36,6 @@ public class RegisterModel(PatientRegistration registration, IOptions<SiteAddres
             return Page();
         }
 
-        AddressTaken = result.AddressTaken;
         foreach (var error in result.Errors)
         {
             ModelState.AddModelError("", error);

@@ -157,8 +157,9 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(queued, e => e.Action == AuditActions.SignOut && e.PatientId == patient && e.ActorId is not null && e.TableName is null);
     }
 
-    // TC-UC5-09 (Simar Rekhi): UC5's "email already registered" course offers to sign in instead, and the code stays
-    // unused, so the patient can register with another address.
+    // TC-UC5-09 (Simar Rekhi): UC5's "email already registered" course. The page answers as it does for a registration
+    // that worked, the address's owner is told by email and offered sign-in, and the code stays unused, so the patient
+    // can register with another address.
     [Fact]
     public async Task An_address_that_already_has_an_account_is_offered_sign_in_and_the_code_stays_usable()
     {
@@ -169,15 +170,112 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         var client = Client(apps.Cloud, new CookieContainer());
         const string password = "a-patient-portal-password";
 
-        using var refused = await PostFormAsync(client, "/portal/register", "/portal/register",
+        using var answered = await PostFormAsync(client, "/portal/register", "/portal/register",
             ("Input.Code", code), ("Input.Email", taken), ("Input.Password", password), ("Input.Confirm", password));
-        var html = await ReadAsync(refused);
-        Assert.Contains("An account with this email address already exists.", html);
-        Assert.Contains("Sign in instead", html);
+        var html = await ReadAsync(answered);
+        Assert.Contains("Check your email", html);
+        Assert.DoesNotContain("already", html);
+        var message = Assert.Single(apps.Emails.Sent, m => m.To == taken);
+        Assert.Contains("Someone tried to register a patient portal account with this address.", message.Body);
+        Assert.Contains("/portal/sign-in", message.Body);
+        Assert.Contains("/portal/forgot", message.Body);
+        Assert.DoesNotContain("/portal/confirm", message.Body);
 
         using var registered = await PostFormAsync(client, "/portal/register", "/portal/register",
             ("Input.Code", code), ("Input.Email", WebApps.NewEmail()), ("Input.Password", password), ("Input.Confirm", password));
         Assert.Contains("Check your email", await ReadAsync(registered));
+    }
+
+    // One valid code, tried against other patients' addresses, learns nothing: each answer is the page a registration
+    // that worked gets, status and HTML, and the code still works afterwards (issue #34).
+    [Fact]
+    public async Task One_valid_code_cant_tell_which_addresses_belong_to_other_patients()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var (confirmed, _) = await apps.CreatePatientAccountAsync(await apps.InsertPatientAsync("Avery", "Confirmed"));
+        var (unconfirmed, _) = await apps.CreatePatientAccountAsync(await apps.InsertPatientAsync("Blake", "Unconfirmed"), confirmed: false);
+        var nobody = WebApps.NewEmail();
+        var code = await IssueCodeAsync(clinician, await apps.InsertPatientAsync("Casey", "Prober"));
+        var client = Client(apps.Cloud, new CookieContainer());
+        const string password = "a-patient-portal-password";
+
+        async Task<(HttpStatusCode Status, string Html)> RegisterAsync(string address, string withPassword)
+        {
+            using var response = await PostFormAsync(client, "/portal/register", "/portal/register",
+                ("Input.Code", code), ("Input.Email", address), ("Input.Password", withPassword), ("Input.Confirm", withPassword));
+            var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            return (response.StatusCode, FormToken().Replace(html, "").Replace(address, "ADDRESS"));
+        }
+
+        var first = await RegisterAsync(confirmed, password);
+        var second = await RegisterAsync(unconfirmed, password);
+        // The unconfirmed account gets a fresh confirmation link, as the resend page sends.
+        Assert.Contains("/portal/confirm", Assert.Single(apps.Emails.Sent, m => m.To == unconfirmed).Body);
+
+        // The code was never spent: it registers an unknown address, and that answer is the one the probes got.
+        var worked = await RegisterAsync(nobody, password);
+        Assert.Contains("Check your email", worked.Html);
+        Assert.Equal(worked, first);
+        Assert.Equal(worked, second);
+    }
+
+    // Issue #33: a registration with a mistyped address is never confirmed. A new code from the clinic takes the
+    // account over: new address, new password, and the old address's link stops working.
+    [Fact]
+    public async Task A_mistyped_registration_is_recovered_with_a_new_code()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Finley", "Mistyped");
+        var client = Client(apps.Cloud, new CookieContainer());
+        var (mistyped, right) = (WebApps.NewEmail(), WebApps.NewEmail());
+        const string password = "a-patient-portal-password";
+        const string newPassword = "another-portal-password";
+
+        using var first = await PostFormAsync(client, "/portal/register", "/portal/register",
+            ("Input.Code", await IssueCodeAsync(clinician, patient)), ("Input.Email", mistyped), ("Input.Password", password), ("Input.Confirm", password));
+        Assert.Contains("Check your email", await ReadAsync(first));
+        var oldPath = new Uri(ConfirmLink().Match(Assert.Single(apps.Emails.Sent, m => m.To == mistyped).Body).Value).PathAndQuery;
+
+        using var second = await PostFormAsync(client, "/portal/register", "/portal/register",
+            ("Input.Code", await IssueCodeAsync(clinician, patient, assign: false)), ("Input.Email", right), ("Input.Password", newPassword), ("Input.Confirm", newPassword));
+        Assert.Contains("Check your email", await ReadAsync(second));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RegistrationReplaced, patientId: patient));
+
+        using var old = await PostFormAsync(client, oldPath, oldPath);
+        Assert.Contains("This link is not valid or has expired.", await ReadAsync(old));
+
+        var newPath = new Uri(ConfirmLink().Match(Assert.Single(apps.Emails.Sent, m => m.To == right).Body).Value).PathAndQuery;
+        using var confirmed = await PostFormAsync(client, newPath, newPath);
+        Assert.Contains("Your address is confirmed", await ReadAsync(confirmed));
+        using var signedIn = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", right), ("Input.Password", newPassword));
+        Assert.Equal("/portal", PathOf(signedIn));
+        using var oldAddress = await PostFormAsync(Client(apps.Cloud, new CookieContainer()), "/portal/sign-in", "/portal/sign-in", ("Input.Email", mistyped), ("Input.Password", password));
+        Assert.NotEqual("/portal", PathOf(oldAddress));
+
+        // Nobody was signed in for any of it, so the events name the patient and no actor.
+        foreach (var action in new[] { AuditActions.PatientRegistered, AuditActions.RegistrationReplaced, AuditActions.EmailConfirmed })
+        {
+            Assert.Equal(1, await apps.AuditEventsWithoutActorAsync(action, patient));
+        }
+    }
+
+    [Fact]
+    public async Task A_confirmed_account_cant_be_taken_over_with_a_new_code()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Gray", "Settled");
+        var (email, password) = await apps.CreatePatientAccountAsync(patient);
+        var code = await IssueCodeAsync(clinician, patient);
+        var client = Client(apps.Cloud, new CookieContainer());
+        var other = WebApps.NewEmail();
+
+        using var refused = await PostFormAsync(client, "/portal/register", "/portal/register",
+            ("Input.Code", code), ("Input.Email", other), ("Input.Password", "another-portal-password"), ("Input.Confirm", "another-portal-password"));
+
+        Assert.Contains("That enrollment code is not valid or has expired.", await ReadAsync(refused));
+        Assert.DoesNotContain(apps.Emails.Sent, m => m.To == other);
+        using var signedIn = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password));
+        Assert.Equal("/portal", PathOf(signedIn));
     }
 
     // TC-UC5-10 (Simar Rekhi): invalid entries are named in place, and nothing is created.
@@ -198,9 +296,13 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // A clinician issues one of their patients an enrollment code from the chart, and reads it off the page.
-    async Task<string> IssueCodeAsync(StaffAccount clinician, Guid patient)
+    async Task<string> IssueCodeAsync(StaffAccount clinician, Guid patient, bool assign = true)
     {
-        await apps.AssignAsync(clinician, patient);
+        if (assign)
+        {
+            await apps.AssignAsync(clinician, patient);
+        }
+
         var session = await SignInAsync(apps.OnPrem, clinician);
         using var response = await PostFormAsync(session.Client, $"/patients/{patient}?handler=Enroll", $"/patients/{patient}");
         var match = EnrollmentCode().Match(await ReadAsync(response));
@@ -210,6 +312,9 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
 
     [GeneratedRegex("<p class=\"code\">([A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4})</p>")]
     private static partial Regex EnrollmentCode();
+
+    [GeneratedRegex("name=\"__RequestVerificationToken\"[^>]*>")]
+    private static partial Regex FormToken();
 
     [GeneratedRegex("https://[^\\s<]+/portal/confirm\\?user=[^\\s<]+")]
     private static partial Regex ConfirmLink();

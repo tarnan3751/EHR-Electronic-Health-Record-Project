@@ -20,7 +20,7 @@ public sealed class PatientAccounts(UserManager<PatientUser> users, EhrDbContext
         }
 
         var token = await users.GeneratePasswordResetTokenAsync(user);
-        audit.Record(AuditActions.PasswordResetRequested, patientId: user.PatientId, actorId: user.Id);
+        audit.Record(AuditActions.PasswordResetRequested, patientId: user.PatientId);
         await db.SaveChangesAsync(cancellationToken);
         await email.SendAsync(address, "Reset your patient portal password",
             $"""

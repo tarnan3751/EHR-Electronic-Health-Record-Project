@@ -33,14 +33,20 @@ builder.Services.AddSingleton(new AuditSource(site == Site.OnPrem ? AuditSources
 
 // The portal's emails: through the mail server in Ehr:Smtp when there is one, otherwise into the log, for development.
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.Section));
+// They go out from a queue in memory (QueuedEmailSender), so a response never waits for the mail server.
 if (builder.Configuration[$"{SmtpOptions.Section}:Host"] is { Length: > 0 })
 {
-    builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+    builder.Services.AddSingleton<SmtpEmailSender>();
+    builder.Services.AddSingleton(services => new QueuedEmailSender(services.GetRequiredService<SmtpEmailSender>(), services.GetRequiredService<ILogger<QueuedEmailSender>>()));
 }
 else
 {
-    builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+    builder.Services.AddSingleton<LoggingEmailSender>();
+    builder.Services.AddSingleton(services => new QueuedEmailSender(services.GetRequiredService<LoggingEmailSender>(), services.GetRequiredService<ILogger<QueuedEmailSender>>()));
 }
+
+builder.Services.AddSingleton<IEmailSender>(services => services.GetRequiredService<QueuedEmailSender>());
+builder.Services.AddHostedService(services => services.GetRequiredService<QueuedEmailSender>());
 
 // The keys that protect cookies and form tokens live in the database, so they survive a restart and both servers share
 // them: a form the cloud app renders is saved by the on-prem app. Only on-prem creates them; the cloud app reads them
