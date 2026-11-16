@@ -632,6 +632,10 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Assessment")
+                        .HasColumnType("text")
+                        .HasColumnName("assessment");
+
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasColumnType("text")
@@ -641,9 +645,25 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("clinician_id");
 
+                    b.Property<bool>("HasUnreviewedProposals")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_unreviewed_proposals");
+
+                    b.Property<string>("History")
+                        .HasColumnType("text")
+                        .HasColumnName("history");
+
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
+
+                    b.Property<string>("Plan")
+                        .HasColumnType("text")
+                        .HasColumnName("plan");
+
+                    b.Property<long?>("StructuredVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("structured_version");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
@@ -660,6 +680,68 @@ namespace Ehr.Migrations
                         .HasDatabaseName("ix_clinical_drafts_patient_id");
 
                     b.ToTable("clinical_drafts", "ehr");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.ClinicalNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Assessment")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("assessment");
+
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<long>("DraftVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("draft_version");
+
+                    b.Property<string>("History")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("history");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("plan");
+
+                    b.Property<DateTimeOffset>("SignedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signed_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("SignerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("signer_id")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_clinical_notes");
+
+                    b.HasIndex("DraftId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_clinical_notes_draft_id");
+
+                    b.HasIndex("SignerId")
+                        .HasDatabaseName("ix_clinical_notes_signer_id");
+
+                    b.HasIndex("PatientId", "SignedAt")
+                        .HasDatabaseName("ix_clinical_notes_patient_id_signed_at");
+
+                    b.ToTable("clinical_notes", "ehr");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>
@@ -1190,6 +1272,30 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_clinical_drafts_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.ClinicalNote", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.ClinicalDraft", null)
+                        .WithMany()
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_clinical_notes_clinical_drafts_draft_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_clinical_notes_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("SignerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_clinical_notes_staff_users_signer_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>

@@ -19,6 +19,8 @@ public class PhiReaderTests
     // The context's sets of patient records, and the entities they hold.
     static readonly Dictionary<string, Type> PhiSets = new()
     {
+        ["ClinicalDrafts"] = typeof(ClinicalDraft),
+        ["ClinicalNotes"] = typeof(ClinicalNote),
         ["Patients"] = typeof(Patient),
         ["AllergyIntolerances"] = typeof(AllergyIntolerance),
         ["MedicationStatements"] = typeof(MedicationStatement),

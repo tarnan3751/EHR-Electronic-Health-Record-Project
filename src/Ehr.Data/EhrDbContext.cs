@@ -54,6 +54,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<ClinicalDraft> ClinicalDrafts => Set<ClinicalDraft>();
 
+    public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
+
     // One-time portal enrollment codes, as hashes. Grants only: registration looks a code up before anyone is signed in.
     public DbSet<PatientEnrollment> PatientEnrollments => Set<PatientEnrollment>();
 

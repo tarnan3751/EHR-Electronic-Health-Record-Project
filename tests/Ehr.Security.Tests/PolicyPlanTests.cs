@@ -21,6 +21,8 @@ public class PolicyPlanTests(MigratedDatabase database) : IClassFixture<Migrated
     [InlineData("conditions")]
     [InlineData("encounters")]
     [InlineData("audit_events")]
+    [InlineData("clinical_drafts")]
+    [InlineData("clinical_notes")]
     public async Task Policies_ask_who_the_user_is_once_per_statement(string table)
     {
         var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);

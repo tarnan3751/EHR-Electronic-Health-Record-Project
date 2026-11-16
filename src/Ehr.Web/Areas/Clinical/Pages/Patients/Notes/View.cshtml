@@ -1,0 +1,15 @@
+@page "/patients/{patientId:guid}/notes/{noteId:guid}"
+@using Ehr.Domain.Notes
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ViewModel
+@{
+    ViewData["Title"] = "Signed clinical note";
+}
+<p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
+<h1>Clinical note <span class="tag">Signed · read-only</span></h1>
+<partial name="_PatientIdentity" model="Model.Patient" />
+<p class="notice" role="status">This note is signed and permanently saved to the clinical record.</p>
+<dl class="record">
+    <dt>Signing clinician</dt><dd>@Model.SignerName <small>(@Model.Note.SignerId)</small></dd>
+    <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss") UTC</time></dd>
+</dl>
+<partial name="_NoteContent" model="new NoteContent(Model.Note.History, Model.Note.Assessment, Model.Note.Plan)" />

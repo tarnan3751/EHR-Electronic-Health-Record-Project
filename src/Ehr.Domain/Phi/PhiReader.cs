@@ -29,8 +29,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
     // A patient's chart: the demographics, the allergies, medications and diagnoses they have now, and their latest
     // visits, up to `visits`, newest first. It is one view of one patient, so it is one recorded read of the patient,
-    // however many rows the sections hold: the same event a list of patients records for each, and the only kind of
-    // read the cloud app's audit queue takes (CloudAuditEvents).
+    // however many rows the sections hold: the same event a list of patients records for each. Draft and signed-note
+    // reads have their own table/row events, also accepted by the cloud audit queue (CloudAuditEvents).
     public async Task<PatientChart?> ChartAsync(Guid id, int visits, CancellationToken cancellationToken)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
@@ -174,6 +174,52 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         return drafts;
+    }
+
+    public async Task<IReadOnlyList<ClinicalDraft>> NoteDraftsAsync(Guid patient, CancellationToken cancel)
+    {
+        var drafts = await db.ClinicalDrafts.AsNoTracking()
+            .Where(d => d.PatientId == patient && d.ClinicianId == user.UserId
+                && !db.ClinicalNotes.Any(n => n.DraftId == d.Id))
+            .OrderByDescending(d => d.Id).ToListAsync(cancel);
+        if (drafts.Count > 0)
+        {
+            audit.RecordReads(DraftsTable, drafts.Select(d => (d.PatientId, d.Id)));
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return drafts;
+    }
+
+    public async Task<IReadOnlyList<ClinicalNote>> NotesAsync(Guid patient, CancellationToken cancel)
+    {
+        var notes = await db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == patient)
+            .OrderByDescending(n => n.SignedAt).ThenBy(n => n.Id).ToListAsync(cancel);
+        if (notes.Count > 0)
+        {
+            audit.RecordReads("clinical_notes", notes.Select(n => (n.PatientId, n.Id)));
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return notes;
+    }
+
+    public Task<ClinicalNote?> SignedDraftAsync(Guid draft, Guid patient, CancellationToken cancel) =>
+        ReadNoteAsync(db.ClinicalNotes.Where(n => n.DraftId == draft && n.PatientId == patient), cancel);
+
+    public Task<ClinicalNote?> NoteAsync(Guid id, Guid patient, CancellationToken cancel) =>
+        ReadNoteAsync(db.ClinicalNotes.Where(n => n.Id == id && n.PatientId == patient), cancel);
+
+    async Task<ClinicalNote?> ReadNoteAsync(IQueryable<ClinicalNote> query, CancellationToken cancel)
+    {
+        var note = await query.AsNoTracking().SingleOrDefaultAsync(cancel);
+        if (note is not null)
+        {
+            audit.Record(AuditActions.Read, note.PatientId, "clinical_notes", note.Id);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return note;
     }
 
     // A list of patients, in name order, each one a recorded read, and whether more match than the limit.

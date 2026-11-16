@@ -1,0 +1,27 @@
+@page "/patients/{patientId:guid}/notes/drafts/{draftId:guid}"
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.EditModel
+@{
+    ViewData["Title"] = "Write clinical note";
+}
+<p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
+<h1>Clinical note <span class="tag">Draft · unsigned</span></h1>
+<partial name="_PatientIdentity" model="Model.Patient" />
+<p id="note-save-status" role="status" aria-live="polite">@Model.SaveStatus</p>
+<div id="note-errors" class="notice error" role="alert" hidden="@(Model.Errors.Count == 0)">
+    @foreach (var error in Model.Errors) { <p>@error</p> }
+</div>
+<form method="post" asp-page-handler="Save" class="note-editor" data-note-editor>
+    <input type="hidden" asp-for="Version" />
+    <p id="note-help">Drafts save to the clinic server as you type. Complete all three fields before signing.</p>
+    <label asp-for="History">History</label>
+    <textarea asp-for="History" rows="7" autofocus aria-describedby="note-help"></textarea>
+    <label asp-for="Assessment">Assessment</label>
+    <textarea asp-for="Assessment" rows="5"></textarea>
+    <label asp-for="Plan">Plan</label>
+    <textarea asp-for="Plan" rows="5"></textarea>
+    <div class="actions">
+        <button type="submit">Save draft</button>
+        <button type="submit" asp-page-handler="Review" data-review>Sign note…</button>
+    </div>
+</form>
+<script src="~/_content/Ehr.Design/js/note-editor.js" defer></script>

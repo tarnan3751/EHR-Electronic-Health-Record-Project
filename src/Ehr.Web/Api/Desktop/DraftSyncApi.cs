@@ -89,6 +89,13 @@ static class DraftSyncApi
             return Results.Ok(new PushResult("duplicate", Describe(current)));
         }
 
+        // An already-applied operation keeps UC 8's duplicate outcome even after finalization. It performs no edit.
+        if (current is not null && await phi.SignedDraftAsync(current.Id, request.PatientId, cancellationToken) is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(new PushResult("invalid", Problem: "This note is signed and cannot be changed."));
+        }
+
         if (current?.Version != request.BaseVersion)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -107,7 +114,7 @@ static class DraftSyncApi
                 Body = request.Body,
                 Version = 1,
             };
-            db.ClinicalDrafts.Add(current);
+            db.AddRange(current);
         }
         else
         {
@@ -127,9 +134,10 @@ static class DraftSyncApi
             // Another writer committed after our read. The next round reads its committed version.
             return Results.StatusCode(StatusCodes.Status409Conflict);
         }
-        catch (DbUpdateException error) when (error.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (DbUpdateException error) when (error.InnerException is PostgresException
+        { SqlState: PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.CheckViolation })
         {
-            // Simultaneous creation, or an identical ID already in use. Give no details about another owner's row.
+            // Simultaneous creation, signing, or an ID already in use. Give no details about another owner's row.
             // The client retries once per round and does not lose its draft.
             return Results.StatusCode(StatusCodes.Status409Conflict);
         }

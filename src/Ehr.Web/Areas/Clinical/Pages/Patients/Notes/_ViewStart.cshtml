@@ -1,0 +1,5 @@
+@{
+    // htmx initializes its session history with the current URL even when caching is disabled.
+    // These native forms/fetch pages must not persist patient/draft/note identifiers in browser storage.
+    ViewData["UseHtmx"] = false;
+}

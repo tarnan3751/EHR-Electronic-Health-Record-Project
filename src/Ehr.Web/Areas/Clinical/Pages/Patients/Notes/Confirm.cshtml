@@ -1,0 +1,24 @@
+@page "/patients/{patientId:guid}/notes/drafts/{draftId:guid}/confirm"
+@using Ehr.Domain.Notes
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ConfirmModel
+@{
+    ViewData["Title"] = "Confirm signature";
+}
+<p><a asp-page="Edit" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@Model.Draft.Id">Return to editor</a></p>
+<h1>Confirm signature</h1>
+<partial name="_PatientIdentity" model="Model.Patient" />
+<p>Review the saved note below. Signing makes it a permanent, read-only clinical record.</p>
+<partial name="_NoteContent" model="NoteContent.From(Model.Draft)" />
+<div id="note-errors" class="notice error" role="alert" hidden="@(Model.Errors.Count == 0)">
+    @foreach (var error in Model.Errors) { <p>@error</p> }
+</div>
+@if (Model.Errors.Count == 0)
+{
+    <form method="post" data-note-sign>
+        <input type="hidden" asp-for="Version" />
+        <label class="note-confirm"><input asp-for="Confirmed" /> I have reviewed this note and confirm my signature as @User.Identity?.Name.</label>
+        <button>Confirm and sign note</button>
+        <p id="note-save-status" role="status" aria-live="polite"></p>
+    </form>
+}
+<script src="~/_content/Ehr.Design/js/note-editor.js" defer></script>

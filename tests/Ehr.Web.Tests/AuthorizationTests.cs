@@ -14,6 +14,9 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
     [Theory]
     [InlineData("/", "/sign-in")]
     [InlineData("/patients", "/sign-in")]
+    [InlineData("/patients/00000000-0000-0000-0000-000000000001/notes/drafts/00000000-0000-0000-0000-000000000002", "/sign-in")]
+    [InlineData("/patients/00000000-0000-0000-0000-000000000001/notes/drafts/00000000-0000-0000-0000-000000000002/confirm", "/sign-in")]
+    [InlineData("/patients/00000000-0000-0000-0000-000000000001/notes/00000000-0000-0000-0000-000000000002", "/sign-in")]
     [InlineData("/admin/staff", "/sign-in")]
     [InlineData("/portal", "/portal/sign-in")]
     public async Task Anonymous_requests_are_sent_to_the_right_sign_in(string path, string signIn)

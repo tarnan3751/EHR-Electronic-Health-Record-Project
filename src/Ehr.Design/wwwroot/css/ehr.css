@@ -213,3 +213,38 @@ dl.record dt {
 dl.record dd {
     margin: 0;
 }
+
+/* Clinical notes use the chart's single-column, keyboard-first form and read-only record styles. */
+.note-editor label {
+    font-weight: 600;
+    margin-top: 1rem;
+}
+
+.note-editor textarea {
+    resize: vertical;
+    min-height: 6rem;
+    padding: 0.6rem;
+    border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: 0.25rem;
+}
+
+.note-editor .actions {
+    margin: 1rem 0 2rem;
+}
+
+.note-patient {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.note-confirm {
+    margin: 1rem 0;
+}
+
+.note-confirm input {
+    width: auto;
+}
+
+.signed-note .body {
+    overflow-wrap: anywhere;
+}

@@ -14,8 +14,11 @@
     <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false}'>
     <title>@ViewData["Title"]</title>
     <link rel="stylesheet" href="~/_content/Ehr.Design/css/ehr.css">
-    <script src="~/_content/Ehr.Design/lib/htmx/dist/htmx.min.js" defer></script>
-    <script src="~/_content/Ehr.Design/js/request-errors.js" defer></script>
+    @if (ViewData["UseHtmx"] is not false)
+    {
+        <script src="~/_content/Ehr.Design/lib/htmx/dist/htmx.min.js" defer></script>
+        <script src="~/_content/Ehr.Design/js/request-errors.js" defer></script>
+    }
     @if (!isPatient && User.IsInRole(StaffRoles.Clinician))
     {
         @* "/" reaches the patient search from any clinical page, and the arrow keys move through its results. *@

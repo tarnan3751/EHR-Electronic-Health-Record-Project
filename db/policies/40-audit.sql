@@ -78,3 +78,7 @@ CREATE OR REPLACE TRIGGER encounters_audit
 CREATE OR REPLACE TRIGGER clinical_drafts_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.clinical_drafts
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER clinical_notes_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.clinical_notes
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();

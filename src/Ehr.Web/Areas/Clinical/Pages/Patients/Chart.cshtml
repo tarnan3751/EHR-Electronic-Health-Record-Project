@@ -3,6 +3,8 @@
 @model ChartModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
+    // This chart uses native forms. Avoid htmx's automatic patient-URL sessionStorage history.
+    ViewData["UseHtmx"] = false;
     ViewData["Title"] = $"{Model.Patient.FamilyName}, {Model.Patient.GivenName}";
 }
 <p><partial name="_BackToSearch" model="Model.Search" /></p>
@@ -35,6 +37,43 @@
         </form>
     }
 </div>
+
+<h2>Clinical notes</h2>
+@if (Model.OnPanel && OnPrem.IsReachable)
+{
+    <form method="post" asp-page-handler="NewNote"><button>New note</button></form>
+}
+else if (!Model.OnPanel)
+{
+    <p>Add this patient to your panel to write a note.</p>
+}
+else
+{
+    <p>New notes and signing require the clinic server. Saved notes remain readable.</p>
+}
+@if (Model.Drafts.Count > 0)
+{
+    <h3>Your drafts</h3>
+    <ul>
+        @foreach (var draft in Model.Drafts)
+        {
+            <li><a asp-page="Notes/Edit" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@draft.Id">Open draft</a> · version @draft.Version · unsigned</li>
+        }
+    </ul>
+}
+@if (Model.Notes.Count > 0)
+{
+    <ul>
+        @foreach (var note in Model.Notes)
+        {
+            <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</a></li>
+        }
+    </ul>
+}
+else
+{
+    <p>No signed notes recorded.</p>
+}
 
 @* Read only for now: nothing here is edited yet. *@
 <h2>Allergies</h2>

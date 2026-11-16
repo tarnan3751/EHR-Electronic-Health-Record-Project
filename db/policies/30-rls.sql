@@ -168,3 +168,13 @@ CREATE POLICY clinical_drafts_own ON ehr.clinical_drafts FOR ALL
               AND a.patient_id = clinical_drafts.patient_id AND a.ended_at IS NULL
         )
     );
+
+-- Signed notes follow the chart's clinician access model. Drafts remain private under PR #26's panel policy.
+ALTER TABLE ehr.clinical_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.clinical_notes FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS clinical_notes_clinician_select ON ehr.clinical_notes;
+CREATE POLICY clinical_notes_clinician_select ON ehr.clinical_notes FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS clinical_notes_own_insert ON ehr.clinical_notes;
+CREATE POLICY clinical_notes_own_insert ON ehr.clinical_notes FOR INSERT
+    WITH CHECK ((SELECT ehr.is_clinician()) AND signer_id = (SELECT ehr.current_user_id()));

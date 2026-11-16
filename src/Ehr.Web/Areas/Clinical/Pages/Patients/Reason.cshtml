@@ -3,6 +3,7 @@
 @model ReasonModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
+    ViewData["UseHtmx"] = false;
     ViewData["Title"] = "Emergency access";
 }
 <h1>Emergency access</h1>

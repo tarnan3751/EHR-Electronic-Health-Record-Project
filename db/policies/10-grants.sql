@@ -78,4 +78,9 @@ GRANT SELECT ON ehr.audit_events TO ehr_read;
 
 GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;
 
+-- Final clinical records are append-only. Cloud reads remain subject to the same forced RLS.
+GRANT SELECT ON ehr.clinical_drafts TO ehr_read;
+GRANT SELECT, INSERT ON ehr.clinical_notes TO ehr_app;
+GRANT SELECT ON ehr.clinical_notes TO ehr_read;
+
 COMMIT;
