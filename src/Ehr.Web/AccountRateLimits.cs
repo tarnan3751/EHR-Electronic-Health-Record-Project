@@ -72,7 +72,8 @@ public static class AccountRateLimits
     {
         if (context.Request.Path.StartsWithSegments("/api"))
         {
-            return context.Response.WriteAsJsonAsync(new { error = "too_many_attempts" }, cancellationToken);
+            // "problem" is what the desktop app shows the person when a sign-in is refused (api.rs, Refusal).
+            return context.Response.WriteAsJsonAsync(new { problem = "Too many attempts. Wait a few minutes and try again." }, cancellationToken);
         }
 
         context.Response.ContentType = "text/html; charset=utf-8";
