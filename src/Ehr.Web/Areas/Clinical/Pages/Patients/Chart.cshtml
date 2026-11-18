@@ -218,6 +218,12 @@ else if (Model.Chart.SensitiveHidden > 0)
         }
     </section>
 
+    @* Who can use the portal for this patient (FR-19): on its own page, read when it is opened. *@
+    <section class="sc-panel" aria-labelledby="chart-proxies">
+        <h2 class="sc-panel__title" id="chart-proxies">Proxy access</h2>
+        <p><a asp-page="Proxies/Index" asp-route-patientId="@Model.Patient.Id" data-proxies>Who can use the portal for this patient</a></p>
+    </section>
+
     @* Appointments still to come (FR-17), part of the chart's one recorded read; booked for a patient on the
        clinician's panel while the clinic's server can be reached. *@
     <section class="sc-panel" aria-labelledby="chart-appointments">

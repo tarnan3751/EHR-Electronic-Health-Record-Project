@@ -12,7 +12,7 @@ namespace Ehr.Web.Areas.Portal.Pages;
 // result ID is taken either: the whole list is one page, so there is nothing to change in a URL to reach someone else's,
 // and row-level security returns no one else's anyway. The read goes through the PHI reader, which records it. It works
 // off-site too, read from the cloud app's replica, and says read-only there while the clinic's server is down (UC2).
-public class ResultsModel(PhiReader phi) : PageModel
+public class ResultsModel(PortalSubject subject, PhiReader phi) : PageModel
 {
     public IReadOnlyList<Observation> Results { get; private set; } = [];
 
@@ -22,7 +22,7 @@ public class ResultsModel(PhiReader phi) : PageModel
     {
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
         Response.Headers.CacheControl = "no-store";
-        var patientId = Guid.Parse(User.FindFirstValue(EhrClaims.PatientId)!);
+        var patientId = subject.PatientId;
         var results = await phi.ResultsAsync(patientId, HttpContext.RequestAborted);
         Available = results is not null;
         Results = results?.Results ?? [];

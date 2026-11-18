@@ -4,12 +4,13 @@ using Xunit;
 namespace Ehr.Architecture.Tests;
 
 // The cloud app handles a HandledOffSite page's POST itself, and whatever that records goes to its audit queue, which
-// takes only what the on-prem app takes (CloudAuditEvents). Today that is signing out, staff and patient, and nothing
-// else; a new page here needs its event's shape added there too.
+// takes only what the on-prem app takes (CloudAuditEvents). Today that is signing out, staff and patient, and the
+// portal page that switches which record a proxy is looking at (FR-19), which records nothing and saves only a
+// cookie. A new page here needs its event's shape added there too.
 public class HandledOffSiteTests
 {
     [Fact]
-    public void Only_the_sign_out_pages_are_handled_off_site()
+    public void Only_the_sign_out_pages_and_the_proxy_switch_are_handled_off_site()
     {
         var marked = typeof(Ehr.Web.Site).Assembly.GetTypes()
             .Where(type => type.IsDefined(typeof(HandledOffSiteAttribute), inherit: false))
@@ -18,8 +19,9 @@ public class HandledOffSiteTests
             .ToList();
 
         Assert.True(
-            marked.SequenceEqual(["Ehr.Web.Areas.Clinical.Pages.Account.SignOutModel", "Ehr.Web.Areas.Portal.Pages.Account.SignOutModel"]),
-            "Only the staff and patient sign-out pages are handled on the cloud app. A new page handled there records its "
+            marked.SequenceEqual(["Ehr.Web.Areas.Clinical.Pages.Account.SignOutModel", "Ehr.Web.Areas.Portal.Pages.Account.SignOutModel",
+                "Ehr.Web.Areas.Portal.Pages.ActingModel"]),
+            "Only the staff and patient sign-out pages and the proxy's switch page are handled on the cloud app. A new page handled there records its "
                 + "events into the cloud app's queue, so add their shape to CloudAuditEvents (both the queue and the on-prem "
                 + "app use it) and then add the page here; otherwise the request fails. Marked now: " + string.Join(", ", marked));
     }

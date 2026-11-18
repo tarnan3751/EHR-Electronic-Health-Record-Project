@@ -5,6 +5,11 @@
     ViewData["Title"] = "Messages";
 }
 <h1>Messages</h1>
+@if (!Model.Allowed)
+{
+    <p class="sc-notice sc-notice--info">Your access to this record doesn't include messages.</p>
+    return;
+}
 @if (OnPrem.IsReachable)
 {
     <p><a asp-page="New" class="sc-btn sc-btn--primary">Write to your care team</a></p>

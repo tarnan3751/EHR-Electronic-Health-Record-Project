@@ -12,6 +12,9 @@
     var here = ViewContext.RouteData.Values["page"] as string ?? "";
     // How many inbox items need the signed-in staff member's action, when the page counted them (InboxCountFilter).
     var waiting = Context.Items[Ehr.Web.InboxCountFilter.Item] as int? ?? 0;
+    // Whose record a portal page is about, when it is someone else's (PortalSubjectFilter; FR-19).
+    var subject = Context.Items[Ehr.Web.PortalSubjectFilter.Item] as Ehr.Web.PortalSubject;
+    var acting = subject?.Acting;
     Func<string, string?> current = start => here.StartsWith(start, StringComparison.Ordinal) ? "page" : null;
 }
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
@@ -81,10 +84,14 @@
             <nav class="sc-appbar__nav" aria-label="Main">
                 @if (isPatient)
                 {
-                    <a asp-area="Portal" asp-page="/Index" class="sc-appbar__link" aria-current="@current("/Index")">My record</a>
+                    <a asp-area="Portal" asp-page="/Index" class="sc-appbar__link" aria-current="@current("/Index")">@(acting is null ? "My record" : "Record")</a>
                     <a asp-area="Portal" asp-page="/Results" class="sc-appbar__link" aria-current="@current("/Results")">Results</a>
                     <a asp-area="Portal" asp-page="/Appointments" class="sc-appbar__link" aria-current="@current("/Appointments")">Appointments</a>
-                    <a asp-area="Portal" asp-page="/Messages/Index" class="sc-appbar__link" aria-current="@current("/Messages/")">Messages</a>
+                    @if (subject?.MayMessage != false)
+                    {
+                        <a asp-area="Portal" asp-page="/Messages/Index" class="sc-appbar__link" aria-current="@current("/Messages/")">Messages</a>
+                    }
+                    <a asp-area="Portal" asp-page="/Access" class="sc-appbar__link" aria-current="@current("/Access")">Access</a>
                 }
                 else
                 {
@@ -123,6 +130,15 @@
         @* FR-34: off-site, with the clinic's server down, records can still be read but nothing can be saved. The band
            runs the full width under the app bar on every page. *@
         <p class="sc-notice sc-notice--warning sc-notice--band" role="status"><span class="sc-notice__state">Read-only:</span> the clinic's server can't be reached. You can look at records, but the newest changes may not appear yet, and nothing can be saved until it's back.</p>
+    }
+    @if (acting is not null)
+    {
+        @* FR-19: a proxy is never left to wonder whose record is on screen. The band sits under the app bar on every
+           portal page while the session is acting for someone, with the way back. *@
+        <form method="post" asp-area="Portal" asp-page="/Acting" asp-page-handler="Mine" class="sc-notice sc-notice--info sc-notice--band sc-acting" data-acting>
+            <p><span class="sc-notice__state">Viewing as a proxy:</span> this is <strong>@acting.PatientName</strong>'s record, not your own.</p>
+            <button type="submit" class="sc-btn sc-btn--compact">Back to my own record</button>
+        </form>
     }
     @* The patient banner, on a page about a patient: directly under the app bar, and it stays put as the page scrolls. *@
     @await RenderSectionAsync("Banner", required: false)

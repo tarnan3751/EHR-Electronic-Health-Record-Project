@@ -1,9 +1,13 @@
 @page "/portal"
 @model IndexModel
 @{
-    ViewData["Title"] = "My record";
+    ViewData["Title"] = Model.ActingFor is { } name ? $"{name}'s record" : "My record";
 }
-<h1>My record</h1>
+<h1>@ViewData["Title"]</h1>
+@if (Model.Ended)
+{
+    <p class="sc-notice sc-notice--warning" role="status"><span class="sc-notice__state">Access ended:</span> you can no longer view that record. This is your own.</p>
+}
 @if (Model.Patient is { } patient)
 {
     <section class="sc-panel" aria-label="About you">
@@ -26,7 +30,10 @@
         }
         <p><a asp-page="/Appointments">All your appointments</a></p>
     </section>
-    <p><a asp-page="/Messages/Index" class="sc-btn">Messages with your care team</a></p>
+    @if (Model.MayMessage)
+    {
+        <p><a asp-page="/Messages/Index" class="sc-btn">Messages with your care team</a></p>
+    }
 }
 else
 {

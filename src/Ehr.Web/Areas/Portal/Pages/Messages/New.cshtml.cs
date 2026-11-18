@@ -13,7 +13,7 @@ namespace Ehr.Web.Areas.Portal.Pages.Messages;
 // has the patient on their panel. Off-site the post is forwarded to the clinic's server; when that can't be reached
 // the cloud app's "Not saved" page shows what was typed again (UC 2, ShownIfNotSaved).
 [ShownIfNotSaved(nameof(Subject), nameof(Body))]
-public class NewModel(SecureMessages messages) : PageModel
+public class NewModel(PortalSubject subject, SecureMessages messages) : PageModel
 {
     [BindProperty]
     public string? Subject { get; set; }
@@ -23,15 +23,25 @@ public class NewModel(SecureMessages messages) : PageModel
 
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
-    public void OnGet() => Response.Headers.CacheControl = "no-store";
+    public IActionResult OnGet()
+    {
+        Response.Headers.CacheControl = "no-store";
+        // A proxy whose grant doesn't include messages (FR-19) is sent to the page that says so.
+        return subject.MayMessage ? Page() : RedirectToPage("Index");
+    }
 
     public async Task<IActionResult> OnPostAsync()
     {
         Response.Headers.CacheControl = "no-store";
+        if (!subject.MayMessage)
+        {
+            return RedirectToPage("Index");
+        }
+
         var errors = SecureMessages.Check(Subject, Body, reply: false);
         if (errors.Count == 0)
         {
-            var patientId = Guid.Parse(User.FindFirstValue(EhrClaims.PatientId)!);
+            var patientId = subject.PatientId;
             var (result, thread) = await messages.StartAsync(patientId, MessageSender.Patient, Subject!, Body!, HttpContext.RequestAborted);
             if (result == SendResult.Sent)
             {

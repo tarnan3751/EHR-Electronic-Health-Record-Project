@@ -867,6 +867,19 @@
         max-width: none;
     }
 
+    /* The band that says a portal session is looking at someone else's record (FR-19), with the way back beside it. */
+    .sc-acting {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .sc-acting p {
+        margin: 0;
+    }
+
     .sc-notice a {
         color: inherit;
         font-weight: 600;

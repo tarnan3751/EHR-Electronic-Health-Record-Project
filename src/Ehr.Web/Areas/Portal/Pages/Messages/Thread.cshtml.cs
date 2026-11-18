@@ -14,7 +14,7 @@ namespace Ehr.Web.Areas.Portal.Pages.Messages;
 // read of the thread, and marks the care team's messages in it as read. Off-site it is read from the cloud copy, where
 // nothing can be marked; a reply is forwarded to the clinic's server.
 [ShownIfNotSaved(nameof(Body))]
-public class ThreadModel(PhiReader phi, SecureMessages messages, SiteKind site) : PageModel
+public class ThreadModel(PortalSubject subject, PhiReader phi, SecureMessages messages, SiteKind site) : PageModel
 {
     [BindProperty]
     public string? Body { get; set; }
@@ -27,7 +27,7 @@ public class ThreadModel(PhiReader phi, SecureMessages messages, SiteKind site) 
 
     public string? Error { get; private set; }
 
-    Guid PatientId => Guid.Parse(User.FindFirstValue(EhrClaims.PatientId)!);
+    Guid PatientId => subject.PatientId;
 
     public async Task<IActionResult> OnGetAsync(Guid threadId)
     {
@@ -72,6 +72,12 @@ public class ThreadModel(PhiReader phi, SecureMessages messages, SiteKind site) 
     async Task<IActionResult?> LoadAsync(Guid threadId)
     {
         Response.Headers.CacheControl = "no-store";
+        // A proxy whose grant doesn't include messages (FR-19) is sent to the page that says so.
+        if (!subject.MayMessage)
+        {
+            return RedirectToPage("Index");
+        }
+
         if (await phi.ThreadAsync(threadId, PatientId, asPatient: true, HttpContext.RequestAborted) is not { } thread)
         {
             return NotFound();
