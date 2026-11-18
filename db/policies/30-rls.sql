@@ -111,6 +111,9 @@ CREATE OR REPLACE FUNCTION ehr.portal_may_message() RETURNS boolean
 -- theirs: the portal's "records you can view" list, before one is chosen. Row-level security gives a portal session
 -- one patient's row at a time, its own or the one it is acting for, so the names come from here: as the owner, who
 -- reads the two tables through policies of its own below, and only ever for the caller's own address.
+-- An earlier build of step 6 gave the names through a policy on ehr.patients and this function: both go, the policy
+-- first, since it depends on the function.
+DROP POLICY IF EXISTS patients_proxy_select ON ehr.patients;
 DROP FUNCTION IF EXISTS ehr.proxied_patient_ids();
 CREATE OR REPLACE FUNCTION ehr.proxied_records()
     RETURNS TABLE (grant_id uuid, patient_id uuid, given_name text, family_name text, scope text, include_sensitive boolean, expires_at timestamptz)

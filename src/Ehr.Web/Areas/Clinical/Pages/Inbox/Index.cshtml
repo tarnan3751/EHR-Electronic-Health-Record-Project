@@ -81,8 +81,9 @@ else
                         @if (!Model.Done)
                         {
                             <td>
-                                @* A result is done by acknowledging it on its own page, which records who and when. *@
-                                @if (OnPrem.IsReachable && item.Kind != InboxItemKind.Result)
+                                @* An order's results are done by acknowledging them on their own page, which records who and
+                                   when. Anything else, a result item with no order behind it included, is marked done here. *@
+                                @if (OnPrem.IsReachable && !(item.Kind == InboxItemKind.Result && item.SourceTable == "orders"))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
                                         <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary">Mark done</button>
