@@ -3,6 +3,10 @@
 @{
     ViewData["Title"] = Model.ActingFor is { } name ? $"{name}'s record" : "My record";
 }
+@{
+    // A proxy is reading about someone else (FR-19): the page doesn't call the record "yours".
+    var own = Model.ActingFor is null;
+}
 <h1>@ViewData["Title"]</h1>
 @if (Model.Ended)
 {
@@ -10,29 +14,29 @@
 }
 @if (Model.Patient is { } patient)
 {
-    <section class="sc-panel" aria-label="About you">
+    <section class="sc-panel" aria-label="@(own ? "About you" : "About the patient")">
         <dl class="record">
             <dt>Name</dt><dd>@patient.GivenName @patient.FamilyName</dd>
             <dt>Medical record number</dt><dd>@patient.Mrn</dd>
             <dt>Date of birth</dt><dd>@patient.BirthDate.ToString("yyyy-MM-dd")</dd>
         </dl>
     </section>
-    <p><a asp-page="/Results" class="sc-btn sc-btn--primary">See your test results</a></p>
+    <p><a asp-page="/Results" class="sc-btn sc-btn--primary">@(own ? "See your test results" : "See test results")</a></p>
     <section class="sc-panel" aria-labelledby="home-appointments">
-        <h2 class="sc-panel__title" id="home-appointments">Your next appointments</h2>
+        <h2 class="sc-panel__title" id="home-appointments">@(own ? "Your next appointments" : "Next appointments")</h2>
         @if (Model.Upcoming.Count > 0)
         {
             <partial name="_Appointments" model="Model.Upcoming" />
         }
         else
         {
-            <p class="sc-muted">You have no appointments booked. To book one, contact the clinic.</p>
+            <p class="sc-muted">@(own ? "You have no appointments booked." : "No appointments are booked.") To book one, contact the clinic.</p>
         }
-        <p><a asp-page="/Appointments">All your appointments</a></p>
+        <p><a asp-page="/Appointments">@(own ? "All your appointments" : "All appointments")</a></p>
     </section>
     @if (Model.MayMessage)
     {
-        <p><a asp-page="/Messages/Index" class="sc-btn">Messages with your care team</a></p>
+        <p><a asp-page="/Messages/Index" class="sc-btn">@(own ? "Messages with your care team" : "Messages with the care team")</a></p>
     }
 }
 else

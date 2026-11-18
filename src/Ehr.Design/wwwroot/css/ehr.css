@@ -405,6 +405,17 @@
         .sc-appbar__user {
             max-width: 6.5rem;
         }
+
+        /* The portal's links wrap onto a second row on a phone, so none is hidden off the edge. */
+        .sc-appbar--portal .sc-appbar__nav {
+            flex-wrap: wrap;
+            overflow-x: visible;
+            gap: 0 var(--space-4);
+        }
+
+        .sc-appbar--portal .sc-appbar__link {
+            min-height: 40px;
+        }
     }
 
     /* The page: clinician pages at width-content, reading at width-reading, account forms at width-form. */
