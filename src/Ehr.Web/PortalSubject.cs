@@ -34,7 +34,8 @@ public sealed class PortalSubject
 // still in force. Gone when the browser closes, when the patient goes back to their own record, and at sign-out.
 public static class ActingCookie
 {
-    public const string Name = "ehr-acting-for";
+    // __Host-: sent only over HTTPS and only to this host, like the sign-in cookies.
+    public const string Name = "__Host-ehr-acting-for";
 
     public static Guid? Read(HttpContext context) => Guid.TryParse(context.Request.Cookies[Name], out var grant) ? grant : null;
 
@@ -74,7 +75,7 @@ public sealed class PortalSubjectFilter(PhiReader phi, PortalSubject subject, Us
             var withoutCheck = page.StartsWith("/Account/", StringComparison.Ordinal) || page == "/Acting";
             if (user.ActingGrant is { } grant && !withoutCheck)
             {
-                if (await phi.ProxiedRecordAsync(grant, own, http.RequestAborted) is not { } record)
+                if (await phi.ProxiedRecordAsync(grant, http.RequestAborted) is not { } record)
                 {
                     ActingCookie.Clear(http);
                     context.Result = new RedirectToPageResult("/Index", new { area = "Portal", ended = true });

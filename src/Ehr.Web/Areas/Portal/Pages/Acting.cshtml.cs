@@ -12,13 +12,13 @@ namespace Ehr.Web.Areas.Portal.Pages;
 // the clinic's server can't be reached. Nothing is recorded here; what the proxy then opens is, under their account
 // and the patient.
 [HandledOffSite]
-public class ActingModel(PhiReader phi, PortalSubject subject) : PageModel
+public class ActingModel(PhiReader phi) : PageModel
 {
     public IActionResult OnGet() => RedirectToPage("/Access");
 
     public async Task<IActionResult> OnPostAsync(Guid grantId)
     {
-        if (await phi.ProxiedRecordAsync(grantId, subject.OwnPatientId, HttpContext.RequestAborted) is null)
+        if (await phi.ProxiedRecordAsync(grantId, HttpContext.RequestAborted) is null)
         {
             return NotFound();
         }

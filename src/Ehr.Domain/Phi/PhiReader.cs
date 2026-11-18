@@ -454,8 +454,10 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         var now = DateTimeOffset.UtcNow;
+        // Those in force first, before the limit, so one that can still be removed is never off the end of the list.
         var rows = await db.ProxyGrants.AsNoTracking().Where(g => g.PatientId == patientId)
-            .OrderByDescending(g => g.GrantedAt).ThenBy(g => g.Id).Take(100).ToListAsync(cancellationToken);
+            .OrderByDescending(g => g.RevokedAt == null && g.ExpiresAt > now).ThenByDescending(g => g.GrantedAt).ThenBy(g => g.Id).Take(100)
+            .ToListAsync(cancellationToken);
         var grants = rows.Select(g => new ProxyGrantEntry(g.Id, g.ProxyEmail.ToLowerInvariant(), g.Scope, g.IncludeSensitive, g.GrantedByKind == "staff",
                 g.GrantedAt, g.ExpiresAt, g.RevokedAt, g.RevokedAt is null && g.ExpiresAt > now))
             .OrderByDescending(g => g.InForce).ToList();
@@ -467,24 +469,19 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     }
 
     // The records the signed-in portal account may open as a proxy: the grants addressed to it that are in force,
-    // each with whose record it is. Row-level security returns no others. The names are all it shows of those
-    // records, so it is not a recorded read: opening one is.
-    public async Task<IReadOnlyList<ProxiedRecord>> ProxiedRecordsAsync(Guid ownPatientId, CancellationToken cancellationToken)
+    // each with whose record it is. The database answers only for the caller's own address, with the patient's name
+    // and nothing else of theirs (ehr.proxied_records), so it is not a recorded read: opening one is.
+    public async Task<IReadOnlyList<ProxiedRecord>> ProxiedRecordsAsync(CancellationToken cancellationToken)
     {
-        var rows = await (
-            from grant in db.ProxyGrants.AsNoTracking()
-            join patient in db.Patients on grant.PatientId equals patient.Id
-            where grant.PatientId != ownPatientId && grant.RevokedAt == null && grant.ExpiresAt > DateTimeOffset.UtcNow
-            orderby patient.FamilyName, patient.GivenName, grant.Id
-            select new { grant.Id, grant.PatientId, patient.GivenName, patient.FamilyName, grant.Scope, grant.IncludeSensitive, grant.ExpiresAt })
-            .ToListAsync(cancellationToken);
-        return [.. rows.Select(r => new ProxiedRecord(r.Id, r.PatientId, $"{r.GivenName} {r.FamilyName}", r.Scope, r.IncludeSensitive, r.ExpiresAt))];
+        var rows = await ProxiedRecords.ListAsync(db, cancellationToken);
+        return [.. rows.OrderBy(r => r.FamilyName, StringComparer.Ordinal).ThenBy(r => r.GivenName, StringComparer.Ordinal).ThenBy(r => r.GrantId)
+            .Select(r => new ProxiedRecord(r.GrantId, r.PatientId, $"{r.GivenName} {r.FamilyName}", r.Scope, r.IncludeSensitive, r.ExpiresAt))];
     }
 
     // One of those, by its grant: what a portal session acting under it is looking at, or null when the grant isn't
     // the account's or is no longer in force.
-    public async Task<ProxiedRecord?> ProxiedRecordAsync(Guid grantId, Guid ownPatientId, CancellationToken cancellationToken) =>
-        (await ProxiedRecordsAsync(ownPatientId, cancellationToken)).FirstOrDefault(record => record.GrantId == grantId);
+    public async Task<ProxiedRecord?> ProxiedRecordAsync(Guid grantId, CancellationToken cancellationToken) =>
+        (await ProxiedRecordsAsync(cancellationToken)).FirstOrDefault(record => record.GrantId == grantId);
 
     // How many messages from staff a patient hasn't opened yet, across their conversations: whether they have already
     // been told there is something to read. A number, about no particular message: not a recorded read.

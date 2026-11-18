@@ -6,7 +6,7 @@ Conventions every coding agent (and every person) follows in this repo. Most com
 
 - Twice, always: ASP.NET Core policies in the app, then row-level security (RLS) in PostgreSQL. A missed check in code must still return no unauthorized rows.
 - Policies attach to whole areas by convention (`Areas/Clinical`, `Areas/Portal`, `Api/Sync`, `Api/Dictation`), not handler by handler.
-- Portal handlers never accept a patient ID. The subject always comes from the session.
+- Portal handlers never accept a patient ID. The subject always comes from the session: pages take it from `PortalSubject`, which is the account's own patient or, under a proxy grant the database has checked, that grant's patient.
 - Every PHI read goes through the PHI reader service in `Ehr.Domain`, which records an audit event.
 - RLS is enabled and forced on every PHI table. The app connects as `ehr_app` or `ehr_read`, which own nothing and lack `BYPASSRLS`.
 - Network position is never identity. Being on the LAN never skips authentication.
@@ -51,9 +51,9 @@ The `ci` check passes (`.github/workflows/ci.yml`). Today it runs:
 
 - Restore (a high or critical package advisory fails it), a Release build, `dotnet format --verify-no-changes`, and `dotnet test`.
 - No runtime role owns anything, has `BYPASSRLS` or another elevated attribute, or holds a privilege beyond its grants, and every `SECURITY DEFINER` function is locked down (`Ehr.Security.Tests`).
-- Every table has a protection decision; every PHI table has RLS enabled and forced plus the write-audit trigger; querying a PHI table without `app.user_id` set returns zero rows; a patient sees only their own row and an admin none (`Ehr.Security.Tests`).
+- Every table has a protection decision; every PHI table has RLS enabled and forced plus the write-audit trigger; querying a PHI table without `app.user_id` set returns zero rows; a patient sees only their own row (or, while acting under a proxy grant in force, that one patient's instead) and an admin none (`Ehr.Security.Tests`).
 - PHI reads only go through the PHI reader, portal handlers take no patient from a request, and no layer depends on the one above it (`Ehr.Architecture.Tests`).
-- Anonymous requests are sent to sign in, each policy refuses the accounts it should, a staff sign-in needs its second factor, and a patient sees only their own record (`Ehr.Web.Tests`).
+- Anonymous requests are sent to sign in, each policy refuses the accounts it should, a staff sign-in needs its second factor, and a patient sees only their own record, or the one record they are acting for as a proxy (`Ehr.Web.Tests`).
 - Every model change has a migration, and `db/migrations/schema.sql` matches the migrations (`Ehr.Data.Tests`).
 - The tokens' CSS matches `docs/brand/tokens.json`, and the desktop app's copy of the shared CSS, fonts and logos matches the web apps' (`dotnet run tools/brand/sync.cs -- --check`, and `Ehr.Web.Tests`).
 - The local server stack: the migration job applies cleanly, and the stack serves all three sites, replicates, and backs up.

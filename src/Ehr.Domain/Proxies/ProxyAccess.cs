@@ -28,7 +28,7 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
         {
             errors["Email"] = "Enter the person's email address.";
         }
-        else if (address.Length > ProxyGrantConfiguration.MaximumEmail || address.Count(c => c == '@') != 1 || address.Any(char.IsWhiteSpace)
+        else if (address.Length > ProxyGrantConfiguration.MaximumEmail || address.Count(c => c == '@') != 1 || address.Any(c => c is <= ' ' or > '~')
             || address.StartsWith('@') || address.EndsWith('@'))
         {
             errors["Email"] = "Enter an email address, like name@example.com.";
@@ -63,8 +63,9 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
             ProxyEmail = proxyEmail.Trim().ToUpperInvariant(),
             Scope = scope,
             IncludeSensitive = includeSensitive,
-            // A little under the whole days, so a year's grant is inside the database's year when it arrives.
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(days).AddMinutes(-1),
+            // An hour under the whole days, so a year's grant is inside the database's year when it arrives, even if
+            // this server's clock runs a little ahead of the database's.
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(days).AddHours(-1),
         };
         try
         {
@@ -86,11 +87,11 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
         })
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-            var state = (e as DbUpdateException)?.InnerException is PostgresException postgres ? postgres.SqlState : "";
-            return state switch
+            return (e as DbUpdateException)?.InnerException switch
             {
-                PostgresErrorCodes.ProgramLimitExceeded => GiveResult.TooMany,
-                PostgresErrorCodes.CheckViolation => GiveResult.Yourself,
+                PostgresException { SqlState: PostgresErrorCodes.ProgramLimitExceeded } => GiveResult.TooMany,
+                // The trigger names this one refusal (95-proxy-access.sql); any other check is just refused.
+                PostgresException { SqlState: PostgresErrorCodes.CheckViolation, ConstraintName: "proxy_grants_not_oneself" } => GiveResult.Yourself,
                 _ => GiveResult.Refused,
             };
         }

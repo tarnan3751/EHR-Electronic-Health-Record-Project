@@ -60,12 +60,16 @@ CREATE OR REPLACE FUNCTION ehr.acting_grant_id() RETURNS uuid
     RETURN NULLIF(current_setting('app.acting_grant', true), '')::uuid;
 
 -- The signed-in patient account's confirmed email, as ASP.NET Core Identity normalizes it, or NULL: a grant is
--- addressed to an email, and only an account that has proved it owns the address can use it.
+-- addressed to an email, and only an account that has proved it owns the address can use it. Only a plain ASCII
+-- address counts: Identity's normalizing folds some look-alike letters together (a long s becomes S), so an account
+-- at a look-alike address would otherwise match a grant written for someone else. Grants are ASCII too
+-- (95-proxy-access.sql).
 CREATE OR REPLACE FUNCTION ehr.current_account_email() RETURNS text
     LANGUAGE sql STABLE
     RETURN (
         SELECT normalized_email FROM ehr.patient_users
         WHERE id = ehr.current_user_id() AND email_confirmed AND (lockout_end IS NULL OR lockout_end <= now())
+          AND email ~ '^[\x21-\x7E]+$'
     );
 
 -- The patient whose record the session is looking at: the portal's subject, which every *_own_* policy keys on.
@@ -103,14 +107,25 @@ CREATE OR REPLACE FUNCTION ehr.portal_may_message() RETURNS boolean
           AND g.proxy_email = ehr.current_account_email() AND g.scope = 'record-and-messages'
     );
 
--- The patients the signed-in account holds a grant for, in force now: whose names the portal's "records you can
--- view" list shows before one is chosen.
-CREATE OR REPLACE FUNCTION ehr.proxied_patient_ids() RETURNS uuid[]
-    LANGUAGE sql STABLE
-    RETURN (
-        SELECT coalesce(array_agg(g.patient_id), '{}') FROM ehr.proxy_grants g
-        WHERE g.revoked_at IS NULL AND g.expires_at > now() AND g.proxy_email = ehr.current_account_email()
-    );
+-- The records the signed-in account holds a grant for, in force now, with each patient's name and nothing else of
+-- theirs: the portal's "records you can view" list, before one is chosen. Row-level security gives a portal session
+-- one patient's row at a time, its own or the one it is acting for, so the names come from here: as the owner, who
+-- reads the two tables through policies of its own below, and only ever for the caller's own address.
+DROP FUNCTION IF EXISTS ehr.proxied_patient_ids();
+CREATE OR REPLACE FUNCTION ehr.proxied_records()
+    RETURNS TABLE (grant_id uuid, patient_id uuid, given_name text, family_name text, scope text, include_sensitive boolean, expires_at timestamptz)
+    LANGUAGE sql
+    STABLE
+    SECURITY DEFINER
+    SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT g.id, g.patient_id, p.given_name::text, p.family_name::text, g.scope::text, g.include_sensitive, g.expires_at
+    FROM ehr.proxy_grants g
+    JOIN ehr.patients p ON p.id = g.patient_id
+    WHERE g.revoked_at IS NULL AND g.expires_at > now() AND g.proxy_email = (SELECT ehr.current_account_email())
+$$;
+REVOKE ALL ON FUNCTION ehr.proxied_records() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ehr.proxied_records() TO ehr_app, ehr_read;
 
 -- Proxy grants (PHI: they say who has a record at this clinic and who helps them). The patient sees and manages
 -- their own, as themselves and never while acting for someone else; a clinician sees them all, as they see charts,
@@ -127,6 +142,9 @@ CREATE POLICY proxy_grants_own_select ON ehr.proxy_grants FOR SELECT
 DROP POLICY IF EXISTS proxy_grants_proxy_select ON ehr.proxy_grants;
 CREATE POLICY proxy_grants_proxy_select ON ehr.proxy_grants FOR SELECT
     USING (proxy_email = (SELECT ehr.current_account_email()) AND revoked_at IS NULL AND expires_at > now());
+-- For the tables' owner alone, which ehr.proxied_records runs as: no runtime role is or can become it.
+DROP POLICY IF EXISTS proxy_grants_owner_select ON ehr.proxy_grants;
+CREATE POLICY proxy_grants_owner_select ON ehr.proxy_grants FOR SELECT TO ehr_owner USING (true);
 DROP POLICY IF EXISTS proxy_grants_own_insert ON ehr.proxy_grants;
 CREATE POLICY proxy_grants_own_insert ON ehr.proxy_grants FOR INSERT
     WITH CHECK (patient_id = (SELECT ehr.own_patient_id()) AND (SELECT ehr.acting_grant_id()) IS NULL);
@@ -180,10 +198,12 @@ CREATE POLICY patients_clinician_update ON ehr.patients FOR UPDATE
 DROP POLICY IF EXISTS patients_own_select ON ehr.patients;
 CREATE POLICY patients_own_select ON ehr.patients FOR SELECT USING (id = (SELECT ehr.current_patient_id()));
 
--- A proxy reads the row of each patient they hold a grant for, before choosing one: the list shows whose it is.
+
+-- A portal session reads one patient's row: its own, or the one it is acting for (ehr.current_patient_id). The
+-- names of the records a proxy may choose come from ehr.proxied_records, which reads this table as its owner.
 DROP POLICY IF EXISTS patients_proxy_select ON ehr.patients;
-CREATE POLICY patients_proxy_select ON ehr.patients FOR SELECT
-    USING (id = ANY ((SELECT ehr.proxied_patient_ids())::uuid[]));
+DROP POLICY IF EXISTS patients_owner_select ON ehr.patients;
+CREATE POLICY patients_owner_select ON ehr.patients FOR SELECT TO ehr_owner USING (true);
 
 -- Patient assignments (PHI). Clinicians read every panel; a clinician puts patients on their own panel and ends their
 -- own assignments, nobody else's; a patient reads who their clinicians are. Nobody deletes (10-grants.sql).
@@ -449,8 +469,9 @@ CREATE POLICY messages_panel_insert ON ehr.messages FOR INSERT
     );
 DROP POLICY IF EXISTS messages_own_read ON ehr.messages;
 CREATE POLICY messages_own_read ON ehr.messages FOR UPDATE
-    USING (patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_may_message()) AND sender_kind = 'staff')
-    WITH CHECK (patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_may_message()) AND sender_kind = 'staff');
+    -- The patient's own reading marks a staff message read, never a proxy's: the patient still sees it as new.
+    USING (patient_id = (SELECT ehr.own_patient_id()) AND (SELECT ehr.acting_grant_id()) IS NULL AND sender_kind = 'staff')
+    WITH CHECK (patient_id = (SELECT ehr.own_patient_id()) AND (SELECT ehr.acting_grant_id()) IS NULL AND sender_kind = 'staff');
 DROP POLICY IF EXISTS messages_panel_read ON ehr.messages;
 CREATE POLICY messages_panel_read ON ehr.messages FOR UPDATE
     USING (

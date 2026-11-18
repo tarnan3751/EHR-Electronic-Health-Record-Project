@@ -99,7 +99,7 @@ public class AccessModel(PhiReader phi, ProxyAccess access, PortalSubject subjec
     async Task LoadAsync()
     {
         Response.Headers.CacheControl = "no-store";
-        Records = await phi.ProxiedRecordsAsync(subject.OwnPatientId, HttpContext.RequestAborted);
+        Records = await phi.ProxiedRecordsAsync(HttpContext.RequestAborted);
         if (!Acting && await phi.ProxyGrantsAsync(subject.OwnPatientId, asPatient: true, HttpContext.RequestAborted) is { } own)
         {
             Grants = own.Grants;

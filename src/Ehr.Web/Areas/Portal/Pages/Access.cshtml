@@ -23,7 +23,11 @@ else if (Model.Done is "changed")
 }
 
 <h2>Records you can view</h2>
-@if (Model.Records.Count == 0)
+@if (Model.Acting)
+{
+    <p class="sc-muted">You're looking at one of them now. Go back to your own record to choose another.</p>
+}
+else if (Model.Records.Count == 0)
 {
     <p class="sc-muted">Nobody has given you access to their record.</p>
 }

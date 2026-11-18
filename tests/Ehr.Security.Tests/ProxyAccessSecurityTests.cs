@@ -102,6 +102,48 @@ public class ProxyAccessSecurityTests(MigratedDatabase database) : IClassFixture
         }
     }
 
+    // A proxy for two patients sees one record at a time: under one grant, nothing of the other, not even their row.
+    [Fact]
+    public async Task A_proxy_for_two_patients_sees_one_record_at_a_time()
+    {
+        var (clinician, first, proxy) = await PeopleAsync();
+        var second = await PersonAsync(clinician);
+        var firstGrant = await GrantAsync(first.Account, first, proxy);
+        var secondGrant = await GrantAsync(second.Account, second, proxy);
+
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal([first.Patient.ToString()], await ActingAsync(connection, proxy.Account, firstGrant, "SELECT id FROM ehr.patients"));
+            Assert.Equal([first.Patient.ToString()], await ActingAsync(connection, proxy.Account, firstGrant, Seen));
+            Assert.Equal([second.Patient.ToString()], await ActingAsync(connection, proxy.Account, secondGrant, "SELECT id FROM ehr.patients"));
+            Assert.Equal([second.Patient.ToString()], await ActingAsync(connection, proxy.Account, secondGrant, Seen));
+            Assert.Equal(2, (await Accounts.QueryAsync(connection, proxy.Account, "SELECT grant_id FROM ehr.proxied_records()")).Count);
+        }
+    }
+
+    // The limit is on grants in force that the patient gave: expired ones and the clinic's don't use it up.
+    [Fact]
+    public async Task A_patient_gives_at_most_20_grants_in_force()
+    {
+        var (clinician, patient, _) = await PeopleAsync();
+        Person Someone(int i) => new(Guid.Empty, Guid.Empty, $"synthetic-{i}-{patient.Account:N}@example.com");
+        for (var i = 0; i < 20; i++)
+        {
+            await GrantAsync(patient.Account, patient, Someone(i));
+        }
+
+        var tooMany = await Assert.ThrowsAsync<PostgresException>(() => GrantAsync(patient.Account, patient, Someone(20)));
+        Assert.Equal(PostgresErrorCodes.ProgramLimitExceeded, tooMany.SqlState);
+        await GrantAsync(clinician, patient, Someone(21));
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "UPDATE ehr.proxy_grants SET expires_at = now() - interval '1 second' WHERE patient_id = @patient AND proxy_email LIKE 'SYNTHETIC-0-%'", ("patient", patient.Patient));
+        await GrantAsync(patient.Account, patient, Someone(22));
+
+        // And an address with a look-alike letter is not an address a grant can name.
+        var lookAlike = await Assert.ThrowsAsync<PostgresException>(() => GrantAsync(clinician, patient, Someone(0) with { Email = "\u017fam@example.com" }));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, lookAlike.SqlState);
+    }
+
     [Fact]
     public async Task A_grant_that_is_revoked_expired_or_whose_account_is_unconfirmed_or_locked_opens_nothing()
     {
@@ -200,6 +242,15 @@ public class ProxyAccessSecurityTests(MigratedDatabase database) : IClassFixture
         // The audit names both: the proxy's account did it, in the patient's record.
         Assert.Equal([$"{proxy.Account} {patient.Patient}"], await AsSuperuserAsync(
             "SELECT actor_id || ' ' || patient_id FROM ehr.audit_events WHERE table_name = 'messages' AND row_id = @id", ("id", message)));
+
+        // Reading as a proxy never marks the care team's messages read: the patient still finds them new.
+        var reply = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, clinician, "INSERT INTO ehr.messages (id, thread_id, patient_id, sender_kind, body) VALUES (@id, @thread, @patient, 'staff', 'Synthetic: a reply')",
+            ("id", reply), ("thread", thread), ("patient", patient.Patient));
+        await ActAsync(proxy.Account, withMessages, "UPDATE ehr.messages SET read_at = now() WHERE id = @id", ("id", reply));
+        Assert.Equal(["true"], await AsSuperuserAsync("SELECT (read_at IS NULL)::text FROM ehr.messages WHERE id = @id", ("id", reply)));
+        await Accounts.ExecuteAsync(App, patient.Account, "UPDATE ehr.messages SET read_at = now() WHERE id = @id", ("id", reply));
+        Assert.Equal(["false"], await AsSuperuserAsync("SELECT (read_at IS NULL)::text FROM ehr.messages WHERE id = @id", ("id", reply)));
 
         // Not into their own record while acting, and not into the patient's while not.
         var own = await Assert.ThrowsAsync<PostgresException>(() => ActAsync(proxy.Account, withMessages,
@@ -318,10 +369,13 @@ public class ProxyAccessSecurityTests(MigratedDatabase database) : IClassFixture
                 Assert.Equal(["0"], await Accounts.QueryAsync(connection, refused, read, ("id", grant)));
             }
 
-            // Before choosing, the proxy can read whose record it is, and nothing in it.
-            Assert.Equal([patient.Patient.ToString(), proxy.Patient.ToString()],
-                (await Accounts.QueryAsync(connection, proxy.Account, "SELECT id FROM ehr.patients")).Order());
-            Assert.Equal([stranger.Patient.ToString()], await Accounts.QueryAsync(connection, stranger.Account, "SELECT id FROM ehr.patients"));
+            // Before choosing, the proxy is told whose record it is, by name, and reads no row of theirs.
+            Assert.Equal([proxy.Patient.ToString()], await Accounts.QueryAsync(connection, proxy.Account, "SELECT id FROM ehr.patients"));
+            Assert.Equal([$"{grant} {patient.Patient}"], await Accounts.QueryAsync(connection, proxy.Account, "SELECT grant_id || ' ' || patient_id FROM ehr.proxied_records()"));
+            foreach (var other in new Guid?[] { stranger.Account, patient.Account, clinician, admin, null })
+            {
+                Assert.Empty(await Accounts.QueryAsync(connection, other, "SELECT grant_id FROM ehr.proxied_records()"));
+            }
         }
     }
 }

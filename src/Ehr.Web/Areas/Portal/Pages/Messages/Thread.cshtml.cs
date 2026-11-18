@@ -37,7 +37,8 @@ public class ThreadModel(PortalSubject subject, PhiReader phi, SecureMessages me
         }
 
         // Only where there is a database to write to: the cloud app reads a copy.
-        if (site.TakesWrites && Thread.Unread.Count > 0)
+        // And only the patient's own reading: a proxy's leaves the care team's messages new for the patient.
+        if (site.TakesWrites && subject.Acting is null && Thread.Unread.Count > 0)
         {
             await messages.MarkReadAsync(Thread.Unread, HttpContext.RequestAborted);
         }
