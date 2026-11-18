@@ -405,6 +405,17 @@
         .sc-appbar__user {
             max-width: 6.5rem;
         }
+
+        /* The portal's links wrap onto a second row on a phone, so none is hidden off the edge. */
+        .sc-appbar--portal .sc-appbar__nav {
+            flex-wrap: wrap;
+            overflow-x: visible;
+            gap: 0 var(--space-4);
+        }
+
+        .sc-appbar--portal .sc-appbar__link {
+            min-height: 40px;
+        }
     }
 
     /* The page: clinician pages at width-content, reading at width-reading, account forms at width-form. */
@@ -865,6 +876,19 @@
         padding: var(--space-2) var(--space-5);
         margin: 0;
         max-width: none;
+    }
+
+    /* The band that says a portal session is looking at someone else's record (FR-19), with the way back beside it. */
+    .sc-acting {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .sc-acting p {
+        margin: 0;
     }
 
     .sc-notice a {

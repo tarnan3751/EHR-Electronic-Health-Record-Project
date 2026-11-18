@@ -18,7 +18,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 3 | Clinician inbox | done | expansion/step-03-inbox | expansion-step-03 | [44304586912](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44304586912) | New UC 15 (proposed). Admins have an inbox too. Touches `db/policies` |
 | 4 | Appointments | done | expansion/step-04-appointments | expansion-step-04 | [44372811264](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44372811264) | New UC 16 (proposed); UC 6 (Simar), UC 4 (Diego). Touches `db/policies` and authorization |
 | 5 | Secure messaging | done | expansion/step-05-messaging | expansion-step-05 | [44382799606](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44382799606) | New UC 17 (proposed); UC 6 (Simar), UC 4 (Diego). Touches `db/policies` and an authorization test |
-| 6 | Proxy access | not started | | | | |
+| 6 | Proxy access | done | expansion/step-06-proxy-access | expansion-step-06 | [44395022419](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44395022419) | New UC 18 (proposed); UC 5, UC 6 (Simar), UC 11 (Luke). Touches `db/policies`, authorization and AGENTS.md |
 | 7 | Order → result → acknowledgment | not started | | | | |
 | 8 | Ordering safety checks | not started | | | | |
 | 9 | Vital signs and trends | not started | | | | |
@@ -398,6 +398,7 @@ New FR IDs (FR-37 onward) and use cases (UC 15 onward), as each step defines the
 | --- | --- | --- |
 | FR-37 | 1 | The system shall let clinicians discontinue a signed order with a reason, and change one by signing a replacement, without ever editing or deleting the signed order; it shall keep who, when and why. (Extends UC 1; test cases TC-UC1-07 to TC-UC1-12.) |
 | FR-38 | 2 | The system shall let clinicians add and change a patient's allergies, medications and diagnoses, each picked from a standard code list, never deleting an entry and keeping the history of every change. (Extends UC 4; test cases TC-UC4-07 to TC-UC4-12.) |
+| UC 18, FR-44 | 6 | Give someone proxy access to a record. The system shall let a patient, or the clinic for them, give another portal account access to the patient's record with a scope and an expiry, and let either remove it; shall hold back sensitive items unless the patient allows them; and shall record everything a proxy does under both the proxy and the patient. (FR-19 covers a proxy choosing whose record to view; test cases TC-UC18-01 to TC-UC18-06, TC-UC6-10 and TC-UC6-11.) |
 | UC 17, FR-43 | 5 | Answer a patient's message. The system shall deliver a patient's message to the inbox of each clinician on their care team, let any of them reply, record every reading of a conversation, and never put a message's content in an email or in the administrators' audit view. (FR-18 covers sending and receiving; test cases TC-UC17-01 to TC-UC17-06, TC-UC6-08 and TC-UC6-09.) |
 | UC 16, FR-42 | 4 | Schedule an appointment. The system shall let clinicians book, reschedule, cancel (with a reason) and check in appointments, show any clinician's day, and never double-book a clinician. (FR-17 covers the portal's list; test cases TC-UC16-01 to TC-UC16-06, and TC-UC6-07.) |
 | UC 15, FR-41 | 3 | Work through the inbox. The system shall give each staff member one list of the items that need their action, show how many on every clinical page, link each item to its patient, and record when each is done. (Test cases TC-UC15-01 to TC-UC15-06.) |
@@ -411,6 +412,37 @@ For each phase:
 - a pull request title and description;
 - the protected paths it touched;
 - a summary of its tests.
+
+### Phase 1: finish the specified scope, plus the foundations
+
+- **Tag and branch:** `expansion-phase-1`; branch `expansion/phase-1` (the same commit as `expansion-step-06`). Open the pull request from `expansion/phase-1` into `main`. Tahseen opens it; nothing here did.
+- **Title:** Expansion phase 1: order changes, editable chart lists, reference data, the inbox, appointments, messages and proxy access
+
+**Description**
+
+Phase 1 of `docs/expansion/PLAN.md`: steps 0 to 6. With it, every functional requirement in the course document is built.
+
+What it adds:
+- **Orders** can be changed and discontinued, with a reason, and never deleted (UC 1; FR-37 proposed).
+- **Allergies, medications and diagnoses** are edited from the chart with coded entries, history and "no known allergies"; sensitive items are marked, shown apart, and hidden from administrators in the audit view (UC 4, UC 12; FR-38 to FR-40 proposed).
+- **Reference data:** ICD-10-CM, RxNorm, LOINC, UNII, FDA drug classes and DDInter 2.0 loaded from pinned files by `tools/reference`, and a synthetic seed whose patients' problems, medications and results fit together. `docs/expansion/reference-data.md` has the sources and licenses. DDInter is CC BY-NC-SA 4.0, an accepted exception to NFR-16 for this non-commercial project.
+- **A clinician inbox** (UC 15, FR-41 proposed), **appointments** with a day schedule (FR-17; UC 16, FR-42 proposed), **secure messages** between a patient and their care team (FR-18; UC 17, FR-43 proposed) and **proxy access** to the portal (FR-19; UC 18, FR-44 proposed).
+
+Protected paths, for line-by-line review by someone other than Tahseen (AGENTS.md):
+- `db/policies`: `10-grants.sql`, `30-rls.sql`, `40-audit.sql`, `60-orders.sql` changed; `65-chart-lists.sql`, `70-inbox.sql`, `80-appointments.sql`, `90-messages.sql`, `95-proxy-access.sql` new. About 1,180 lines added. The largest single change in meaning is step 6's: `ehr.current_patient_id()` now answers with another patient under a proxy grant the database has checked. Three functions run as their owner: `ehr.deliver_message`, `ehr.shown_audit_details` and `ehr.proxied_records`, with owner-only policies on the tables they read or write.
+- Authorization: `Program.cs` (area policies for the new folders, the new filters), `UserContext.cs` and `UserContextInterceptor.cs` (a second setting, `app.acting_grant`), `UserContextMiddleware.cs`, `PortalSubject.cs`, `InboxCountFilter.cs`, the gate in `Areas/Clinical/Pages/Patients/Messages/MessagePage.cs`, and `CloudAuditEvents.cs`.
+- Tests about authorization that were changed on purpose: `PortalSubjectTests` (a portal request may name a thread or a proxy grant, never a patient; portal pages take their patient from `PortalSubject`), `HandledOffSiteTests` (the proxy's record switch is handled on the cloud app and records nothing), `PortalResultsIsolationTests` (a proxy's attempt added beside the patient's). `AGENTS.md` was updated to say what a portal session now sees.
+- Not touched: the sync conflict resolver, the dictation prompt and the note schema.
+
+Migrations: `OrderChanges`, `ChartLists`, `AuditSensitive`, `ClinicalCodeSearch`, `ReferenceTables`, `InboxItems`, `Appointments`, `AppointmentVersion`, `Messages`, `ProxyGrants`.
+
+Tests: 780 in the solution; 750 pass and 30 performance cases are skipped unless a benchmark results file is given (CI's benchmark job checks them). New: test cases TC-UC1-07 to 12, TC-UC4-07 to 13, TC-UC12-07, TC-UC6-07 to 11, and six each for UC 15 to UC 18, each with a keyboard-only browser test; security tests against the database for every new table (`OrderChangeSecurityTests`, `ChartListSecurityTests`, `SensitiveAuditSecurityTests`, `InboxSecurityTests`, `AppointmentSecurityTests`, `MessageSecurityTests`, `ProxyAccessSecurityTests`). The render benchmark has a row for every new page, on-site and off-site, and `--assert` passes at 50,000 patients.
+
+Each step was also read by a review agent before it was merged; what it found and what was left open is in the decision log. That does not replace the human review above.
+
+Open questions for Tahseen are listed at the end of the log's step entries; the main ones: DDInter's downloads have no management advice and no license text on the download page; whether a proxy may be someone who isn't a patient of the clinic; the limits chosen for messages and grants; whether administrators should still see audit values for orders, results and note text.
+
+Heads-up to use-case owners: Diego (UC 3/4: the chart gained sections and editing), Simar (UC 5/6: the portal gained appointments, messages, Access and a changed app bar), Luke (UC 11/12: the audit view hides sensitive values and message text), everyone (the app bar gained Schedule and Inbox).
 
 ## Decision log
 
@@ -508,6 +540,17 @@ One entry per decision: date, step, the decision, and why.
   - *Different from A3's UC 6:* a message is started from the Messages page, not from a result.
   - *Not in the desktop app:* no offline copy of messages; reading them offline would need its own sync and a decision on keeping message text on a laptop.
   - *Left open:* the chart lists the five latest conversations and the portal 50, with no page of older ones; a reply clears the inbox item of a patient message that arrived a moment before it; the notice email is queued just before the reply's transaction commits; nobody is notified when a patient with no care team writes; a patient's database context could read which staff account wrote a message (the pages show "Your care team"), a rule older than this step.
+- **2026-11-19, step 6, design and as built.**
+  - *The grant* (`ehr.proxy_grants`, PHI): patient, the proxy's portal email, scope (`record` or `record-and-messages`), whether sensitive items are included, who gave it and when, an expiry (always; at most a year), and when and by whom it was revoked. Addressed to an email, not an account, so the form can't be used to find out who has an account.
+  - *Acting.* The session's cookie names the grant; the app passes it to the database as `app.acting_grant`; `ehr.current_patient_id()` answers with the grant's patient only while the grant is this account's, not revoked and not expired, and otherwise with nobody. One record at a time: not the proxy's own beside it, and not another shared record.
+  - *Sensitive items and messages* are held back by row-level security unless the grant includes them; only the patient, as themselves, turns sensitive items on.
+  - *Who gives and removes:* the patient for their own record, or a clinician with the patient on their panel. A proxy never passes access on.
+  - *The rule that changed.* "A patient sees only their own row" is now "a portal session sees only the one patient it is looking at". `PortalSubjectTests`, `PortalResultsIsolationTests`, `HandledOffSiteTests` and AGENTS.md were changed to say so.
+  - *From the review:* the names for "records you can view" come from a function that answers only for the caller's address (the first build let a proxy read the whole patients row of every record shared with them); the 20-grant limit counts only grants in force that the patient gave; a proxy's reading doesn't mark messages read; plain ASCII addresses only, so a look-alike address can't match a grant; the cookie is cleared at sign-in.
+  - *Numbers that are mine:* expiry at most a year, offered as 30 days, 90 days, 6 months, 1 year; 20 grants in force per patient.
+  - *Different from A3's UC 6:* the record is chosen under Access, not on a picker straight after sign-in.
+  - *Left open:* a proxy must be a patient of the clinic (portal accounts belong to patients); the portal shows no diagnoses or medications, so the sensitive rule has nothing on a page yet; results and appointments have no sensitive mark; two scopes only; the reply notice goes to the patient, not the proxy; switching records is not an audit event; off-site a removed proxy can read until the cloud copy catches up; `PortalSubjectTests` allows `grantId` by name without a companion check. **Step 10 (sensitive notes) must apply `ehr.portal_sees_sensitive()` to notes if notes reach the portal.**
+  - *Not in the desktop app:* it has no portal.
 
 ## Log
 
@@ -555,3 +598,9 @@ One entry per session or step: date, step, what was done, measurements (p99, pag
   - *Measurements* (this Mac, 50,000 patients, before the review's fixes; p99 whole request / excluding the commit, ms). On-site: conversation 2.9 / 2.6, portal messages 2.0 / 1.8, portal conversation 2.1 / 1.8, chart (now with conversations) 7.1 / 6.7, inbox 3.2 / 2.9. Off-site chart 21.2 / 17.1 in this run, with one slow outlier (12 to 15 in earlier runs); under the 20 ms gate, which excludes the commit. `--assert` passed locally and in CI. No new script; first contentful paint not measured.
   - *Heads-up:* Simar (UC 6: the portal gained Messages, and its "what's left" rows for FR-18 are gone), Diego (UC 4: the chart gained a Messages section).
   - *Resume at step 6,* proxy access.
+- **2026-11-19, step 6. Proxy access (FR-19; new UC 18, proposed FR-44).** Migration `ProxyGrants`; `db/policies` 10, 30, 40 and the new `95-proxy-access.sql`. `UserContext.ActingGrant` and the interceptor's second setting; `PortalSubject`, its cookie and filter; `Ehr.Domain.Proxies.ProxyAccess`; reads in `PhiReader` and `Ehr.Data.Proxies.ProxiedRecords`; portal pages `/portal/access` and `/portal/acting`, the band on every portal page; clinical page `/patients/{id}/proxies` and the chart's link. Tests: 780, 750 passed, 30 skipped (performance cases); 9 in `ProxyAccessSecurityTests`, one more in `PortalResultsIsolationTests`, TC-UC18-01 to 06 (the last a keyboard-only browser test), TC-UC6-10 and 11. `docs/UC18.md`, `docs/UC6.md`, README, AGENTS.md. Looked at the clinic's page, the portal's Access page, and the home and results pages as a proxy, at 1280 and 360px, in light and dark, on the stack (synthetic patient SYN0000002 is on the test clinician's panel there, with the test patient account as their proxy). Two things the screens showed and I changed: the portal's fifth link was off the edge on a phone (the links now wrap), and a proxy's pages called the record "yours".
+  - *Review.* The review agent found no way to reach a record that wasn't shared, and failed the build on the points listed in the decision log, all fixed with tests.
+  - *Measurements* (this Mac, 50,000 patients, before the review's fixes; p99 whole request / excluding the commit, ms). On-site: the clinic's proxy page 2.7 / 2.5, portal Access 2.8 / 2.4, portal home as a proxy 3.0 / 2.7 (2.2 / 2.0 on one's own record), portal results as a proxy 3.3 / 2.8 (3.0 / 2.6). `--assert` passed locally and in CI. No new script; first contentful paint not measured.
+  - *Heads-up:* Simar (UC 5 and UC 6: sign-in clears the proxy cookie; the portal gained Access, a band, and a subject that isn't always the account's own), Luke (UC 11: audit events by a proxy have the proxy's account as actor and another patient as subject).
+  - *End of phase 1.* Tag `expansion-phase-1`, branch `expansion/phase-1`; the pull request draft is under "Phase merges". A good time for step 21's deployment, which waits for Tahseen.
+  - *Resume at step 7,* order → result → acknowledgment.

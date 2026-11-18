@@ -1,0 +1,160 @@
+@page "/portal/access"
+@using Ehr.Data.Proxies
+@using Ehr.Domain.Proxies
+@model Ehr.Web.Areas.Portal.Pages.AccessModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    ViewData["Title"] = "Access";
+    var inForce = Model.Grants.Where(g => g.InForce).ToList();
+    var ended = Model.Grants.Where(g => !g.InForce).Take(10).ToList();
+}
+<h1>Access</h1>
+@if (Model.Done is "given")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> they can see your record when they sign in with that email address. We sent them an email that doesn't say whose record it is.</p>
+}
+else if (Model.Done is "removed")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Removed:</span> they can no longer see your record.</p>
+}
+else if (Model.Done is "changed")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> what they can see has changed.</p>
+}
+
+<h2>Records you can view</h2>
+@if (Model.Acting)
+{
+    <p class="sc-muted">You're looking at one of them now. Go back to your own record to choose another.</p>
+}
+else if (Model.Records.Count == 0)
+{
+    <p class="sc-muted">Nobody has given you access to their record.</p>
+}
+else
+{
+    <ul class="sc-results">
+        @foreach (var record in Model.Records)
+        {
+            <li class="sc-result" data-record>
+                <h3>@record.PatientName</h3>
+                <p>@ProxyAccess.ScopeLabel(record.Scope). Until @record.ExpiresAt.UtcDateTime.ToString("MMM d, yyyy").</p>
+                <form method="post" asp-page="/Acting">
+                    <input type="hidden" name="grantId" value="@record.GrantId">
+                    <button type="submit" class="sc-btn sc-btn--primary">View this record</button>
+                </form>
+            </li>
+        }
+    </ul>
+}
+
+<h2>Who can view your record</h2>
+@if (Model.Acting)
+{
+    <p class="sc-muted">You're looking at someone else's record. Go back to your own record to see or change who can view yours.</p>
+}
+else
+{
+    @if (inForce.Count == 0)
+    {
+        <p class="sc-muted">Nobody else can view your record.</p>
+    }
+    else
+    {
+        <ul class="sc-results">
+            @foreach (var grant in inForce)
+            {
+                <li class="sc-result" data-grant>
+                    <h3>@grant.Email</h3>
+                    <p>
+                        @ProxyAccess.ScopeLabel(grant.Scope). Until @grant.ExpiresAt.UtcDateTime.ToString("MMM d, yyyy").
+                        @(grant.ByClinic ? "Recorded by your clinic." : "Given by you.")
+                    </p>
+                    <p>@(grant.IncludeSensitive ? "They can also see items your care team marked sensitive." : "They can't see items your care team marked sensitive.")</p>
+                    @if (OnPrem.IsReachable)
+                    {
+                        <div class="sc-actions">
+                            <form method="post" asp-page-handler="Sensitive">
+                                <input type="hidden" name="grantId" value="@grant.Id">
+                                <input type="hidden" name="allow" value="@(grant.IncludeSensitive ? "false" : "true")">
+                                <button type="submit" class="sc-btn">@(grant.IncludeSensitive ? "Hide sensitive items" : "Show sensitive items")</button>
+                            </form>
+                            <form method="post" asp-page-handler="Revoke">
+                                <input type="hidden" name="grantId" value="@grant.Id">
+                                <button type="submit" class="sc-btn sc-btn--danger">Remove access</button>
+                            </form>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    <h2>Give someone access</h2>
+    @if (!OnPrem.IsReachable)
+    {
+        <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> access can't be given or removed until the clinic's server is back.</p>
+    }
+    else
+    {
+        <p class="sc-muted">For a family member or carer who helps with your care. They need their own portal account, and they sign in with their own password, never yours. Access ends on the date you choose, and you can remove it at any time.</p>
+        <form method="post" class="sc-form">
+            @if (Model.Errors.Count > 0)
+            {
+                <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> fix what is marked below and try again.</p>
+            }
+            <div class="sc-field">
+                <label for="access-email">Their email address</label>
+                <input id="access-email" class="sc-field__input" type="email" name="Email" value="@Model.Email" maxlength="@ProxyGrantConfiguration.MaximumEmail" autocomplete="off" required
+                       aria-invalid="@(Model.Errors.ContainsKey("Email") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "access-email-error" : null)">
+                @if (Model.Errors.TryGetValue("Email", out var emailError))
+                {
+                    <p class="sc-field__error" id="access-email-error">@emailError</p>
+                }
+            </div>
+            <div class="sc-field">
+                <label for="access-scope">What they can see</label>
+                <select id="access-scope" class="sc-field__input" name="Scope">
+                    @foreach (var scope in ProxyScope.All)
+                    {
+                        <!option value="@scope" @(Model.Scope == scope ? "selected" : null)>@ProxyAccess.ScopeLabel(scope)</!option>
+                    }
+                </select>
+                @if (Model.Errors.TryGetValue("Scope", out var scopeError))
+                {
+                    <p class="sc-field__error">@scopeError</p>
+                }
+            </div>
+            <div class="sc-field">
+                <label class="sc-check" for="access-sensitive"><input type="checkbox" id="access-sensitive" name="IncludeSensitive" value="true" checked="@Model.IncludeSensitive"> Also show them items my care team marked sensitive</label>
+            </div>
+            <div class="sc-field">
+                <label for="access-days">For how long</label>
+                <select id="access-days" class="sc-field__input" name="Days">
+                    @foreach (var (days, label) in ProxyAccess.Durations)
+                    {
+                        <!option value="@days" @(Model.Days == days ? "selected" : null)>@label</!option>
+                    }
+                </select>
+                @if (Model.Errors.TryGetValue("Days", out var daysError))
+                {
+                    <p class="sc-field__error">@daysError</p>
+                }
+            </div>
+            <div class="sc-actions">
+                <button type="submit" class="sc-btn sc-btn--primary">Give access</button>
+            </div>
+        </form>
+    }
+
+    @if (ended.Count > 0)
+    {
+        <h2>Access that has ended</h2>
+        <ul class="sc-list">
+            @foreach (var grant in ended)
+            {
+                <li>@grant.Email <span class="sc-muted">· @(grant.RevokedAt is { } revoked ? $"removed {revoked.UtcDateTime:MMM d, yyyy}" : $"expired {grant.ExpiresAt.UtcDateTime:MMM d, yyyy}")</span></li>
+            }
+        </ul>
+    }
+}

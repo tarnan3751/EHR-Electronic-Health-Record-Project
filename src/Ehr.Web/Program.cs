@@ -38,6 +38,8 @@ builder.Services.AddScoped<Ehr.Domain.Orders.ClinicalOrders>();
 builder.Services.AddScoped<Ehr.Domain.Patients.ChartLists>();
 // Secure messages (Ehr.Domain.Messaging).
 builder.Services.AddScoped<Ehr.Domain.Messaging.SecureMessages>();
+builder.Services.AddScoped<Ehr.Domain.Proxies.ProxyAccess>();
+builder.Services.AddScoped<Ehr.Web.PortalSubject>();
 // Appointments (Ehr.Domain.Scheduling).
 builder.Services.AddScoped<Ehr.Domain.Scheduling.Appointments>();
 // The staff inbox (Ehr.Domain.Inbox).
@@ -127,6 +129,8 @@ builder.Services.AddRazorPages(options =>
         options.Filters.Add(new TypeFilterAttribute(typeof(DatabaseTransactionFilter)) { Arguments = [site == Site.OnPrem] });
         // After the transaction filter, so it runs inside the page's transaction, as the signed-in user.
         options.Filters.Add(new TypeFilterAttribute(typeof(InboxCountFilter)));
+        // The same, for whose record a portal page is about (FR-19).
+        options.Filters.Add(new TypeFilterAttribute(typeof(PortalSubjectFilter)));
         options.Filters.Add(new Ehr.Web.Areas.Clinical.Pages.Patients.Notes.NoteWriteExceptionFilter());
     })
     // Validation runs on the server only, so pages don't need the jQuery validation attributes.

@@ -32,7 +32,9 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 
 - Secure messages (FR-18): a patient writes to their care team from the portal, the message arrives in the inbox of each clinician who has them on their panel, and any of them replies from the conversation; clinicians can also start one from the chart. Every opening of a conversation is audited, the email about a reply says only that there is one, and the audit page never shows a message's text. See `docs/UC17.md` and `docs/UC6.md`.
 
-**Not built yet:** editing visits, the clinical workflows beyond finding patients, opening charts, orders and writing/signing notes, the portal's proxy access, and completing an order with its result. `docs/expansion/PLAN.md` is the plan for these and the rest.
+- Proxy access (FR-19): a patient gives a family member or carer access to their record in the portal, or the clinic records it, with a scope and always an end date. The proxy signs in with their own account and chooses whose record to view; the database checks on every query that the access is theirs and in force, holds back sensitive items and messages unless the access includes them, and records everything under the proxy's account and the patient. See `docs/UC18.md` and `docs/UC6.md`.
+
+**Not built yet:** editing visits, the clinical workflows beyond finding patients, opening charts, orders and writing/signing notes, and completing an order with its result. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
 ## Layout
 

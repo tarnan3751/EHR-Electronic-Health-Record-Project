@@ -1,0 +1,123 @@
+@page "/patients/{patientId:guid}/proxies"
+@using Ehr.Data.Proxies
+@using Ehr.Domain.Proxies
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Proxies.IndexModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Patient;
+    ViewData["Title"] = $"Proxy access: {patient.FamilyName}, {patient.GivenName}";
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+</div>
+<h1>Proxy access: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Done is "recorded")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> the proxy can open this record in the portal. Their email doesn't say whose record it is.</p>
+}
+else if (Model.Done is "removed")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Removed:</span> that proxy can no longer open this record.</p>
+}
+<p class="sc-muted">A proxy signs in to the portal with their own account and sees this patient's record until the access expires or is removed. Only the patient can let a proxy see items marked sensitive.</p>
+@if (Model.Grants.Count == 0)
+{
+    <p class="sc-muted">No proxies.</p>
+}
+else
+{
+    <div class="sc-table-wrap">
+        <table class="sc-table">
+            <thead>
+                <tr><th scope="col">Proxy</th><th scope="col">Can see</th><th scope="col">Sensitive items</th><th scope="col">Given</th><th scope="col">Status</th><th scope="col"><span class="sc-visually-hidden">Action</span></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var grant in Model.Grants)
+                {
+                    <tr data-grant="@(grant.InForce ? "in-force" : "ended")">
+                        <td>@grant.Email</td>
+                        <td>@ProxyAccess.ScopeLabel(grant.Scope)</td>
+                        <td>@(grant.IncludeSensitive ? "Shown (the patient allowed it)" : "Hidden")</td>
+                        <td>@(grant.ByClinic ? "By the clinic" : "By the patient"), @grant.GrantedAt.UtcDateTime.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            @if (grant.InForce)
+                            {
+                                <span class="sc-tag sc-tag--success">In force</span> <span>until @grant.ExpiresAt.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                            }
+                            else if (grant.RevokedAt is { } revoked)
+                            {
+                                <span class="sc-tag">Removed</span> <span>@revoked.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                            }
+                            else
+                            {
+                                <span class="sc-tag">Expired</span> <span>@grant.ExpiresAt.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                            }
+                        </td>
+                        <td>
+                            @if (grant.InForce && Model.OnPanel && OnPrem.IsReachable)
+                            {
+                                <form method="post" asp-page-handler="Revoke" asp-route-patientId="@patient.Id">
+                                    <input type="hidden" name="grantId" value="@grant.Id">
+                                    <button type="submit" class="sc-btn sc-btn--compact sc-btn--danger" aria-label="Remove access for @grant.Email">Remove</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+<h2>Record a proxy</h2>
+@if (!Model.OnPanel)
+{
+    <p class="sc-muted">Add this patient to your panel to record or remove a proxy.</p>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">A proxy can't be recorded or removed until the clinic's server is back.</p>
+}
+else
+{
+    <form method="post" class="sc-form" asp-route-patientId="@patient.Id">
+        @if (Model.Errors.Count > 0)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> fix the highlighted fields and save again.</p>
+        }
+        <div class="sc-field">
+            <label for="proxy-email">The proxy's portal email <span>(required)</span></label>
+            <input id="proxy-email" class="sc-field__input" type="email" name="Email" value="@Model.Email" maxlength="@ProxyGrantConfiguration.MaximumEmail" autocomplete="off" required autofocus
+                   aria-invalid="@(Model.Errors.ContainsKey("Email") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "proxy-email-error" : null)">
+            @if (Model.Errors.TryGetValue("Email", out var emailError))
+            {
+                <p class="sc-field__error" id="proxy-email-error">@emailError</p>
+            }
+        </div>
+        <div class="sc-field">
+            <label for="proxy-scope">Can see</label>
+            <select id="proxy-scope" class="sc-field__input" name="Scope">
+                @foreach (var scope in ProxyScope.All)
+                {
+                    <!option value="@scope" @(Model.Scope == scope ? "selected" : null)>@ProxyAccess.ScopeLabel(scope)</!option>
+                }
+            </select>
+        </div>
+        <div class="sc-field">
+            <label for="proxy-days">For</label>
+            <select id="proxy-days" class="sc-field__input" name="Days">
+                @foreach (var (days, label) in ProxyAccess.Durations)
+                {
+                    <!option value="@days" @(Model.Days == days ? "selected" : null)>@label</!option>
+                }
+            </select>
+        </div>
+        <div class="sc-actions">
+            <button type="submit" class="sc-btn sc-btn--primary">Record proxy</button>
+        </div>
+    </form>
+}

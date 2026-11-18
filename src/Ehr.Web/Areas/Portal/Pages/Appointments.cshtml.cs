@@ -9,7 +9,7 @@ namespace Ehr.Web.Areas.Portal.Pages;
 // there is no self-scheduling. Which patient comes from the session, never from the request (AGENTS.md), and row-level
 // security would return nothing else anyway. One recorded read of the patient, through the PHI reader; off-site it
 // comes from the cloud copy like the rest of the portal.
-public class AppointmentsModel(PhiReader phi) : PageModel
+public class AppointmentsModel(PortalSubject subject, PhiReader phi) : PageModel
 {
     public const int Past = 20;
 
@@ -18,7 +18,7 @@ public class AppointmentsModel(PhiReader phi) : PageModel
     public async Task OnGetAsync()
     {
         Response.Headers.CacheControl = "no-store";
-        var patientId = Guid.Parse(User.FindFirstValue(EhrClaims.PatientId)!);
+        var patientId = subject.PatientId;
         Appointments = await phi.AppointmentsAsync(patientId, Past, HttpContext.RequestAborted);
     }
 }

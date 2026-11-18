@@ -11,7 +11,7 @@
 }
 else if (Model.Results.Count == 0)
 {
-    <p>You have no test results yet. If you are waiting for one, contact your care team.</p>
+    <p>@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "There are no test results yet. If one is expected, contact the care team." : "You have no test results yet. If you are waiting for one, contact your care team.")</p>
 }
 else
 {
@@ -46,7 +46,7 @@ else
                         <dl class="record">
                             @if (ResultExplanation.Value(result) is { } value)
                             {
-                                <dt>Your result</dt><dd>@value</dd>
+                                <dt>@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "Result" : "Your result")</dt><dd>@value</dd>
                             }
                             @if (ResultExplanation.Range(result) is { } range)
                             {
@@ -67,4 +67,4 @@ else
         }
     </ul>
 }
-<p><a asp-page="/Index">Back to my record</a></p>
+<p><a asp-page="/Index">@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "Back to the record" : "Back to my record")</a></p>

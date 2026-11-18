@@ -116,10 +116,26 @@ static class Accounts
         return rows;
     }
 
+    // The proxy grant the statements that follow say they act under (FR-19), as the app's UserContextInterceptor sends
+    // it beside the user: set it, run the statements, and dispose what this returns.
+    public static IDisposable ActingUnder(Guid grant)
+    {
+        Acting.Value = grant;
+        return new StopActing();
+    }
+
+    static readonly AsyncLocal<Guid?> Acting = new();
+
+    sealed class StopActing : IDisposable
+    {
+        public void Dispose() => Acting.Value = null;
+    }
+
     static async Task SetUserAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid? userId)
     {
-        await using var set = Command(connection, transaction, "SELECT set_config('app.user_id', @user_id, true)",
-            ("user_id", userId?.ToString() ?? ""));
+        await using var set = Command(connection, transaction,
+            "SELECT set_config('app.user_id', @user_id, true), set_config('app.acting_grant', @grant, true)",
+            ("user_id", userId?.ToString() ?? ""), ("grant", Acting.Value?.ToString() ?? ""));
         await set.ExecuteNonQueryAsync(Cancel);
     }
 

@@ -27,6 +27,8 @@ public class SignInModel(PatientSignIn signIn) : PageModel
         switch (await signIn.SignInAsync(HttpContext, Input.Email!, Input.Password!, HttpContext.RequestAborted))
         {
             case PatientSignInOutcome.SignedIn:
+                // A new session starts on its own record, whatever the last one on this browser was looking at (FR-19).
+                ActingCookie.Clear(HttpContext);
                 return LocalRedirect(Links.Local(Url, ReturnUrl, AccountSchemes.PortalPath));
             case PatientSignInOutcome.EmailNotConfirmed:
                 ModelState.AddModelError("", "Confirm your email address first: open the link we sent you when you registered. If it expired, ask for a new one below.");
