@@ -95,7 +95,9 @@ CREATE OR REPLACE FUNCTION ehr.shown_audit_details(event_ids uuid[]) RETURNS TAB
 AS $$
     SELECT e.id, e.details
     FROM ehr.audit_events e
-    WHERE e.id = ANY(event_ids) AND (SELECT ehr.is_admin()) AND NOT e.sensitive AND e.table_name IS DISTINCT FROM 'chart_history'
+    WHERE e.id = ANY(event_ids) AND (SELECT ehr.is_admin()) AND NOT e.sensitive
+      -- Nor the text of what a patient and their care team wrote to each other.
+      AND e.table_name IS DISTINCT FROM 'chart_history' AND e.table_name IS DISTINCT FROM 'messages' AND e.table_name IS DISTINCT FROM 'message_threads'
       AND e.details IS NOT NULL
 $$;
 REVOKE ALL ON FUNCTION ehr.shown_audit_details(uuid[]) FROM PUBLIC;
@@ -163,6 +165,14 @@ CREATE OR REPLACE TRIGGER ai_field_proposals_audit
 
 CREATE OR REPLACE TRIGGER chart_history_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.chart_history
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER message_threads_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.message_threads
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER messages_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.messages
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
 CREATE OR REPLACE TRIGGER appointments_audit

@@ -120,6 +120,14 @@ GRANT SELECT, INSERT ON ehr.orders TO ehr_app;
 GRANT UPDATE (status, discontinue_reason, replaced_by_order_id) ON ehr.orders TO ehr_app;
 GRANT SELECT ON ehr.orders TO ehr_read;
 
+-- Secure messages (FR-18). PHI: row-level security and the write-audit trigger follow. A patient and their care
+-- team start threads and send messages: INSERT. Nothing edits a thread or a message: the one UPDATE is recording when
+-- the other side first read a message, on that column alone, and a trigger holds it to that (90-messages.sql). Never
+-- DELETE.
+GRANT SELECT, INSERT ON ehr.message_threads, ehr.messages TO ehr_app;
+GRANT UPDATE (read_at) ON ehr.messages TO ehr_app;
+GRANT SELECT ON ehr.message_threads, ehr.messages TO ehr_read;
+
 -- Appointments (FR-17). PHI: row-level security and the write-audit trigger follow. Clinicians book and change them:
 -- INSERT, and UPDATE of the columns a reschedule, a cancellation, a check-in or a no-show writes, which a trigger
 -- holds to those moves (80-appointments.sql). Never DELETE. Checking a patient in creates their visit, so ehr_app

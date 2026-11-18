@@ -17,7 +17,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 2a | Reference data and a coherent synthetic seed | done | expansion/step-02a-reference-data | expansion-step-02a | [44297723824](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44297723824) | LOINC loaded from Tahseen's download. CVX not loaded (optional). Open questions for Tahseen in the log |
 | 3 | Clinician inbox | done | expansion/step-03-inbox | expansion-step-03 | [44304586912](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44304586912) | New UC 15 (proposed). Admins have an inbox too. Touches `db/policies` |
 | 4 | Appointments | done | expansion/step-04-appointments | expansion-step-04 | [44372811264](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44372811264) | New UC 16 (proposed); UC 6 (Simar), UC 4 (Diego). Touches `db/policies` and authorization |
-| 5 | Secure messaging | not started | | | | |
+| 5 | Secure messaging | in progress | expansion/step-05-messaging | | | See the decision log for the design and where to resume |
 | 6 | Proxy access | not started | | | | |
 | 7 | Order → result → acknowledgment | not started | | | | |
 | 8 | Ordering safety checks | not started | | | | |
@@ -488,6 +488,17 @@ One entry per decision: date, step, the decision, and why.
   - *Desktop.* Not in the offline copy for now: the offline chart is for reading a record and drafting, not for the day's schedule. Open for Sara.
 - **2026-11-19, step 4, as built (beyond the design above).** Every change to an appointment names the version it began from (a `version` column the database counts), so a stale page can't undo a colleague's reschedule. The guard refuses any isolation level but READ COMMITTED, as the order trigger does. Only a disabled clinician account can't be booked with; one locked for minutes can. The appointment page gates before it reads. Checking in is the first thing at runtime to write a visit: `ehr_app` gained INSERT on `encounters` for panel patients.
 - **2026-11-19, step 4, open for Tahseen.** (1) A colleague's day hides a visit's reason unless the patient is on the viewer's panel; the plan said only "a day view per clinician", and the stricter reading was chosen. (2) Only clinicians schedule: there is no front-desk role. (3) Times are UTC. (4) A visit that check-in starts is never finished by the app. (5) Appointments aren't in the desktop app's offline copy.
+- **2026-11-19, step 5, design (decided before building).**
+  - *Tables* (PHI): `ehr.message_threads` (patient, subject, when started) and `ehr.messages` (thread, patient, who sent it: the patient or a staff member, the text, when sent, when the other side first read it). Never edited or deleted.
+  - *Who.* A patient writes to their care team: the clinicians with them on their active panel. Any of those clinicians reads and replies, and can start a thread. Clinicians read every thread in the database, as they read charts; the pages ask for the panel or emergency access, and only a panel clinician writes. A patient reads and writes only their own.
+  - *Inbox.* A patient's message puts one item in each care-team clinician's inbox, written by a `SECURITY DEFINER` trigger (no runtime role may insert inbox items). When any of them replies, the thread's open items are marked done for all of them. The item's summary says only that a patient sent a message.
+  - *Reads are audited:* opening a thread is a recorded read of that thread, for staff and for the patient, on-site and through the cloud queue.
+  - *Email.* A staff message sends the patient "You have a new message" with a link to the portal: no subject, no text, no names.
+  - *Admins.* The audit page never shows a message's text or a thread's subject: `ehr.shown_audit_details` leaves both tables out, as it does sensitive items.
+  - *Pages.* Portal: `/portal/messages`, `/portal/messages/new`, `/portal/messages/{thread}`. Clinical: the chart's Messages section, `/patients/{id}/messages/new`, `/patients/{id}/messages/{thread}`; the inbox item links to the thread.
+  - *Off-site.* Threads are read from the cloud copy; sending is forwarded. With the clinic's server unreachable the forms are replaced by "Messages can't be sent until the clinic's server is back.", the wording UC 6 names.
+  - *Use cases.* The patient's side extends UC 6 (TC-UC6-08 on). The clinician's side is a new use case, UC 17 (six test cases).
+  - *Not built:* attachments, messages between staff, and a count of unread messages in the portal's app bar.
 
 ## Log
 
