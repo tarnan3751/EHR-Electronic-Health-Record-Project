@@ -18,7 +18,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 3 | Clinician inbox | done | expansion/step-03-inbox | expansion-step-03 | [44304586912](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44304586912) | New UC 15 (proposed). Admins have an inbox too. Touches `db/policies` |
 | 4 | Appointments | done | expansion/step-04-appointments | expansion-step-04 | [44372811264](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44372811264) | New UC 16 (proposed); UC 6 (Simar), UC 4 (Diego). Touches `db/policies` and authorization |
 | 5 | Secure messaging | done | expansion/step-05-messaging | expansion-step-05 | [44382799606](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44382799606) | New UC 17 (proposed); UC 6 (Simar), UC 4 (Diego). Touches `db/policies` and an authorization test |
-| 6 | Proxy access | not started | | | | |
+| 6 | Proxy access | in progress | expansion/step-06-proxy-access | | | See the decision log |
 | 7 | Order → result → acknowledgment | not started | | | | |
 | 8 | Ordering safety checks | not started | | | | |
 | 9 | Vital signs and trends | not started | | | | |
@@ -398,6 +398,7 @@ New FR IDs (FR-37 onward) and use cases (UC 15 onward), as each step defines the
 | --- | --- | --- |
 | FR-37 | 1 | The system shall let clinicians discontinue a signed order with a reason, and change one by signing a replacement, without ever editing or deleting the signed order; it shall keep who, when and why. (Extends UC 1; test cases TC-UC1-07 to TC-UC1-12.) |
 | FR-38 | 2 | The system shall let clinicians add and change a patient's allergies, medications and diagnoses, each picked from a standard code list, never deleting an entry and keeping the history of every change. (Extends UC 4; test cases TC-UC4-07 to TC-UC4-12.) |
+| UC 18, FR-44 | 6 | Give someone proxy access to a record. The system shall let a patient, or the clinic for them, give another portal account access to the patient's record with a scope and an expiry, and let either remove it; shall hold back sensitive items unless the patient allows them; and shall record everything a proxy does under both the proxy and the patient. (FR-19 covers a proxy choosing whose record to view; test cases TC-UC18-01 to TC-UC18-06, TC-UC6-10 and TC-UC6-11.) |
 | UC 17, FR-43 | 5 | Answer a patient's message. The system shall deliver a patient's message to the inbox of each clinician on their care team, let any of them reply, record every reading of a conversation, and never put a message's content in an email or in the administrators' audit view. (FR-18 covers sending and receiving; test cases TC-UC17-01 to TC-UC17-06, TC-UC6-08 and TC-UC6-09.) |
 | UC 16, FR-42 | 4 | Schedule an appointment. The system shall let clinicians book, reschedule, cancel (with a reason) and check in appointments, show any clinician's day, and never double-book a clinician. (FR-17 covers the portal's list; test cases TC-UC16-01 to TC-UC16-06, and TC-UC6-07.) |
 | UC 15, FR-41 | 3 | Work through the inbox. The system shall give each staff member one list of the items that need their action, show how many on every clinical page, link each item to its patient, and record when each is done. (Test cases TC-UC15-01 to TC-UC15-06.) |

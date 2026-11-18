@@ -28,6 +28,7 @@ Everything needed to brand SwiftChart: the guide below, the tokens, fonts, logos
 Components added to the shared stylesheet since the kit, in its style:
 
 - `sc-btn--compact` as a link above a chart list ("Add allergy"), and the "Change" link after an entry (`sc-list__actions`): entries are changed or given another status, never deleted, so no list has a delete action.
+- `sc-acting`: the band under the portal's app bar while someone is looking at another person's record as their proxy. An info notice at full width that names whose record it is, with the button back to their own beside it. It is on every page, so nobody has to remember whose record they opened.
 - `sc-thread` and `sc-message`: a conversation, oldest message first, each in its own bordered block with who and when above the text. The reader's own messages are set in from the left with an accent bar (`sc-message--mine`); every message also says who wrote it, so the bar is never the only sign. To a patient, staff are "Your care team" and they are "You".
 - `sc-appbar__count`: a count beside an app bar link, as on "Inbox": mono, navy on mint, shown only when it isn't zero, and read out as "Inbox, 2 to do".
 - `sc-list__actions`: a record line's own actions, as plain links after the line's text, such as an active order's "Change" and "Discontinue…". Links, not buttons, because each opens a page; a destructive one ends in "…" and its page's button is the danger button, which names the action ("Discontinue order").
