@@ -633,7 +633,8 @@ CREATE POLICY clinical_notes_own_insert ON ehr.clinical_notes FOR INSERT
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;
 -- the signing trigger also locks, checks for a duplicate and sets the time (60-orders.sql). The one update is
 -- discontinuing an order, by the same rule: a clinician, for a patient on their active panel, recorded as themselves
--- (the trigger sets that before this check). Nothing deletes an order (10-grants.sql), so there is no policy for it.
+-- (the trigger sets that before this check). The other is the database's own: an order becomes completed when a
+-- result is filed for it, as the clinician filing it, who is on the patient's panel too (75-results.sql). Nothing deletes an order (10-grants.sql), so there is no policy for it.
 ALTER TABLE ehr.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.orders FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS orders_clinician_select ON ehr.orders;
@@ -662,7 +663,8 @@ CREATE POLICY orders_panel_update ON ehr.orders FOR UPDATE
     )
     WITH CHECK (
         (SELECT ehr.is_clinician())
-        AND discontinuer_id = (SELECT ehr.current_user_id())
+        -- Discontinued, as themselves; or completed by its results (step 7), which names nobody as discontinuing it.
+        AND (discontinuer_id = (SELECT ehr.current_user_id()) OR (status = 'completed' AND discontinuer_id IS NULL))
         AND EXISTS (
             SELECT 1 FROM ehr.patient_assignments a
             WHERE a.clinician_id = (SELECT ehr.current_user_id())

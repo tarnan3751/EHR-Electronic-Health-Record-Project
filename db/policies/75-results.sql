@@ -8,7 +8,8 @@
 --   2. It is for one of the tests the order's catalog item reports (ehr.order_result_codes), and its name, unit and
 --      reference range are the database's own for that test (ehr.observation_codes), whatever the client sent: the
 --      range is what marks a result abnormal, so it is never the client's to choose.
---   3. It is a final, numeric result, collected no later than now, and released now: the portal shows it at once.
+--   3. It is a final, numeric result, collected no later than now (it may be before the order was signed: an order
+--      is sometimes entered after the sample was drawn), and released now: the portal shows it at once.
 CREATE OR REPLACE FUNCTION ehr.file_result() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -42,8 +43,8 @@ BEGIN
         RAISE EXCEPTION 'A result has a value' USING ERRCODE = '23514';
     END IF;
 
-    IF NEW.effective_at IS NULL OR NEW.effective_at > now() + interval '5 minutes' OR NEW.effective_at < ordered.signed_at - interval '5 minutes' THEN
-        RAISE EXCEPTION 'A sample is collected after its order is signed, and not in the future' USING ERRCODE = '23514';
+    IF NEW.effective_at IS NULL OR NEW.effective_at > now() + interval '5 minutes' THEN
+        RAISE EXCEPTION 'A sample is not collected in the future' USING ERRCODE = '23514';
     END IF;
 
     NEW.display := left(test.display, 200);
