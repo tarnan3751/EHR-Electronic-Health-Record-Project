@@ -14,7 +14,7 @@ namespace Ehr.Web.Areas.Portal.Pages.Messages;
 // read of the thread, and marks the care team's messages in it as read. Off-site it is read from the cloud copy, where
 // nothing can be marked; a reply is forwarded to the clinic's server.
 [ShownIfNotSaved(nameof(Body))]
-public class ThreadModel(PhiReader phi, SecureMessages messages, OnPremStatus onPrem, Site site) : PageModel
+public class ThreadModel(PhiReader phi, SecureMessages messages, SiteKind site) : PageModel
 {
     [BindProperty]
     public string? Body { get; set; }
@@ -37,7 +37,7 @@ public class ThreadModel(PhiReader phi, SecureMessages messages, OnPremStatus on
         }
 
         // Only where there is a database to write to: the cloud app reads a copy.
-        if (site == Site.OnPrem && Thread.Unread.Count > 0)
+        if (site.TakesWrites && Thread.Unread.Count > 0)
         {
             await messages.MarkReadAsync(Thread.Unread, HttpContext.RequestAborted);
         }
@@ -71,7 +71,6 @@ public class ThreadModel(PhiReader phi, SecureMessages messages, OnPremStatus on
     async Task<IActionResult?> LoadAsync(Guid threadId)
     {
         Response.Headers.CacheControl = "no-store";
-        _ = onPrem;
         if (await phi.ThreadAsync(threadId, PatientId, asPatient: true, HttpContext.RequestAborted) is not { } thread)
         {
             return NotFound();

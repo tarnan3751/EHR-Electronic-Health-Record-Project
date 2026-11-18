@@ -16,7 +16,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Messages;
 // does that), and tells the patient by email that there is a message, with no detail.
 [ShownIfNotSaved(nameof(Body))]
 public class ThreadModel(
-    PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, SecureMessages messages, IOptions<SiteAddresses> addresses, Site site)
+    PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, SecureMessages messages, IOptions<SiteAddresses> addresses, SiteKind site)
     : MessagePage(assignments, breakGlass)
 {
     [BindProperty]
@@ -37,7 +37,7 @@ public class ThreadModel(
         }
 
         // Only where there is a database to write to, and only by the care team (the database refuses anyone else).
-        if (site == Site.OnPrem && OnPanel && Thread.Unread.Count > 0)
+        if (site.TakesWrites && OnPanel && Thread.Unread.Count > 0)
         {
             await messages.MarkReadAsync(Thread.Unread, HttpContext.RequestAborted);
         }
