@@ -1129,6 +1129,52 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcknowledgedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("AcknowledgedBy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("acknowledged_by")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_result_acknowledgments");
+
+                    b.HasIndex("AcknowledgedBy")
+                        .HasDatabaseName("ix_result_acknowledgments_acknowledged_by");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_result_acknowledgments_order_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_result_acknowledgments_patient_id");
+
+                    b.HasIndex("OrderId", "PatientId")
+                        .HasDatabaseName("ix_result_acknowledgments_order_id_patient_id");
+
+                    b.ToTable("result_acknowledgments", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1873,6 +1919,11 @@ namespace Ehr.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_observations");
+
+                    b.HasIndex("OrderId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_observations_order_id_code")
+                        .HasFilter("order_id IS NOT NULL AND code IS NOT NULL");
 
                     b.HasIndex("OrderId", "PatientId")
                         .HasDatabaseName("ix_observations_order_id_patient_id");
@@ -2671,6 +2722,24 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_orders_order_catalog_items_type_catalog_code");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("AcknowledgedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_acknowledgments_staff_users_acknowledged_by");
+
+                    b.HasOne("Ehr.Data.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_acknowledgments_orders_order_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>

@@ -49,6 +49,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Chart lists: clinicians add and change entries, and nothing deletes one. Their history is the database's to write.
         [("ehr_app", "allergy_intolerances")] = ["SELECT", "INSERT", "UPDATE"],
         // Messages: sent by insert, never edited; marking one read is a column grant.
+        [("ehr_app", "result_acknowledgments")] = ["SELECT", "INSERT"],
+        [("ehr_read", "result_acknowledgments")] = ["SELECT"],
         [("ehr_app", "proxy_grants")] = ["SELECT", "INSERT"],
         [("ehr_read", "proxy_grants")] = ["SELECT"],
         [("ehr_app", "message_threads")] = ["SELECT", "INSERT"],
@@ -103,7 +105,7 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // A visit is created by checking a patient in for an appointment; nothing updates or deletes one.
         [("ehr_app", "encounters")] = ["SELECT", "INSERT"],
         [("ehr_read", "encounters")] = ["SELECT"],
-        [("ehr_app", "observations")] = ["SELECT"],
+        [("ehr_app", "observations")] = ["SELECT", "INSERT"],
         [("ehr_read", "observations")] = ["SELECT"],
         [("ehr_app", "patient_enrollments")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_read", "patient_enrollments")] = ["SELECT"],

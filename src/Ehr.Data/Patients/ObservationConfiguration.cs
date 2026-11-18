@@ -30,5 +30,7 @@ public sealed class ObservationConfiguration : IEntityTypeConfiguration<Observat
         observation.HasOne<Order>().WithMany()
             .HasForeignKey(o => new { o.OrderId, o.PatientId }).HasPrincipalKey(o => new { o.Id, o.PatientId })
             .OnDelete(DeleteBehavior.Restrict);
+        // One result for each test of an order: filing it again is refused, not doubled.
+        observation.HasIndex(o => new { o.OrderId, o.Code }).IsUnique().HasFilter("order_id IS NOT NULL AND code IS NOT NULL");
     }
 }

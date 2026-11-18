@@ -49,6 +49,7 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["inbox_items"] = Protection.Phi,
         ["appointments"] = Protection.Phi,
         ["proxy_grants"] = Protection.Phi,
+        ["result_acknowledgments"] = Protection.Phi,
         ["message_threads"] = Protection.Phi,
         ["messages"] = Protection.Phi,
         ["clinical_codes"] = Protection.Internal,

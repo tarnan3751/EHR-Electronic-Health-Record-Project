@@ -387,12 +387,42 @@ CREATE POLICY encounters_own_select ON ehr.encounters FOR SELECT
 
 -- Test results (PHI). Clinicians read every patient's. A patient reads only their own, and only once the result is
 -- released and finished (Observation.IssuedAt, ObservationStatus.Released): a result still being worked on, cancelled
--- or entered in error never reaches the portal, even through a bug in the app. No write policies, as for the chart.
+-- or entered in error never reaches the portal, even through a bug in the app. A clinician files results for a patient
+-- on their active panel; nothing updates or deletes one (10-grants.sql).
 ALTER TABLE ehr.observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS observations_clinician_select ON ehr.observations;
 CREATE POLICY observations_clinician_select ON ehr.observations FOR SELECT USING ((SELECT ehr.is_clinician()));
+
+DROP POLICY IF EXISTS observations_panel_insert ON ehr.observations;
+CREATE POLICY observations_panel_insert ON ehr.observations FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+-- Acknowledgments of results (PHI). Clinicians read them, as they read the orders; a clinician with the patient on
+-- their active panel makes one, as themselves. Patients, admins and nobody see none. Never updated or deleted.
+ALTER TABLE ehr.result_acknowledgments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.result_acknowledgments FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS result_acknowledgments_clinician_select ON ehr.result_acknowledgments;
+CREATE POLICY result_acknowledgments_clinician_select ON ehr.result_acknowledgments FOR SELECT USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS result_acknowledgments_panel_insert ON ehr.result_acknowledgments;
+CREATE POLICY result_acknowledgments_panel_insert ON ehr.result_acknowledgments FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND acknowledged_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = result_acknowledgments.patient_id AND a.ended_at IS NULL
+        )
+    );
 
 DROP POLICY IF EXISTS observations_own_released_select ON ehr.observations;
 CREATE POLICY observations_own_released_select ON ehr.observations FOR SELECT
