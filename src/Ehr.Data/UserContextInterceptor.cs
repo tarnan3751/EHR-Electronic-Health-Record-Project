@@ -11,7 +11,8 @@ public sealed class UserContextInterceptor(UserContext user) : DbTransactionInte
     // No user is sent as an empty string, not as no setting. Once a connection has used app.user_id,
     // PostgreSQL reads it as '' rather than NULL, so policies have to treat '' as nobody either way:
     // NULLIF(current_setting('app.user_id', true), '')::uuid.
-    const string Sql = "SELECT set_config('app.user_id', @user_id, true)";
+    // app.acting_grant is the proxy grant a portal session acts under, or '' (UserContext.ActingGrant).
+    const string Sql = "SELECT set_config('app.user_id', @user_id, true), set_config('app.acting_grant', @acting_grant, true)";
 
     public override DbTransaction TransactionStarted(
         DbConnection connection, TransactionEndEventData eventData, DbTransaction result)
@@ -39,6 +40,10 @@ public sealed class UserContextInterceptor(UserContext user) : DbTransactionInte
         parameter.ParameterName = "user_id";
         parameter.Value = user.UserId?.ToString() ?? "";
         command.Parameters.Add(parameter);
+        var grant = command.CreateParameter();
+        grant.ParameterName = "acting_grant";
+        grant.Value = user.ActingGrant?.ToString() ?? "";
+        command.Parameters.Add(grant);
         return command;
     }
 }

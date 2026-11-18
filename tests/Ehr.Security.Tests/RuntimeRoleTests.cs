@@ -49,6 +49,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Chart lists: clinicians add and change entries, and nothing deletes one. Their history is the database's to write.
         [("ehr_app", "allergy_intolerances")] = ["SELECT", "INSERT", "UPDATE"],
         // Messages: sent by insert, never edited; marking one read is a column grant.
+        [("ehr_app", "proxy_grants")] = ["SELECT", "INSERT"],
+        [("ehr_read", "proxy_grants")] = ["SELECT"],
         [("ehr_app", "message_threads")] = ["SELECT", "INSERT"],
         [("ehr_read", "message_threads")] = ["SELECT"],
         [("ehr_app", "messages")] = ["SELECT", "INSERT"],
@@ -263,6 +265,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_app", "orders", "UPDATE")] = ["discontinue_reason", "replaced_by_order_id", "status"],
         [("ehr_app", "appointments", "UPDATE")] = ["cancel_reason", "encounter_id", "minutes", "reason", "starts_at", "status"],
         [("ehr_app", "messages", "UPDATE")] = ["read_at"],
+        // FR-19: revoking a proxy grant, and the patient allowing sensitive items.
+        [("ehr_app", "proxy_grants", "UPDATE")] = ["include_sensitive", "revoked_at", "revoked_by"],
         // Marking an inbox item done.
         [("ehr_app", "inbox_items", "UPDATE")] = ["done_at"],
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.

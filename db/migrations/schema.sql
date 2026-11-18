@@ -1099,3 +1099,31 @@ VALUES ('20261118185826_Messages', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.proxy_grants (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    proxy_email character varying(256) NOT NULL,
+    scope character varying(30) NOT NULL,
+    include_sensitive boolean NOT NULL,
+    granted_by_kind character varying(20) NOT NULL DEFAULT 'patient',
+    granted_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    granted_at timestamp with time zone NOT NULL DEFAULT (now()),
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    revoked_by uuid,
+    CONSTRAINT pk_proxy_grants PRIMARY KEY (id),
+    CONSTRAINT ck_proxy_grants_granted_by_kind CHECK (granted_by_kind IN ('patient', 'staff')),
+    CONSTRAINT ck_proxy_grants_scope CHECK (scope IN ('record', 'record-and-messages')),
+    CONSTRAINT fk_proxy_grants_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_proxy_grants_patient_id_proxy_email ON ehr.proxy_grants (patient_id, proxy_email) WHERE revoked_at IS NULL;
+
+CREATE INDEX ix_proxy_grants_proxy_email ON ehr.proxy_grants (proxy_email);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261118195958_ProxyGrants', '10.0.13');
+
+COMMIT;
+

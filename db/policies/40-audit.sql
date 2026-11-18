@@ -167,6 +167,10 @@ CREATE OR REPLACE TRIGGER chart_history_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.chart_history
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
+CREATE OR REPLACE TRIGGER proxy_grants_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.proxy_grants
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
 CREATE OR REPLACE TRIGGER message_threads_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.message_threads
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
