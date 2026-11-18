@@ -22,12 +22,15 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   2. With the first link, post passwords that don't match; then post matching ones; then post the same link again.
 //   3. Post the second link after its end date.
 //   4. Post the link sent to the second patient's address.
+//   4b. A patient account exists that named a third address and never confirmed it. Give that address access, and
+//      accept the invitation with a password of the owner's choosing.
 //   5. As the new account, viewing the record, post the "Give someone access" form.
 //   6. As the patient, remove the new account's access. As the new account, open "Results".
 // Expected result: Step 1: "This invitation link isn't valid any more." and no form. Step 2: "The passwords don't
 //   match." with the form still there and no account; then "Created:"; then "isn't valid any more", and still one
 //   account. Step 3: "isn't valid any more" and no account. Step 4: "You already have a portal account with this email
-//   address." and that patient's account is unchanged. Step 5: nothing is saved. Step 6: the new account lands on
+//   address." and that patient's account is unchanged. Step 4b: "Created:"; the address signs in with the owner's
+//   password and not with the unconfirmed account's, which no longer has the address. Step 5: nothing is saved. Step 6: the new account lands on
 //   "Whose record?" with "Access ended:" and "Nobody is sharing a record with you at the moment."
 // Creator: Tahseen Arnan
 public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
@@ -83,6 +86,21 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("You already have a portal account with this email address.", Words(await AcceptAsync(apps, InvitationPath(apps, existing.Email), "Synthetic Impostor")));
         Assert.Equal([""], await Accounts(existing.Email));
         Assert.Equal("/portal/choose", (await SignInAsync(apps, existing.Email)).Path);
+
+        // Someone registered a patient account with an address that isn't theirs and never confirmed it, hoping its
+        // owner would confirm it for them. The owner is then given access and follows the invitation: the account
+        // created is the owner's, with the owner's password, and the unconfirmed one no longer has the address.
+        var squatter = await apps.InsertPatientAsync("Synthetic", "Squatter");
+        var (claimed, squattersPassword) = await apps.CreatePatientAccountAsync(squatter, confirmed: false);
+        await GiveAsync(patient, claimed);
+        const string ownersPassword = "the-invitees-own-password";
+        Assert.Contains("Created:", await AcceptAsync(apps, InvitationPath(apps, claimed), "Synthetic Owner", ownersPassword));
+        Assert.Equal(["Synthetic Owner"], await Accounts(claimed));
+        Assert.Equal("/portal/choose", (await SignInAsync(apps, claimed, ownersPassword)).Path);
+        var squatting = await SignInAsync(apps, claimed, squattersPassword);
+        Assert.Equal("/portal/sign-in", squatting.Path);
+        Assert.Contains("Wrong email or password.", squatting.Page);
+        Assert.Equal(["false"], await QueryAsync(apps, "SELECT (email_confirmed OR email NOT LIKE 'unconfirmed-%@unconfirmed.invalid')::text FROM ehr.patient_users WHERE patient_id = @patient", squatter));
 
         var session = await SignInAsync(apps, first);
         var grants = await GrantsAsync(apps, patient.Patient);

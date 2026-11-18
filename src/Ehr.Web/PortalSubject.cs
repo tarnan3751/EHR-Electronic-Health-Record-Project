@@ -59,9 +59,11 @@ public static class ActingCookie
 }
 
 // Works out the portal's subject once for each portal page, inside the page's transaction. When the session names a
-// grant that is no longer the account's or no longer in force, it forgets the grant and sends the browser to the
-// account's own record, which says so, before the handler reads anything. The page that switches records, and the
-// account pages, run without the check so there is always a way back.
+// grant that is no longer the account's or no longer in force, it forgets the grant and sends the browser on, before
+// the handler reads anything: to the account's own record, which says so, or, for an account with no record of its
+// own, to the page that asks whose record. A session with no record to look at is sent to that page from everywhere
+// but Access. The account pages, the page that switches records and the page that asks run without these checks, so
+// there is always a way back; none of them reads a record.
 public sealed class PortalSubjectFilter(PhiReader phi, PortalSubject subject, UserContext user) : IAsyncPageFilter
 {
     // Where the layout finds the subject.

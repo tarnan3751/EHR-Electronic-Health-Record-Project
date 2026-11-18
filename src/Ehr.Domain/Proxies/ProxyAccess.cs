@@ -28,7 +28,10 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
         {
             errors["Email"] = "Enter the person's email address.";
         }
-        else if (address.Length > ProxyGrantConfiguration.MaximumEmail || address.Count(c => c == '@') != 1 || address.Any(c => c is <= ' ' or > '~')
+        // Only the characters a portal account's address may have (ASP.NET Core Identity's defaults for a user name):
+        // an address with any other could be given access and then never accept it.
+        else if (address.Length > ProxyGrantConfiguration.MaximumEmail || address.Count(c => c == '@') != 1
+            || address.Any(c => !(char.IsAsciiLetterOrDigit(c) || "-._@+".Contains(c)))
             || address.StartsWith('@') || address.EndsWith('@'))
         {
             errors["Email"] = "Enter an email address, like name@example.com.";
@@ -126,7 +129,7 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
         email.SendAsync(proxyEmail.Trim(), "You have been given access to a record",
             "Someone gave you access to their record in the patient portal, or their clinic recorded it. For their privacy this email doesn't say who. "
                 + $"If you already have a portal account with this email address, sign in at {signInLink} to see it. "
-                + "If you don't, use the button to create one: the link works once and expires in 7 days.",
+                + $"If you don't, create one at {invitationLink} (the link works once and expires in 7 days).",
             new EmailAction("Create your portal account", invitationLink), cancellationToken);
 
     // A stand-in for the row, with its key: only revoked_at is sent, and the database sets its value and who.

@@ -84,7 +84,7 @@ public sealed class AuditLog(EhrDbContext db)
         foreach (var account in await db.PatientUsers.AsNoTracking()
                      .Where(u => actorIds.Contains(u.Id)).Select(u => new { u.Id, u.Email }).ToListAsync(cancellationToken))
         {
-            actors[account.Id] = $"Patient account {account.Email}";
+            actors[account.Id] = $"Portal account {account.Email}";
         }
 
         return new AuditPage(page, actors, more);
