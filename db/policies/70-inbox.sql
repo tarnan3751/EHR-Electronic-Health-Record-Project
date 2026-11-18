@@ -15,6 +15,12 @@ BEGIN
         RAISE EXCEPTION 'An inbox item is marked done once' USING ERRCODE = '23514';
     END IF;
 
+    -- An order's results are done by acknowledging them, which records who and when (75-results.sql): that marks
+    -- the item done as the tables' owner. The apps, by the role they connect as, never tick one off directly.
+    IF OLD.kind = 'result' AND OLD.source_table = 'orders' AND current_user IN ('ehr_app', 'ehr_read') THEN
+        RAISE EXCEPTION 'Results are acknowledged on their own page, not marked done' USING ERRCODE = '23514';
+    END IF;
+
     IF (to_jsonb(NEW) - 'done_at') IS DISTINCT FROM (to_jsonb(OLD) - 'done_at') THEN
         RAISE EXCEPTION 'An inbox item is never edited' USING ERRCODE = '42501';
     END IF;

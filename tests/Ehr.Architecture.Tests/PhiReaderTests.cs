@@ -31,6 +31,7 @@ public class PhiReaderTests
         ["InboxItems"] = typeof(Ehr.Data.Inbox.InboxItem),
         ["Appointments"] = typeof(Ehr.Data.Scheduling.Appointment),
         ["ProxyGrants"] = typeof(Ehr.Data.Proxies.ProxyGrant),
+        ["ResultAcknowledgments"] = typeof(Ehr.Data.Orders.ResultAcknowledgment),
         ["MessageThreads"] = typeof(Ehr.Data.Messaging.MessageThread),
         ["Messages"] = typeof(Ehr.Data.Messaging.Message),
         ["Encounters"] = typeof(Encounter),

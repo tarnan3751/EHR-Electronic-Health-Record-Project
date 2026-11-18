@@ -82,9 +82,16 @@ GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
 GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
     ehr.drug_class_cross_reactions, ehr.drug_interactions TO ehr_app, ehr_read;
 
--- Test results (observations). PHI, like the chart: row-level security and the write-audit trigger follow. Read only:
--- results will come from the lab interface, and no page changes them. The portal reads them on either server.
-GRANT SELECT ON ehr.observations TO ehr_app, ehr_read;
+-- Test results (observations). PHI, like the chart: row-level security and the write-audit trigger follow. A clinician
+-- files the results of a lab order: INSERT, which a trigger holds to a final result of one of the order's tests, with
+-- the name, unit and reference range the database knows (75-results.sql). No UPDATE or DELETE: a filed result isn't
+-- changed. The portal reads them on either server.
+GRANT SELECT, INSERT ON ehr.observations TO ehr_app;
+GRANT SELECT ON ehr.observations TO ehr_read;
+
+-- Acknowledgments of an order's results. PHI. Made once: INSERT, never UPDATE or DELETE.
+GRANT SELECT, INSERT ON ehr.result_acknowledgments TO ehr_app;
+GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 
 -- Portal enrollment codes, as hashes. Internal: grants only, no row-level security, because registration looks a
 -- code up before anyone is signed in; the hash is useless without the code, which is never stored. The app marks a

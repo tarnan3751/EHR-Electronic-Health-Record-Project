@@ -63,6 +63,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<Proxies.ProxyGrant> ProxyGrants => Set<Proxies.ProxyGrant>();
 
+    public DbSet<Orders.ResultAcknowledgment> ResultAcknowledgments => Set<Orders.ResultAcknowledgment>();
+
     // Appointments (FR-17; PHI).
     public DbSet<Scheduling.Appointment> Appointments => Set<Scheduling.Appointment>();
 

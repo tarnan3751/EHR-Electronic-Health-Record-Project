@@ -13,7 +13,8 @@
 --      ehr_app has. Foreign keys to the patient take a weaker lock, which this one doesn't block, and plain reads take
 --      none, so only another order (or an update of the patient) waits. Anyone but a clinician sees no patient, and is
 --      refused here.
---   2. refuses an order that isn't active: an order is signed active, and only discontinuing changes that.
+--   2. refuses an order that isn't active: an order is signed active, and only discontinuing it or its results
+--      arriving changes that.
 --   3. for a replacement (replaces_order_id), refuses one whose replaced order isn't an active order of the same
 --      patient and type. The change is finished by discontinuing that order in the same transaction, which
 --      ehr.check_order_replacement() checks at commit.
@@ -68,7 +69,7 @@ CREATE OR REPLACE TRIGGER orders_sign
     BEFORE INSERT ON ehr.orders
     FOR EACH ROW EXECUTE FUNCTION ehr.sign_order();
 
--- Discontinuing an order: the one update there is. Row-level security lets a clinician update only the orders of a
+-- Discontinuing an order: the one update a person makes (the other, completing it when results arrive, is below). Row-level security lets a clinician update only the orders of a
 -- patient on their panel, and the grant covers only status, discontinue_reason and replaced_by_order_id; this trigger
 -- holds the update to exactly one change, whoever makes it:
 --   1. only an active order, and only to revoked (FHIR's code for a stopped request, shown as "Discontinued"). A
@@ -85,6 +86,22 @@ CREATE OR REPLACE FUNCTION ehr.discontinue_order() RETURNS trigger
     SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
+    -- The other change an order takes (step 7): an active order becomes completed, FHIR's code for a request that
+    -- has been carried out and shown as "Resulted", once a final result has been filed for it, and nothing else on
+    -- the row moves. The database makes this change itself when the first result arrives (75-results.sql).
+    IF OLD.status = 'active' AND NEW.status = 'completed' THEN
+        PERFORM 1 FROM ehr.observations o WHERE o.order_id = OLD.id AND o.patient_id = OLD.patient_id AND o.status = 'final';
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'An order is completed by its results' USING ERRCODE = '23514';
+        END IF;
+
+        IF (to_jsonb(NEW) - 'status') IS DISTINCT FROM (to_jsonb(OLD) - 'status') THEN
+            RAISE EXCEPTION 'A signed order is never edited' USING ERRCODE = '42501';
+        END IF;
+
+        RETURN NEW;
+    END IF;
+
     IF OLD.status IS DISTINCT FROM 'active' OR NEW.status IS DISTINCT FROM 'revoked' THEN
         RAISE EXCEPTION 'An order changes only once, from active to discontinued' USING ERRCODE = '23514';
     END IF;

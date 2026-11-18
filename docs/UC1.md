@@ -24,6 +24,16 @@ A signed order is never edited in place. Each active order on the chart has two 
 
 **Discontinued orders**, under the active orders, lists every discontinued order of the patient, newest first, with what it was, who discontinued it, when and why, and a "Changed" tag when a changed order replaced it. It is open to whoever the chart is open to, emergency access included.
 
+### Results and their acknowledgment
+
+Added in the expansion plan's step 7 (Tahseen Arnan).
+
+- **Enter results.** Each active lab order on the chart has **Enter results**, for a patient on your panel. The page lists the tests the order reports, each with its unit and reference range. Type the values the lab reported and the time the sample was collected, and choose **File results**. Leave a test empty if its result hasn't come; it can be added later. Until the lab sends results itself (step 12), this is how they arrive.
+- **Resulted.** With its first result the order becomes completed and leaves the active orders. The chart's **Results** section lists resulted orders: those still to acknowledge first, abnormal ones before the rest.
+- **Abnormal.** A value outside its reference range is flagged "High" or "Low" and listed first, on the results page, the chart and the inbox.
+- **Acknowledge.** The clinician who signed the order gets an inbox item, "Results are in", with the patient's name and no values. **Open the results**, then **Acknowledge results**, records who acknowledged and when, and clears the item. It covers the results that were on the page: if another arrived meanwhile, the page comes back with it and nothing is recorded yet. A result's inbox item can't be ticked off any other way. Any clinician with the patient on their panel can acknowledge. Once acknowledged, nothing more is added to that order's results.
+- **The patient** sees a filed result in the portal at once, as results have always shown there, acknowledged or not.
+
 ## Decisions
 
 - **Who.** Clinicians only, and only for a patient on their panel, as for "New note" and dictation. Under emergency access the chart says to add the patient to the panel first, and the order page sends anyone off the panel back to the chart before anything is read.
@@ -64,7 +74,15 @@ The Assignment 4 test cases are one file each, in `tests/Ehr.Web.Tests/TestCases
 | TC-UC1-11, NFR-01 | On-site, the discontinued orders, the change form and the discontinue form: p99 under 15 ms at 50,000 patients | `TC_UC1_11_Nfr01_ChangePagesOnSite.cs` |
 | TC-UC1-12, NFR-12 | In a real browser, discontinuing and changing an order with the keyboard only | `TC_UC1_12_Nfr12_ChangeKeyboardFirst.cs` |
 
-TC-UC1-05 and TC-UC1-11 run only against a run of the render benchmark; `tests/Ehr.Web.Tests/TestCases/PerformanceResults.cs` says how. In the normal test run they are skipped.
+| TC-UC1-13, successful flow (results) | Results are filed against their order, the abnormal one flagged and first, the order resulted; acknowledged from the inbox, with who and when | `TC_UC1_13_ResultsSuccessfulFlow.cs` |
+| TC-UC1-14, alternative flow and invalid input (results) | Results in parts; values that aren't numbers; a colleague on the care team files and acknowledges; emergency access reads only; nothing is added after acknowledgment | `TC_UC1_14_ResultsAlternativeAndInvalid.cs` |
+| TC-UC1-15, exceptional condition (results) | Off-site, filing and acknowledging are forwarded; with the server down the results are read-only | `TC_UC1_15_ResultsExceptionalCondition.cs` |
+| TC-UC1-16, NFR-01 (results) | An order's results page, and the inbox holding results: p99 under 15 ms at 50,000 patients | `TC_UC1_16_Nfr01_ResultPagesOnSite.cs` |
+| TC-UC1-17, NFR-12 (results) | In a real browser, entering and acknowledging results with the keyboard only | `TC_UC1_17_Nfr12_ResultsKeyboardFirst.cs` |
+
+`tests/Ehr.Security.Tests/ResultSecurityTests.cs` asks the database directly: a filed result gets the database's own name, unit and range; only a panel clinician files, only for a test of an open lab order of that patient; an order is completed only by its results and then never changes; results are acknowledged once, by a panel clinician as themselves, which ends the filing. TC-UC6-12 is the portal's side and TC-UC15-07 the inbox's.
+
+TC-UC1-05, TC-UC1-11 and TC-UC1-16 run only against a run of the render benchmark; `tests/Ehr.Web.Tests/TestCases/PerformanceResults.cs` says how. In the normal test run they are skipped.
 
 Extra coverage, without test case IDs, in `tests/Ehr.Web.Tests/OrderTests.cs`:
 
@@ -119,10 +137,19 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - For changing and discontinuing: in `db/policies/60-orders.sql`, the signing trigger's replacement check and its exception to the duplicate check, `ehr.discontinue_order()` and `ehr.check_order_replacement()` with its deferred constraint trigger; in `10-grants.sql`, the UPDATE grant on three columns; in `30-rls.sql`, the `orders_panel_update` policy; the `OrderChanges` migration's check constraints; and the panel rule on the discontinue page and on the chart's two links.
 - The order page's panel rule (`Areas/Clinical/Pages/Patients/Orders/New.cshtml.cs`) and the chart's condition for offering "New order".
 - The new `PhiReader` methods. `CloudAuditEvents` is unchanged.
+- For results (step 7): the new `db/policies/75-results.sql` (`ehr.deliver_result` and `ehr.clear_result_items` run as their owner); in `60-orders.sql`, the first branch of `ehr.discontinue_order()`, which lets an active order become completed when a final result exists; in `30-rls.sql`, `observations_panel_insert`, the policies on `result_acknowledgments`, and the check of `orders_panel_update`; `INSERT` on `observations` in `10-grants.sql`; and the gate of the results page (`MessagePage.GateAsync`).
 
 ## Limits
 
-- Orders can't be completed, and a discontinuation can't be undone: place the order again instead.
+- A discontinuation can't be undone: place the order again instead. A resulted order can't be discontinued or changed.
+- Results are numbers typed in for lab orders whose catalog item has result fields set up (12 items today, including the common panels). Other lab tests, imaging and referrals have no results page content yet. Nothing imports results; the simulated lab is step 12.
+- A filed result can't be corrected or withdrawn. A wrong value needs a new order.
+- The reference ranges are one range for each test, for adults, not by age or sex.
+- The inbox item goes to the clinician who signed the order, even if they have since left the patient's panel; any panel clinician can acknowledge from the chart. If the signer's account is disabled or no longer a clinician's, it goes to each clinician on the patient's panel instead.
+- The chart lists a patient's eight most relevant resulted orders (unacknowledged and abnormal first); there is no page of older ones yet.
+- The inbox looks at the oldest 500 waiting results when deciding which are abnormal.
+- Results are released to the portal as soon as they are filed, before anyone acknowledges them.
+- Collection time is entered and shown in UTC.
 - A change keeps the order's type.
 - The chart's confirmation after discontinuing doesn't name the order; the discontinued orders list does.
 - An order isn't sent anywhere: no lab, pharmacy or referral interface.

@@ -1127,3 +1127,30 @@ VALUES ('20261118195958_ProxyGrants', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.result_acknowledgments (
+    id uuid NOT NULL,
+    order_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    acknowledged_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    acknowledged_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_result_acknowledgments PRIMARY KEY (id),
+    CONSTRAINT fk_result_acknowledgments_orders_order_id_patient_id FOREIGN KEY (order_id, patient_id) REFERENCES ehr.orders (id, patient_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_result_acknowledgments_staff_users_acknowledged_by FOREIGN KEY (acknowledged_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_observations_order_id_code ON ehr.observations (order_id, code) WHERE order_id IS NOT NULL AND code IS NOT NULL;
+
+CREATE INDEX ix_result_acknowledgments_acknowledged_by ON ehr.result_acknowledgments (acknowledged_by);
+
+CREATE UNIQUE INDEX ix_result_acknowledgments_order_id ON ehr.result_acknowledgments (order_id);
+
+CREATE INDEX ix_result_acknowledgments_order_id_patient_id ON ehr.result_acknowledgments (order_id, patient_id);
+
+CREATE INDEX ix_result_acknowledgments_patient_id ON ehr.result_acknowledgments (patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261118215809_OrderResults', '10.0.13');
+
+COMMIT;
+

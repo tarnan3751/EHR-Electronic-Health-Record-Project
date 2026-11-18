@@ -1,0 +1,149 @@
+@page "/patients/{patientId:guid}/orders/{orderId:guid}/results"
+@using Ehr.Data.Orders
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Orders.ResultsModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var order = Model.Order;
+    var patient = order.Patient;
+    ViewData["Title"] = $"Results: {order.Display}";
+    var filed = order.Tests.Where(test => test.Value is not null).ToList();
+    var waiting = order.Tests.Where(test => test.Value is null).ToList();
+    var abnormal = filed.Count(test => test.Flag is not null);
+    var canWrite = Model.OnPanel && OnPrem.IsReachable;
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, order.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+    <p><a asp-page="/Inbox/Index">Inbox</a></p>
+</div>
+<h1>Results: @order.Display</h1>
+<p class="sc-muted">Ordered by @order.SignedBy, @order.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+@if (Model.Done is "filed")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> the results are filed, and the patient can see them in the portal. @order.SignedBy has them in their inbox to acknowledge.</p>
+}
+else if (Model.Done is "acknowledged")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Acknowledged:</span> recorded under your name.</p>
+}
+@if (Model.Stale)
+{
+    <p class="sc-notice sc-notice--warning" role="alert"><span class="sc-notice__state">Not saved:</span> this order changed while the page was open. What is below is how it stands now.</p>
+}
+
+@if (filed.Count == 0)
+{
+    <p class="sc-muted">@(order.Status == OrderStatus.Revoked ? "This order was discontinued. It has no results." : "No results yet.")</p>
+}
+else
+{
+    @if (abnormal > 0)
+    {
+        <p class="sc-notice sc-notice--warning" data-abnormal><span class="sc-notice__state">Outside the reference range:</span> @abnormal of @filed.Count @(filed.Count == 1 ? "result" : "results"), listed first.</p>
+    }
+    <div class="sc-table-wrap">
+        <table class="sc-table">
+            <thead>
+                <tr><th scope="col">Test</th><th scope="col">Result</th><th scope="col">Flag</th><th scope="col">Reference range</th><th scope="col">Collected</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var test in filed)
+                {
+                    <tr class="@(test.Flag is null ? null : "sc-table__flagged")" data-result="@(test.Flag is null ? "normal" : "abnormal")">
+                        <th scope="row">@test.Display</th>
+                        <td class="sc-table__mono">@test.Value!.Value.ToString("0.####") @test.Unit</td>
+                        <td>
+                            @if (test.Flag is { } flag)
+                            {
+                                <span class="sc-tag sc-tag--warning">@flag</span>
+                            }
+                        </td>
+                        <td class="sc-table__mono">@test.Range @(test.Range.Length > 0 ? test.Unit : null)</td>
+                        <td class="sc-table__mono">@test.CollectedAt!.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Acknowledgment</h2>
+    @if (order.AcknowledgedAt is { } when)
+    {
+        <p data-acknowledged>Acknowledged by @order.AcknowledgedBy, @when.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+    }
+    else if (canWrite)
+    {
+        <form method="post" asp-page-handler="Acknowledge" asp-route-patientId="@patient.Id" asp-route-orderId="@order.OrderId">
+            <input type="hidden" name="Seen" value="@order.Seen">
+            <p class="sc-muted">Acknowledging records that you have seen these results, under your name and the time. It can't be undone.</p>
+            <button type="submit" class="sc-btn sc-btn--primary" data-acknowledge autofocus="@(waiting.Count == 0 || !order.OpenToResults)">Acknowledge results</button>
+        </form>
+    }
+    else if (!Model.OnPanel)
+    {
+        <p class="sc-muted">Not acknowledged. Add this patient to your panel to acknowledge results.</p>
+    }
+    else
+    {
+        <p class="sc-muted">Not acknowledged. Results can't be acknowledged until the clinic's server is back.</p>
+    }
+}
+
+@if (order.OpenToResults)
+{
+    <h2>@(filed.Count == 0 ? "Enter results" : "Enter the remaining results")</h2>
+    @if (!Model.OnPanel)
+    {
+        <p class="sc-muted">Add this patient to your panel to enter results.</p>
+    }
+    else if (!OnPrem.IsReachable)
+    {
+        <p class="sc-muted">Results can't be entered until the clinic's server is back.</p>
+    }
+    else
+    {
+        <form method="post" class="sc-form" asp-route-patientId="@patient.Id" asp-route-orderId="@order.OrderId">
+            @if (Model.Errors.Count > 0)
+            {
+                <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : "fix the highlighted fields and save again.")</p>
+            }
+            <p class="sc-muted">Type the values the lab reported. Leave a test empty if its result hasn't come. The name, unit and reference range are the clinic's own for each test.</p>
+            @{ var first = true; }
+            @foreach (var test in waiting)
+            {
+                var id = $"result-{test.Code}";
+                var error = Model.Errors.GetValueOrDefault(test.Code);
+                <div class="sc-field">
+                    <label for="@id">@test.Display <span>(@(string.IsNullOrEmpty(test.Unit) ? "no unit" : test.Unit)@(test.Range.Length > 0 ? $"; reference {test.Range}" : null))</span></label>
+                    <input id="@id" class="sc-field__input" name="Values[@test.Code]" value="@Model.Values.GetValueOrDefault(test.Code)" inputmode="decimal" autocomplete="off" autofocus="@(first && filed.Count == 0)"
+                           aria-invalid="@(error is null ? null : "true")" aria-describedby="@(error is null ? null : id + "-error")">
+                    @if (error is not null)
+                    {
+                        <p class="sc-field__error" id="@(id)-error">@error</p>
+                    }
+                </div>
+                first = false;
+            }
+            <div class="sc-field">
+                <label for="result-collected">Sample collected (UTC) <span>(required)</span></label>
+                <input id="result-collected" class="sc-field__input" type="datetime-local" name="CollectedAt" value="@Model.CollectedAt" required
+                       aria-invalid="@(Model.Errors.ContainsKey("CollectedAt") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("CollectedAt") ? "result-collected-error" : null)">
+                @if (Model.Errors.TryGetValue("CollectedAt", out var collectedError))
+                {
+                    <p class="sc-field__error" id="result-collected-error">@collectedError</p>
+                }
+            </div>
+            <div class="sc-actions">
+                <button type="submit" class="sc-btn sc-btn--primary" data-file-results>File results</button>
+            </div>
+        </form>
+    }
+}
+else if (order.Type == OrderType.Lab && order.Tests.Count == 0)
+{
+    <p class="sc-muted">This test has no result fields set up, so its results can't be entered here.</p>
+}

@@ -133,6 +133,18 @@ internal static partial class RenderBenchmark
                     var (patient, thread) = threads[threadRandom.Next(threads.Count)];
                     return $"/patients/{patient}/messages/{thread}";
                 }));
+                // Results of orders (step 7): 24 resulted lipid panels the clinician signed, half with a value outside its
+                // range. Their results page, and the inbox while it holds them (it sorts abnormal ones first). Then they
+                // are acknowledged, so the rows measured after this find the inbox as it was.
+                var resulted = await FileResultsAsync(app, clinicianId, panel);
+                var resultRandom = new Random(20261120);
+                results.Add(await MeasureAsync(client, times, "Order results, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, order) = resulted[resultRandom.Next(resulted.Count)];
+                    return $"/patients/{patient}/orders/{order}/results";
+                }));
+                results.Add(await MeasureAsync(client, times, "Inbox, with results to acknowledge", typing: false, () => "/inbox"));
+                await AcknowledgeResultsAsync(app, clinicianId, resulted);
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -822,6 +834,51 @@ internal static partial class RenderBenchmark
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return thread.Id;
+    }
+
+    // A lipid panel signed and resulted for each of the first 24 patients on the panel, through the app's own service
+    // and the database's rules: total cholesterol inside its range for half and above it for the rest, and HDL.
+    static async Task<List<(Guid Patient, Guid Order)>> FileResultsAsync(BenchApp app, Guid clinicianId, List<Guid> panel)
+    {
+        var resulted = new List<(Guid, Guid)>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var lab = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Results.LabResults>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, index) in panel.Take(DaySize).Select((patient, index) => (patient, index)))
+        {
+            var order = new Order { Id = Guid.CreateVersion7(), PatientId = patient, Type = OrderType.Lab, CatalogCode = "SYN-LAB-004", Details = "{}", Status = OrderStatus.Active };
+            db.Add(order);
+            await db.SaveChangesAsync();
+            if (!await lab.FileAsync(patient, order.Id, [("2093-3", index % 2 == 0 ? 180m : 260m), ("2085-9", 55m)], DateTimeOffset.UtcNow.AddMinutes(-30), CancellationToken.None))
+            {
+                throw new InvalidOperationException("The benchmark's results were refused.");
+            }
+
+            resulted.Add((patient, order.Id));
+        }
+
+        await transaction.CommitAsync();
+        return resulted;
+    }
+
+    static async Task AcknowledgeResultsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Order)> resulted)
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var lab = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Results.LabResults>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, order) in resulted)
+        {
+            if (!await lab.AcknowledgeAsync(patient, order, CancellationToken.None))
+            {
+                throw new InvalidOperationException("The benchmark's acknowledgment was refused.");
+            }
+        }
+
+        await transaction.CommitAsync();
     }
 
     // The clinician records a proxy for a patient on their panel, through the app's own service and the database's rules.
