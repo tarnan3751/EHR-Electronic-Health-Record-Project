@@ -1,0 +1,86 @@
+@page "/appointments/{appointmentId:guid}"
+@using Ehr.Data.Scheduling
+@using Ehr.Domain.Scheduling
+@model Ehr.Web.Areas.Clinical.Pages.Schedule.AppointmentModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The page is about a patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Detail.Patient;
+    var appointment = Model.Detail.Appointment;
+    ViewData["Title"] = $"Appointment: {patient.FamilyName}, {patient.GivenName}";
+    var saved = Model.Saved switch
+    {
+        "rescheduled" => "Appointment rescheduled:",
+        "cancelled" => "Appointment cancelled:",
+        "checked-in" => "Checked in:",
+        "no-show" => "Marked as a no-show:",
+        _ => null,
+    };
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Detail.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+    <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd")">That day's schedule</a></p>
+</div>
+<h1>Appointment: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Gone)
+{
+    <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> this appointment was changed by someone else first. It is shown below as it is now.</p>
+}
+else if (saved is not null && Model.Errors.Count == 0)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">@saved</span> @(Model.Saved == "checked-in" ? "the visit has started and is on the chart." : "the patient sees the change in the portal.")</p>
+}
+<section class="sc-panel" aria-label="Appointment">
+    <dl class="record">
+        <dt>When</dt><dd>@appointment.StartsAt.UtcDateTime.ToString("dddd, MMMM d, yyyy"), @AppointmentForm.Time(appointment)</dd>
+        <dt>With</dt><dd>@appointment.Clinician</dd>
+        <dt>Reason</dt><dd>@appointment.Reason</dd>
+        <dt>Status</dt><dd><span class="sc-tag" data-appointment-status="@appointment.Status">@AppointmentStatus.Names[appointment.Status]</span>@if (appointment.CancelReason is { } why) {<text> @why</text>}</dd>
+    </dl>
+</section>
+@if (Model.CanChange && OnPrem.IsReachable)
+{
+    <section class="sc-panel" aria-labelledby="appointment-arrival">
+        <h2 class="sc-panel__title" id="appointment-arrival">When the time comes</h2>
+        <div class="sc-actions">
+            <form method="post" asp-page-handler="CheckIn"><button class="sc-btn sc-btn--primary">Check in</button></form>
+            <form method="post" asp-page-handler="NoShow"><button class="sc-btn">Mark as a no-show</button></form>
+        </div>
+        <p class="sc-muted">Checking in starts the patient's visit.</p>
+    </section>
+    <section class="sc-panel" aria-labelledby="appointment-reschedule">
+        <h2 class="sc-panel__title" id="appointment-reschedule">Reschedule</h2>
+        <form method="post" asp-page-handler="Reschedule" class="sc-form">
+            <partial name="_When" model="new WhenFields(Model.Day, Model.Time, Model.Minutes, Model.Reason, Model.Errors)" />
+            <button type="submit" class="sc-btn">Save new time</button>
+        </form>
+    </section>
+    <section class="sc-panel" aria-labelledby="appointment-cancel">
+        <h2 class="sc-panel__title" id="appointment-cancel">Cancel</h2>
+        <form method="post" asp-page-handler="Cancel" class="sc-form">
+            <div class="sc-field">
+                <label for="appointment-cancel-reason">Reason for cancelling <span>(required)</span></label>
+                <textarea id="appointment-cancel-reason" class="sc-field__input" name="CancelReason" rows="2" maxlength="@Appointments.MaximumReasonLength" required
+                          aria-invalid="@(Model.Errors.ContainsKey("CancelReason") ? "true" : null)"
+                          aria-describedby="@(Model.Errors.ContainsKey("CancelReason") ? "appointment-cancel-reason-error" : null)">@Model.CancelReason</textarea>
+                @if (Model.Errors.TryGetValue("CancelReason", out var cancelError))
+                {
+                    <p class="sc-field__error" id="appointment-cancel-reason-error">@cancelError</p>
+                }
+            </div>
+            <button type="submit" class="sc-btn sc-btn--danger">Cancel appointment</button>
+        </form>
+    </section>
+}
+else if (appointment.Status == AppointmentStatus.Booked && !OnPrem.IsReachable)
+{
+    <p class="sc-muted">Changing an appointment needs the clinic's server. The schedule remains readable.</p>
+}
+else if (appointment.Status == AppointmentStatus.Booked)
+{
+    <p class="sc-muted">Add this patient to your panel to change their appointments.</p>
+}

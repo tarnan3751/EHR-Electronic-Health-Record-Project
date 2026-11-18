@@ -1017,3 +1017,40 @@ VALUES ('20261118120345_InboxItems', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.appointments (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    clinician_id uuid NOT NULL,
+    starts_at timestamp with time zone NOT NULL,
+    minutes integer NOT NULL,
+    reason character varying(200) NOT NULL,
+    status character varying(20) NOT NULL,
+    cancel_reason character varying(500),
+    encounter_id uuid,
+    booked_by_id uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    booked_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_appointments PRIMARY KEY (id),
+    CONSTRAINT ck_appointments_cancelled CHECK ((status = 'cancelled') = (cancel_reason IS NOT NULL)),
+    CONSTRAINT ck_appointments_minutes CHECK (minutes BETWEEN 5 AND 240),
+    CONSTRAINT ck_appointments_status CHECK (status IN ('booked', 'cancelled', 'fulfilled', 'noshow')),
+    CONSTRAINT ck_appointments_visit CHECK ((status = 'fulfilled') = (encounter_id IS NOT NULL)),
+    CONSTRAINT fk_appointments_encounters_encounter_id FOREIGN KEY (encounter_id) REFERENCES ehr.encounters (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appointments_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appointments_staff_users_booked_by_id FOREIGN KEY (booked_by_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appointments_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_appointments_booked_by_id ON ehr.appointments (booked_by_id);
+
+CREATE INDEX ix_appointments_clinician_id_starts_at ON ehr.appointments (clinician_id, starts_at);
+
+CREATE UNIQUE INDEX ix_appointments_encounter_id ON ehr.appointments (encounter_id);
+
+CREATE INDEX ix_appointments_patient_id_starts_at ON ehr.appointments (patient_id, starts_at);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261118124810_Appointments', '10.0.13');
+
+COMMIT;
+

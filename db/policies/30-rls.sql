@@ -281,6 +281,59 @@ CREATE POLICY audit_events_owner_select ON ehr.audit_events FOR SELECT TO ehr_ow
 DROP POLICY IF EXISTS audit_events_owner_mark ON ehr.audit_events;
 CREATE POLICY audit_events_owner_mark ON ehr.audit_events FOR UPDATE TO ehr_owner USING (NOT sensitive) WITH CHECK (sensitive);
 
+-- Appointments (PHI). Clinicians read every patient's, as they read charts; a patient reads their own. A clinician
+-- books and changes them only for a patient on their active panel, the rule for orders and the chart's lists, and is
+-- recorded as the one who booked. Nothing deletes one (10-grants.sql).
+ALTER TABLE ehr.appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.appointments FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS appointments_clinician_select ON ehr.appointments;
+CREATE POLICY appointments_clinician_select ON ehr.appointments FOR SELECT USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS appointments_own_select ON ehr.appointments;
+CREATE POLICY appointments_own_select ON ehr.appointments FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()));
+DROP POLICY IF EXISTS appointments_panel_insert ON ehr.appointments;
+CREATE POLICY appointments_panel_insert ON ehr.appointments FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = appointments.patient_id AND a.ended_at IS NULL
+        )
+        AND booked_by_id = (SELECT ehr.current_user_id())
+    );
+DROP POLICY IF EXISTS appointments_panel_update ON ehr.appointments;
+CREATE POLICY appointments_panel_update ON ehr.appointments FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = appointments.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = appointments.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+-- A visit is created when a clinician checks a patient in for an appointment: for a patient on their active panel.
+-- Nothing else at runtime writes visits, and nothing updates or deletes one.
+DROP POLICY IF EXISTS encounters_panel_insert ON ehr.encounters;
+CREATE POLICY encounters_panel_insert ON ehr.encounters FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = encounters.patient_id AND a.ended_at IS NULL
+        )
+    );
+
 -- The staff inbox (PHI). An item is its recipient's alone: they read it and mark it done, while their account is a
 -- staff account that may sign in (a clinician or an admin). Nobody else sees it: not another clinician, not an admin
 -- who isn't the recipient, not the patient. Nothing at runtime inserts or deletes one yet (10-grants.sql).

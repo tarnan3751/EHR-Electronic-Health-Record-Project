@@ -2198,6 +2198,90 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Scheduling.Appointment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("BookedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("booked_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("BookedById")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("booked_by_id")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<Guid>("ClinicianId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id");
+
+                    b.Property<Guid?>("EncounterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("encounter_id");
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("minutes");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_appointments");
+
+                    b.HasIndex("BookedById")
+                        .HasDatabaseName("ix_appointments_booked_by_id");
+
+                    b.HasIndex("EncounterId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_appointments_encounter_id");
+
+                    b.HasIndex("ClinicianId", "StartsAt")
+                        .HasDatabaseName("ix_appointments_clinician_id_starts_at");
+
+                    b.HasIndex("PatientId", "StartsAt")
+                        .HasDatabaseName("ix_appointments_patient_id_starts_at");
+
+                    b.ToTable("appointments", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_appointments_cancelled", "(status = 'cancelled') = (cancel_reason IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_appointments_minutes", "minutes BETWEEN 5 AND 240");
+
+                            t.HasCheckConstraint("ck_appointments_status", "status IN ('booked', 'cancelled', 'fulfilled', 'noshow')");
+
+                            t.HasCheckConstraint("ck_appointments_visit", "(status = 'fulfilled') = (encounter_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.SyncOperation", b =>
                 {
                     b.Property<Guid>("IdempotencyKey")
@@ -2595,6 +2679,36 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_result_codes_observation_codes_observation_code");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Scheduling.Appointment", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("BookedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_appointments_staff_users_booked_by_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_appointments_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Encounter", null)
+                        .WithOne()
+                        .HasForeignKey("Ehr.Data.Scheduling.Appointment", "EncounterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_encounters_encounter_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_appointments_patients_patient_id");
                 });
 #pragma warning restore 612, 618
         }

@@ -23,7 +23,18 @@ public sealed record PatientChart(
     public int SensitiveHidden { get; init; }
 
     public bool SensitiveShown { get; init; }
+
+    // The patient's appointments still to come, soonest first (FR-17): part of the same recorded read.
+    public IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming { get; init; } = [];
 }
+
+// A patient's appointments as the portal lists them, already recorded as one read of the patient: those still to come,
+// soonest first, and those past or cancelled, latest first.
+public sealed record PatientAppointments(
+    Patient Patient, IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming, IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Past);
+
+// One appointment with its patient, and the patient's allergies for the banner: one recorded read of the patient.
+public sealed record AppointmentDetail(Ehr.Domain.Scheduling.AppointmentEntry Appointment, Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies);
 
 // One item of a staff member's inbox as its page lists it: what it is, the patient it is about (by name for a
 // clinician, who may read patients; by ID alone for an admin, who may not), and where it came from.

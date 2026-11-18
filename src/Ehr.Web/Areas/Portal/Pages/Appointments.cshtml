@@ -1,0 +1,32 @@
+@page "/portal/appointments"
+@model AppointmentsModel
+@{
+    ViewData["Title"] = "Appointments";
+}
+<h1>Appointments</h1>
+@if (Model.Appointments is { } appointments)
+{
+    <h2>Coming up</h2>
+    @if (appointments.Upcoming.Count > 0)
+    {
+        <partial name="_Appointments" model="appointments.Upcoming" />
+    }
+    else
+    {
+        <p class="sc-muted">You have no appointments booked.</p>
+    }
+    <p>To book, change or cancel an appointment, contact the clinic.</p>
+    <h2>Earlier</h2>
+    @if (appointments.Past.Count > 0)
+    {
+        <partial name="_Appointments" model="appointments.Past" />
+    }
+    else
+    {
+        <p class="sc-muted">No earlier appointments.</p>
+    }
+}
+else
+{
+    <p class="sc-notice sc-notice--danger">Your appointments are not available right now. Contact the clinic if this continues.</p>
+}

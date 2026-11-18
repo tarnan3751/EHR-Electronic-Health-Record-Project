@@ -29,6 +29,7 @@ public class PhiReaderTests
         ["Conditions"] = typeof(Condition),
         ["ChartHistory"] = typeof(ChartHistoryEntry),
         ["InboxItems"] = typeof(Ehr.Data.Inbox.InboxItem),
+        ["Appointments"] = typeof(Ehr.Data.Scheduling.Appointment),
         ["Encounters"] = typeof(Encounter),
         ["Orders"] = typeof(Ehr.Data.Orders.Order),
         ["Observations"] = typeof(Observation),

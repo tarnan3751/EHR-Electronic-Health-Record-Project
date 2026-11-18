@@ -16,7 +16,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 2b | Sensitive-item and allergy-status fixes | done | expansion/step-02b-sensitive-fixes | expansion-step-02b | [44286735927](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44286735927) | Inserted by Tahseen on 2026-11-18. UC 4 (Diego), UC 7 (Sara), UC 12 (Luke). Touches `db/policies` |
 | 2a | Reference data and a coherent synthetic seed | done | expansion/step-02a-reference-data | expansion-step-02a | [44297723824](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44297723824) | LOINC loaded from Tahseen's download. CVX not loaded (optional). Open questions for Tahseen in the log |
 | 3 | Clinician inbox | done | expansion/step-03-inbox | expansion-step-03 | [44304586912](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44304586912) | New UC 15 (proposed). Admins have an inbox too. Touches `db/policies` |
-| 4 | Appointments | not started | | | | |
+| 4 | Appointments | in progress | expansion/step-04-appointments | | | See the decision log for the design and where to resume |
 | 5 | Secure messaging | not started | | | | |
 | 6 | Proxy access | not started | | | | |
 | 7 | Order → result → acknowledgment | not started | | | | |
@@ -477,6 +477,14 @@ One entry per decision: date, step, the decision, and why.
 - **2026-11-18, step 3. Marking done is a column grant on `done_at` with a trigger,** the pattern of step 1: once, at the database's time, nothing else changes, nothing reopens. Items are never deleted.
 - **2026-11-18, step 3. The app bar's count is one index lookup made by a page filter inside the page's transaction,** on full clinical GET pages only. It isn't an audited read: it says nothing about a patient. `LayoutTests.cs`, which the plan named, wasn't changed: the UC 15 test cases cover the link and the count.
 - **2026-11-18, step 3. Not in the desktop app.** Nothing creates items yet, and an offline inbox would need its own sync; revisit with step 5.
+- **2026-11-18, step 4, design (decided before building).**
+  - *Table* `ehr.appointments` (PHI): patient, clinician, start, length in minutes, reason, status (FHIR's `booked`, `cancelled`, `fulfilled`, `noshow`), the cancellation reason, the visit it became (`encounter_id`), who booked it and when. Never deleted.
+  - *Who.* Clinicians schedule, for a patient on their panel, with any clinician (admins have no access to patient data, and there is no front-desk role yet: a follow-up for Tahseen). Clinicians read every appointment, as they read charts; a patient reads their own.
+  - *Changes.* Reschedule changes the start and length; cancel needs a reason; "Check in" creates the visit (an encounter, in progress) and marks the appointment fulfilled, linking the two; "No-show" marks it. A trigger holds updates to those moves and refuses two booked appointments that overlap for one clinician, locking the clinician's row so two bookings at once can't both get through.
+  - *Pages.* `/schedule`: a clinician's day, any clinician and any day. `/patients/{id}/appointments/new`, and `/appointments/{id}` to reschedule, cancel, check in or mark a no-show. Portal: upcoming and past on the home page and at `/portal/appointments`; no self-scheduling.
+  - *Times* are UTC, as everywhere else in the app.
+  - *Use cases.* Scheduling is a new use case, UC 16 (six test cases). The portal's list extends UC 6 (TC-UC6-07 on).
+  - *Desktop.* Not in the offline copy for now: the offline chart is for reading a record and drafting, not for the day's schedule. Open for Sara.
 
 ## Log
 

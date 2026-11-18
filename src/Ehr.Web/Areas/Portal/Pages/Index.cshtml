@@ -14,7 +14,19 @@
         </dl>
     </section>
     <p><a asp-page="/Results" class="sc-btn sc-btn--primary">See your test results</a></p>
-    <p class="sc-muted">Appointments and messages will appear here.</p>
+    <section class="sc-panel" aria-labelledby="home-appointments">
+        <h2 class="sc-panel__title" id="home-appointments">Your next appointments</h2>
+        @if (Model.Upcoming.Count > 0)
+        {
+            <partial name="_Appointments" model="Model.Upcoming" />
+        }
+        else
+        {
+            <p class="sc-muted">You have no appointments booked. To book one, contact the clinic.</p>
+        }
+        <p><a asp-page="/Appointments">All your appointments</a></p>
+    </section>
+    <p class="sc-muted">Messages will appear here.</p>
 }
 else
 {

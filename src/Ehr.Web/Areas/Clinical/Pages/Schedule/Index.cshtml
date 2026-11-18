@@ -1,0 +1,59 @@
+@page "/schedule"
+@using Ehr.Data.Scheduling
+@model Ehr.Web.Areas.Clinical.Pages.Schedule.IndexModel
+@{
+    // Patients are named here. Without htmx, nothing keeps the page in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    ViewData["Title"] = "Schedule";
+}
+<h1>Schedule</h1>
+<form method="get" class="sc-filters">
+    <div class="sc-field">
+        <label for="schedule-clinician">Clinician</label>
+        <select id="schedule-clinician" class="sc-field__input" name="clinician">
+            @foreach (var (id, name) in Model.Clinicians)
+            {
+                <option value="@id" selected="@(id == Model.Shown)">@name</option>
+            }
+        </select>
+    </div>
+    <div class="sc-field">
+        <label for="schedule-day">Day</label>
+        <input type="date" id="schedule-day" class="sc-field__input" name="day" value="@Model.Date.ToString("yyyy-MM-dd")">
+    </div>
+    <button class="sc-btn">Show</button>
+</form>
+<nav aria-label="Days">
+    <ul class="sc-actions">
+        <li><a href="@Model.Link(-1)">Previous day</a></li>
+        <li><a href="@Model.Link(1)">Next day</a></li>
+    </ul>
+</nav>
+<h2>@Model.Date.ToString("dddd, MMMM d, yyyy")</h2>
+@if (Model.Appointments.Count == 0)
+{
+    <p class="sc-muted">No appointments on this day.</p>
+}
+else
+{
+    <div class="sc-table-wrap">
+        <table class="sc-table">
+            <thead>
+                <tr><th scope="col">Time</th><th scope="col">Patient</th><th scope="col">Reason</th><th scope="col">Status</th><th scope="col"><span class="sc-visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var appointment in Model.Appointments)
+                {
+                    <tr data-appointment="@appointment.Status">
+                        <td class="sc-table__mono">@AppointmentForm.Time(appointment)</td>
+                        <td><a asp-page="/Patients/Chart" asp-route-id="@appointment.PatientId">@appointment.PatientName</a> <span class="sc-table__mono">@appointment.PatientMrn</span></td>
+                        <td>@appointment.Reason</td>
+                        <td><span class="sc-tag @(appointment.Status == AppointmentStatus.Cancelled || appointment.Status == AppointmentStatus.NoShow ? "sc-tag--warning" : appointment.Status == AppointmentStatus.Fulfilled ? "sc-tag--success" : null)">@AppointmentStatus.Names[appointment.Status]</span></td>
+                        <td><a asp-page="Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @appointment.PatientName, @AppointmentForm.Time(appointment)">Open</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+<p class="sc-muted">Times are UTC. To book an appointment, open the patient's chart.</p>

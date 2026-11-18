@@ -33,6 +33,8 @@ builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Si
 builder.Services.AddScoped<Ehr.Domain.Orders.ClinicalOrders>();
 // Adding to and changing allergies, medications and diagnoses (Ehr.Domain.Patients).
 builder.Services.AddScoped<Ehr.Domain.Patients.ChartLists>();
+// Appointments (Ehr.Domain.Scheduling).
+builder.Services.AddScoped<Ehr.Domain.Scheduling.Appointments>();
 // The staff inbox (Ehr.Domain.Inbox).
 builder.Services.AddScoped<Ehr.Domain.Inbox.StaffInbox>();
 
@@ -108,6 +110,7 @@ builder.Services.AddRazorPages(options =>
     // sign in and register, are the only anonymous pages. The database's row-level security is the second layer.
     options.Conventions.AuthorizeAreaFolder("Clinical", "/", EhrPolicies.Staff);
     options.Conventions.AuthorizeAreaFolder("Clinical", "/Patients", EhrPolicies.Clinician);
+    options.Conventions.AuthorizeAreaFolder("Clinical", "/Schedule", EhrPolicies.Clinician);
     options.Conventions.AuthorizeAreaFolder("Clinical", "/Admin", EhrPolicies.Admin);
     options.Conventions.AllowAnonymousToAreaFolder("Clinical", "/Account");
     options.Conventions.AuthorizeAreaFolder("Portal", "/", EhrPolicies.Patient);
