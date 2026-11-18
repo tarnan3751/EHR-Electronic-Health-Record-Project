@@ -118,10 +118,12 @@ internal static partial class RenderBenchmark
                 var panel = await AssignPanelAsync(app, clinicianId, patients);
                 var labOrders = await SignOrdersAsync(app, clinicianId, panel);
                 await FillInboxAsync(database, clinicianId, panel);
+                var (scheduleDay, appointments) = await BookDayAsync(app, clinicianId, panel);
                 var session = new CookieContainer();
                 using var client = await SignInAsync(app, session, email, password, key);
                 await SettleAsync(database);
                 var results = await MeasureEachAsync(client, times, "", panel, labOrders, patients);
+                results.AddRange(await MeasureScheduleAsync(client, times, "", panel, scheduleDay, appointments));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -130,6 +132,8 @@ internal static partial class RenderBenchmark
                 {
                     using var portal = await PortalSignInAsync(app, patientEmail, patientPassword);
                     results.Add(await MeasureAsync(portal, times, "Portal results, the patient's own", typing: false, () => "/portal/results"));
+                    results.Add(await MeasureAsync(portal, times, "Portal appointments, the patient's own", typing: false, () => "/portal/appointments"));
+                    results.Add(await MeasureAsync(portal, times, "Portal home, the patient's own", typing: false, () => "/portal"));
                 }
                 finally
                 {
@@ -143,7 +147,7 @@ internal static partial class RenderBenchmark
                 else
                 {
                     await SettleAsync(database);
-                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients));
+                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments));
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -264,7 +268,8 @@ internal static partial class RenderBenchmark
     // UC 2 (Tahseen Arnan): the same requests to the cloud app, with the on-site session's cookies, during an outage. Its
     // audit queue goes in a folder of its own, deleted at the end.
     static async Task<List<Result>> MeasureOffSiteAsync(
-        BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients)
+        BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
+        string scheduleDay, List<Guid> appointments)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -278,7 +283,9 @@ internal static partial class RenderBenchmark
             }
 
             using var client = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
-            return await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
+            var results = await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
+            results.AddRange(await MeasureScheduleAsync(client, times, "Off-site, ", panel, scheduleDay, appointments));
+            return results;
         }
         finally
         {
@@ -753,6 +760,49 @@ internal static partial class RenderBenchmark
             .SetProperty(order => order.DiscontinueReason, "Synthetic: no longer needed"));
         await transaction.CommitAsync();
         return labOrders;
+    }
+
+    const int DaySize = 24;
+
+    // A day of appointments for the benchmark's clinician (FR-17), each with a different patient on their panel,
+    // booked through the database's own rules, so the schedule has a full day to list and the charts an appointment
+    // to show. With --stack they stay on the primary afterwards, as its orders do.
+    static async Task<(string Day, List<Guid> Appointments)> BookDayAsync(BenchApp app, Guid clinicianId, List<Guid> panel)
+    {
+        var day = DateTime.UtcNow.Date.AddDays(7);
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var appointments = panel.Take(DaySize).Select((patient, slot) => new Ehr.Data.Scheduling.Appointment
+        {
+            Id = Guid.CreateVersion7(),
+            PatientId = patient,
+            ClinicianId = clinicianId,
+            StartsAt = new DateTimeOffset(day.AddHours(8).AddMinutes(20 * slot), TimeSpan.Zero),
+            Minutes = 20,
+            Reason = "Synthetic: follow-up",
+            Status = Ehr.Data.Scheduling.AppointmentStatus.Booked,
+        }).ToList();
+        db.AddRange(appointments);
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return (day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), [.. appointments.Select(appointment => appointment.Id)]);
+    }
+
+    // The schedule's pages: a clinician's day, each patient named a recorded read; the form that books an appointment;
+    // and one appointment's page.
+    static async Task<List<Result>> MeasureScheduleAsync(HttpClient client, DatabaseTimes times, string prefix, List<Guid> panel, string day, List<Guid> appointments)
+    {
+        var random = new Random(20261118);
+        return
+        [
+            await MeasureAsync(client, times, prefix + $"Schedule, a day of {DaySize} appointments", typing: false, () => $"/schedule?day={day}"),
+            await MeasureAsync(client, times, prefix + "Book appointment form, a patient on the panel", typing: false,
+                () => $"/patients/{panel[random.Next(panel.Count)]}/appointments/new"),
+            await MeasureAsync(client, times, prefix + "Appointment, a patient on the panel", typing: false,
+                () => $"/appointments/{appointments[random.Next(appointments.Count)]}"),
+        ];
     }
 
     const int InboxSize = 40;

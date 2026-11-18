@@ -62,9 +62,10 @@ The A3 UC 6 specification includes these; they are listed as remaining work in t
 
 | Part of UC 6 | Requirement | What's left |
 |---|---|---|
-| Typical step 1: the portal home lists upcoming appointments | FR-17 | An appointments table with its database rules, seeded appointments, and the home page's list |
 | Step 1 alternative: a proxy chooses which patient's records to view | FR-19 | A proxy authorization table, a patient picker after sign-in, and row-level security keyed on the chosen patient rather than the account's own |
 | Step 3 alternative: send a secure message to the care team from a result, with a confirmation | FR-18 | A messages table with its rules, a compose form linked from each result, and a clinician inbox |
 | Outage alternative: "messages cannot be sent until the server is back" | FR-18 | Depends on messaging; the form would show that message while the site is read-only, as the order form does |
+
+**Appointments (FR-17) are built** (the expansion plan's step 4, by Tahseen Arnan). The portal's home page lists the patient's next three appointments, and `/portal/appointments` lists all of them: those coming up, soonest first, and earlier ones, with "Attended", "Missed" or "Cancelled". Each shows the date written out, the time in UTC, the length, the clinician and the reason the clinic entered. There is no self-scheduling: the page says to contact the clinic. The patient comes from the session; row-level security returns only their own appointments; the page is one recorded read. Staff book and change appointments as `docs/UC16.md` describes. Test case TC-UC6-07 (`TC_UC6_07_Appointments.cs`) covers the portal's side, off-site included.
 
 Outside UC 6 itself: nothing writes results (no lab interface), and the clinician's chart doesn't list them (see Limits).

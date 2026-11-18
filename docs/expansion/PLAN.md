@@ -398,6 +398,7 @@ New FR IDs (FR-37 onward) and use cases (UC 15 onward), as each step defines the
 | --- | --- | --- |
 | FR-37 | 1 | The system shall let clinicians discontinue a signed order with a reason, and change one by signing a replacement, without ever editing or deleting the signed order; it shall keep who, when and why. (Extends UC 1; test cases TC-UC1-07 to TC-UC1-12.) |
 | FR-38 | 2 | The system shall let clinicians add and change a patient's allergies, medications and diagnoses, each picked from a standard code list, never deleting an entry and keeping the history of every change. (Extends UC 4; test cases TC-UC4-07 to TC-UC4-12.) |
+| UC 16, FR-42 | 4 | Schedule an appointment. The system shall let clinicians book, reschedule, cancel (with a reason) and check in appointments, show any clinician's day, and never double-book a clinician. (FR-17 covers the portal's list; test cases TC-UC16-01 to TC-UC16-06, and TC-UC6-07.) |
 | UC 15, FR-41 | 3 | Work through the inbox. The system shall give each staff member one list of the items that need their action, show how many on every clinical page, link each item to its patient, and record when each is done. (Test cases TC-UC15-01 to TC-UC15-06.) |
 | FR-40 | 2b | The system shall show an administrator reviewing the audit log that a sensitive item changed and who changed it, and never the item's values. |
 | FR-39 | 2 | The system shall treat mental-health, substance-use and other designated diagnoses, and any item a clinician marks, as sensitive: left out of a chart until asked for, with each such view recorded. |

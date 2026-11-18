@@ -28,7 +28,9 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 
 - A staff inbox (`/inbox`): what needs each clinician's or admin's action, with a count in the app bar, each item linking to its patient, and "Mark done". It starts empty; later features put their items in it. See `docs/UC15.md`.
 
-**Not built yet:** editing visits, the clinical workflows beyond finding patients, opening charts, orders and writing/signing notes, the portal's appointments, messages and proxy access, and completing an order with its result. `docs/expansion/PLAN.md` is the plan for these and the rest.
+- Appointments (FR-17): clinicians book an appointment from a patient's chart, with any clinician, and reschedule it, cancel it with a reason, check the patient in (which starts their visit) or mark a no-show; `/schedule` shows any clinician's day; the database refuses a double booking. Patients see their upcoming and earlier appointments in the portal. There is no self-scheduling. See `docs/UC16.md`.
+
+**Not built yet:** editing visits, the clinical workflows beyond finding patients, opening charts, orders and writing/signing notes, the portal's messages and proxy access, and completing an order with its result. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
 ## Layout
 
