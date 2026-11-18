@@ -2,7 +2,7 @@
 
 The file in this folder, `10-drug-interactions.sql`, is derived from **DDInter 2.0** (https://ddinter2.scbdd.com), downloaded on 18 November 2026. It is not covered by this repository's own license.
 
-This project uses DDInter under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License** (CC BY-NC-SA 4.0, https://creativecommons.org/licenses/by-nc-sa/4.0/), the license recorded for it in the project's decision of 18 November 2026 (`docs/expansion/PLAN.md`). The download page itself carries no license text that the import could read, so the statement should be checked against DDInter's site whenever the data is refreshed. That means:
+This project uses DDInter under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License** (CC BY-NC-SA 4.0, https://creativecommons.org/licenses/by-nc-sa/4.0/), which DDInter states on its terms page, https://ddinter.scbdd.com/terms/ (confirmed by Tahseen on 19 November 2026; the download page itself carries no license text). Check that page again whenever the data is refreshed. That means:
 
 - **Attribution.** Credit DDInter, as below.
 - **Non-commercial.** This data may not be used for commercial purposes. SwiftChart is a course project that uses synthetic data only. If the project ever goes commercial, this table must be replaced.
