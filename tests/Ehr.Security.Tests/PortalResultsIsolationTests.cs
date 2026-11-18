@@ -65,6 +65,48 @@ public class PortalResultsIsolationTests(MigratedDatabase database) : IClassFixt
         }
     }
 
+    // Added with proxy access (FR-19; the expansion plan's step 6, Tahseen Arnan). The rule above used to be "a patient
+    // sees only their own results". It is now "a portal session sees only the results of the one patient it is looking
+    // at": its own, or, under a proxy grant that is the account's and in force, that patient's instead. So the same
+    // attempt is made again by a proxy: with the grant, the other patient's released results and not their own or an
+    // unreleased one; without it, or with someone else's, exactly what the test above shows.
+    [Fact]
+    public async Task A_proxy_reads_only_the_released_results_of_the_patient_they_act_for()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        var proxyPatient = await Accounts.PatientAsync(database, clinician);
+        var third = await Accounts.PatientAsync(database, clinician);
+        var patientAccount = await Accounts.PatientAccountAsync(database, patient);
+        var proxyAccount = await Accounts.PatientAccountAsync(database, proxyPatient);
+        var thirdAccount = await Accounts.PatientAccountAsync(database, third);
+        var released = await ReleasedResultAsync(patient, "Hemoglobin A1c");
+        var own = await ReleasedResultAsync(proxyPatient, "Thyroid stimulating hormone");
+        var others = await ReleasedResultAsync(third, "Ferritin");
+        var unreleased = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "INSERT INTO ehr.observations (id, patient_id, display, status, effective_at) VALUES (@id, @patient, 'Potassium', 'final', now())",
+            ("id", unreleased), ("patient", patient));
+        var grant = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, patientAccount,
+            "INSERT INTO ehr.proxy_grants (id, patient_id, proxy_email, scope, expires_at) VALUES (@id, @patient, @email, 'record', now() + interval '30 days')",
+            ("id", grant), ("patient", patient), ("email", $"{proxyAccount:N}@example.com"));
+
+        const string visible = "SELECT id FROM ehr.observations";
+        foreach (var connectionString in new[] { App, Read })
+        {
+            Assert.Equal([own.ToString()], await Accounts.QueryAsync(connectionString, proxyAccount, visible));
+            using (Accounts.ActingUnder(grant))
+            {
+                Assert.Equal([released.ToString()], await Accounts.QueryAsync(connectionString, proxyAccount, visible));
+                // The grant is the proxy's alone: the third patient naming it sees nothing, not even their own.
+                Assert.Empty(await Accounts.QueryAsync(connectionString, thirdAccount, visible));
+            }
+
+            Assert.Equal([others.ToString()], await Accounts.QueryAsync(connectionString, thirdAccount, visible));
+        }
+    }
+
     // A released, final result for the patient, inserted as the superuser the way the lab interface will.
     async Task<Guid> ReleasedResultAsync(Guid patient, string display)
     {
