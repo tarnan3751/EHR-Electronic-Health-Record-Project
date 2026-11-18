@@ -1,0 +1,52 @@
+@page "/patients/{patientId:guid}/messages/{threadId:guid}"
+@using Ehr.Data.Messaging
+@using Ehr.Domain.Messaging
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Messages.ThreadModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Thread.Patient;
+    ViewData["Title"] = $"Message: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Width"] = "reading";
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Thread.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+    <p><a asp-page="/Inbox/Index">Inbox</a></p>
+</div>
+<h1>@Model.Thread.Subject</h1>
+@if (Model.Sent && Model.Error is null)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent:</span> the patient's email says only that there is a new message.</p>
+}
+<partial name="_Thread" model="(Model.Thread.Messages, MessageSender.Staff)" />
+@if (!Model.OnPanel)
+{
+    <p class="sc-muted">Add this patient to your panel to reply.</p>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">Messages can't be sent until the clinic's server is back. The conversation remains readable.</p>
+}
+else
+{
+    <form method="post" class="sc-form">
+        @if (Model.Error is not null)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> fix the highlighted field and send again.</p>
+        }
+        <div class="sc-field">
+            <label for="message-body">Reply <span>(required)</span></label>
+            <textarea id="message-body" class="sc-field__input" name="Body" rows="6" maxlength="@SecureMessages.MaximumBody" required autofocus
+                      aria-invalid="@(Model.Error is null ? null : "true")" aria-describedby="@(Model.Error is null ? null : "message-body-error")">@(Model.Error is null ? null : Model.Body)</textarea>
+            @if (Model.Error is not null)
+            {
+                <p class="sc-field__error" id="message-body-error">@Model.Error</p>
+            }
+        </div>
+        <button type="submit" class="sc-btn sc-btn--primary">Send reply</button>
+    </form>
+}

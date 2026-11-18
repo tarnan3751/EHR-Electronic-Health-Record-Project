@@ -33,6 +33,8 @@ builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Si
 builder.Services.AddScoped<Ehr.Domain.Orders.ClinicalOrders>();
 // Adding to and changing allergies, medications and diagnoses (Ehr.Domain.Patients).
 builder.Services.AddScoped<Ehr.Domain.Patients.ChartLists>();
+// Secure messages (Ehr.Domain.Messaging).
+builder.Services.AddScoped<Ehr.Domain.Messaging.SecureMessages>();
 // Appointments (Ehr.Domain.Scheduling).
 builder.Services.AddScoped<Ehr.Domain.Scheduling.Appointments>();
 // The staff inbox (Ehr.Domain.Inbox).

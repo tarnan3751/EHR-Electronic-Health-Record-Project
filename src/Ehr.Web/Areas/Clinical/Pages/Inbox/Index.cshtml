@@ -47,7 +47,14 @@ else
                 {
                     <tr data-inbox-item="@item.Kind">
                         <td class="sc-table__mono">@((item.DoneAt ?? item.CreatedAt).UtcDateTime.ToString("yyyy-MM-dd HH:mm")) UTC</td>
-                        <td><span class="sc-tag">@InboxItemKind.Names.GetValueOrDefault(item.Kind, item.Kind)</span> @item.Summary</td>
+                        <td>
+                            <span class="sc-tag">@InboxItemKind.Names.GetValueOrDefault(item.Kind, item.Kind)</span> @item.Summary
+                            @if (clinician && item.SourceTable == "message_threads" && item.PatientId is not null)
+                            {
+                                @* Where it came from: the conversation, which is where it gets answered. *@
+                                <a asp-page="/Patients/Messages/Thread" asp-route-patientId="@item.PatientId" asp-route-threadId="@item.SourceId" data-inbox-source>Open the conversation</a>
+                            }
+                        </td>
                         @if (item.PatientName is not null && clinician)
                         {
                             <td><a asp-page="/Patients/Chart" asp-route-id="@item.PatientId">@item.PatientName</a> <span class="sc-table__mono">@item.PatientMrn</span></td>

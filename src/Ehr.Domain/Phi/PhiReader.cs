@@ -1,9 +1,11 @@
 using Ehr.Data;
 using Ehr.Data.Audit;
+using Ehr.Data.Messaging;
 using Ehr.Data.Orders;
 using Ehr.Data.Patients;
 using Ehr.Data.Scheduling;
 using Ehr.Domain.Audit;
+using Ehr.Domain.Messaging;
 using Ehr.Domain.Orders;
 using Ehr.Domain.Scheduling;
 using Microsoft.EntityFrameworkCore;
@@ -79,8 +81,14 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         var upcoming = await AppointmentEntriesAsync(
             db.Appointments.Where(a => a.PatientId == id && a.Status == AppointmentStatus.Booked && a.StartsAt >= soon).OrderBy(a => a.StartsAt).Take(5),
             latestFirst: false, cancellationToken);
+        var threads = await db.MessageThreads.AsNoTracking().Where(t => t.PatientId == id)
+            .OrderByDescending(t => t.LastMessageAt).ThenBy(t => t.Id).Take(5)
+            .Select(t => new ThreadEntry(t.Id, t.Subject, t.LastMessageAt,
+                db.Messages.Count(m => m.ThreadId == t.Id && m.SenderKind == MessageSender.Patient && m.ReadAt == null)))
+            .ToListAsync(cancellationToken);
         return new PatientChart(patient, allergies, medications, conditions, encounters, orders)
         {
+            Threads = threads,
             Upcoming = upcoming,
             ConfirmsDiscontinued = confirmed,
             SensitiveHidden = hidden,
@@ -340,6 +348,66 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         return charts;
+    }
+
+    public const string ThreadsTable = "message_threads";
+
+    // A patient's message threads (FR-18), latest first, each with how many messages the reader hasn't opened: the
+    // patient's own in the portal (those from staff), or the chart's for a clinician (those from the patient). One
+    // view of one patient: one recorded read of the patient. Row-level security returns a patient only their own.
+    public async Task<PatientThreads?> ThreadsAsync(Guid patientId, bool asPatient, int limit, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var from = asPatient ? MessageSender.Staff : MessageSender.Patient;
+        var threads = await db.MessageThreads.AsNoTracking().Where(t => t.PatientId == patientId)
+            .OrderByDescending(t => t.LastMessageAt).ThenBy(t => t.Id).Take(limit)
+            .Select(t => new ThreadEntry(t.Id, t.Subject, t.LastMessageAt,
+                db.Messages.Count(m => m.ThreadId == t.Id && m.SenderKind == from && m.ReadAt == null)))
+            .ToListAsync(cancellationToken);
+        var allergies = asPatient ? [] : await CurrentAllergies(patientId).ToListAsync(cancellationToken);
+
+        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new PatientThreads(patient, threads, allergies);
+    }
+
+    // One thread of a patient's, with its messages in order: a recorded read of the thread, whoever reads it. To a
+    // patient, staff messages come from "Your care team" and their own from "You"; to staff, each staff message names
+    // who wrote it. Null when the thread isn't this patient's.
+    public async Task<ThreadDetail?> ThreadAsync(Guid threadId, Guid patientId, bool asPatient, CancellationToken cancellationToken)
+    {
+        var thread = await db.MessageThreads.AsNoTracking().SingleOrDefaultAsync(t => t.Id == threadId && t.PatientId == patientId, cancellationToken);
+        var patient = thread is null ? null : await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (thread is null || patient is null)
+        {
+            return null;
+        }
+
+        var rows = await (
+            from message in db.Messages.AsNoTracking()
+            join staff in db.StaffUsers on message.SenderId equals staff.Id into senders
+            from staff in senders.DefaultIfEmpty()
+            where message.ThreadId == threadId
+            orderby message.SentAt, message.Id
+            select new { message.Id, message.SenderKind, Staff = staff == null ? null : staff.DisplayName, message.Body, message.SentAt, message.ReadAt })
+            .ToListAsync(cancellationToken);
+        var messages = rows.Select(m => new MessageEntry(m.Id, m.SenderKind,
+            m.SenderKind == MessageSender.Patient
+                ? asPatient ? "You" : $"{patient.GivenName} {patient.FamilyName}"
+                : asPatient ? "Your care team" : m.Staff ?? "Staff",
+            m.Body, m.SentAt, m.ReadAt)).ToList();
+        var other = asPatient ? MessageSender.Staff : MessageSender.Patient;
+        var allergies = asPatient ? [] : await CurrentAllergies(patientId).ToListAsync(cancellationToken);
+
+        audit.Record(AuditActions.Read, patient.Id, ThreadsTable, thread.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new ThreadDetail(thread.Id, thread.Subject, patient, allergies, messages,
+            [.. messages.Where(m => m.SenderKind == other && m.ReadAt is null).Select(m => m.Id)]);
     }
 
     // Appointments, already chosen and limited, with the names the lists show: the clinician's, a staff account anyone
