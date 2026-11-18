@@ -32,6 +32,10 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
     [BindProperty]
     public string? CancelReason { get; set; }
 
+    // The version of the appointment the page showed, sent back with every change (Appointment.Version).
+    [BindProperty]
+    public int Version { get; set; }
+
     public AppointmentDetail Detail { get; private set; } = null!;
 
     public bool OnPanel { get; private set; }
@@ -69,7 +73,7 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
         var start = AppointmentForm.Check(Day, Time, Minutes, Reason, errors);
         if (errors.Count == 0)
         {
-            var result = await appointments.RescheduleAsync(appointmentId, start!.Value, Minutes, Reason!, HttpContext.RequestAborted);
+            var result = await appointments.RescheduleAsync(appointmentId, Version, start!.Value, Minutes, Reason!, HttpContext.RequestAborted);
             if (result == AppointmentResult.Overlap)
             {
                 errors["Time"] = "This clinician already has an appointment booked then. Choose another time.";
@@ -110,15 +114,15 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
             return Page();
         }
 
-        return Done(await appointments.CancelAsync(appointmentId, reason, HttpContext.RequestAborted), appointmentId, "cancelled");
+        return Done(await appointments.CancelAsync(appointmentId, Version, reason, HttpContext.RequestAborted), appointmentId, "cancelled");
     }
 
     public async Task<IActionResult> OnPostCheckInAsync(Guid appointmentId) =>
         await LoadAsync(appointmentId, changing: true) ?? Done(
-            await appointments.CheckInAsync(appointmentId, Detail.Patient.Id, Detail.Appointment.Reason, HttpContext.RequestAborted), appointmentId, "checked-in");
+            await appointments.CheckInAsync(appointmentId, Version, Detail.Patient.Id, Detail.Appointment.Reason, HttpContext.RequestAborted), appointmentId, "checked-in");
 
     public async Task<IActionResult> OnPostNoShowAsync(Guid appointmentId) =>
-        await LoadAsync(appointmentId, changing: true) ?? Done(await appointments.NoShowAsync(appointmentId, HttpContext.RequestAborted), appointmentId, "no-show");
+        await LoadAsync(appointmentId, changing: true) ?? Done(await appointments.NoShowAsync(appointmentId, Version, HttpContext.RequestAborted), appointmentId, "no-show");
 
     IActionResult Done(AppointmentResult result, Guid appointmentId, string saved)
     {
@@ -128,6 +132,7 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
         }
 
         Gone = true;
+        Errors = new Dictionary<string, string>();
         Fill();
         Response.StatusCode = StatusCodes.Status409Conflict;
         return Page();
@@ -138,6 +143,7 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
     {
         if (Errors.ContainsKey("Day") || Errors.ContainsKey("Time") || Errors.ContainsKey("Reason") || Errors.ContainsKey("Minutes"))
         {
+            // The form keeps what was entered; the version it began from stays the one posted.
             return;
         }
 
@@ -146,23 +152,29 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
         Time = appointment.StartsAt.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture);
         Minutes = appointment.Minutes;
         Reason = appointment.Reason;
+        Version = appointment.Version;
     }
 
     // The gate, then the one recorded read. Null when the page may be shown. A change needs the patient on the panel.
     async Task<IActionResult?> LoadAsync(Guid appointmentId, bool changing = false)
     {
         Response.Headers.CacheControl = "no-store";
-        // Whose appointment it is decides who may open it, and reading that is itself a read of the patient: so the
-        // appointment is read first, recorded, and shown only to someone the chart is open to.
-        if (await phi.AppointmentAsync(appointmentId, HttpContext.RequestAborted) is not { } detail)
+        // The gate first, as on the chart: whose appointment it is, then whether the chart is open to this clinician,
+        // and only then the read, which is recorded.
+        if (await phi.AppointmentPatientAsync(appointmentId, HttpContext.RequestAborted) is not { } patient)
         {
             return NotFound();
         }
 
-        OnPanel = await assignments.IsOnPanelAsync(detail.Patient.Id, HttpContext.RequestAborted);
-        if (!OnPanel && (changing || await breakGlass.ActiveUntilAsync(detail.Patient.Id, HttpContext.RequestAborted) is null))
+        OnPanel = await assignments.IsOnPanelAsync(patient, HttpContext.RequestAborted);
+        if (!OnPanel && (changing || await breakGlass.ActiveUntilAsync(patient, HttpContext.RequestAborted) is null))
         {
-            return RedirectToPage("/Patients/Chart", new { id = detail.Patient.Id });
+            return RedirectToPage("/Patients/Chart", new { id = patient });
+        }
+
+        if (await phi.AppointmentAsync(appointmentId, HttpContext.RequestAborted) is not { } detail)
+        {
+            return NotFound();
         }
 
         Detail = detail;

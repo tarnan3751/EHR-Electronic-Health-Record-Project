@@ -46,5 +46,14 @@ static class AppointmentTests
         return rows;
     }
 
+    // A change to an appointment, as its page's forms post it: with the version of the appointment the page showed.
+    public static async Task<HttpResponseMessage> ChangeAsync(HttpClient client, Guid appointment, string handler, params (string Name, object Value)[] fields)
+    {
+        var page = await client.GetStringAsync($"/appointments/{appointment}", Cancel);
+        var version = System.Text.RegularExpressions.Regex.Match(page, "name=\"Version\" value=\"(\\d+)\"").Groups[1].Value;
+        return await client.PostAsync($"/appointments/{appointment}?handler={handler}",
+            Form([("__RequestVerificationToken", Token(page)), ("Version", version), .. fields]), Cancel);
+    }
+
     public static async Task<Guid> IdAsync(WebApps apps, Guid patient) => Guid.Parse((await RowsAsync(apps, patient, "id::text")).Single());
 }

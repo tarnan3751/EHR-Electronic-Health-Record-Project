@@ -1054,3 +1054,11 @@ VALUES ('20261118124810_Appointments', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.appointments ADD version integer NOT NULL DEFAULT 1;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261118183905_AppointmentVersion', '10.0.13');
+
+COMMIT;
+

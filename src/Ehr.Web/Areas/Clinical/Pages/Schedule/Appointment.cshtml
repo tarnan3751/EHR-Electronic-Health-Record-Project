@@ -47,14 +47,15 @@ else if (saved is not null && Model.Errors.Count == 0)
     <section class="sc-panel" aria-labelledby="appointment-arrival">
         <h2 class="sc-panel__title" id="appointment-arrival">When the time comes</h2>
         <div class="sc-actions">
-            <form method="post" asp-page-handler="CheckIn"><button class="sc-btn sc-btn--primary">Check in</button></form>
-            <form method="post" asp-page-handler="NoShow"><button class="sc-btn">Mark as a no-show</button></form>
+            <form method="post" asp-page-handler="CheckIn"><input type="hidden" name="Version" value="@Model.Version"><button class="sc-btn sc-btn--primary">Check in</button></form>
+            <form method="post" asp-page-handler="NoShow"><input type="hidden" name="Version" value="@Model.Version"><button class="sc-btn">Mark as a no-show</button></form>
         </div>
         <p class="sc-muted">Checking in starts the patient's visit.</p>
     </section>
     <section class="sc-panel" aria-labelledby="appointment-reschedule">
         <h2 class="sc-panel__title" id="appointment-reschedule">Reschedule</h2>
         <form method="post" asp-page-handler="Reschedule" class="sc-form">
+            <input type="hidden" name="Version" value="@Model.Version">
             <partial name="_When" model="new WhenFields(Model.Day, Model.Time, Model.Minutes, Model.Reason, Model.Errors)" />
             <button type="submit" class="sc-btn">Save new time</button>
         </form>
@@ -62,6 +63,7 @@ else if (saved is not null && Model.Errors.Count == 0)
     <section class="sc-panel" aria-labelledby="appointment-cancel">
         <h2 class="sc-panel__title" id="appointment-cancel">Cancel</h2>
         <form method="post" asp-page-handler="Cancel" class="sc-form">
+            <input type="hidden" name="Version" value="@Model.Version">
             <div class="sc-field">
                 <label for="appointment-cancel-reason">Reason for cancelling <span>(required)</span></label>
                 <textarea id="appointment-cancel-reason" class="sc-field__input" name="CancelReason" rows="2" maxlength="@Appointments.MaximumReasonLength" required

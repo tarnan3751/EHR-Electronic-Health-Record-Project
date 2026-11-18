@@ -62,7 +62,8 @@ GRANT SELECT ON ehr.break_glass_accesses TO ehr_read;
 -- The rest of the chart: allergies, medications, diagnoses (conditions) and visits (encounters). PHI, like patients:
 -- row-level security and the write-audit trigger follow. The on-prem app reads them as ehr_app, the cloud app as
 -- ehr_read. Clinicians add and change allergies, medications and diagnoses, and mark them inactive: INSERT and UPDATE
--- for ehr_app, and never DELETE. Visits are still read only.
+-- for ehr_app, and never DELETE. A visit is created when a patient is checked in for an appointment (INSERT, further
+-- down); nothing updates or deletes one.
 GRANT SELECT ON ehr.allergy_intolerances, ehr.medication_statements, ehr.conditions, ehr.encounters TO ehr_app, ehr_read;
 GRANT INSERT, UPDATE ON ehr.allergy_intolerances, ehr.medication_statements, ehr.conditions TO ehr_app;
 

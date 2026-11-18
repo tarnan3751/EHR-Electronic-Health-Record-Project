@@ -63,7 +63,7 @@ public class TC_UC16_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(">Booked</span>", day);
         Assert.Contains($"href=\"/appointments/{appointment}\"", day);
 
-        using var checkedIn = await PostFormAsync(session.Client, $"/appointments/{appointment}?handler=CheckIn", $"/appointments/{appointment}");
+        using var checkedIn = await ChangeAsync(session.Client, appointment, "CheckIn");
         var after = await ReadAsync(checkedIn);
         Assert.Contains("Checked in: the visit has started and is on the chart.", Words(after));
         Assert.DoesNotContain("Cancel appointment</button>", after);

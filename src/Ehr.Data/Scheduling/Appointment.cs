@@ -41,6 +41,11 @@ public class Appointment
     public Guid BookedById { get; set; }
 
     public DateTimeOffset BookedAt { get; set; }
+
+    // Counts the appointment's changes, kept by the database. A change says which version it started from, and is
+    // refused when the appointment has moved on since: so a page opened before a colleague rescheduled can't quietly
+    // put the old time back.
+    public int Version { get; set; }
 }
 
 // FHIR R4's appointment status codes that this clinic uses.
@@ -89,6 +94,7 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         appointment.Property(a => a.CancelReason).HasMaxLength(500);
         appointment.Property(a => a.BookedById).HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
         appointment.Property(a => a.BookedAt).HasDefaultValueSql("now()");
+        appointment.Property(a => a.Version).HasDefaultValue(1).IsConcurrencyToken();
         appointment.HasOne<Patient>().WithMany().HasForeignKey(a => a.PatientId).OnDelete(DeleteBehavior.Restrict);
         appointment.HasOne<StaffUser>().WithMany().HasForeignKey(a => a.ClinicianId).OnDelete(DeleteBehavior.Restrict);
         appointment.HasOne<StaffUser>().WithMany().HasForeignKey(a => a.BookedById).OnDelete(DeleteBehavior.Restrict);

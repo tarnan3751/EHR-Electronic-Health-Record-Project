@@ -54,6 +54,8 @@ public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             Assert.Equal($"/patients/{patient}", new Uri(Base, sent.Headers.Location!).AbsolutePath);
         }
 
+        // Sent away before anything was read: no read of the patient is recorded for them.
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, patientId: patient, source: AuditSources.OnPrem) - await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.OnPrem));
         using var opened = await PostFormAsync(covering.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));
         var chart = await ReadAsync(opened);
         Assert.DoesNotContain("data-book-appointment", chart);
@@ -66,16 +68,25 @@ public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
         Assert.Equal(["booked"], await RowsAsync(apps, patient));
 
-        var stale = Token(await session.Client.GetStringAsync($"/appointments/{appointment}", Cancel));
-        using var cancelled = await PostFormAsync(session.Client, $"/appointments/{appointment}?handler=Cancel", $"/appointments/{appointment}", ("CancelReason", "Synthetic: first"));
-        using var late = await session.Client.PostAsync($"/appointments/{appointment}?handler=NoShow", Form(("__RequestVerificationToken", stale)), Cancel);
+        // A reschedule from a page read before a colleague's reschedule doesn't put the old time back.
+        var before = await session.Client.GetStringAsync($"/appointments/{appointment}", Cancel);
+        using var moved = await ChangeAsync(session.Client, appointment, "Reschedule", ("Day", Day(4)), ("Time", "16:00"), ("Minutes", 20), ("Reason", "Synthetic: follow-up"));
+        using var staleMove = await session.Client.PostAsync($"/appointments/{appointment}?handler=Reschedule", Form(
+            ("__RequestVerificationToken", Token(before)), ("Version", "1"), ("Day", Day(4)), ("Time", "13:00"), ("Minutes", 20), ("Reason", "Synthetic: edited on an old page")), Cancel);
+        Assert.Equal(HttpStatusCode.Conflict, staleMove.StatusCode);
+        Assert.Equal(["16:00 Synthetic: follow-up"], await RowsAsync(apps, patient, "to_char(starts_at AT TIME ZONE 'UTC', 'HH24:MI') || ' ' || reason"));
+
+        var stale = Token(before);
+        using var cancelled = await ChangeAsync(session.Client, appointment, "Cancel", ("CancelReason", "Synthetic: first"));
+        using var late = await session.Client.PostAsync($"/appointments/{appointment}?handler=NoShow", Form(("__RequestVerificationToken", stale), ("Version", "2")), Cancel);
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
         Assert.Contains("Not saved: this appointment was changed by someone else first.", Words(await late.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal(["cancelled"], await RowsAsync(apps, patient));
-        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Update, clinician.Id, patient));
+        // Two updates were saved: the reschedule and the cancellation.
+        Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.Update, clinician.Id, patient));
 
         using var again = await BookAsync(session.Client, patient, clinician.Id, Day(4), "15:00", "Synthetic: rebooked");
-        var second = Guid.Parse((await RowsAsync(apps, patient, "id::text")).Last());
+        var second = Guid.Parse((await RowsAsync(apps, patient, "CASE WHEN status = 'booked' THEN id::text ELSE '' END")).Single(id => id.Length > 0));
         var token = Token(await session.Client.GetStringAsync($"/appointments/{second}", Cancel));
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Client(apps.CloudCutOff, session.Jar);
@@ -85,8 +96,8 @@ public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("Changing an appointment needs the clinic's server. The schedule remains readable.", page);
         Assert.DoesNotContain("Cancel appointment</button>", page);
         using var notSaved = await cutOff.PostAsync($"/appointments/{second}?handler=Cancel",
-            Form(("__RequestVerificationToken", token), ("CancelReason", "Synthetic: typed off-site")), Cancel);
+            Form(("__RequestVerificationToken", token), ("Version", "1"), ("CancelReason", "Synthetic: typed off-site")), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);
-        Assert.Equal(["cancelled", "booked"], await RowsAsync(apps, patient));
+        Assert.Equal(["booked", "cancelled"], await RowsAsync(apps, patient));
     }
 }

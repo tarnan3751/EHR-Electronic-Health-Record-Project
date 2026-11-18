@@ -100,8 +100,8 @@ CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR IN
     WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
 
 -- The rest of the chart (PHI): allergies, medications, diagnoses and visits, each row one patient's. Clinicians read
--- every patient's; a patient reads their own. Visits have no write policies: nothing at runtime writes them yet
--- (10-grants.sql), and with row-level security forced a write that got past the grants would still be refused.
+-- every patient's; a patient reads their own. A visit is inserted when a patient is checked in for an appointment
+-- (encounters_panel_insert, with the appointments' policies below); nothing updates or deletes one (10-grants.sql).
 -- Allergies, medications and diagnoses are added and changed by a clinician for a patient on their active panel, the
 -- rule for signing an order; an update can't move an entry to a patient off the panel either (WITH CHECK). Nothing
 -- deletes one, so there is no policy for it.

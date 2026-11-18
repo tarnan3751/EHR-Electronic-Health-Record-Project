@@ -353,7 +353,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             join patient in db.Patients on appointment.PatientId equals patient.Id
             select new AppointmentEntry(appointment.Id, appointment.PatientId, patient.FamilyName + ", " + patient.GivenName, patient.Mrn,
                 appointment.ClinicianId, clinician.DisplayName, appointment.StartsAt, appointment.Minutes, appointment.Reason, appointment.Status,
-                appointment.CancelReason)).ToListAsync(cancellationToken);
+                appointment.CancelReason, appointment.Version)).ToListAsync(cancellationToken);
         return [.. latestFirst ? entries.OrderByDescending(a => a.StartsAt).ThenBy(a => a.Id) : entries.OrderBy(a => a.StartsAt).ThenBy(a => a.Id)];
     }
 
@@ -398,6 +398,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         await db.SaveChangesAsync(cancellationToken);
         return new PatientAppointments(patient, upcoming, earlier);
     }
+
+    // Whose appointment it is, for the page's gate, which comes before anything is read or shown: the ID of the
+    // patient and nothing else. Not a recorded read; the read that follows the gate is.
+    public Task<Guid?> AppointmentPatientAsync(Guid id, CancellationToken cancellationToken) =>
+        db.Appointments.AsNoTracking().Where(a => a.Id == id).Select(a => (Guid?)a.PatientId).SingleOrDefaultAsync(cancellationToken);
 
     // One appointment, with its patient and their allergies for the banner: one recorded read of the patient.
     public async Task<AppointmentDetail?> AppointmentAsync(Guid id, CancellationToken cancellationToken)

@@ -226,6 +226,62 @@ public class AppointmentSecurityTests(MigratedDatabase database) : IClassFixture
         }
     }
 
+    // A clinician locked out for a few minutes after wrong passwords still has a schedule: only a disabled account,
+    // locked out for good, can't be booked with.
+    [Fact]
+    public async Task A_clinician_locked_out_for_minutes_can_still_be_booked_with()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "UPDATE ehr.staff_users SET lockout_end = now() + interval '15 minutes' WHERE id = @id", ("id", colleague));
+
+        await BookAsync(clinician, patient, colleague, Morning.AddDays(9));
+    }
+
+    // Each change is one more version, whatever the client sends, so an update that names an old version finds no row.
+    [Fact]
+    public async Task Each_change_is_one_more_version()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var id = await BookAsync(clinician, patient, clinician, Morning.AddDays(10));
+
+        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.appointments SET minutes = 30 WHERE id = @id AND version = 1", ("id", id));
+        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.appointments SET minutes = 45 WHERE id = @id AND version = 1", ("id", id));
+
+        Assert.Equal(["2 30"], await AsSuperuserAsync("SELECT version || ' ' || minutes FROM ehr.appointments WHERE id = @id", ("id", id)));
+        var error = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            "UPDATE ehr.appointments SET version = 1 WHERE id = @id", ("id", id)));
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, error.SqlState);
+    }
+
+    // Under a stricter isolation level the overlap check would read an old snapshot and miss the booking it waited
+    // for: refused outright, as signing an order is.
+    [Theory]
+    [InlineData(System.Data.IsolationLevel.RepeatableRead)]
+    [InlineData(System.Data.IsolationLevel.Serializable)]
+    public async Task A_booking_outside_a_read_committed_transaction_is_refused(System.Data.IsolationLevel level)
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        await using var connection = new NpgsqlConnection(App);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(level, TestContext.Current.CancellationToken);
+        await using (var user = new NpgsqlCommand("SELECT set_config('app.user_id', @id, true)", connection, transaction))
+        {
+            user.Parameters.AddWithValue("id", clinician.ToString());
+            await user.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using var book = new NpgsqlCommand(Book, connection, transaction);
+        book.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        book.Parameters.AddWithValue("patient", patient);
+        book.Parameters.AddWithValue("clinician", clinician);
+        book.Parameters.AddWithValue("start", Morning.AddDays(11));
+        var error = await Assert.ThrowsAsync<PostgresException>(() => book.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(PostgresErrorCodes.FeatureNotSupported, error.SqlState);
+    }
+
     [Fact]
     public async Task Two_bookings_of_the_same_time_at_once_cannot_both_get_through()
     {

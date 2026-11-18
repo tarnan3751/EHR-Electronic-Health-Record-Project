@@ -26,7 +26,8 @@ public sealed class Appointments(EhrDbContext db)
     {
         var now = DateTimeOffset.UtcNow;
         var clinicians = await db.StaffUsers.AsNoTracking()
-            .Where(s => s.Roles.Contains(StaffRoles.Clinician) && (s.LockoutEnd == null || s.LockoutEnd <= now))
+            // Not disabled: a disabled account is locked out for good, one locked for minutes after wrong passwords isn't.
+            .Where(s => s.Roles.Contains(StaffRoles.Clinician) && (s.LockoutEnd == null || s.LockoutEnd < now.AddYears(10)))
             .OrderBy(s => s.DisplayName).ThenBy(s => s.Id)
             .Select(s => new { s.Id, s.DisplayName })
             .ToListAsync(cancellationToken);
@@ -45,24 +46,26 @@ public sealed class Appointments(EhrDbContext db)
             Status = AppointmentStatus.Booked,
         }, isNew: true, cancellationToken);
 
-    public Task<AppointmentResult> RescheduleAsync(Guid id, DateTimeOffset startsAt, int minutes, string reason, CancellationToken cancellationToken) =>
-        SaveAsync(Stub(id, AppointmentStatus.Booked, a =>
+    // Each change names the version of the appointment the page showed: a change that began from an older one, because
+    // a colleague rescheduled in between, is refused and saves nothing.
+    public Task<AppointmentResult> RescheduleAsync(Guid id, int version, DateTimeOffset startsAt, int minutes, string reason, CancellationToken cancellationToken) =>
+        SaveAsync(Stub(id, version, AppointmentStatus.Booked, a =>
         {
             a.StartsAt = startsAt;
             a.Minutes = minutes;
             a.Reason = reason.Trim();
         }), isNew: false, cancellationToken, nameof(Appointment.StartsAt), nameof(Appointment.Minutes), nameof(Appointment.Reason));
 
-    public Task<AppointmentResult> CancelAsync(Guid id, string reason, CancellationToken cancellationToken) =>
-        SaveAsync(Stub(id, AppointmentStatus.Cancelled, a => a.CancelReason = reason.Trim()), isNew: false, cancellationToken,
+    public Task<AppointmentResult> CancelAsync(Guid id, int version, string reason, CancellationToken cancellationToken) =>
+        SaveAsync(Stub(id, version, AppointmentStatus.Cancelled, a => a.CancelReason = reason.Trim()), isNew: false, cancellationToken,
             nameof(Appointment.Status), nameof(Appointment.CancelReason));
 
-    public Task<AppointmentResult> NoShowAsync(Guid id, CancellationToken cancellationToken) =>
-        SaveAsync(Stub(id, AppointmentStatus.NoShow, _ => { }), isNew: false, cancellationToken, nameof(Appointment.Status));
+    public Task<AppointmentResult> NoShowAsync(Guid id, int version, CancellationToken cancellationToken) =>
+        SaveAsync(Stub(id, version, AppointmentStatus.NoShow, _ => { }), isNew: false, cancellationToken, nameof(Appointment.Status));
 
     // The patient has arrived: their visit starts (an encounter, in progress, for the appointment's reason) and the
     // appointment names it. Both, or neither.
-    public async Task<AppointmentResult> CheckInAsync(Guid id, Guid patient, string reason, CancellationToken cancellationToken)
+    public async Task<AppointmentResult> CheckInAsync(Guid id, int version, Guid patient, string reason, CancellationToken cancellationToken)
     {
         const string savepoint = "check_in";
         var transaction = db.Database.CurrentTransaction!;
@@ -89,7 +92,7 @@ public sealed class Appointments(EhrDbContext db)
         }
 
         entry.State = EntityState.Detached;
-        var result = await SaveAsync(Stub(id, AppointmentStatus.Fulfilled, a => a.EncounterId = visit.Id), isNew: false, cancellationToken,
+        var result = await SaveAsync(Stub(id, version, AppointmentStatus.Fulfilled, a => a.EncounterId = visit.Id), isNew: false, cancellationToken,
             nameof(Appointment.Status), nameof(Appointment.EncounterId));
         if (result != AppointmentResult.Saved)
         {
@@ -101,10 +104,11 @@ public sealed class Appointments(EhrDbContext db)
         return result;
     }
 
-    // A stand-in for the row, with its key: only the properties a move names are sent.
-    static Appointment Stub(Guid id, string status, Action<Appointment> change)
+    // A stand-in for the row, with its key and the version the change began from: only the properties a move names are
+    // sent, and only to that version of the row.
+    static Appointment Stub(Guid id, int version, string status, Action<Appointment> change)
     {
-        var appointment = new Appointment { Id = id, Reason = "", Status = status };
+        var appointment = new Appointment { Id = id, Version = version, Reason = "", Status = status };
         change(appointment);
         return appointment;
     }
@@ -134,7 +138,7 @@ public sealed class Appointments(EhrDbContext db)
         }
         catch (DbUpdateConcurrencyException)
         {
-            // No row: not an appointment this clinician may change.
+            // No row: not an appointment this clinician may change, or changed by someone else since the page was read.
             result = AppointmentResult.Refused;
         }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.ExclusionViolation })
@@ -181,4 +185,4 @@ public enum AppointmentResult
 // An appointment as the schedule, the chart and the portal list it: only the fields they show.
 public sealed record AppointmentEntry(
     Guid Id, Guid PatientId, string? PatientName, string? PatientMrn, Guid ClinicianId, string Clinician, DateTimeOffset StartsAt, int Minutes, string Reason,
-    string Status, string? CancelReason);
+    string Status, string? CancelReason, int Version = 0);

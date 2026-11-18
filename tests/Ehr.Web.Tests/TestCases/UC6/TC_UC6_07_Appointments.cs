@@ -43,7 +43,7 @@ public class TC_UC6_07_Appointments(WebApps apps) : IClassFixture<WebApps>
         using var b = await BookAsync(session.Client, patient, clinician.Id, Day(5), "11:00", "Synthetic: cancelled visit");
         using var c = await BookAsync(session.Client, other, clinician.Id, Day(5), "10:00", "Synthetic: someone else's");
         var second = Guid.Parse((await RowsAsync(apps, patient, "id::text")).Last());
-        using var cancelled = await PostFormAsync(session.Client, $"/appointments/{second}?handler=Cancel", $"/appointments/{second}", ("CancelReason", "Synthetic"));
+        using var cancelled = await ChangeAsync(session.Client, second, "Cancel", ("CancelReason", "Synthetic"));
 
         var portal = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, patient);
         var home = await portal.Client.GetStringAsync("/portal", Cancel);
