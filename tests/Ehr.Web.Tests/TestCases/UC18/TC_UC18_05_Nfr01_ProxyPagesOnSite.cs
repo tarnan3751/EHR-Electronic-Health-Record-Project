@@ -20,8 +20,8 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   1. Run the benchmark with --results, as PerformanceResults.cs says.
 //   2. Run this test case against that file.
 // Expected result: The p99 of the whole request, the commit of its audit event included, is under 15 ms for each of
-//   the rows "Proxy access, a patient on the panel", "Portal access, the patient's own", "Portal home, as a proxy" and
-//   "Portal results, as a proxy". Acceptance criterion: p99 < 15 ms, each.
+//   the rows "Proxy access, a patient on the panel", "Portal access, the patient's own", "Portal choose, a record
+//   shared" (the page after sign-in, step 6b), "Portal home, as a proxy" and "Portal results, as a proxy". Acceptance criterion: p99 < 15 ms, each.
 // Creator: Tahseen Arnan
 public class TC_UC18_05_Nfr01_ProxyPagesOnSite
 {
@@ -31,6 +31,7 @@ public class TC_UC18_05_Nfr01_ProxyPagesOnSite
     [Trait("Category", PerformanceResults.Category)]
     [InlineData("Proxy access, a patient on the panel")]
     [InlineData("Portal access, the patient's own")]
+    [InlineData("Portal choose, a record shared")]
     [InlineData("Portal home, as a proxy")]
     [InlineData("Portal results, as a proxy")]
     public void On_site_the_proxy_pages_render_in_under_15_ms_at_p99(string path)
