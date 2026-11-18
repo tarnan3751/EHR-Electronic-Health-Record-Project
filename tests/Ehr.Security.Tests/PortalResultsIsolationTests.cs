@@ -89,7 +89,7 @@ public class PortalResultsIsolationTests(MigratedDatabase database) : IClassFixt
             ("id", unreleased), ("patient", patient));
         var grant = Guid.CreateVersion7();
         await Accounts.ExecuteAsync(App, patientAccount,
-            "INSERT INTO ehr.proxy_grants (id, patient_id, proxy_email, scope, expires_at) VALUES (@id, @patient, @email, 'record', now() + interval '30 days')",
+            "INSERT INTO ehr.proxy_grants (id, patient_id, proxy_email, scope, include_sensitive, expires_at) VALUES (@id, @patient, @email, 'record', false, now() + interval '30 days')",
             ("id", grant), ("patient", patient), ("email", $"{proxyAccount:N}@example.com"));
 
         const string visible = "SELECT id FROM ehr.observations";
