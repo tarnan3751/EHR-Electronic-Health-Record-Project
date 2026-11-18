@@ -2,7 +2,7 @@ using Ehr.Domain.Accounts;
 
 namespace Ehr.Web.Email;
 
-// At most RateLimits:EmailsPerAddressPerHour account emails to one address (lower-cased) in any hour, so the account
+// At most RateLimits:EmailsPerAddressPerHour emails (account emails and "you have a new message" notices) to one address (lower-cased) in any hour, so the account
 // pages can't be used to flood someone's inbox. Over the cap it sends nothing and says nothing: the pages answer as
 // usual. Kept in memory, so a restart starts the count again.
 public sealed class CappedEmailSender(IEmailSender inner, int perAddressPerHour, TimeProvider time) : IEmailSender

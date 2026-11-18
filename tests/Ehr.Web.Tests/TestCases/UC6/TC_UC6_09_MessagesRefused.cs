@@ -23,10 +23,12 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Open, and reply to, the other patient's conversation.
 //   3. Off-site with the clinic's server unreachable, open "Messages", the conversation, and "Write to your care
 //      team"; post a reply that was already on screen.
+//   4. Back on-site, start nine more conversations, then an eleventh.
 // Expected result: Step 1: each is answered 422 with "Not sent:" and "Enter a subject." / "Write your message."; no
 //   message is added. Step 2: both are answered 404, and the list never shows the other conversation. Step 3: the
 //   pages are readable and say "Read-only: messages can't be sent until the clinic's server is back.", with no form;
-//   the post is answered 503 and no message is added.
+//   the post is answered 503 and no message is added. Step 4: the eleventh is answered 422 with "Please call the
+//   clinic, or try again later." and isn't saved.
 // Creator: Tahseen Arnan
 public class TC_UC6_09_MessagesRefused(WebApps apps) : IClassFixture<WebApps>
 {
@@ -70,5 +72,15 @@ public class TC_UC6_09_MessagesRefused(WebApps apps) : IClassFixture<WebApps>
         using var notSent = await cutOff.PostAsync($"/portal/messages/{mine}", Form(("__RequestVerificationToken", token), ("Body", "Synthetic: typed during the outage")), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSent.StatusCode);
         Assert.Single(await RowsAsync(apps, patient, "body"));
+
+        for (var i = 2; i <= 10; i++)
+        {
+            await StartAsync(portal.Client, $"Synthetic: conversation {i}", "Synthetic: another");
+        }
+
+        using var eleventh = await PostFormAsync(portal.Client, "/portal/messages/new", "/portal/messages/new", ("Subject", "Synthetic: one too many"), ("Body", "Synthetic: again"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, eleventh.StatusCode);
+        Assert.Contains("Please call the clinic, or try again later.", await eleventh.Content.ReadAsStringAsync(Cancel));
+        Assert.Equal(10, (await RowsAsync(apps, patient, "body")).Count);
     }
 }

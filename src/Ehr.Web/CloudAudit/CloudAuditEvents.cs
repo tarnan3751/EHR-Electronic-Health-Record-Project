@@ -10,8 +10,8 @@ namespace Ehr.Web.CloudAudit;
 // event recorded on the cloud app, such as on another HandledOffSite page, needs its shape here first.
 public static class CloudAuditEvents
 {
-    // Exactly what the cloud app records: PhiReader reads of patients, private drafts/reviews or signed notes (forced RLS
-    // decides visibility), or a sign-out as StaffSignIn and PatientSignIn record it,
+    // Exactly what the cloud app records: PhiReader reads of patients, private drafts/reviews, signed notes or message
+    // threads (forced RLS decides visibility), or a sign-out as StaffSignIn and PatientSignIn record it,
     // with the patient for a patient's. Both by an actor, neither with a reason or details. The JSON the on-prem app
     // reads can hold null where an event should be.
     public static bool IsAllowed([NotNullWhen(true)] AuditEvent? e) =>

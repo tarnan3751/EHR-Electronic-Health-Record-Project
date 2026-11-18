@@ -1,12 +1,25 @@
 -- Secure messages (FR-18; the expansion plan's step 5). Applied as ehr_owner after migrations, on every run of
 -- infra/migrate; safe to re-run. The grants are in 10-grants.sql and the row-level security policies in 30-rls.sql.
 
--- Before a thread is inserted: the database sets when, whatever the client sent. Runs as the caller.
+-- Before a thread is inserted: the database sets when, whatever the client sent. And a patient starts at most 10
+-- conversations in a day: each one puts an item in every care-team clinician's inbox, so without a limit one account
+-- could bury a care team. The error is program_limit_exceeded (54000), which the portal turns into "call the
+-- clinic"; a 53xxx code would be retried as a transient failure. Staff have no limit, and a conversation staff
+-- started doesn't count. Runs as the caller, who sees only their own threads.
 CREATE OR REPLACE FUNCTION ehr.start_message_thread() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
+    IF ehr.current_patient_id() IS NOT NULL
+       AND (SELECT count(*) FROM ehr.message_threads t
+            WHERE t.patient_id = NEW.patient_id AND t.started_at > now() - interval '1 day'
+              -- Not the ones staff started: those whose first message is from staff.
+              AND (SELECT m.sender_kind FROM ehr.messages m WHERE m.thread_id = t.id ORDER BY m.sent_at, m.id LIMIT 1)
+                  IS DISTINCT FROM 'staff') >= 10 THEN
+        RAISE EXCEPTION 'A patient starts at most 10 conversations a day' USING ERRCODE = '54000';
+    END IF;
+
     NEW.started_at := clock_timestamp();
     NEW.last_message_at := NEW.started_at;
     RETURN NEW;
@@ -34,6 +47,13 @@ BEGIN
 
         IF coalesce(NEW.body, '') !~ '[^[:space:]]' THEN
             RAISE EXCEPTION 'A message says something' USING ERRCODE = '23514';
+        END IF;
+
+        -- A patient sends at most 30 messages in an hour, for the reason they start at most 10 conversations a day.
+        IF NEW.sender_kind = 'patient'
+           AND (SELECT count(*) FROM ehr.messages m
+                WHERE m.patient_id = NEW.patient_id AND m.sender_kind = 'patient' AND m.sent_at > now() - interval '1 hour') >= 30 THEN
+            RAISE EXCEPTION 'A patient sends at most 30 messages an hour' USING ERRCODE = '54000';
         END IF;
 
         NEW.sender_id := ehr.current_user_id();
@@ -65,7 +85,9 @@ CREATE OR REPLACE TRIGGER messages_guard
 --   2. A patient's message goes into the inbox of each clinician with the patient on their active panel: their care
 --      team. The item's summary says only that a patient sent a message. A clinician who already has an open item for
 --      the thread doesn't get a second.
---   3. A staff message answers the thread: its open inbox items are marked done, for the whole care team.
+--   3. A staff message answers the thread: its open inbox items are marked done, for the whole care team. That
+--      includes an item for a patient message that arrived a moment before the reply; the page the reply returns to
+--      shows that message, and the patient's next one opens a new item.
 CREATE OR REPLACE FUNCTION ehr.deliver_message() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER

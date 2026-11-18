@@ -420,7 +420,8 @@ CREATE POLICY encounters_panel_insert ON ehr.encounters FOR INSERT
 
 -- The staff inbox (PHI). An item is its recipient's alone: they read it and mark it done, while their account is a
 -- staff account that may sign in (a clinician or an admin). Nobody else sees it: not another clinician, not an admin
--- who isn't the recipient, not the patient. Nothing at runtime inserts or deletes one yet (10-grants.sql).
+-- who isn't the recipient, not the patient. No runtime role inserts or deletes one (10-grants.sql): items are created
+-- by the database's own triggers, such as a patient's message being delivered (90-messages.sql).
 ALTER TABLE ehr.inbox_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.inbox_items FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS inbox_items_own_select ON ehr.inbox_items;

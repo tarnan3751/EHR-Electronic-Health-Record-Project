@@ -184,6 +184,36 @@ public class MessageSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         }
     }
 
+    // Each conversation a patient starts puts an item in every care-team inbox, so the database holds one account to
+    // 10 new conversations a day and 30 messages an hour. Staff aren't limited, and what staff start doesn't count.
+    [Fact]
+    public async Task A_patient_cannot_bury_their_care_team_in_messages()
+    {
+        var (clinician, patient, account) = await CareAsync();
+        await SendAsync(clinician, await ThreadAsync(clinician, patient), patient, "staff");
+        var thread = Guid.Empty;
+        for (var i = 0; i < 10; i++)
+        {
+            thread = await ThreadAsync(account, patient);
+            await SendAsync(account, thread, patient, "patient");
+        }
+
+        var eleventh = await Assert.ThrowsAsync<PostgresException>(() => ThreadAsync(account, patient));
+        Assert.Equal(PostgresErrorCodes.ProgramLimitExceeded, eleventh.SqlState);
+        await ThreadAsync(clinician, patient);
+
+        for (var i = 10; i < 30; i++)
+        {
+            await SendAsync(account, thread, patient, "patient");
+        }
+
+        var tooMany = await Assert.ThrowsAsync<PostgresException>(() => SendAsync(account, thread, patient, "patient"));
+        Assert.Equal(PostgresErrorCodes.ProgramLimitExceeded, tooMany.SqlState);
+        await SendAsync(clinician, thread, patient, "staff");
+        Assert.Equal(["30"], await AsSuperuserAsync("SELECT count(*) FROM ehr.messages WHERE patient_id = @patient AND sender_kind = 'patient'", ("patient", patient)));
+        Assert.Equal(["10"], await AsSuperuserAsync("SELECT count(*) FROM ehr.inbox_items WHERE patient_id = @patient", ("patient", patient)));
+    }
+
     // The write audit keeps every message; an admin sees that one was written and by whom, never its text or subject.
     [Fact]
     public async Task An_admin_never_gets_a_messages_text_from_the_audit_log()

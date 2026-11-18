@@ -55,12 +55,13 @@ public class ThreadModel(PhiReader phi, SecureMessages messages, SiteKind site) 
         var errors = SecureMessages.Check(subject: null, Body, reply: true);
         if (errors.Count == 0)
         {
-            if (await messages.ReplyAsync(threadId, PatientId, MessageSender.Patient, Body!, HttpContext.RequestAborted))
+            var result = await messages.ReplyAsync(threadId, PatientId, MessageSender.Patient, Body!, HttpContext.RequestAborted);
+            if (result == SendResult.Sent)
             {
                 return RedirectToPage(new { threadId, sent = true });
             }
 
-            errors["Body"] = "Your message couldn't be sent. Try again, or contact the clinic.";
+            errors["Body"] = result == SendResult.TooMany ? SecureMessages.TooMany : "Your message couldn't be sent. Try again, or contact the clinic.";
         }
 
         Error = errors["Body"];

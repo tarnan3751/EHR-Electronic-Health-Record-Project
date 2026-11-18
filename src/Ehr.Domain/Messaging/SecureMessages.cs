@@ -41,16 +41,19 @@ public sealed class SecureMessages(EhrDbContext db, IEmailSender email)
         return errors;
     }
 
-    // Starts a thread with its first message; the new thread's ID, or null when the database refused it.
-    public async Task<Guid?> StartAsync(Guid patient, string sender, string subject, string body, CancellationToken cancellationToken)
+    // Starts a thread with its first message: the new thread's ID when it was sent.
+    public async Task<(SendResult Result, Guid Thread)> StartAsync(Guid patient, string sender, string subject, string body, CancellationToken cancellationToken)
     {
         var thread = new MessageThread { Id = Guid.CreateVersion7(), PatientId = patient, Subject = subject.Trim() };
-        return await SaveAsync(cancellationToken, thread, NewMessage(thread.Id, patient, sender, body)) ? thread.Id : null;
+        return (await SaveAsync(cancellationToken, thread, NewMessage(thread.Id, patient, sender, body)), thread.Id);
     }
 
-    // Adds a message to a thread of this patient's; false when the database refused it.
-    public Task<bool> ReplyAsync(Guid thread, Guid patient, string sender, string body, CancellationToken cancellationToken) =>
+    // Adds a message to a thread of this patient's.
+    public Task<SendResult> ReplyAsync(Guid thread, Guid patient, string sender, string body, CancellationToken cancellationToken) =>
         SaveAsync(cancellationToken, NewMessage(thread, patient, sender, body));
+
+    // What the portal says when a patient has reached the day's or the hour's limit.
+    public const string TooMany = "You've sent a lot of messages today. Please call the clinic, or try again later.";
 
     // Records that the signed-in side has now read the other side's messages in a thread: the patient, the staff's; a
     // clinician with the patient on their panel, the patient's. The database marks each once and refuses anyone else,
@@ -85,9 +88,17 @@ public sealed class SecureMessages(EhrDbContext db, IEmailSender email)
 
     // Tells the patient, at their portal account's address, that the clinic sent a message: that and a link to the
     // portal, and nothing else. No subject, no text, no names: email isn't a place for health details. A patient with
-    // no portal account gets nothing.
-    public async Task NotifyPatientAsync(Guid patient, string portalLink, CancellationToken cancellationToken)
+    // no portal account gets nothing. And one notice is enough: unreadFromStaff counts the staff messages the patient
+    // hasn't opened, the one just sent included, and when there were others already they have been told. So a run of
+    // replies doesn't use up the few emails an address may be sent in an hour (CappedEmailSender), which a password
+    // reset also draws on.
+    public async Task NotifyPatientAsync(Guid patient, int unreadFromStaff, string portalLink, CancellationToken cancellationToken)
     {
+        if (unreadFromStaff > 1)
+        {
+            return;
+        }
+
         var address = await db.PatientUsers.AsNoTracking().Where(u => u.PatientId == patient && u.EmailConfirmed)
             .Select(u => u.Email).FirstOrDefaultAsync(cancellationToken);
         if (address is not null)
@@ -102,7 +113,7 @@ public sealed class SecureMessages(EhrDbContext db, IEmailSender email)
         new() { Id = Guid.CreateVersion7(), ThreadId = thread, PatientId = patient, SenderKind = sender, Body = body.Trim() };
 
     // Inserts the rows, or none of them. Reads nothing: row-level security and the triggers decide.
-    async Task<bool> SaveAsync(CancellationToken cancellationToken, params object[] rows)
+    async Task<SendResult> SaveAsync(CancellationToken cancellationToken, params object[] rows)
     {
         const string savepoint = "message";
         var transaction = db.Database.CurrentTransaction!;
@@ -112,16 +123,17 @@ public sealed class SecureMessages(EhrDbContext db, IEmailSender email)
         {
             await db.SaveChangesAsync(cancellationToken);
             await transaction.ReleaseSavepointAsync(savepoint, cancellationToken);
-            return true;
+            return SendResult.Sent;
         }
         catch (DbUpdateException e) when (e.InnerException is PostgresException
         {
-            // Refused by row-level security, or the thread isn't this patient's.
-            SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation or PostgresErrorCodes.ForeignKeyViolation,
-        })
+            // Refused by row-level security, or the thread isn't this patient's; or the patient has reached the limit.
+            SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation or PostgresErrorCodes.ForeignKeyViolation
+                or PostgresErrorCodes.ProgramLimitExceeded,
+        } refused)
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-            return false;
+            return refused.SqlState == PostgresErrorCodes.ProgramLimitExceeded ? SendResult.TooMany : SendResult.Refused;
         }
         finally
         {
@@ -131,6 +143,17 @@ public sealed class SecureMessages(EhrDbContext db, IEmailSender email)
             }
         }
     }
+}
+
+public enum SendResult
+{
+    Sent,
+
+    // Not this account's to send.
+    Refused,
+
+    // A patient has started too many conversations today, or sent too many messages this hour.
+    TooMany,
 }
 
 // A thread as the lists show it: its subject, when its latest message was sent, and how many messages from the other

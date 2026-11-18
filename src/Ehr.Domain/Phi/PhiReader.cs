@@ -410,6 +410,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             [.. messages.Where(m => m.SenderKind == other && m.ReadAt is null).Select(m => m.Id)]);
     }
 
+    // How many messages from staff a patient hasn't opened yet, across their conversations: whether they have already
+    // been told there is something to read. A number, about no particular message: not a recorded read.
+    public Task<int> UnreadFromStaffAsync(Guid patientId, CancellationToken cancellationToken) =>
+        db.Messages.CountAsync(m => m.PatientId == patientId && m.SenderKind == MessageSender.Staff && m.ReadAt == null, cancellationToken);
+
     // Appointments, already chosen and limited, with the names the lists show: the clinician's, a staff account anyone
     // signed in may read, and the patient's, which the caller records a read of where it shows it. Sorted here, by
     // start: the joins keep no order.

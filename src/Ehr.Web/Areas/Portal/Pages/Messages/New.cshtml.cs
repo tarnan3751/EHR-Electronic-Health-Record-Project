@@ -32,12 +32,13 @@ public class NewModel(SecureMessages messages) : PageModel
         if (errors.Count == 0)
         {
             var patientId = Guid.Parse(User.FindFirstValue(EhrClaims.PatientId)!);
-            if (await messages.StartAsync(patientId, MessageSender.Patient, Subject!, Body!, HttpContext.RequestAborted) is { } thread)
+            var (result, thread) = await messages.StartAsync(patientId, MessageSender.Patient, Subject!, Body!, HttpContext.RequestAborted);
+            if (result == SendResult.Sent)
             {
                 return RedirectToPage("Thread", new { threadId = thread, sent = true });
             }
 
-            errors["Body"] = "Your message couldn't be sent. Try again, or contact the clinic.";
+            errors["Body"] = result == SendResult.TooMany ? SecureMessages.TooMany : "Your message couldn't be sent. Try again, or contact the clinic.";
         }
 
         Errors = errors;
