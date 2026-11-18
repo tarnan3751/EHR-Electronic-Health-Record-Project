@@ -11,7 +11,7 @@
 <h1>Access</h1>
 @if (Model.Done is "given")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> they can see your record when they sign in with that email address. We sent them an email that doesn't say whose record it is.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> they can see your record when they sign in with that email address. We sent them an email that doesn't say whose record it is; if they don't have a portal account, it has a link to create one.</p>
 }
 else if (Model.Done is "removed")
 {
@@ -48,6 +48,11 @@ else
     </ul>
 }
 
+@if (!Model.HasOwnRecord)
+{
+    @* A proxy-only account (step 6b) has no record of its own, so nothing to share. *@
+    return;
+}
 <h2>Who can view your record</h2>
 @if (Model.Acting)
 {
@@ -97,7 +102,7 @@ else
     }
     else
     {
-        <p class="sc-muted">For a family member or carer who helps with your care. They need their own portal account, and they sign in with their own password, never yours. Access ends on the date you choose, and you can remove it at any time.</p>
+        <p class="sc-muted">For a family member or carer who helps with your care. They sign in with their own portal account and their own password, never yours; if they don't have an account, the email we send them has a link to create one. Access ends on the date you choose, and you can remove it at any time.</p>
         <form method="post" class="sc-form">
             @if (Model.Errors.Count > 0)
             {

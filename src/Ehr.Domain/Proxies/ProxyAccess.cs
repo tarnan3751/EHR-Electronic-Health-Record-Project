@@ -49,7 +49,7 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
 
     // Gives the person with that portal email access to the patient's record. Giving it again replaces what they had:
     // the earlier grant is revoked first, in the same transaction.
-    public async Task<GiveResult> GiveAsync(Guid patient, IEnumerable<Guid> replaces, string proxyEmail, string scope, bool includeSensitive, int days,
+    public async Task<(GiveResult Result, Guid Grant)> GiveAsync(Guid patient, IEnumerable<Guid> replaces, string proxyEmail, string scope, bool includeSensitive, int days,
         CancellationToken cancellationToken)
     {
         const string savepoint = "proxy_grant";
@@ -75,7 +75,7 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
             db.Add((object)grant);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.ReleaseSavepointAsync(savepoint, cancellationToken);
-            return GiveResult.Given;
+            return (GiveResult.Given, grant.Id);
         }
         catch (Exception e) when (e is DbUpdateConcurrencyException || e is DbUpdateException
         {
@@ -87,13 +87,13 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
         })
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-            return (e as DbUpdateException)?.InnerException switch
+            return ((e as DbUpdateException)?.InnerException switch
             {
                 PostgresException { SqlState: PostgresErrorCodes.ProgramLimitExceeded } => GiveResult.TooMany,
                 // The trigger names this one refusal (95-proxy-access.sql); any other check is just refused.
                 PostgresException { SqlState: PostgresErrorCodes.CheckViolation, ConstraintName: "proxy_grants_not_oneself" } => GiveResult.Yourself,
                 _ => GiveResult.Refused,
-            };
+            }, grant.Id);
         }
         finally
         {
@@ -120,12 +120,14 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
     }
 
     // Tells the address that someone gave it access, and nothing else: no names, and the same whether or not a portal
-    // account has that address.
-    public Task NotifyAsync(string proxyEmail, string portalLink, CancellationToken cancellationToken) =>
+    // account has that address. The link creates an account for someone who has none (ProxyInvitations): it works
+    // once and expires. Someone who has an account signs in as usual.
+    public Task NotifyAsync(string proxyEmail, string signInLink, string invitationLink, CancellationToken cancellationToken) =>
         email.SendAsync(proxyEmail.Trim(), "You have been given access to a record",
             "Someone gave you access to their record in the patient portal, or their clinic recorded it. For their privacy this email doesn't say who. "
-                + "Sign in to the patient portal with this email address to see it. If you don't have a portal account, ask the clinic.",
-            new EmailAction("Open the patient portal", portalLink), cancellationToken);
+                + $"If you already have a portal account with this email address, sign in at {signInLink} to see it. "
+                + "If you don't, use the button to create one: the link works once and expires in 7 days.",
+            new EmailAction("Create your portal account", invitationLink), cancellationToken);
 
     // A stand-in for the row, with its key: only revoked_at is sent, and the database sets its value and who.
     Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry Revoking(Guid grant)

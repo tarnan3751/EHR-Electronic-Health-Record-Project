@@ -16,11 +16,17 @@ namespace Ehr.Web;
 // (ehr.current_patient_id), so a page that got this wrong would be shown nothing.
 public sealed class PortalSubject
 {
-    // The patient the page is about.
-    public Guid PatientId { get; internal set; }
+    // The patient the page is about. PortalSubjectFilter lets a handler run only when there is one, except on the
+    // pages that choose (Access, Choose, Acting), which don't ask.
+    public Guid PatientId => Subject ?? throw new InvalidOperationException("This portal request has no patient to look at.");
 
-    // The signed-in account's own patient, whoever it is looking at.
-    public Guid OwnPatientId { get; internal set; }
+    public bool HasSubject => Subject is not null;
+
+    internal Guid? Subject { get; set; }
+
+    // The signed-in account's own patient, whoever it is looking at. Null for a proxy-only account (step 6b), which
+    // has no record of its own.
+    public Guid? OwnPatientId { get; internal set; }
 
     // The grant the session is acting under and whose record it opens, or null on the account's own record.
     public ProxiedRecord? Acting { get; internal set; }
@@ -66,27 +72,36 @@ public sealed class PortalSubjectFilter(PhiReader phi, PortalSubject subject, Us
     public async Task OnPageHandlerExecutionAsync(PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
     {
         var http = context.HttpContext;
-        if (string.Equals(context.RouteData.Values["area"] as string, "Portal", StringComparison.Ordinal)
-            && Guid.TryParse(http.User.FindFirstValue(EhrClaims.PatientId), out var own))
+        if (string.Equals(context.RouteData.Values["area"] as string, "Portal", StringComparison.Ordinal) && http.User.IsPortalAccount())
         {
+            Guid? own = Guid.TryParse(http.User.FindFirstValue(EhrClaims.PatientId), out var patient) ? patient : null;
             subject.OwnPatientId = own;
-            subject.PatientId = own;
+            subject.Subject = own;
             var page = context.RouteData.Values["page"] as string ?? "";
-            var withoutCheck = page.StartsWith("/Account/", StringComparison.Ordinal) || page == "/Acting";
-            if (user.ActingGrant is { } grant && !withoutCheck)
+            var choosing = page.StartsWith("/Account/", StringComparison.Ordinal) || page is "/Acting" or "/Choose";
+            if (user.ActingGrant is { } grant && !choosing)
             {
                 if (await phi.ProxiedRecordAsync(grant, http.RequestAborted) is not { } record)
                 {
                     ActingCookie.Clear(http);
-                    context.Result = new RedirectToPageResult("/Index", new { area = "Portal", ended = true });
+                    // Back to their own record, which says so; an account without one goes to choose again.
+                    context.Result = new RedirectToPageResult(own is null ? "/Choose" : "/Index", new { area = "Portal", ended = true });
                     return;
                 }
 
                 subject.Acting = record;
-                subject.PatientId = record.PatientId;
+                subject.Subject = record.PatientId;
             }
 
             http.Items[Item] = subject;
+
+            // A proxy-only account that isn't looking at a shared record has nothing to show but the pages that
+            // choose one (step 6b): everything else sends it there, before a handler reads anything.
+            if (!subject.HasSubject && !choosing && page != "/Access")
+            {
+                context.Result = new RedirectToPageResult("/Choose", new { area = "Portal" });
+                return;
+            }
         }
 
         await next();

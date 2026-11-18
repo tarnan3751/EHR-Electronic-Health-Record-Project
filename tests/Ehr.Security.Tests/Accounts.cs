@@ -40,6 +40,21 @@ static class Accounts
         return id;
     }
 
+    // A proxy-only portal account (step 6b): confirmed, with no patient record of its own. Its ID and its address.
+    public static async Task<(Guid Id, string Email)> ProxyOnlyAccountAsync(MigratedDatabase database)
+    {
+        var id = Guid.CreateVersion7();
+        var email = $"{id:N}@example.com";
+        await ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.patient_users (id, user_name, normalized_user_name, email, normalized_email, email_confirmed,
+                phone_number_confirmed, two_factor_enabled, lockout_enabled, access_failed_count, patient_id, display_name)
+            VALUES (@id, @email, upper(@email), @email, upper(@email), true, false, false, true, 0, NULL, 'Synthetic Proxy')
+            """,
+            ("id", id), ("email", email));
+        return (id, email);
+    }
+
     // How an account is disabled: locked out indefinitely.
     public static Task LockOutAsync(MigratedDatabase database, Guid staffId) =>
         ExecuteAsync(database.SuperuserConnectionString, null,

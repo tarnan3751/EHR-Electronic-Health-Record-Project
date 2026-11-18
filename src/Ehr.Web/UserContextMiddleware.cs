@@ -18,7 +18,7 @@ public sealed class UserContextMiddleware(RequestDelegate next)
 
             // A portal session may be acting under a proxy grant (FR-19): the database is told which, and decides
             // whether it counts (ehr.current_patient_id). Staff sessions never act under one.
-            if (context.User.HasClaim(claim => claim.Type == Ehr.Domain.Accounts.EhrClaims.PatientId))
+            if (Ehr.Domain.Accounts.EhrClaims.IsPortalAccount(context.User))
             {
                 user.ActingGrant = ActingCookie.Read(context);
             }

@@ -99,6 +99,13 @@ GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 GRANT SELECT, INSERT, UPDATE ON ehr.patient_enrollments TO ehr_app;
 GRANT SELECT ON ehr.patient_enrollments TO ehr_read;
 
+-- Invitations to create a proxy-only portal account (step 6b), as hashes. Internal, for the reason enrollment codes
+-- are: the page that accepts one runs before anyone is signed in. The hash is useless without the code, which is
+-- never stored, and an invitation opens nothing by itself. The app marks one redeemed, that column alone. No DELETE.
+GRANT SELECT, INSERT ON ehr.proxy_invitations TO ehr_app;
+GRANT UPDATE (redeemed_at) ON ehr.proxy_invitations TO ehr_app;
+GRANT SELECT ON ehr.proxy_invitations TO ehr_read;
+
 -- Audit events. Restricted: row-level security is enabled and forced, in the policy files that follow; no trigger,
 -- since nothing audits the audit. Append-only: no UPDATE and no DELETE for anyone at runtime. The write-audit
 -- trigger inserts as the table's owner; the app role inserts read and sign-in events.

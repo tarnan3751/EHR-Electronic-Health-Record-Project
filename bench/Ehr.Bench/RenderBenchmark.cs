@@ -889,7 +889,7 @@ internal static partial class RenderBenchmark
         var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
         await using var transaction = await db.Database.BeginTransactionAsync();
         var access = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Proxies.ProxyAccess>();
-        if (await access.GiveAsync(patient, [], proxyEmail, Ehr.Data.Proxies.ProxyScope.RecordAndMessages, includeSensitive: false, 30, CancellationToken.None)
+        if ((await access.GiveAsync(patient, [], proxyEmail, Ehr.Data.Proxies.ProxyScope.RecordAndMessages, includeSensitive: false, 30, CancellationToken.None)).Result
             != Ehr.Domain.Proxies.GiveResult.Given)
         {
             throw new InvalidOperationException("The benchmark's proxy grant was refused.");

@@ -15,7 +15,7 @@ namespace Ehr.Web.Areas.Portal.Pages;
 // from the request; a grant is named by its ID and found only among that patient's. While the session is looking at
 // someone else's record nothing here can be changed: a proxy never passes access on.
 [ShownIfNotSaved(nameof(Email))]
-public class AccessModel(PhiReader phi, ProxyAccess access, PortalSubject subject, IOptions<SiteAddresses> addresses) : PageModel
+public class AccessModel(PhiReader phi, ProxyAccess access, ProxyInvitations invitations, PortalSubject subject, IOptions<SiteAddresses> addresses) : PageModel
 {
     [BindProperty]
     public string? Email { get; set; }
@@ -35,6 +35,9 @@ public class AccessModel(PhiReader phi, ProxyAccess access, PortalSubject subjec
 
     public bool Acting => subject.Acting is not null;
 
+    // False for a proxy-only account (step 6b): it has no record of its own to share.
+    public bool HasOwnRecord => subject.OwnPatientId is not null;
+
     public IReadOnlyList<ProxiedRecord> Records { get; private set; } = [];
 
     public IReadOnlyList<ProxyGrantEntry> Grants { get; private set; } = [];
@@ -45,7 +48,7 @@ public class AccessModel(PhiReader phi, ProxyAccess access, PortalSubject subjec
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (Acting)
+        if (Acting || subject.OwnPatientId is not { } own)
         {
             return RedirectToPage();
         }
@@ -56,10 +59,13 @@ public class AccessModel(PhiReader phi, ProxyAccess access, PortalSubject subjec
         {
             // Giving it again replaces what that person had.
             var earlier = Grants.Where(g => g.RevokedAt is null && string.Equals(g.Email, Email!.Trim(), StringComparison.OrdinalIgnoreCase)).Select(g => g.Id);
-            switch (await access.GiveAsync(subject.OwnPatientId, earlier, Email!, Scope!, IncludeSensitive, Days, HttpContext.RequestAborted))
+            var (result, grant) = await access.GiveAsync(own, earlier, Email!, Scope!, IncludeSensitive, Days, HttpContext.RequestAborted);
+            switch (result)
             {
                 case GiveResult.Given:
-                    await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, Request, "/portal/access"), HttpContext.RequestAborted);
+                    var code = await invitations.IssueAsync(grant, Email!, HttpContext.RequestAborted);
+                    await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, Request, "/portal/sign-in"),
+                        Links.Build(addresses.Value.PortalBaseUrl, Request, $"/portal/invitation?code={code}"), HttpContext.RequestAborted);
                     return RedirectToPage(new { done = "given" });
                 case GiveResult.Yourself:
                     errors["Email"] = "That's your own email address. Enter the other person's.";
@@ -87,7 +93,7 @@ public class AccessModel(PhiReader phi, ProxyAccess access, PortalSubject subjec
     // A change to one of the patient's own grants that is still in force; anything else is not found.
     async Task<IActionResult> ChangeAsync(Guid grantId, Func<Task<bool>> change, string done)
     {
-        if (Acting)
+        if (Acting || !HasOwnRecord)
         {
             return RedirectToPage();
         }
@@ -100,7 +106,7 @@ public class AccessModel(PhiReader phi, ProxyAccess access, PortalSubject subjec
     {
         Response.Headers.CacheControl = "no-store";
         Records = await phi.ProxiedRecordsAsync(HttpContext.RequestAborted);
-        if (!Acting && await phi.ProxyGrantsAsync(subject.OwnPatientId, asPatient: true, HttpContext.RequestAborted) is { } own)
+        if (!Acting && subject.OwnPatientId is { } patient && await phi.ProxyGrantsAsync(patient, asPatient: true, HttpContext.RequestAborted) is { } own)
         {
             Grants = own.Grants;
         }

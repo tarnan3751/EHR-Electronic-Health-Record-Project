@@ -29,7 +29,9 @@ public class SignInModel(PatientSignIn signIn) : PageModel
             case PatientSignInOutcome.SignedIn:
                 // A new session starts on its own record, whatever the last one on this browser was looking at (FR-19).
                 ActingCookie.Clear(HttpContext);
-                return LocalRedirect(Links.Local(Url, ReturnUrl, AccountSchemes.PortalPath));
+                // To the page that asks whose record, which goes straight on to the account's own when nothing is
+                // shared with it (step 6b; UC 6's alternative course).
+                return LocalRedirect(Links.Local(Url, ReturnUrl, AccountSchemes.PortalPath + "/choose"));
             case PatientSignInOutcome.EmailNotConfirmed:
                 ModelState.AddModelError("", "Confirm your email address first: open the link we sent you when you registered. If it expired, ask for a new one below.");
                 return Page();
