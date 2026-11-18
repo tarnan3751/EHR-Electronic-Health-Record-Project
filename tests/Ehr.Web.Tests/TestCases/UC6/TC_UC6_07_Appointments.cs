@@ -24,8 +24,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Open "Appointments".
 //   3. Open the same page off-site with the clinic's server unreachable.
 // Expected result: Step 1: "Your next appointments" lists the 09:00 appointment with its date written out, "09:00
-//   UTC, for 20 minutes, with Dr. Portal Schedule" and its reason, and a link to all appointments; the placeholder now
-//   says only "Messages will appear here." Step 2: "Coming up" lists the 09:00 appointment; "Earlier" lists the
+//   UTC, for 20 minutes, with Dr. Portal Schedule" and its reason, and a link to all appointments; the placeholder is
+//   gone. Step 2: "Coming up" lists the 09:00 appointment; "Earlier" lists the
 //   cancelled one with a "Cancelled" tag; the other patient's appointment appears nowhere; the page has no form and
 //   says to contact the clinic; it is one recorded read of the patient. Step 3: the same list, read from the cloud copy.
 // Creator: Tahseen Arnan
@@ -52,7 +52,7 @@ public class TC_UC6_07_Appointments(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Synthetic: annual physical", home);
         Assert.DoesNotContain("Synthetic: cancelled visit", home);
         Assert.Contains("href=\"/portal/appointments\">All your appointments</a>", home);
-        Assert.Contains("Messages will appear here.", home);
+        Assert.DoesNotContain("will appear here.", home);
         Assert.DoesNotContain("Appointments and messages will appear here.", home);
 
         var account = await apps.AuditEventsAsync(AuditActions.Read, patientId: patient);

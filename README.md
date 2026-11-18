@@ -30,7 +30,9 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 
 - Appointments (FR-17): clinicians book an appointment from a patient's chart, with any clinician, and reschedule it, cancel it with a reason, check the patient in (which starts their visit) or mark a no-show; `/schedule` shows any clinician's day; the database refuses a double booking. Patients see their upcoming and earlier appointments in the portal. There is no self-scheduling. See `docs/UC16.md`.
 
-**Not built yet:** editing visits, the clinical workflows beyond finding patients, opening charts, orders and writing/signing notes, the portal's messages and proxy access, and completing an order with its result. `docs/expansion/PLAN.md` is the plan for these and the rest.
+- Secure messages (FR-18): a patient writes to their care team from the portal, the message arrives in the inbox of each clinician who has them on their panel, and any of them replies from the conversation; clinicians can also start one from the chart. Every opening of a conversation is audited, the email about a reply says only that there is one, and the audit page never shows a message's text. See `docs/UC17.md` and `docs/UC6.md`.
+
+**Not built yet:** editing visits, the clinical workflows beyond finding patients, opening charts, orders and writing/signing notes, the portal's proxy access, and completing an order with its result. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
 ## Layout
 

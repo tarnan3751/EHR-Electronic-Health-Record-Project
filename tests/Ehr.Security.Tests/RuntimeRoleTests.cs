@@ -48,6 +48,11 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "break_glass_accesses")] = ["SELECT"],
         // Chart lists: clinicians add and change entries, and nothing deletes one. Their history is the database's to write.
         [("ehr_app", "allergy_intolerances")] = ["SELECT", "INSERT", "UPDATE"],
+        // Messages: sent by insert, never edited; marking one read is a column grant.
+        [("ehr_app", "message_threads")] = ["SELECT", "INSERT"],
+        [("ehr_read", "message_threads")] = ["SELECT"],
+        [("ehr_app", "messages")] = ["SELECT", "INSERT"],
+        [("ehr_read", "messages")] = ["SELECT"],
         // Appointments: booked by insert; rescheduling, cancelling, checking in and no-shows are column grants.
         [("ehr_app", "appointments")] = ["SELECT", "INSERT"],
         [("ehr_read", "appointments")] = ["SELECT"],
@@ -257,6 +262,7 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // UC 1: discontinuing an order.
         [("ehr_app", "orders", "UPDATE")] = ["discontinue_reason", "replaced_by_order_id", "status"],
         [("ehr_app", "appointments", "UPDATE")] = ["cancel_reason", "encounter_id", "minutes", "reason", "starts_at", "status"],
+        [("ehr_app", "messages", "UPDATE")] = ["read_at"],
         // Marking an inbox item done.
         [("ehr_app", "inbox_items", "UPDATE")] = ["done_at"],
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.

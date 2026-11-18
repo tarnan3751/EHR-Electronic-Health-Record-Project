@@ -29,10 +29,15 @@ builder.Services.AddScoped<QuickTextSaver>();
 builder.Services.AddScoped<Ehr.Domain.Notes.ClinicalNotes>();
 builder.Services.AddScoped<Ehr.Domain.Notes.NoteReviews>();
 builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Site.OnPrem));
+// Which of the two apps this is, for the few pages that write as part of a read (marking a message read) and so must
+// know whether their database takes writes.
+builder.Services.AddSingleton(new Ehr.Web.SiteKind(site));
 // UC 1: placing orders (Ehr.Domain.Orders).
 builder.Services.AddScoped<Ehr.Domain.Orders.ClinicalOrders>();
 // Adding to and changing allergies, medications and diagnoses (Ehr.Domain.Patients).
 builder.Services.AddScoped<Ehr.Domain.Patients.ChartLists>();
+// Secure messages (Ehr.Domain.Messaging).
+builder.Services.AddScoped<Ehr.Domain.Messaging.SecureMessages>();
 // Appointments (Ehr.Domain.Scheduling).
 builder.Services.AddScoped<Ehr.Domain.Scheduling.Appointments>();
 // The staff inbox (Ehr.Domain.Inbox).

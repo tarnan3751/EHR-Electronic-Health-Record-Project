@@ -24,9 +24,22 @@ public sealed record PatientChart(
 
     public bool SensitiveShown { get; init; }
 
+    // The patient's latest conversations with their care team (FR-18), with how many of the patient's messages are
+    // unread: part of the same recorded read.
+    public IReadOnlyList<Ehr.Domain.Messaging.ThreadEntry> Threads { get; init; } = [];
+
     // The patient's appointments still to come, soonest first (FR-17): part of the same recorded read.
     public IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming { get; init; } = [];
 }
+
+// A patient's message threads, latest first, already recorded as one read of the patient.
+public sealed record PatientThreads(Patient Patient, IReadOnlyList<Ehr.Domain.Messaging.ThreadEntry> Threads, IReadOnlyList<AllergyIntolerance> Allergies);
+
+// One thread with its messages in order, already recorded as a read of the thread. Unread are the messages from the
+// other side that the reader is opening for the first time.
+public sealed record ThreadDetail(
+    Guid Id, string Subject, Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<Ehr.Domain.Messaging.MessageEntry> Messages,
+    IReadOnlyList<Guid> Unread);
 
 // A patient's appointments as the portal lists them, already recorded as one read of the patient: those still to come,
 // soonest first, and those past or cancelled, latest first.

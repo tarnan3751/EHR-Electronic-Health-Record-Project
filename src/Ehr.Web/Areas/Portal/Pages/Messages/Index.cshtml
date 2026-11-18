@@ -1,0 +1,42 @@
+@page "/portal/messages"
+@model Ehr.Web.Areas.Portal.Pages.Messages.IndexModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    ViewData["Title"] = "Messages";
+}
+<h1>Messages</h1>
+@if (OnPrem.IsReachable)
+{
+    <p><a asp-page="New" class="sc-btn sc-btn--primary">Write to your care team</a></p>
+}
+else
+{
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> messages can't be sent until the clinic's server is back. You can still read them.</p>
+}
+<p class="sc-muted">For an emergency, call your local emergency number. Messages are read during clinic hours.</p>
+@if (Model.Threads is not { } threads)
+{
+    <p class="sc-notice sc-notice--danger">Your messages are not available right now. Contact the clinic if this continues.</p>
+}
+else if (threads.Threads.Count == 0)
+{
+    <p class="sc-muted">You have no messages.</p>
+}
+else
+{
+    <ul class="sc-results">
+        @foreach (var thread in threads.Threads)
+        {
+            <li class="sc-result" data-thread="@(thread.Unread > 0 ? "new" : "read")">
+                <h2><a asp-page="Thread" asp-route-threadId="@thread.Id">@thread.Subject</a></h2>
+                <p>
+                    @if (thread.Unread > 0)
+                    {
+                        <span class="sc-tag sc-tag--info">New</span>
+                    }
+                    Last message @thread.LastMessageAt.UtcDateTime.ToString("MMM d, yyyy")
+                </p>
+            </li>
+        }
+    </ul>
+}

@@ -1,0 +1,12 @@
+@* A thread's messages, oldest first (docs/brand: messages): who and when above each, the text as written, line
+   breaks kept. The reader's own messages are marked, in text as well as in tone. *@
+@model (IReadOnlyList<Ehr.Domain.Messaging.MessageEntry> Messages, string Mine)
+<ol class="sc-thread" aria-label="Messages">
+    @foreach (var message in Model.Messages)
+    {
+        <li class="sc-message @(message.SenderKind == Model.Mine ? "sc-message--mine" : null)" data-message="@message.SenderKind">
+            <p class="sc-message__head"><strong>@message.From</strong> · <span class="sc-message__time">@message.SentAt.UtcDateTime.ToString("MMM d, yyyy HH:mm") UTC</span></p>
+            <p class="sc-message__body">@message.Body</p>
+        </li>
+    }
+</ol>

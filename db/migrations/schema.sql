@@ -1062,3 +1062,40 @@ VALUES ('20261118183905_AppointmentVersion', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.message_threads (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    subject character varying(150) NOT NULL,
+    started_at timestamp with time zone NOT NULL DEFAULT (now()),
+    last_message_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_message_threads PRIMARY KEY (id),
+    CONSTRAINT fk_message_threads_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.messages (
+    id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    sender_kind character varying(20) NOT NULL,
+    sender_id uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    body character varying(4000) NOT NULL,
+    sent_at timestamp with time zone NOT NULL DEFAULT (now()),
+    read_at timestamp with time zone,
+    CONSTRAINT pk_messages PRIMARY KEY (id),
+    CONSTRAINT ck_messages_sender_kind CHECK (sender_kind IN ('patient', 'staff')),
+    CONSTRAINT fk_messages_message_threads_thread_id FOREIGN KEY (thread_id) REFERENCES ehr.message_threads (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_messages_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_message_threads_patient_id_last_message_at ON ehr.message_threads (patient_id, last_message_at);
+
+CREATE INDEX ix_messages_patient_id ON ehr.messages (patient_id);
+
+CREATE INDEX ix_messages_thread_id_sent_at ON ehr.messages (thread_id, sent_at);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261118185826_Messages', '10.0.13');
+
+COMMIT;
+

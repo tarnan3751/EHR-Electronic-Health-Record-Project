@@ -281,6 +281,90 @@ CREATE POLICY audit_events_owner_select ON ehr.audit_events FOR SELECT TO ehr_ow
 DROP POLICY IF EXISTS audit_events_owner_mark ON ehr.audit_events;
 CREATE POLICY audit_events_owner_mark ON ehr.audit_events FOR UPDATE TO ehr_owner USING (NOT sensitive) WITH CHECK (sensitive);
 
+-- Secure messages (PHI). Clinicians read every thread and message, as they read charts (the pages ask for the panel
+-- or emergency access); a patient reads their own. A patient writes in their own threads; a clinician writes only for
+-- a patient on their active panel. The one update is marking a message read, by the side that didn't send it: the
+-- patient for a staff message, a panel clinician for the patient's. Nothing deletes (10-grants.sql).
+ALTER TABLE ehr.message_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.message_threads FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS message_threads_clinician_select ON ehr.message_threads;
+CREATE POLICY message_threads_clinician_select ON ehr.message_threads FOR SELECT USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS message_threads_own_select ON ehr.message_threads;
+CREATE POLICY message_threads_own_select ON ehr.message_threads FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()));
+DROP POLICY IF EXISTS message_threads_own_insert ON ehr.message_threads;
+CREATE POLICY message_threads_own_insert ON ehr.message_threads FOR INSERT
+    WITH CHECK (patient_id = (SELECT ehr.current_patient_id()));
+DROP POLICY IF EXISTS message_threads_panel_insert ON ehr.message_threads;
+CREATE POLICY message_threads_panel_insert ON ehr.message_threads FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = message_threads.patient_id AND a.ended_at IS NULL
+        )
+    );
+ALTER TABLE ehr.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.messages FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS messages_clinician_select ON ehr.messages;
+CREATE POLICY messages_clinician_select ON ehr.messages FOR SELECT USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS messages_own_select ON ehr.messages;
+CREATE POLICY messages_own_select ON ehr.messages FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()));
+DROP POLICY IF EXISTS messages_own_insert ON ehr.messages;
+CREATE POLICY messages_own_insert ON ehr.messages FOR INSERT
+    WITH CHECK (patient_id = (SELECT ehr.current_patient_id()) AND sender_kind = 'patient' AND sender_id = (SELECT ehr.current_user_id()));
+DROP POLICY IF EXISTS messages_panel_insert ON ehr.messages;
+CREATE POLICY messages_panel_insert ON ehr.messages FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = messages.patient_id AND a.ended_at IS NULL
+        )
+        AND sender_kind = 'staff' AND sender_id = (SELECT ehr.current_user_id())
+    );
+DROP POLICY IF EXISTS messages_own_read ON ehr.messages;
+CREATE POLICY messages_own_read ON ehr.messages FOR UPDATE
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND sender_kind = 'staff')
+    WITH CHECK (patient_id = (SELECT ehr.current_patient_id()) AND sender_kind = 'staff');
+DROP POLICY IF EXISTS messages_panel_read ON ehr.messages;
+CREATE POLICY messages_panel_read ON ehr.messages FOR UPDATE
+    USING (
+        sender_kind = 'patient' AND (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = messages.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        sender_kind = 'patient' AND (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = messages.patient_id AND a.ended_at IS NULL
+        )
+    );
+-- A thread's latest-message time is kept by the messages' trigger, which runs as the tables' owner: forced row-level
+-- security binds the owner too, so this lets it, and only it. The runtime roles have no UPDATE on threads.
+DROP POLICY IF EXISTS message_threads_owner_select ON ehr.message_threads;
+CREATE POLICY message_threads_owner_select ON ehr.message_threads FOR SELECT TO ehr_owner USING (true);
+DROP POLICY IF EXISTS message_threads_owner_update ON ehr.message_threads;
+CREATE POLICY message_threads_owner_update ON ehr.message_threads FOR UPDATE TO ehr_owner USING (true) WITH CHECK (true);
+-- The same trigger puts a patient's message in each care-team clinician's inbox and marks those items done when one
+-- of them replies: the owner's alone, again. The runtime roles still can't insert an inbox item.
+DROP POLICY IF EXISTS inbox_items_owner_select ON ehr.inbox_items;
+CREATE POLICY inbox_items_owner_select ON ehr.inbox_items FOR SELECT TO ehr_owner USING (true);
+DROP POLICY IF EXISTS inbox_items_owner_insert ON ehr.inbox_items;
+CREATE POLICY inbox_items_owner_insert ON ehr.inbox_items FOR INSERT TO ehr_owner WITH CHECK (true);
+DROP POLICY IF EXISTS inbox_items_owner_update ON ehr.inbox_items;
+CREATE POLICY inbox_items_owner_update ON ehr.inbox_items FOR UPDATE TO ehr_owner USING (done_at IS NULL) WITH CHECK (done_at IS NOT NULL);
+DROP POLICY IF EXISTS patient_assignments_owner_select ON ehr.patient_assignments;
+CREATE POLICY patient_assignments_owner_select ON ehr.patient_assignments FOR SELECT TO ehr_owner USING (true);
+
 -- Appointments (PHI). Clinicians read every patient's, as they read charts; a patient reads their own. A clinician
 -- books and changes them only for a patient on their active panel, the rule for orders and the chart's lists, and is
 -- recorded as the one who booked. Nothing deletes one (10-grants.sql).
@@ -336,7 +420,8 @@ CREATE POLICY encounters_panel_insert ON ehr.encounters FOR INSERT
 
 -- The staff inbox (PHI). An item is its recipient's alone: they read it and mark it done, while their account is a
 -- staff account that may sign in (a clinician or an admin). Nobody else sees it: not another clinician, not an admin
--- who isn't the recipient, not the patient. Nothing at runtime inserts or deletes one yet (10-grants.sql).
+-- who isn't the recipient, not the patient. No runtime role inserts or deletes one (10-grants.sql): items are created
+-- by the database's own triggers, such as a patient's message being delivered (90-messages.sql).
 ALTER TABLE ehr.inbox_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.inbox_items FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS inbox_items_own_select ON ehr.inbox_items;

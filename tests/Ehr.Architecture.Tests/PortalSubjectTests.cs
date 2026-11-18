@@ -25,7 +25,8 @@ public class PortalSubjectTests
                          .Where(method => method.Name.StartsWith("On", StringComparison.Ordinal)))
             {
                 offending.AddRange(handler.GetParameters()
-                    .Where(parameter => IsGuid(parameter.ParameterType) || parameter.Name!.Contains("patient", StringComparison.OrdinalIgnoreCase))
+                    .Where(parameter => (IsGuid(parameter.ParameterType) && !RecordsOfTheSessionsPatient.Contains(parameter.Name!))
+                        || parameter.Name!.Contains("patient", StringComparison.OrdinalIgnoreCase))
                     .Select(parameter => $"{model.Name}.{handler.Name}({parameter.Name})"));
             }
 
@@ -38,6 +39,21 @@ public class PortalSubjectTests
         }
 
         Assert.True(offending.Count == 0, "Portal pages take their patient from the session, never from a request: " + string.Join(", ", offending));
+    }
+
+    // The IDs a portal handler may take: each names one record, never a patient, and the page finds it only among the
+    // session's patient's own (PhiReader.ThreadAsync takes the patient from the session; row-level security returns
+    // nothing else). Adding a name here is a change to who can reach what: it needs line-by-line review.
+    static readonly string[] RecordsOfTheSessionsPatient = ["threadId"];
+
+    // The exception above is no wider than it says: every handler that takes a thread reads it for the session's patient.
+    [Fact]
+    public void A_portal_handler_that_takes_a_thread_reads_it_for_the_sessions_patient()
+    {
+        var models = PortalPageModels.Where(model => model.GetMethods().Any(method => method.GetParameters().Any(p => p.Name == "threadId"))).ToList();
+
+        Assert.NotEmpty(models);
+        Assert.All(models, model => Assert.NotNull(model.GetProperty("PatientId", BindingFlags.NonPublic | BindingFlags.Instance)));
     }
 
     static bool IsGuid(Type type) => type == typeof(Guid) || type == typeof(Guid?);
