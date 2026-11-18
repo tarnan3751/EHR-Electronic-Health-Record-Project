@@ -653,24 +653,35 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         // Two plain conditions, not one compared with a parameter: each matches its own partial index whatever the plan.
         var mine = db.InboxItems.AsNoTracking().Where(i => i.RecipientId == user.UserId);
         mine = done ? mine.Where(i => i.DoneAt != null) : mine.Where(i => i.DoneAt == null);
-        // Still to do: results with a value outside its reference range come first (step 7), then the oldest.
-        var flagged = mine.Select(item => new
+        // Still to do: results with a value outside its reference range come first (step 7), then the oldest. Which
+        // of the waiting result items are abnormal is worked out first, from those orders' results alone (an index
+        // lookup for each order): asked as one sorted query, the database reads every result on file.
+        var abnormal = new List<Guid>();
+        if (!done)
         {
-            Item = item,
-            Abnormal = item.Kind == Ehr.Data.Inbox.InboxItemKind.Result
-                && db.Observations.Any(o => o.OrderId == item.SourceId && (o.Value < o.ReferenceLow || o.Value > o.ReferenceHigh)),
-        });
+            var waiting = await mine.Where(i => i.Kind == Ehr.Data.Inbox.InboxItemKind.Result && i.SourceId != null)
+                .OrderBy(i => i.CreatedAt).Select(i => i.SourceId!.Value).Take(500).ToListAsync(cancellationToken);
+            if (waiting.Count > 0)
+            {
+                abnormal = await db.Observations.AsNoTracking()
+                    .Where(o => o.OrderId != null && waiting.Contains(o.OrderId.Value) && (o.Value < o.ReferenceLow || o.Value > o.ReferenceHigh))
+                    .Select(o => o.OrderId!.Value).Distinct().ToListAsync(cancellationToken);
+            }
+        }
+
         var ordered = done
-            ? flagged.OrderByDescending(i => i.Item.DoneAt).ThenBy(i => i.Item.Id)
-            : flagged.OrderByDescending(i => i.Abnormal).ThenBy(i => i.Item.CreatedAt).ThenBy(i => i.Item.Id);
-        var items = await (
-            from row in ordered.Take(limit + 1)
-            join patient in db.Patients on row.Item.PatientId equals patient.Id into patients
+            ? mine.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id)
+            : abnormal.Count > 0
+                ? mine.OrderByDescending(i => i.SourceId != null && abnormal.Contains(i.SourceId.Value)).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id)
+                : mine.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id);
+        var rows = await (
+            from item in ordered.Take(limit + 1)
+            join patient in db.Patients on item.PatientId equals patient.Id into patients
             from patient in patients.DefaultIfEmpty()
-            select new InboxEntry(row.Item.Id, row.Item.Kind, row.Item.Summary, row.Item.CreatedAt, row.Item.DoneAt, row.Item.PatientId,
-                patient == null ? null : patient.FamilyName + ", " + patient.GivenName, patient == null ? null : patient.Mrn, row.Item.SourceTable,
-                row.Item.SourceId, row.Abnormal))
+            select new InboxEntry(item.Id, item.Kind, item.Summary, item.CreatedAt, item.DoneAt, item.PatientId,
+                patient == null ? null : patient.FamilyName + ", " + patient.GivenName, patient == null ? null : patient.Mrn, item.SourceTable, item.SourceId))
             .ToListAsync(cancellationToken);
+        var items = rows.Select(i => i with { Abnormal = i.SourceId is { } source && abnormal.Contains(source) }).ToList();
         items = [.. done
             ? items.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id)
             : items.OrderByDescending(i => i.Abnormal).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id)];
