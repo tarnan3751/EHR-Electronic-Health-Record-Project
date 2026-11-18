@@ -581,7 +581,10 @@ One entry per decision: date, step, the decision, and why.
   - *The portal is unchanged:* a filed result is released at once and shows as results always have, before anyone acknowledges it. Say if results should wait for acknowledgment instead.
   - *Dropped while building:* a rule that a sample is collected after its order was signed; orders are sometimes entered after the draw.
   - *Not in the desktop app:* results aren't in its offline copy.
-  - *Left open:* only 12 lab catalog items have result fields; no correcting or withdrawing a filed result; the item goes to the signer even if they left the panel; times are UTC.
+  - *From the review* (no way in through the app itself; each needed a crafted request or raw SQL as the app's role): the filing rules are now tied to the role the apps connect as, not to who a statement says is signed in, because one statement can sign itself out between its own rows while row-level security asks who the user is only once; an acknowledgment carries what the page showed and is refused if a result arrived since; a result's inbox item can't be marked done directly, in the database, not just by hiding the button; filing and acknowledging need READ COMMITTED, as signing an order does; when the signer's account is disabled or no longer a clinician's, the item goes to the patient's panel instead.
+  - **For the human review of `db/policies`:** that first point is a class, not one trigger. Every trigger that decides something from `ehr.current_user_id()` row by row sits beside policies that ask `(SELECT ehr.current_user_id())` once for the statement. It needs raw SQL as `ehr_app`, which can already name any user, so it is defence in depth; the older triggers (orders, chart lists, appointments, messages, proxy grants) were not changed here.
+  - **For step 9:** vital signs are observations with no order, which `ehr.file_result` refuses from the apps as written. Step 9 has to widen it deliberately.
+  - *Left open:* only 12 lab catalog items have result fields; the chart lists eight resulted orders with no page of older ones; the inbox checks the oldest 500 waiting results for abnormal values; no correcting or withdrawing a filed result; the item goes to the signer even if they left the panel; times are UTC.
 
 ## Log
 

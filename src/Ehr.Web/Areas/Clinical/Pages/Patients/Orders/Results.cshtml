@@ -78,6 +78,7 @@ else
     else if (canWrite)
     {
         <form method="post" asp-page-handler="Acknowledge" asp-route-patientId="@patient.Id" asp-route-orderId="@order.OrderId">
+            <input type="hidden" name="Seen" value="@order.Seen">
             <p class="sc-muted">Acknowledging records that you have seen these results, under your name and the time. It can't be undone.</p>
             <button type="submit" class="sc-btn sc-btn--primary" data-acknowledge autofocus="@(waiting.Count == 0 || !order.OpenToResults)">Acknowledge results</button>
         </form>

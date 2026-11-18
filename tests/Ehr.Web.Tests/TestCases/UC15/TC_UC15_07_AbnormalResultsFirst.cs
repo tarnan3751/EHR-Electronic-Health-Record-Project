@@ -17,9 +17,10 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Steps:
 //   1. File the lipid panel's result, then the blood count's.
 //   2. Open the inbox.
+//   3. Post "Mark done" for one of the items, as a crafted request.
 // Expected result: Two "Result to acknowledge" items. The blood count's, tagged "Abnormal", is listed first although
 //   it arrived second; the lipid panel's has no tag. Neither has a "Mark done" button; each has "Open the results".
-//   The app bar counts 2.
+//   The app bar counts 2. Step 3: nothing is marked done.
 // Creator: Tahseen Arnan
 public class TC_UC15_07_AbnormalResultsFirst(WebApps apps) : IClassFixture<WebApps>
 {
@@ -47,5 +48,10 @@ public class TC_UC15_07_AbnormalResultsFirst(WebApps apps) : IClassFixture<WebAp
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(inbox, ">Open the results</a>").Count);
         Assert.DoesNotContain("Mark done", inbox);
         Assert.Matches("data-inbox-count>.*?2", inbox);
+
+        // Posting "Mark done" for one anyway changes nothing: the database refuses it.
+        var item = (await MessageTests.RowsAsync(apps, patient, "id::text", "inbox_items", "created_at")).First();
+        using var ticked = await Browser.PostFormAsync(session.Client, $"/inbox?handler=Done&id={item}", "/inbox");
+        Assert.Equal(2, (await MessageTests.RowsAsync(apps, patient, "id::text", "inbox_items", "created_at", "done_at IS NULL")).Count);
     }
 }

@@ -22,8 +22,14 @@ static class ResultTests
         PostFormAsync(client, Path(patient, order), Path(patient, order),
             [.. values.Select(v => ($"Values[{v.Code}]", (object)v.Value)), ("CollectedAt", DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm"))]);
 
-    public static Task<HttpResponseMessage> AcknowledgeAsync(HttpClient client, Guid patient, Guid order) =>
-        PostFormAsync(client, Path(patient, order) + "?handler=Acknowledge", Path(patient, order));
+    // "Acknowledge results", as the page posts it: with what it showed.
+    public static async Task<HttpResponseMessage> AcknowledgeAsync(HttpClient client, Guid patient, Guid order)
+    {
+        var page = await client.GetStringAsync(Path(patient, order), Cancel);
+        return await client.PostAsync(Path(patient, order) + "?handler=Acknowledge", Form(("__RequestVerificationToken", Token(page)), ("Seen", SeenOn(page))), Cancel);
+    }
+
+    public static string SeenOn(string page) => System.Text.RegularExpressions.Regex.Match(page, "name=\"Seen\" value=\"([^\"]*)\"").Groups[1].Value;
 
     // "code value flag-or-normal" for each result of the order, by code.
     public static Task<List<string>> FiledAsync(WebApps apps, Guid patient) => ProxyTests.QueryAsync(apps,

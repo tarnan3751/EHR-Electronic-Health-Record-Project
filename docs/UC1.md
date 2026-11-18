@@ -31,7 +31,7 @@ Added in the expansion plan's step 7 (Tahseen Arnan).
 - **Enter results.** Each active lab order on the chart has **Enter results**, for a patient on your panel. The page lists the tests the order reports, each with its unit and reference range. Type the values the lab reported and the time the sample was collected, and choose **File results**. Leave a test empty if its result hasn't come; it can be added later. Until the lab sends results itself (step 12), this is how they arrive.
 - **Resulted.** With its first result the order becomes completed and leaves the active orders. The chart's **Results** section lists resulted orders: those still to acknowledge first, abnormal ones before the rest.
 - **Abnormal.** A value outside its reference range is flagged "High" or "Low" and listed first, on the results page, the chart and the inbox.
-- **Acknowledge.** The clinician who signed the order gets an inbox item, "Results are in", with the patient's name and no values. **Open the results**, then **Acknowledge results**, records who acknowledged and when, and clears the item. Any clinician with the patient on their panel can acknowledge. Once acknowledged, nothing more is added to that order's results.
+- **Acknowledge.** The clinician who signed the order gets an inbox item, "Results are in", with the patient's name and no values. **Open the results**, then **Acknowledge results**, records who acknowledged and when, and clears the item. It covers the results that were on the page: if another arrived meanwhile, the page comes back with it and nothing is recorded yet. A result's inbox item can't be ticked off any other way. Any clinician with the patient on their panel can acknowledge. Once acknowledged, nothing more is added to that order's results.
 - **The patient** sees a filed result in the portal at once, as results have always shown there, acknowledged or not.
 
 ## Decisions
@@ -145,7 +145,9 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - Results are numbers typed in for lab orders whose catalog item has result fields set up (12 items today, including the common panels). Other lab tests, imaging and referrals have no results page content yet. Nothing imports results; the simulated lab is step 12.
 - A filed result can't be corrected or withdrawn. A wrong value needs a new order.
 - The reference ranges are one range for each test, for adults, not by age or sex.
-- The inbox item goes to the clinician who signed the order, even if they have since left the patient's panel; any panel clinician can acknowledge from the chart.
+- The inbox item goes to the clinician who signed the order, even if they have since left the patient's panel; any panel clinician can acknowledge from the chart. If the signer's account is disabled or no longer a clinician's, it goes to each clinician on the patient's panel instead.
+- The chart lists a patient's eight most relevant resulted orders (unacknowledged and abnormal first); there is no page of older ones yet.
+- The inbox looks at the oldest 500 waiting results when deciding which are abnormal.
 - Results are released to the portal as soon as they are filed, before anyone acknowledges them.
 - Collection time is entered and shown in UTC.
 - A change keeps the order's type.

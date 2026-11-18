@@ -25,6 +25,10 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
     [BindProperty]
     public string? CollectedAt { get; set; }
 
+    // What the page showed when "Acknowledge results" was chosen (OrderResults.Seen).
+    [BindProperty]
+    public string? Seen { get; set; }
+
     // Set by the redirect after a save: "filed" or "acknowledged".
     [BindProperty(SupportsGet = true)]
     public string? Done { get; set; }
@@ -77,14 +81,21 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
             return refused;
         }
 
-        if (Order.HasResults && Order.AcknowledgedAt is null && await results.AcknowledgeAsync(patientId, orderId, HttpContext.RequestAborted))
+        // Only what was on the page is acknowledged: if a result arrived since, the page is shown again with it.
+        if (Order.HasResults && Order.AcknowledgedAt is null && Seen == Order.Seen
+            && await results.AcknowledgeAsync(patientId, orderId, HttpContext.RequestAborted))
         {
             return RedirectToPage(new { patientId, orderId, done = "acknowledged" });
         }
 
-        // Already acknowledged, by this clinician in another tab or by a colleague: say so, with who and when.
+        // Already acknowledged, by this clinician in another tab or by a colleague, or a result arrived since the
+        // page was loaded: say so, with how it stands now, which the read above already has unless the save failed.
         Stale = true;
-        Order = (await phi.OrderResultsAsync(patientId, orderId, HttpContext.RequestAborted))!;
+        if (Seen == Order.Seen)
+        {
+            Order = (await phi.OrderResultsAsync(patientId, orderId, HttpContext.RequestAborted))!;
+        }
+
         Response.StatusCode = StatusCodes.Status409Conflict;
         return Page();
     }

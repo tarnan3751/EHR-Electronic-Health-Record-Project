@@ -132,6 +132,80 @@ public class ResultSecurityTests(MigratedDatabase database) : IClassFixture<Migr
             ("a", patient), ("b", second), ("c", treated)));
     }
 
+    // The rules are held by the role the apps connect as, not by who a statement says is signed in: a statement that
+    // signs itself out between its own rows doesn't get its later rows past them. (Row-level security asks who the
+    // user is once for a statement; a trigger keyed on the user would have been skipped for those rows.)
+    [Fact]
+    public async Task A_statement_that_signs_itself_out_between_rows_does_not_skip_the_rules()
+    {
+        var (clinician, patient, order) = await OrderedAsync();
+        var (_, _, another) = await OrderedAsync();
+
+        var crafted = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            """
+            INSERT INTO ehr.observations (id, patient_id, order_id, code, display, status, value, unit, reference_low, reference_high, effective_at)
+            SELECT gen_random_uuid(), @patient, v.order_id, '718-7', 'Forged name', v.status, 9.1, 'forged', 0, 1000, now()
+            FROM (VALUES (@order::uuid, 'final', ''), (NULL::uuid, 'preliminary', set_config('app.user_id', '', true)), (@another::uuid, 'final', '')) AS v(order_id, status, signed_out)
+            """,
+            ("patient", patient), ("order", order), ("another", another)));
+        Assert.Contains(crafted.SqlState, new[] { PostgresErrorCodes.CheckViolation, PostgresErrorCodes.InsufficientPrivilege, PostgresErrorCodes.ForeignKeyViolation });
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*) FROM ehr.observations WHERE patient_id = @patient", ("patient", patient)));
+        Assert.Equal(["active"], await AsSuperuserAsync("SELECT status FROM ehr.orders WHERE id = @order", ("order", order)));
+    }
+
+    // A snapshot taken before an acknowledgment was committed can't be used to add to those results afterwards.
+    [Fact]
+    public async Task Results_are_filed_and_acknowledged_only_in_read_committed_transactions()
+    {
+        var (clinician, patient, order) = await OrderedAsync();
+        foreach (var sql in new[] { Result, Acknowledge })
+        {
+            await using var connection = new NpgsqlConnection(App);
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, TestContext.Current.CancellationToken);
+            await using (var user = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction))
+            {
+                user.Parameters.AddWithValue("user", clinician.ToString());
+                await user.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+            }
+
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            foreach (var (name, value) in new (string, object)[] { ("id", Guid.CreateVersion7()), ("patient", patient), ("order", order), ("code", "718-7"), ("value", 9.1m), ("by", clinician) })
+            {
+                if (sql.Contains("@" + name, StringComparison.Ordinal))
+                {
+                    command.Parameters.AddWithValue(name, value);
+                }
+            }
+
+            var refused = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(PostgresErrorCodes.FeatureNotSupported, refused.SqlState);
+        }
+    }
+
+    // A signer whose account is disabled is not the only one told: the patient's care team is, instead. And nobody
+    // ticks a result off from the inbox: it is done by acknowledging.
+    [Fact]
+    public async Task Results_reach_the_care_team_when_the_signer_cannot_sign_in_and_are_done_only_by_acknowledging()
+    {
+        var (signer, patient, order) = await OrderedAsync();
+        var first = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var second = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, first, patient);
+        await Accounts.AssignAsync(database, second, patient);
+        await Accounts.LockOutAsync(database, signer);
+
+        await FileAsync(first, patient, order);
+        Assert.Equal(new[] { first.ToString(), second.ToString() }.Order(), (await AsSuperuserAsync(
+            "SELECT recipient_id::text FROM ehr.inbox_items WHERE source_id = @order AND done_at IS NULL", ("order", order))).Order());
+
+        var ticked = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, first,
+            "UPDATE ehr.inbox_items SET done_at = now() WHERE source_id = @order AND recipient_id = @me", ("order", order), ("me", first)));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ticked.SqlState);
+        await AcknowledgeAsync(second, patient, order);
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*) FROM ehr.inbox_items WHERE source_id = @order AND done_at IS NULL", ("order", order)));
+    }
+
     [Fact]
     public async Task An_order_is_completed_only_by_its_results_and_then_never_changes()
     {

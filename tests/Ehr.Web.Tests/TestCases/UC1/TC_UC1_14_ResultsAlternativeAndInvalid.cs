@@ -21,7 +21,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Test data: Hemoglobin "abc", then "14.2"; nothing typed; a collection time tomorrow; platelets 90; hematocrit 41.
 // Steps:
 //   1. As the first clinician, post "abc" for hemoglobin; post with nothing typed; post 14.2 with tomorrow's time.
-//   2. Post hemoglobin 14.2. Later, as the second clinician, post platelets 90.
+//   2. Post hemoglobin 14.2. Later, as the second clinician, post platelets 90. Then, as the first, choose
+//      "Acknowledge results" on the page that still shows only hemoglobin.
 //   3. As the third clinician, after giving a reason on the chart, open the results; post a value and an
 //      acknowledgment.
 //   4. Request the results under another patient's address.
@@ -30,6 +31,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Expected result: Step 1: each is answered 422 with "Not saved:" and "Enter a number, like 5.4.", "Enter at least one
 //   result." and "The collection time can't be in the future."; what was typed stays; nothing is filed. Step 2: both
 //   are saved; the form then offers only the tests still waiting; one inbox item exists, for the first clinician.
+//   The acknowledgment from the older page is answered 409, the page comes back showing the low platelets, and
+//   nothing is recorded.
 //   Step 3: the results are shown with "Add this patient to your panel to acknowledge results." and no form; both
 //   posts are redirected to the chart and nothing changes. Step 4: 404. Step 5: the acknowledgment is the second
 //   clinician's and clears the first's inbox; the late posts are answered 409 with "Not saved: this order changed
@@ -71,6 +74,16 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
         var colleague = await SignInAsync(apps.OnPrem, second);
         using var later = await FileAsync(colleague.Client, patient, order, (Platelets, "90"));
         Assert.Contains("Saved:", await ReadAsync(later));
+
+        // The first clinician's page still shows one result. Acknowledging from it covers only what it showed: the
+        // page comes back with the low platelets, and nothing is recorded.
+        using var unseen = await session.Client.PostAsync(path + "?handler=Acknowledge",
+            Form(("__RequestVerificationToken", Token(partial)), ("Seen", SeenOn(partial))), Cancel);
+        Assert.Equal(HttpStatusCode.Conflict, unseen.StatusCode);
+        var shownAgain = await unseen.Content.ReadAsStringAsync(Cancel);
+        Assert.Contains("Not saved:", shownAgain);
+        Assert.Contains("90 10*3/uL", shownAgain);
+        Assert.Empty(await MessageTests.RowsAsync(apps, patient, "id::text", "result_acknowledgments", "id"));
         Assert.Equal([$"{Hemoglobin} 14.2 normal", $"{Platelets} 90 low"], await FiledAsync(apps, patient));
         Assert.Equal([clinician.Id.ToString()], await MessageTests.RowsAsync(apps, patient, "recipient_id::text", "inbox_items", "created_at", "done_at IS NULL"));
         var stale = Token(await session.Client.GetStringAsync(path, Cancel));

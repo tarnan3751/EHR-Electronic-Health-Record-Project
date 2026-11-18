@@ -137,6 +137,10 @@ public sealed record OrderResults(
 {
     public bool HasResults => Tests.Any(test => test.Value is not null);
 
+    // What a page showing these results has shown: how many, and when the latest was released. An acknowledgment
+    // carries it back, so it never covers a result that arrived after the page was loaded.
+    public string Seen => $"{Tests.Count(test => test.Value is not null)}-{Tests.Max(test => test.ReleasedAt)?.UtcTicks ?? 0}";
+
     // Results can still be added: a lab order, not discontinued, not acknowledged, with a test still waiting.
     public bool OpenToResults => Type == OrderType.Lab && Status is OrderStatus.Active or OrderStatus.Completed && AcknowledgedAt is null && Tests.Any(test => test.Value is null);
 }

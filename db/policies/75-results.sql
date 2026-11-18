@@ -18,6 +18,12 @@ DECLARE
     ordered ehr.orders%ROWTYPE;
     test ehr.observation_codes%ROWTYPE;
 BEGIN
+    -- As for signing an order (60-orders.sql): under a snapshot taken earlier, the checks below could miss an
+    -- acknowledgment that has since been committed.
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
+        RAISE EXCEPTION 'A result is filed in a READ COMMITTED transaction' USING ERRCODE = '0A000';
+    END IF;
+
     IF NEW.order_id IS NULL THEN
         RAISE EXCEPTION 'A result is filed against the order that asked for it' USING ERRCODE = '23514';
     END IF;
@@ -59,9 +65,10 @@ $$;
 REVOKE ALL ON FUNCTION ehr.file_result() FROM PUBLIC;
 CREATE OR REPLACE TRIGGER observations_file
     BEFORE INSERT ON ehr.observations
-    -- For a signed-in user's insert. Rows loaded with nobody signed in (the seed, as ehr_owner) don't pass through
-    -- here, and no runtime role can insert one that way: row-level security needs a clinician.
-    FOR EACH ROW WHEN (ehr.current_user_id() IS NOT NULL)
+    -- For every insert the apps make, by the role they connect as: never by who the statement says is signed in,
+    -- which a statement can change between its own rows. Rows loaded by the schema's owner (the seed) or a superuser
+    -- (a test standing in for a lab interface) don't pass through here.
+    FOR EACH ROW WHEN (current_user IN ('ehr_app', 'ehr_read'))
     EXECUTE FUNCTION ehr.file_result();
 
 -- After a result is inserted: its order, if still active, becomes completed. As the caller, who may update the orders
@@ -82,16 +89,29 @@ CREATE OR REPLACE TRIGGER observations_complete_order
     EXECUTE FUNCTION ehr.complete_resulted_order();
 
 -- After an order becomes completed: the clinician who signed it gets an inbox item, "Results are in", naming the
--- patient and the order and none of the values. SECURITY DEFINER, because no runtime role may insert inbox items
--- (10-grants.sql); it takes everything from the order's own row and reads no other table.
+-- patient and the order and none of the values. If that account can no longer sign in or is no longer a clinician,
+-- the item goes to each clinician with the patient on their panel instead, so results never arrive unseen.
+-- SECURITY DEFINER, because no runtime role may insert inbox items (10-grants.sql); beyond the order's own row it
+-- reads the signer's account and, for the fallback, the patient's panel.
 CREATE OR REPLACE FUNCTION ehr.deliver_result() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
-    INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at)
-    VALUES (uuidv7(), NEW.signer_id, 'result', NEW.patient_id, 'orders', NEW.id, 'Results are in', clock_timestamp());
+    IF EXISTS (SELECT 1 FROM ehr.staff_users s
+               WHERE s.id = NEW.signer_id AND s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end <= now())) THEN
+        INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at)
+        VALUES (uuidv7(), NEW.signer_id, 'result', NEW.patient_id, 'orders', NEW.id, 'Results are in', clock_timestamp());
+    ELSE
+        INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at)
+        SELECT uuidv7(), a.clinician_id, 'result', NEW.patient_id, 'orders', NEW.id, 'Results are in', clock_timestamp()
+        FROM ehr.patient_assignments a
+        JOIN ehr.staff_users s ON s.id = a.clinician_id
+        WHERE a.patient_id = NEW.patient_id AND a.ended_at IS NULL
+          AND s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end <= now());
+    END IF;
+
     RETURN NULL;
 END
 $$;
@@ -108,6 +128,10 @@ CREATE OR REPLACE FUNCTION ehr.acknowledge_results() RETURNS trigger
     SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
+        RAISE EXCEPTION 'Results are acknowledged in a READ COMMITTED transaction' USING ERRCODE = '0A000';
+    END IF;
+
     PERFORM 1 FROM ehr.orders o WHERE o.id = NEW.order_id AND o.patient_id = NEW.patient_id AND o.status = 'completed' FOR NO KEY UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Only an order whose results are in is acknowledged' USING ERRCODE = '23514';

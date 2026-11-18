@@ -34,7 +34,7 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 
 - Proxy access (FR-19): a patient gives a family member or carer access to their record in the portal, or the clinic records it, with a scope and always an end date. The proxy signs in with their own account and chooses whose record to view; the database checks on every query that the access is theirs and in force, holds back sensitive items and messages unless the access includes them, and records everything under the proxy's account and the patient. See `docs/UC18.md` and `docs/UC6.md`.
 
-- Results (the plan's step 7): a clinician files a lab order's results against it, the order becomes resulted, values outside their reference range are flagged and listed first, the clinician who signed the order acknowledges them from their inbox, and the patient sees them in the portal. See `docs/UC1.md`.
+- Results (the plan's step 7): a clinician files a lab order's results against it, the order becomes resulted, values outside their reference range are flagged and listed first, the clinician who signed the order finds them in their inbox, they or a colleague on the patient's care team acknowledges them, and the patient sees them in the portal. See `docs/UC1.md`.
 
 **Not built yet:** editing visits, sending orders to a lab or pharmacy, and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
 

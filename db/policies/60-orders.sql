@@ -13,7 +13,8 @@
 --      ehr_app has. Foreign keys to the patient take a weaker lock, which this one doesn't block, and plain reads take
 --      none, so only another order (or an update of the patient) waits. Anyone but a clinician sees no patient, and is
 --      refused here.
---   2. refuses an order that isn't active: an order is signed active, and only discontinuing changes that.
+--   2. refuses an order that isn't active: an order is signed active, and only discontinuing it or its results
+--      arriving changes that.
 --   3. for a replacement (replaces_order_id), refuses one whose replaced order isn't an active order of the same
 --      patient and type. The change is finished by discontinuing that order in the same transaction, which
 --      ehr.check_order_replacement() checks at commit.
