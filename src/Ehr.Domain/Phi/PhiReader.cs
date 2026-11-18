@@ -9,6 +9,7 @@ using Ehr.Domain.Audit;
 using Ehr.Domain.Messaging;
 using Ehr.Domain.Orders;
 using Ehr.Domain.Proxies;
+using Ehr.Domain.Results;
 using Ehr.Domain.Scheduling;
 using Microsoft.EntityFrameworkCore;
 
@@ -88,8 +89,10 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .Select(t => new ThreadEntry(t.Id, t.Subject, t.LastMessageAt,
                 db.Messages.Count(m => m.ThreadId == t.Id && m.SenderKind == MessageSender.Patient && m.ReadAt == null)))
             .ToListAsync(cancellationToken);
+        var resulted = await ResultedOrdersAsync(id, 8, cancellationToken);
         return new PatientChart(patient, allergies, medications, conditions, encounters, orders)
         {
+            Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,
             ConfirmsDiscontinued = confirmed,
@@ -437,6 +440,82 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             [.. messages.Where(m => m.SenderKind == other && m.ReadAt is null).Select(m => m.Id)]);
     }
 
+    // Results of orders (the expansion plan's step 7).
+
+    // A patient's completed lab orders for the chart: those nobody has acknowledged first, abnormal before the rest,
+    // then the latest. Part of the chart's one recorded read.
+    async Task<List<ResultedOrder>> ResultedOrdersAsync(Guid patientId, int limit, CancellationToken cancellationToken)
+    {
+        var rows = await (
+            from order in db.Orders.AsNoTracking()
+            join item in db.OrderCatalogItems on order.CatalogCode equals item.Code
+            where order.PatientId == patientId && order.Status == OrderStatus.Completed
+            select new
+            {
+                order.Id,
+                item.Display,
+                ResultedAt = db.Observations.Where(o => o.OrderId == order.Id).Max(o => o.IssuedAt),
+                Abnormal = db.Observations.Count(o => o.OrderId == order.Id && (o.Value < o.ReferenceLow || o.Value > o.ReferenceHigh)),
+                Acknowledged = db.ResultAcknowledgments.Any(a => a.OrderId == order.Id),
+            })
+            .OrderBy(o => o.Acknowledged).ThenByDescending(o => o.Abnormal > 0).ThenByDescending(o => o.ResultedAt).ThenBy(o => o.Id)
+            .Take(limit).ToListAsync(cancellationToken);
+        return [.. rows.Select(o => new ResultedOrder(o.Id, o.Display, o.ResultedAt, o.Abnormal, o.Acknowledged))];
+    }
+
+    // One order of a patient's with the tests it reports, the results filed so far and who acknowledged them: for the
+    // page that enters, shows and acknowledges results. One recorded read of the patient. Null when the order isn't
+    // this patient's.
+    public async Task<OrderResults?> OrderResultsAsync(Guid patientId, Guid orderId, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        var found = patient is null
+            ? null
+            : await (
+                from order in db.Orders.AsNoTracking()
+                join item in db.OrderCatalogItems on order.CatalogCode equals item.Code
+                join signer in db.StaffUsers on order.SignerId equals signer.Id
+                where order.Id == orderId && order.PatientId == patientId
+                select new { order.Id, order.CatalogCode, item.Display, order.Type, order.Status, Signer = signer.DisplayName, order.SignedAt })
+                .SingleOrDefaultAsync(cancellationToken);
+        if (patient is null || found is null)
+        {
+            return null;
+        }
+
+        var expected = await (
+            from link in db.OrderResultCodes.AsNoTracking()
+            join code in db.ObservationCodes on link.ObservationCode equals code.Code
+            where link.CatalogCode == found.CatalogCode
+            orderby code.Display, code.Code
+            select new { code.Code, code.Display, code.Unit, code.ReferenceLow, code.ReferenceHigh }).ToListAsync(cancellationToken);
+        var filed = await db.Observations.AsNoTracking().Where(o => o.OrderId == orderId && o.PatientId == patientId)
+            .OrderBy(o => o.Display).ThenBy(o => o.Id).ToListAsync(cancellationToken);
+        // The tests the order reports, each with its result when there is one; then any result that isn't one of them
+        // (a seeded or interfaced one), so nothing filed is ever left off the page.
+        var tests = expected.Select(test =>
+        {
+            var result = filed.FirstOrDefault(o => o.Code == test.Code);
+            return result is null
+                ? new OrderTest(test.Code, test.Display, test.Unit, test.ReferenceLow, test.ReferenceHigh, null, null, null)
+                : new OrderTest(test.Code, result.Display, result.Unit, result.ReferenceLow, result.ReferenceHigh, result.Value, result.EffectiveAt, result.IssuedAt);
+        }).Concat(filed.Where(o => expected.All(test => test.Code != o.Code))
+            .Select(o => new OrderTest(o.Code ?? "", o.Display, o.Unit, o.ReferenceLow, o.ReferenceHigh, o.Value, o.EffectiveAt, o.IssuedAt)))
+            // Abnormal results first, then the rest as they were.
+            .OrderByDescending(test => test.Flag is not null).ToList();
+        var acknowledged = await (
+            from acknowledgment in db.ResultAcknowledgments.AsNoTracking()
+            join staff in db.StaffUsers on acknowledgment.AcknowledgedBy equals staff.Id
+            where acknowledgment.OrderId == orderId
+            select new { staff.DisplayName, acknowledgment.AcknowledgedAt }).SingleOrDefaultAsync(cancellationToken);
+        var allergies = await CurrentAllergies(patientId).ToListAsync(cancellationToken);
+
+        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new OrderResults(patient, allergies, found.Id, found.Display, found.Type, found.Status, found.Signer, found.SignedAt, tests,
+            acknowledged?.DisplayName, acknowledged?.AcknowledgedAt);
+    }
+
     // Proxy access (FR-19).
 
     public const string ProxyGrantsTable = "proxy_grants";
@@ -574,15 +653,27 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         // Two plain conditions, not one compared with a parameter: each matches its own partial index whatever the plan.
         var mine = db.InboxItems.AsNoTracking().Where(i => i.RecipientId == user.UserId);
         mine = done ? mine.Where(i => i.DoneAt != null) : mine.Where(i => i.DoneAt == null);
-        var ordered = done ? mine.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id) : mine.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id);
+        // Still to do: results with a value outside its reference range come first (step 7), then the oldest.
+        var flagged = mine.Select(item => new
+        {
+            Item = item,
+            Abnormal = item.Kind == Ehr.Data.Inbox.InboxItemKind.Result
+                && db.Observations.Any(o => o.OrderId == item.SourceId && (o.Value < o.ReferenceLow || o.Value > o.ReferenceHigh)),
+        });
+        var ordered = done
+            ? flagged.OrderByDescending(i => i.Item.DoneAt).ThenBy(i => i.Item.Id)
+            : flagged.OrderByDescending(i => i.Abnormal).ThenBy(i => i.Item.CreatedAt).ThenBy(i => i.Item.Id);
         var items = await (
-            from item in ordered.Take(limit + 1)
-            join patient in db.Patients on item.PatientId equals patient.Id into patients
+            from row in ordered.Take(limit + 1)
+            join patient in db.Patients on row.Item.PatientId equals patient.Id into patients
             from patient in patients.DefaultIfEmpty()
-            select new InboxEntry(item.Id, item.Kind, item.Summary, item.CreatedAt, item.DoneAt, item.PatientId,
-                patient == null ? null : patient.FamilyName + ", " + patient.GivenName, patient == null ? null : patient.Mrn, item.SourceTable, item.SourceId))
+            select new InboxEntry(row.Item.Id, row.Item.Kind, row.Item.Summary, row.Item.CreatedAt, row.Item.DoneAt, row.Item.PatientId,
+                patient == null ? null : patient.FamilyName + ", " + patient.GivenName, patient == null ? null : patient.Mrn, row.Item.SourceTable,
+                row.Item.SourceId, row.Abnormal))
             .ToListAsync(cancellationToken);
-        items = [.. done ? items.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id) : items.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id)];
+        items = [.. done
+            ? items.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id)
+            : items.OrderByDescending(i => i.Abnormal).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id)];
         var more = items.Count > limit;
         items = [.. items.Take(limit)];
 

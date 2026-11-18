@@ -163,6 +163,11 @@ else if (Model.Chart.SensitiveHidden > 0)
                             <span class="sc-list__actions">
                                 <a asp-page="Orders/New" asp-all-route-data="changeRoute" aria-label="Change: @order.Display" data-change-order>Change</a>
                                 <a asp-page="Orders/Discontinue" asp-all-route-data="discontinueRoute" aria-label="Discontinue…: @order.Display" data-discontinue-order>Discontinue…</a>
+                                @if (order.Type == Ehr.Data.Orders.OrderType.Lab)
+                                {
+                                    @* Step 7: where the lab's values are typed in, until the lab sends them itself. *@
+                                    <a asp-page="Orders/Results" asp-route-patientId="@Model.Patient.Id" asp-route-orderId="@order.Id" aria-label="Enter results: @order.Display" data-enter-results>Enter results</a>
+                                }
                             </span>
                         }
                     </li>
@@ -182,6 +187,39 @@ else if (Model.Chart.SensitiveHidden > 0)
             discontinuedRoute["id"] = Model.Patient.Id.ToString();
         }
         <p><a asp-page="Orders/Discontinued" asp-all-route-data="discontinuedRoute">Discontinued orders</a></p>
+    </section>
+
+    @* Lab orders whose results are in (step 7), part of the chart's one recorded read: those still to acknowledge
+       first, abnormal before the rest. Each opens its results. *@
+    <section class="sc-panel" aria-labelledby="chart-results">
+        <h2 class="sc-panel__title" id="chart-results">Results</h2>
+        @if (Model.Chart.Resulted.Count > 0)
+        {
+            <ul class="sc-list">
+                @foreach (var resulted in Model.Chart.Resulted)
+                {
+                    <li data-resulted="@(resulted.Acknowledged ? "acknowledged" : "to-acknowledge")">
+                        <a asp-page="Orders/Results" asp-route-patientId="@Model.Patient.Id" asp-route-orderId="@resulted.Id">@resulted.Display</a>
+                        @if (resulted.Abnormal > 0)
+                        {
+                            <span class="sc-tag sc-tag--warning">Abnormal</span>
+                        }
+                        @if (!resulted.Acknowledged)
+                        {
+                            <span class="sc-tag sc-tag--info">To acknowledge</span>
+                        }
+                        @if (resulted.ResultedAt is { } at)
+                        {
+                            <span class="sc-muted">· @at.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="sc-muted">No results.</p>
+        }
     </section>
 
     @* Messages with the patient (FR-18): the conversations, latest first, read with the chart; a new one for a patient
