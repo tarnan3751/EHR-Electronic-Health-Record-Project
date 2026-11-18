@@ -62,7 +62,8 @@ GRANT SELECT ON ehr.break_glass_accesses TO ehr_read;
 -- The rest of the chart: allergies, medications, diagnoses (conditions) and visits (encounters). PHI, like patients:
 -- row-level security and the write-audit trigger follow. The on-prem app reads them as ehr_app, the cloud app as
 -- ehr_read. Clinicians add and change allergies, medications and diagnoses, and mark them inactive: INSERT and UPDATE
--- for ehr_app, and never DELETE. Visits are still read only.
+-- for ehr_app, and never DELETE. A visit is created when a patient is checked in for an appointment (INSERT, further
+-- down); nothing updates or deletes one.
 GRANT SELECT ON ehr.allergy_intolerances, ehr.medication_statements, ehr.conditions, ehr.encounters TO ehr_app, ehr_read;
 GRANT INSERT, UPDATE ON ehr.allergy_intolerances, ehr.medication_statements, ehr.conditions TO ehr_app;
 
@@ -118,6 +119,15 @@ GRANT SELECT ON ehr.order_catalog_items TO ehr_app, ehr_read;
 GRANT SELECT, INSERT ON ehr.orders TO ehr_app;
 GRANT UPDATE (status, discontinue_reason, replaced_by_order_id) ON ehr.orders TO ehr_app;
 GRANT SELECT ON ehr.orders TO ehr_read;
+
+-- Appointments (FR-17). PHI: row-level security and the write-audit trigger follow. Clinicians book and change them:
+-- INSERT, and UPDATE of the columns a reschedule, a cancellation, a check-in or a no-show writes, which a trigger
+-- holds to those moves (80-appointments.sql). Never DELETE. Checking a patient in creates their visit, so ehr_app
+-- may now INSERT encounters, under a policy of its own (30-rls.sql); nothing updates or deletes a visit.
+GRANT SELECT, INSERT ON ehr.appointments TO ehr_app;
+GRANT UPDATE (starts_at, minutes, reason, status, cancel_reason, encounter_id) ON ehr.appointments TO ehr_app;
+GRANT SELECT ON ehr.appointments TO ehr_read;
+GRANT INSERT ON ehr.encounters TO ehr_app;
 
 -- The staff inbox: what needs a staff member's action. PHI: row-level security and the write-audit trigger follow.
 -- Read by its recipient. The one change is marking an item done: UPDATE on that column alone, and a trigger sets the

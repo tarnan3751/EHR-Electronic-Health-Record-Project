@@ -184,6 +184,39 @@ else if (Model.Chart.SensitiveHidden > 0)
         <p><a asp-page="Orders/Discontinued" asp-all-route-data="discontinuedRoute">Discontinued orders</a></p>
     </section>
 
+    @* Appointments still to come (FR-17), part of the chart's one recorded read; booked for a patient on the
+       clinician's panel while the clinic's server can be reached. *@
+    <section class="sc-panel" aria-labelledby="chart-appointments">
+        <h2 class="sc-panel__title" id="chart-appointments">Appointments</h2>
+        @if (Model.OnPanel && OnPrem.IsReachable)
+        {
+            var bookRoute = Model.Search.RouteData();
+            bookRoute["id"] = Model.Patient.Id.ToString();
+            <p class="sc-actions"><a asp-page="/Schedule/New" asp-all-route-data="bookRoute" class="sc-btn sc-btn--compact" data-book-appointment>Book appointment</a></p>
+        }
+        else if (Model.OnPanel)
+        {
+            <p class="sc-muted">Booking an appointment needs the clinic's server.</p>
+        }
+        @if (Model.Chart.Upcoming.Count > 0)
+        {
+            <ul class="sc-list">
+                @foreach (var appointment in Model.Chart.Upcoming)
+                {
+                    <li>
+                        <strong>@appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</strong> · @appointment.Minutes minutes · @appointment.Clinician
+                        <br>@appointment.Reason
+                        <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")">Open</a></span>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="sc-muted">No appointments booked.</p>
+        }
+    </section>
+
     @* Allergies, medications and diagnoses: added and changed for a patient on the clinician's panel while the clinic's
        server can be reached (Lists/Entry). Nothing is deleted; an entry that no longer applies gets another status. *@
     <section class="sc-panel" aria-labelledby="chart-allergies">

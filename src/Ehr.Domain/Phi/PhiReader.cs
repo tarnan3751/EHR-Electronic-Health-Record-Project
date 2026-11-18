@@ -2,8 +2,10 @@ using Ehr.Data;
 using Ehr.Data.Audit;
 using Ehr.Data.Orders;
 using Ehr.Data.Patients;
+using Ehr.Data.Scheduling;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Orders;
+using Ehr.Domain.Scheduling;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Domain.Phi;
@@ -73,8 +75,13 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
 
         await db.SaveChangesAsync(cancellationToken);
+        var soon = DateTimeOffset.UtcNow.AddHours(-1);
+        var upcoming = await AppointmentEntriesAsync(
+            db.Appointments.Where(a => a.PatientId == id && a.Status == AppointmentStatus.Booked && a.StartsAt >= soon).OrderBy(a => a.StartsAt).Take(5),
+            latestFirst: false, cancellationToken);
         return new PatientChart(patient, allergies, medications, conditions, encounters, orders)
         {
+            Upcoming = upcoming,
             ConfirmsDiscontinued = confirmed,
             SensitiveHidden = hidden,
             SensitiveShown = sensitive,
@@ -333,6 +340,84 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         return charts;
+    }
+
+    // Appointments, already chosen and limited, with the names the lists show: the clinician's, a staff account anyone
+    // signed in may read, and the patient's, which the caller records a read of where it shows it. Sorted here, by
+    // start: the joins keep no order.
+    async Task<List<AppointmentEntry>> AppointmentEntriesAsync(IQueryable<Appointment> appointments, bool latestFirst, CancellationToken cancellationToken)
+    {
+        var entries = await (
+            from appointment in appointments.AsNoTracking()
+            join clinician in db.StaffUsers on appointment.ClinicianId equals clinician.Id
+            join patient in db.Patients on appointment.PatientId equals patient.Id
+            select new AppointmentEntry(appointment.Id, appointment.PatientId, patient.FamilyName + ", " + patient.GivenName, patient.Mrn,
+                appointment.ClinicianId, clinician.DisplayName, appointment.StartsAt, appointment.Minutes, appointment.Reason, appointment.Status,
+                appointment.CancelReason, appointment.Version)).ToListAsync(cancellationToken);
+        return [.. latestFirst ? entries.OrderByDescending(a => a.StartsAt).ThenBy(a => a.Id) : entries.OrderBy(a => a.StartsAt).ThenBy(a => a.Id)];
+    }
+
+    // A clinician's day (FR-17): their appointments that start on that day, UTC, earliest first, whatever their
+    // status. Each patient named is a recorded read of that patient, as in a list of patients.
+    public async Task<IReadOnlyList<AppointmentEntry>> ScheduleAsync(Guid clinician, DateOnly day, CancellationToken cancellationToken)
+    {
+        var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        var to = from.AddDays(1);
+        var appointments = await AppointmentEntriesAsync(
+            db.Appointments.Where(a => a.ClinicianId == clinician && a.StartsAt >= from && a.StartsAt < to), latestFirst: false, cancellationToken);
+        if (appointments.Count > 0)
+        {
+            audit.RecordReads(PatientsTable, appointments.Select(a => a.PatientId).Distinct().Select(patient => (patient, patient)));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return appointments;
+    }
+
+    // A patient's appointments, for the portal: one view of one patient, so one recorded read of the patient.
+    // Row-level security returns a patient only their own.
+    public async Task<PatientAppointments?> AppointmentsAsync(Guid patientId, int past, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow.AddHours(-1);
+        var mine = db.Appointments.Where(a => a.PatientId == patientId);
+        var upcoming = await AppointmentEntriesAsync(
+            mine.Where(a => a.Status == AppointmentStatus.Booked && a.StartsAt >= now).OrderBy(a => a.StartsAt).Take(50), latestFirst: false, cancellationToken);
+        var earlier = past == 0
+            ? []
+            : await AppointmentEntriesAsync(
+                mine.Where(a => a.Status != AppointmentStatus.Booked || a.StartsAt < now).OrderByDescending(a => a.StartsAt).Take(past),
+                latestFirst: true, cancellationToken);
+
+        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new PatientAppointments(patient, upcoming, earlier);
+    }
+
+    // Whose appointment it is, for the page's gate, which comes before anything is read or shown: the ID of the
+    // patient and nothing else. Not a recorded read; the read that follows the gate is.
+    public Task<Guid?> AppointmentPatientAsync(Guid id, CancellationToken cancellationToken) =>
+        db.Appointments.AsNoTracking().Where(a => a.Id == id).Select(a => (Guid?)a.PatientId).SingleOrDefaultAsync(cancellationToken);
+
+    // One appointment, with its patient and their allergies for the banner: one recorded read of the patient.
+    public async Task<AppointmentDetail?> AppointmentAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var appointment = (await AppointmentEntriesAsync(db.Appointments.Where(a => a.Id == id), latestFirst: false, cancellationToken)).SingleOrDefault();
+        if (appointment is null)
+        {
+            return null;
+        }
+
+        var patient = await db.Patients.AsNoTracking().SingleAsync(p => p.Id == appointment.PatientId, cancellationToken);
+        var allergies = await CurrentAllergies(patient.Id).ToListAsync(cancellationToken);
+        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new AppointmentDetail(appointment, patient, allergies);
     }
 
     // The signed-in staff member's inbox: the items that still need action, oldest first, or the ones done, newest
