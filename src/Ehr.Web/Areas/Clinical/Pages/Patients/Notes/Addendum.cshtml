@@ -1,0 +1,45 @@
+@page "/patients/{patientId:guid}/notes/{noteId:guid}/addendum"
+@using Ehr.Domain.Notes
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.AddendumModel
+@{
+    ViewData["Title"] = "Add an addendum";
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to the signed note</a></p>
+</div>
+<h1>Add an addendum</h1>
+<p class="sc-prose">The note, signed @Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC, can't be changed. An addendum is a new text shown after it, signed as you with the time. It can't be edited or removed.</p>
+<form method="post" class="sc-form sc-form--wide" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">
+    @if (Model.Errors.Count > 0)
+    {
+        <div class="sc-notice sc-notice--danger" role="alert">
+            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not signed:</span> @error</p> }
+        </div>
+    }
+    <div class="sc-field">
+        <label for="addendum-text">Addendum <span>(required)</span></label>
+        <textarea id="addendum-text" class="sc-field__input" name="Text" rows="8" maxlength="@Ehr.Data.Patients.NoteAddendumConfiguration.MaxLength" required autofocus
+                  aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)">@Model.Text</textarea>
+    </div>
+    @if (Model.Note.Sensitive)
+    {
+        <p class="sc-muted">This note is sensitive, so its addenda are too.</p>
+    }
+    else
+    {
+        <label class="sc-check" for="addendum-sensitive"><input type="checkbox" id="addendum-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="addendum-sensitive-hint"> Sensitive</label>
+        <p class="sc-field__hint" id="addendum-sensitive-hint">A sensitive addendum is left out of the note's page until someone asks for it, and each view is recorded.</p>
+    }
+    <div class="sc-actions">
+        <button type="submit" class="sc-btn sc-btn--primary" data-sign-addendum>Sign addendum</button>
+        <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Cancel</a>
+    </div>
+</form>
+
+<h2>The signed note</h2>
+<partial name="_NoteContent" model="new NoteContent(Model.Note.History, Model.Note.Assessment, Model.Note.Plan)" />

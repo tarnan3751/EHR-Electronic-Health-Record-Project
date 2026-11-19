@@ -1,8 +1,11 @@
 @page "/patients/{patientId:guid}/notes/{noteId:guid}"
 @using Ehr.Domain.Notes
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ViewModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = "Signed clinical note";
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
 }
 @* The patient, in the banner under the app bar. The note pages read no allergies, so the banner shows none. *@
 @section Banner {
@@ -11,12 +14,71 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
 </div>
-<h1 class="sc-title">Clinical note <span class="sc-tag sc-tag--success">Signed · read-only</span></h1>
-<p class="sc-notice sc-notice--success" role="status">This note is signed and permanently saved to the clinical record.</p>
+<h1 class="sc-title">Clinical note <span class="sc-tag sc-tag--success">Signed · read-only</span>@if (Model.Note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning" data-note-sensitive>Sensitive</span> }</h1>
+@if (Model.Done == "addendum")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Signed:</span> the addendum is part of the record, after the note.</p>
+}
+else
+{
+    <p class="sc-notice sc-notice--success" role="status">This note is signed and permanently saved to the clinical record.</p>
+}
+@if (Model.Note.Sensitive)
+{
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive note:</span> your view of it is recorded.</p>
+}
 <dl class="record">
     <dt>Signing clinician</dt><dd>@Model.SignerName <small class="mono-id">(@Model.Note.SignerId)</small></dd>
     <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss") UTC</time></dd>
 </dl>
 <partial name="_NoteContent" model="new NoteContent(Model.Note.History, Model.Note.Assessment, Model.Note.Plan)" />
+
+@* Addenda (step 10): the note above never changes; each addendum is a signed text after it, oldest first. *@
+<h2 id="addenda">Addenda</h2>
+@if (Model.Addenda.SensitiveHidden > 0)
+{
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive addenda hidden:</span> @Model.Addenda.SensitiveHidden @(Model.Addenda.SensitiveHidden == 1 ? "addendum is" : "addenda are") not shown. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-sensitive="true" asp-fragment="addenda">Show sensitive addenda</a></p>
+}
+else if (Model.Addenda.SensitiveShown && !Model.Note.Sensitive && Model.Addenda.Shown.Any(a => a.Sensitive))
+{
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive addenda shown:</span> your view of them is recorded. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="addenda">Hide sensitive addenda</a></p>
+}
+@if (Model.Addenda.Shown.Count == 0)
+{
+    <p class="sc-muted">@(Model.Addenda.SensitiveHidden > 0 ? "No other addenda." : "No addenda.")</p>
+}
+else
+{
+    <ol class="sc-list" data-addenda>
+        @foreach (var addendum in Model.Addenda.Shown)
+        {
+            <li data-addendum="@addendum.Id">
+                <p>
+                    <strong>@addendum.AuthorName</strong>
+                    <span class="sc-muted">· signed <time datetime="@addendum.SignedAt.ToString("O")">@addendum.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</time></span>
+                    @if (addendum.Sensitive)
+                    {
+                        <span class="sc-tag sc-tag--warning">Sensitive</span>
+                    }
+                </p>
+                <p class="sc-note__text">@addendum.Text</p>
+            </li>
+        }
+    </ol>
+}
+
+@* The form is on a page of its own: this page stays read-only, with nothing to type into. *@
+@if (!Model.OnPanel)
+{
+    <p class="sc-muted">Add this patient to your panel to sign an addendum.</p>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">An addendum can't be signed until the clinic's server is back.</p>
+}
+else
+{
+    <p><a class="sc-btn" asp-page="Addendum" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-add-addendum>Add an addendum</a></p>
+}
 
 <partial name="_ReviewHistory" model="Model.CompletedReviews" />

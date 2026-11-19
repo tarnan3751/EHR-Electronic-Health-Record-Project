@@ -56,6 +56,9 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
                 Threads = db.MessageThreads.Any(t => t.PatientId == id),
                 Resulted = db.Orders.Any(o => o.PatientId == id && o.Status == OrderStatus.Completed),
                 Notes = db.ClinicalNotes.Any(n => n.PatientId == id),
+                // Signed notes marked sensitive (step 10): counted here, in the patient's statement, and left out of
+                // the chart's list unless asked for, like sensitive diagnoses and medications.
+                SensitiveNotes = db.ClinicalNotes.Count(n => n.PatientId == id && n.Sensitive),
                 Drafts = db.ClinicalDrafts.Any(d => d.PatientId == id),
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -134,6 +137,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             Upcoming = upcoming,
             ConfirmsDiscontinued = confirmed,
             SensitiveHidden = hidden,
+            SensitiveNotesHidden = sensitive ? 0 : found.SensitiveNotes,
             SensitiveShown = sensitive,
         };
     }
@@ -394,7 +398,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         {
             if (await ChartAsync(id, visits, cancellationToken) is { } chart)
             {
-                charts.Add(chart);
+                // The signed notes that may be kept offline, with their addenda (step 10): only when there are any.
+                charts.Add(chart.HasNotes ? chart with { OfflineNotes = await OfflineNotesAsync(id, limit: 10, cancellationToken) } : chart);
             }
         }
 
@@ -834,9 +839,12 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return drafts;
     }
 
-    public async Task<IReadOnlyList<ClinicalNote>> NotesAsync(Guid patient, CancellationToken cancel)
+    // A patient's signed notes, newest first. Notes marked sensitive (step 10) are left out unless asked for: the chart
+    // asks only when the clinician chose "Show sensitive items", which the chart's own read records as a view of
+    // sensitive items.
+    public async Task<IReadOnlyList<ClinicalNote>> NotesAsync(Guid patient, CancellationToken cancel, bool sensitive = false)
     {
-        var notes = await db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == patient)
+        var notes = await db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == patient && (sensitive || !n.Sensitive))
             .OrderByDescending(n => n.SignedAt).ThenBy(n => n.Id).ToListAsync(cancel);
         if (notes.Count > 0)
         {
@@ -859,10 +867,66 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         if (note is not null)
         {
             audit.Record(AuditActions.Read, note.PatientId, "clinical_notes", note.Id);
+            if (note.Sensitive)
+            {
+                // Opening a sensitive note is a view of the patient's sensitive items, recorded as the chart's is.
+                audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
+            }
+
             await db.SaveChangesAsync(cancel);
         }
 
         return note;
+    }
+
+    // The addenda to a signed note (step 10), in the order they were signed, each with its author's name. The note's
+    // own read covers them: call this for a note just read. Sensitive addenda to a note that isn't sensitive are left
+    // out unless asked for, and showing them is recorded as a view of the patient's sensitive items; a sensitive
+    // note's addenda are all sensitive, and its read has already recorded that.
+    public async Task<NoteAddenda> AddendaAsync(ClinicalNote note, bool sensitive, CancellationToken cancel)
+    {
+        var all = await db.NoteAddenda.AsNoTracking().Where(a => a.NoteId == note.Id && a.PatientId == note.PatientId)
+            .OrderBy(a => a.SignedAt).ThenBy(a => a.Id)
+            .Select(a => new AddendumEntry(a.Id, a.Text, a.SignedAt, a.Sensitive, a.AuthorId,
+                db.StaffUsers.Where(u => u.Id == a.AuthorId).Select(u => u.DisplayName).FirstOrDefault() ?? ""))
+            .ToListAsync(cancel);
+        var show = sensitive || note.Sensitive;
+        var shown = show ? all : all.Where(a => !a.Sensitive).ToList();
+        if (show && !note.Sensitive && all.Any(a => a.Sensitive))
+        {
+            audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return new NoteAddenda(shown, all.Count - shown.Count, show);
+    }
+
+    // For the desktop app's offline copy (step 10): a patient's latest signed notes that aren't sensitive, each with
+    // its addenda that aren't, newest note first. Sensitive ones are never kept offline. Each note read is recorded.
+    async Task<IReadOnlyList<OfflineNote>> OfflineNotesAsync(Guid patient, int limit, CancellationToken cancel)
+    {
+        var notes = await db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == patient && !n.Sensitive)
+            .OrderByDescending(n => n.SignedAt).ThenBy(n => n.Id).Take(limit)
+            .Select(n => new { Note = n, Signer = db.StaffUsers.Where(u => u.Id == n.SignerId).Select(u => u.DisplayName).FirstOrDefault() })
+            .ToListAsync(cancel);
+        if (notes.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = notes.Select(n => n.Note.Id).ToList();
+        var addenda = await db.NoteAddenda.AsNoTracking().Where(a => ids.Contains(a.NoteId) && a.PatientId == patient && !a.Sensitive)
+            .OrderBy(a => a.SignedAt).ThenBy(a => a.Id)
+            .Select(a => new
+            {
+                a.NoteId,
+                Entry = new AddendumEntry(a.Id, a.Text, a.SignedAt, a.Sensitive, a.AuthorId,
+                db.StaffUsers.Where(u => u.Id == a.AuthorId).Select(u => u.DisplayName).FirstOrDefault() ?? "")
+            })
+            .ToListAsync(cancel);
+        audit.RecordReads("clinical_notes", notes.Select(n => (n.Note.PatientId, n.Note.Id)));
+        await db.SaveChangesAsync(cancel);
+        return [.. notes.Select(n => new OfflineNote(n.Note, n.Signer ?? "", [.. addenda.Where(a => a.NoteId == n.Note.Id).Select(a => a.Entry)]))];
     }
 
     public async Task<ClinicalDraft?> LockDraftAsync(Guid id, Guid patient, CancellationToken cancel) =>

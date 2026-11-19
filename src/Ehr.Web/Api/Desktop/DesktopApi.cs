@@ -86,9 +86,12 @@ public static class DesktopApi
             chart.Visits.Select(v => new CachedVisit(v.PeriodStart, v.Reason, Whole(chart.VisitVitals.GetValueOrDefault(v.Id)?.Systolic),
                 Whole(chart.VisitVitals.GetValueOrDefault(v.Id)?.Diastolic), Whole(chart.VisitVitals.GetValueOrDefault(v.Id)?.HeartRate))).ToList(),
             // The offline copy never holds sensitive items: the chart read left them out, and says how many.
-            chart.SensitiveHidden,
+            chart.SensitiveHidden + chart.SensitiveNotesHidden,
             // "No known allergies" is its own state, not an allergy in the list.
-            chart.Allergies.Any(a => a.Code != AllergyIntolerance.NoKnownAllergy) ? "listed" : chart.Allergies.Count > 0 ? "none-known" : "not-recorded")).ToList());
+            chart.Allergies.Any(a => a.Code != AllergyIntolerance.NoKnownAllergy) ? "listed" : chart.Allergies.Count > 0 ? "none-known" : "not-recorded",
+            // Signed notes and their addenda (step 10); sensitive ones were left out by the read, and are counted above.
+            chart.OfflineNotes.Select(n => new CachedNote(n.Note.SignedAt, n.SignerName, n.Note.History, n.Note.Assessment, n.Note.Plan,
+                n.Addenda.Select(a => new CachedAddendum(a.SignedAt, a.AuthorName, a.Text)).ToList())).ToList())).ToList());
     }
 
     // A vital sign as the desktop app's contract carries it: a whole number.

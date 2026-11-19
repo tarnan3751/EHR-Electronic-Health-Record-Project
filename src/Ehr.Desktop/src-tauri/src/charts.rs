@@ -28,7 +28,7 @@ pub struct Chart {
     pub medications: Vec<Medication>,
     pub conditions: Vec<Condition>,
     pub visits: Vec<Visit>,
-    /// How many sensitive diagnoses and medications the server left out:
+    /// How many sensitive diagnoses, medications and signed notes the server left out:
     /// they are never kept offline. Absent from copies made before it was sent.
     #[serde(default)]
     pub sensitive_not_kept: u32,
@@ -36,6 +36,30 @@ pub struct Chart {
     /// Absent from copies made before it was sent.
     #[serde(default)]
     pub allergy_status: Option<String>,
+    /// The latest signed notes that aren't sensitive, newest first, each with
+    /// its addenda in order. Absent from copies made before they were sent.
+    #[serde(default)]
+    pub notes: Vec<SignedNote>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedNote {
+    pub signed_at: String,
+    pub signer: String,
+    pub history: String,
+    pub assessment: String,
+    pub plan: String,
+    #[serde(default)]
+    pub addenda: Vec<Addendum>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Addendum {
+    pub signed_at: String,
+    pub author: String,
+    pub text: String,
 }
 
 #[derive(Deserialize, Serialize)]

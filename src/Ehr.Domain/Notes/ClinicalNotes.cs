@@ -3,6 +3,8 @@ using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Phi;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Ehr.Domain.Notes;
 
@@ -113,7 +115,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         return errors;
     }
 
-    public async Task<NoteResult> SignAsync(Guid patient, Guid id, long version, bool confirmed, CancellationToken cancel)
+    // `sensitive` (step 10): the signer marks the note sensitive, for good, as it is signed.
+    public async Task<NoteResult> SignAsync(Guid patient, Guid id, long version, bool confirmed, CancellationToken cancel, bool sensitive = false)
     {
         // ReadDraft enforces ownership AND current panel assignment through RLS, even for a retried signature.
         if (!authority.IsPrimaryHost)
@@ -158,13 +161,71 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             History = draft.History!,
             Assessment = draft.Assessment!,
             Plan = draft.Plan!,
+            Sensitive = sensitive,
         };
         db.AddRange(note);
         audit.Record(AuditActions.SignNote, patient, "clinical_notes", note.Id);
         await db.SaveChangesAsync(cancel);
         return new(200, [], Note: note);
     }
+
+    // Signs an addendum to a signed note (step 10): a new text attached to the note, which stays as it was. The
+    // database decides who may (a clinician with the patient on their panel, as themselves), sets who signed and when,
+    // and makes an addendum to a sensitive note sensitive (db/policies/30-rls.sql and 50-clinical-notes.sql).
+    public async Task<AddendumResult> AddAddendumAsync(Guid patient, Guid note, string? text, bool sensitive, CancellationToken cancel)
+    {
+        if (!authority.IsPrimaryHost)
+        {
+            return new(503, ["The authoritative clinic server must be available to sign an addendum. Your text is still displayed."]);
+        }
+
+        text = text?.ReplaceLineEndings("\n").Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return new(422, ["Write the addendum before signing it."]);
+        }
+
+        if (text.Length > NoteAddendumConfiguration.MaxLength)
+        {
+            return new(422, [$"An addendum can be up to {NoteAddendumConfiguration.MaxLength:N0} characters. This one has {text.Length:N0}."]);
+        }
+
+        if (!await phi.IsAssignedAsync(patient, cancel))
+        {
+            return new(403, ["Add this patient to your panel to sign an addendum."]);
+        }
+
+        object addendum = new NoteAddendum { Id = Guid.CreateVersion7(), NoteId = note, PatientId = patient, AuthorId = user.UserId ?? Guid.Empty, Text = text, Sensitive = sensitive };
+        const string savepoint = "note_addendum";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancel);
+        try
+        {
+            db.Add(addendum);
+            await db.SaveChangesAsync(cancel);
+            await transaction.ReleaseSavepointAsync(savepoint, cancel);
+            return new(200, []);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation or PostgresErrorCodes.ForeignKeyViolation,
+        } refusal)
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
+                ? new(403, ["Add this patient to your panel to sign an addendum."])
+                : new(404, ["This note is unavailable."]);
+        }
+        finally
+        {
+            db.Entry(addendum).State = EntityState.Detached;
+        }
+    }
 }
+
+// What became of an addendum: 200 signed; 422 with what to fix; 403 the patient isn't on the clinician's panel; 404
+// the note isn't this patient's; 503 off the clinic's server.
+public sealed record AddendumResult(int Status, IReadOnlyList<string> Errors);
 
 public sealed record NoteResult(int Status, IReadOnlyList<string> Errors, ClinicalDraft? Draft = null, ClinicalNote? Note = null)
 {

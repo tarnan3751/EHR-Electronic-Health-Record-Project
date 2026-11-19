@@ -17,10 +17,17 @@ public sealed record CachedChart(
     Guid Id, string Name, string Mrn, DateOnly BirthDate, string Gender,
     IReadOnlyList<CachedAllergy> Allergies, IReadOnlyList<CachedMedication> Medications,
     IReadOnlyList<CachedCondition> Conditions, IReadOnlyList<CachedVisit> Visits,
-    // How many sensitive diagnoses and medications the chart has that aren't in this copy: they are never kept offline.
+    // How many sensitive diagnoses, medications and signed notes the chart has that aren't in this copy: they are
+    // never kept offline.
     int SensitiveNotKept = 0,
     // What the allergy list is: "listed" (Allergies holds them), "none-known" (asked, and none) or "not-recorded".
-    string AllergyStatus = "listed");
+    string AllergyStatus = "listed",
+    // The latest signed notes that aren't sensitive, newest first, each with its addenda in order (step 10).
+    IReadOnlyList<CachedNote>? Notes = null);
+
+public sealed record CachedNote(DateTimeOffset SignedAt, string Signer, string History, string Assessment, string Plan, IReadOnlyList<CachedAddendum> Addenda);
+
+public sealed record CachedAddendum(DateTimeOffset SignedAt, string Author, string Text);
 
 public sealed record CachedAllergy(string Display, string? Reaction, string? Criticality);
 

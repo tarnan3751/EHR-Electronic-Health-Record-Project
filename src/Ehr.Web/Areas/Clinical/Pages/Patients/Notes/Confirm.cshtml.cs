@@ -12,6 +12,9 @@ public class ConfirmModel(PhiReader phi, PatientAssignments assignments, BreakGl
 {
     [BindProperty(SupportsGet = true)] public long Version { get; set; }
     [BindProperty] public bool Confirmed { get; set; }
+
+    // Step 10: the signer marks the note sensitive as they sign it.
+    [BindProperty] public bool Sensitive { get; set; }
     public ClinicalDraft Draft { get; private set; } = null!;
     public IReadOnlyList<string> Errors { get; private set; } = [];
 
@@ -42,7 +45,7 @@ public class ConfirmModel(PhiReader phi, PatientAssignments assignments, BreakGl
     {
         Response.Headers.CacheControl = "no-store";
         var result = ModelState.IsValid
-            ? await notes.SignAsync(patientId, draftId, Version, Confirmed, HttpContext.RequestAborted)
+            ? await notes.SignAsync(patientId, draftId, Version, Confirmed, HttpContext.RequestAborted, Sensitive)
             : new NoteResult(422, ["Send a valid draft version and confirm your signature."]);
         var url = result.Note is { } note ? Url.Page("View", new { patientId, noteId = note.Id, signed = true }) : null;
         if (Request.Headers.ContainsKey("HX-Request"))

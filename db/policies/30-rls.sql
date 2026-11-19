@@ -632,6 +632,27 @@ DROP POLICY IF EXISTS clinical_notes_own_insert ON ehr.clinical_notes;
 CREATE POLICY clinical_notes_own_insert ON ehr.clinical_notes FOR INSERT
     WITH CHECK ((SELECT ehr.is_clinician()) AND signer_id = (SELECT ehr.current_user_id()));
 
+-- Addenda to signed notes (PHI; step 10). Read as the notes are, by every clinician on the chart's access model. A
+-- clinician signs one only as themselves and only for a patient on their active panel, the rule for writing notes; the
+-- signing trigger sets who and when and checks the rest (50-clinical-notes.sql). Nothing updates or deletes one
+-- (10-grants.sql), so there is no policy for either.
+ALTER TABLE ehr.note_addenda ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.note_addenda FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS note_addenda_clinician_select ON ehr.note_addenda;
+CREATE POLICY note_addenda_clinician_select ON ehr.note_addenda FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS note_addenda_panel_insert ON ehr.note_addenda;
+CREATE POLICY note_addenda_panel_insert ON ehr.note_addenda FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND author_id = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = note_addenda.patient_id AND a.ended_at IS NULL
+        )
+    );
+
 -- UC 1 (Tahseen Arnan). Orders (PHI) are read as signed notes are: by every clinician, on the chart's access model. A
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;
 -- the signing trigger also locks, checks for a duplicate and sets the time (60-orders.sql). The one update is

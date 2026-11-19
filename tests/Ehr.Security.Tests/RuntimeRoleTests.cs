@@ -99,6 +99,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "ai_field_proposals")] = ["SELECT"],
         [("ehr_app", "clinical_notes")] = ["SELECT", "INSERT"],
         [("ehr_read", "clinical_notes")] = ["SELECT"],
+        [("ehr_app", "note_addenda")] = ["SELECT", "INSERT"],
+        [("ehr_read", "note_addenda")] = ["SELECT"],
         [("ehr_app", "clinical_drafts")] = ["SELECT", "INSERT", "UPDATE"],
         // UC 14 adds replica draft reads under the same private-author/active-panel RLS as the primary.
         [("ehr_read", "clinical_drafts")] = ["SELECT"],
