@@ -131,7 +131,8 @@ public class NoteAddendumSecurityTests(MigratedDatabase database) : IClassFixtur
                 "DELETE FROM ehr.note_addenda WHERE note_id = @note", ("note", note)));
         }
 
-        // Even the tables' owner, who has every privilege, is stopped by the trigger; and the note itself still is.
+        // Even the tables' owner, who has every privilege, is stopped by the trigger. The note takes one change, its
+        // sensitivity with a reason (step 10b; NoteSensitivitySecurityTests): a bare flip is still refused.
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             "UPDATE ehr.note_addenda SET text = 'Changed' WHERE note_id = @note", ("note", note)));
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => Accounts.ExecuteAsync(database.SuperuserConnectionString, null,

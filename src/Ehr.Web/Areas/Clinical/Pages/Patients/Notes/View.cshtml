@@ -19,6 +19,10 @@
 {
     <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Signed:</span> the addendum is part of the record, after the note.</p>
 }
+else if (Model.Done is "marked" or "unmarked")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> @(Model.Done == "marked" ? "it is marked sensitive, with your reason." : "it is no longer marked sensitive, with your reason.")</p>
+}
 else
 {
     <p class="sc-notice sc-notice--success" role="status">This note is signed and permanently saved to the clinical record.</p>
@@ -32,6 +36,15 @@ else
     <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss") UTC</time></dd>
 </dl>
 <partial name="_NoteContent" model="new NoteContent(Model.Note.History, Model.Note.Assessment, Model.Note.Plan)" />
+@* Step 10b: the note's sensitivity can change after signing, with a reason; its text never does. *@
+@if (Model.Note.SensitiveReason is not null)
+{
+    <p class="sc-muted" data-sensitivity-reason>@Model.Change(Model.Note.Sensitive, Model.Note.SensitiveMarkedBy) @Model.Note.SensitiveChangedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC: @Model.Note.SensitiveReason</p>
+}
+@if (Model.OnPanel && OnPrem.IsReachable)
+{
+    <p><a asp-page="Sensitivity" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-note-sensitivity>@(Model.Note.Sensitive ? "Unmark this note as sensitive" : "Mark this note sensitive")</a></p>
+}
 
 @* Addenda (step 10): the note above never changes; each addendum is a signed text after it, oldest first. *@
 <h2 id="addenda">Addenda</h2>
@@ -54,7 +67,8 @@ else
         {
             <li data-addendum="@addendum.Id">
                 <p>
-                    <strong>@addendum.AuthorName</strong>
+                    @* Step 10b: one written by someone other than the note's signer says so. *@
+                    <strong>@(addendum.ByNoteAuthor ? addendum.AuthorName : $"Addendum by {addendum.AuthorName}, not the note's author")</strong>
                     <span class="sc-muted">· signed <time datetime="@addendum.SignedAt.ToString("O")">@addendum.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</time></span>
                     @if (addendum.Sensitive)
                     {
@@ -62,6 +76,14 @@ else
                     }
                 </p>
                 <p class="sc-note__text">@addendum.Text</p>
+                @if (addendum.SensitiveReason is not null)
+                {
+                    <p class="sc-muted">@Model.Change(addendum.Sensitive, addendum.SensitiveMarkedBy) @addendum.SensitiveChangedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC: @addendum.SensitiveReason</p>
+                }
+                @if (Model.OnPanel && OnPrem.IsReachable && !(addendum.Sensitive && Model.Note.Sensitive))
+                {
+                    <p><a asp-page="Sensitivity" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-addendum="@addendum.Id" data-addendum-sensitivity>@(addendum.Sensitive ? "Unmark as sensitive" : "Mark sensitive")<span class="sc-visually-hidden">, the addendum by @addendum.AuthorName signed @addendum.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</span></a></p>
+                }
             </li>
         }
     </ol>

@@ -48,7 +48,8 @@ public class TC_UC4_18_Nfr12_VitalSignsKeyboardFirst(WebApps apps) : IClassFixtu
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/vitals");
-        Assert.True(await page.EvaluateAsync<bool>($"document.activeElement.matches('input[name=\"Values[{Systolic}]\"]')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync($"document.activeElement.matches('input[name=\"Values[{Systolic}]\"]')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         await page.Keyboard.TypeAsync("126");

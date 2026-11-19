@@ -63,6 +63,9 @@ pub struct Addendum {
     pub signed_at: String,
     pub author: String,
     pub text: String,
+    /// Written by someone other than the note's signer.
+    #[serde(default)]
+    pub not_note_author: bool,
 }
 
 #[derive(Deserialize, Serialize)]

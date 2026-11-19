@@ -43,6 +43,24 @@ static class NoteAddendumTests
     public static Task<HttpResponseMessage> AddAsync(HttpClient client, Guid patient, Guid note, string text, bool sensitive = false) =>
         PostFormAsync(client, AddendumPath(patient, note), AddendumPath(patient, note), ("Text", text), ("Sensitive", sensitive));
 
+    public static string SensitivityPath(Guid patient, Guid note, Guid? addendum = null) =>
+        NotePath(patient, note) + "/sensitivity" + (addendum is null ? "" : $"?addendum={addendum}");
+
+    // "Mark sensitive" (mark: true) or "Unmark as sensitive" (false), as the page posts it: the form says which.
+    public static Task<HttpResponseMessage> ChangeSensitivityAsync(HttpClient client, Guid patient, Guid note, bool mark, string? reason, Guid? addendum = null) =>
+        PostFormAsync(client, SensitivityPath(patient, note, addendum), SensitivityPath(patient, note, addendum),
+            reason is null ? [("Mark", mark)] : [("Mark", mark), ("Reason", reason)]);
+
+    // "sensitive marked-by reason" for the patient's notes, then their addenda, each in the order signed.
+    public static Task<List<string>> SensitivityAsync(WebApps apps, Guid patient) => ProxyTests.QueryAsync(apps,
+        """
+        SELECT kind || ' ' || sensitive || ' ' || coalesce(sensitive_marked_by::text, 'none') || ' ' || coalesce(sensitive_reason, 'none') FROM (
+            SELECT 'note' AS kind, sensitive, sensitive_marked_by, sensitive_reason, signed_at, id FROM ehr.clinical_notes WHERE patient_id = @patient
+            UNION ALL
+            SELECT 'addendum', sensitive, sensitive_marked_by, sensitive_reason, signed_at, id FROM ehr.note_addenda WHERE patient_id = @patient) rows
+        ORDER BY kind DESC, signed_at, id
+        """, patient);
+
     // "author sensitive text" for each addendum of the patient's notes, in the order signed.
     public static Task<List<string>> AddendaAsync(WebApps apps, Guid patient) => ProxyTests.QueryAsync(apps,
         "SELECT author_id || ' ' || sensitive || ' ' || text FROM ehr.note_addenda WHERE patient_id = @patient ORDER BY signed_at, id", patient);

@@ -30,7 +30,8 @@ public sealed record CachedNote(
     DateTimeOffset SignedAt, string Signer, string History, string Assessment, string Plan, IReadOnlyList<CachedAddendum> Addenda,
     int SensitiveAddendaNotKept = 0);
 
-public sealed record CachedAddendum(DateTimeOffset SignedAt, string Author, string Text);
+// NotNoteAuthor: written by someone other than the note's signer (step 10b); the desktop labels it so.
+public sealed record CachedAddendum(DateTimeOffset SignedAt, string Author, string Text, bool NotNoteAuthor = false);
 
 public sealed record CachedAllergy(string Display, string? Reaction, string? Criticality);
 

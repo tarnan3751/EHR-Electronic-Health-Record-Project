@@ -895,15 +895,38 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     public async Task<(ClinicalNote Note, NoteAddenda Addenda)?> NoteWithAddendaAsync(Guid id, Guid patient, bool sensitive, CancellationToken cancel) =>
         await NoteAsync(id, patient, cancel) is { } note ? (note, await AddendaAsync(note, sensitive, cancel)) : null;
 
+    // One addendum of a note, for the page that marks it sensitive or unmarks it (step 10b): who wrote it and when,
+    // whether it is sensitive and who made it so. Its text is read with it and not shown there. The page has just
+    // read the note, which is the recorded read. Null when it isn't an addendum of that note.
+    public async Task<AddendumEntry?> AddendumAsync(ClinicalNote note, Guid addendum, CancellationToken cancel)
+    {
+        var entry = (await AddendaAsync(note, sensitive: false, cancel, only: addendum)).All.SingleOrDefault();
+        if (entry is { Sensitive: true })
+        {
+            // The page says who wrote a sensitive addendum and when, to someone who may not have asked to see it:
+            // recorded as a view of the patient's sensitive items.
+            audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return entry;
+    }
+
     // The addenda to a note just read, in the order they were signed, each with its author's name. Sensitive addenda
     // to a note that isn't sensitive are left out unless asked for, and showing them is recorded as a view of the
     // patient's sensitive items; a sensitive note's addenda are all sensitive, and its read has already recorded that.
-    async Task<NoteAddenda> AddendaAsync(ClinicalNote note, bool sensitive, CancellationToken cancel)
+    async Task<NoteAddenda> AddendaAsync(ClinicalNote note, bool sensitive, CancellationToken cancel, Guid? only = null)
     {
-        var all = await db.NoteAddenda.AsNoTracking().Where(a => a.NoteId == note.Id && a.PatientId == note.PatientId)
+        var all = await db.NoteAddenda.AsNoTracking().Where(a => a.NoteId == note.Id && a.PatientId == note.PatientId && (only == null || a.Id == only))
             .OrderBy(a => a.SignedAt).ThenBy(a => a.Id)
             .Select(a => new AddendumEntry(a.Id, a.Text, a.SignedAt, a.Sensitive, a.AuthorId,
-                db.StaffUsers.Where(u => u.Id == a.AuthorId).Select(u => u.DisplayName).FirstOrDefault() ?? ""))
+                db.StaffUsers.Where(u => u.Id == a.AuthorId).Select(u => u.DisplayName).FirstOrDefault() ?? "")
+            {
+                ByNoteAuthor = a.AuthorId == note.SignerId,
+                SensitiveMarkedBy = a.SensitiveMarkedBy,
+                SensitiveReason = a.SensitiveReason,
+                SensitiveChangedAt = a.SensitiveChangedAt,
+            })
             .ToListAsync(cancel);
         var show = sensitive || note.Sensitive;
         var shown = show ? all : all.Where(a => !a.Sensitive).ToList();
@@ -913,7 +936,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             await db.SaveChangesAsync(cancel);
         }
 
-        return new NoteAddenda(shown, all.Count - shown.Count, show);
+        return new NoteAddenda(shown, all.Count - shown.Count, show) { All = all };
     }
 
     // For the desktop app's offline copy (step 10): a patient's latest signed notes that aren't sensitive, each with
@@ -944,7 +967,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         // How many sensitive addenda each note has that aren't in the copy, so the desktop can say so.
         var withheld = await db.NoteAddenda.AsNoTracking().Where(a => ids.Contains(a.NoteId) && a.PatientId == patient && a.Sensitive)
             .GroupBy(a => a.NoteId).Select(group => new { NoteId = group.Key, Count = group.Count() }).ToDictionaryAsync(g => g.NoteId, g => g.Count, cancel);
-        return [.. notes.Select(n => new OfflineNote(n.Note, n.Signer ?? "", [.. addenda.Where(a => a.NoteId == n.Note.Id).Select(a => a.Entry)])
+        return [.. notes.Select(n => new OfflineNote(n.Note, n.Signer ?? "",
+            [.. addenda.Where(a => a.NoteId == n.Note.Id).Select(a => a.Entry with { ByNoteAuthor = a.Entry.AuthorId == n.Note.SignerId })])
         {
             SensitiveAddendaNotKept = withheld.GetValueOrDefault(n.Note.Id),
         })];

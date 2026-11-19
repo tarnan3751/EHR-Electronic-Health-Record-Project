@@ -51,7 +51,8 @@ public class TC_UC14_12_Nfr12_AddendumKeyboardFirst(WebApps apps) : IClassFixtur
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/addendum");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('textarea[name=\"Text\"]')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('textarea[name=\"Text\"]')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         await page.Keyboard.TypeAsync("Synthetic keyboard addendum.");

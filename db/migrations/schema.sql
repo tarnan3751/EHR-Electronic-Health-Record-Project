@@ -1403,3 +1403,57 @@ VALUES ('20261119072440_VitalCorrections', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.inbox_items DROP CONSTRAINT ck_inbox_items_kind;
+
+ALTER TABLE ehr.note_addenda ADD sensitive_changed_at timestamp with time zone;
+
+ALTER TABLE ehr.note_addenda ADD sensitive_marked_by uuid;
+
+ALTER TABLE ehr.note_addenda ADD sensitive_reason character varying(500);
+
+ALTER TABLE ehr.clinical_notes ADD sensitive_changed_at timestamp with time zone;
+
+ALTER TABLE ehr.clinical_notes ADD sensitive_marked_by uuid;
+
+ALTER TABLE ehr.clinical_notes ADD sensitive_reason character varying(500);
+
+CREATE INDEX ix_note_addenda_sensitive_marked_by ON ehr.note_addenda (sensitive_marked_by);
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum'));
+
+CREATE INDEX ix_clinical_notes_sensitive_marked_by ON ehr.clinical_notes (sensitive_marked_by);
+
+ALTER TABLE ehr.clinical_notes ADD CONSTRAINT fk_clinical_notes_staff_users_sensitive_marked_by FOREIGN KEY (sensitive_marked_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT;
+
+ALTER TABLE ehr.note_addenda ADD CONSTRAINT fk_note_addenda_staff_users_sensitive_marked_by FOREIGN KEY (sensitive_marked_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT;
+
+DO $$
+DECLARE
+    forced_notes boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.clinical_notes'::regclass);
+    forced_addenda boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.note_addenda'::regclass);
+BEGIN
+    ALTER TABLE ehr.clinical_notes NO FORCE ROW LEVEL SECURITY;
+    ALTER TABLE ehr.note_addenda NO FORCE ROW LEVEL SECURITY;
+    ALTER TABLE ehr.clinical_notes DISABLE TRIGGER USER;
+    ALTER TABLE ehr.note_addenda DISABLE TRIGGER USER;
+
+    UPDATE ehr.clinical_notes SET sensitive_marked_by = signer_id WHERE sensitive AND sensitive_marked_by IS NULL;
+    UPDATE ehr.note_addenda SET sensitive_marked_by = author_id WHERE sensitive AND sensitive_marked_by IS NULL;
+
+    ALTER TABLE ehr.clinical_notes ENABLE TRIGGER USER;
+    ALTER TABLE ehr.note_addenda ENABLE TRIGGER USER;
+    IF forced_notes THEN
+        ALTER TABLE ehr.clinical_notes FORCE ROW LEVEL SECURITY;
+    END IF;
+    IF forced_addenda THEN
+        ALTER TABLE ehr.note_addenda FORCE ROW LEVEL SECURITY;
+    END IF;
+END
+$$;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119083741_NoteSensitivity', '10.0.13');
+
+COMMIT;
+

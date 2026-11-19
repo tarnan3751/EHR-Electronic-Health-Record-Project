@@ -49,7 +49,8 @@ public class TC_UC1_17_Nfr12_ResultsKeyboardFirst(WebApps apps) : IClassFixture<
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/results");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('input[name^=\"Values[\"]')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('input[name^=\"Values[\"]')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         foreach (var value in new[] { "44", "14", "7", "250" })
@@ -70,7 +71,8 @@ public class TC_UC1_17_Nfr12_ResultsKeyboardFirst(WebApps apps) : IClassFixture<
         await AiReviewBrowserTests.TabToAsync(page, "a[data-inbox-source]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/results");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('button[data-acknowledge]')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('button[data-acknowledge]')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=acknowledged", StringComparison.Ordinal));

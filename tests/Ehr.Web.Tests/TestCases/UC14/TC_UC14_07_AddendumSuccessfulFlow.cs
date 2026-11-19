@@ -56,7 +56,7 @@ public class TC_UC14_07_AddendumSuccessfulFlow(WebApps apps) : IClassFixture<Web
 
         using var second = await AddAsync(other.Client, patient, note, "Synthetic addendum: seen in follow-up.");
         page = await ReadAsync(second);
-        Assert.Matches("(?s)Dr. Test</strong>.*?culture negative\\..*?Dr. Colleague</strong>.*?seen in follow-up\\.", page);
+        Assert.Matches("(?s)<strong>Dr. Test</strong>.*?culture negative\\..*?<strong>Addendum by Dr. Colleague, not the note&#x27;s author</strong>.*?seen in follow-up\\.", page);
         Assert.Equal([$"{clinician.Id} false Synthetic addendum: culture negative.", $"{colleague.Id} false Synthetic addendum: seen in follow-up."], await AddendaAsync(apps, patient));
         Assert.Equal(before, await ProxyTests.QueryAsync(apps, "SELECT to_jsonb(n)::text FROM ehr.clinical_notes n WHERE n.patient_id = @patient", patient));
         Assert.Equal([clinician.Id.ToString(), colleague.Id.ToString()], await ProxyTests.QueryAsync(apps,
@@ -67,6 +67,6 @@ public class TC_UC14_07_AddendumSuccessfulFlow(WebApps apps) : IClassFixture<Web
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);
         var copy = await offline.Content.ReadAsStringAsync(Cancel);
         Assert.Matches("\"notes\":\\[\\{\"signedAt\":\"[^\"]+\",\"signer\":\"Dr. Test\",\"history\":\"Synthetic history: cough for two days.\"", copy);
-        Assert.Matches("\"addenda\":\\[\\{[^\\]]*\"author\":\"Dr. Test\",\"text\":\"Synthetic addendum: culture negative.\"\\},\\{[^\\]]*\"author\":\"Dr. Colleague\",\"text\":\"Synthetic addendum: seen in follow-up.\"\\}\\]", copy);
+        Assert.Matches("\"addenda\":\\[\\{[^\\]]*\"author\":\"Dr. Test\",\"text\":\"Synthetic addendum: culture negative.\"[^}]*\\},\\{[^\\]]*\"author\":\"Dr. Colleague\",\"text\":\"Synthetic addendum: seen in follow-up.\"[^}]*\\}\\]", copy);
     }
 }

@@ -40,7 +40,19 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
     {
         var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
         var patient = await Accounts.PatientAsync(database, clinician);
+        // An inbox item of the kind step 10b added: rolling back past that step has to take it away, since the older
+        // schema's check refuses the kind.
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at) VALUES (gen_random_uuid(), @to, 'addendum', @patient, 'Synthetic', now())",
+            ("to", clinician), ("patient", patient));
         await MigrateAsync(BeforeStep9);
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.inbox_items WHERE kind = 'addendum'"));
+        // Nothing of step 10b is left behind for the older schema to carry.
+        Assert.Equal(["0"], await AsSuperuserAsync(
+            """
+            SELECT ((SELECT count(*) FROM pg_policies WHERE schemaname = 'ehr' AND policyname IN ('clinical_notes_panel_update', 'clinical_notes_owner_select', 'note_addenda_panel_update'))
+                + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'ehr'::regnamespace AND proname IN ('change_note_sensitivity', 'change_addendum_sensitivity', 'deliver_addendum', 'log_note_sensitivity_change', 'mark_note_addenda_sensitive')))::text
+            """));
 
         // As the schema was before step 9: a visit with all three, one with a heart rate only, one with none.
         foreach (var (minutes, systolic, diastolic, rate) in new (int, object, object, object)[] { (60, (short)148, (short)92, (short)71), (120, DBNull.Value, DBNull.Value, (short)64), (180, DBNull.Value, DBNull.Value, DBNull.Value) })

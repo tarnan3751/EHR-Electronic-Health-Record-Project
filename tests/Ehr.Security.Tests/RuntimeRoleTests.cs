@@ -280,6 +280,9 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_app", "messages", "UPDATE")] = ["read_at"],
         // FR-19: revoking a proxy grant, and the patient allowing sensitive items.
         [("ehr_app", "proxy_grants", "UPDATE")] = ["include_sensitive", "revoked_at", "revoked_by"],
+        // Step 10b: marking a signed note or addendum sensitive, or unmarking it.
+        [("ehr_app", "clinical_notes", "UPDATE")] = ["sensitive", "sensitive_reason"],
+        [("ehr_app", "note_addenda", "UPDATE")] = ["sensitive", "sensitive_reason"],
         // Step 9b: marking a vital sign entered in error.
         [("ehr_app", "observations", "UPDATE")] = ["entered_in_error_reason", "status"],
         // Marking an inbox item done.

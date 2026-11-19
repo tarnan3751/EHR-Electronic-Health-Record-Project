@@ -47,7 +47,8 @@ public class TC_UC4_22_Nfr12_VitalSignErrorKeyboardFirst(WebApps apps) : IClassF
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/vitals/error?at=*");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('input[name=\"Chosen\"]')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('input[name=\"Chosen\"]')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         await page.Keyboard.PressAsync("Space");

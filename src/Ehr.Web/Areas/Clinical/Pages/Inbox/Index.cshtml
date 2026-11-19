@@ -59,6 +59,11 @@ else
                                 @* Where it gets acknowledged, which is what marks it done. *@
                                 <a asp-page="/Patients/Orders/Results" asp-route-patientId="@item.PatientId" asp-route-orderId="@item.SourceId" data-inbox-source>Open the results</a>
                             }
+                            @if (clinician && item.Kind == InboxItemKind.Addendum && item.SourceTable == "clinical_notes" && item.PatientId is not null)
+                            {
+                                @* Step 10b: someone else added to a note this clinician signed. *@
+                                <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="addenda" data-inbox-source>Open the note</a>
+                            }
                             @if (clinician && item.SourceTable == "message_threads" && item.PatientId is not null)
                             {
                                 @* Where it came from: the conversation, which is where it gets answered. *@

@@ -1,8 +1,9 @@
 namespace Ehr.Data.Patients;
 
 // An addendum to a signed note (the expansion plan's step 10). The note stays locked: an addendum is a new signed text
-// attached to it, shown after it in order with its author and time. Insert-only, like the note: the database sets who
-// signed it and when, and refuses any change or deletion (db/policies/50-clinical-notes.sql). An addendum to a
+// attached to it, shown after it in order with its author and time. Its text is fixed, like the note's: the database
+// sets who signed it and when, and refuses any change but to its sensitivity, and any deletion
+// (db/policies/50-clinical-notes.sql). An addendum to a
 // sensitive note is sensitive; one to another note may be marked so. PHI: row-level security is enabled and forced on
 // it and every write is recorded by trigger; reads go through the PHI reader. Synthetic data only.
 public sealed class NoteAddendum
@@ -22,4 +23,13 @@ public sealed class NoteAddendum
     public DateTimeOffset SignedAt { get; set; }
 
     public bool Sensitive { get; set; }
+
+    // Who made it sensitive (the expansion plan's step 10b): its signer or author when it was signed sensitive, or
+    // whoever marked it afterwards. Null while it isn't sensitive. Only that person, or the note's signer, unmarks it.
+    public Guid? SensitiveMarkedBy { get; set; }
+
+    // Why it was last marked or unmarked after signing, and when. Null if its sensitivity never changed.
+    public string? SensitiveReason { get; set; }
+
+    public DateTimeOffset? SensitiveChangedAt { get; set; }
 }
