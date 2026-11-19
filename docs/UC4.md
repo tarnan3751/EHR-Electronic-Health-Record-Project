@@ -14,6 +14,14 @@ Open a patient on your panel. Each of **Allergies**, **Medications** and **Diagn
 - **Allergies are in one of three states.** "No allergy information recorded" means nobody has asked. **Record no known allergies** records that someone asked and there are none. Adding an allergy clears "No known allergies" by itself. The chart, the patient banner and the desktop app's offline copy each show the state.
 - **History of allergies, medications and diagnoses**, above the lists, shows every entry added and every change, newest first, with who and when.
 
+**Vital signs** (the expansion plan's step 9, by Tahseen Arnan). The chart's **Vital signs** section links to the patient's vital signs page, `/patients/{id}/vitals`:
+
+- **Flowsheet:** the latest six sets side by side, newest first, each sign with its unit; a value outside its reference range is tagged High or Low.
+- **Trends:** a small chart for each sign with two or more values. The shaded band is the reference range, a value outside it is a diamond, and the sentence under the chart says what it shows. **The values as a table** opens every number behind it. The charts are drawn by the server as SVG: no script.
+- **Record vital signs:** blood pressure, heart rate, temperature, respiratory rate, oxygen saturation, weight and height. Enter what was taken and leave the rest empty. Body mass index is worked out from the weight and height. Only a clinician with the patient on their panel records; off-site the set is forwarded to the clinic's server, and recording is not offered while that server can't be reached.
+- A vital sign is an observation with its LOINC code and UCUM unit, like a lab result. It can't be edited or deleted. The patient sees their vital signs in the portal at once (UC 6).
+- A visit's blood pressure and heart rate, which used to be the visit's own columns, are now observations linked to the visit. The chart's latest visit and the desktop app's offline copy show them as before. The offline copy does not carry the full flowsheet.
+
 | List | Fields |
 |---|---|
 | Allergy | Substance, reaction, severity of the reaction, risk from another exposure, status |
@@ -52,6 +60,14 @@ One file each, in `tests/Ehr.Web.Tests/TestCases/UC4/`, continuing UC 4's number
 | TC-UC4-12, NFR-12 | In a real browser, adding a coded diagnosis with the keyboard only | `TC_UC4_12_Nfr12_EntryKeyboardFirst.cs` |
 | TC-UC4-13, alternative flow | The allergy list's three states on the chart, the banner and the offline copy; "No known allergies" recorded, and cleared by adding an allergy | `TC_UC4_13_AllergyStatus.cs` |
 
+| TC-UC4-14, successful flow (vital signs) | A set is recorded from the chart; the flowsheet flags what is out of range and shows the body mass index; a second set gives each sign a trend with its table | `TC_UC4_14_VitalSignsSuccessfulFlow.cs` |
+| TC-UC4-15, invalid input and alternative flow (vital signs) | Half a blood pressure, a word, an impossible value, nothing, or a future time is not saved; a clinician off the panel records nothing | `TC_UC4_15_VitalSignsInvalidAndRefused.cs` |
+| TC-UC4-16, exceptional condition (vital signs) | Off-site a set is forwarded; with the server down the flowsheet and trends are read-only | `TC_UC4_16_VitalSignsOffSite.cs` |
+| TC-UC4-17, NFR-01 (vital signs) | The vital signs page: p99 under 15 ms at 50,000 patients | `TC_UC4_17_Nfr01_VitalSignsOnSite.cs` |
+| TC-UC4-18, NFR-12 (vital signs) | In a real browser, recording a set and opening a trend's table with the keyboard only | `TC_UC4_18_Nfr12_VitalSignsKeyboardFirst.cs` |
+
+`tests/Ehr.Security.Tests/VitalSignSecurityTests.cs` asks the database directly: a recorded vital sign gets the database's own name, unit and range and is audited; only a clinician with the patient on their panel records one; without an order only a sound vital sign is accepted; the body mass index is the database's arithmetic; a result of an order can't pass as a vital sign; nothing is edited or deleted.
+
 Extra coverage in `tests/Ehr.Web.Tests/ChartListTests.cs`: the code search and who may use it; sensitive items left out until asked for, with the audit action, on-site and off-site; allergies in the banner on the note and dictation pages; a save forwarded from off-site.
 
 In `tests/Ehr.Security.Tests/ChartListSecurityTests.cs`, against the database directly: who may add and change entries; nothing deletes or moves one; the history and the audit record each change; the sensitive ranges; a sensitive code can't be unmarked; who reads the history; the reference codes are loaded.
@@ -60,6 +76,7 @@ In `tests/Ehr.Security.Tests/ChartListSecurityTests.cs`, against the database di
 
 These need line-by-line review (AGENTS.md):
 
+- `db/policies/75-results.sql`: `ehr.file_result` now lets a vital sign be recorded with no order (step 9), and works out the body mass index.
 - `db/policies/65-chart-lists.sql`: the sensitive ranges, the guard trigger, and the `SECURITY DEFINER` history trigger.
 - `db/policies/10-grants.sql`, `30-rls.sql` and `40-audit.sql`: the grants and policies for the three lists, `chart_history` and `clinical_codes`.
 - The panel rule on the entry page (`Areas/Clinical/Pages/Patients/Lists/Entry.cshtml.cs`), and `CloudAuditEvents`, which now accepts `read_sensitive`.

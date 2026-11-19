@@ -25,7 +25,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 7a | Chart render headroom | done | expansion/step-07a-chart-headroom | expansion-step-07a | [44429275145](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44429275145) | Added while working: the chart was at the benchmark gate on CI runners. No behaviour change |
 | 6c | Security follow-ups: invitation and enrollment lookups, emailed links | done | expansion/step-06c-security-follow-ups | expansion-step-06c | [44436811170](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44436811170) | Inserted by Tahseen; before step 8. Touches `db/policies`; a new required setting; UC 5 (Simar), UC 11 (Luke) |
 | 8 | Ordering safety checks | done | expansion/step-08-order-checks | expansion-step-08 | [44445242631](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44445242631) | Extends UC 1 (Tahseen). Touches `db/policies`; three interaction sources |
-| 9 | Vital signs and trends | not started | | | | |
+| 9 | Vital signs and trends | in progress | expansion/step-09-vitals | | | Extends UC 4 (Diego) and UC 6 (Simar). Touches `db/policies` |
 | 10 | Addenda to signed notes | not started | | | | |
 | 11 | Read-only FHIR API | not started | | | | |
 | 12 | Simulated lab | not started | | | | |
@@ -417,6 +417,7 @@ New FR IDs (FR-37 onward) and use cases (UC 15 onward), as each step defines the
 | --- | --- | --- |
 | FR-37 | 1 | The system shall let clinicians discontinue a signed order with a reason, and change one by signing a replacement, without ever editing or deleting the signed order; it shall keep who, when and why. (Extends UC 1; test cases TC-UC1-07 to TC-UC1-12.) |
 | FR-38 | 2 | The system shall let clinicians add and change a patient's allergies, medications and diagnoses, each picked from a standard code list, never deleting an entry and keeping the history of every change. (Extends UC 4; test cases TC-UC4-07 to TC-UC4-12.) |
+| FR-48 | 9 | The system shall let a clinician record vital signs (blood pressure, heart rate, temperature, respiratory rate, oxygen saturation, weight and height) as coded observations, calculate the body mass index, show them as a flowsheet, and show vital signs and laboratory values over time as charts with their reference ranges and an equivalent table, to clinicians and to the patient in the portal. |
 | FR-47 | 8 | The system shall check a medication order against the patient's coded allergies, including drugs of the same or a cross-reactive class, and against the patient's active medications for known interactions; shall show each warning with its severity and source; and shall require and record a reason before an order with a serious warning is signed. (Extends UC 1: test cases TC-UC1-18 to TC-UC1-20.) |
 | FR-46 | 6b | The system shall let someone who is not a patient act as a proxy through a portal account with no record of its own, created from a single-use, expiring invitation sent to the address the access names, and shall ask an account with shared records whose record to view after sign-in. (Extends UC 18 and UC 6: test cases TC-UC18-07, TC-UC18-08 and TC-UC6-13.) |
 | FR-45 | 7 | The system shall attach each result to the order that requested it and mark the order resulted, flag values outside their reference range and list them first, notify the ordering clinician, and record who acknowledged the results and when. (Extends UC 1: test cases TC-UC1-13 to TC-UC1-17, TC-UC6-12 and TC-UC15-07.) |
@@ -649,6 +650,19 @@ One entry per decision: date, step, the decision, and why.
   - *Left open:* the chart doesn't yet show an order's override reason; adding a medication at the same instant an order is signed can slip past the check; medications "on hold" are not counted as taken; an item with no drug code (the albuterol inhaler) can't be checked; food allergies aren't checked against drugs; no dose, renal, age or pregnancy checks.
   - *Not in the desktop app:* it places no orders.
 
+- **2026-11-19, step 9: how vital signs are stored and shown.** Mine, none of it asked of Tahseen.
+  - *Vital signs are observations.* `ehr.observations` gains `category` (`laboratory` or `vital-signs`, FHIR's names) and a nullable `encounter_id`. The three columns on `ehr.encounters` are gone; the migration copies their values into observations first (292,730 of each on the local stack), lifting forced row-level security for the owner while it copies and pausing the audit trigger, because moving a value is not a clinical write.
+  - *The database decides what a vital sign is.* `ehr.file_result` (`db/policies/75-results.sql`) now accepts an observation with no order only when its category is `vital-signs` and its code is one of the nine vital-sign codes; it sets the name, unit and reference range itself, refuses a future time, a value of zero or less, or another patient's visit, and releases it at once. No new grant or policy: the existing panel-insert policy applies.
+  - *Body mass index is the database's arithmetic,* from the weight and height recorded for the same moment, whatever number the client sends, and refused without them.
+  - *Released to the patient at once,* like a filed result (still open with Tahseen from step 7: results reach the portal before acknowledgment).
+  - *A vital sign can't be corrected yet.* The apps have no UPDATE or DELETE on observations. A wrong entry stays, and a new set can be recorded. "Entered in error" for observations is not built: **open with Tahseen** whether it should be, and in which step.
+  - *Trend charts* are SVG drawn in a Razor partial (`_Trend.cshtml`), styled only by classes that use tokens; the reference range is a band; a value outside it differs by shape (a diamond) as well as color; a sentence and a table of the values go with every chart. At most the latest 24 values per chart.
+  - *Where trends appear:* the vital signs page, an order's results page (each test with earlier values), and the portal's results page (tests and vital signs). **Not on the chart page itself:** it is the page closest to the benchmark gate (step 7a), so it only links to the vital signs page and makes no extra query.
+  - *Units* are stored as UCUM and shown the usual way for four of them (mmHg, °C, kg/m², per minute).
+  - *Reference ranges for vital signs* are the adult ones in `db/reference`, applied to everyone. Ranges by age are not built; a child's values will be flagged against adult ranges.
+  - *Desktop:* the offline copy keeps a visit's blood pressure and heart rate, with the API's contract unchanged (read from observations now). The full flowsheet is not in the offline copy.
+  - *The entry form is first on the page:* with it at the bottom, the starting cursor scrolled the page past the flowsheet (found in the screenshots).
+
 ## Log
 
 One entry per session or step: date, step, what was done, measurements (p99, page JavaScript size, first contentful paint), follow-ups, and where to resume.
@@ -729,3 +743,10 @@ One entry per session or step: date, step, what was done, measurements (p99, pag
   - *Heads-up:* everyone who orders (a medication order can now come back asking for a reason, or once to show notes). No other owner's use case changed.
   - *Open with Tahseen:* how to close the class-level gaps; whether moderate and minor interactions should need a reason; the address pattern of DDInter's pair pages.
   - *Resume at step 9,* vital signs and trends. It must widen `ehr.file_result` for observations without an order (step 7's note), and it adds to the chart, the page closest to the benchmark gate (step 7a's note).
+- **2026-11-19, step 9. Vital signs and trends (extends UC 4 and UC 6; proposed FR-48).** Migration `VitalSigns`. **Protected path: `db/policies/75-results.sql`** (`ehr.file_result` widened for vital signs with no order; body mass index worked out there). No new table, grant, policy or authorization attribute. New page `/patients/{id}/vitals` under the clinical area's policy, with the panel rule other write pages use; `PhiReader.VitalsAsync`; the chart query reads each visit's blood pressure and heart rate with the visit, so the chart makes no more round trips than before.
+  - *Tests:* `VitalSignSecurityTests` (6); TC-UC4-14 to 18, TC-UC1-21, TC-UC6-14; the seed test checks the seeded vital signs. Full run: 831 tests, none failing.
+  - *Measurements* (this Mac, 50,000 patients; p99 whole request / excluding the commit, ms): vital signs page 3.8 / 3.3, off-site 10.8 / 6.4; chart 6.9 / 6.5; order results 12.6 / 12.1; portal results 2.1 / 1.9. `--assert` passed. No script added; the stylesheet grew by the trend and form rules.
+  - *Screens looked at* in both themes at 1280, 640 and 360 (portal): no sideways scrolling.
+  - *Heads-up:* Diego (UC 4: the chart has a Vital signs section, and a visit's vital signs are observations now), Simar (UC 6: the results page has trend charts and vital signs), Sara (UC 7 and 8: the offline panel's contract is unchanged, but its values come from observations).
+  - *Open with Tahseen:* correcting a wrongly entered vital sign; reference ranges by age.
+  - *Resume at step 10,* addenda to signed notes, with sensitive notes.

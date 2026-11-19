@@ -1,0 +1,47 @@
+@using Ehr.Domain.Results
+@model Trend
+@* One test's or vital sign's values over time (step 9; docs/brand: sc-trend). Drawn here as SVG: no script, colored
+   by the stylesheet's tokens, the reference range as a band behind the line, values outside it marked by shape as well
+   as color. The sentence under it says what it shows, and the table under that has every number: the chart is never
+   the only way to read them. The table has two narrow columns so it fits the card; the unit is in the title. *@
+<figure class="sc-trend" data-trend="@Model.Code">
+    <figcaption class="sc-trend__title">@Model.Title@(Model.Unit is null ? "" : $" ({Model.Unit})")</figcaption>
+    <svg class="sc-trend__chart" viewBox="0 0 @Trend.Width @Trend.Height" role="img" aria-label="@Model.Summary" focusable="false">
+        @if (Model.HasRange)
+        {
+            <rect class="sc-trend__range" x="0" y="@Model.Band.Y" width="@Trend.Width" height="@Model.Band.Height"></rect>
+        }
+        <polyline class="sc-trend__line" points="@Model.Line"></polyline>
+        @for (var i = 0; i < Model.Points.Count; i++)
+        {
+            var (x, y) = (Model.X(i), Model.Y(Model.Points[i].Value));
+            if (Model.IsOutside(Model.Points[i]))
+            {
+                @* Outside the range: a diamond, not only another color. *@
+                <rect class="sc-trend__point sc-trend__point--outside" x="@Trend.Number(x - 4)" y="@Trend.Number(y - 4)" width="8" height="8" transform="rotate(45 @Trend.Number(x) @Trend.Number(y))"></rect>
+            }
+            else
+            {
+                <circle class="sc-trend__point" cx="@Trend.Number(x)" cy="@Trend.Number(y)" r="3.5"></circle>
+            }
+        }
+    </svg>
+    <p class="sc-trend__summary">@Model.Summary@(Model.HasRange ? " The shaded band is the reference range; values outside it are diamonds." : "")</p>
+    <details class="sc-trend__values">
+        <summary>The values as a table</summary>
+        <div class="sc-table-wrap">
+            <table class="sc-table">
+                <thead><tr><th scope="col">Taken (UTC)</th><th scope="col">Value</th></tr></thead>
+                <tbody>
+                    @foreach (var point in Model.Points.Reverse())
+                    {
+                        <tr>
+                            <td class="sc-table__mono">@point.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="sc-table__mono">@point.Value.ToString("0.####")@(Model.HasRange && Model.IsOutside(point) ? ", outside the range" : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </details>
+</figure>

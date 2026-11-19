@@ -40,6 +40,7 @@ builder.Services.AddScoped<Ehr.Domain.Patients.ChartLists>();
 builder.Services.AddScoped<Ehr.Domain.Messaging.SecureMessages>();
 builder.Services.AddScoped<Ehr.Domain.Proxies.ProxyAccess>();
 builder.Services.AddScoped<Ehr.Domain.Results.LabResults>();
+builder.Services.AddScoped<Ehr.Domain.Results.VitalSigns>();
 builder.Services.AddScoped<Ehr.Domain.Proxies.ProxyInvitations>();
 builder.Services.AddScoped<Ehr.Web.PortalSubject>();
 // Appointments (Ehr.Domain.Scheduling).

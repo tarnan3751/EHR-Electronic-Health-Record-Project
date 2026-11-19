@@ -2,7 +2,7 @@
 -- to, whatever the app does. Who may file and acknowledge is row-level security's (30-rls.sql): a clinician with the
 -- patient on their active panel. Plain SQL, safe to run again.
 
--- Before a result is inserted. Runs as the caller.
+-- Before a result or a vital sign is inserted. Runs as the caller.
 --   1. It answers a lab order of the same patient that is still open to results: active, or completed and not yet
 --      acknowledged, so results that arrive in parts can be added until someone has signed them off.
 --   2. It is for one of the tests the order's catalog item reports (ehr.order_result_codes), and its name, unit and
@@ -24,8 +24,55 @@ BEGIN
         RAISE EXCEPTION 'A result is filed in a READ COMMITTED transaction' USING ERRCODE = '0A000';
     END IF;
 
+    -- A vital sign (step 9) answers no order. It is one of the vital-sign codes, taken no later than now, at a visit of
+    -- the same patient when it names one; its name, unit and reference range are the database's own, as for a result;
+    -- it is final and released at once. A body mass index is never the client's number: it is worked out here from the
+    -- weight and height recorded for the same moment, and refused without them.
     IF NEW.order_id IS NULL THEN
-        RAISE EXCEPTION 'A result is filed against the order that asked for it' USING ERRCODE = '23514';
+        IF NEW.category IS DISTINCT FROM 'vital-signs' THEN
+            RAISE EXCEPTION 'A result is filed against the order that asked for it' USING ERRCODE = '23514';
+        END IF;
+
+        SELECT c.* INTO test FROM ehr.observation_codes c WHERE c.code = NEW.code AND c.kind = 'vital';
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'That is not a vital sign this system records' USING ERRCODE = '23514';
+        END IF;
+
+        IF NEW.effective_at IS NULL OR NEW.effective_at > now() + interval '5 minutes' THEN
+            RAISE EXCEPTION 'A vital sign is not taken in the future' USING ERRCODE = '23514';
+        END IF;
+
+        IF NEW.encounter_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM ehr.encounters e WHERE e.id = NEW.encounter_id AND e.patient_id = NEW.patient_id) THEN
+            RAISE EXCEPTION 'A vital sign is taken at a visit of the same patient' USING ERRCODE = '23514';
+        END IF;
+
+        IF NEW.code = '39156-5' THEN
+            SELECT round(w.value / ((h.value / 100) ^ 2), 1) INTO NEW.value
+            FROM ehr.observations w, ehr.observations h
+            WHERE w.patient_id = NEW.patient_id AND w.code = '29463-7' AND w.effective_at = NEW.effective_at
+              AND h.patient_id = NEW.patient_id AND h.code = '8302-2' AND h.effective_at = NEW.effective_at AND h.value > 0
+            ORDER BY w.issued_at DESC, h.issued_at DESC
+            LIMIT 1;
+            IF NEW.value IS NULL THEN
+                RAISE EXCEPTION 'A body mass index needs the weight and height taken with it' USING ERRCODE = '23514';
+            END IF;
+        ELSIF NEW.value IS NULL OR NEW.value <= 0 OR NEW.value >= 1000 THEN
+            RAISE EXCEPTION 'A vital sign has a value above zero' USING ERRCODE = '23514';
+        END IF;
+
+        NEW.display := left(test.display, 200);
+        NEW.unit := left(test.unit, 20);
+        NEW.reference_low := test.reference_low;
+        NEW.reference_high := test.reference_high;
+        NEW.status := 'final';
+        NEW.issued_at := clock_timestamp();
+        NEW.note := NULL;
+        RETURN NEW;
+    END IF;
+
+    IF NEW.category IS DISTINCT FROM 'laboratory' OR NEW.encounter_id IS NOT NULL THEN
+        RAISE EXCEPTION 'A result of an order is a laboratory result' USING ERRCODE = '23514';
     END IF;
 
     -- The order's row is locked, so a result and an acknowledgment of the same order never pass each other.

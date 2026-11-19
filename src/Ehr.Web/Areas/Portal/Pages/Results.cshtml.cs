@@ -16,6 +16,11 @@ public class ResultsModel(PortalSubject subject, PhiReader phi) : PageModel
 {
     public IReadOnlyList<Observation> Results { get; private set; } = [];
 
+    // Step 9: a trend for each test, and each vital sign, that has more than one value.
+    public IReadOnlyList<Ehr.Domain.Results.Trend> ResultTrends { get; private set; } = [];
+
+    public IReadOnlyList<Ehr.Domain.Results.Trend> VitalTrends { get; private set; } = [];
+
     public bool Available { get; private set; }
 
     public async Task OnGetAsync()
@@ -26,5 +31,7 @@ public class ResultsModel(PortalSubject subject, PhiReader phi) : PageModel
         var results = await phi.ResultsAsync(patientId, HttpContext.RequestAborted);
         Available = results is not null;
         Results = results?.Results ?? [];
+        ResultTrends = Ehr.Domain.Results.Trend.From(Results);
+        VitalTrends = Ehr.Domain.Results.Trend.From(results?.Vitals ?? [], VitalSign.All);
     }
 }

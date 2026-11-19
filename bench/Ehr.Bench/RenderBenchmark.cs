@@ -295,6 +295,8 @@ internal static partial class RenderBenchmark
             // The staff inbox (the expansion plan's step 3): its items, each naming a patient, which is a recorded read
             // of each. Every row above also counted the inbox for the app bar.
             await MeasureAsync(client, times, prefix + $"Inbox, {InboxSize} items", typing: false, () => "/inbox"),
+            // Vital signs (step 9): the flowsheet and its trend charts, drawn by the server.
+            await MeasureAsync(client, times, prefix + "Vital signs, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}/vitals"),
             await MeasureAsync(client, times, prefix + "Chart history, a patient on the panel", typing: false,
                 () => $"/patients/{panel[random.Next(panel.Count)]}/chart-history"),
         ];

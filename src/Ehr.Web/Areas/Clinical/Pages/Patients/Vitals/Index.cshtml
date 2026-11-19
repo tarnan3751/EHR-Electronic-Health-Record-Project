@@ -1,0 +1,132 @@
+@page "/patients/{patientId:guid}/vitals"
+@using Ehr.Data.Patients
+@using Ehr.Domain.Results
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Vitals.IndexModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Vitals.Patient;
+    ViewData["Title"] = $"Vital signs: {patient.FamilyName}, {patient.GivenName}";
+    var names = Model.Vitals.Signs.GroupBy(sign => sign.Code!).ToDictionary(group => group.Key, group => group.First());
+    var recorded = VitalSign.All.Where(names.ContainsKey).ToList();
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Vitals.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+</div>
+<h1>Vital signs: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Saved)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> the vital signs are recorded, and the patient can see them in the portal.</p>
+}
+
+@* The form comes first: the cursor starts in it (NFR-12), and the flowsheet and trends stay in view under it. *@
+<h2>Record vital signs</h2>
+@if (!Model.OnPanel)
+{
+    <p class="sc-muted">Add this patient to your panel to record vital signs.</p>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">Vital signs can't be recorded until the clinic's server is back.</p>
+}
+else
+{
+    <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@patient.Id">
+        @if (Model.Errors.Count > 0)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : "fix the highlighted fields and save again.")</p>
+        }
+        <p class="sc-muted">Enter what was taken and leave the rest empty. Body mass index is worked out from the weight and height.</p>
+        @{ var first = true; }
+        <div class="sc-vitals-fields">
+        @foreach (var (code, label, unit, _) in VitalSigns.Fields)
+        {
+            var id = $"vital-{code}";
+            var error = Model.Errors.GetValueOrDefault(code);
+            <div class="sc-field">
+                <label for="@id">@label <span>(@unit)</span></label>
+                <input id="@id" class="sc-field__input" name="Values[@code]" value="@Model.Values.GetValueOrDefault(code)" inputmode="decimal" autocomplete="off"
+                       autofocus="@(first && Model.Errors.Count == 0 || error is not null && VitalSigns.Fields.First(field => Model.Errors.ContainsKey(field.Code)).Code == code)"
+                       aria-invalid="@(error is null ? null : "true")" aria-describedby="@(error is null ? null : id + "-error")">
+                @if (error is not null)
+                {
+                    <p class="sc-field__error" id="@(id)-error">@error</p>
+                }
+            </div>
+            first = false;
+        }
+            <div class="sc-field">
+                <label for="vital-taken">Taken (UTC) <span>(required)</span></label>
+                <input id="vital-taken" class="sc-field__input" type="datetime-local" name="TakenAt" value="@Model.TakenAt" required
+                       aria-invalid="@(Model.Errors.ContainsKey("TakenAt") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("TakenAt") ? "vital-taken-error" : null)">
+                @if (Model.Errors.TryGetValue("TakenAt", out var takenError))
+                {
+                    <p class="sc-field__error" id="vital-taken-error">@takenError</p>
+                }
+            </div>
+        </div>
+        <div class="sc-actions">
+            <button type="submit" class="sc-btn sc-btn--primary" data-record-vitals>Record vital signs</button>
+        </div>
+    </form>
+}
+
+<h2>Flowsheet</h2>
+@if (recorded.Count == 0)
+{
+    <p class="sc-muted">No vital signs recorded.</p>
+}
+else
+{
+    <div class="sc-table-wrap">
+        <table class="sc-table" data-flowsheet>
+            <caption class="sc-visually-hidden">The latest @Model.Times.Count sets of vital signs, newest first. Times are UTC.</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Vital sign</th>
+                    @foreach (var time in Model.Times)
+                    {
+                        <th scope="col" class="sc-table__mono">@time.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var code in recorded)
+                {
+                    <tr>
+                        <th scope="row">@names[code].Display <span class="sc-muted">(@Units.Shown(names[code].Unit))</span></th>
+                        @foreach (var time in Model.Times)
+                        {
+                            var sign = Model.At(code, time);
+                            <td class="sc-table__mono">
+                                @if (sign is not null)
+                                {
+                                    @sign.Value!.Value.ToString("0.#")
+                                    @if (IndexModel.IsOutside(sign))
+                                    {
+                                        <span class="sc-tag sc-tag--warning">@(sign.Value > sign.ReferenceHigh ? "High" : "Low")</span>
+                                    }
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (Model.Trends.Count > 0)
+{
+    <h2>Trends</h2>
+    <div class="sc-trends">
+        @foreach (var trend in Model.Trends)
+        {
+            <partial name="_Trend" model="trend" />
+        }
+    </div>
+}
