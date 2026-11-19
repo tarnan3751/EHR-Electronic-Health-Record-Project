@@ -31,6 +31,12 @@ public sealed record PatientChart(
     // The patient's appointments still to come, soonest first (FR-17): part of the same recorded read.
     public IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming { get; init; } = [];
 
+    // Whether the patient has any signed note, and any draft the reader may see: the page asks for those lists
+    // only when there is something in them.
+    public bool HasNotes { get; init; } = true;
+
+    public bool HasDrafts { get; init; } = true;
+
     // Lab orders whose results are in (step 7): those still to acknowledge first, abnormal ones before the rest.
     public IReadOnlyList<Ehr.Domain.Results.ResultedOrder> Resulted { get; init; } = [];
 }

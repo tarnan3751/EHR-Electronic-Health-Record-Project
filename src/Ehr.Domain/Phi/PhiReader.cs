@@ -43,12 +43,28 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     public async Task<PatientChart?> ChartAsync(
         Guid id, int visits, CancellationToken cancellationToken, Guid? discontinued = null, bool sensitive = false)
     {
-        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
-        if (patient is null)
+        // With the patient, in the same statement: which of the chart's occasional sections have anything in them.
+        // Most charts have no appointment booked, no conversation, no resulted order waiting and no notes, and each
+        // empty section then costs an index probe here instead of a query and a round trip of its own. The page is
+        // about sixteen round trips otherwise, which is most of its time.
+        var soon = DateTimeOffset.UtcNow.AddHours(-1);
+        var found = await db.Patients.AsNoTracking().Where(p => p.Id == id)
+            .Select(p => new
+            {
+                Patient = p,
+                Upcoming = db.Appointments.Any(a => a.PatientId == id && a.Status == AppointmentStatus.Booked && a.StartsAt >= soon),
+                Threads = db.MessageThreads.Any(t => t.PatientId == id),
+                Resulted = db.Orders.Any(o => o.PatientId == id && o.Status == OrderStatus.Completed),
+                Notes = db.ClinicalNotes.Any(n => n.PatientId == id),
+                Drafts = db.ClinicalDrafts.Any(d => d.PatientId == id),
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (found is null)
         {
             return null;
         }
 
+        var patient = found.Patient;
         var allergies = await CurrentAllergies(id).ToListAsync(cancellationToken);
         // Sensitive medications and diagnoses are read either way, and left out below unless asked for: the chart
         // says how many it left out, without another query.
@@ -80,18 +96,23 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
 
         await db.SaveChangesAsync(cancellationToken);
-        var soon = DateTimeOffset.UtcNow.AddHours(-1);
-        var upcoming = await AppointmentEntriesAsync(
-            db.Appointments.Where(a => a.PatientId == id && a.Status == AppointmentStatus.Booked && a.StartsAt >= soon).OrderBy(a => a.StartsAt).Take(5),
-            latestFirst: false, cancellationToken);
-        var threads = await db.MessageThreads.AsNoTracking().Where(t => t.PatientId == id)
-            .OrderByDescending(t => t.LastMessageAt).ThenBy(t => t.Id).Take(5)
-            .Select(t => new ThreadEntry(t.Id, t.Subject, t.LastMessageAt,
-                db.Messages.Count(m => m.ThreadId == t.Id && m.SenderKind == MessageSender.Patient && m.ReadAt == null)))
-            .ToListAsync(cancellationToken);
-        var resulted = await ResultedOrdersAsync(id, 8, cancellationToken);
+        var upcoming = !found.Upcoming
+            ? []
+            : await AppointmentEntriesAsync(
+                db.Appointments.Where(a => a.PatientId == id && a.Status == AppointmentStatus.Booked && a.StartsAt >= soon).OrderBy(a => a.StartsAt).Take(5),
+                latestFirst: false, cancellationToken);
+        var threads = !found.Threads
+            ? []
+            : await db.MessageThreads.AsNoTracking().Where(t => t.PatientId == id)
+                .OrderByDescending(t => t.LastMessageAt).ThenBy(t => t.Id).Take(5)
+                .Select(t => new ThreadEntry(t.Id, t.Subject, t.LastMessageAt,
+                    db.Messages.Count(m => m.ThreadId == t.Id && m.SenderKind == MessageSender.Patient && m.ReadAt == null)))
+                .ToListAsync(cancellationToken);
+        var resulted = found.Resulted ? await ResultedOrdersAsync(id, 8, cancellationToken) : [];
         return new PatientChart(patient, allergies, medications, conditions, encounters, orders)
         {
+            HasNotes = found.Notes,
+            HasDrafts = found.Drafts,
             Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,
