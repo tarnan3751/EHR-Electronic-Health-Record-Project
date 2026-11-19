@@ -1,0 +1,66 @@
+@page "/patients/{patientId:guid}/notes/{noteId:guid}/sensitivity"
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.SensitivityModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    var what = Model.Entry is null ? "note" : "addendum";
+    var title = Model.Sensitive ? $"Unmark this {what} as sensitive" : $"Mark this {what} sensitive";
+    ViewData["Title"] = title;
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to the signed note</a></p>
+</div>
+<h1>@title</h1>
+@if (Model.Entry is { } entry)
+{
+    <p class="sc-prose">The addendum by <strong>@entry.AuthorName</strong>, signed @entry.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC, to the note signed @Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+}
+else
+{
+    <p class="sc-prose">The note signed @Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+}
+@if (!Model.Sensitive)
+{
+    <p class="sc-prose">Its text doesn't change. Once sensitive, it is left out until someone asks for sensitive items, each view of it is recorded, and it is never kept offline@(Model.Entry is null ? "; its addenda become sensitive with it" : ""). Views of it before now are already in the audit log. Only you, or the note's signer, can unmark it.</p>
+}
+else
+{
+    <p class="sc-prose">Its text doesn't change. Unmarked, it is shown with the rest of the chart again.@(Model.Entry is null ? " Its addenda stay as they are: unmark each one that should be." : "")</p>
+}
+@if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">This can't be changed until the clinic's server is back.</p>
+}
+else if (Model.Sensitive && Model.HeldByNote)
+{
+    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">Not offered:</span> the note is sensitive, and an addendum to a sensitive note is sensitive. Unmark the note first.</p>
+}
+else if (Model.Sensitive && !Model.MayUnmark)
+{
+    <p class="sc-notice sc-notice--info" data-may-not-unmark><span class="sc-notice__state">Not offered:</span> only the person who marked it sensitive, or the note's signer, can unmark it.</p>
+}
+else
+{
+    <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-addendum="@Model.Addendum">
+        @if (Model.Errors.Count > 0)
+        {
+            <div class="sc-notice sc-notice--danger" role="alert">
+                @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not changed:</span> @error</p> }
+            </div>
+        }
+        <div class="sc-field">
+            <label for="sensitivity-reason">Reason <span>(required)</span></label>
+            <input id="sensitivity-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="500" required autofocus autocomplete="off"
+                   aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)" aria-describedby="sensitivity-reason-hint">
+            <p class="sc-field__hint" id="sensitivity-reason-hint">Recorded with your name and the time, and shown on the note.</p>
+        </div>
+        <div class="sc-actions">
+            <button type="submit" class="sc-btn sc-btn--primary" data-change-sensitivity>@(Model.Sensitive ? "Unmark as sensitive" : "Mark sensitive")</button>
+            <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Cancel</a>
+        </div>
+    </form>
+}

@@ -22,4 +22,13 @@ public sealed class NoteAddendum
     public DateTimeOffset SignedAt { get; set; }
 
     public bool Sensitive { get; set; }
+
+    // Who made it sensitive (the expansion plan's step 10b): its signer or author when it was signed sensitive, or
+    // whoever marked it afterwards. Null while it isn't sensitive. Only that person, or the note's signer, unmarks it.
+    public Guid? SensitiveMarkedBy { get; set; }
+
+    // Why it was last marked or unmarked after signing, and when. Null if its sensitivity never changed.
+    public string? SensitiveReason { get; set; }
+
+    public DateTimeOffset? SensitiveChangedAt { get; set; }
 }

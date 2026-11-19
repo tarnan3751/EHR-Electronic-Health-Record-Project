@@ -61,7 +61,9 @@ BEGIN
     -- it would be sensitive. They are marked with the note, so the audit page stops showing their values too. Found
     -- through the audit events themselves (a review's insert names its draft, a proposal's its review), by the index
     -- on the patient: this function reads no patient table.
-    IF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'clinical_notes' AND is_sensitive THEN
+    -- The same when a signed note is marked sensitive afterwards (step 10b).
+    IF TG_TABLE_NAME = 'clinical_notes' AND coalesce((new_row ->> 'sensitive')::boolean, false)
+       AND (TG_OP = 'INSERT' OR TG_OP = 'UPDATE' AND NOT coalesce((old_row ->> 'sensitive')::boolean, false)) THEN
         UPDATE ehr.audit_events e SET sensitive = true
         WHERE e.patient_id = (kept ->> 'patient_id')::uuid AND NOT e.sensitive
           AND (e.table_name = 'clinical_drafts' AND e.row_id = (kept ->> 'draft_id')::uuid

@@ -57,11 +57,26 @@ public sealed record PatientChart(
 public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal? HeartRate);
 
 // An addendum to a signed note as a page shows it.
-public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt, bool Sensitive, Guid AuthorId, string AuthorName);
+public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt, bool Sensitive, Guid AuthorId, string AuthorName)
+{
+    // Whether its author is the note's signer (step 10b): one that isn't is labeled as not the note's author.
+    public bool ByNoteAuthor { get; init; } = true;
+
+    // Who made it sensitive, and why and when its sensitivity last changed after it was signed.
+    public Guid? SensitiveMarkedBy { get; init; }
+
+    public string? SensitiveReason { get; init; }
+
+    public DateTimeOffset? SensitiveChangedAt { get; init; }
+}
 
 // A note's addenda in the order they were signed: the ones shown, how many sensitive ones were left out, and whether
 // sensitive ones were shown.
-public sealed record NoteAddenda(IReadOnlyList<AddendumEntry> Shown, int SensitiveHidden, bool SensitiveShown);
+public sealed record NoteAddenda(IReadOnlyList<AddendumEntry> Shown, int SensitiveHidden, bool SensitiveShown)
+{
+    // Every one, hidden ones too: for the reader's own use, never for a page to list.
+    internal IReadOnlyList<AddendumEntry> All { get; init; } = [];
+}
 
 // A signed note for the offline copy: the note, who signed it, and its addenda.
 public sealed record OfflineNote(ClinicalNote Note, string SignerName, IReadOnlyList<AddendumEntry> Addenda)

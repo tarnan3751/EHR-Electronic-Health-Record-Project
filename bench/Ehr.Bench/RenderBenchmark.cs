@@ -155,6 +155,11 @@ internal static partial class RenderBenchmark
                     var (patient, note) = noted[noteRandom.Next(noted.Count)];
                     return $"/patients/{patient}/notes/{note}";
                 }));
+                results.Add(await MeasureAsync(client, times, "Note sensitivity form, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                    return $"/patients/{patient}/notes/{note}/sensitivity";
+                }));
                 results.Add(await MeasureAsync(client, times, "Addendum form, a patient on the panel", typing: false, () =>
                 {
                     var (patient, note) = noted[noteRandom.Next(noted.Count)];

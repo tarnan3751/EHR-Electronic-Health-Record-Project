@@ -23,5 +23,7 @@ public sealed class NoteAddendumConfiguration : IEntityTypeConfiguration<NoteAdd
         addendum.HasIndex(a => a.PatientId);
         addendum.Property(a => a.AuthorId).HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
         addendum.Property(a => a.SignedAt).HasDefaultValueSql("now()");
+        addendum.Property(a => a.SensitiveReason).HasMaxLength(500);
+        addendum.HasOne<StaffUser>().WithMany().HasForeignKey(a => a.SensitiveMarkedBy).OnDelete(DeleteBehavior.Restrict);
     }
 }

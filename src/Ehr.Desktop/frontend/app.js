@@ -399,7 +399,7 @@ function signedNotes(notes) {
     ...(notes.length ? notes.map((note) => el('details', { className: 'sc-result' },
       el('summary', { textContent: `Signed note · ${stamp(note.signedAt)} · ${note.signer}${note.addenda.length ? ` · ${note.addenda.length} ${note.addenda.length === 1 ? 'addendum' : 'addenda'}` : ''}` }),
       ...part('History', note.history), ...part('Assessment', note.assessment), ...part('Plan', note.plan),
-      ...note.addenda.flatMap((addendum) => part(`Addendum · ${addendum.author} · ${stamp(addendum.signedAt)}`, addendum.text)),
+      ...note.addenda.flatMap((addendum) => part(`${addendum.notNoteAuthor ? `Addendum by ${addendum.author}, not the note's author` : `Addendum · ${addendum.author}`} · ${stamp(addendum.signedAt)}`, addendum.text)),
       ...(note.sensitiveAddendaNotKept
         ? [el('p', { className: 'sc-muted', textContent: `Sensitive addenda not kept offline: ${note.sensitiveAddendaNotKept}. Open the note on the clinic's site to see them.` })]
         : []),

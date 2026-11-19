@@ -590,7 +590,7 @@ namespace Ehr.Migrations
 
                     b.ToTable("inbox_items", "ehr", t =>
                         {
-                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review')");
+                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum')");
 
                             t.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
                         });
@@ -1675,6 +1675,19 @@ namespace Ehr.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("sensitive");
 
+                    b.Property<DateTimeOffset?>("SensitiveChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sensitive_changed_at");
+
+                    b.Property<Guid?>("SensitiveMarkedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sensitive_marked_by");
+
+                    b.Property<string>("SensitiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("sensitive_reason");
+
                     b.Property<DateTimeOffset>("SignedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1696,6 +1709,9 @@ namespace Ehr.Migrations
                     b.HasIndex("DraftId")
                         .IsUnique()
                         .HasDatabaseName("ix_clinical_notes_draft_id");
+
+                    b.HasIndex("SensitiveMarkedBy")
+                        .HasDatabaseName("ix_clinical_notes_sensitive_marked_by");
 
                     b.HasIndex("SignerId")
                         .HasDatabaseName("ix_clinical_notes_signer_id");
@@ -1884,6 +1900,19 @@ namespace Ehr.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("sensitive");
 
+                    b.Property<DateTimeOffset?>("SensitiveChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sensitive_changed_at");
+
+                    b.Property<Guid?>("SensitiveMarkedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sensitive_marked_by");
+
+                    b.Property<string>("SensitiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("sensitive_reason");
+
                     b.Property<DateTimeOffset>("SignedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1903,6 +1932,9 @@ namespace Ehr.Migrations
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_note_addenda_patient_id");
+
+                    b.HasIndex("SensitiveMarkedBy")
+                        .HasDatabaseName("ix_note_addenda_sensitive_marked_by");
 
                     b.HasIndex("NoteId", "PatientId")
                         .HasDatabaseName("ix_note_addenda_note_id_patient_id");
@@ -3087,6 +3119,12 @@ namespace Ehr.Migrations
 
                     b.HasOne("Ehr.Data.Accounts.StaffUser", null)
                         .WithMany()
+                        .HasForeignKey("SensitiveMarkedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_clinical_notes_staff_users_sensitive_marked_by");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
                         .HasForeignKey("SignerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -3138,6 +3176,12 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_note_addenda_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("SensitiveMarkedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_note_addenda_staff_users_sensitive_marked_by");
 
                     b.HasOne("Ehr.Data.Patients.ClinicalNote", null)
                         .WithMany()

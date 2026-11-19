@@ -116,10 +116,15 @@ GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;
 GRANT SELECT ON ehr.clinical_drafts TO ehr_read;
 GRANT SELECT, INSERT ON ehr.clinical_notes TO ehr_app;
 GRANT SELECT ON ehr.clinical_notes TO ehr_read;
+-- Marking a signed note or addendum sensitive, or unmarking it, with a reason (step 10b): these two columns, and a
+-- trigger holds the update to exactly that and sets who and when (50-clinical-notes.sql). No other column of either
+-- is ever updated.
+GRANT UPDATE (sensitive, sensitive_reason) ON ehr.clinical_notes TO ehr_app;
 
 -- Addenda to signed notes (step 10). PHI, append-only like the notes: a clinician signs one (INSERT), and nothing
 -- updates or deletes one. Row-level security, the signing trigger and the write-audit trigger follow.
 GRANT SELECT, INSERT ON ehr.note_addenda TO ehr_app;
+GRANT UPDATE (sensitive, sensitive_reason) ON ehr.note_addenda TO ehr_app;
 GRANT SELECT ON ehr.note_addenda TO ehr_read;
 
 -- UC 1 (Tahseen Arnan). The catalog of what can be ordered: not PHI, grants only, seeded by its migration and read by

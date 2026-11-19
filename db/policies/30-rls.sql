@@ -655,10 +655,34 @@ DROP POLICY IF EXISTS clinical_notes_own_insert ON ehr.clinical_notes;
 CREATE POLICY clinical_notes_own_insert ON ehr.clinical_notes FOR INSERT
     WITH CHECK ((SELECT ehr.is_clinician()) AND signer_id = (SELECT ehr.current_user_id()));
 
+-- Marking a signed note sensitive or unmarking it (step 10b): a clinician with the patient on their active panel, the
+-- rule for writing notes. The trigger holds the update to exactly that, and decides who may unmark
+-- (50-clinical-notes.sql). The tables' owner reads a note's signer to deliver an addendum to their inbox.
+DROP POLICY IF EXISTS clinical_notes_panel_update ON ehr.clinical_notes;
+CREATE POLICY clinical_notes_panel_update ON ehr.clinical_notes FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = clinical_notes.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = clinical_notes.patient_id AND a.ended_at IS NULL
+        )
+    );
+DROP POLICY IF EXISTS clinical_notes_owner_select ON ehr.clinical_notes;
+CREATE POLICY clinical_notes_owner_select ON ehr.clinical_notes FOR SELECT TO ehr_owner USING (true);
+
 -- Addenda to signed notes (PHI; step 10). Read as the notes are, by every clinician on the chart's access model. A
 -- clinician signs one only as themselves and only for a patient on their active panel, the rule for writing notes; the
--- signing trigger sets who and when and checks the rest (50-clinical-notes.sql). Nothing updates or deletes one
--- (10-grants.sql), so there is no policy for either.
+-- signing trigger sets who and when and checks the rest (50-clinical-notes.sql). Nothing deletes one (10-grants.sql);
+-- its one update is its sensitivity (step 10b), by the same panel rule.
 ALTER TABLE ehr.note_addenda ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.note_addenda FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS note_addenda_clinician_select ON ehr.note_addenda;
@@ -669,6 +693,25 @@ CREATE POLICY note_addenda_panel_insert ON ehr.note_addenda FOR INSERT
     WITH CHECK (
         (SELECT ehr.is_clinician())
         AND author_id = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = note_addenda.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+DROP POLICY IF EXISTS note_addenda_panel_update ON ehr.note_addenda;
+CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = note_addenda.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
         AND EXISTS (
             SELECT 1 FROM ehr.patient_assignments a
             WHERE a.clinician_id = (SELECT ehr.current_user_id())

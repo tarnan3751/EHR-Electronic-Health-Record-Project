@@ -15,5 +15,7 @@ public sealed class ClinicalNoteConfiguration : IEntityTypeConfiguration<Clinica
         note.HasIndex(n => new { n.PatientId, n.SignedAt });
         note.Property(n => n.SignerId).HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
         note.Property(n => n.SignedAt).HasDefaultValueSql("now()");
+        note.Property(n => n.SensitiveReason).HasMaxLength(500);
+        note.HasOne<StaffUser>().WithMany().HasForeignKey(n => n.SensitiveMarkedBy).OnDelete(DeleteBehavior.Restrict);
     }
 }

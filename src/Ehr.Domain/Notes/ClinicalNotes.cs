@@ -177,6 +177,69 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         return new(200, [], Note: note);
     }
 
+    // Marks a signed note, or one of its addenda, sensitive after signing, or unmarks it, with a reason (step 10b). The
+    // text never changes. The database decides who may (a clinician with the patient on their panel marks; only the
+    // person who made it sensitive, or the note's signer, unmarks), sets who and when, and marks a note's addenda with
+    // it (db/policies/30-rls.sql and 50-clinical-notes.sql). The caller has read the note as this patient's.
+    public async Task<SensitivityResult> SetSensitivityAsync(Guid patient, Guid note, Guid? addendum, bool sensitive, string? reason, CancellationToken cancel)
+    {
+        if (!authority.IsPrimaryHost)
+        {
+            return new(503, ["The authoritative clinic server must be available to change this. Your reason is still displayed."]);
+        }
+
+        reason = reason?.Trim();
+        if (string.IsNullOrEmpty(reason))
+        {
+            return new(422, ["Say why, so the record shows it."]);
+        }
+
+        if (reason.Length > 500)
+        {
+            return new(422, [$"The reason can be up to 500 characters. This one has {reason.Length}."]);
+        }
+
+        if (!await phi.IsAssignedAsync(patient, cancel))
+        {
+            return new(403, ["Add this patient to your panel to change this."]);
+        }
+
+        // Only the two columns the apps may update; the row is found by its ID, under row-level security.
+        object row = addendum is { } id
+            ? new NoteAddendum { Id = id, NoteId = note, PatientId = patient, Text = "", Sensitive = sensitive, SensitiveReason = reason }
+            : new ClinicalNote { Id = note, PatientId = patient, History = "", Assessment = "", Plan = "", Sensitive = sensitive, SensitiveReason = reason };
+        const string savepoint = "note_sensitivity";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancel);
+        try
+        {
+            var entry = db.Attach(row);
+            entry.Property(nameof(ClinicalNote.Sensitive)).IsModified = true;
+            entry.Property(nameof(ClinicalNote.SensitiveReason)).IsModified = true;
+            await db.SaveChangesAsync(cancel);
+            await transaction.ReleaseSavepointAsync(savepoint, cancel);
+            return new(200, []);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return new(403, ["Add this patient to your panel to change this."]);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation } refusal)
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
+                ? new(403, ["Only the person who marked it sensitive, or the note's signer, can unmark it."])
+                : new(409, [addendum is not null && !sensitive
+                    ? "This can't be unmarked: an addendum to a sensitive note is sensitive, or it has already been unmarked."
+                    : "This has already been changed. Open the note again."]);
+        }
+        finally
+        {
+            db.Entry(row).State = EntityState.Detached;
+        }
+    }
+
     // Signs an addendum to a signed note (step 10): a new text attached to the note, which stays as it was. The
     // database decides who may (a clinician with the patient on their panel, as themselves), sets who signed and when,
     // and makes an addendum to a sensitive note sensitive (db/policies/30-rls.sql and 50-clinical-notes.sql).
@@ -230,6 +293,10 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         }
     }
 }
+
+// What became of marking or unmarking: 200 done; 422 with what to fix; 403 not allowed (off the panel, or not the
+// person who may unmark); 409 it is already as asked, or an addendum of a sensitive note; 503 off the clinic's server.
+public sealed record SensitivityResult(int Status, IReadOnlyList<string> Errors);
 
 // What became of an addendum: 200 signed; 422 with what to fix; 403 the patient isn't on the clinician's panel; 404
 // the note isn't this patient's; 503 off the clinic's server.
