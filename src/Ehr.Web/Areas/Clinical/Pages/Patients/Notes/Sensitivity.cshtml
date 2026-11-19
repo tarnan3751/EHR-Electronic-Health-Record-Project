@@ -25,7 +25,7 @@ else
 }
 @if (!Model.Sensitive)
 {
-    <p class="sc-prose">Its text doesn't change. Once sensitive, it is left out until someone asks for sensitive items, each view of it is recorded, and it is never kept offline@(Model.Entry is null ? "; its addenda become sensitive with it" : ""). Views of it before now are already in the audit log. Only you, or the note's signer, can unmark it.</p>
+    <p class="sc-prose">Its text doesn't change. Once sensitive, it is left out until someone asks for sensitive items, each view of it is recorded, and it is never kept offline@(Model.Entry is null ? "; its addenda become sensitive with it" : ""). Views of it before now are already in the audit log. @(Model.IsSigner ? "Only you can unmark it, as the note's signer and the person who marked it." : "Only you, or the note's signer, can unmark it.")</p>
 }
 else
 {
@@ -52,6 +52,7 @@ else
                 @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not changed:</span> @error</p> }
             </div>
         }
+        <input type="hidden" name="Mark" value="@(Model.Sensitive ? "false" : "true")">
         <div class="sc-field">
             <label for="sensitivity-reason">Reason <span>(required)</span></label>
             <input id="sensitivity-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="500" required autofocus autocomplete="off"

@@ -137,7 +137,8 @@ namespace Ehr.Migrations
             // this and the migration before it drop, and the notes' and addenda's immutability triggers cover deletes
             // only (the update rule is this step's). They are removed, and immutability is put back for updates too,
             // as it was before this step, so nothing is left updatable in between. db/policies re-creates them all
-            // when it is next applied.
+            // when it is next applied. Until the earlier release's db/policies is applied, signing a note fails (its
+            // signing functions still name these columns): apply it straight after rolling back.
             migrationBuilder.Sql("""
                 DROP TRIGGER IF EXISTS clinical_notes_mark_addenda ON ehr.clinical_notes;
                 DROP TRIGGER IF EXISTS clinical_notes_log_sensitivity ON ehr.clinical_notes;
@@ -156,7 +157,30 @@ namespace Ehr.Migrations
                     END IF;
                 END
                 $$;
-                DELETE FROM ehr.inbox_items WHERE kind = 'addendum';
+                -- This step's policies and functions go too: nothing of it is left for the older schema to carry.
+                DROP POLICY IF EXISTS clinical_notes_panel_update ON ehr.clinical_notes;
+                DROP POLICY IF EXISTS clinical_notes_owner_select ON ehr.clinical_notes;
+                DROP POLICY IF EXISTS note_addenda_panel_update ON ehr.note_addenda;
+                DROP FUNCTION IF EXISTS ehr.change_note_sensitivity();
+                DROP FUNCTION IF EXISTS ehr.change_addendum_sensitivity();
+                DROP FUNCTION IF EXISTS ehr.mark_note_addenda_sensitive();
+                DROP FUNCTION IF EXISTS ehr.log_note_sensitivity_change();
+                DROP FUNCTION IF EXISTS ehr.deliver_addendum();
+                -- Inbox items of this step's kind, which the older schema's check refuses. Forced row-level security
+                -- would hide them from this delete.
+                DO $$
+                DECLARE
+                    forced boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.inbox_items'::regclass);
+                BEGIN
+                    ALTER TABLE ehr.inbox_items NO FORCE ROW LEVEL SECURITY;
+                    ALTER TABLE ehr.inbox_items DISABLE TRIGGER USER;
+                    DELETE FROM ehr.inbox_items WHERE kind = 'addendum';
+                    ALTER TABLE ehr.inbox_items ENABLE TRIGGER USER;
+                    IF forced THEN
+                        ALTER TABLE ehr.inbox_items FORCE ROW LEVEL SECURITY;
+                    END IF;
+                END
+                $$;
                 """);
 
             migrationBuilder.DropForeignKey(

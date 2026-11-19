@@ -52,29 +52,56 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         var (marker, bystander) = (await SignInAsync(apps.OnPrem, first), await SignInAsync(apps.OnPrem, second));
         var text = await ProxyTests.QueryAsync(apps, "SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient);
 
+        // Before anyone marks it: the second colleague opens the note, which the app records; and the desktop syncs,
+        // which gives the watermark a later pull starts from.
+        Assert.Contains(History, await bystander.Client.GetStringAsync(NotePath(patient, note), Cancel));
+        var token = await apps.DesktopSignInAsync(apps.OnPrem, signer);
+        using var desktop = apps.OnPrem.CreateClient();
+        desktop.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        async Task<string> PullAsync(string since)
+        {
+            using var response = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(desktop, "/api/desktop/drafts/pull",
+                new { Since = since, Patients = new[] { patient } }, System.Text.Json.JsonSerializerOptions.Web, Cancel);
+            return await response.Content.ReadAsStringAsync(Cancel);
+        }
+
+        var synced = await PullAsync("0");
+        Assert.Contains("cough for two days", synced);
+        var watermark = System.Text.Json.JsonDocument.Parse(synced).RootElement.GetProperty("watermark").GetString()!;
+        Assert.DoesNotContain("\"withheld\":true", await PullAsync(watermark));
+
         var page = await marker.Client.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.Matches($"<a [^>]*href=\"{SensitivityPath(patient, note)}\"[^>]*>Mark this note sensitive</a>", page);
-        using var unexplained = await ChangeSensitivityAsync(marker.Client, patient, note, null);
+        using var unexplained = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, null);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unexplained.StatusCode);
         Assert.Contains("Not changed: Say why, so the record shows it.", Words(await unexplained.Content.ReadAsStringAsync(Cancel)));
-        using var marked = await ChangeSensitivityAsync(marker.Client, patient, note, "Patient asked for it.");
+        using var marked = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, "Patient asked for it.");
         page = await ReadAsync(marked);
         Assert.Contains("Saved: it is marked sensitive, with your reason.", Words(page));
         Assert.Contains("Sensitive note: your view of it is recorded.", Words(page));
-        Assert.Matches("data-sensitivity-reason>Marked sensitive \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC: Patient asked for it\\.", page);
+        Assert.Matches("data-sensitivity-reason>Marked sensitive by Dr. First \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC: Patient asked for it\\.", page);
+
+        // The same form sent again (a double click, or Back and send): it asked to mark, the note is marked, and it
+        // is not undone.
+        using var twice = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, "Patient asked for it.");
+        Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
+        Assert.Contains("It is already marked sensitive. Nothing was changed.", Words(await twice.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal([$"note true {first.Id} Patient asked for it.", $"addendum true {first.Id} Patient asked for it."], await SensitivityAsync(apps, patient));
         Assert.Equal(text, await ProxyTests.QueryAsync(apps, "SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
 
         var chart = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
         Assert.Contains("Sensitive items hidden: 1 signed note is not shown.", chart);
-        var token = await apps.DesktopSignInAsync(apps.OnPrem, signer);
-        using var desktop = apps.OnPrem.CreateClient();
-        desktop.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        using var pulled = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(desktop, "/api/desktop/drafts/pull",
-            new { Since = "0", Patients = new[] { patient } }, System.Text.Json.JsonSerializerOptions.Web, Cancel);
-        var drafts = await pulled.Content.ReadAsStringAsync(Cancel);
+        // The desktop's next sync, from where it left off: the draft comes again, with no text, to be emptied there.
+        var drafts = await PullAsync(watermark);
         Assert.Matches("\"body\":\"\",\"version\":\\d+,\"withheld\":true", drafts);
         Assert.DoesNotContain("cough for two days", drafts);
+        // The view the second colleague made before the note was marked is in the audit log, as the app wrote it,
+        // dated before the mark.
+        Assert.Equal(["true"], await ProxyTests.QueryAsync(apps,
+            $"""
+            SELECT bool_and(e.occurred_at < n.sensitive_changed_at)::text FROM ehr.audit_events e JOIN ehr.clinical_notes n ON n.id = e.row_id
+            WHERE e.patient_id = @patient AND e.action = 'read' AND e.table_name = 'clinical_notes' AND e.actor_id = '{second.Id}' HAVING count(*) = 1
+            """, patient));
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);
         var copy = await offline.Content.ReadAsStringAsync(Cancel);
         Assert.DoesNotContain("cough for two days", copy);
@@ -85,24 +112,26 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         Assert.Contains("data-may-not-unmark", refusedPage);
         Assert.DoesNotContain("data-change-sensitivity", refusedPage);
         var ownToken = Token(refusedPage);
-        using var refused = await bystander.Client.PostAsync(SensitivityPath(patient, note), Form(("__RequestVerificationToken", ownToken), ("Reason", "Let me see it.")), Cancel);
+        using var refused = await bystander.Client.PostAsync(SensitivityPath(patient, note), Form(("__RequestVerificationToken", ownToken), ("Mark", false), ("Reason", "Let me see it.")), Cancel);
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         Assert.StartsWith("note true ", (await SensitivityAsync(apps, patient))[0]);
 
-        using var unmarked = await ChangeSensitivityAsync(session.Client, patient, note, "Marked the wrong note.");
+        using var unmarked = await ChangeSensitivityAsync(session.Client, patient, note, mark: false, "Marked the wrong note.");
         page = await ReadAsync(unmarked);
         Assert.Contains("Saved: it is no longer marked sensitive, with your reason.", Words(page));
         Assert.Matches("data-sensitivity-reason>Unmarked as sensitive [^<]*UTC: Marked the wrong note\\.", page);
+        // After unmarking, the desktop's sync sends the draft's text again.
+        Assert.Contains("cough for two days", await PullAsync(System.Text.Json.JsonDocument.Parse(drafts).RootElement.GetProperty("watermark").GetString()!));
         Assert.Equal(["note false none Marked the wrong note.", $"addendum true {first.Id} Patient asked for it."], await SensitivityAsync(apps, patient));
         Assert.DoesNotContain("Sensitive items hidden", Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel)));
         Assert.Contains("Sensitive addenda hidden: 1 addendum is not shown.", Words(page));
 
         // The addendum: unmarked by the note's signer, then marked again by another clinician.
-        using var shown = await ChangeSensitivityAsync(session.Client, patient, note, "Not sensitive.", addendum);
+        using var shown = await ChangeSensitivityAsync(session.Client, patient, note, mark: false, "Not sensitive.", addendum);
         Assert.Contains("Synthetic addendum: culture negative.", await ReadAsync(shown));
         Assert.Equal("addendum false none Not sensitive.", (await SensitivityAsync(apps, patient))[1]);
         var views = await apps.AuditEventsAsync(AuditActions.ReadSensitive, second.Id, patient);
-        using var again = await ChangeSensitivityAsync(bystander.Client, patient, note, "Mentions a family member.", addendum);
+        using var again = await ChangeSensitivityAsync(bystander.Client, patient, note, mark: true, "Mentions a family member.", addendum);
         // The person who marked it is shown it once more, which is a recorded view; after that it is left out.
         Assert.Contains("Synthetic addendum: culture negative.", await ReadAsync(again));
         Assert.Equal(views + 1, await apps.AuditEventsAsync(AuditActions.ReadSensitive, second.Id, patient));

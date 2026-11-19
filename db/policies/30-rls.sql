@@ -662,6 +662,10 @@ DROP POLICY IF EXISTS clinical_notes_panel_update ON ehr.clinical_notes;
 CREATE POLICY clinical_notes_panel_update ON ehr.clinical_notes FOR UPDATE
     USING (
         (SELECT ehr.is_clinician())
+        -- A sensitive note is updatable (which can only be unmarking it) by the person who made it so, or its signer:
+        -- decided here, on the row as it stood and the person the statement began as, before anything the statement
+        -- itself does. The trigger checks it again.
+        AND (NOT sensitive OR signer_id = (SELECT ehr.current_user_id()) OR sensitive_marked_by = (SELECT ehr.current_user_id()))
         AND EXISTS (
             SELECT 1 FROM ehr.patient_assignments a
             WHERE a.clinician_id = (SELECT ehr.current_user_id())
@@ -704,6 +708,11 @@ DROP POLICY IF EXISTS note_addenda_panel_update ON ehr.note_addenda;
 CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
     USING (
         (SELECT ehr.is_clinician())
+        -- As for the note: a sensitive addendum is updatable by the person who made it so (its author, if nobody was
+        -- recorded), or by the signer of its note.
+        AND (NOT sensitive
+             OR coalesce(sensitive_marked_by, author_id) = (SELECT ehr.current_user_id())
+             OR EXISTS (SELECT 1 FROM ehr.clinical_notes n WHERE n.id = note_addenda.note_id AND n.signer_id = (SELECT ehr.current_user_id())))
         AND EXISTS (
             SELECT 1 FROM ehr.patient_assignments a
             WHERE a.clinician_id = (SELECT ehr.current_user_id())

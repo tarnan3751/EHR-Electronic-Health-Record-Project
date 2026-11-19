@@ -222,8 +222,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         }
         catch (DbUpdateConcurrencyException)
         {
+            // No row the database lets this person update: unmarking is for the person who marked it or the note's
+            // signer (the policy decides, on the row as it stood); the panel was checked above.
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
-            return new(403, ["Add this patient to your panel to change this."]);
+            return new(403, [sensitive
+                ? "This couldn't be marked. Open the note again."
+                : "Only the person who marked it sensitive, or the note's signer, can unmark it."]);
         }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation } refusal)
         {

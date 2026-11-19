@@ -39,7 +39,7 @@ else
 @* Step 10b: the note's sensitivity can change after signing, with a reason; its text never does. *@
 @if (Model.Note.SensitiveReason is not null)
 {
-    <p class="sc-muted" data-sensitivity-reason>@(Model.Note.Sensitive ? "Marked sensitive" : "Unmarked as sensitive") @Model.Note.SensitiveChangedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC: @Model.Note.SensitiveReason</p>
+    <p class="sc-muted" data-sensitivity-reason>@Model.Change(Model.Note.Sensitive, Model.Note.SensitiveMarkedBy) @Model.Note.SensitiveChangedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC: @Model.Note.SensitiveReason</p>
 }
 @if (Model.OnPanel && OnPrem.IsReachable)
 {
@@ -78,7 +78,7 @@ else
                 <p class="sc-note__text">@addendum.Text</p>
                 @if (addendum.SensitiveReason is not null)
                 {
-                    <p class="sc-muted">@(addendum.Sensitive ? "Marked sensitive" : "Unmarked as sensitive") @addendum.SensitiveChangedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC: @addendum.SensitiveReason</p>
+                    <p class="sc-muted">@Model.Change(addendum.Sensitive, addendum.SensitiveMarkedBy) @addendum.SensitiveChangedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC: @addendum.SensitiveReason</p>
                 }
                 @if (Model.OnPanel && OnPrem.IsReachable && !(addendum.Sensitive && Model.Note.Sensitive))
                 {

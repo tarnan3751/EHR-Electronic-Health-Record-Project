@@ -107,7 +107,9 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
 
         // A third clinician on the panel: refused, for the note and for the addendum they wrote themselves, which the
         // marker made sensitive.
-        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => ChangeAsync(other, "clinical_notes", note, sensitive: false));
+        // The policy gives them no row to update: nothing changes, whatever the statement does later.
+        await ChangeAsync(other, "clinical_notes", note, sensitive: false);
+        Assert.StartsWith($"true {marker} ", (await StateAsync("clinical_notes", note)).Single());
         // While the note is sensitive, so is its addendum, whoever asks.
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ChangeAsync(marker, "note_addenda", addendum, sensitive: false));
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ChangeAsync(marker, "clinical_notes", note, sensitive: false, reason: "  "));
@@ -116,13 +118,69 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         await ChangeAsync(marker, "clinical_notes", note, sensitive: false, reason: "Marked the wrong note.");
         Assert.Equal(["false none Marked the wrong note. true"], await StateAsync("clinical_notes", note));
         Assert.StartsWith($"true {marker} ", (await StateAsync("note_addenda", addendum)).Single());
-        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => ChangeAsync(other, "note_addenda", addendum, sensitive: false));
+        // Its own author didn't make it sensitive, the marker did: the author can't unmark it.
+        await ChangeAsync(other, "note_addenda", addendum, sensitive: false);
+        Assert.StartsWith($"true {marker} ", (await StateAsync("note_addenda", addendum)).Single());
+        // Nor by naming the marker part-way through the statement: the policy has already decided on the row as it
+        // stood and the person the statement began as.
+        await Accounts.ExecuteAsync(App, other,
+            "UPDATE ehr.note_addenda SET sensitive = false, sensitive_reason = 'x' || left(set_config('app.user_id', @marker, true), 0) WHERE id = @id",
+            ("id", addendum), ("marker", marker.ToString()));
+        Assert.StartsWith($"true {marker} ", (await StateAsync("note_addenda", addendum)).Single());
         // The note's signer may unmark what someone else marked: the addendum here, and a note marked again.
         await ChangeAsync(signer, "note_addenda", addendum, sensitive: false, reason: "Not sensitive.");
         Assert.Equal(["false none Not sensitive. true"], await StateAsync("note_addenda", addendum));
         await ChangeAsync(other, "clinical_notes", note, sensitive: true);
         await ChangeAsync(signer, "clinical_notes", note, sensitive: false, reason: "Reviewed with the patient.");
         Assert.Equal(["false none Reviewed with the patient. true"], await StateAsync("clinical_notes", note));
+    }
+
+    // An addendum signed at the very moment its note is being marked sensitive ends sensitive: the two wait for each
+    // other instead of passing. Two connections, the first holding its transaction open.
+    [Fact]
+    public async Task An_addendum_signed_while_its_note_is_being_marked_ends_sensitive()
+    {
+        var (signer, patient, note, _) = await SignedAsync();
+        var colleague = await ColleagueAsync(patient);
+        var cancel = TestContext.Current.CancellationToken;
+        async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginAsync(Guid user)
+        {
+            var connection = new NpgsqlConnection(App);
+            await connection.OpenAsync(cancel);
+            var transaction = await connection.BeginTransactionAsync(cancel);
+            await using var set = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction);
+            set.Parameters.AddWithValue("user", user.ToString());
+            await set.ExecuteNonQueryAsync(cancel);
+            return (connection, transaction);
+        }
+
+        var (writing, writingTransaction) = await BeginAsync(colleague);
+        var (marking, markingTransaction) = await BeginAsync(signer);
+        await using (writing)
+        await using (marking)
+        {
+            await using (var insert = new NpgsqlCommand(
+                "INSERT INTO ehr.note_addenda (id, note_id, patient_id, author_id, text) VALUES (gen_random_uuid(), @note, @patient, @author, 'Synthetic addendum, signed during the mark.')",
+                writing, writingTransaction))
+            {
+                insert.Parameters.AddWithValue("note", note);
+                insert.Parameters.AddWithValue("patient", patient);
+                insert.Parameters.AddWithValue("author", colleague);
+                await insert.ExecuteNonQueryAsync(cancel);
+            }
+
+            await using var mark = new NpgsqlCommand("UPDATE ehr.clinical_notes SET sensitive = true, sensitive_reason = 'Synthetic' WHERE id = @note", marking, markingTransaction);
+            mark.Parameters.AddWithValue("note", note);
+            var waiting = mark.ExecuteNonQueryAsync(cancel);
+            // The mark waits for the addendum's transaction.
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), cancel)));
+            await writingTransaction.CommitAsync(cancel);
+            Assert.Equal(1, await waiting);
+            await markingTransaction.CommitAsync(cancel);
+        }
+
+        Assert.Equal(["true true"], await AsSuperuserAsync(
+            "SELECT n.sensitive || ' ' || a.sensitive FROM ehr.clinical_notes n JOIN ehr.note_addenda a ON a.note_id = n.id WHERE n.id = @note", ("note", note)));
     }
 
     [Fact]

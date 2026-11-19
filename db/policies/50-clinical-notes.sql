@@ -1,5 +1,6 @@
 -- UC 14: signing and edits serialize on the SAME draft row. These invoker functions respect RLS and grants.
--- No runtime UPDATE/DELETE grant on signed notes, with a trigger as an additional immutability boundary.
+-- No runtime DELETE grant on signed notes, and UPDATE on their sensitivity alone (step 10b), with triggers as an
+-- additional immutability boundary: a signed note's text never changes.
 CREATE OR REPLACE FUNCTION ehr.guard_clinical_draft() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -103,6 +104,8 @@ BEGIN
     IF (to_jsonb(NEW) - apart) IS DISTINCT FROM (to_jsonb(OLD) - apart) THEN
         RAISE EXCEPTION 'Signed clinical notes are immutable' USING ERRCODE = '23514';
     END IF;
+    -- One at a time with an addendum being signed to this note (ehr.sign_note_addendum).
+    PERFORM pg_advisory_xact_lock(hashtextextended('ehr.clinical_notes:' || OLD.id::text, 0));
     IF NEW.sensitive IS NOT DISTINCT FROM OLD.sensitive THEN
         RAISE EXCEPTION 'A signed note changes only by being marked sensitive or unmarked' USING ERRCODE = '23514';
     END IF;
@@ -112,10 +115,14 @@ BEGIN
     END IF;
 
     IF NEW.sensitive THEN
+        IF ehr.current_user_id() IS NULL THEN
+            RAISE EXCEPTION 'A note is marked sensitive by someone' USING ERRCODE = '42501';
+        END IF;
         NEW.sensitive_marked_by := ehr.current_user_id();
     ELSE
+        -- A note marked before anyone was recorded as marking it was marked by its signer.
         IF ehr.current_user_id() IS NULL
-           OR (ehr.current_user_id() IS DISTINCT FROM OLD.sensitive_marked_by AND ehr.current_user_id() IS DISTINCT FROM OLD.signer_id) THEN
+           OR (ehr.current_user_id() IS DISTINCT FROM coalesce(OLD.sensitive_marked_by, OLD.signer_id) AND ehr.current_user_id() IS DISTINCT FROM OLD.signer_id) THEN
             RAISE EXCEPTION 'Only the person who marked a note sensitive, or its signer, unmarks it'
                 USING ERRCODE = '42501', CONSTRAINT = 'clinical_notes_unmark';
         END IF;
@@ -139,6 +146,10 @@ AS $$
 BEGIN
     UPDATE ehr.note_addenda a SET sensitive = true, sensitive_reason = NEW.sensitive_reason
     WHERE a.note_id = NEW.id AND a.patient_id = NEW.patient_id AND NOT a.sensitive;
+    -- All of them, or the note isn't marked: an update the policies hid from this caller would leave one behind.
+    IF EXISTS (SELECT 1 FROM ehr.note_addenda a WHERE a.note_id = NEW.id AND NOT a.sensitive) THEN
+        RAISE EXCEPTION 'The note''s addenda could not be marked sensitive with it' USING ERRCODE = '42501';
+    END IF;
     RETURN NULL;
 END
 $$;
@@ -180,6 +191,11 @@ AS $$
 DECLARE
     note_sensitive boolean;
 BEGIN
+    -- One at a time for a note, with a mark of it (step 10b; ehr.change_note_sensitivity takes the same lock): an
+    -- addendum signed while its note is being marked sensitive waits for the mark, or the mark waits for it and then
+    -- marks it too. Without it one could slip between the two and stay unmarked. A lock on the note's ID, not its
+    -- row: a row lock would follow the update policy, and a colleague who may add an addendum may not update the note.
+    PERFORM pg_advisory_xact_lock(hashtextextended('ehr.clinical_notes:' || NEW.note_id::text, 0));
     SELECT n.sensitive INTO note_sensitive FROM ehr.clinical_notes n WHERE n.id = NEW.note_id AND n.patient_id = NEW.patient_id;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'The signed note is unavailable' USING ERRCODE = '23514';
@@ -238,6 +254,9 @@ BEGIN
     END IF;
 
     IF NEW.sensitive THEN
+        IF ehr.current_user_id() IS NULL THEN
+            RAISE EXCEPTION 'An addendum is marked sensitive by someone' USING ERRCODE = '42501';
+        END IF;
         NEW.sensitive_marked_by := ehr.current_user_id();
     ELSE
         SELECT n.signer_id, n.sensitive INTO note_signer, note_sensitive FROM ehr.clinical_notes n WHERE n.id = OLD.note_id;
@@ -245,7 +264,8 @@ BEGIN
             RAISE EXCEPTION 'An addendum to a sensitive note is sensitive' USING ERRCODE = '23514';
         END IF;
         IF ehr.current_user_id() IS NULL
-           OR (ehr.current_user_id() IS DISTINCT FROM OLD.sensitive_marked_by AND ehr.current_user_id() IS DISTINCT FROM note_signer) THEN
+           -- One marked before anyone was recorded as marking it was marked by its author.
+           OR (ehr.current_user_id() IS DISTINCT FROM coalesce(OLD.sensitive_marked_by, OLD.author_id) AND ehr.current_user_id() IS DISTINCT FROM note_signer) THEN
             RAISE EXCEPTION 'Only the person who marked an addendum sensitive, or the note''s signer, unmarks it'
                 USING ERRCODE = '42501', CONSTRAINT = 'note_addenda_unmark';
         END IF;

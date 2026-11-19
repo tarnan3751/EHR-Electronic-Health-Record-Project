@@ -1,6 +1,7 @@
 namespace Ehr.Data.Patients;
 
-// Immutable signed snapshot. One final record per draft; the draft remains as a frozen sync record.
+// The signed snapshot, whose text never changes; its sensitivity is the one thing that can (step 10b). One final
+// record per draft; the draft remains as a frozen sync record.
 public sealed class ClinicalNote
 {
     public Guid Id { get; set; }

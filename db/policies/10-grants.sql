@@ -112,7 +112,8 @@ GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id,
 
 GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;
 
--- Final clinical records are append-only. Cloud reads remain subject to the same forced RLS.
+-- Final clinical records are append-only, but for their sensitivity (below). Cloud reads remain subject to the same
+-- forced RLS.
 GRANT SELECT ON ehr.clinical_drafts TO ehr_read;
 GRANT SELECT, INSERT ON ehr.clinical_notes TO ehr_app;
 GRANT SELECT ON ehr.clinical_notes TO ehr_read;
@@ -121,8 +122,9 @@ GRANT SELECT ON ehr.clinical_notes TO ehr_read;
 -- is ever updated.
 GRANT UPDATE (sensitive, sensitive_reason) ON ehr.clinical_notes TO ehr_app;
 
--- Addenda to signed notes (step 10). PHI, append-only like the notes: a clinician signs one (INSERT), and nothing
--- updates or deletes one. Row-level security, the signing trigger and the write-audit trigger follow.
+-- Addenda to signed notes (step 10). PHI, append-only like the notes: a clinician signs one (INSERT), nothing deletes
+-- one, and its one update is its sensitivity (step 10b). Row-level security, the signing trigger and the write-audit
+-- trigger follow.
 GRANT SELECT, INSERT ON ehr.note_addenda TO ehr_app;
 GRANT UPDATE (sensitive, sensitive_reason) ON ehr.note_addenda TO ehr_app;
 GRANT SELECT ON ehr.note_addenda TO ehr_read;

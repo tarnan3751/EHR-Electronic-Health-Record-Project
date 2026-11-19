@@ -896,10 +896,21 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         await NoteAsync(id, patient, cancel) is { } note ? (note, await AddendaAsync(note, sensitive, cancel)) : null;
 
     // One addendum of a note, for the page that marks it sensitive or unmarks it (step 10b): who wrote it and when,
-    // whether it is sensitive and who made it so. Its text is read with it and not shown there. No event of its own:
-    // the page has just read the note. Null when it isn't an addendum of that note.
-    public async Task<AddendumEntry?> AddendumAsync(ClinicalNote note, Guid addendum, CancellationToken cancel) =>
-        (await AddendaAsync(note, sensitive: false, cancel, only: addendum)).All.SingleOrDefault();
+    // whether it is sensitive and who made it so. Its text is read with it and not shown there. The page has just
+    // read the note, which is the recorded read. Null when it isn't an addendum of that note.
+    public async Task<AddendumEntry?> AddendumAsync(ClinicalNote note, Guid addendum, CancellationToken cancel)
+    {
+        var entry = (await AddendaAsync(note, sensitive: false, cancel, only: addendum)).All.SingleOrDefault();
+        if (entry is { Sensitive: true })
+        {
+            // The page says who wrote a sensitive addendum and when, to someone who may not have asked to see it:
+            // recorded as a view of the patient's sensitive items.
+            audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return entry;
+    }
 
     // The addenda to a note just read, in the order they were signed, each with its author's name. Sensitive addenda
     // to a note that isn't sensitive are left out unless asked for, and showing them is recorded as a view of the

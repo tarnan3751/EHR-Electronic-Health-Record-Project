@@ -25,6 +25,11 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
     [BindProperty]
     public string? Reason { get; set; }
 
+    // What the form was offering when it was shown: to mark (true) or to unmark (false). The post does that, and not
+    // "the other of whatever it is now": a form sent twice, or after someone else changed it, would otherwise undo it.
+    [BindProperty]
+    public bool? Mark { get; set; }
+
     public ClinicalNote Note { get; private set; } = null!;
 
     public AddendumEntry? Entry { get; private set; }
@@ -38,6 +43,8 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
     // An addendum can't be unmarked while its note is sensitive.
     public bool HeldByNote => Entry is not null && Note.Sensitive;
 
+    public bool IsSigner { get; private set; }
+
     public IReadOnlyList<string> Errors { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid noteId) => await LoadAsync(patientId, noteId) ?? Page();
@@ -49,11 +56,18 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
             return refused;
         }
 
-        var result = await notes.SetSensitivityAsync(patientId, noteId, Addendum, !Sensitive, Reason, HttpContext.RequestAborted);
+        if (Mark is not { } mark)
+        {
+            return BadRequest();
+        }
+
+        var result = mark == Sensitive
+            ? new SensitivityResult(StatusCodes.Status409Conflict, [mark ? "It is already marked sensitive. Nothing was changed." : "It is already unmarked. Nothing was changed."])
+            : await notes.SetSensitivityAsync(patientId, noteId, Addendum, mark, Reason, HttpContext.RequestAborted);
         if (result.Status == StatusCodes.Status200OK)
         {
             // What was just marked is shown to the person who marked it, as a recorded view.
-            return RedirectToPage("View", null, new { patientId, noteId, done = Sensitive ? "unmarked" : "marked", sensitive = !Sensitive && Addendum is not null ? true : (bool?)null },
+            return RedirectToPage("View", null, new { patientId, noteId, done = mark ? "marked" : "unmarked", sensitive = mark && Addendum is not null ? true : (bool?)null },
                 Addendum is null ? null : "addenda");
         }
 
@@ -90,11 +104,12 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
             }
 
             Entry = entry;
-            (Sensitive, MayUnmark) = (entry.Sensitive, me == entry.SensitiveMarkedBy || me == note.SignerId);
+            (Sensitive, MayUnmark) = (entry.Sensitive, me == (entry.SensitiveMarkedBy ?? entry.AuthorId) || me == note.SignerId);
         }
         else
         {
             (Sensitive, MayUnmark) = (note.Sensitive, me == note.SensitiveMarkedBy || me == note.SignerId);
+            IsSigner = me == note.SignerId;
         }
 
         return null;

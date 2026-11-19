@@ -46,9 +46,10 @@ static class NoteAddendumTests
     public static string SensitivityPath(Guid patient, Guid note, Guid? addendum = null) =>
         NotePath(patient, note) + "/sensitivity" + (addendum is null ? "" : $"?addendum={addendum}");
 
-    // "Mark sensitive" or "Unmark as sensitive", as the page posts it: whichever the note or addendum isn't now.
-    public static Task<HttpResponseMessage> ChangeSensitivityAsync(HttpClient client, Guid patient, Guid note, string? reason, Guid? addendum = null) =>
-        PostFormAsync(client, SensitivityPath(patient, note, addendum), SensitivityPath(patient, note, addendum), reason is null ? [] : [("Reason", reason)]);
+    // "Mark sensitive" (mark: true) or "Unmark as sensitive" (false), as the page posts it: the form says which.
+    public static Task<HttpResponseMessage> ChangeSensitivityAsync(HttpClient client, Guid patient, Guid note, bool mark, string? reason, Guid? addendum = null) =>
+        PostFormAsync(client, SensitivityPath(patient, note, addendum), SensitivityPath(patient, note, addendum),
+            reason is null ? [("Mark", mark)] : [("Mark", mark), ("Reason", reason)]);
 
     // "sensitive marked-by reason" for the patient's notes, then their addenda, each in the order signed.
     public static Task<List<string>> SensitivityAsync(WebApps apps, Guid patient) => ProxyTests.QueryAsync(apps,

@@ -43,12 +43,12 @@ public class TC_UC14_15_SensitivityRefusedAndOffSite(WebApps apps) : IClassFixtu
         using var page = await noRedirects.GetAsync(SensitivityPath(patient, note), Cancel);
         Assert.Equal(HttpStatusCode.Redirect, page.StatusCode);
         Assert.Equal(NotePath(patient, note), page.Headers.Location?.OriginalString);
-        using var posted = await noRedirects.PostAsync(SensitivityPath(patient, note), Form(("__RequestVerificationToken", token), ("Reason", "Patient asked for it.")), Cancel);
+        using var posted = await noRedirects.PostAsync(SensitivityPath(patient, note), Form(("__RequestVerificationToken", token), ("Mark", true), ("Reason", "Patient asked for it.")), Cancel);
         Assert.Equal(HttpStatusCode.Redirect, posted.StatusCode);
         Assert.Equal(["note false none none"], await SensitivityAsync(apps, patient));
 
         var cloud = Client(apps.Cloud, session.Jar);
-        using var marked = await ChangeSensitivityAsync(cloud, patient, note, "Patient asked for it.");
+        using var marked = await ChangeSensitivityAsync(cloud, patient, note, mark: true, "Patient asked for it.");
         Assert.Contains($"POST {SensitivityPath(patient, note)}", apps.Forwarded);
         Assert.Equal([$"note true {clinician.Id} Patient asked for it."], await SensitivityAsync(apps, patient));
         var own = Token(await session.Client.GetStringAsync(SensitivityPath(patient, note), Cancel));
@@ -58,7 +58,7 @@ public class TC_UC14_15_SensitivityRefusedAndOffSite(WebApps apps) : IClassFixtu
         var readOnly = await cutOff.GetStringAsync(SensitivityPath(patient, note), Cancel);
         Assert.Contains("This can't be changed until the clinic's server is back.", readOnly);
         Assert.DoesNotContain("data-change-sensitivity", readOnly);
-        using var notSaved = await cutOff.PostAsync(SensitivityPath(patient, note), Form(("__RequestVerificationToken", own), ("Reason", "During the outage.")), Cancel);
+        using var notSaved = await cutOff.PostAsync(SensitivityPath(patient, note), Form(("__RequestVerificationToken", own), ("Mark", false), ("Reason", "During the outage.")), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);
         Assert.Equal([$"note true {clinician.Id} Patient asked for it."], await SensitivityAsync(apps, patient));
     }

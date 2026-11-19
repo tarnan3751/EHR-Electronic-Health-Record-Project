@@ -46,7 +46,8 @@ public class TC_UC14_16_Nfr12_SensitivityKeyboardFirst(WebApps apps) : IClassFix
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/sensitivity");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#sensitivity-reason')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('#sensitivity-reason')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         await page.Keyboard.TypeAsync("Patient asked for it.");
