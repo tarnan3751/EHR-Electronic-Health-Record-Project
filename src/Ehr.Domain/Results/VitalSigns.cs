@@ -24,6 +24,10 @@ public sealed class VitalSigns(EhrDbContext db)
         (VitalSign.Weight, "Weight", "kg", 0.2m, 700), (VitalSign.Height, "Height", "cm", 20, 280),
     ];
 
+    // A sign's short name, as the form labels it, where a list has no room for the coded one.
+    public static string Name(string code, string coded) =>
+        code == VitalSign.BodyMassIndex ? "Body mass index" : Fields.FirstOrDefault(field => field.Code == code).Label ?? coded;
+
     // What is wrong with what was typed, by code ("" for the whole form, "TakenAt" for the time): empty when it can be sent.
     public static Dictionary<string, string> Check(IReadOnlyDictionary<string, string?> typed, DateTimeOffset? takenAt, out List<(string Code, decimal Value)> values)
     {

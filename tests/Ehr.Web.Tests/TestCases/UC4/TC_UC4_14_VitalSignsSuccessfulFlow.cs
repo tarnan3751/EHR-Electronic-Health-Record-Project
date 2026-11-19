@@ -80,7 +80,7 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         // The desktop app's offline copy has the visit's too.
         chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Contains("blood pressure 126/80 mmHg, heart rate 68/min", Words(chart));
-        Assert.Matches("(?s)data-latest-vitals.*?Systolic blood pressure</th>\\s*<td class=\"sc-table__mono\">\\s*126 mmHg\\s*</td>.*?Body weight</th>\\s*<td class=\"sc-table__mono\">\\s*81 kg", chart);
+        Assert.Matches("(?s)data-latest-vitals.*?<strong>Systolic blood pressure</strong>\\s*126 mmHg\\s*<span class=\"sc-muted\">.*?<strong>Weight</strong>\\s*81 kg.*?<strong>Body mass index</strong>\\s*25 kg/m&#xB2;\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", chart);
         var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);
         Assert.Matches("\"systolicMmHg\":126,\"diastolicMmHg\":80,\"heartRatePerMinute\":68", await offline.Content.ReadAsStringAsync(Cancel));

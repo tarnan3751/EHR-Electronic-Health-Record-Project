@@ -265,32 +265,25 @@ else if (Model.Chart.SensitiveHidden > 0)
         }
         else
         {
-            <div class="sc-table-wrap">
-                <table class="sc-table" data-latest-vitals>
-                    <caption class="sc-visually-hidden">The latest value of each vital sign. Times are UTC.</caption>
-                    <thead><tr><th scope="col">Vital sign</th><th scope="col">Latest</th><th scope="col">Taken (UTC)</th></tr></thead>
-                    <tbody>
-                        @foreach (var vital in Model.Chart.LatestVitals)
+            @* A list, not a table: the panel is a third of the page. Short names, as on the entry form. *@
+            <ul class="sc-list" data-latest-vitals>
+                @foreach (var vital in Model.Chart.LatestVitals)
+                {
+                    <li>
+                        <strong>@Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display)</strong>
+                        @vital.Value.ToString("0.#") @Ehr.Domain.Results.Units.Shown(vital.Unit)
+                        @if (vital.Value > vital.ReferenceHigh)
                         {
-                            <tr>
-                                <th scope="row">@vital.Display</th>
-                                <td class="sc-table__mono">
-                                    @vital.Value.ToString("0.#") @Ehr.Domain.Results.Units.Shown(vital.Unit)
-                                    @if (vital.Value > vital.ReferenceHigh)
-                                    {
-                                        <span class="sc-tag sc-tag--warning">High</span>
-                                    }
-                                    else if (vital.Value < vital.ReferenceLow)
-                                    {
-                                        <span class="sc-tag sc-tag--warning">Low</span>
-                                    }
-                                </td>
-                                <td class="sc-table__mono">@vital.TakenAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                            </tr>
+                            <span class="sc-tag sc-tag--warning">High</span>
                         }
-                    </tbody>
-                </table>
-            </div>
+                        else if (vital.Value < vital.ReferenceLow)
+                        {
+                            <span class="sc-tag sc-tag--warning">Low</span>
+                        }
+                        <span class="sc-muted">· @vital.TakenAt.UtcDateTime.ToString("yyyy-MM-dd") UTC</span>
+                    </li>
+                }
+            </ul>
         }
         <p><a asp-page="Vitals/Index" asp-route-patientId="@Model.Patient.Id" data-vitals>Flowsheet, trends and recording</a></p>
     </section>
