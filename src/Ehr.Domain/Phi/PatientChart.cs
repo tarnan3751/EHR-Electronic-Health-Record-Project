@@ -31,6 +31,12 @@ public sealed record PatientChart(
     // The patient's appointments still to come, soonest first (FR-17): part of the same recorded read.
     public IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming { get; init; } = [];
 
+    // The blood pressure and heart rate taken at each visit shown, by the visit's ID (step 9).
+    public IReadOnlyDictionary<Guid, VisitVitals> VisitVitals { get; init; } = new Dictionary<Guid, VisitVitals>();
+
+    // The newest value of each vital sign among the patient's latest sets, in the flowsheet's order (step 9).
+    public IReadOnlyList<LatestVital> LatestVitals { get; init; } = [];
+
     // Whether the patient has any signed note, and any draft the reader may see: the page asks for those lists
     // only when there is something in them.
     public bool HasNotes { get; init; } = true;
@@ -40,6 +46,12 @@ public sealed record PatientChart(
     // Lab orders whose results are in (step 7): those still to acknowledge first, abnormal ones before the rest.
     public IReadOnlyList<Ehr.Domain.Results.ResultedOrder> Resulted { get; init; } = [];
 }
+
+// The vital signs a visit shows on the chart; null where one wasn't taken.
+public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal? HeartRate);
+
+// A vital sign's newest value, for the chart's short flowsheet.
+public sealed record LatestVital(string Code, string Display, decimal Value, string? Unit, decimal? ReferenceLow, decimal? ReferenceHigh, DateTimeOffset TakenAt);
 
 // A patient's message threads, latest first, already recorded as one read of the patient.
 public sealed record PatientThreads(Patient Patient, IReadOnlyList<Ehr.Domain.Messaging.ThreadEntry> Threads, IReadOnlyList<AllergyIntolerance> Allergies);

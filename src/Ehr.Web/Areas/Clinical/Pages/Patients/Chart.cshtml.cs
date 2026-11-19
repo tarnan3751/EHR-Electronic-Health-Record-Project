@@ -61,11 +61,11 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     public string? EnrollmentCode { get; private set; }
 
     // A visit's vital signs as the chart shows them, or null when they weren't taken.
-    public static string? BloodPressure(Encounter visit) =>
-        visit is { SystolicMmHg: { } systolic, DiastolicMmHg: { } diastolic } ? $"{systolic}/{diastolic} mmHg" : null;
+    public string? BloodPressure(Encounter visit) =>
+        Chart.VisitVitals.GetValueOrDefault(visit.Id) is { Systolic: { } systolic, Diastolic: { } diastolic } ? $"{systolic:0.#}/{diastolic:0.#} mmHg" : null;
 
-    public static string? HeartRate(Encounter visit) =>
-        visit.HeartRatePerMinute is { } rate ? $"{rate}/min" : null;
+    public string? HeartRate(Encounter visit) =>
+        Chart.VisitVitals.GetValueOrDefault(visit.Id)?.HeartRate is { } rate ? $"{rate:0.#}/min" : null;
 
     public async Task<IActionResult> OnGetAsync(Guid id) => await LoadAsync(id) ?? Page();
 

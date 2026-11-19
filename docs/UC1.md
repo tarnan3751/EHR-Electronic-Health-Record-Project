@@ -96,6 +96,8 @@ The Assignment 4 test cases are one file each, in `tests/Ehr.Web.Tests/TestCases
 | TC-UC1-19, alternative flow and exceptional condition (safety) | A moderate interaction is shown and kept without a reason; an uncoded allergy and a lab order raise nothing; off-site the warning shows from the cloud copy | `TC_UC1_19_SafetyInformationOnly.cs` |
 | TC-UC1-20, NFR-12 (safety) | In a real browser, a stopped order is answered and signed with the keyboard only | `TC_UC1_20_Nfr12_SafetyKeyboardFirst.cs` |
 
+| TC-UC1-21, successful flow (trends) | An order's results page charts each test that has earlier values, with the reference range and a table of the numbers (the plan's step 9) | `TC_UC1_21_ResultTrends.cs` |
+
 `tests/Ehr.Security.Tests/OrderSafetySecurityTests.cs` asks the database directly: an order for a drug the patient is allergic to needs a reason, kept with what the database found (not what the client claimed); same-class and cross-reactive classes; interactions from each source, with only serious ones needing a reason; and only a clinician is told anything.
 
 TC-UC1-05, TC-UC1-11 and TC-UC1-16 run only against a run of the render benchmark; `tests/Ehr.Web.Tests/TestCases/PerformanceResults.cs` says how. In the normal test run they are skipped.

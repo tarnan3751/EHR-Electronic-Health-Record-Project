@@ -891,6 +891,77 @@
         margin: 0;
     }
 
+    /* A trend chart (step 9): one test or vital sign over time, drawn by the server as SVG. The reference range is a
+       band behind the line; a value outside it is a diamond as well as another color. Its numbers are in the table
+       under it. */
+    .sc-trends {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+        gap: var(--space-5);
+        margin: 0;
+        padding: 0;
+    }
+
+    /* The vital signs form (step 9): its short fields side by side, as many as fit, one column on a narrow screen. */
+    .sc-vitals-fields {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+        gap: var(--space-4) var(--space-5);
+        align-items: start;
+    }
+
+    .sc-trend {
+        margin: 0;
+        padding: var(--space-4);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+    }
+
+    .sc-trend__title {
+        font-weight: 600;
+        margin-bottom: var(--space-2);
+    }
+
+    .sc-trend__chart {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-bottom: 1px solid var(--line-strong);
+    }
+
+    .sc-trend__range {
+        fill: var(--success-soft);
+    }
+
+    .sc-trend__line {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .sc-trend__point {
+        fill: var(--surface-raised);
+        stroke: var(--ink);
+        stroke-width: 1.5;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .sc-trend__point--outside {
+        fill: var(--warning);
+    }
+
+    .sc-trend__summary {
+        margin: var(--space-2) 0;
+        color: var(--ink-muted);
+    }
+
+    .sc-trend__values summary {
+        cursor: pointer;
+    }
+
     /* A list inside a notice, such as an order's safety warnings: a long address in a citation wraps inside it. */
     .sc-notice .sc-list li {
         overflow-wrap: anywhere;
