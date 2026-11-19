@@ -81,3 +81,44 @@ REVOKE ALL ON FUNCTION ehr.reject_clinical_note_change() FROM PUBLIC;
 CREATE OR REPLACE TRIGGER clinical_notes_immutable
     BEFORE UPDATE OR DELETE ON ehr.clinical_notes
     FOR EACH ROW EXECUTE FUNCTION ehr.reject_clinical_note_change();
+
+-- Addenda to signed notes (the expansion plan's step 10). The note stays locked; an addendum is a new signed text
+-- attached to it. Before one is inserted, as the caller (row-level security has already required a clinician with the
+-- patient on their panel, as themselves): the note must be this patient's and readable by the caller; who signed and
+-- when are the database's, never the client's; and an addendum to a sensitive note is sensitive whatever was sent, so
+-- it can't be used to put a sensitive note's matter where the chart shows it unasked.
+CREATE OR REPLACE FUNCTION ehr.sign_note_addendum() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+    note_sensitive boolean;
+BEGIN
+    SELECT n.sensitive INTO note_sensitive FROM ehr.clinical_notes n WHERE n.id = NEW.note_id AND n.patient_id = NEW.patient_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'The signed note is unavailable' USING ERRCODE = '23514';
+    END IF;
+
+    NEW.author_id := ehr.current_user_id();
+    NEW.signed_at := clock_timestamp();
+    NEW.sensitive := coalesce(NEW.sensitive, false) OR note_sensitive;
+    RETURN NEW;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.sign_note_addendum() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER note_addenda_sign
+    BEFORE INSERT ON ehr.note_addenda
+    FOR EACH ROW EXECUTE FUNCTION ehr.sign_note_addendum();
+
+CREATE OR REPLACE FUNCTION ehr.reject_note_addendum_change() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    RAISE EXCEPTION 'Signed addenda are immutable' USING ERRCODE = '23514';
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.reject_note_addendum_change() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER note_addenda_immutable
+    BEFORE UPDATE OR DELETE ON ehr.note_addenda
+    FOR EACH ROW EXECUTE FUNCTION ehr.reject_note_addendum_change();

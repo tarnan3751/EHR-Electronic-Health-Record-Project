@@ -97,6 +97,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
 
+    public DbSet<NoteAddendum> NoteAddenda => Set<NoteAddendum>();
+
     // UC 1: the orders clinicians sign, PHI like the chart (read them only through the PHI reader), and the catalog of
     // what can be ordered, which isn't.
     public DbSet<Order> Orders => Set<Order>();

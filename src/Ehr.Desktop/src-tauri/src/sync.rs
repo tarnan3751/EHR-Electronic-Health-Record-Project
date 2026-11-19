@@ -1229,6 +1229,7 @@ mod tests {
                     visits: vec![],
                     sensitive_not_kept: 0,
                     allergy_status: None,
+                    notes: vec![],
                 }],
             )
             .unwrap();

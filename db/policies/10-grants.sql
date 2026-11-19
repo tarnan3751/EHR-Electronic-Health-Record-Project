@@ -114,6 +114,11 @@ GRANT SELECT ON ehr.clinical_drafts TO ehr_read;
 GRANT SELECT, INSERT ON ehr.clinical_notes TO ehr_app;
 GRANT SELECT ON ehr.clinical_notes TO ehr_read;
 
+-- Addenda to signed notes (step 10). PHI, append-only like the notes: a clinician signs one (INSERT), and nothing
+-- updates or deletes one. Row-level security, the signing trigger and the write-audit trigger follow.
+GRANT SELECT, INSERT ON ehr.note_addenda TO ehr_app;
+GRANT SELECT ON ehr.note_addenda TO ehr_read;
+
 -- UC 1 (Tahseen Arnan). The catalog of what can be ordered: not PHI, grants only, seeded by its migration and read by
 -- both apps. Nothing at runtime changes it.
 GRANT SELECT ON ehr.order_catalog_items TO ehr_app, ehr_read;

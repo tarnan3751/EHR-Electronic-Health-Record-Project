@@ -34,6 +34,12 @@ public sealed record PatientChart(
     // The blood pressure and heart rate taken at each visit shown, by the visit's ID (step 9).
     public IReadOnlyDictionary<Guid, VisitVitals> VisitVitals { get; init; } = new Dictionary<Guid, VisitVitals>();
 
+    // Signed notes marked sensitive that the chart's list leaves out (step 10); zero when sensitive items are shown.
+    public int SensitiveNotesHidden { get; init; }
+
+    // For the desktop app's offline copy only: the latest signed notes that aren't sensitive, with their addenda.
+    public IReadOnlyList<OfflineNote> OfflineNotes { get; init; } = [];
+
     // The newest value of each vital sign among the patient's latest sets, in the flowsheet's order (step 9).
     public IReadOnlyList<LatestVital> LatestVitals { get; init; } = [];
 
@@ -49,6 +55,20 @@ public sealed record PatientChart(
 
 // The vital signs a visit shows on the chart; null where one wasn't taken.
 public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal? HeartRate);
+
+// An addendum to a signed note as a page shows it.
+public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt, bool Sensitive, Guid AuthorId, string AuthorName);
+
+// A note's addenda in the order they were signed: the ones shown, how many sensitive ones were left out, and whether
+// sensitive ones were shown.
+public sealed record NoteAddenda(IReadOnlyList<AddendumEntry> Shown, int SensitiveHidden, bool SensitiveShown);
+
+// A signed note for the offline copy: the note, who signed it, and its addenda.
+public sealed record OfflineNote(ClinicalNote Note, string SignerName, IReadOnlyList<AddendumEntry> Addenda)
+{
+    // Sensitive addenda the note has that are not in the copy.
+    public int SensitiveAddendaNotKept { get; init; }
+}
 
 // A vital sign's newest value, for the chart's short flowsheet.
 public sealed record LatestVital(string Code, string Display, decimal Value, string? Unit, decimal? ReferenceLow, decimal? ReferenceHigh, DateTimeOffset TakenAt);

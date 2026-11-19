@@ -1280,3 +1280,36 @@ VALUES ('20261119035421_VitalSignOnce', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.clinical_notes ADD sensitive boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE ehr.clinical_notes ADD CONSTRAINT ak_clinical_notes_id_patient_id UNIQUE (id, patient_id);
+
+CREATE TABLE ehr.note_addenda (
+    id uuid NOT NULL,
+    note_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    author_id uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    text text NOT NULL,
+    signed_at timestamp with time zone NOT NULL DEFAULT (now()),
+    sensitive boolean NOT NULL,
+    CONSTRAINT pk_note_addenda PRIMARY KEY (id),
+    CONSTRAINT ck_note_addenda_text CHECK (text ~ '[^[:space:]]' AND char_length(text) <= 16000),
+    CONSTRAINT fk_note_addenda_clinical_notes_note_id_patient_id FOREIGN KEY (note_id, patient_id) REFERENCES ehr.clinical_notes (id, patient_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_note_addenda_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_note_addenda_staff_users_author_id FOREIGN KEY (author_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_note_addenda_author_id ON ehr.note_addenda (author_id);
+
+CREATE INDEX ix_note_addenda_note_id_patient_id ON ehr.note_addenda (note_id, patient_id);
+
+CREATE INDEX ix_note_addenda_note_id_signed_at ON ehr.note_addenda (note_id, signed_at);
+
+CREATE INDEX ix_note_addenda_patient_id ON ehr.note_addenda (patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119053453_NoteAddenda', '10.0.13');
+
+COMMIT;
+

@@ -145,6 +145,21 @@ internal static partial class RenderBenchmark
                 }));
                 results.Add(await MeasureAsync(client, times, "Inbox, with results to acknowledge", typing: false, () => "/inbox"));
                 await AcknowledgeResultsAsync(app, clinicianId, resulted);
+                // Addenda to signed notes (step 10): eight more patients join the panel, each with a signed note and
+                // three addenda, one of them sensitive. They are not among the patients the chart rows pick from, so
+                // those rows measure what they did. The note's page with its addenda, and the page that signs one.
+                var noted = await SignNotesAsync(app, clinicianId, patients);
+                var noteRandom = new Random(20261121);
+                results.Add(await MeasureAsync(client, times, "Signed note with addenda, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                    return $"/patients/{patient}/notes/{note}";
+                }));
+                results.Add(await MeasureAsync(client, times, "Addendum form, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                    return $"/patients/{patient}/notes/{note}/addendum";
+                }));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -868,6 +883,63 @@ internal static partial class RenderBenchmark
 
         await transaction.CommitAsync();
         return resulted;
+    }
+
+    // Step 10: a signed note with three addenda (one sensitive) for each of eight patients added to the panel for it,
+    // through the database's own signing triggers and policies.
+    static async Task<List<(Guid Patient, Guid Note)>> SignNotesAsync(BenchApp app, Guid clinicianId, int patients)
+    {
+        var noted = new List<(Guid, Guid)>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var assignments = scope.ServiceProvider.GetRequiredService<PatientAssignments>();
+        var notes = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.ClinicalNotes>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var step = patients / Math.Min(PanelSize, patients);
+        foreach (var index in Enumerable.Range(0, 8).Select(i => ((i * step) + (step / 2)) % patients).Distinct())
+        {
+            var patient = SyntheticClinic.Chart(index).Patient.Id;
+            await assignments.AssignAsync(patient, CancellationToken.None);
+            var draft = new Ehr.Data.Patients.ClinicalDraft
+            {
+                Id = Guid.CreateVersion7(),
+                PatientId = patient,
+                ClinicianId = clinicianId,
+                Body = "Synthetic note",
+                Version = 1,
+                History = "Synthetic history: cough for two days.",
+                Assessment = "Synthetic assessment: viral illness.",
+                Plan = "Synthetic plan: rest and follow-up.",
+                StructuredVersion = 1,
+            };
+            db.Add(draft);
+            await db.SaveChangesAsync();
+            var note = new Ehr.Data.Patients.ClinicalNote
+            {
+                Id = Guid.CreateVersion7(),
+                DraftId = draft.Id,
+                PatientId = patient,
+                DraftVersion = 1,
+                History = draft.History,
+                Assessment = draft.Assessment,
+                Plan = draft.Plan,
+            };
+            db.Add(note);
+            await db.SaveChangesAsync();
+            foreach (var (text, sensitive) in new[] { ("Synthetic addendum: culture negative.", false), ("Synthetic addendum: seen in follow-up, improving.", false), ("Synthetic sensitive addendum.", true) })
+            {
+                if ((await notes.AddAddendumAsync(patient, note.Id, text, sensitive, CancellationToken.None)).Status != 200)
+                {
+                    throw new InvalidOperationException("The benchmark's addendum was refused.");
+                }
+            }
+
+            noted.Add((patient, note.Id));
+        }
+
+        await transaction.CommitAsync();
+        return noted;
     }
 
     static async Task AcknowledgeResultsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Order)> resulted)

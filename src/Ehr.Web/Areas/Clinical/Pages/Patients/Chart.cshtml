@@ -61,10 +61,13 @@
 {
     <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="Chart" asp-all-route-data="sensitiveRoute">Hide sensitive items</a></p>
 }
-else if (Model.Chart.SensitiveHidden > 0)
+else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0)
 {
     sensitiveRoute["sensitive"] = "true";
-    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @Model.Chart.SensitiveHidden @(Model.Chart.SensitiveHidden == 1 ? "diagnosis or medication is" : "diagnoses or medications are") not shown. <a asp-page="Chart" asp-all-route-data="sensitiveRoute">Show sensitive items</a></p>
+    @* Step 10: signed notes marked sensitive are counted beside the sensitive diagnoses and medications. *@
+    var hiddenLists = Model.Chart.SensitiveHidden == 0 ? "" : $"{Model.Chart.SensitiveHidden} {(Model.Chart.SensitiveHidden == 1 ? "diagnosis or medication is" : "diagnoses or medications are")} not shown. ";
+    var hiddenNotes = Model.Chart.SensitiveNotesHidden == 0 ? "" : $"{Model.Chart.SensitiveNotesHidden} signed {(Model.Chart.SensitiveNotesHidden == 1 ? "note is" : "notes are")} not shown. ";
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @hiddenLists@hiddenNotes<a asp-page="Chart" asp-all-route-data="sensitiveRoute">Show sensitive items</a></p>
 }
 <p><a asp-page="Lists/History" asp-all-route-data="historyRoute">History of allergies, medications and diagnoses</a></p>
 
@@ -109,13 +112,13 @@ else if (Model.Chart.SensitiveHidden > 0)
             <ul class="sc-list">
                 @foreach (var note in Model.Notes)
                 {
-                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</a></li>
+                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</a>@if (note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</li>
                 }
             </ul>
         }
         else
         {
-            <p class="sc-muted">No signed notes recorded.</p>
+            <p class="sc-muted">@(Model.Chart.SensitiveNotesHidden > 0 ? "No other signed notes." : "No signed notes recorded.")</p>
         }
     </section>
 

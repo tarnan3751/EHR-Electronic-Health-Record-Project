@@ -1671,6 +1671,10 @@ namespace Ehr.Migrations
                         .HasColumnType("text")
                         .HasColumnName("plan");
 
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
                     b.Property<DateTimeOffset>("SignedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1685,6 +1689,9 @@ namespace Ehr.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_clinical_notes");
+
+                    b.HasAlternateKey("Id", "PatientId")
+                        .HasName("ak_clinical_notes_id_patient_id");
 
                     b.HasIndex("DraftId")
                         .IsUnique()
@@ -1849,6 +1856,63 @@ namespace Ehr.Migrations
                     b.ToTable("medication_statements", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_medication_statements_status", "status IN ('active', 'completed', 'entered-in-error', 'intended', 'stopped', 'on-hold', 'unknown', 'not-taken')");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.NoteAddendum", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("note_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
+                    b.Property<DateTimeOffset>("SignedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signed_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_note_addenda");
+
+                    b.HasIndex("AuthorId")
+                        .HasDatabaseName("ix_note_addenda_author_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_note_addenda_patient_id");
+
+                    b.HasIndex("NoteId", "PatientId")
+                        .HasDatabaseName("ix_note_addenda_note_id_patient_id");
+
+                    b.HasIndex("NoteId", "SignedAt")
+                        .HasDatabaseName("ix_note_addenda_note_id_signed_at");
+
+                    b.ToTable("note_addenda", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_note_addenda_text", "text ~ '[^[:space:]]' AND char_length(text) <= 16000");
                         });
                 });
 
@@ -2990,6 +3054,31 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_medication_statements_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.NoteAddendum", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_note_addenda_staff_users_author_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_note_addenda_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Patients.ClinicalNote", null)
+                        .WithMany()
+                        .HasForeignKey("NoteId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_note_addenda_clinical_notes_note_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.Observation", b =>

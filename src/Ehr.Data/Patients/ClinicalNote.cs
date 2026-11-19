@@ -12,4 +12,9 @@ public sealed class ClinicalNote
     public required string Plan { get; set; }
     public Guid SignerId { get; set; }
     public DateTimeOffset SignedAt { get; set; }
+
+    // Marked sensitive by its signer (the expansion plan's step 10): left out of the chart until asked for, each such
+    // view recorded, its values never shown in the audit log, never kept offline, like any sensitive item. Set when
+    // the note is signed and, like the rest of it, never changed.
+    public bool Sensitive { get; set; }
 }

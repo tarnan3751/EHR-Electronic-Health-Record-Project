@@ -56,6 +56,28 @@ BEGIN
           AND NOT e.sensitive;
     END IF;
 
+    -- A note signed as sensitive (step 10) was written as a draft first, and perhaps dictated: the draft's events, and
+    -- those of its dictation reviews and their proposed fields, hold the same text, written before anyone could know
+    -- it would be sensitive. They are marked with the note, so the audit page stops showing their values too. Found
+    -- through the audit events themselves (a review's insert names its draft, a proposal's its review), by the index
+    -- on the patient: this function reads no patient table.
+    IF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'clinical_notes' AND is_sensitive THEN
+        UPDATE ehr.audit_events e SET sensitive = true
+        WHERE e.patient_id = (kept ->> 'patient_id')::uuid AND NOT e.sensitive
+          AND (e.table_name = 'clinical_drafts' AND e.row_id = (kept ->> 'draft_id')::uuid
+               OR e.table_name = 'ai_note_reviews' AND e.row_id IN (
+                    SELECT r.row_id FROM ehr.audit_events r
+                    WHERE r.patient_id = (kept ->> 'patient_id')::uuid AND r.table_name = 'ai_note_reviews' AND r.action = 'insert'
+                      AND r.details -> 'inserted' ->> 'draft_id' = kept ->> 'draft_id')
+               OR e.table_name = 'ai_field_proposals' AND e.row_id IN (
+                    SELECT p.row_id FROM ehr.audit_events p
+                    WHERE p.patient_id = (kept ->> 'patient_id')::uuid AND p.table_name = 'ai_field_proposals' AND p.action = 'insert'
+                      AND p.details -> 'inserted' ->> 'review_id' IN (
+                          SELECT r.row_id::text FROM ehr.audit_events r
+                          WHERE r.patient_id = (kept ->> 'patient_id')::uuid AND r.table_name = 'ai_note_reviews' AND r.action = 'insert'
+                            AND r.details -> 'inserted' ->> 'draft_id' = kept ->> 'draft_id')));
+    END IF;
+
     RETURN NULL;
 END
 $$;
@@ -154,6 +176,10 @@ CREATE OR REPLACE TRIGGER clinical_drafts_audit
 
 CREATE OR REPLACE TRIGGER clinical_notes_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.clinical_notes
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER note_addenda_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.note_addenda
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
 CREATE OR REPLACE TRIGGER ai_note_reviews_audit
