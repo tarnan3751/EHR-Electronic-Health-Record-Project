@@ -39,13 +39,12 @@ public class ViewModel(PhiReader phi, PatientAssignments assignments, BreakGlass
             return denied;
         }
 
-        if (await Phi.NoteAsync(noteId, patientId, HttpContext.RequestAborted) is not { } note)
+        if (await Phi.NoteWithAddendaAsync(noteId, patientId, Sensitive, HttpContext.RequestAborted) is not var (note, addenda))
         {
             return NotFound();
         }
 
-        Note = note;
-        Addenda = await Phi.AddendaAsync(note, Sensitive, HttpContext.RequestAborted);
+        (Note, Addenda) = (note, addenda);
         OnPanel = await assignments.IsOnPanelAsync(patientId, HttpContext.RequestAborted);
         CompletedReviews = (await Phi.AiReviewsAsync(note.DraftId, HttpContext.RequestAborted))
             .Where(r => r.State == AiReviewStates.Completed).ToList();

@@ -28,11 +28,12 @@ public class AddendumModel(PhiReader phi, PatientAssignments assignments, BreakG
     [BindProperty]
     public bool Sensitive { get; set; }
 
-    public Task<IActionResult> OnGetAsync(Guid patientId, Guid noteId) => LoadAsync(patientId, noteId);
+    public Task<IActionResult> OnGetAsync(Guid patientId, Guid noteId) => LoadAsync(patientId, noteId, shown: true);
 
     public async Task<IActionResult> OnPostAsync(Guid patientId, Guid noteId)
     {
-        if (await LoadAsync(patientId, noteId) is not Microsoft.AspNetCore.Mvc.RazorPages.PageResult)
+        // Signing shows nobody the note: no view of a sensitive note is recorded unless the page comes back.
+        if (await LoadAsync(patientId, noteId, shown: false) is not Microsoft.AspNetCore.Mvc.RazorPages.PageResult)
         {
             return RedirectToPage("View", new { patientId, noteId });
         }
@@ -44,12 +45,19 @@ public class AddendumModel(PhiReader phi, PatientAssignments assignments, BreakG
             return RedirectToPage("View", null, new { patientId, noteId, done = "addendum", sensitive = Sensitive && !Note.Sensitive ? true : (bool?)null }, "addenda");
         }
 
+        // The page comes back with the note under the form: that is a view of it.
+        if (await Phi.NoteAsync(noteId, patientId, HttpContext.RequestAborted) is not { } shownNote)
+        {
+            return NotFound();
+        }
+
+        Note = shownNote;
         Errors = result.Errors;
         Response.StatusCode = result.Status;
         return Page();
     }
 
-    async Task<IActionResult> LoadAsync(Guid patientId, Guid noteId)
+    async Task<IActionResult> LoadAsync(Guid patientId, Guid noteId, bool shown)
     {
         if (await LoadPatientAsync(patientId) is { } denied)
         {
@@ -61,7 +69,7 @@ public class AddendumModel(PhiReader phi, PatientAssignments assignments, BreakG
             return RedirectToPage("View", new { patientId, noteId });
         }
 
-        if (await Phi.NoteAsync(noteId, patientId, HttpContext.RequestAborted) is not { } note)
+        if (await Phi.NoteAsync(noteId, patientId, HttpContext.RequestAborted, shown) is not { } note)
         {
             return NotFound();
         }

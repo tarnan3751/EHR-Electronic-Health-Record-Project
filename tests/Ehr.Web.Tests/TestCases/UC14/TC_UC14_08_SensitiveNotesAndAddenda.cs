@@ -28,8 +28,10 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   "Sensitive note: your view of it is recorded." and each view is in the audit log as a view of sensitive items; its
 //   addendum is stored sensitive. Step 3: the ordinary note's page shows the ordinary addendum and says "1 addendum
 //   is not shown." Step 4: both are shown, the sensitive one tagged, and the view is recorded. Step 5: the copy has
-//   the ordinary note with only its ordinary addendum, nothing of the sensitive note or addendum, and
-//   "sensitiveNotKept": 1.
+//   the ordinary note with only its ordinary addendum and "sensitiveAddendaNotKept": 1, nothing of the sensitive note
+//   or addendum, and "sensitiveNotKept": 1; the draft sync sends the sensitive note's draft with no text, marked
+//   withheld; and an administrator's audit page for the patient has none of the sensitive note's or addenda's text,
+//   including the text saved while it was a draft.
 // Creator: Tahseen Arnan
 public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<WebApps>
 {
@@ -39,7 +41,12 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
     public async Task A_sensitive_note_and_a_sensitive_addendum_are_left_out_until_asked_for_and_never_kept_offline()
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
-        var sensitive = await SignedNoteAsync(session.Client, patient, sensitive: true);
+        const string secret = "Synthetic sensitive history: low mood for three weeks.";
+        var sensitive = await SignedNoteAsync(session.Client, patient, sensitive: true, history: secret);
+        // With only a sensitive note, the chart doesn't say there are none.
+        var only = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
+        Assert.Contains("No other signed notes.", only);
+        Assert.DoesNotContain("No signed notes recorded.", only);
         var ordinary = await SignedNoteAsync(session.Client, patient);
         Task<long> ViewsAsync() => apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient);
         var views = await ViewsAsync();
@@ -86,7 +93,32 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         Assert.Contains("Synthetic ordinary addendum.", copy);
         Assert.DoesNotContain("sensitive addendum", copy, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("the sensitive note", copy);
+        Assert.DoesNotContain("low mood", copy);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(copy, "\"signedAt\":\"[^\"]+\",\"signer\""));
         Assert.Contains("\"sensitiveNotKept\":1", copy);
+        // The ordinary note says it has a sensitive addendum that isn't in the copy.
+        Assert.Contains("\"sensitiveAddendaNotKept\":1", copy);
+
+        // The draft sync (UC 8) sends the ordinary note's draft as before, and the sensitive note's draft with no text,
+        // marked withheld, so a desktop that had its text removes it.
+        using var desktop = apps.OnPrem.CreateClient();
+        desktop.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        using var pulled = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(desktop, "/api/desktop/drafts/pull",
+            new { Since = "0", Patients = new[] { patient } }, System.Text.Json.JsonSerializerOptions.Web, Cancel);
+        var drafts = await pulled.Content.ReadAsStringAsync(Cancel);
+        Assert.Equal(System.Net.HttpStatusCode.OK, pulled.StatusCode);
+        Assert.Contains(History, drafts);
+        Assert.DoesNotContain("low mood", drafts);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(drafts, "\"body\":\"\",\"version\":\\d+,\"withheld\":true"));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(drafts, "\"withheld\":false"));
+
+        // An administrator's audit page: the ordinary note's text is there, as for any write; nothing of the sensitive
+        // note's is, though it was typed and saved as a draft before anyone marked it.
+        var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("The Reviewer of Notes", Ehr.Data.Accounts.StaffRoles.Admin));
+        var log = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}", Cancel);
+        Assert.Contains("cough for two days", log);
+        Assert.DoesNotContain("low mood", log);
+        Assert.DoesNotContain("Synthetic sensitive addendum", log);
+        Assert.DoesNotContain("the sensitive note", log);
     }
 }

@@ -118,7 +118,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
         else
         {
-            <p class="sc-muted">No signed notes recorded.</p>
+            <p class="sc-muted">@(Model.Chart.SensitiveNotesHidden > 0 ? "No other signed notes." : "No signed notes recorded.")</p>
         }
     </section>
 

@@ -137,6 +137,14 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (await phi.SignedDraftAsync(id, patient, cancel) is { } existing)
         {
+            if (existing.DraftVersion == version && existing.Sensitive != sensitive)
+            {
+                // A retry that ticks or clears "Sensitive" can't change a note that was already signed (step 10).
+                return new(409, [existing.Sensitive
+                    ? "This note was already signed, as sensitive. Open the signed note from the chart."
+                    : "This note was already signed, and not as sensitive. A signed note can't be changed: open it from the chart."]);
+            }
+
             return existing.DraftVersion == version
                 ? new(200, [], Note: existing)
                 : NoteResult.Conflict;

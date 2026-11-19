@@ -897,6 +897,7 @@ mod tests {
                         patient_id: patient.to_string(),
                         body: "Synthetic first draft".to_owned(),
                         version: 1,
+                        withheld: false,
                     },
                 },
             )

@@ -52,6 +52,9 @@ pub struct SignedNote {
     pub plan: String,
     #[serde(default)]
     pub addenda: Vec<Addendum>,
+    /// How many sensitive addenda the note has that the server left out.
+    #[serde(default)]
+    pub sensitive_addenda_not_kept: u32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -166,4 +169,30 @@ pub fn get(connection: &Connection, owner: Uuid, patient: Uuid) -> Result<Option
             },
         )
         .optional()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The expansion plan's step 10: a chart copy carries signed notes and their addenda, and a copy stored before
+    /// they were sent (no `notes` at all) still reads, as a chart with none.
+    #[test]
+    fn a_chart_copy_reads_with_signed_notes_and_without_them() {
+        let old = r#"{"id":"018f0000-0000-7000-8000-000000000001","name":"Synthetic Patient","mrn":"SYN1","birthDate":"1980-01-01",
+            "gender":"unknown","allergies":[],"medications":[],"conditions":[],"visits":[]}"#;
+        let chart: Chart = serde_json::from_str(old).unwrap();
+        assert!(chart.notes.is_empty());
+
+        let new = r#"{"id":"018f0000-0000-7000-8000-000000000001","name":"Synthetic Patient","mrn":"SYN1","birthDate":"1980-01-01",
+            "gender":"unknown","allergies":[],"medications":[],"conditions":[],"visits":[],"sensitiveNotKept":1,
+            "notes":[{"signedAt":"2026-11-19T06:00:17Z","signer":"Dr. Test","history":"H","assessment":"A","plan":"P",
+                "addenda":[{"signedAt":"2026-11-19T07:00:00Z","author":"Dr. Colleague","text":"Synthetic addendum"}],
+                "sensitiveAddendaNotKept":2}]}"#;
+        let chart: Chart = serde_json::from_str(new).unwrap();
+        let again: Chart = serde_json::from_str(&serde_json::to_string(&chart).unwrap()).unwrap();
+        assert_eq!(again.notes.len(), 1);
+        assert_eq!(again.notes[0].addenda[0].author, "Dr. Colleague");
+        assert_eq!(again.notes[0].sensitive_addenda_not_kept, 2);
+    }
 }

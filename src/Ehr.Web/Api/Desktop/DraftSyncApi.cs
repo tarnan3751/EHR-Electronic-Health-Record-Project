@@ -22,7 +22,9 @@ static class DraftSyncApi
 
     public sealed record PullRequest(string Since, Guid[] Patients);
     public sealed record PushRequest(Guid Key, Guid Id, Guid PatientId, long? BaseVersion, string? Body);
-    public sealed record Draft(Guid Id, Guid PatientId, string Body, long Version);
+    // Withheld (step 10): the draft was signed as a sensitive note, which is never kept offline. Its text is not sent
+    // (Body is empty), and a desktop that has an earlier copy of the text removes it.
+    public sealed record Draft(Guid Id, Guid PatientId, string Body, long Version, bool Withheld = false);
     public sealed record PushResult(string Outcome, Draft? Current = null, string? Problem = null);
 
     static Guid? Identify(UserContext user, HttpContext context)
@@ -54,8 +56,9 @@ static class DraftSyncApi
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         var until = await ChangeLog.WatermarkAsync(db, cancellationToken);
         var drafts = await phi.ChangedDraftsAsync(request.Patients, since > until ? 0 : since, until, cancellationToken);
+        var withheld = await phi.SensitiveSignedDraftsAsync([.. drafts.Select(d => d.Id)], cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return Results.Ok(new { Watermark = until.ToString(CultureInfo.InvariantCulture), Drafts = drafts.Select(Describe) });
+        return Results.Ok(new { Watermark = until.ToString(CultureInfo.InvariantCulture), Drafts = drafts.Select(d => Describe(d, withheld.Contains(d.Id))) });
     }
 
     static async Task<IResult> PushAsync(PushRequest request, EhrDbContext db, PhiReader phi, UserContext user,
@@ -85,8 +88,9 @@ static class DraftSyncApi
         if (await db.SyncOperations.AnyAsync(o => o.IdempotencyKey == receipt && o.RowId == request.Id, cancellationToken)
             && current is not null)
         {
+            var signedSensitive = await phi.SensitiveSignedDraftsAsync([current.Id], cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return Results.Ok(new PushResult("duplicate", Describe(current)));
+            return Results.Ok(new PushResult("duplicate", Describe(current, signedSensitive.Count > 0)));
         }
 
         // An already-applied operation keeps UC 8's duplicate outcome even after finalization. It performs no edit.
@@ -143,5 +147,6 @@ static class DraftSyncApi
         }
     }
 
-    static Draft Describe(ClinicalDraft draft) => new(draft.Id, draft.PatientId, draft.Body, draft.Version);
+    static Draft Describe(ClinicalDraft draft, bool withheld = false) =>
+        new(draft.Id, draft.PatientId, withheld ? "" : draft.Body, draft.Version, withheld);
 }

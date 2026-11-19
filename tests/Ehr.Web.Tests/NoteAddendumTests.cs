@@ -18,7 +18,7 @@ static class NoteAddendumTests
 
     // A note written and signed the way the pages do it: a draft from the chart, reviewed, then confirmed and signed,
     // marked sensitive or not as it is signed. Returns the signed note's ID.
-    public static async Task<Guid> SignedNoteAsync(HttpClient client, Guid patient, bool sensitive = false)
+    public static async Task<Guid> SignedNoteAsync(HttpClient client, Guid patient, bool sensitive = false, string history = History)
     {
         using var created = await PostFormAsync(client, $"/patients/{patient}?handler=NewNote", $"/patients/{patient}");
         var (path, token) = (PathOf(created), Token(await ReadAsync(created)));
@@ -26,7 +26,7 @@ static class NoteAddendumTests
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, target);
             request.Headers.Add("HX-Request", "true");
-            request.Content = Form([("__RequestVerificationToken", token), ("Version", version), ("History", History),
+            request.Content = Form([("__RequestVerificationToken", token), ("Version", version), ("History", history),
                 ("Assessment", "Synthetic assessment: viral illness."), ("Plan", "Synthetic plan: rest and follow-up."), .. extra]);
             using var response = await client.SendAsync(request, Cancel);
             Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);

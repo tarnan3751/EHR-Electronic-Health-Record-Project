@@ -27,6 +27,10 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 8 | Ordering safety checks | done | expansion/step-08-order-checks | expansion-step-08 | [44445242631](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44445242631) | Extends UC 1 (Tahseen). Touches `db/policies`; three interaction sources |
 | 9 | Vital signs and trends | done | expansion/step-09-vitals | expansion-step-09 | [44461482885](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44461482885) | Extends UC 4 (Diego) and UC 6 (Simar). Touches `db/policies`; off-site chart nearest the gate |
 | 10 | Addenda to signed notes | in progress | expansion/step-10-addenda | | | Extends UC 14 (Satwik). Touches `db/policies`; desktop offline copy gains signed notes |
+| 9b | Vital-sign corrections and age-based ranges | not started | | | | Added by Tahseen, 2026-11-19. Before the phase 2 tag |
+| 10b | Addenda and sensitivity follow-ups | not started | | | | Added by Tahseen, 2026-11-19. Before the phase 2 tag |
+| 10c | The off-site audit cost (UC 2) | not started | | | | Added by Tahseen, 2026-11-19. Before the phase 2 tag |
+| 10d | Clinic time zone | not started | | | | Added by Tahseen, 2026-11-19. First step of phase 3 |
 | 11 | Read-only FHIR API | not started | | | | |
 | 12 | Simulated lab | not started | | | | |
 | 13a | Visit summaries | not started | | | | |
@@ -332,7 +336,31 @@ At the end of phase 1, every FR in the course document is built. Write the phase
 - **Affects:** UC 14.
 - **In the repo:** `ehr.clinical_notes` is insert-only, with `ehr.reject_clinical_note_change()` in `db/policies/50-clinical-notes.sql`; the signed note page is `Patients/Notes/View.cshtml`. The desktop app syncs drafts, not signed notes: its offline chart would need the signed notes first.
 
+**Step 9b. Vital-sign corrections and age-based ranges** (added by Tahseen, 2026-11-19)
+- **Entered in error:** a vital sign can be marked "entered in error" with a required reason. It is never deleted, and the marking is audited (FHIR's `entered-in-error` status). The correct value is entered as a new reading.
+- **Where entries in error are skipped:** trends, the chart's latest values and the desktop app's offline copy. The vital signs page shows them struck through on request.
+- **Reference ranges by age band** (infant, young child, older child, adolescent, adult) for heart rate, respiratory rate and blood pressure, from a cited source recorded in `docs/expansion/reference-data.md`. Temperature and SpO2 keep one range. The seed's children must be flagged correctly.
+- **Trend charts stay on the vital signs page,** not the chart. On the chart, show a small up or down mark against the previous reading only if the existing query can supply it without another statement.
+- **Affects:** UC 4, UC 6.
+
+**Step 10b. Addenda and sensitivity follow-ups** (added by Tahseen, 2026-11-19)
+- **Who adds an addendum:** any clinician with the patient on their panel, as built. One written by someone other than the note's signer is labeled "Addendum by <name>, not the note's author", and the signer gets an inbox item for it.
+- **Marking sensitive after signing:** a signed note or addendum can be marked sensitive after signing, with a required reason, audited. Only the person who marked it, or the note's signer, can unmark it, also with a reason.
+- **A proxy's earlier view:** if a proxy viewed it before it was marked, the audit log already shows that. Add a test proving it does.
+- **Affects:** UC 14, UC 15.
+
+**Step 10c. The off-site audit cost (UC 2)** (added by Tahseen, 2026-11-19)
+- **First confirm the cause:** time `CloudAuditQueue.Enqueue` separately from the statements around it. Tahseen expects most of the per-statement cost seen in step 9 is its `Flush(flushToDisk: true)`, paid once per PHI read because `AuditRecorder.Record` enqueues each event as it happens.
+- **If that's it:** collect the request's audit events and enqueue them once, with one disk sync, before the response is sent. That keeps the rule that a read is never shown without its durable record, as on-site, where the events commit with the request's transaction. A failure must still fail the request without showing the data. Add tests, and report the off-site chart's p99 before and after.
+- **If that isn't the cause:** write up what was measured and leave it for Tahseen.
+- **Affects:** UC 2.
+
 ### Phase 3: connect to other systems
+
+**Step 10d. Clinic time zone** (added by Tahseen, 2026-11-19; the first step of phase 3)
+- One configured clinic time zone (`America/Chicago` for the local stack). Clinician pages and the desktop app show times in it, labeled.
+- The audit log stays in labeled UTC. Leave the portal's dates alone for now (TC-UC6-01 expects its current format; UC 6 is Simar's).
+- Update the dates rule in `docs/brand/README.md`.
 
 **Step 11. Read-only FHIR R4 API**
 - **Resources:** Patient, AllergyIntolerance, MedicationStatement, Condition, Observation (results and vitals) and Appointment, using the codes from step 2a.
@@ -681,6 +709,15 @@ One entry per decision: date, step, the decision, and why.
   - *Desktop:* the offline panel now carries each patient's ten latest signed notes that aren't sensitive, with their addenda, and the desktop chart shows them read-only. The contract gained an optional `notes` field; older desktop builds ignore it and older copies read as having none. The sync conflict resolver is untouched. Ten is my number.
   - *Limits:* an addendum is up to 16,000 characters, as each part of a note is.
 
+- **2026-11-19, Tahseen's answers to the six questions from steps 9 and 10, and one more fix.** His decisions, in his words where they are rules; each becomes work in a new step. Step 10's review fixes are finished and merged first, then steps 9b, 10b and 10c, all before the phase 2 tag; the time zone step opens phase 3.
+  - *Trend charts (question 1):* "Trend charts stay on the vital signs page, not the chart. On the chart, show a small up or down mark against the previous reading only if the existing query can supply it without another statement." Step 9b.
+  - *Correcting a vital sign (question 2):* "A vital sign can be marked 'entered in error' with a required reason, never deleted, audited (FHIR's entered-in-error status). The correct value is entered as a new reading. Trends, the chart's latest values and the desktop app's offline copy skip entries in error, and the vital signs page shows them struck through on request." Step 9b.
+  - *Ranges by age (question 3):* "Reference ranges by age band (infant, young child, older child, adolescent, adult) for heart rate, respiratory rate and blood pressure, from a cited source recorded in docs/expansion/reference-data.md. Temperature and SpO2 keep one range. The seed's children must be flagged correctly." Step 9b.
+  - *Local time (question 4):* "One configured clinic time zone (America/Chicago for the local stack). Clinician pages and the desktop app show times in it, labeled. The audit log stays in labeled UTC. Leave the portal's dates alone for now (TC-UC6-01 expects its current format; UC 6 is Simar's). Update the dates rule in docs/brand/README.md." Step 10d, at the start of phase 3.
+  - *Who adds addenda (question 5):* "Any clinician with the patient on their panel can still add an addendum. One written by someone other than the note's signer is labeled 'Addendum by <name>, not the note's author', and the signer gets an inbox item for it." Step 10b.
+  - *Marking sensitive afterwards (question 6):* "A signed note or addendum can be marked sensitive after signing, with a required reason, audited. Only the person who marked it, or the note's signer, can unmark it, also with a reason. If a proxy viewed it before it was marked, the audit log already shows that; add a test proving it does." Step 10b. This reverses step 10's "never afterwards", and is the first change a signed note accepts: only its sensitivity, never its text.
+  - *The off-site cost per statement (the one more fix):* Tahseen expects the cause is `CloudAuditQueue.Enqueue`'s `Flush(flushToDisk: true)`, paid once per PHI read, not PostgreSQL re-planning as I guessed in step 9. Confirm by timing it; if so, enqueue a request's events once with one disk sync before the response is sent, keeping "a read is never shown without its durable record"; a failure must still fail the request without showing the data. If not, write up what was measured and leave it for him. Step 10c.
+
 ## Log
 
 One entry per session or step: date, step, what was done, measurements (p99, page JavaScript size, first contentful paint), follow-ups, and where to resume.
@@ -770,10 +807,19 @@ One entry per session or step: date, step, what was done, measurements (p99, pag
   - *Heads-up:* Diego (UC 4: the chart has a Vital signs section, and a visit's vital signs are observations now), Simar (UC 6: the results page has trend charts and vital signs), Sara (UC 7 and 8: the offline panel's contract is unchanged, but its values come from observations).
   - *Open with Tahseen:* whether the trend charts belong on the chart page itself; correcting a wrongly entered vital sign; reference ranges by age; times are typed in UTC on clinician pages (as since step 7), which a clinician typing local time will get wrong.
   - *Resume at step 10,* addenda to signed notes, with sensitive notes.
-- **2026-11-19, step 10. Addenda to signed notes, with sensitive notes (extends UC 14; proposed FR-49).** Migration `NoteAddenda` (the `note_addenda` table; `clinical_notes.sensitive`). **Protected paths: `db/policies/50-clinical-notes.sql`** (the addendum's signing and immutability triggers), **`30-rls.sql`** (the `note_addenda` policies), **`10-grants.sql`** and **`40-audit.sql`** (its grants and write-audit trigger). No authorization attribute or policy in the app changed; the new page `/patients/{id}/notes/{note}/addendum` is under the clinical area's policy with the note pages' chart gate plus the panel rule. The sync conflict resolver and the dictation prompt and note schema are untouched.
-  - *Tests:* `NoteAddendumSecurityTests` (4); TC-UC14-07 to 12 in `TestCases/UC14/`; the table is in the protection, privilege, policy-plan and PHI-reader tests. UC 14's existing tests are unchanged and pass. Full run: 846 tests, none failing. Desktop: `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` pass.
+- **2026-11-19, step 10. Addenda to signed notes, with sensitive notes (extends UC 14; proposed FR-49).** Migration `NoteAddenda` (the `note_addenda` table; `clinical_notes.sensitive`). **Protected paths: `db/policies/50-clinical-notes.sql`** (the addendum's signing and immutability triggers), **`30-rls.sql`** (the `note_addenda` policies), **`10-grants.sql`** and **`40-audit.sql`** (its grants and write-audit trigger). After the review, also **`40-audit.sql`'s `ehr.record_write`** and **the draft sync** (`draft_sync.rs`, `DraftSyncApi.cs`). No authorization attribute or policy in the app changed; the new page `/patients/{id}/notes/{note}/addendum` is under the clinical area's policy with the note pages' chart gate plus the panel rule. The dictation prompt and note schema are untouched.
+  - *Tests:* `NoteAddendumSecurityTests` (4); TC-UC14-07 to 12 in `TestCases/UC14/`; two desktop tests (a withheld draft is emptied; a chart copy reads with and without notes); the table is in the protection, privilege, policy-plan and PHI-reader tests. UC 14's existing tests are unchanged and pass. Full run: 847 tests, none failing. Desktop: `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` pass.
   - *Measurements* (this Mac, 50,000 patients; p99 whole request / excluding the commit, ms): signed note with addenda 4.7 / 4.3; addendum form 5.4 / 5.0; chart 8.6 / 8.2; off-site chart 16.5 / 11.9. `--assert` passed. No script added.
   - *Screens looked at* in both themes at 1280 and 640: the confirmation page with "Sensitive", the note with addenda, sensitive addenda hidden and shown, a sensitive note, the addendum page and its error, the chart with a sensitive note hidden and shown. No sideways scrolling.
+  - *From the review* (failed: two leaks of a sensitive note's text, both reproduced), all fixed with tests:
+    - **An administrator could read a sensitive note's whole text on the audit page,** through the write events of its draft, saved before anyone marked it. `ehr.record_write` (`db/policies/40-audit.sql`) now marks the draft's events, and those of its dictation reviews and their proposed fields, when the note is signed as sensitive. My step 10 entry said the audit needed no change; that was wrong.
+    - **The signer's desktop kept a sensitive note's text,** because signing puts the draft back in the draft sync. The pull now sends such a draft with no text and `withheld: true`, and the desktop empties its copy in any state (`draft_sync.rs`, the sync conflict resolver's code, so a **protected path**: Sara's, UC 7 and 8). A desktop build from before this step empties a synced copy but keeps text typed on it and never sent: **the phase 2 pull request must say desktops need the new build.**
+    - Sensitive addenda vanished from the offline copy without a word: each note now says how many aren't kept.
+    - A retried signature with "Sensitive" ticked returned success for a note that wasn't sensitive: now a conflict that says so.
+    - A view of sensitive items was recorded by checks that show nobody anything (the draft pages' "is it signed?", the addendum post): now only where the note is shown.
+    - Smaller: the chart said "No signed notes recorded." beside "1 signed note is not shown."; the addendum page offered its form during an outage; the reader's addenda method could be called without a recorded read.
+    - *Rolling back `NoteAddenda`* drops every addendum and every sensitive mark; a note that was sensitive comes back unmarked. Roll back only a database where step 10 was not used.
+    - *Left open:* the offline panel's size has no cap on addenda per note (up to ten notes a patient, each with every non-sensitive addendum); a sensitive note opened by its address is shown at once, with the recorded-view notice, and is not gated behind a second click; the seed has no notes or addenda.
   - *Not looked at:* the desktop app's new "Signed notes" section on screen. Its code is small and uses the app's existing element helpers, and the Rust side is tested, but I did not run the desktop app.
   - *Heads-up:* Satwik (UC 14: the confirmation page has a "Sensitive" box, the signed note's page lists addenda and links to a new addendum page), Sara (UC 7 and 8: the offline panel carries signed notes and addenda in an optional `notes` field), Diego (UC 4: the chart's sensitive notice also counts signed notes).
   - *Open with Tahseen:* whether a colleague on the panel, and not only the signer, should add addenda (built: any panel clinician); whether a signed note should be markable sensitive afterwards (built: no).

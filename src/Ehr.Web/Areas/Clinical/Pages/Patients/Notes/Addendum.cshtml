@@ -1,6 +1,7 @@
 @page "/patients/{patientId:guid}/notes/{noteId:guid}/addendum"
 @using Ehr.Domain.Notes
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.AddendumModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = "Add an addendum";
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
@@ -14,6 +15,13 @@
 </div>
 <h1>Add an addendum</h1>
 <p class="sc-prose">The note, signed @Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC, can't be changed. An addendum is a new text shown after it, signed as you with the time. It can't be edited or removed.</p>
+@if (!OnPrem.IsReachable)
+{
+    @* UC 2: reached by Back or a tab opened before the outage. Nothing to sign with until the server is back. *@
+    <p class="sc-muted">An addendum can't be signed until the clinic's server is back.</p>
+}
+else
+{
 <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">
     @if (Model.Errors.Count > 0)
     {
@@ -40,6 +48,7 @@
         <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Cancel</a>
     </div>
 </form>
+}
 
 <h2>The signed note</h2>
 <partial name="_NoteContent" model="new NoteContent(Model.Note.History, Model.Note.Assessment, Model.Note.Plan)" />

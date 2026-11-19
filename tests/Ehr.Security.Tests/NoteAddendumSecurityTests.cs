@@ -160,6 +160,18 @@ public class NoteAddendumSecurityTests(MigratedDatabase database) : IClassFixtur
             """;
         var first = await Accounts.QueryAsync(App, admin, shown, ("patient", patient));
         Assert.Equal(["clinical_notes true hidden", "note_addenda true hidden"], first);
+
+        // The sensitive note was a draft first, and the draft's events hold the same text: marked with the note, so an
+        // administrator gets none of it. An ordinary note's draft events are shown as any write is.
+        const string drafts = """
+            SELECT e.sensitive || ' ' || coalesce((SELECT d.details::text FROM ehr.shown_audit_details(ARRAY[e.id]) d), 'hidden')
+            FROM ehr.audit_events e WHERE e.patient_id = @patient AND e.table_name = 'clinical_drafts' ORDER BY e.occurred_at
+            """;
+        var sensitiveDraft = await Accounts.QueryAsync(App, admin, drafts, ("patient", patient));
+        Assert.NotEmpty(sensitiveDraft);
+        Assert.All(sensitiveDraft, line => Assert.Equal("true hidden", line));
+        var ordinaryDraft = await Accounts.QueryAsync(App, admin, drafts, ("patient", other));
+        Assert.Contains(ordinaryDraft, line => line.StartsWith("false ", StringComparison.Ordinal) && line.Contains("Synthetic history", StringComparison.Ordinal));
         var second = await Accounts.QueryAsync(App, admin, shown, ("patient", other));
         Assert.Equal(3, second.Count);
         Assert.Contains("Synthetic history", second[0]);

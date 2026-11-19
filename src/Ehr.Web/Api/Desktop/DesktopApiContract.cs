@@ -25,7 +25,10 @@ public sealed record CachedChart(
     // The latest signed notes that aren't sensitive, newest first, each with its addenda in order (step 10).
     IReadOnlyList<CachedNote>? Notes = null);
 
-public sealed record CachedNote(DateTimeOffset SignedAt, string Signer, string History, string Assessment, string Plan, IReadOnlyList<CachedAddendum> Addenda);
+// SensitiveAddendaNotKept: how many sensitive addenda the note has that aren't in this copy.
+public sealed record CachedNote(
+    DateTimeOffset SignedAt, string Signer, string History, string Assessment, string Plan, IReadOnlyList<CachedAddendum> Addenda,
+    int SensitiveAddendaNotKept = 0);
 
 public sealed record CachedAddendum(DateTimeOffset SignedAt, string Author, string Text);
 

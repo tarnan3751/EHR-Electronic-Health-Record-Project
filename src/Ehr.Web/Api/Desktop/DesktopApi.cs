@@ -91,7 +91,7 @@ public static class DesktopApi
             chart.Allergies.Any(a => a.Code != AllergyIntolerance.NoKnownAllergy) ? "listed" : chart.Allergies.Count > 0 ? "none-known" : "not-recorded",
             // Signed notes and their addenda (step 10); sensitive ones were left out by the read, and are counted above.
             chart.OfflineNotes.Select(n => new CachedNote(n.Note.SignedAt, n.SignerName, n.Note.History, n.Note.Assessment, n.Note.Plan,
-                n.Addenda.Select(a => new CachedAddendum(a.SignedAt, a.AuthorName, a.Text)).ToList())).ToList())).ToList());
+                n.Addenda.Select(a => new CachedAddendum(a.SignedAt, a.AuthorName, a.Text)).ToList(), n.SensitiveAddendaNotKept)).ToList())).ToList());
     }
 
     // A vital sign as the desktop app's contract carries it: a whole number.

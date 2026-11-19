@@ -855,19 +855,27 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return notes;
     }
 
+    // Whether a draft is signed, and its note: the check the draft pages and the sync make before anything else. It
+    // shows nobody the note, so for a sensitive note it records the read of the row and not a view of sensitive items.
     public Task<ClinicalNote?> SignedDraftAsync(Guid draft, Guid patient, CancellationToken cancel) =>
-        ReadNoteAsync(db.ClinicalNotes.Where(n => n.DraftId == draft && n.PatientId == patient), cancel);
+        ReadNoteAsync(db.ClinicalNotes.Where(n => n.DraftId == draft && n.PatientId == patient), shown: false, cancel);
 
-    public Task<ClinicalNote?> NoteAsync(Guid id, Guid patient, CancellationToken cancel) =>
-        ReadNoteAsync(db.ClinicalNotes.Where(n => n.Id == id && n.PatientId == patient), cancel);
+    // A signed note for a page that shows it. `shown: false` is for a request that only acts on it (signing an
+    // addendum) and sends the reader on.
+    public Task<ClinicalNote?> NoteAsync(Guid id, Guid patient, CancellationToken cancel, bool shown = true) =>
+        ReadNoteAsync(db.ClinicalNotes.Where(n => n.Id == id && n.PatientId == patient), shown, cancel);
 
-    async Task<ClinicalNote?> ReadNoteAsync(IQueryable<ClinicalNote> query, CancellationToken cancel)
+    // Of these drafts, the ones signed as a sensitive note (step 10): the desktop sync withholds their text.
+    public async Task<HashSet<Guid>> SensitiveSignedDraftsAsync(IReadOnlyCollection<Guid> drafts, CancellationToken cancel) =>
+        drafts.Count == 0 ? [] : [.. await db.ClinicalNotes.AsNoTracking().Where(n => drafts.Contains(n.DraftId) && n.Sensitive).Select(n => n.DraftId).ToListAsync(cancel)];
+
+    async Task<ClinicalNote?> ReadNoteAsync(IQueryable<ClinicalNote> query, bool shown, CancellationToken cancel)
     {
         var note = await query.AsNoTracking().SingleOrDefaultAsync(cancel);
         if (note is not null)
         {
             audit.Record(AuditActions.Read, note.PatientId, "clinical_notes", note.Id);
-            if (note.Sensitive)
+            if (note.Sensitive && shown)
             {
                 // Opening a sensitive note is a view of the patient's sensitive items, recorded as the chart's is.
                 audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
@@ -879,11 +887,15 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return note;
     }
 
-    // The addenda to a signed note (step 10), in the order they were signed, each with its author's name. The note's
-    // own read covers them: call this for a note just read. Sensitive addenda to a note that isn't sensitive are left
-    // out unless asked for, and showing them is recorded as a view of the patient's sensitive items; a sensitive
-    // note's addenda are all sensitive, and its read has already recorded that.
-    public async Task<NoteAddenda> AddendaAsync(ClinicalNote note, bool sensitive, CancellationToken cancel)
+    // A signed note with its addenda (step 10), for the page that shows them: one recorded read of the note, which
+    // covers its addenda. Null when the note isn't this patient's or isn't the reader's to see.
+    public async Task<(ClinicalNote Note, NoteAddenda Addenda)?> NoteWithAddendaAsync(Guid id, Guid patient, bool sensitive, CancellationToken cancel) =>
+        await NoteAsync(id, patient, cancel) is { } note ? (note, await AddendaAsync(note, sensitive, cancel)) : null;
+
+    // The addenda to a note just read, in the order they were signed, each with its author's name. Sensitive addenda
+    // to a note that isn't sensitive are left out unless asked for, and showing them is recorded as a view of the
+    // patient's sensitive items; a sensitive note's addenda are all sensitive, and its read has already recorded that.
+    async Task<NoteAddenda> AddendaAsync(ClinicalNote note, bool sensitive, CancellationToken cancel)
     {
         var all = await db.NoteAddenda.AsNoTracking().Where(a => a.NoteId == note.Id && a.PatientId == note.PatientId)
             .OrderBy(a => a.SignedAt).ThenBy(a => a.Id)
@@ -926,7 +938,13 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .ToListAsync(cancel);
         audit.RecordReads("clinical_notes", notes.Select(n => (n.Note.PatientId, n.Note.Id)));
         await db.SaveChangesAsync(cancel);
-        return [.. notes.Select(n => new OfflineNote(n.Note, n.Signer ?? "", [.. addenda.Where(a => a.NoteId == n.Note.Id).Select(a => a.Entry)]))];
+        // How many sensitive addenda each note has that aren't in the copy, so the desktop can say so.
+        var withheld = await db.NoteAddenda.AsNoTracking().Where(a => ids.Contains(a.NoteId) && a.PatientId == patient && a.Sensitive)
+            .GroupBy(a => a.NoteId).Select(group => new { NoteId = group.Key, Count = group.Count() }).ToDictionaryAsync(g => g.NoteId, g => g.Count, cancel);
+        return [.. notes.Select(n => new OfflineNote(n.Note, n.Signer ?? "", [.. addenda.Where(a => a.NoteId == n.Note.Id).Select(a => a.Entry)])
+        {
+            SensitiveAddendaNotKept = withheld.GetValueOrDefault(n.Note.Id),
+        })];
     }
 
     public async Task<ClinicalDraft?> LockDraftAsync(Guid id, Guid patient, CancellationToken cancel) =>

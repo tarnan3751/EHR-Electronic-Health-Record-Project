@@ -60,4 +60,32 @@ public class TC_UC14_09_AddendumInvalidAndRefused(WebApps apps) : IClassFixture<
 
         Assert.Empty(await AddendaAsync(apps, patient));
     }
+
+    // A signature that reached the server and is sent again with "Sensitive" ticked can't change the signed note: the
+    // answer says so instead of sending the clinician to a note that isn't what they asked for.
+    [Fact]
+    public async Task A_retried_signature_cannot_change_whether_the_signed_note_is_sensitive()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps);
+        using var created = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NewNote", $"/patients/{patient}");
+        var (path, token) = (PathOf(created), Token(await ReadAsync(created)));
+        async Task<HttpResponseMessage> PostAsync(string target, long version, params (string Name, object Value)[] extra)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, target);
+            request.Headers.Add("HX-Request", "true");
+            request.Content = Form([("__RequestVerificationToken", token), ("Version", version), ("History", History),
+                ("Assessment", "Synthetic assessment."), ("Plan", "Synthetic plan."), .. extra]);
+            return await session.Client.SendAsync(request, Cancel);
+        }
+
+        using var review = await PostAsync(path + "?handler=Review", 1);
+        using var signed = await PostAsync(path + "/confirm", 2, ("Confirmed", true));
+        Assert.Equal(HttpStatusCode.OK, signed.StatusCode);
+        using var same = await PostAsync(path + "/confirm", 2, ("Confirmed", true));
+        Assert.Equal(HttpStatusCode.OK, same.StatusCode);
+        using var changed = await PostAsync(path + "/confirm", 2, ("Confirmed", true), ("Sensitive", true));
+        Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
+        Assert.Contains("already signed, and not as sensitive", await changed.Content.ReadAsStringAsync(Cancel));
+        Assert.Equal(["false"], await ProxyTests.QueryAsync(apps, "SELECT sensitive::text FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
+    }
 }

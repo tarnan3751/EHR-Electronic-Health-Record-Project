@@ -64,7 +64,11 @@ public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt
 public sealed record NoteAddenda(IReadOnlyList<AddendumEntry> Shown, int SensitiveHidden, bool SensitiveShown);
 
 // A signed note for the offline copy: the note, who signed it, and its addenda.
-public sealed record OfflineNote(ClinicalNote Note, string SignerName, IReadOnlyList<AddendumEntry> Addenda);
+public sealed record OfflineNote(ClinicalNote Note, string SignerName, IReadOnlyList<AddendumEntry> Addenda)
+{
+    // Sensitive addenda the note has that are not in the copy.
+    public int SensitiveAddendaNotKept { get; init; }
+}
 
 // A vital sign's newest value, for the chart's short flowsheet.
 public sealed record LatestVital(string Code, string Display, decimal Value, string? Unit, decimal? ReferenceLow, decimal? ReferenceHigh, DateTimeOffset TakenAt);

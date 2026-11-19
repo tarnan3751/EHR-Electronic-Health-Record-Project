@@ -400,6 +400,9 @@ function signedNotes(notes) {
       el('summary', { textContent: `Signed note · ${stamp(note.signedAt)} · ${note.signer}${note.addenda.length ? ` · ${note.addenda.length} ${note.addenda.length === 1 ? 'addendum' : 'addenda'}` : ''}` }),
       ...part('History', note.history), ...part('Assessment', note.assessment), ...part('Plan', note.plan),
       ...note.addenda.flatMap((addendum) => part(`Addendum · ${addendum.author} · ${stamp(addendum.signedAt)}`, addendum.text)),
+      ...(note.sensitiveAddendaNotKept
+        ? [el('p', { className: 'sc-muted', textContent: `Sensitive addenda not kept offline: ${note.sensitiveAddendaNotKept}. Open the note on the clinic's site to see them.` })]
+        : []),
     )) : [el('p', { className: 'sc-muted', textContent: 'None signed.' })]));
 }
 
@@ -455,7 +458,10 @@ function renderDraft(patient, draft) {
     pending: 'Saved on this device · Pending sync',
     conflict: 'A newer version is on the server. Choose which to keep.',
     invalid: draft.problem ?? 'This draft needs review.',
+    // Signed as a sensitive note: its text was removed from this device, and it can't be edited here.
+    withheld: 'Signed as a sensitive note · Not kept on this device',
   };
+  if (draft.state === 'withheld') return el('li', {}, el('p', { className: 'desktop-draft__state', textContent: labels.withheld }));
   const row = el('li', {}, el('p', { className: 'desktop-draft__state', textContent: labels[draft.state] }),
     el('pre', { className: 'desktop-draft__body', textContent: draft.body }));
   if (draft.state === 'synced' || draft.state === 'invalid') {

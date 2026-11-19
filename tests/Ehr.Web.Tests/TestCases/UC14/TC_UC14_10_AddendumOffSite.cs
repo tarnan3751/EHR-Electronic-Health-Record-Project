@@ -47,8 +47,20 @@ public class TC_UC14_10_AddendumOffSite(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Synthetic addendum signed off-site.", readOnly);
         Assert.Contains("An addendum can't be signed until the clinic's server is back.", readOnly);
         Assert.DoesNotContain("data-add-addendum", readOnly);
-        using var notSaved = await cutOff.PostAsync(AddendumPath(patient, note), Form(("__RequestVerificationToken", token), ("Text", "Synthetic addendum during the outage.")), Cancel);
+        // The addendum page itself, reached by Back or a tab left open: no form either.
+        var page = await cutOff.GetStringAsync(AddendumPath(patient, note), Cancel);
+        Assert.Contains("An addendum can't be signed until the clinic's server is back.", page);
+        Assert.DoesNotContain("data-sign-addendum", page);
+        // As the browser sends its own form (Sec-Fetch-Site), which is what lets the page show the text again.
+        using var request = new HttpRequestMessage(HttpMethod.Post, AddendumPath(patient, note))
+        {
+            Content = Form(("__RequestVerificationToken", token), ("Text", "Synthetic addendum during the outage.")),
+        };
+        request.Headers.Add("Sec-Fetch-Site", "same-origin");
+        using var notSaved = await cutOff.SendAsync(request, Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);
+        // What was typed is shown again to copy (UC 2).
+        Assert.Contains("Synthetic addendum during the outage.", await notSaved.Content.ReadAsStringAsync(Cancel));
 
         Assert.Single(await AddendaAsync(apps, patient));
     }
