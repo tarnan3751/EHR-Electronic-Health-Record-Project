@@ -129,7 +129,10 @@ else
     var queueDirectory = builder.Configuration["Ehr:CloudAudit:Directory"]
         ?? throw new InvalidOperationException("Set Ehr:CloudAudit:Directory to where the cloud app keeps its audit events.");
     builder.Services.AddSingleton(new CloudAuditQueue(queueDirectory));
-    builder.Services.AddSingleton<IAuditQueue>(services => services.GetRequiredService<CloudAuditQueue>());
+    builder.Services.AddSingleton<IDurableAuditQueue>(services => services.GetRequiredService<CloudAuditQueue>());
+    // A request's events are written to it together, with one flush, before the response begins (step 10c).
+    builder.Services.AddScoped<RequestAuditEvents>();
+    builder.Services.AddScoped<IAuditQueue>(services => services.GetRequiredService<RequestAuditEvents>());
     builder.Services.AddSingleton(CloudAuditKey.FromConfiguration(builder.Configuration));
     builder.Services.AddSingleton<CloudAuditShipper>();
     builder.Services.AddHostedService(services => services.GetRequiredService<CloudAuditShipper>());
@@ -179,6 +182,13 @@ if (site == Site.Cloud)
 
 // A page that fails says so, after forwarding, so forwarded responses pass by untouched (ErrorPages).
 app.UseErrorPages();
+if (site == Site.Cloud)
+{
+    // A request's audit events reach the disk before any of its response is sent; if they can't, the error pages
+    // above answer instead (CloudAuditFlushMiddleware).
+    app.UseMiddleware<CloudAuditFlushMiddleware>();
+}
+
 app.UseAuthentication();
 app.UseMiddleware<UserContextMiddleware>();
 app.UseAuthorization();

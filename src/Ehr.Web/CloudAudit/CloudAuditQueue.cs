@@ -14,7 +14,7 @@ namespace Ehr.Web.CloudAudit;
 // two only ships some events twice, which the on-prem app ignores (AuditEventImport). A line cut short by a crash was
 // never confirmed to anyone, so it is dropped at startup. The files are as encrypted as the disk they're on, like the
 // databases (see "Encryption" in infra/compose/README.md).
-public sealed class CloudAuditQueue : IAuditQueue, IDisposable
+public sealed class CloudAuditQueue : IAuditQueue, IDurableAuditQueue, IDisposable
 {
     const byte NewLine = (byte)'\n';
 
@@ -39,7 +39,8 @@ public sealed class CloudAuditQueue : IAuditQueue, IDisposable
 
     public void Enqueue(AuditEvent auditEvent) => Enqueue([auditEvent]);
 
-    // A request's events go to disk together: one write and one flush, however many patients a page listed. Only what
+    // What it is given goes to disk together: one write and one flush. A request's events are given together
+    // (RequestAuditEvents), however many the page recorded. Only what
     // the on-prem app will take (CloudAuditEvents): anything else fails the request now, with nothing written, rather
     // than jamming the queue later.
     public void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents)

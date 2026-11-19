@@ -15,7 +15,7 @@ The tests are in `tests/Ehr.Web.Tests` unless named otherwise. `CloudCutOff` is 
 | Step | What happens | Code | Tests |
 |---|---|---|---|
 | 1. Off-site, signed in, the clinician opens search, the panel or a chart | Served from the replica as `ehr_read`; reads aren't forwarded | `Program.cs` (cloud registrations), `Forwarding/CloudForwardingMiddleware.cs`, `Ehr.Domain/Phi/PhiReader.cs` | `PatientSearchTests.Off_site_during_an_outage_search_and_as_you_type_come_from_the_replica_and_their_reads_are_queued_then_shipped`, `TestCases/UC2/TC_UC2_01_SuccessfulFlow.cs` (TC-UC2-01), `OffSiteOutageTests.The_panel_is_read_from_the_replica_and_each_patient_listed_is_audited`, `CloudForwardingTests.With_the_on_prem_app_unreachable_reads_come_from_the_replica`, `CloudForwardingTests.During_an_outage_reads_after_a_save_come_from_the_replica` |
-| 2. Each read is audited | One event per patient read, appended to the cloud app's queue | `Ehr.Domain/Audit/AuditRecorder.cs`, `CloudAudit/CloudAuditQueue.cs`, `CloudAudit/CloudAuditEvents.cs` | `CloudAuditTests.With_the_primary_database_down_off_site_pages_say_read_only_and_reads_stay_queued`, `CloudAuditTests.An_off_site_search_queues_one_read_per_patient_listed_and_ships_them_from_the_cloud`, `CloudAuditQueueTests` |
+| 2. Each read is audited | One event per patient read, written to the cloud app's queue before the page is sent: a request's events together, with one flush to disk (the plan's step 10c) | `Ehr.Domain/Audit/AuditRecorder.cs`, `CloudAudit/RequestAuditEvents.cs`, `CloudAudit/CloudAuditQueue.cs`, `CloudAudit/CloudAuditEvents.cs` | `CloudAuditTests.With_the_primary_database_down_off_site_pages_say_read_only_and_reads_stay_queued`, `CloudAuditTests.An_off_site_search_queues_one_read_per_patient_listed_and_ships_them_from_the_cloud`, `CloudAuditQueueTests` |
 | 3. The site says it is read-only | The shipper's check every 2 s finds the on-site server can't save; every page shows the notice | `Forwarding/OnPremStatus.cs`, `CloudAudit/CloudAuditShipper.cs`, `Pages/Shared/_Layout.cshtml` | `TestCases/UC2/TC_UC2_04_ExceptionalCondition.cs` (TC-UC2-04), `CloudAuditTests.A_save_answered_with_a_server_error_leaves_the_read_only_notice_as_it_was` |
 | 4. A write is refused with an explanation, and what was typed is kept | 503 and the "Not saved" page, which shows the typed text again; htmx and the page scripts keep the form; read-only pages offer no change | `CloudForwardingMiddleware.cs`, `Forwarding/ShownIfNotSavedAttribute.cs`, `Ehr.Design/wwwroot/js/request-errors.js`, `note-editor.js`, `dictation.js`; the pages in the table below | `CloudForwardingTests.With_the_on_prem_app_unreachable_a_save_fails_clearly`, `TestCases/UC2/TC_UC2_03_InvalidInput.cs` (TC-UC2-03), `CloudForwardingTests.An_htmx_post_that_cannot_be_forwarded_still_gets_the_short_message`, `OffSiteOutageTests` (the first five tests), `PatientPanelTests.With_the_on_prem_app_unreachable_the_chart_offers_no_changes`, `BreakGlassTests.With_the_on_prem_app_unreachable_emergency_access_is_not_offered`, `DictationPageTests.Off_site_with_the_clinics_server_down_no_dictation_is_offered` |
 | 5. Signing out still works | The cloud app signs out itself and queues the event | `Forwarding/HandledOffSiteAttribute.cs`, `Areas/Clinical/Pages/Account/SignOut.cshtml.cs` | `StaffSignInTests.Off_site_signing_out_works_while_the_on_prem_app_cant_save`, `CloudForwardingTests.Signing_out_off_site_is_done_by_the_cloud_app_and_recorded_from_there` |
@@ -39,6 +39,7 @@ One file each, in `tests/Ehr.Web.Tests/TestCases/UC2/`, with the test case's fie
 | TC-UC2-04, exceptional condition | The on-site app answers but its database is down; the site stays read-only | `TC_UC2_04_ExceptionalCondition.cs` |
 | TC-UC2-05, NFR-03 | Off-site, every page: p99 under 20 ms of server time excluding the commit, at 50,000 patients with durability on | `TC_UC2_05_Nfr03_OffSiteNavigation.cs` |
 | TC-UC2-06, NFR-09 | One authoritative copy: the read role can write no table; a refused write changes nothing; after recovery the save lands once, on the primary. The restore drill below is supporting evidence | `TC_UC2_06_Nfr09_OneAuthoritativeCopy.cs` |
+| TC-UC2-07, exceptional condition (audit before the page) | Off-site, a page's audit events are written together, once, before it is sent; when they can't be written, the page is not sent | `TC_UC2_07_AuditBeforeThePage.cs` |
 
 TC-UC2-05 runs only against a run of the render benchmark; `tests/Ehr.Web.Tests/TestCases/PerformanceResults.cs` says how. In the normal test run it is skipped.
 
@@ -80,6 +81,23 @@ A run at 50,000 patients with `--assert`, durability on, nothing else running, o
 Off-site, the queue's write and flush took 4.0 to 4.4 ms at p50. The off-site chart and panel get the full-time warning (p99 21.2 and 20.8 ms, the flush included), which doesn't fail the run; their 20 ms target is for the cloud server. An earlier run, made while other builds, tests and benchmarks were running on the same machine, failed six off-site rows in their tails only.
 
 After UC 1 was merged in, one quiet run of two failed the first off-site row, the chart (p99 32.4 ms excluding the commit, with a median of 5.5 ms). The benchmark uses one PostgreSQL for both sites, and the off-site rows began the moment the on-site rows had written their 200,000 or so audit events, while PostgreSQL was still vacuuming, analyzing and checkpointing after them. A replica on its own server wouldn't be doing that for the on-site rows. The benchmark now lets the database finish that work before each set of rows (`SettleAsync`: `VACUUM (ANALYZE)`, `CHECKPOINT`, and a collected .NET heap), and never with `--stack`. The gate, its limit and the sampling are unchanged. Three runs in a row then passed, with the off-site chart at 8.9, 10.8 and 12.6 ms and no gated row above 13.0 ms.
+
+### What the audit queue costs, and what step 10c changed
+
+Measured for the expansion plan's step 10c (Tahseen's diagnosis, 19 November 2026), on the development Mac, 50,000 patients:
+
+- **The flush to disk is the largest single cost of an off-site page:** about 3.7 ms each time, where a database statement takes 0.3 to 0.5 ms. A scratch program doing the same append measured 4.0 ms with the flush and 0.003 ms without. On macOS a .NET flush to disk waits for the drive itself; a Linux server's will differ, so these are this machine's numbers.
+- **It also slows what follows it.** With the flush switched off for one run, the off-site chart's ten statements took 2.7 ms in all, the same as on-site; with it on, 3.8 to 4.9 ms. The benchmark's "excluding the commit" figure takes out the flush itself, not that after-effect, which is why off-site pages look slower per statement than on-site ones.
+- **Before step 10c each audit event was its own write and flush.** A page that recorded one event paid once; a chart with a signed note, or a note's page, recorded two and paid twice (7.2 ms).
+- **Now a request's events are held as they are recorded and written together, once, before any of the page is sent** (`CloudAudit/RequestAuditEvents.cs`). The page is kept in memory while the handler makes it, the events are written and flushed, and then the page goes out. If the write fails, the error page is sent and the page that was made is thrown away: a read is never shown without its durable record, the rule the on-site app keeps by committing the event in the request's transaction.
+
+| Off-site page | Events | Before: mean, p99 (whole request) | After |
+|---|---|---|---|
+| Chart with a signed note | 2 | 15.2 ms, 19.2 ms | 10.1 ms, 17.0 ms |
+| Signed note with addenda | 2 | 15.6 ms, 22.2 ms | 9.0 ms, 11.1 ms |
+| Chart (no notes) | 1 | 12.8 ms, 19.6 ms | 10.1 ms, 16.1 ms |
+
+A page that records one event pays the same one flush as before; the chart's difference between the two runs is run-to-run variation, not this change. Pages that record more gain a flush for each event beyond the first. What would bring every off-site page down is a cheaper durable write (the flush itself), which this step does not change.
 
 ## Restore drill
 
