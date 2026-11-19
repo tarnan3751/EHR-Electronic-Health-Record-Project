@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   1. As the first clinician, record each of the five in turn.
 //   2. As the second clinician, open the patient's vital signs, and post a set to it.
 // Expected result: Step 1: each is answered 422 with "Not saved:" and, in turn, "Enter both numbers of the blood
-//   pressure.", "Enter a number, like 36.8.", "Enter a value above 0 and no more than 45 °C.", "Enter at least one
+//   pressure.", "Enter a number, like 36.8.", "Enter a value from 20 to 45 °C.", "Enter at least one
 //   vital sign." and "The time can't be in the future."; what was typed is still in the form; nothing is saved. Step
 //   2: both are sent back to the chart, and nothing is saved.
 // Creator: Tahseen Arnan
@@ -39,7 +39,7 @@ public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture
         {
             ([(Systolic, "148")], now, "Enter both numbers of the blood pressure."),
             ([(HeartRate, "fast")], now, "Enter a number, like 36.8."),
-            ([(Temperature, "60")], now, "Enter a value above 0 and no more than 45 °C."),
+            ([(Temperature, "60")], now, "Enter a value from 20 to 45 °C."),
             ([], now, "Enter at least one vital sign."),
             ([(HeartRate, "72")], tomorrow, "The time can't be in the future."),
         })
@@ -67,5 +67,17 @@ public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture
         Assert.Equal($"/patients/{patient}", posted.Headers.Location?.OriginalString);
 
         Assert.Empty(await RecordedAsync(apps, patient));
+
+        // A weight and height the form takes whose body mass index no person has: the set is refused whole. And a set
+        // sent twice is recorded once, and the second answer says so.
+        using var absurd = await RecordAtAsync(session.Client, patient, now, (Weight, "700"), (Height, "20"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, absurd.StatusCode);
+        Assert.Contains("The vital signs couldn't be saved.", Words(await absurd.Content.ReadAsStringAsync(Cancel)));
+        Assert.Empty(await RecordedAsync(apps, patient));
+        using var once = await RecordAtAsync(session.Client, patient, now, (HeartRate, "72"));
+        using var twice = await RecordAtAsync(session.Client, patient, now, (HeartRate, "72"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, twice.StatusCode);
+        Assert.Contains("Vital signs are already recorded for that time.", Words(await twice.Content.ReadAsStringAsync(Cancel)));
+        Assert.Equal([$"{HeartRate} 72"], await RecordedAsync(apps, patient));
     }
 }

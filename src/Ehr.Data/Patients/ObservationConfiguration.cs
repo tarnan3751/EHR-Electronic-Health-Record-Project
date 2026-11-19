@@ -22,6 +22,10 @@ public sealed class ObservationConfiguration : IEntityTypeConfiguration<Observat
         observation.HasOne<Encounter>().WithMany().HasForeignKey(o => o.EncounterId).OnDelete(DeleteBehavior.Restrict);
         // A patient's values of one test or vital sign over time: a trend, and the latest of each.
         observation.HasIndex(o => new { o.PatientId, o.Category, o.Code, o.EffectiveAt });
+        // One value of a vital sign for a patient at a moment (and a visit): a form sent twice records once, since
+        // nothing can be taken back. A visit's absence counts as a value, so two with no visit collide too.
+        observation.HasIndex(o => new { o.PatientId, o.Code, o.EffectiveAt, o.EncounterId })
+            .IsUnique().AreNullsDistinct(false).HasFilter("category = 'vital-signs'").HasDatabaseName("ux_observations_vital_sign_once");
         observation.Property(o => o.Display).HasMaxLength(200);
         observation.Property(o => o.Status).HasMaxLength(20);
         observation.Property(o => o.Value).HasPrecision(12, 4);

@@ -14,7 +14,9 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Vitals;
 // the patient on their panel records (MessagePage's gate). The database names each sign, gives it its unit and
 // reference range, and works out the body mass index (db/policies/75-results.sql). Off-site it is read from the cloud
 // copy and the form's post is forwarded to the clinic's server.
-[ShownIfNotSaved(nameof(TakenAt))]
+[ShownIfNotSaved(
+    "Values[8480-6]", "Values[8462-4]", "Values[8867-4]", "Values[8310-5]", "Values[9279-1]", "Values[59408-5]", "Values[29463-7]", "Values[8302-2]",
+    nameof(TakenAt))]
 public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, VitalSigns vitals) : MessagePage(assignments, breakGlass)
 {
     // How many sets the flowsheet shows side by side.
@@ -63,12 +65,17 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         var errors = VitalSigns.Check(Values, taken, out var values);
         if (errors.Count == 0)
         {
-            if (await vitals.RecordAsync(patientId, values, taken!.Value, HttpContext.RequestAborted))
+            switch (await vitals.RecordAsync(patientId, values, taken!.Value, HttpContext.RequestAborted))
             {
-                return RedirectToPage(new { patientId, saved = true });
+                case Recorded.Saved:
+                    return RedirectToPage(new { patientId, saved = true });
+                case Recorded.AlreadyRecorded:
+                    errors[""] = "Vital signs are already recorded for that time. Check the flowsheet, or change the time.";
+                    break;
+                default:
+                    errors[""] = "The vital signs couldn't be saved. Reload the page and try again.";
+                    break;
             }
-
-            errors[""] = "The vital signs couldn't be saved. Reload the page and try again.";
         }
 
         Errors = errors;

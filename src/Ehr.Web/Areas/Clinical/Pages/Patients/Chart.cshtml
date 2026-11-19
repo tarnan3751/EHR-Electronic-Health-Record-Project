@@ -256,10 +256,42 @@ else if (Model.Chart.SensitiveHidden > 0)
         }
     </section>
 
-    @* Vital signs (step 9): the flowsheet and trends are on their own page, read when it is opened, so the chart
-       makes no more queries for them. The latest visit's blood pressure and heart rate are with the visits below. *@
+    @* Vital signs (step 9): the newest value of each sign, from the chart's one query of the patient's vital signs. Every set, the trends and recording are on the vital signs page. *@
     <section class="sc-panel" aria-labelledby="chart-vitals">
         <h2 class="sc-panel__title" id="chart-vitals">Vital signs</h2>
+        @if (Model.Chart.LatestVitals.Count == 0)
+        {
+            <p class="sc-muted">No vital signs recorded.</p>
+        }
+        else
+        {
+            <div class="sc-table-wrap">
+                <table class="sc-table" data-latest-vitals>
+                    <caption class="sc-visually-hidden">The latest value of each vital sign. Times are UTC.</caption>
+                    <thead><tr><th scope="col">Vital sign</th><th scope="col">Latest</th><th scope="col">Taken (UTC)</th></tr></thead>
+                    <tbody>
+                        @foreach (var vital in Model.Chart.LatestVitals)
+                        {
+                            <tr>
+                                <th scope="row">@vital.Display</th>
+                                <td class="sc-table__mono">
+                                    @vital.Value.ToString("0.#") @Ehr.Domain.Results.Units.Shown(vital.Unit)
+                                    @if (vital.Value > vital.ReferenceHigh)
+                                    {
+                                        <span class="sc-tag sc-tag--warning">High</span>
+                                    }
+                                    else if (vital.Value < vital.ReferenceLow)
+                                    {
+                                        <span class="sc-tag sc-tag--warning">Low</span>
+                                    }
+                                </td>
+                                <td class="sc-table__mono">@vital.TakenAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
         <p><a asp-page="Vitals/Index" asp-route-patientId="@Model.Patient.Id" data-vitals>Flowsheet, trends and recording</a></p>
     </section>
 

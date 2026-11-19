@@ -82,10 +82,11 @@ GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
 GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
     ehr.drug_class_cross_reactions, ehr.drug_interactions TO ehr_app, ehr_read;
 
--- Test results (observations). PHI, like the chart: row-level security and the write-audit trigger follow. A clinician
--- files the results of a lab order: INSERT, which a trigger holds to a final result of one of the order's tests, with
--- the name, unit and reference range the database knows (75-results.sql). No UPDATE or DELETE: a filed result isn't
--- changed. The portal reads them on either server.
+-- Test results and vital signs (observations). PHI, like the chart: row-level security and the write-audit trigger
+-- follow. A clinician files the results of a lab order, or records vital signs: INSERT, which a trigger holds to a
+-- final result of one of the order's tests, or to a vital sign with no order, each with the name, unit and reference
+-- range the database knows (75-results.sql). No UPDATE or DELETE: neither is changed once filed. The portal reads them
+-- on either server.
 GRANT SELECT, INSERT ON ehr.observations TO ehr_app;
 GRANT SELECT ON ehr.observations TO ehr_read;
 

@@ -12,6 +12,8 @@ namespace Ehr.Web.Areas.Portal.Pages;
 // result ID is taken either: the whole list is one page, so there is nothing to change in a URL to reach someone else's,
 // and row-level security returns no one else's anyway. The read goes through the PHI reader, which records it. It works
 // off-site too, read from the cloud app's replica, and says read-only there while the clinic's server is down (UC2).
+// Under the list (the expansion plan's step 9): a trend for each test, and each vital sign, with more than one value,
+// from the same read.
 public class ResultsModel(PortalSubject subject, PhiReader phi) : PageModel
 {
     public IReadOnlyList<Observation> Results { get; private set; } = [];

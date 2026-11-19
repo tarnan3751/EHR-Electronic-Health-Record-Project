@@ -141,6 +141,45 @@ public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<M
     }
 
     [Fact]
+    public async Task A_vital_sign_is_tied_to_the_visit_it_was_taken_at_and_never_to_one_that_was_not_held()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var visit = await VisitAsync(patient);
+        var cancelled = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (@id, @patient, 'cancelled', 'AMB', now() - interval '20 minutes')",
+            ("id", cancelled), ("patient", patient));
+
+        // Naming no visit: the one held in the hours before. A day earlier: none. A cancelled visit can't be named.
+        await RecordAsync(clinician, patient);
+        await RecordAsync(clinician, patient, at: Taken.AddDays(-1));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, code: "8867-4", value: 70m, visit: cancelled));
+
+        Assert.Equal([$"none", $"{visit}"], await AsSuperuserAsync(
+            "SELECT coalesce(encounter_id::text, 'none') FROM ehr.observations WHERE patient_id = @patient ORDER BY effective_at", ("patient", patient)));
+    }
+
+    [Fact]
+    public async Task A_value_no_person_has_a_time_before_any_lifetime_and_the_same_sign_twice_are_refused()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, code: "59408-5", value: 999m));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, code: "8310-5", value: 60m));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, at: new DateTime(1850, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+        // The heaviest and shortest the bounds allow: the body mass index is refused, not stored or overflowed.
+        await RecordAsync(clinician, patient, Weight, 700m);
+        await RecordAsync(clinician, patient, Height, 20m);
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, BodyMassIndex, 19m));
+
+        // A form sent twice records once.
+        await RecordAsync(clinician, patient);
+        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => RecordAsync(clinician, patient, value: 150m));
+        Assert.Equal(["29463-7 700", "8302-2 20", "8480-6 142"], await AsSuperuserAsync(
+            "SELECT code || ' ' || trim_scale(value) FROM ehr.observations WHERE patient_id = @patient ORDER BY code", ("patient", patient)));
+    }
+
+    [Fact]
     public async Task A_result_of_an_order_cannot_pass_as_a_vital_sign_or_claim_a_visit()
     {
         var (clinician, patient) = await OnPanelAsync();

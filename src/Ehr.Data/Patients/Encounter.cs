@@ -1,7 +1,7 @@
 namespace Ehr.Data.Patients;
 
-// A visit, shaped on FHIR's Encounter, with the vital signs taken at it. FHIR records vital signs as Observations of
-// their own; here the blood pressure and heart rate the chart shows are columns of the visit, until more are needed.
+// A visit, shaped on FHIR's Encounter. The vital signs taken at it are observations that name it
+// (Observation.EncounterId), as FHIR has them; until the expansion plan's step 9 they were columns here.
 // PHI: row-level security is enabled and forced on it and every write is recorded by trigger (db/policies); reads go
 // through the PHI reader in Ehr.Domain, which records them. Checking a patient in for an appointment creates one
 // (Ehr.Domain.Scheduling); nothing updates or deletes one. Synthetic data only.
@@ -24,8 +24,6 @@ public class Encounter
     public DateTimeOffset PeriodStart { get; set; }
 
     public DateTimeOffset? PeriodEnd { get; set; }
-
-    // Blood pressure in mmHg and heart rate in beats a minute, when taken.
 }
 
 // FHIR R4's Encounter status codes, the values Encounter.Status may hold.

@@ -13,14 +13,15 @@ namespace Ehr.Domain.Results;
 // may (db/policies/30-rls.sql and 75-results.sql). It reads nothing: the flowsheet comes from the PHI reader.
 public sealed class VitalSigns(EhrDbContext db)
 {
-    // What the form asks for, in its order, with the label and unit shown beside each field and the most the field
-    // takes. The body mass index is not asked for.
-    public static readonly IReadOnlyList<(string Code, string Label, string Unit, decimal Most)> Fields =
+    // What the form asks for, in its order, with the label and unit shown beside each field and the least and most
+    // the field takes: the widest a person can have, the same bounds the database holds (75-results.sql). The body
+    // mass index is not asked for.
+    public static readonly IReadOnlyList<(string Code, string Label, string Unit, decimal Least, decimal Most)> Fields =
     [
-        (VitalSign.Systolic, "Systolic blood pressure", "mmHg", 350), (VitalSign.Diastolic, "Diastolic blood pressure", "mmHg", 250),
-        (VitalSign.HeartRate, "Heart rate", "per minute", 350), (VitalSign.Temperature, "Temperature", "°C", 45),
-        (VitalSign.RespiratoryRate, "Respiratory rate", "per minute", 100), (VitalSign.OxygenSaturation, "Oxygen saturation", "%", 100),
-        (VitalSign.Weight, "Weight", "kg", 700), (VitalSign.Height, "Height", "cm", 280),
+        (VitalSign.Systolic, "Systolic blood pressure", "mmHg", 1, 350), (VitalSign.Diastolic, "Diastolic blood pressure", "mmHg", 1, 250),
+        (VitalSign.HeartRate, "Heart rate", "per minute", 1, 350), (VitalSign.Temperature, "Temperature", "°C", 20, 45),
+        (VitalSign.RespiratoryRate, "Respiratory rate", "per minute", 1, 100), (VitalSign.OxygenSaturation, "Oxygen saturation", "%", 1, 100),
+        (VitalSign.Weight, "Weight", "kg", 0.2m, 700), (VitalSign.Height, "Height", "cm", 20, 280),
     ];
 
     // What is wrong with what was typed, by code ("" for the whole form, "TakenAt" for the time): empty when it can be sent.
@@ -28,7 +29,7 @@ public sealed class VitalSigns(EhrDbContext db)
     {
         var errors = new Dictionary<string, string>();
         values = [];
-        foreach (var (code, label, unit, most) in Fields)
+        foreach (var (code, _, unit, least, most) in Fields)
         {
             if (!typed.TryGetValue(code, out var text) || string.IsNullOrWhiteSpace(text))
             {
@@ -39,9 +40,9 @@ public sealed class VitalSigns(EhrDbContext db)
             {
                 errors[code] = "Enter a number, like 36.8.";
             }
-            else if (value <= 0 || value > most)
+            else if (value < least || value > most)
             {
-                errors[code] = $"Enter a value above 0 and no more than {most:0.#} {unit}.";
+                errors[code] = $"Enter a value from {least:0.#} to {most:0.#} {unit}.";
             }
             else
             {
@@ -72,8 +73,10 @@ public sealed class VitalSigns(EhrDbContext db)
         return errors;
     }
 
-    // Records the set, all or none. False when the database refused: the patient isn't on the signed-in clinician's panel.
-    public async Task<bool> RecordAsync(Guid patient, IReadOnlyList<(string Code, decimal Value)> values, DateTimeOffset takenAt, CancellationToken cancellationToken)
+    // Records the set, all or none. Refused when the database said no: the patient isn't on the signed-in clinician's
+    // panel, or a value is one it doesn't take. AlreadyRecorded when the same sign is already there for the same
+    // moment: a form sent twice records once.
+    public async Task<Recorded> RecordAsync(Guid patient, IReadOnlyList<(string Code, decimal Value)> values, DateTimeOffset takenAt, CancellationToken cancellationToken)
     {
         // To the second: the signs of one set share their time, which is how the flowsheet puts them in one column.
         var at = new DateTimeOffset(takenAt.UtcDateTime.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, TimeSpan.Zero);
@@ -104,12 +107,16 @@ public sealed class VitalSigns(EhrDbContext db)
             }
 
             await transaction.ReleaseSavepointAsync(savepoint, cancellationToken);
-            return true;
+            return Recorded.Saved;
         }
-        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation })
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation or PostgresErrorCodes.UniqueViolation
+                or PostgresErrorCodes.NumericValueOutOfRange,
+        } refusal)
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-            return false;
+            return refusal.SqlState == PostgresErrorCodes.UniqueViolation ? Recorded.AlreadyRecorded : Recorded.Refused;
         }
         finally
         {
@@ -119,6 +126,13 @@ public sealed class VitalSigns(EhrDbContext db)
             }
         }
     }
+}
+
+public enum Recorded
+{
+    Saved,
+    Refused,
+    AlreadyRecorded,
 }
 
 // One value of a test or a vital sign at a time.

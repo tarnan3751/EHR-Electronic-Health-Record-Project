@@ -1949,6 +1949,13 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "Category", "Code", "EffectiveAt")
                         .HasDatabaseName("ix_observations_patient_id_category_code_effective_at");
 
+                    b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_observations_vital_sign_once")
+                        .HasFilter("category = 'vital-signs'");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId"), false);
+
                     b.ToTable("observations", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_observations_category", "category IN ('laboratory', 'vital-signs')");

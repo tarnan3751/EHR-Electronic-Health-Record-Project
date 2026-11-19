@@ -18,6 +18,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Inputs and system conditions: GET /patients/{id}; GET and POST /patients/{id}/vitals.
 // Test data: First set, a day ago: 148/92 mmHg, heart rate 72, weight 81 kg, height 180 cm. Second set, ten minutes
 //   ago: 126/80 mmHg, heart rate 68.
+//   The patient has a visit that began half an hour ago.
 // Steps:
 //   1. On the chart, follow "Flowsheet, trends and recording".
 //   2. Type the first set and choose "Record vital signs".
@@ -27,7 +28,9 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   index 25 "High", each with the clinic's own name and unit; no trend yet; the write is in the audit log under the
 //   clinician. Step 3: the flowsheet has two columns, newest first; "Trends" has a chart for systolic, diastolic and
 //   heart rate and none for weight, each an SVG with a sentence saying what it shows ("down from 148") and a table of
-//   its values; the systolic chart marks one value outside the range.
+//   its values; the systolic chart marks one value outside the range. The chart then says of the latest visit "blood
+//   pressure 126/80 mmHg, heart rate 68/min" and lists the newest value of each sign; the desktop app's offline copy
+//   has the same three for the visit.
 // Creator: Tahseen Arnan
 public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -37,7 +40,11 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
     public async Task Vital_signs_are_recorded_from_the_chart_shown_on_the_flowsheet_and_charted_over_time()
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
+        // Today's visit began half an hour ago, with nothing taken yet.
+        await apps.InsertVisitAsync(patient, DateTimeOffset.UtcNow.AddMinutes(-30), reason: "Synthetic follow-up");
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
+        Assert.Contains("blood pressure not taken, heart rate not taken", Words(chart));
+        Assert.DoesNotContain("data-latest-vitals", chart);
         Assert.Matches($"<a [^>]*href=\"{Path(patient)}\"[^>]*>Flowsheet, trends and recording</a>", chart);
         var empty = await session.Client.GetStringAsync(Path(patient), Cancel);
         Assert.Contains("No vital signs recorded.", empty);
@@ -68,5 +75,14 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         Assert.Matches("(?s)<summary>The values as a table</summary>.*?<td class=\"sc-table__mono\">126</td>.*?<td class=\"sc-table__mono\">148, outside the range</td>", systolic);
         Assert.DoesNotContain("style=", systolic);
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient) >= 3);
+
+        // The chart: the set taken during today's visit is the visit's, and the newest value of each sign is listed.
+        // The desktop app's offline copy has the visit's too.
+        chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
+        Assert.Contains("blood pressure 126/80 mmHg, heart rate 68/min", Words(chart));
+        Assert.Matches("(?s)data-latest-vitals.*?Systolic blood pressure</th>\\s*<td class=\"sc-table__mono\">\\s*126 mmHg\\s*</td>.*?Body weight</th>\\s*<td class=\"sc-table__mono\">\\s*81 kg", chart);
+        var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
+        using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);
+        Assert.Matches("\"systolicMmHg\":126,\"diastolicMmHg\":80,\"heartRatePerMinute\":68", await offline.Content.ReadAsStringAsync(Cancel));
     }
 }

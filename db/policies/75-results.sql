@@ -17,6 +17,8 @@ AS $$
 DECLARE
     ordered ehr.orders%ROWTYPE;
     test ehr.observation_codes%ROWTYPE;
+    lowest numeric;
+    highest numeric;
 BEGIN
     -- As for signing an order (60-orders.sql): under a snapshot taken earlier, the checks below could miss an
     -- acknowledgment that has since been committed.
@@ -38,13 +40,28 @@ BEGIN
             RAISE EXCEPTION 'That is not a vital sign this system records' USING ERRCODE = '23514';
         END IF;
 
-        IF NEW.effective_at IS NULL OR NEW.effective_at > now() + interval '5 minutes' THEN
-            RAISE EXCEPTION 'A vital sign is not taken in the future' USING ERRCODE = '23514';
+        IF NEW.effective_at IS NULL OR NEW.effective_at > now() + interval '5 minutes'
+           OR NEW.effective_at < now() - interval '130 years' THEN
+            RAISE EXCEPTION 'A vital sign is taken in a lifetime, and not in the future' USING ERRCODE = '23514';
         END IF;
 
-        IF NEW.encounter_id IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM ehr.encounters e WHERE e.id = NEW.encounter_id AND e.patient_id = NEW.patient_id) THEN
-            RAISE EXCEPTION 'A vital sign is taken at a visit of the same patient' USING ERRCODE = '23514';
+        -- The visit it was taken at. Named: a visit of the same patient that was held. Not named: the patient's visit
+        -- that was held and began in the twelve hours before it was taken (or within fifteen minutes after), the
+        -- latest of them, if there is one; the chart and the offline copy show a visit's vital signs with the visit.
+        IF NEW.encounter_id IS NOT NULL THEN
+            IF NOT EXISTS (SELECT 1 FROM ehr.encounters e
+                           WHERE e.id = NEW.encounter_id AND e.patient_id = NEW.patient_id
+                             AND e.status NOT IN ('planned', 'cancelled', 'entered-in-error')) THEN
+                RAISE EXCEPTION 'A vital sign is taken at a visit of the same patient that was held' USING ERRCODE = '23514';
+            END IF;
+        ELSE
+            SELECT e.id INTO NEW.encounter_id
+            FROM ehr.encounters e
+            WHERE e.patient_id = NEW.patient_id AND e.status NOT IN ('planned', 'cancelled', 'entered-in-error')
+              AND e.period_start <= NEW.effective_at + interval '15 minutes'
+              AND e.period_start >= NEW.effective_at - interval '12 hours'
+            ORDER BY e.period_start DESC, e.id
+            LIMIT 1;
         END IF;
 
         IF NEW.code = '39156-5' THEN
@@ -57,8 +74,17 @@ BEGIN
             IF NEW.value IS NULL THEN
                 RAISE EXCEPTION 'A body mass index needs the weight and height taken with it' USING ERRCODE = '23514';
             END IF;
-        ELSIF NEW.value IS NULL OR NEW.value <= 0 OR NEW.value >= 1000 THEN
-            RAISE EXCEPTION 'A vital sign has a value above zero' USING ERRCODE = '23514';
+        END IF;
+
+        -- A value a person can have: the widest bounds for each sign, the same ones the form states. The weight and
+        -- height bounds keep the body mass index's arithmetic inside what the column holds; its own bound is checked
+        -- after it is worked out.
+        SELECT b.lowest, b.highest INTO lowest, highest
+        FROM (VALUES ('8480-6', 1, 350), ('8462-4', 1, 250), ('8867-4', 1, 350), ('8310-5', 20, 45), ('9279-1', 1, 100),
+                     ('59408-5', 1, 100), ('29463-7', 0.2, 700), ('8302-2', 20, 280), ('39156-5', 1, 500)) AS b(code, lowest, highest)
+        WHERE b.code = NEW.code;
+        IF NOT FOUND OR NEW.value IS NULL OR NEW.value < lowest OR NEW.value > highest THEN
+            RAISE EXCEPTION 'That value is outside what this vital sign can be' USING ERRCODE = '23514';
         END IF;
 
         NEW.display := left(test.display, 200);

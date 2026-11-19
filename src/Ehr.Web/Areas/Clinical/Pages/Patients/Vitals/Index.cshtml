@@ -41,27 +41,31 @@ else
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : "fix the highlighted fields and save again.")</p>
         }
         <p class="sc-muted">Enter what was taken and leave the rest empty. Body mass index is worked out from the weight and height.</p>
-        @{ var first = true; }
+        @{
+            // The cursor starts in the first field that is wrong; in the first field when nothing is, or when what is
+            // wrong is the whole form; in the time when only the time is.
+            var wrong = VitalSigns.Fields.Select(field => field.Code).FirstOrDefault(Model.Errors.ContainsKey);
+            var focus = wrong ?? (Model.Errors.ContainsKey("TakenAt") && !Model.Errors.ContainsKey("") ? "TakenAt" : VitalSigns.Fields[0].Code);
+        }
         <div class="sc-vitals-fields">
-        @foreach (var (code, label, unit, _) in VitalSigns.Fields)
+        @foreach (var (code, label, unit, _, _) in VitalSigns.Fields)
         {
             var id = $"vital-{code}";
             var error = Model.Errors.GetValueOrDefault(code);
             <div class="sc-field">
                 <label for="@id">@label <span>(@unit)</span></label>
                 <input id="@id" class="sc-field__input" name="Values[@code]" value="@Model.Values.GetValueOrDefault(code)" inputmode="decimal" autocomplete="off"
-                       autofocus="@(first && Model.Errors.Count == 0 || error is not null && VitalSigns.Fields.First(field => Model.Errors.ContainsKey(field.Code)).Code == code)"
+                       autofocus="@(code == focus)"
                        aria-invalid="@(error is null ? null : "true")" aria-describedby="@(error is null ? null : id + "-error")">
                 @if (error is not null)
                 {
                     <p class="sc-field__error" id="@(id)-error">@error</p>
                 }
             </div>
-            first = false;
         }
             <div class="sc-field">
                 <label for="vital-taken">Taken (UTC) <span>(required)</span></label>
-                <input id="vital-taken" class="sc-field__input" type="datetime-local" name="TakenAt" value="@Model.TakenAt" required
+                <input id="vital-taken" class="sc-field__input" type="datetime-local" name="TakenAt" value="@Model.TakenAt" required autofocus="@(focus == "TakenAt")"
                        aria-invalid="@(Model.Errors.ContainsKey("TakenAt") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("TakenAt") ? "vital-taken-error" : null)">
                 @if (Model.Errors.TryGetValue("TakenAt", out var takenError))
                 {

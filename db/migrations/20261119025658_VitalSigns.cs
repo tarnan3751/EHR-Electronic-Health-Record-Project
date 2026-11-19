@@ -121,6 +121,76 @@ namespace Ehr.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<short>(
+                name: "diastolic_mm_hg",
+                schema: "ehr",
+                table: "encounters",
+                type: "smallint",
+                nullable: true);
+
+            migrationBuilder.AddColumn<short>(
+                name: "heart_rate_per_minute",
+                schema: "ehr",
+                table: "encounters",
+                type: "smallint",
+                nullable: true);
+
+            migrationBuilder.AddColumn<short>(
+                name: "systolic_mm_hg",
+                schema: "ehr",
+                table: "encounters",
+                type: "smallint",
+                nullable: true);
+
+            // Written by hand, like the copy in Up: the visits get their blood pressure and heart rate back (the
+            // latest of each taken at the visit), and then every vital-sign observation is deleted, because the
+            // schema this returns to has no category and would show them as laboratory results. Vital signs that
+            // were not taken at a visit, and the other six signs, have no place in that schema and are lost: roll
+            // back only a database where step 9 was not used.
+            migrationBuilder.Sql("""
+                DO $$
+                DECLARE
+                    forced_encounters boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.encounters'::regclass);
+                    forced_observations boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
+                    encounters_audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.encounters'::regclass AND tgname = 'encounters_audit');
+                    observations_audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
+                BEGIN
+                    ALTER TABLE ehr.encounters NO FORCE ROW LEVEL SECURITY;
+                    ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
+                    IF encounters_audited THEN
+                        ALTER TABLE ehr.encounters DISABLE TRIGGER encounters_audit;
+                    END IF;
+                    IF observations_audited THEN
+                        ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
+                    END IF;
+
+                    UPDATE ehr.encounters e
+                    SET systolic_mm_hg = (SELECT round(o.value)::smallint FROM ehr.observations o
+                                          WHERE o.encounter_id = e.id AND o.code = '8480-6' ORDER BY o.effective_at DESC, o.issued_at DESC LIMIT 1),
+                        diastolic_mm_hg = (SELECT round(o.value)::smallint FROM ehr.observations o
+                                           WHERE o.encounter_id = e.id AND o.code = '8462-4' ORDER BY o.effective_at DESC, o.issued_at DESC LIMIT 1),
+                        heart_rate_per_minute = (SELECT round(o.value)::smallint FROM ehr.observations o
+                                                 WHERE o.encounter_id = e.id AND o.code = '8867-4' ORDER BY o.effective_at DESC, o.issued_at DESC LIMIT 1)
+                    WHERE EXISTS (SELECT 1 FROM ehr.observations o WHERE o.encounter_id = e.id);
+
+                    DELETE FROM ehr.observations WHERE category = 'vital-signs';
+
+                    IF observations_audited THEN
+                        ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
+                    END IF;
+                    IF encounters_audited THEN
+                        ALTER TABLE ehr.encounters ENABLE TRIGGER encounters_audit;
+                    END IF;
+                    IF forced_encounters THEN
+                        ALTER TABLE ehr.encounters FORCE ROW LEVEL SECURITY;
+                    END IF;
+                    IF forced_observations THEN
+                        ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
+                    END IF;
+                END
+                $$;
+                """);
+
             migrationBuilder.DropForeignKey(
                 name: "fk_observations_encounters_encounter_id",
                 schema: "ehr",
@@ -150,27 +220,6 @@ namespace Ehr.Migrations
                 name: "encounter_id",
                 schema: "ehr",
                 table: "observations");
-
-            migrationBuilder.AddColumn<short>(
-                name: "diastolic_mm_hg",
-                schema: "ehr",
-                table: "encounters",
-                type: "smallint",
-                nullable: true);
-
-            migrationBuilder.AddColumn<short>(
-                name: "heart_rate_per_minute",
-                schema: "ehr",
-                table: "encounters",
-                type: "smallint",
-                nullable: true);
-
-            migrationBuilder.AddColumn<short>(
-                name: "systolic_mm_hg",
-                schema: "ehr",
-                table: "encounters",
-                type: "smallint",
-                nullable: true);
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_encounters_vital_signs",

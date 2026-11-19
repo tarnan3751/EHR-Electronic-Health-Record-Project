@@ -76,22 +76,24 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .Where(c => c.PatientId == id && ConditionClinicalStatus.Current.Contains(c.ClinicalStatus))
             .OrderBy(c => c.OnsetDate == null).ThenByDescending(c => c.OnsetDate).ThenBy(c => c.Display).ThenBy(c => c.Id)
             .ToListAsync(cancellationToken);
-        // Each visit with the blood pressure and heart rate taken at it (step 9: vital signs are observations now), in
-        // the same statement, so the chart makes no more round trips for them than when they were the visit's columns.
-        var visitRows = await db.Encounters.AsNoTracking()
+        var encounters = await db.Encounters.AsNoTracking()
             .Where(e => e.PatientId == id && !EncounterStatus.NotHeld.Contains(e.Status))
             .OrderByDescending(e => e.PeriodStart).ThenBy(e => e.Id)
             .Take(visits)
-            .Select(e => new
-            {
-                Visit = e,
-                Systolic = db.Observations.Where(o => o.EncounterId == e.Id && o.Code == VitalSign.Systolic).Select(o => o.Value).FirstOrDefault(),
-                Diastolic = db.Observations.Where(o => o.EncounterId == e.Id && o.Code == VitalSign.Diastolic).Select(o => o.Value).FirstOrDefault(),
-                HeartRate = db.Observations.Where(o => o.EncounterId == e.Id && o.Code == VitalSign.HeartRate).Select(o => o.Value).FirstOrDefault(),
-            })
             .ToListAsync(cancellationToken);
-        var encounters = visitRows.Select(row => row.Visit).ToList();
-        var visitVitals = visitRows.ToDictionary(row => row.Visit.Id, row => new VisitVitals(row.Systolic, row.Diastolic, row.HeartRate));
+        // The patient's newest vital signs (step 9), in one plain query: the chart's short flowsheet takes the newest
+        // value of each sign from it, and each visit shown takes the blood pressure and heart rate taken at it. 120
+        // values is thirteen full sets, or forty visits' three signs. One statement, because off-site each statement
+        // costs the chart far more than on-site (measured: about 3 ms at the median for this one, however it was
+        // written; two cost more).
+        var newestVitals = (await db.Observations.AsNoTracking()
+                .Where(o => o.PatientId == id && o.Category == ObservationCategory.VitalSigns && o.Value != null)
+                .OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).Take(120).ToListAsync(cancellationToken))
+                .Where(o => ObservationStatus.Released.Contains(o.Status))
+                .OrderByDescending(o => o.EffectiveAt).ThenByDescending(o => o.IssuedAt).ToList();
+        decimal? At(Guid visit, string code) => newestVitals.FirstOrDefault(o => o.EncounterId == visit && o.Code == code)?.Value;
+        var visitVitals = encounters.ToDictionary(e => e.Id, e => new VisitVitals(At(e.Id, VitalSign.Systolic), At(e.Id, VitalSign.Diastolic), At(e.Id, VitalSign.HeartRate)));
+        var latestVitals = newestVitals.Select(o => new LatestVital(o.Code!, o.Display, o.Value!.Value, o.Unit, o.ReferenceLow, o.ReferenceHigh, o.EffectiveAt));
         var orders = await ActiveOrders(id, catalogCode: null).ToListAsync(cancellationToken);
         // Only when the discontinue page sent the clinician here: whether that order is this patient's, and discontinued.
         var confirmed = discontinued is not null && await db.Orders.AsNoTracking()
@@ -125,6 +127,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             HasNotes = found.Notes,
             HasDrafts = found.Drafts,
             VisitVitals = visitVitals,
+            // The newest of each sign, in the flowsheet's order.
+            LatestVitals = [.. latestVitals.GroupBy(v => v.Code).Select(group => group.First()).OrderBy(v => Array.IndexOf(VitalSign.All, v.Code))],
             Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,
@@ -297,14 +301,17 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             return null;
         }
 
-        // One query for both kinds of observation the patient may see: the laboratory results, which the page lists,
-        // and the vital signs (step 9), which it charts. Released and finished only, as row-level security also holds.
-        var released = await db.Observations.AsNoTracking()
-            .Where(o => o.PatientId == patientId && o.IssuedAt != null && ObservationStatus.Released.Contains(o.Status))
+        var results = await db.Observations.AsNoTracking()
+            // Laboratory results: vital signs are observations too since step 9, and are read apart, below, so that
+            // however many there are they never crowd a result out.
+            .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.Laboratory && o.IssuedAt != null && ObservationStatus.Released.Contains(o.Status))
             .OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Display).ThenBy(o => o.Id)
-            .Take(2000).ToListAsync(cancellationToken);
-        var results = released.Where(o => o.Category == ObservationCategory.Laboratory).ToList();
-        var vitals = released.Where(o => o.Category == ObservationCategory.VitalSigns).ToList();
+            .ToListAsync(cancellationToken);
+        // The vital signs for the page's trends: the newest 600 values, which is more than the charts draw.
+        var vitals = await db.Observations.AsNoTracking()
+            .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.VitalSigns && o.Value != null && o.IssuedAt != null
+                && ObservationStatus.Released.Contains(o.Status))
+            .OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).Take(600).ToListAsync(cancellationToken);
 
         audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
         await db.SaveChangesAsync(cancellationToken);

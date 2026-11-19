@@ -6,7 +6,7 @@
    the only way to read them. The table has two narrow columns so it fits the card; the unit is in the title. *@
 <figure class="sc-trend" data-trend="@Model.Code">
     <figcaption class="sc-trend__title">@Model.Title@(Model.Unit is null ? "" : $" ({Model.Unit})")</figcaption>
-    <svg class="sc-trend__chart" viewBox="0 0 @Trend.Width @Trend.Height" role="img" aria-label="@Model.Summary" focusable="false">
+    <svg class="sc-trend__chart" viewBox="0 0 @Trend.Width @Trend.Height" role="img" aria-label="Chart of @Model.Title.ToLowerInvariant(), described under it" focusable="false">
         @if (Model.HasRange)
         {
             <rect class="sc-trend__range" x="0" y="@Model.Band.Y" width="@Trend.Width" height="@Model.Band.Height"></rect>

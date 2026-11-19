@@ -14,11 +14,14 @@ Open a patient on your panel. Each of **Allergies**, **Medications** and **Diagn
 - **Allergies are in one of three states.** "No allergy information recorded" means nobody has asked. **Record no known allergies** records that someone asked and there are none. Adding an allergy clears "No known allergies" by itself. The chart, the patient banner and the desktop app's offline copy each show the state.
 - **History of allergies, medications and diagnoses**, above the lists, shows every entry added and every change, newest first, with who and when.
 
-**Vital signs** (the expansion plan's step 9, by Tahseen Arnan). The chart's **Vital signs** section links to the patient's vital signs page, `/patients/{id}/vitals`:
+**Vital signs** (the expansion plan's step 9, by Tahseen Arnan). The chart's **Vital signs** section lists the newest value of each sign, with High or Low where it is outside its reference range, and links to the patient's vital signs page, `/patients/{id}/vitals`:
 
 - **Flowsheet:** the latest six sets side by side, newest first, each sign with its unit; a value outside its reference range is tagged High or Low.
 - **Trends:** a small chart for each sign with two or more values. The shaded band is the reference range, a value outside it is a diamond, and the sentence under the chart says what it shows. **The values as a table** opens every number behind it. The charts are drawn by the server as SVG: no script.
-- **Record vital signs:** blood pressure, heart rate, temperature, respiratory rate, oxygen saturation, weight and height. Enter what was taken and leave the rest empty. Body mass index is worked out from the weight and height. Only a clinician with the patient on their panel records; off-site the set is forwarded to the clinic's server, and recording is not offered while that server can't be reached.
+- **Record vital signs**, first on the page: blood pressure, heart rate, temperature, respiratory rate, oxygen saturation, weight and height. Enter what was taken and leave the rest empty. Body mass index is worked out from the weight and height. Only a clinician with the patient on their panel records; off-site the set is forwarded to the clinic's server, and recording is not offered while that server can't be reached.
+- A set taken during a visit belongs to that visit: the database ties it to the patient's visit that began in the twelve hours before it was taken, and the chart's latest visit then shows its blood pressure and heart rate. A set sent twice is recorded once.
+- Each sign has bounds no person is outside of (a temperature from 20 to 45 °C, for example); the form and the database both refuse a value beyond them.
+- Times are typed and shown in UTC, as elsewhere in the clinician app.
 - A vital sign is an observation with its LOINC code and UCUM unit, like a lab result. It can't be edited or deleted. The patient sees their vital signs in the portal at once (UC 6).
 - A visit's blood pressure and heart rate, which used to be the visit's own columns, are now observations linked to the visit. The chart's latest visit and the desktop app's offline copy show them as before. The offline copy does not carry the full flowsheet.
 
@@ -59,14 +62,13 @@ One file each, in `tests/Ehr.Web.Tests/TestCases/UC4/`, continuing UC 4's number
 | TC-UC4-11, NFR-01 | The entry form, code search, history and chart with sensitive items: p99 under 15 ms at 50,000 patients | `TC_UC4_11_Nfr01_ListPagesOnSite.cs` |
 | TC-UC4-12, NFR-12 | In a real browser, adding a coded diagnosis with the keyboard only | `TC_UC4_12_Nfr12_EntryKeyboardFirst.cs` |
 | TC-UC4-13, alternative flow | The allergy list's three states on the chart, the banner and the offline copy; "No known allergies" recorded, and cleared by adding an allergy | `TC_UC4_13_AllergyStatus.cs` |
-
-| TC-UC4-14, successful flow (vital signs) | A set is recorded from the chart; the flowsheet flags what is out of range and shows the body mass index; a second set gives each sign a trend with its table | `TC_UC4_14_VitalSignsSuccessfulFlow.cs` |
-| TC-UC4-15, invalid input and alternative flow (vital signs) | Half a blood pressure, a word, an impossible value, nothing, or a future time is not saved; a clinician off the panel records nothing | `TC_UC4_15_VitalSignsInvalidAndRefused.cs` |
+| TC-UC4-14, successful flow (vital signs) | A set is recorded from the chart; the flowsheet flags what is out of range and shows the body mass index; a second set gives each sign a trend with its table; the chart's latest visit and the offline copy show the set taken during the visit | `TC_UC4_14_VitalSignsSuccessfulFlow.cs` |
+| TC-UC4-15, invalid input and alternative flow (vital signs) | Half a blood pressure, a word, an impossible value, nothing, or a future time is not saved; a clinician off the panel records nothing; an impossible body mass index refuses the whole set; a set sent twice is recorded once | `TC_UC4_15_VitalSignsInvalidAndRefused.cs` |
 | TC-UC4-16, exceptional condition (vital signs) | Off-site a set is forwarded; with the server down the flowsheet and trends are read-only | `TC_UC4_16_VitalSignsOffSite.cs` |
 | TC-UC4-17, NFR-01 (vital signs) | The vital signs page: p99 under 15 ms at 50,000 patients | `TC_UC4_17_Nfr01_VitalSignsOnSite.cs` |
 | TC-UC4-18, NFR-12 (vital signs) | In a real browser, recording a set and opening a trend's table with the keyboard only | `TC_UC4_18_Nfr12_VitalSignsKeyboardFirst.cs` |
 
-`tests/Ehr.Security.Tests/VitalSignSecurityTests.cs` asks the database directly: a recorded vital sign gets the database's own name, unit and range and is audited; only a clinician with the patient on their panel records one; without an order only a sound vital sign is accepted; the body mass index is the database's arithmetic; a result of an order can't pass as a vital sign; nothing is edited or deleted.
+`tests/Ehr.Security.Tests/VitalSignSecurityTests.cs` asks the database directly: a recorded vital sign gets the database's own name, unit and range and is audited; only a clinician with the patient on their panel records one; without an order only a sound vital sign is accepted; the body mass index is the database's arithmetic; a set is tied to the visit it was taken at; values no person has, and the same sign twice, are refused; a result of an order can't pass as a vital sign; nothing is edited or deleted. `VitalSignMigrationTests.cs` runs the migration that moved the visits' vital signs, down and up, on a database with its policies in place.
 
 Extra coverage in `tests/Ehr.Web.Tests/ChartListTests.cs`: the code search and who may use it; sensitive items left out until asked for, with the audit action, on-site and off-site; allergies in the banner on the note and dictation pages; a save forwarded from off-site.
 

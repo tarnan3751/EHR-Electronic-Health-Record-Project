@@ -388,10 +388,10 @@ DROP POLICY IF EXISTS encounters_own_select ON ehr.encounters;
 CREATE POLICY encounters_own_select ON ehr.encounters FOR SELECT
     USING (patient_id = (SELECT ehr.current_patient_id()));
 
--- Test results (PHI). Clinicians read every patient's. A patient reads only their own, and only once the result is
--- released and finished (Observation.IssuedAt, ObservationStatus.Released): a result still being worked on, cancelled
--- or entered in error never reaches the portal, even through a bug in the app. A clinician files results for a patient
--- on their active panel; nothing updates or deletes one (10-grants.sql).
+-- Test results and vital signs (PHI). Clinicians read every patient's. A patient reads only their own, and only once
+-- the result is released and finished (Observation.IssuedAt, ObservationStatus.Released): a result still being worked
+-- on, cancelled or entered in error never reaches the portal, even through a bug in the app. A clinician files results
+-- and records vital signs for a patient on their active panel; nothing updates or deletes one (10-grants.sql).
 ALTER TABLE ehr.observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
 

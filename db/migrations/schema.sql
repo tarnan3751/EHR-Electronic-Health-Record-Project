@@ -1272,3 +1272,11 @@ VALUES ('20261119025658_VitalSigns', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE UNIQUE INDEX ux_observations_vital_sign_once ON ehr.observations (patient_id, code, effective_at, encounter_id) NULLS NOT DISTINCT WHERE category = 'vital-signs';
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119035421_VitalSignOnce', '10.0.13');
+
+COMMIT;
+
