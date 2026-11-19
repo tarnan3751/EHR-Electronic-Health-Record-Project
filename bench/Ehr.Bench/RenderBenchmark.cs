@@ -150,6 +150,10 @@ internal static partial class RenderBenchmark
                 // those rows measure what they did. The note's page with its addenda, and the page that signs one.
                 var noted = await SignNotesAsync(app, clinicianId, patients);
                 var noteRandom = new Random(20261121);
+                // A generator of its own, so the rows after it pick the notes they always did.
+                var notedChartRandom = new Random(20261124);
+                results.Add(await MeasureAsync(client, times, "Chart with a signed note, a patient on the panel", typing: false,
+                    () => $"/patients/{noted[notedChartRandom.Next(noted.Count)].Patient}"));
                 results.Add(await MeasureAsync(client, times, "Signed note with addenda, a patient on the panel", typing: false, () =>
                 {
                     var (patient, note) = noted[noteRandom.Next(noted.Count)];
@@ -207,7 +211,7 @@ internal static partial class RenderBenchmark
                 else
                 {
                     await SettleAsync(database);
-                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments));
+                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted));
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -343,7 +347,7 @@ internal static partial class RenderBenchmark
     // audit queue goes in a folder of its own, deleted at the end.
     static async Task<List<Result>> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
-        string scheduleDay, List<Guid> appointments)
+        string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -359,6 +363,17 @@ internal static partial class RenderBenchmark
             using var client = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
             var results = await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
             results.AddRange(await MeasureScheduleAsync(client, times, "Off-site, ", panel, scheduleDay, appointments));
+            // Pages that record more than one audit event (step 10c): a chart that has a signed note records the
+            // patient's read and the note's; a note's page records the patient's and the note's. Off-site each event
+            // used to be its own write to the queue, flushed to disk; now a request's events go together.
+            var noteRandom = new Random(20261123);
+            results.Add(await MeasureAsync(client, times, "Off-site, Chart with a signed note, a patient on the panel", typing: false,
+                () => $"/patients/{noted[noteRandom.Next(noted.Count)].Patient}"));
+            results.Add(await MeasureAsync(client, times, "Off-site, Signed note with addenda, a patient on the panel", typing: false, () =>
+            {
+                var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                return $"/patients/{patient}/notes/{note}";
+            }));
             return results;
         }
         finally
@@ -569,9 +584,10 @@ internal static partial class RenderBenchmark
     }
 
     // UC 2 (Tahseen Arnan): the cloud app's audit queue, its append timed as the request's commit. The append writes the
-    // page's events and flushes them to disk before the page is sent (CloudAuditQueue), as an on-prem page's commit waits
+    // page's events together and flushes them to disk before the page is sent (RequestAuditEvents, step 10c, and
+    // CloudAuditQueue), as an on-prem page's commit waits
     // for its audit events to reach the disk; writing a few lines of JSON is a small part of it.
-    internal sealed class TimedAuditQueue(IAuditQueue queue, DatabaseTimes times) : IAuditQueue
+    internal sealed class TimedAuditQueue(IDurableAuditQueue queue, DatabaseTimes times) : IDurableAuditQueue
     {
         public void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents)
         {
@@ -1195,7 +1211,7 @@ internal static partial class RenderBenchmark
                 {
                     services.AddSingleton(keys);
                     services.AddSingleton(new OnPremApp(OnPremUrl, new HttpMessageInvoker(new LinkDown())));
-                    services.AddSingleton<IAuditQueue>(provider => new TimedAuditQueue(provider.GetRequiredService<CloudAuditQueue>(), times));
+                    services.AddSingleton<IDurableAuditQueue>(provider => new TimedAuditQueue(provider.GetRequiredService<CloudAuditQueue>(), times));
                     services.ConfigureDbContext<EhrDbContext>(options => options.AddInterceptors(times));
                 });
 

@@ -41,7 +41,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // however many rows the sections hold: the same event a list of patients records for each. Draft and signed-note
     // reads have their own table/row events, also accepted by the cloud audit queue (CloudAuditEvents).
     public async Task<PatientChart?> ChartAsync(
-        Guid id, int visits, CancellationToken cancellationToken, Guid? discontinued = null, bool sensitive = false)
+        Guid id, int visits, CancellationToken cancellationToken, Guid? discontinued = null, bool sensitive = false, bool notes = true)
     {
         // With the patient, in the same statement: which of the chart's occasional sections have anything in them.
         // Most charts have no appointment booked, no conversation, no resulted order waiting and no notes, and each
@@ -108,8 +108,21 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             hidden = medications.RemoveAll(m => m.Sensitive) + conditions.RemoveAll(c => c.Sensitive);
         }
 
-        // One event for one view: a read, or a read that showed sensitive items.
+        // The chart's list of signed notes (step 10c): when and whether sensitive, not their text, read here so their
+        // reads are recorded with the chart's in one insert. It was a read and an insert of its own, which put a
+        // chart with notes over the gate on a slow CI runner. Sensitive ones only when asked for (step 10). Not for
+        // the offline copy, which reads the notes it keeps, text and all, itself (`notes: false`).
+        IReadOnlyList<SignedNoteEntry> signed = !notes || !found.Notes
+            ? []
+            : await db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == id && (sensitive || !n.Sensitive))
+                .OrderByDescending(n => n.SignedAt).ThenBy(n => n.Id)
+                .Select(n => new SignedNoteEntry(n.Id, n.SignedAt, n.Sensitive)).ToListAsync(cancellationToken);
+        // One event for one view: a read, or a read that showed sensitive items. Then each note listed, as before.
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        if (signed.Count > 0)
+        {
+            audit.RecordReads("clinical_notes", signed.Select(n => (id, n.Id)));
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         var upcoming = !found.Upcoming
@@ -128,6 +141,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return new PatientChart(patient, allergies, medications, conditions, encounters, orders)
         {
             HasNotes = found.Notes,
+            Notes = signed,
             HasDrafts = found.Drafts,
             VisitVitals = visitVitals,
             // The newest of each sign, in the flowsheet's order.
@@ -398,7 +412,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         var charts = new List<PatientChart>(ids.Count);
         foreach (var id in ids)
         {
-            if (await ChartAsync(id, visits, cancellationToken) is { } chart)
+            if (await ChartAsync(id, visits, cancellationToken, notes: false) is { } chart)
             {
                 // The signed notes that may be kept offline, with their addenda (step 10): only when there are any.
                 charts.Add(chart.HasNotes ? chart with { OfflineNotes = await OfflineNotesAsync(id, limit: 10, cancellationToken) } : chart);
@@ -840,22 +854,6 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         return drafts;
-    }
-
-    // A patient's signed notes, newest first. Notes marked sensitive (step 10) are left out unless asked for: the chart
-    // asks only when the clinician chose "Show sensitive items", which the chart's own read records as a view of
-    // sensitive items.
-    public async Task<IReadOnlyList<ClinicalNote>> NotesAsync(Guid patient, CancellationToken cancel, bool sensitive = false)
-    {
-        var notes = await db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == patient && (sensitive || !n.Sensitive))
-            .OrderByDescending(n => n.SignedAt).ThenBy(n => n.Id).ToListAsync(cancel);
-        if (notes.Count > 0)
-        {
-            audit.RecordReads("clinical_notes", notes.Select(n => (n.PatientId, n.Id)));
-            await db.SaveChangesAsync(cancel);
-        }
-
-        return notes;
     }
 
     // Whether a draft is signed, and its note: the check the draft pages and the sync make before anything else. It

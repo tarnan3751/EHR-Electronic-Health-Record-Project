@@ -34,6 +34,9 @@ public sealed record PatientChart(
     // The blood pressure and heart rate taken at each visit shown, by the visit's ID (step 9).
     public IReadOnlyDictionary<Guid, VisitVitals> VisitVitals { get; init; } = new Dictionary<Guid, VisitVitals>();
 
+    // The patient's signed notes for the chart's list, newest first: sensitive ones only when sensitive items are shown.
+    public IReadOnlyList<SignedNoteEntry> Notes { get; init; } = [];
+
     // Signed notes marked sensitive that the chart's list leaves out (step 10); zero when sensitive items are shown.
     public int SensitiveNotesHidden { get; init; }
 
@@ -55,6 +58,9 @@ public sealed record PatientChart(
 
 // The vital signs a visit shows on the chart; null where one wasn't taken.
 public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal? HeartRate);
+
+// A signed note as the chart lists it: when it was signed and whether it is sensitive. Not its text.
+public sealed record SignedNoteEntry(Guid Id, DateTimeOffset SignedAt, bool Sensitive);
 
 // An addendum to a signed note as a page shows it.
 public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt, bool Sensitive, Guid AuthorId, string AuthorName)

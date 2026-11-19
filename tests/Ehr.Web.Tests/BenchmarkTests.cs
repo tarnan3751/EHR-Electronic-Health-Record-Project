@@ -177,7 +177,7 @@ public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, times.AuditMilliseconds);
     }
 
-    sealed class SlowQueue : IAuditQueue
+    sealed class SlowQueue : Ehr.Web.CloudAudit.IDurableAuditQueue
     {
         public const int Milliseconds = 30;
 
