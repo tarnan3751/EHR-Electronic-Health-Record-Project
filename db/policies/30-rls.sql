@@ -710,7 +710,9 @@ CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
         (SELECT ehr.is_clinician())
         -- As for the note: a sensitive addendum is updatable by the person who made it so (its author, if nobody was
         -- recorded), or by the signer of its note.
+        -- A mark inherited from the note is cleared by whoever unmarks the note (the trigger refuses it otherwise).
         AND (NOT sensitive
+             OR sensitive_inherited
              OR coalesce(sensitive_marked_by, author_id) = (SELECT ehr.current_user_id())
              OR EXISTS (SELECT 1 FROM ehr.clinical_notes n WHERE n.id = note_addenda.note_id AND n.signer_id = (SELECT ehr.current_user_id())))
         AND EXISTS (

@@ -64,6 +64,9 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         $"SELECT sensitive || ' ' || coalesce(sensitive_marked_by::text, 'none') || ' ' || coalesce(sensitive_reason, 'none') || ' ' || coalesce((sensitive_changed_at > now() - interval '1 minute')::text, 'none') FROM ehr.{table} WHERE id = @id",
         ("id", id));
 
+    Task<List<string>> InheritedAsync(Guid addendum) =>
+        AsSuperuserAsync("SELECT sensitive_inherited::text FROM ehr.note_addenda WHERE id = @id", ("id", addendum));
+
     [Fact]
     public async Task A_signed_note_is_marked_sensitive_with_a_reason_and_its_addenda_its_audit_trail_and_the_desktop_follow()
     {
@@ -84,8 +87,9 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
 
         Assert.Equal([$"true {colleague} Patient asked for it. true"], await StateAsync("clinical_notes", note));
         Assert.Equal(text, await AsSuperuserAsync("SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE id = @id", ("id", note)));
-        // Its addendum is sensitive with it, with the same reason.
-        Assert.Equal([$"true {colleague} Patient asked for it. true"], await StateAsync("note_addenda", addendum));
+        // Its addendum is sensitive with it, with the same reason: inherited from the note, marked by nobody itself.
+        Assert.Equal(["true none Patient asked for it. true"], await StateAsync("note_addenda", addendum));
+        Assert.Equal(["true"], await InheritedAsync(addendum));
         // The administrator's audit page: every earlier event of the note, its draft and its addendum is hidden now,
         // and the marking itself is there, with no values.
         var after = await Accounts.QueryAsync(App, admin, shown, ("patient", patient));
@@ -103,7 +107,10 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         var marker = await ColleagueAsync(patient);
         var other = await ColleagueAsync(patient);
         var addendum = await AddendumAsync(other, patient, note);
+        // Marked on its own, before the note is: the mark is the addendum's, and the marker's.
+        await ChangeAsync(marker, "note_addenda", addendum, sensitive: true);
         await ChangeAsync(marker, "clinical_notes", note, sensitive: true);
+        Assert.Equal(["false"], await InheritedAsync(addendum));
 
         // A third clinician on the panel: refused, for the note and for the addendum they wrote themselves, which the
         // marker made sensitive.
@@ -114,7 +121,7 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ChangeAsync(marker, "note_addenda", addendum, sensitive: false));
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ChangeAsync(marker, "clinical_notes", note, sensitive: false, reason: "  "));
 
-        // The person who marked it unmarks it; the addendum stays sensitive until it is unmarked itself.
+        // The person who marked it unmarks it; the addendum, marked on its own, stays sensitive until it is unmarked itself.
         await ChangeAsync(marker, "clinical_notes", note, sensitive: false, reason: "Marked the wrong note.");
         Assert.Equal(["false none Marked the wrong note. true"], await StateAsync("clinical_notes", note));
         Assert.StartsWith($"true {marker} ", (await StateAsync("note_addenda", addendum)).Single());
@@ -204,7 +211,7 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
             Assert.Equal(["false none none none"], await StateAsync(table, id));
 
             // The text, who and when: no privilege. As the tables' owner, who has every privilege: the trigger.
-            foreach (var column in new[] { table == "clinical_notes" ? "plan = 'Changed'" : "text = 'Changed'", "sensitive_marked_by = gen_random_uuid()", "sensitive_changed_at = '2000-01-01'", "patient_id = gen_random_uuid()" })
+            foreach (var column in new[] { table == "clinical_notes" ? "plan = 'Changed'" : "text = 'Changed'", table == "clinical_notes" ? "signer_id = gen_random_uuid()" : "sensitive_inherited = true", "sensitive_marked_by = gen_random_uuid()", "sensitive_changed_at = '2000-01-01'", "patient_id = gen_random_uuid()" })
             {
                 await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(App, signer, $"UPDATE ehr.{table} SET {column} WHERE id = @id", ("id", id)));
             }
@@ -245,6 +252,169 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "UPDATE ehr.staff_users SET lockout_end = now() + interval '10 years' WHERE id = @id", ("id", gone));
         await AddendumAsync(covering, theirs, old);
         Assert.Empty(await AsSuperuserAsync(items, ("patient", theirs)));
+    }
+
+    // Tahseen's decision of 19 November 2026 (step 10e): marking a note marks its addenda as inherited from it,
+    // unmarking it clears only the inherited marks, and an addendum marked on its own stays marked.
+    [Fact]
+    public async Task Marking_a_note_marks_its_addenda_as_inherited_and_unmarking_it_clears_only_those()
+    {
+        var (signer, patient, note, _) = await SignedAsync();
+        var colleague = await ColleagueAsync(patient);
+        async Task<Guid> SignedSensitiveAsync(string text)
+        {
+            var id = Guid.CreateVersion7();
+            await Accounts.ExecuteAsync(App, colleague, "INSERT INTO ehr.note_addenda (id, note_id, patient_id, author_id, text, sensitive) VALUES (@id, @note, @patient, @author, @text, true)",
+                ("id", id), ("note", note), ("patient", patient), ("author", colleague), ("text", text));
+            return id;
+        }
+
+        Task<List<string>> AllAsync() => AsSuperuserAsync(
+            "SELECT text || ': ' || sensitive || ' ' || sensitive_inherited || ' ' || coalesce(sensitive_marked_by::text, 'none') || ' ' || coalesce(sensitive_reason, 'none') FROM ehr.note_addenda WHERE note_id = @note ORDER BY text",
+            ("note", note));
+
+        // Three addenda before the note is marked: one plain, one marked on its own afterwards, one signed sensitive.
+        var plain = await AddendumAsync(signer, patient, note, "a plain");
+        var marked = await AddendumAsync(signer, patient, note, "b marked on its own");
+        await ChangeAsync(colleague, "note_addenda", marked, sensitive: true, reason: "Names a relative.");
+        await SignedSensitiveAsync("c signed sensitive");
+
+        // 1. Marking the note marks each addendum that wasn't, as inherited, by nobody of its own; the two with a
+        //    mark of their own keep it, with who and why.
+        await ChangeAsync(signer, "clinical_notes", note, sensitive: true);
+        Assert.Equal(
+            ["a plain: true true none Patient asked for it.", $"b marked on its own: true false {colleague} Names a relative.", $"c signed sensitive: true false {colleague} none"],
+            await AllAsync());
+
+        // Signed while the note is sensitive: inherited, unless its author ticked it sensitive themselves.
+        var later = await AddendumAsync(colleague, patient, note, "d signed to a sensitive note");
+        await SignedSensitiveAsync("e signed sensitive to a sensitive note");
+        Assert.Equal(
+            ["d signed to a sensitive note: true true none none", $"e signed sensitive to a sensitive note: true false {colleague} none"],
+            (await AllAsync())[3..]);
+
+        // No addendum of a sensitive note is anything but sensitive, and none can be made so: unmarking one is
+        // refused whoever asks and whichever kind of mark it has, and "inherited" isn't a column anyone may set.
+        foreach (var user in new[] { signer, colleague })
+        {
+            foreach (var addendum in new[] { plain, marked, later })
+            {
+                await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ChangeAsync(user, "note_addenda", addendum, sensitive: false));
+            }
+        }
+
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(App, signer, "UPDATE ehr.note_addenda SET sensitive_inherited = false WHERE id = @id", ("id", plain)));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "UPDATE ehr.note_addenda SET sensitive_inherited = false WHERE id = @id", ("id", plain)));
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.note_addenda WHERE note_id = @note AND NOT sensitive", ("note", note)));
+
+        // 2 and 3. Unmarking the note clears the inherited marks, with the note's reason, and only those.
+        await ChangeAsync(signer, "clinical_notes", note, sensitive: false, reason: "Marked the wrong note.");
+        Assert.Equal(
+            [
+                "a plain: false false none Marked the wrong note.",
+                $"b marked on its own: true false {colleague} Names a relative.",
+                $"c signed sensitive: true false {colleague} none",
+                "d signed to a sensitive note: false false none Marked the wrong note.",
+                $"e signed sensitive to a sensitive note: true false {colleague} none",
+            ],
+            await AllAsync());
+        // Each cleared mark is in the audit log, as a change to the addendum.
+        // (the first was marked and cleared: two changes; the one signed to the sensitive note was cleared: one).
+        Assert.Equal(["3"], await AsSuperuserAsync(
+            "SELECT count(*)::text FROM ehr.audit_events WHERE table_name = 'note_addenda' AND action = 'update' AND row_id = ANY(@ids)",
+            ("ids", new[] { plain, later })));
+
+        // An addendum marked on its own stays marked until it is unmarked itself, by whoever marked it.
+        await ChangeAsync(colleague, "note_addenda", marked, sensitive: false, reason: "Not sensitive after all.");
+        Assert.Equal("b marked on its own: false false none Not sensitive after all.", (await AllAsync())[1]);
+
+        // Marked again: the one just unmarked is inherited this time, and goes with the note's mark.
+        await ChangeAsync(colleague, "clinical_notes", note, sensitive: true);
+        Assert.Equal("b marked on its own: true true none Patient asked for it.", (await AllAsync())[1]);
+        await ChangeAsync(colleague, "clinical_notes", note, sensitive: false, reason: "Reviewed.");
+        Assert.Equal("b marked on its own: false false none Reviewed.", (await AllAsync())[1]);
+    }
+
+    // An addendum's own mark changed at the very moment its note's is: the two wait for each other. Unmarked while the
+    // note is being marked, it ends sensitive with the note; marked while the note is being unmarked, it ends with a
+    // mark of its own, never an inherited one with no sensitive note behind it. Two connections each time.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_addendum_changed_while_its_note_is_being_changed_waits_for_it(bool noteIsBeingMarked)
+    {
+        var (signer, patient, note, _) = await SignedAsync();
+        var colleague = await ColleagueAsync(patient);
+        var addendum = await AddendumAsync(colleague, patient, note);
+        if (noteIsBeingMarked)
+        {
+            await ChangeAsync(colleague, "note_addenda", addendum, sensitive: true);
+        }
+        else
+        {
+            // The note is sensitive, then unmarked while the addendum (unmarked with it at once below) is marked again.
+            await ChangeAsync(signer, "clinical_notes", note, sensitive: true);
+        }
+
+        var cancel = TestContext.Current.CancellationToken;
+        async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginAsync(Guid user)
+        {
+            var connection = new NpgsqlConnection(App);
+            await connection.OpenAsync(cancel);
+            var transaction = await connection.BeginTransactionAsync(cancel);
+            await using var set = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction);
+            set.Parameters.AddWithValue("user", user.ToString());
+            await set.ExecuteNonQueryAsync(cancel);
+            return (connection, transaction);
+        }
+
+        NpgsqlCommand Command(string table, Guid id, bool sensitive, NpgsqlConnection connection, NpgsqlTransaction transaction)
+        {
+            var command = new NpgsqlCommand($"UPDATE ehr.{table} SET sensitive = @sensitive, sensitive_reason = 'Synthetic' WHERE id = @id", connection, transaction);
+            command.Parameters.AddWithValue("sensitive", sensitive);
+            command.Parameters.AddWithValue("id", id);
+            return command;
+        }
+
+        var (first, firstTransaction) = await BeginAsync(noteIsBeingMarked ? colleague : signer);
+        var (second, secondTransaction) = await BeginAsync(noteIsBeingMarked ? signer : colleague);
+        await using (first)
+        await using (second)
+        {
+            if (noteIsBeingMarked)
+            {
+                // The addendum's marker unmarks it and hasn't committed; the note's mark waits, then marks it again.
+                await using var unmark = Command("note_addenda", addendum, sensitive: false, first, firstTransaction);
+                Assert.Equal(1, await unmark.ExecuteNonQueryAsync(cancel));
+                await using var mark = Command("clinical_notes", note, sensitive: true, second, secondTransaction);
+                var waiting = mark.ExecuteNonQueryAsync(cancel);
+                Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), cancel)));
+                await firstTransaction.CommitAsync(cancel);
+                Assert.Equal(1, await waiting);
+                await secondTransaction.CommitAsync(cancel);
+                Assert.Equal(["true true true"], await AsSuperuserAsync(
+                    "SELECT n.sensitive || ' ' || a.sensitive || ' ' || a.sensitive_inherited FROM ehr.note_addenda a JOIN ehr.clinical_notes n ON n.id = a.note_id WHERE a.id = @id", ("id", addendum)));
+            }
+            else
+            {
+                // The note's unmark has cleared the addendum's inherited mark and hasn't committed; marking the
+                // addendum waits for it, then finds the note not sensitive: a mark of its own, or nothing to change.
+                await using var unmark = Command("clinical_notes", note, sensitive: false, first, firstTransaction);
+                Assert.Equal(1, await unmark.ExecuteNonQueryAsync(cancel));
+                await using var mark = Command("note_addenda", addendum, sensitive: true, second, secondTransaction);
+                var waiting = mark.ExecuteNonQueryAsync(cancel);
+                Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), cancel)));
+                await firstTransaction.CommitAsync(cancel);
+                Assert.Equal(1, await waiting);
+                await secondTransaction.CommitAsync(cancel);
+                Assert.Equal([$"false true false {colleague}"], await AsSuperuserAsync(
+                    "SELECT n.sensitive || ' ' || a.sensitive || ' ' || a.sensitive_inherited || ' ' || a.sensitive_marked_by FROM ehr.note_addenda a JOIN ehr.clinical_notes n ON n.id = a.note_id WHERE a.id = @id", ("id", addendum)));
+            }
+        }
+
+        // Whatever the order: no addendum is left with an inherited mark and no sensitive note behind it.
+        Assert.Equal(["0"], await AsSuperuserAsync(
+            "SELECT count(*)::text FROM ehr.note_addenda a JOIN ehr.clinical_notes n ON n.id = a.note_id WHERE a.note_id = @note AND (a.sensitive_inherited AND NOT n.sensitive OR n.sensitive AND NOT a.sensitive)", ("note", note)));
     }
 
     // Tahseen's question (2026-11-19): if someone viewed it before it was marked, the audit log already shows that.
@@ -307,6 +477,14 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
         Assert.Equal([colleague.ToString()], await Accounts.QueryAsync(App, admin,
             "SELECT actor_id::text FROM ehr.audit_events WHERE patient_id = @patient AND action = 'read' AND row_id = @note", ("patient", patient), ("note", note)));
+        // Nor an addendum signed to the note now that it is sensitive, nor any after the note is unmarked again.
+        await AddendumAsync(colleague, patient, note, "Synthetic addendum to a sensitive note.");
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal(["1 0 0"], await AsProxyAsync(connection));
+        }
+
+        await ChangeAsync(colleague, "clinical_notes", note, sensitive: false, reason: "Marked the wrong note.");
         foreach (var connection in new[] { App, Read })
         {
             Assert.Equal(["1 0 0"], await AsProxyAsync(connection));
