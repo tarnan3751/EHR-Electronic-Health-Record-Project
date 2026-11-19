@@ -13,9 +13,15 @@ public sealed class ObservationConfiguration : IEntityTypeConfiguration<Observat
         {
             table.HasCheckConstraint("ck_observations_status", $"status IN ({Codes.List(ObservationStatus.All)})");
             table.HasCheckConstraint("ck_observations_reference_range", "reference_low <= reference_high");
+            table.HasCheckConstraint("ck_observations_category", $"category IN ({Codes.List(ObservationCategory.All)})");
         });
 
         observation.Property(o => o.Code).HasMaxLength(20);
+        observation.Property(o => o.Category).HasMaxLength(20).HasDefaultValue(ObservationCategory.Laboratory);
+        // A visit's vital signs, read with the visit.
+        observation.HasOne<Encounter>().WithMany().HasForeignKey(o => o.EncounterId).OnDelete(DeleteBehavior.Restrict);
+        // A patient's values of one test or vital sign over time: a trend, and the latest of each.
+        observation.HasIndex(o => new { o.PatientId, o.Category, o.Code, o.EffectiveAt });
         observation.Property(o => o.Display).HasMaxLength(200);
         observation.Property(o => o.Status).HasMaxLength(20);
         observation.Property(o => o.Value).HasPrecision(12, 4);

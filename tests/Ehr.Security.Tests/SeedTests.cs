@@ -40,7 +40,10 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
 
         Assert.Equal(first.Patient.Id, again.Patient.Id);
         Assert.Equal((first.Patient.GivenName, first.Patient.FamilyName, first.Patient.BirthDate), (again.Patient.GivenName, again.Patient.FamilyName, again.Patient.BirthDate));
-        Assert.Equal(first.Visits.Select(v => (v.Id, v.PeriodStart, v.SystolicMmHg)), again.Visits.Select(v => (v.Id, v.PeriodStart, v.SystolicMmHg)));
+        Assert.Equal(first.Visits.Select(v => (v.Id, v.PeriodStart)), again.Visits.Select(v => (v.Id, v.PeriodStart)));
+        // The vital signs taken at the visits are observations (step 9): the same ones, with the same values.
+        Assert.NotEmpty(first.Vitals);
+        Assert.Equal(first.Vitals.Select(v => (v.Id, v.EncounterId, v.Code, v.Value)), again.Vitals.Select(v => (v.Id, v.EncounterId, v.Code, v.Value)));
         Assert.Equal("SYN0001235", first.Patient.Mrn);
         Assert.Equal(7, first.Patient.Id.Version);
     }

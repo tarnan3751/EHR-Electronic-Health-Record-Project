@@ -121,8 +121,7 @@ public static class Seeder
                 cancellationToken);
             rows["encounters"] = await CopyAsync(connection,
                 """
-                COPY ehr.encounters (id, patient_id, status, class_code, reason, period_start, period_end, systolic_mm_hg, diastolic_mm_hg,
-                    heart_rate_per_minute) FROM STDIN (FORMAT BINARY)
+                COPY ehr.encounters (id, patient_id, status, class_code, reason, period_start, period_end) FROM STDIN (FORMAT BINARY)
                 """,
                 clinic.Charts().SelectMany(chart => chart.Visits),
                 async (row, e, ct) =>
@@ -134,17 +133,15 @@ public static class Seeder
                     await WriteAsync(row, e.Reason, ct);
                     await row.WriteAsync(e.PeriodStart, NpgsqlDbType.TimestampTz, ct);
                     await WriteAsync(row, e.PeriodEnd, NpgsqlDbType.TimestampTz, ct);
-                    await WriteAsync(row, e.SystolicMmHg, NpgsqlDbType.Smallint, ct);
-                    await WriteAsync(row, e.DiastolicMmHg, NpgsqlDbType.Smallint, ct);
-                    await WriteAsync(row, e.HeartRatePerMinute, NpgsqlDbType.Smallint, ct);
                 },
                 cancellationToken);
             rows["observations"] = await CopyAsync(connection,
                 """
                 COPY ehr.observations (id, patient_id, code, display, status, value, unit, reference_low, reference_high, effective_at,
-                    issued_at, note) FROM STDIN (FORMAT BINARY)
+                    issued_at, note, category, encounter_id) FROM STDIN (FORMAT BINARY)
                 """,
-                clinic.Charts().SelectMany(chart => chart.Results),
+                // Laboratory results, and the vital signs taken at the visits (step 9).
+                clinic.Charts().SelectMany(chart => chart.Results.Concat(chart.Vitals)),
                 async (row, o, ct) =>
                 {
                     await row.WriteAsync(o.Id, NpgsqlDbType.Uuid, ct);
@@ -159,6 +156,8 @@ public static class Seeder
                     await row.WriteAsync(o.EffectiveAt, NpgsqlDbType.TimestampTz, ct);
                     await WriteAsync(row, o.IssuedAt, NpgsqlDbType.TimestampTz, ct);
                     await WriteAsync(row, o.Note, ct);
+                    await row.WriteAsync(o.Category, NpgsqlDbType.Varchar, ct);
+                    await WriteAsync(row, o.EncounterId, NpgsqlDbType.Uuid, ct);
                 },
                 cancellationToken);
 

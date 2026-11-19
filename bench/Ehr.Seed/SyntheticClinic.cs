@@ -136,14 +136,14 @@ public sealed class SyntheticClinic
         }
 
         var has = problems.Select(problem => problem.Code).ToHashSet();
-        var visits = Enumerable.Range(0, Math.Min(12, random.Next(1, 4) + (2 * problems.Count(problem => !problem.Passing))))
+        var visitsWithVitals = Enumerable.Range(0, Math.Min(12, random.Next(1, 4) + (2 * problems.Count(problem => !problem.Passing))))
             .Select(_ =>
             {
                 var start = Today.AddMinutes(-random.Next(1, 5 * 365 * 24 * 60));
                 var vitals = random.NextDouble() < 0.9;
                 // Higher with hypertension, even treated.
                 var systolic = has.Contains("I10") ? random.Next(128, 166) : random.Next(102, 131);
-                return new Encounter
+                var visit = new Encounter
                 {
                     Id = Uuid7(made, random),
                     PatientId = patientId,
@@ -157,12 +157,37 @@ public sealed class SyntheticClinic
                     Reason = problems.Count > 0 && random.NextDouble() < 0.7 ? problems[random.Next(problems.Count)].Visit : Pick(VisitReasons, random),
                     PeriodStart = start,
                     PeriodEnd = start.AddMinutes(20),
-                    SystolicMmHg = vitals ? (short)systolic : null,
-                    DiastolicMmHg = vitals ? (short)(systolic - random.Next(38, 56)) : null,
-                    HeartRatePerMinute = vitals ? (short)random.Next(55, 101) : null,
                 };
+                // The visit's vital signs, drawn as they always were, so the rest of the chart comes out the same.
+                // Drawn only when taken, in this order, as before.
+                var diastolic = vitals ? systolic - random.Next(38, 56) : 0;
+                var heartRate = vitals ? random.Next(55, 101) : 0;
+                return (Visit: visit, Vitals: vitals ? new[] { (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic), (VitalSign.HeartRate, heartRate) } : []);
             })
             .ToList();
+        // Vital signs are observations (step 9): one for each sign taken at a visit, released with the visit. Their
+        // IDs come from a generator of their own, seeded by the visit, so no other part of the chart shifts.
+        var vitalSigns = visitsWithVitals.SelectMany(visit =>
+        {
+            var ids = new SplitMix64(BitConverter.ToUInt64(visit.Visit.Id.ToByteArray(), 8));
+            return visit.Vitals.Select(vital => new Observation
+            {
+                Id = Uuid7(visit.Visit.PeriodStart, ids),
+                PatientId = patientId,
+                EncounterId = visit.Visit.Id,
+                Category = ObservationCategory.VitalSigns,
+                Code = vital.Item1,
+                Display = VitalSigns[vital.Item1].Display,
+                Status = ObservationStatus.Final,
+                Value = vital.Item2,
+                Unit = VitalSigns[vital.Item1].Unit,
+                ReferenceLow = VitalSigns[vital.Item1].Low,
+                ReferenceHigh = VitalSigns[vital.Item1].High,
+                EffectiveAt = visit.Visit.PeriodStart,
+                IssuedAt = visit.Visit.PeriodStart,
+            });
+        }).ToList();
+        var visits = visitsWithVitals.Select(visit => visit.Visit).ToList();
 
         // Test results (UC6): the tests each condition is followed with, more than once over the years, and a routine
         // one or two. Most are final and released; about one in ten is still preliminary and not released, which the
@@ -205,8 +230,16 @@ public sealed class SyntheticClinic
             })
             .ToList();
 
-        return new SyntheticChart(patient, allergies, medications, conditions, visits, results);
+        return new SyntheticChart(patient, allergies, medications, conditions, visits, results, vitalSigns);
     }
+
+    // The three vital signs a seeded visit records, as db/reference names them (ehr.observation_codes).
+    static readonly Dictionary<string, (string Display, string Unit, decimal Low, decimal High)> VitalSigns = new()
+    {
+        [VitalSign.Systolic] = ("Systolic blood pressure", "mm[Hg]", 90, 129),
+        [VitalSign.Diastolic] = ("Diastolic blood pressure", "mm[Hg]", 60, 84),
+        [VitalSign.HeartRate] = ("Heart rate", "/min", 60, 100),
+    };
 
     public static string Mrn(int index) => $"SYN{index + 1:D7}";
 
@@ -410,4 +443,6 @@ public sealed record SyntheticChart(
     IReadOnlyList<MedicationStatement> Medications,
     IReadOnlyList<Condition> Conditions,
     IReadOnlyList<Encounter> Visits,
-    IReadOnlyList<Observation> Results);
+    IReadOnlyList<Observation> Results,
+    // The vital signs taken at the visits: observations too, kept apart from the laboratory results.
+    IReadOnlyList<Observation> Vitals);

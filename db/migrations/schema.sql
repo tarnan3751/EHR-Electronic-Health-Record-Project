@@ -1212,3 +1212,63 @@ VALUES ('20261119014501_OrderSafety', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.observations ADD category character varying(20) NOT NULL DEFAULT 'laboratory';
+
+ALTER TABLE ehr.observations ADD encounter_id uuid;
+
+CREATE INDEX ix_observations_encounter_id ON ehr.observations (encounter_id);
+
+CREATE INDEX ix_observations_patient_id_category_code_effective_at ON ehr.observations (patient_id, category, code, effective_at);
+
+ALTER TABLE ehr.observations ADD CONSTRAINT ck_observations_category CHECK (category IN ('laboratory', 'vital-signs'));
+
+ALTER TABLE ehr.observations ADD CONSTRAINT fk_observations_encounters_encounter_id FOREIGN KEY (encounter_id) REFERENCES ehr.encounters (id) ON DELETE RESTRICT;
+
+DO $$
+DECLARE
+    forced_encounters boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.encounters'::regclass);
+    forced_observations boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
+    audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
+BEGIN
+    ALTER TABLE ehr.encounters NO FORCE ROW LEVEL SECURITY;
+    ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
+    IF audited THEN
+        ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
+    END IF;
+
+    INSERT INTO ehr.observations (id, patient_id, encounter_id, category, code, display, status, value, unit, reference_low, reference_high, effective_at, issued_at)
+    SELECT uuidv7(), e.patient_id, e.id, 'vital-signs', v.code, v.display, 'final', v.value, v.unit, v.low, v.high, e.period_start, e.period_start
+    FROM ehr.encounters e
+    CROSS JOIN LATERAL (VALUES
+        ('8480-6', 'Systolic blood pressure', e.systolic_mm_hg, 'mm[Hg]', 90, 129),
+        ('8462-4', 'Diastolic blood pressure', e.diastolic_mm_hg, 'mm[Hg]', 60, 84),
+        ('8867-4', 'Heart rate', e.heart_rate_per_minute, '/min', 60, 100)
+    ) AS v(code, display, value, unit, low, high)
+    WHERE v.value IS NOT NULL;
+
+    IF audited THEN
+        ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
+    END IF;
+    IF forced_encounters THEN
+        ALTER TABLE ehr.encounters FORCE ROW LEVEL SECURITY;
+    END IF;
+    IF forced_observations THEN
+        ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
+    END IF;
+END
+$$;
+
+ALTER TABLE ehr.encounters DROP CONSTRAINT ck_encounters_vital_signs;
+
+ALTER TABLE ehr.encounters DROP COLUMN diastolic_mm_hg;
+
+ALTER TABLE ehr.encounters DROP COLUMN heart_rate_per_minute;
+
+ALTER TABLE ehr.encounters DROP COLUMN systolic_mm_hg;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119025658_VitalSigns', '10.0.13');
+
+COMMIT;
+

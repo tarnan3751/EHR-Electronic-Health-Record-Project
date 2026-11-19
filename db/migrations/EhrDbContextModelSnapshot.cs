@@ -1760,14 +1760,6 @@ namespace Ehr.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("class_code");
 
-                    b.Property<short?>("DiastolicMmHg")
-                        .HasColumnType("smallint")
-                        .HasColumnName("diastolic_mm_hg");
-
-                    b.Property<short?>("HeartRatePerMinute")
-                        .HasColumnType("smallint")
-                        .HasColumnName("heart_rate_per_minute");
-
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
@@ -1791,10 +1783,6 @@ namespace Ehr.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
-                    b.Property<short?>("SystolicMmHg")
-                        .HasColumnType("smallint")
-                        .HasColumnName("systolic_mm_hg");
-
                     b.HasKey("Id")
                         .HasName("pk_encounters");
 
@@ -1804,8 +1792,6 @@ namespace Ehr.Migrations
                     b.ToTable("encounters", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_encounters_status", "status IN ('planned', 'arrived', 'triaged', 'in-progress', 'onleave', 'finished', 'cancelled', 'entered-in-error', 'unknown')");
-
-                            t.HasCheckConstraint("ck_encounters_vital_signs", "systolic_mm_hg > 0 AND diastolic_mm_hg > 0 AND heart_rate_per_minute > 0");
                         });
                 });
 
@@ -1873,6 +1859,14 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("laboratory")
+                        .HasColumnName("category");
+
                     b.Property<string>("Code")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -1887,6 +1881,10 @@ namespace Ehr.Migrations
                     b.Property<DateTimeOffset>("EffectiveAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("effective_at");
+
+                    b.Property<Guid?>("EncounterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("encounter_id");
 
                     b.Property<DateTimeOffset?>("IssuedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1934,6 +1932,9 @@ namespace Ehr.Migrations
                     b.HasKey("Id")
                         .HasName("pk_observations");
 
+                    b.HasIndex("EncounterId")
+                        .HasDatabaseName("ix_observations_encounter_id");
+
                     b.HasIndex("OrderId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ix_observations_order_id_code")
@@ -1945,8 +1946,13 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "EffectiveAt")
                         .HasDatabaseName("ix_observations_patient_id_effective_at");
 
+                    b.HasIndex("PatientId", "Category", "Code", "EffectiveAt")
+                        .HasDatabaseName("ix_observations_patient_id_category_code_effective_at");
+
                     b.ToTable("observations", "ehr", t =>
                         {
+                            t.HasCheckConstraint("ck_observations_category", "category IN ('laboratory', 'vital-signs')");
+
                             t.HasCheckConstraint("ck_observations_reference_range", "reference_low <= reference_high");
 
                             t.HasCheckConstraint("ck_observations_status", "status IN ('registered', 'preliminary', 'final', 'amended', 'corrected', 'cancelled', 'entered-in-error')");
@@ -2981,6 +2987,12 @@ namespace Ehr.Migrations
 
             modelBuilder.Entity("Ehr.Data.Patients.Observation", b =>
                 {
+                    b.HasOne("Ehr.Data.Patients.Encounter", null)
+                        .WithMany()
+                        .HasForeignKey("EncounterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_observations_encounters_encounter_id");
+
                     b.HasOne("Ehr.Data.Patients.Patient", null)
                         .WithMany()
                         .HasForeignKey("PatientId")

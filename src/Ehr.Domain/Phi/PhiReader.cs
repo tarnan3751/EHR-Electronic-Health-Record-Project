@@ -76,11 +76,22 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .Where(c => c.PatientId == id && ConditionClinicalStatus.Current.Contains(c.ClinicalStatus))
             .OrderBy(c => c.OnsetDate == null).ThenByDescending(c => c.OnsetDate).ThenBy(c => c.Display).ThenBy(c => c.Id)
             .ToListAsync(cancellationToken);
-        var encounters = await db.Encounters.AsNoTracking()
+        // Each visit with the blood pressure and heart rate taken at it (step 9: vital signs are observations now), in
+        // the same statement, so the chart makes no more round trips for them than when they were the visit's columns.
+        var visitRows = await db.Encounters.AsNoTracking()
             .Where(e => e.PatientId == id && !EncounterStatus.NotHeld.Contains(e.Status))
             .OrderByDescending(e => e.PeriodStart).ThenBy(e => e.Id)
             .Take(visits)
+            .Select(e => new
+            {
+                Visit = e,
+                Systolic = db.Observations.Where(o => o.EncounterId == e.Id && o.Code == VitalSign.Systolic).Select(o => o.Value).FirstOrDefault(),
+                Diastolic = db.Observations.Where(o => o.EncounterId == e.Id && o.Code == VitalSign.Diastolic).Select(o => o.Value).FirstOrDefault(),
+                HeartRate = db.Observations.Where(o => o.EncounterId == e.Id && o.Code == VitalSign.HeartRate).Select(o => o.Value).FirstOrDefault(),
+            })
             .ToListAsync(cancellationToken);
+        var encounters = visitRows.Select(row => row.Visit).ToList();
+        var visitVitals = visitRows.ToDictionary(row => row.Visit.Id, row => new VisitVitals(row.Systolic, row.Diastolic, row.HeartRate));
         var orders = await ActiveOrders(id, catalogCode: null).ToListAsync(cancellationToken);
         // Only when the discontinue page sent the clinician here: whether that order is this patient's, and discontinued.
         var confirmed = discontinued is not null && await db.Orders.AsNoTracking()
@@ -113,6 +124,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         {
             HasNotes = found.Notes,
             HasDrafts = found.Drafts,
+            VisitVitals = visitVitals,
             Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,
@@ -286,7 +298,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         var results = await db.Observations.AsNoTracking()
-            .Where(o => o.PatientId == patientId && o.IssuedAt != null && ObservationStatus.Released.Contains(o.Status))
+            // Laboratory results: vital signs are observations too since step 9, and have their own lists.
+            .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.Laboratory && o.IssuedAt != null && ObservationStatus.Released.Contains(o.Status))
             .OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Display).ThenBy(o => o.Id)
             .ToListAsync(cancellationToken);
 

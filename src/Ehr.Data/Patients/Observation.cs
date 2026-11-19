@@ -15,6 +15,12 @@ public class Observation
     // The lab order this result answers (UC 1), when there is one; it must be the same patient's.
     public Guid? OrderId { get; set; }
 
+    // One of ObservationCategory: a laboratory result, or a vital sign (the expansion plan's step 9).
+    public string Category { get; set; } = ObservationCategory.Laboratory;
+
+    // The visit a vital sign was taken at, when it was taken at one.
+    public Guid? EncounterId { get; set; }
+
     // The test as a LOINC code, such as 4548-4 for hemoglobin A1c, when it has one.
     public string? Code { get; set; }
 
@@ -45,6 +51,33 @@ public class Observation
 }
 
 // FHIR R4's Observation status codes, the values Observation.Status may hold.
+// FHIR's observation categories, the two this system records.
+public static class ObservationCategory
+{
+    public const string Laboratory = "laboratory";
+
+    public const string VitalSigns = "vital-signs";
+
+    public static readonly string[] All = [Laboratory, VitalSigns];
+}
+
+// The vital signs recorded (step 9), by LOINC code, as db/reference loads them into ehr.observation_codes.
+public static class VitalSign
+{
+    public const string Systolic = "8480-6";
+    public const string Diastolic = "8462-4";
+    public const string HeartRate = "8867-4";
+    public const string Temperature = "8310-5";
+    public const string RespiratoryRate = "9279-1";
+    public const string OxygenSaturation = "59408-5";
+    public const string Weight = "29463-7";
+    public const string Height = "8302-2";
+    public const string BodyMassIndex = "39156-5";
+
+    // In the order a flowsheet lists them.
+    public static readonly string[] All = [Systolic, Diastolic, HeartRate, Temperature, RespiratoryRate, OxygenSaturation, Weight, Height, BodyMassIndex];
+}
+
 public static class ObservationStatus
 {
     public const string Registered = "registered";

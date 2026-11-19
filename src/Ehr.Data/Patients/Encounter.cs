@@ -26,11 +26,6 @@ public class Encounter
     public DateTimeOffset? PeriodEnd { get; set; }
 
     // Blood pressure in mmHg and heart rate in beats a minute, when taken.
-    public short? SystolicMmHg { get; set; }
-
-    public short? DiastolicMmHg { get; set; }
-
-    public short? HeartRatePerMinute { get; set; }
 }
 
 // FHIR R4's Encounter status codes, the values Encounter.Status may hold.

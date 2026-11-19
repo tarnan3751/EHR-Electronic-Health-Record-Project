@@ -413,7 +413,7 @@ else if (Model.Chart.SensitiveHidden > 0)
             var latest = Model.Chart.Visits[0];
             <p class="latest-visit">
                 Latest visit, @latest.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd"):
-                blood pressure @(ChartModel.BloodPressure(latest) ?? "not taken"), heart rate @(ChartModel.HeartRate(latest) ?? "not taken").
+                blood pressure @(Model.BloodPressure(latest) ?? "not taken"), heart rate @(Model.HeartRate(latest) ?? "not taken").
             </p>
             <div class="sc-table-wrap">
                 <table class="sc-table">
@@ -426,8 +426,8 @@ else if (Model.Chart.SensitiveHidden > 0)
                             <tr>
                                 <td class="sc-table__mono">@visit.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd")</td>
                                 <td>@visit.Reason</td>
-                                <td>@ChartModel.BloodPressure(visit)</td>
-                                <td>@ChartModel.HeartRate(visit)</td>
+                                <td>@Model.BloodPressure(visit)</td>
+                                <td>@Model.HeartRate(visit)</td>
                             </tr>
                         }
                     </tbody>
