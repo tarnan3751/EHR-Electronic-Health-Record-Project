@@ -24,10 +24,8 @@ public sealed class RequestAuditEventsTests
         // Each write: how many events, and whether any of the response had started on its way by then.
         public List<(int Events, bool AfterPage)> Writes { get; } = [];
 
-        // Whether the response had started when the queue was last asked: set by the test app's outermost step.
+        // Whether the response has started on its way: set by the test app's outermost step.
         public Func<bool> Started { get; set; } = () => false;
-
-        public bool PageWritten { get => Started(); set { } }
 
         public void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents)
         {
@@ -36,7 +34,7 @@ public sealed class RequestAuditEventsTests
                 throw new IOException("Synthetic: the disk is full.");
             }
 
-            Writes.Add((auditEvents.Count, PageWritten));
+            Writes.Add((auditEvents.Count, Started()));
         }
     }
 
@@ -87,11 +85,11 @@ public sealed class RequestAuditEventsTests
         return (response, await response.Content.ReadAsStringAsync(Cancel));
     }
 
-    static async Task WritePageAsync(HttpContext context, RecordingQueue queue)
+    // The handler writes its page and flushes it, as far as it can tell.
+    static async Task WritePageAsync(HttpContext context)
     {
         await context.Response.WriteAsync(Found);
         await context.Response.Body.FlushAsync();
-        queue.PageWritten = true;
     }
 
     [Fact]
@@ -105,7 +103,7 @@ public sealed class RequestAuditEventsTests
             events.Enqueue([Read()]);
             events.Enqueue([Read("clinical_notes"), Read("clinical_notes")]);
             Assert.Empty(queue.Writes);
-            await WritePageAsync(context, queue);
+            await WritePageAsync(context);
             // The handler has written and flushed its page; none of it has left, and no event is written yet.
             Assert.False(context.Response.HasStarted);
             Assert.Empty(queue.Writes);
@@ -124,7 +122,7 @@ public sealed class RequestAuditEventsTests
         var (response, body) = await RequestAsync(queue, async (context, events) =>
         {
             events.Enqueue([Read()]);
-            await WritePageAsync(context, queue);
+            await WritePageAsync(context);
         });
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -213,7 +211,7 @@ public sealed class RequestAuditEventsTests
         {
             events.Enqueue([Read()]);
             events.Enqueue([refused]);
-            await WritePageAsync(context, queue);
+            await WritePageAsync(context);
         });
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);

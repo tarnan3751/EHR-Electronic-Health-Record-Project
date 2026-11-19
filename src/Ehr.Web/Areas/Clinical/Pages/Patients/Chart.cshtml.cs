@@ -48,7 +48,7 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     public bool Sensitive { get; set; }
 
     public IReadOnlyList<ClinicalDraft> Drafts { get; private set; } = [];
-    public IReadOnlyList<ClinicalNote> Notes { get; private set; } = [];
+    public IReadOnlyList<SignedNoteEntry> Notes { get; private set; } = [];
 
     // The patient's conversations with their care team (FR-18), latest first.
     public IReadOnlyList<Ehr.Domain.Messaging.ThreadEntry> Threads => Chart.Threads;
@@ -144,10 +144,7 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         }
 
         Chart = chart;
-        if (chart.HasNotes)
-        {
-            Notes = await phi.NotesAsync(id, HttpContext.RequestAborted, Sensitive);
-        }
+        Notes = chart.Notes;
 
         if (OnPanel && chart.HasDrafts)
         {

@@ -14,7 +14,7 @@ namespace Ehr.Web.CloudAudit;
 // two only ships some events twice, which the on-prem app ignores (AuditEventImport). A line cut short by a crash was
 // never confirmed to anyone, so it is dropped at startup. The files are as encrypted as the disk they're on, like the
 // databases (see "Encryption" in infra/compose/README.md).
-public sealed class CloudAuditQueue : IAuditQueue, IDurableAuditQueue, IDisposable
+public sealed class CloudAuditQueue : IDurableAuditQueue, IDisposable
 {
     const byte NewLine = (byte)'\n';
 

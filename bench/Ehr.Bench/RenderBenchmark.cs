@@ -150,8 +150,10 @@ internal static partial class RenderBenchmark
                 // those rows measure what they did. The note's page with its addenda, and the page that signs one.
                 var noted = await SignNotesAsync(app, clinicianId, patients);
                 var noteRandom = new Random(20261121);
+                // A generator of its own, so the rows after it pick the notes they always did.
+                var notedChartRandom = new Random(20261124);
                 results.Add(await MeasureAsync(client, times, "Chart with a signed note, a patient on the panel", typing: false,
-                    () => $"/patients/{noted[noteRandom.Next(noted.Count)].Patient}"));
+                    () => $"/patients/{noted[notedChartRandom.Next(noted.Count)].Patient}"));
                 results.Add(await MeasureAsync(client, times, "Signed note with addenda, a patient on the panel", typing: false, () =>
                 {
                     var (patient, note) = noted[noteRandom.Next(noted.Count)];

@@ -91,13 +91,20 @@ Measured for the expansion plan's step 10c (Tahseen's diagnosis, 19 November 202
 - **Before step 10c each audit event was its own write and flush.** A page that recorded one event paid once; a chart with a signed note, or a note's page, recorded two and paid twice (7.2 ms).
 - **Now a request's events are held as they are recorded and written together, once, before any of the page is sent** (`CloudAudit/RequestAuditEvents.cs`). The page is kept in memory while the handler makes it, the events are written and flushed, and then the page goes out. If the write fails, the error page is sent and the page that was made is thrown away: a read is never shown without its durable record, the rule the on-site app keeps by committing the event in the request's transaction.
 
-| Off-site page | Events | Before: mean, p99 (whole request) | After |
+| Off-site page | Events | Before: mean; p99 whole request; p99 excluding the commit | After |
 |---|---|---|---|
-| Chart with a signed note | 2 | 15.2 ms, 19.2 ms | 10.1 ms, 17.0 ms |
-| Signed note with addenda | 2 | 15.6 ms, 22.2 ms | 9.0 ms, 11.1 ms |
-| Chart (no notes) | 1 | 12.8 ms, 19.6 ms | 10.1 ms, 16.1 ms |
+| Chart with a signed note | 2 | 15.2 ms; 19.2 ms; 10.5 ms | 10.1 ms; 17.0 ms; 12.5 ms |
+| Signed note with addenda | 2 | 15.6 ms; 22.2 ms; 13.7 ms | 9.0 ms; 11.1 ms; 7.4 ms |
+| Chart (no notes) | 1 | 12.8 ms; 19.6 ms; 14.7 ms | 10.1 ms; 16.1 ms; 10.5 ms |
 
-A page that records one event pays the same one flush as before; the chart's difference between the two runs is run-to-run variation, not this change. Pages that record more gain a flush for each event beyond the first. What would bring every off-site page down is a cheaper durable write (the flush itself), which this step does not change.
+One run each, before and after, on one machine. "Excluding the commit" is the figure the NFR-03 gate checks; it takes the flush's own time out, so for the pages with two events it shows little of this change, whose saving is a flush.
+
+- A page that records one event pays the same one flush as before. Its flush now comes after all its statements, where it used to come part-way, and by the after-effect above that could itself help; the chart's difference between the two runs can't be told apart from run-to-run variation.
+- Pages that record more gain a flush for each event beyond the first.
+- If the events are written and sending the page then fails, because the browser has gone, the read is recorded for a page nobody received.
+- **On Linux the flush is much cheaper.** CI's Linux runner measured about 0.7 ms for it (the off-site chart's commit time in the benchmark job), against 3.7 ms on the development Mac, where .NET's flush waits for the drive. The clinic's cloud server is Linux: the saving there will be smaller in milliseconds, and the off-site pages were never as slow there as they look on a Mac.
+
+Tests: `RequestAuditEventsTests` (the middleware and holder in a small app: order, failure, a response with no body, a failing handler, a large page, a refused event) and TC-UC2-07 (the real cloud app).
 
 ## Restore drill
 
