@@ -103,17 +103,42 @@ public class DrugClassCrossReaction
     public required string Source { get; set; }
 }
 
-// A known interaction between two ingredients, by RxNorm code, the lower code first, with its level. From DDInter 2.0,
-// which is licensed CC BY-NC-SA 4.0: an accepted exception to the project's free-software rule, kept in its own folder
-// (db/reference/ddinter) with its license and citation.
+// A known interaction between two ingredients, by RxNorm code, the lower code first, as one source gives it: a pair
+// can have a row from each source, and a warning names the source it came from. Three sources (step 8):
+//   ddinter    DDInter 2.0, with its level. CC BY-NC-SA 4.0: an accepted exception to the project's free-software
+//              rule, kept in its own folder (db/reference/ddinter) with its license and citation.
+//   onc        The ONC high-priority list (Phansalkar et al., 2012), as Wikidata's "significant drug interaction"
+//              statements record it. CC0. Every pair is "high-priority".
+//   fda-label  A short hand-written list for important pairs neither covers, each citing the FDA label
+//              (DailyMed, public domain) whose Drug Interactions section it paraphrases.
 public class DrugInteraction
 {
     public required string IngredientA { get; set; }
 
     public required string IngredientB { get; set; }
 
+    // One of DrugInteractionSource.
+    public string Source { get; set; } = DrugInteractionSource.DdInter;
+
     // One of DrugInteractionLevel.
     public required string Level { get; set; }
+
+    // What the source says about the pair, in the project's own words: only the hand-written rows have one.
+    public string? Detail { get; set; }
+
+    // Where a reader can check it: the label's title and DailyMed address, or the paper.
+    public string? Citation { get; set; }
+}
+
+public static class DrugInteractionSource
+{
+    public const string DdInter = "ddinter";
+
+    public const string Onc = "onc";
+
+    public const string FdaLabel = "fda-label";
+
+    public static readonly string[] All = [DdInter, Onc, FdaLabel];
 }
 
 public static class DrugInteractionLevel
@@ -124,7 +149,10 @@ public static class DrugInteractionLevel
 
     public const string Minor = "minor";
 
-    public static readonly string[] All = [Major, Moderate, Minor];
+    // The ONC list's own grade: pairs it says should always interrupt the prescriber.
+    public const string HighPriority = "high-priority";
+
+    public static readonly string[] All = [Major, Moderate, Minor, HighPriority];
 }
 
 // Maps the tables above. EhrDbContext picks these up with ApplyConfigurationsFromAssembly.
@@ -214,11 +242,15 @@ public sealed class DrugInteractionConfiguration : IEntityTypeConfiguration<Drug
         {
             table.HasCheckConstraint("ck_drug_interactions_level", $"level IN ({Codes.List(DrugInteractionLevel.All)})");
             table.HasCheckConstraint("ck_drug_interactions_order", "ingredient_a < ingredient_b");
+            table.HasCheckConstraint("ck_drug_interactions_source", $"source IN ({Codes.List(DrugInteractionSource.All)})");
         });
-        interaction.HasKey(i => new { i.IngredientA, i.IngredientB });
+        interaction.HasKey(i => new { i.IngredientA, i.IngredientB, i.Source });
         interaction.Property(i => i.IngredientA).HasMaxLength(20);
         interaction.Property(i => i.IngredientB).HasMaxLength(20);
+        interaction.Property(i => i.Source).HasMaxLength(20).HasDefaultValue(DrugInteractionSource.DdInter);
         interaction.Property(i => i.Level).HasMaxLength(20);
+        interaction.Property(i => i.Detail).HasMaxLength(1000);
+        interaction.Property(i => i.Citation).HasMaxLength(500);
         // Looked up from either side.
         interaction.HasIndex(i => i.IngredientB);
     }

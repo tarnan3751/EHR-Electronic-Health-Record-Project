@@ -1,0 +1,13 @@
+# Wikidata's "significant drug interaction" (P769) statements whose reference is the ONC high-priority list
+# (Q17505343: Phansalkar S, et al. High-priority drug-drug interactions for use in electronic health records.
+# J Am Med Inform Assoc. 2012;19(5):735-743), with each side's RxNorm code (P3345).
+# Run at https://query.wikidata.org on 19 November 2026; the result is onc-high-priority-interactions-2026-11-19.csv.
+SELECT DISTINCT ?a ?aLabel ?aRxnorm ?b ?bLabel ?bRxnorm WHERE {
+  ?a p:P769 ?statement .
+  ?statement ps:P769 ?b ;
+             prov:wasDerivedFrom/pr:P248 wd:Q17505343 .
+  ?a wdt:P3345 ?aRxnorm .
+  ?b wdt:P3345 ?bRxnorm .
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+}
+ORDER BY ?a ?b

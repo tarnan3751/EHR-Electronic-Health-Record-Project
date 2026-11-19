@@ -28,7 +28,9 @@ None of these tables is patient data. Both apps read them and nothing at runtime
 | `drug_ingredients` | What each drug product is made of | The same RxNorm release (RXNREL) | 25,490 |
 | `drug_classes` | The class an ingredient belongs to | FDA pharmacologic class indexing files, and DailyMed's mapping files, downloaded 18 November 2026 | 2,105 |
 | `drug_class_cross_reactions` | Which classes cross-react in an allergic patient | Curated by this project, each row citing its source | 2 |
-| `drug_interactions` | Interactions between two ingredients | DDInter 2.0, downloaded 18 November 2026 | 81,610 |
+| `drug_interactions`, source `ddinter` | Interactions between two ingredients, with DDInter's level | DDInter 2.0, downloaded 18 November 2026 | 81,610 |
+| `drug_interactions`, source `onc` | The ONC high-priority interactions, each marked "high-priority" | Wikidata's "significant drug interaction" statements that cite the ONC list, queried 19 November 2026 (`db/reference/wikidata`) | 709 |
+| `drug_interactions`, source `fda-label` | Important pairs neither holds, with what the label says | Hand-written from FDA labels on DailyMed (`db/reference/60-label-interactions.sql`) | 23 |
 
 The clinic's 29 common order items (`SYN-...`) come from a migration, not from here; where a standard code applies they name it.
 
@@ -61,6 +63,19 @@ Two rows, both from Khan DA, Banerji A, Blumenthal KG, et al. Drug allergy: a 20
 ### What DDInter's files do and don't hold
 
 Each row is two drug names and a level (major, moderate, minor or unknown). There is no management advice in the files; that text is only on DDInter's web pages. Of 222,383 rows, 47,182 have an unknown level and are left out, and 56,526 name a drug that isn't a RxNorm ingredient (446 of DDInter's 1,939 drugs, many not sold in the United States). 81,610 distinct pairs are loaded. The checks built on this are decision support for a demonstration system, not a complete clinical reference.
+
+### Why DDInter is supplemented, and with what
+
+DDInter's eight download files hold only pairs where at least one drug has an ATC code in groups A, B, D, H, L, P, R or V. Pairs where neither does are not in the files: an SSRI with tramadol, an ACE inhibitor with an angiotensin receptor blocker, a beta-blocker with verapamil. Tahseen decided on 19 November 2026 to supplement it rather than ship around the gaps. A pair can have a row from each source, and every warning names the source it came from.
+
+- **The ONC high-priority list**, by way of Wikidata. Phansalkar S, Desai AA, Bell D, et al. High-priority drug-drug interactions for use in electronic health records. *J Am Med Inform Assoc.* 2012;19(5):735-743: the interactions an electronic record should always warn about. Wikidata records them as "significant drug interaction" (P769) statements that cite the paper, with each drug's RxNorm code; Wikidata is CC0. The query and its dated result are committed in `db/reference/wikidata`, so building the data reads the repository, never the network. Of 1,798 statements, 709 pairs are between RxNorm ingredients; 280 of those DDInter also has. Each is loaded with the level "high-priority".
+- **FDA labels**, by hand. `db/reference/60-label-interactions.sql` lists 23 pairs, each with what the label's Drug Interactions section (or its contraindications or boxed warning) says, paraphrased closely, and the label it was read from with its DailyMed set ID. Labels are in the public domain. The level on these rows is this project's reading of the label: major where the label contraindicates the pair, carries a boxed warning or reports a serious outcome; moderate where it says to monitor or adjust; minor otherwise.
+
+Coverage of the order catalog's 2,581 medication ingredients, pairs with a warning: 78,166 from DDInter alone, 78,580 with both supplements (391 more from ONC, 23 from labels). The numbers are small beside DDInter's because the supplements are aimed at what it lacks, not at volume.
+
+**What is still not covered.** Labels mostly speak of classes ("angiotensin receptor blockers", "benzodiazepines", "SSRIs"), and the hand-written table lists pairs, so it covers the pairs written and not their classmates: lisinopril with losartan is there, enalapril with valsartan is not. By class, among catalog ingredients: ACE inhibitor with angiotensin receptor blocker 1 of 88 pairs, beta-blocker with calcium channel blocker 2 of 160, SSRI with SNRI 0 of 40, antipsychotic with antiarrhythmic 18 of 228. No warning never means a pair is safe, and the order form says so.
+
+DDInter's website is not read by any tool here: only its download files. A warning from DDInter links to DDInter's interaction checker, not to a page for the pair, because the files don't give the addresses of pair pages.
 
 ## Not loaded, and why
 

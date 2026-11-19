@@ -1180,3 +1180,25 @@ VALUES ('20261118230602_ProxyOnlyAccounts', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.drug_interactions DROP CONSTRAINT pk_drug_interactions;
+
+ALTER TABLE ehr.drug_interactions DROP CONSTRAINT ck_drug_interactions_level;
+
+ALTER TABLE ehr.drug_interactions ADD source character varying(20) NOT NULL DEFAULT 'ddinter';
+
+ALTER TABLE ehr.drug_interactions ADD citation character varying(500);
+
+ALTER TABLE ehr.drug_interactions ADD detail character varying(1000);
+
+ALTER TABLE ehr.drug_interactions ADD CONSTRAINT pk_drug_interactions PRIMARY KEY (ingredient_a, ingredient_b, source);
+
+ALTER TABLE ehr.drug_interactions ADD CONSTRAINT ck_drug_interactions_level CHECK (level IN ('major', 'moderate', 'minor', 'high-priority'));
+
+ALTER TABLE ehr.drug_interactions ADD CONSTRAINT ck_drug_interactions_source CHECK (source IN ('ddinter', 'onc', 'fda-label'));
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119014012_InteractionSources', '10.0.13');
+
+COMMIT;
+

@@ -456,11 +456,45 @@ foreach (var (file, sha) in ddinter)
 Write(Path.Combine("ddinter", "10-drug-interactions.sql"),
     "Interactions between two drug ingredients (RxNorm codes, the lower first), each with DDInter's level.\n"
     + "-- From DDInter 2.0 (https://ddinter2.scbdd.com), licensed CC BY-NC-SA 4.0: see LICENSE.md in this folder. Not for commercial use.",
-    new Table("drug_interactions", ["ingredient_a", "ingredient_b", "level"], 2,
-        [.. interactions.Select(pair => new[] { pair.Key.A, pair.Key.B, levels[pair.Value] })]));
+    new Table("drug_interactions", ["ingredient_a", "ingredient_b", "source", "level"], 3,
+        [.. interactions.Select(pair => new[] { pair.Key.A, pair.Key.B, "ddinter", levels[pair.Value] })], Scope: "t.source = 'ddinter'"));
 Console.WriteLine($"drug_interactions           {interactions.Count,8:N0}  from {pairs:N0} rows: {unknown:N0} of unknown level, {unmatchedPairs:N0} with a drug that isn't a RxNorm ingredient");
 Console.WriteLine($"  DDInter drugs: {drugNames.Count:N0}; not matched: {unmatchedNames.Count:N0}, the most frequent: "
     + string.Join(", ", unmatchedNames.OrderByDescending(pair => pair.Value).Take(12).Select(pair => pair.Key)));
+
+// ---- The ONC high-priority interactions, from Wikidata ----------------------------------------------------------------
+
+// Wikidata's "significant drug interaction" (P769) statements whose reference is the ONC high-priority list (Phansalkar
+// et al., J Am Med Inform Assoc 2012, Q17505343), each side with its RxNorm code (P3345). Wikidata is CC0. The query's
+// result is committed, dated, beside the query that made it (db/reference/wikidata), so this step reads the
+// repository and never the network. A pair is kept when both codes are RxNorm ingredients; every one is "high-priority".
+const string oncCsv = "onc-high-priority-interactions-2026-11-19.csv";
+const string oncCitation = "ONC high-priority drug-drug interactions (Phansalkar S, et al. J Am Med Inform Assoc. 2012;19(5):735-743), from Wikidata's \"significant drug interaction\" statements, 19 November 2026.";
+var ingredientCodes = rxType.Where(pair => pair.Value == "IN").Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal);
+var onc = new SortedSet<(string A, string B)>();
+var (oncRows, oncUnknown) = (0, 0);
+using (var reader = new StreamReader(Path.Combine(root, "db", "reference", "wikidata", oncCsv), Encoding.UTF8))
+{
+    foreach (var row in Csv(reader))
+    {
+        oncRows++;
+        var (a, b) = (row["a_rxnorm"], row["b_rxnorm"]);
+        if (a == b || !ingredientCodes.Contains(a) || !ingredientCodes.Contains(b))
+        {
+            oncUnknown++;
+            continue;
+        }
+
+        onc.Add(string.CompareOrdinal(a, b) < 0 ? (a, b) : (b, a));
+    }
+}
+
+Write("50-onc-interactions.sql",
+    "The ONC high-priority drug-drug interactions (Phansalkar et al., 2012) between two ingredients (RxNorm codes, the lower\n"
+    + $"-- first), from Wikidata's \"significant drug interaction\" statements (CC0): db/reference/wikidata/{oncCsv}.",
+    new Table("drug_interactions", ["ingredient_a", "ingredient_b", "source", "level", "citation"], 3,
+        [.. onc.Select(pair => new[] { pair.A, pair.B, "onc", "high-priority", oncCitation })], Scope: "t.source = 'onc'"));
+Console.WriteLine($"drug_interactions (ONC)     {onc.Count,8:N0}  from {oncRows:N0} statements: {oncUnknown:N0} with a side that isn't a RxNorm ingredient");
 return 0;
 
 // ---- Helpers -----------------------------------------------------------------------------------------------------
@@ -507,7 +541,8 @@ void Write(string name, string about, params Table[] tables)
         if (!table.Keep)
         {
             sql.Append($"DELETE FROM ehr.{table.Name} t\n");
-            sql.Append($"WHERE NOT EXISTS (SELECT 1 FROM incoming_{table.Name} i WHERE {string.Join(" AND ", keys.Select(key => $"i.{key} = t.{key}"))});\n");
+            sql.Append($"WHERE NOT EXISTS (SELECT 1 FROM incoming_{table.Name} i WHERE {string.Join(" AND ", keys.Select(key => $"i.{key} = t.{key}"))})");
+            sql.Append(table.Scope is null ? ";\n" : $"\n    AND {table.Scope};\n");
         }
     }
 
@@ -622,7 +657,8 @@ static string ScriptPath([CallerFilePath] string path = "") => path;
 
 // A table to fill: its columns (a cast after "::" where the column isn't text), how many of the first are its key,
 // and its rows. Keep leaves rows the file doesn't have; Where limits which existing rows it may change.
-record Table(string Name, string[] Columns, int Keys, IReadOnlyList<string?[]> Rows, bool Keep = false, string? Where = null);
+// Scope limits which existing rows it may delete, for a table that other files fill too (alias t).
+record Table(string Name, string[] Columns, int Keys, IReadOnlyList<string?[]> Rows, bool Keep = false, string? Where = null, string? Scope = null);
 
 static class Checked
 {
