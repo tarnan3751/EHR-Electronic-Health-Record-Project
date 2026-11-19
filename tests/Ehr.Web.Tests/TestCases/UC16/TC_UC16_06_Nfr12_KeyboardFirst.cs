@@ -44,7 +44,8 @@ public class TC_UC16_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/appointments/new");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#appointment-clinician')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('#appointment-clinician')");
         Assert.True(await page.EvaluateAsync<bool>("document.querySelector('#appointment-day').value !== ''"));
 
         await AiReviewBrowserTests.TabToAsync(page, "#appointment-time");

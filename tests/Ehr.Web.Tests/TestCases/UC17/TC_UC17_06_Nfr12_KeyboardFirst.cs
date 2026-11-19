@@ -45,7 +45,8 @@ public class TC_UC17_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/messages/*");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#message-body')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('#message-body')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         await page.Keyboard.TypeAsync("Synthetic: answered by keyboard");

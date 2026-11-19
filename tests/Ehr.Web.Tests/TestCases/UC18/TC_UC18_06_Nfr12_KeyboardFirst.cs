@@ -52,7 +52,8 @@ public class TC_UC18_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/proxies");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#proxy-email')"));
+        // Focus lands once the page has loaded: waited for, not looked at once (it failed now and then under load).
+        await page.WaitForFunctionAsync("document.activeElement.matches('#proxy-email')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         await page.Keyboard.TypeAsync(proxy.Email);
