@@ -15,13 +15,13 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 // all of it (db/policies/75-results.sql): this page only asks. Off-site it is read from the cloud copy and its posts
 // are forwarded to the clinic's server.
 [ShownIfNotSaved(nameof(CollectedAt))]
-public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, LabResults results) : MessagePage(assignments, breakGlass)
+public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, LabResults results, Ehr.Domain.Time.ClinicTime clinic) : MessagePage(assignments, breakGlass)
 {
     // The values typed, by test code.
     [BindProperty]
     public Dictionary<string, string?> Values { get; set; } = [];
 
-    // When the sample was collected, UTC, as a datetime-local field sends it.
+    // When the sample was collected, on the clinic's clock (step 10d), as a datetime-local field sends it.
     [BindProperty]
     public string? CollectedAt { get; set; }
 
@@ -42,7 +42,8 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
 
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid orderId)
     {
-        CollectedAt ??= DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+        // The clinic's clock, which is what the field takes (step 10d).
+        CollectedAt ??= clinic.Now.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
         return await LoadAsync(patientId, orderId, writing: false) ?? Page();
     }
 
@@ -54,10 +55,16 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
         }
 
         DateTimeOffset? collected = DateTime.TryParseExact(CollectedAt, ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"], CultureInfo.InvariantCulture,
-            DateTimeStyles.None, out var typed) ? new DateTimeOffset(typed, TimeSpan.Zero) : null;
+            DateTimeStyles.None, out var typed) ? clinic.From(typed) : null;
         // Only the tests the order reports that still wait for a result: anything else typed is ignored.
         var waiting = Order.Tests.Where(test => test.Value is null).Select(test => test.Code).ToHashSet(StringComparer.Ordinal);
         var errors = LabResults.Check(Values.Where(value => waiting.Contains(value.Key)).ToDictionary(), collected, out var values);
+        if (collected is null && typed != default && errors.ContainsKey(nameof(CollectedAt)))
+        {
+            // A time was typed, and the clinic's clocks skip it that day.
+            errors[nameof(CollectedAt)] = "That time doesn't exist on that day: the clocks go forward. Enter the time on the clinic's clock.";
+        }
+
         if (errors.Count == 0)
         {
             if (Order.OpenToResults && await results.FileAsync(patientId, orderId, values, collected!.Value, HttpContext.RequestAborted))

@@ -62,7 +62,7 @@ public static class DesktopApi
 
     // POST so the cloud forwards this to the primary, where the chart reads are audited.
     static async Task<IResult> OfflinePanelAsync(
-        EhrDbContext db, PhiReader phi, UserContext user, HttpContext context, CancellationToken cancellationToken)
+        EhrDbContext db, PhiReader phi, UserContext user, HttpContext context, Ehr.Domain.Time.ClinicTime clinic, CancellationToken cancellationToken)
     {
         // The Desktop policy authenticates the bearer scheme after UserContextMiddleware.
         if (!Guid.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var clinicianId))
@@ -91,7 +91,9 @@ public static class DesktopApi
             chart.Allergies.Any(a => a.Code != AllergyIntolerance.NoKnownAllergy) ? "listed" : chart.Allergies.Count > 0 ? "none-known" : "not-recorded",
             // Signed notes and their addenda (step 10); sensitive ones were left out by the read, and are counted above.
             chart.OfflineNotes.Select(n => new CachedNote(n.Note.SignedAt, n.SignerName, n.Note.History, n.Note.Assessment, n.Note.Plan,
-                n.Addenda.Select(a => new CachedAddendum(a.SignedAt, a.AuthorName, a.Text, !a.ByNoteAuthor)).ToList(), n.SensitiveAddendaNotKept)).ToList())).ToList());
+                n.Addenda.Select(a => new CachedAddendum(a.SignedAt, a.AuthorName, a.Text, !a.ByNoteAuthor)).ToList(), n.SensitiveAddendaNotKept)).ToList(),
+            // The zone the desktop shows these times in (step 10d).
+            clinic.Id)).ToList());
     }
 
     // A vital sign as the desktop app's contract carries it: a whole number.

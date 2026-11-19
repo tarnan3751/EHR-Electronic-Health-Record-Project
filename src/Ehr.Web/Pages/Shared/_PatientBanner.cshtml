@@ -2,6 +2,7 @@
    section, which the layout renders directly under the app bar; it stays put while the page scrolls. *@
 @using Ehr.Data.Patients
 @model PatientBanner
+@inject Ehr.Domain.Time.ClinicTime Clinic
 <section class="sc-banner" aria-label="Patient">
     @if (Model.Title)
     {
@@ -25,7 +26,7 @@
         <div class="sc-banner__end">
             @if (Model.EmergencyUntil is { } until)
             {
-                <span class="sc-tag sc-tag--danger">Emergency access until @until.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                <span class="sc-tag sc-tag--danger">Emergency access until @Clinic.Format(until)</span>
             }
             @if (Model.Known.Count > 0)
             {

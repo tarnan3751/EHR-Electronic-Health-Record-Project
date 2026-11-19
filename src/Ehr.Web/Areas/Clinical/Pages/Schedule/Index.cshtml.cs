@@ -7,10 +7,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Ehr.Web.Areas.Clinical.Pages.Schedule;
 
-// A clinician's day (FR-17): the appointments that start on one day, UTC, earliest first, for the signed-in clinician
+// A clinician's day (FR-17): the appointments that start on one day of the clinic's calendar, earliest first, for the signed-in clinician
 // or a colleague. Read-only, so it works off-site like the chart. Each patient named is a recorded read of that
 // patient (PhiReader.ScheduleAsync). For clinicians: the page's policy (Program.cs).
-public class IndexModel(PhiReader phi, Appointments appointments, Ehr.Domain.Patients.PatientAssignments assignments) : PageModel
+public class IndexModel(PhiReader phi, Appointments appointments, Ehr.Domain.Patients.PatientAssignments assignments, Ehr.Domain.Time.ClinicTime clinic) : PageModel
 {
     // The clinician whose day it is; the signed-in one when not given.
     [BindProperty(SupportsGet = true)]
@@ -43,11 +43,13 @@ public class IndexModel(PhiReader phi, Appointments appointments, Ehr.Domain.Pat
         Response.Headers.CacheControl = "no-store";
         Date = DateOnly.TryParseExact(Day, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
             ? day
-            : DateOnly.FromDateTime(DateTime.UtcNow);
+            : clinic.Today;
         Clinicians = await appointments.CliniciansAsync(HttpContext.RequestAborted);
         Me = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         Shown = Clinician is { } asked && Clinicians.Any(c => c.Id == asked) ? asked : Me;
         Panel = Shown == Me ? [] : await assignments.PanelIdsAsync(HttpContext.RequestAborted);
-        Appointments = await phi.ScheduleAsync(Shown, Date, HttpContext.RequestAborted);
+        // The clinic's calendar day (step 10d): from its midnight to the next.
+        var (from, to) = clinic.DayBounds(Date);
+        Appointments = await phi.ScheduleAsync(Shown, from, to, HttpContext.RequestAborted);
     }
 }

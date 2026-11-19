@@ -43,19 +43,19 @@ else
                         <td>@grant.Email</td>
                         <td>@ProxyAccess.ScopeLabel(grant.Scope)</td>
                         <td>@(grant.IncludeSensitive ? "Shown (the patient allowed it)" : "Hidden")</td>
-                        <td>@(grant.ByClinic ? "By the clinic" : "By the patient"), @grant.GrantedAt.UtcDateTime.ToString("yyyy-MM-dd")</td>
+                        <td>@(grant.ByClinic ? "By the clinic" : "By the patient"), @Clinic.Day(grant.GrantedAt)</td>
                         <td>
                             @if (grant.InForce)
                             {
-                                <span class="sc-tag sc-tag--success">In force</span> <span>until @grant.ExpiresAt.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                                <span class="sc-tag sc-tag--success">In force</span> <span>until @Clinic.Day(grant.ExpiresAt)</span>
                             }
                             else if (grant.RevokedAt is { } revoked)
                             {
-                                <span class="sc-tag">Removed</span> <span>@revoked.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                                <span class="sc-tag">Removed</span> <span>@Clinic.Day(revoked)</span>
                             }
                             else
                             {
-                                <span class="sc-tag">Expired</span> <span>@grant.ExpiresAt.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                                <span class="sc-tag">Expired</span> <span>@Clinic.Day(grant.ExpiresAt)</span>
                             }
                         </td>
                         <td>

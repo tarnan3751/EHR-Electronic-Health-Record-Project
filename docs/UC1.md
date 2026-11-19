@@ -168,7 +168,7 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - The chart lists a patient's eight most relevant resulted orders (unacknowledged and abnormal first); there is no page of older ones yet.
 - The inbox looks at the oldest 500 waiting results when deciding which are abnormal.
 - Results are released to the portal as soon as they are filed, before anyone acknowledges them.
-- Collection time is entered and shown in UTC.
+- Collection time is entered and shown on the clinic's clock, labeled (the plan's step 10d), and stored in UTC.
 - A change keeps the order's type.
 - The chart's confirmation after discontinuing doesn't name the order; the discontinued orders list does.
 - An order isn't sent anywhere: no lab, pharmacy or referral interface.

@@ -52,6 +52,9 @@ builder.Services.AddScoped<Ehr.Domain.Inbox.StaffInbox>();
 builder.Services.AddEhrAccounts(builder.Configuration);
 builder.Services.AddSingleton(new AuditSource(site == Site.OnPrem ? AuditSources.OnPrem : AuditSources.Cloud));
 
+// The clinic's time zone (step 10d): required outside Development, where the default is UTC.
+builder.Services.AddSingleton(Ehr.Domain.Time.ClinicTime.FromSettings(
+    builder.Configuration["Ehr:Clinic:TimeZone"], builder.Configuration["Ehr:Clinic:TimeZoneAbbreviations"], builder.Environment.IsDevelopment()));
 // The addresses the app's links are built from: required outside Development, so a deployment that forgot one fails
 // here, at startup, with what to set (step 6c).
 var siteAddresses = SiteAddresses.Checked(builder.Configuration.GetSection(SiteAddresses.Section).Get<SiteAddresses>(), builder.Environment.IsDevelopment());

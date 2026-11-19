@@ -19,6 +19,10 @@ x-web-app: &web-app
     # email. The on-prem app handles forms posted to the cloud site, so it can't take these from the request.
     Ehr__Links__ClinicalBaseUrl: https://ehr-remote.example.com:9443
     Ehr__Links__PortalBaseUrl: https://portal.example.com:9443
+    # The clinic's time zone: clinician pages and the desktop app show and take times in it, labeled with these two
+    # abbreviations (standard, daylight). An IANA name. The audit log stays in UTC.
+    Ehr__Clinic__TimeZone: ${EHR_CLINIC_TIME_ZONE:-America/Chicago}
+    Ehr__Clinic__TimeZoneAbbreviations: ${EHR_CLINIC_TIME_ZONE_ABBREVIATIONS:-CST,CDT}
     # The keys that protect cookies and form tokens are encrypted at rest with the same certificate, which both apps
     # hold (see "Encryption" in the README).
     Ehr__DataProtection__Certificate: /certs/example.com.pem

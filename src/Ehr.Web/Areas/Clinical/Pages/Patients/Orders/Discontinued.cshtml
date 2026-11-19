@@ -40,8 +40,8 @@ else
                             <strong>@order.Display</strong> (@OrderForms.TypeNames[order.Type])
                             <br>@OrderForms.Summary(order.Type, order.Details)
                         </td>
-                        <td class="sc-table__mono">@order.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</td>
-                        <td class="sc-table__mono">@order.DiscontinuedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</td>
+                        <td class="sc-table__mono">@Clinic.Format(order.SignedAt)</td>
+                        <td class="sc-table__mono">@Clinic.Format(order.DiscontinuedAt)</td>
                         <td>@order.DiscontinuedBy</td>
                         <td>
                             @if (order.Replaced)

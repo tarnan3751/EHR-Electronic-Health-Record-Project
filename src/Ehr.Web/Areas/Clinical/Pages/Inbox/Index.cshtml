@@ -46,7 +46,7 @@ else
                 @foreach (var item in Model.Items.Items)
                 {
                     <tr data-inbox-item="@item.Kind">
-                        <td class="sc-table__mono">@((item.DoneAt ?? item.CreatedAt).UtcDateTime.ToString("yyyy-MM-dd HH:mm")) UTC</td>
+                        <td class="sc-table__mono">@Clinic.Format(item.DoneAt ?? item.CreatedAt)</td>
                         <td>
                             <span class="sc-tag">@InboxItemKind.Names.GetValueOrDefault(item.Kind, item.Kind)</span> @item.Summary
                             @if (item.Abnormal)
