@@ -21,11 +21,11 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Steps:
 //   1. Sign amoxicillin.
 //   2. Open the lab order form.
-//   3. Sign lisinopril with no reason, as a request the form's script would send, and look at the answer when the
-//      same order is then asked for again off-site.
+//   3. Choose "Sign order" for lisinopril; choose it again. Then ask for the same order again off-site.
 // Expected result: Step 1: signed with nothing found (the uncoded allergy can't be checked, and the form says only
-//   coded allergies and medications are). Step 2: no line about safety checks. Step 3: signed without a reason; the
-//   order holds the moderate interaction with metformin from DDInter and no reason. Off-site, the form for the same
+//   coded allergies and medications are). Step 2: no line about safety checks. Step 3: the first press signs nothing and
+//   brings the form back with "Be aware" and "Sign again to go ahead, or cancel.", the cursor on "Sign order" and no
+//   reason field; the second signs; the order holds the moderate interaction with metformin from DDInter and no reason. Off-site, the form for the same
 //   drug shows "Be aware" with "Interaction: lisinopril with metformin", "Moderate", "Source: DDInter 2.0" with a link
 //   to DDInter's interaction checker, "These don't stop the order.", and no reason field.
 // Creator: Tahseen Arnan
@@ -48,7 +48,20 @@ public class TC_UC1_19_SafetyInformationOnly(WebApps apps) : IClassFixture<WebAp
         Assert.DoesNotContain("data-safety-disclaimer", await session.Client.GetStringAsync(FormPath(patient, "lab"), Cancel));
 
         await SignedAsync(session.Client, patient, "medication", "Metformin 500 mg tablet", Details);
-        await SignedAsync(session.Client, patient, "medication", "Lisinopril 10 mg tablet", Details);
+
+        // The first "Sign order" brings the note up and signs nothing; the second signs, with no reason asked.
+        using var first = await SignAsync(session.Client, patient, "Lisinopril 10 mg tablet");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, first.StatusCode);
+        var notes = await first.Content.ReadAsStringAsync(Cancel);
+        Assert.Contains("data-order-safety=\"information\"", notes);
+        Assert.Contains("These don't stop the order. They are kept on it. Sign again to go ahead, or cancel.", Words(notes));
+        Assert.Contains("name=\"SafetySeen\" value=\"true\"", notes);
+        Assert.DoesNotContain("name=\"SafetyReason\"", notes);
+        Assert.DoesNotContain("aria-invalid", notes);
+        Assert.Matches("<button [^>]*data-order-sign[^>]*autofocus", notes);
+        Assert.Equal(2, (await OrdersAsync(apps, patient)).Count);
+        using var second = await SignAsync(session.Client, patient, "Lisinopril 10 mg tablet", seen: true);
+        Assert.Equal($"/patients/{patient}", PathOf(second));
         Assert.Equal(["-|-", "-|-", "-|interaction:moderate:ddinter"], await OrdersAsync(apps, patient));
 
         // Off-site, asking for lisinopril again: a duplicate now, which needs its own reason, and the interaction beside it.

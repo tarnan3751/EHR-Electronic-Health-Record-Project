@@ -38,12 +38,12 @@ static class SafetyTests
     }
 
     // "Sign order" for a medication as the form posts it without JavaScript, with the reason for overriding when given.
-    public static async Task<HttpResponseMessage> SignAsync(HttpClient client, Guid patient, string item, string? safetyReason = null)
+    public static async Task<HttpResponseMessage> SignAsync(HttpClient client, Guid patient, string item, string? safetyReason = null, bool seen = false)
     {
         var path = OrderTests.FormPath(patient, "medication");
         var token = Token(await client.GetStringAsync(path, Cancel));
         return await client.PostAsync(path, Form([("__RequestVerificationToken", token), ("Item", item),
-            .. Details.Select(d => ($"Details[{d.Name}]", (object)d.Value)), .. safetyReason is null ? [] : new[] { ("SafetyReason", (object)safetyReason) }]), Cancel);
+            .. Details.Select(d => ($"Details[{d.Name}]", (object)d.Value)), .. safetyReason is null ? [] : new[] { ("SafetyReason", (object)safetyReason) }, .. seen ? new[] { ("SafetySeen", (object)"true") } : []]), Cancel);
     }
 
     // "reason|kinds" of the patient's medication orders, oldest first: "-" where there is none.

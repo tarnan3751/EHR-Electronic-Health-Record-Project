@@ -41,7 +41,7 @@ Added in the expansion plan's step 8 (Tahseen Arnan).
 - **What is checked.** When a medication order is signed, the database checks it against the patient's coded allergies (the drug itself, another drug of the same FDA class, and classes known to cross-react) and against what the patient takes (active medications on the chart and other active medication orders) for known interactions.
 - **What the form shows.** Each warning names the problem, with its severity, one general line of advice, and its source: the chart, DDInter 2.0, the ONC high-priority list (by way of Wikidata), or an FDA label, with what the label says and where to read it.
 - **What stops the order.** An allergy, a drug of a related class, or a major or high-priority interaction: the form comes back headed **Check before signing**, with the cursor in **Reason for ordering despite the warnings**. Give a reason and sign, or cancel. The reason and what was found are kept on the order and in the write audit.
-- **What doesn't.** A moderate or minor interaction is shown under **Be aware** and kept on the order, without asking for a reason.
+- **What doesn't.** A moderate or minor interaction is shown under **Be aware** and kept on the order, without asking for a reason. The first **Sign order** brings the notes up with the cursor on the button; pressing it again signs.
 - **What it is not.** The form says so on every medication order: decision support for this demonstration system, not a complete clinical reference. Only coded allergies and medications are checked, and no warning doesn't mean a combination is safe. `docs/expansion/reference-data.md` says what the interaction data covers and what it doesn't.
 
 ## Decisions

@@ -48,6 +48,14 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
     [BindProperty]
     public string? SafetyReason { get; set; }
 
+    // Set by the form once it has shown the notes that don't stop an order (a moderate or minor interaction): the
+    // first "Sign order" brings them up, the second signs. Without it they would never be seen.
+    [BindProperty]
+    public bool SafetySeen { get; set; }
+
+    // The form is back only to show those notes; nothing needs fixing.
+    public bool ShowingNotes { get; private set; }
+
     // A change: the active order this one replaces, from the query string, and why, which is optional.
     [BindProperty(SupportsGet = true)]
     public Guid? Replaces { get; set; }
@@ -138,6 +146,12 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         if (errors.Count > 0)
         {
             return Refused(errors);
+        }
+
+        if (Form.Warnings.Count > 0 && !Form.Warnings.Any(OrderSafetyText.NeedsReason) && !SafetySeen)
+        {
+            ShowingNotes = true;
+            return Refused([]);
         }
 
         var (order, refusal) = await orders.SignAsync(id, item!, OrderForms.Details(type, Details), Form.Duplicates.Count > 0 ? reason : null,

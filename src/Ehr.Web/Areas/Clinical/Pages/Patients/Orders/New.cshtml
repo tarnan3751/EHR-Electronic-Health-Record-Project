@@ -120,7 +120,8 @@ else
                 </ul>
                 @if (!stops)
                 {
-                    <p>These don't stop the order. They are kept on it.</p>
+                    <input type="hidden" name="SafetySeen" value="true">
+                    <p>These don't stop the order. They are kept on it. @(Model.ShowingNotes ? "Sign again to go ahead, or cancel." : null)</p>
                 }
                 else
                 {
@@ -156,7 +157,7 @@ else
             </div>
         }
         <div class="sc-actions">
-            <button type="submit" class="sc-btn sc-btn--primary">@(replaced is null ? "Sign order" : "Sign changed order")</button>
+            <button type="submit" class="sc-btn sc-btn--primary" data-order-sign autofocus="@Model.ShowingNotes">@(replaced is null ? "Sign order" : "Sign changed order")</button>
             <a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Cancel</a>
         </div>
     </form>
@@ -165,7 +166,10 @@ else
 @functions {
     // Keyboard first (NFR-12): the page opens with the cursor in the first field to fix, or in the item when there is
     // nothing to fix yet.
-    string Focused() => Model.Errors.Count == 0 || Model.Errors.ContainsKey("Item")
+    string Focused() => Model.ShowingNotes
+        // Back only to show notes: the cursor is on "Sign order".
+        ? ""
+        : Model.Errors.Count == 0 || Model.Errors.ContainsKey("Item")
         ? "Item"
         : OrderForms.Fields[Model.KnownType!].Select(detail => detail.Name).FirstOrDefault(Model.Errors.ContainsKey) ?? "";
 
