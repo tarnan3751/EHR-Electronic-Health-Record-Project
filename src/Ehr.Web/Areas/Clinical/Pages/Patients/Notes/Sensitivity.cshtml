@@ -17,11 +17,11 @@
 <h1>@title</h1>
 @if (Model.Entry is { } entry)
 {
-    <p class="sc-prose">The addendum by <strong>@entry.AuthorName</strong>, signed @entry.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC, to the note signed @Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+    <p class="sc-prose">The addendum by <strong>@entry.AuthorName</strong>, signed @Clinic.Format(entry.SignedAt), to the note signed @Clinic.Format(Model.Note.SignedAt).</p>
 }
 else
 {
-    <p class="sc-prose">The note signed @Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+    <p class="sc-prose">The note signed @Clinic.Format(Model.Note.SignedAt).</p>
 }
 @if (!Model.Sensitive)
 {

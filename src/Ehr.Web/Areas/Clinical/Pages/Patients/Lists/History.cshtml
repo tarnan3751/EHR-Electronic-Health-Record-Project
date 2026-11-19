@@ -44,7 +44,7 @@ else
                 @foreach (var change in Model.History.Changes)
                 {
                     <tr>
-                        <td class="sc-table__mono">@change.ChangedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</td>
+                        <td class="sc-table__mono">@Clinic.Format(change.ChangedAt)</td>
                         <td>@(change.ChangedBy ?? "The system")</td>
                         <td>@HistoryModel.ListNames.GetValueOrDefault(change.TableName, change.TableName)</td>
                         <td><strong>@HistoryModel.Name(change)</strong></td>

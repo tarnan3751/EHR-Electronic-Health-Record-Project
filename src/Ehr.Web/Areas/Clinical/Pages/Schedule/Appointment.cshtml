@@ -23,7 +23,7 @@
 }
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
-    <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd")">That day's schedule</a></p>
+    <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@Clinic.Day(appointment.StartsAt)">That day's schedule</a></p>
 </div>
 <h1>Appointment: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Gone)

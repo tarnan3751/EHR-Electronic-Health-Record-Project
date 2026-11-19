@@ -60,7 +60,7 @@ else
         {
             @* A signed order is never edited: the change is a new order, and signing it discontinues this one. *@
             <div class="sc-notice sc-notice--info" data-order-replaces>
-                <p><span class="sc-notice__state">Replaces:</span> <strong>@replaced.Display</strong> @OrderForms.Summary(replaced.Type, replaced.Details) · signed @replaced.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</p>
+                <p><span class="sc-notice__state">Replaces:</span> <strong>@replaced.Display</strong> @OrderForms.Summary(replaced.Type, replaced.Details) · signed @Clinic.Format(replaced.SignedAt)</p>
                 <p>Signing the change discontinues that order and keeps it in the chart's discontinued orders.</p>
             </div>
         }
@@ -81,7 +81,7 @@ else
                 <h3>Already ordered</h3>
                 @foreach (var duplicate in Model.Form.Duplicates)
                 {
-                    <p>An active order for <strong>@duplicate.Display</strong> was signed @duplicate.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+                    <p>An active order for <strong>@duplicate.Display</strong> was signed @Clinic.Format(duplicate.SignedAt).</p>
                 }
                 <p>Cancel, or give a reason and sign to order it again.</p>
                 <div class="sc-field">

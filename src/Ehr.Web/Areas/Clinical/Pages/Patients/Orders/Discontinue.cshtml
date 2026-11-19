@@ -32,7 +32,7 @@
     @if (Model.Order is { } order)
     {
         <h2>@OrderForms.TypeNames[order.Type] order</h2>
-        <p data-order-discontinues><strong>@order.Display</strong> @OrderForms.Summary(order.Type, order.Details) · signed @order.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</p>
+        <p data-order-discontinues><strong>@order.Display</strong> @OrderForms.Summary(order.Type, order.Details) · signed @Clinic.Format(order.SignedAt)</p>
         <p class="sc-muted">The order stays in the record, marked discontinued, with your name, the time and this reason.</p>
     }
     <div class="sc-field">
