@@ -15,7 +15,7 @@
         @for (var i = 0; i < Model.Points.Count; i++)
         {
             var (x, y) = (Model.X(i), Model.Y(Model.Points[i].Value));
-            if (Model.IsOutside(Model.Points[i]))
+            if (Model.Points[i].IsOutside)
             {
                 @* Outside the range: a diamond, not only another color. *@
                 <rect class="sc-trend__point sc-trend__point--outside" x="@Trend.Number(x - 4)" y="@Trend.Number(y - 4)" width="8" height="8" transform="rotate(45 @Trend.Number(x) @Trend.Number(y))"></rect>
@@ -37,7 +37,7 @@
                     {
                         <tr>
                             <td class="sc-table__mono">@point.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td class="sc-table__mono">@point.Value.ToString("0.####")@(Model.HasRange && Model.IsOutside(point) ? ", outside the range" : "")</td>
+                            <td class="sc-table__mono">@point.Value.ToString("0.####")@(point.IsOutside ? ", outside the range" : "")</td>
                         </tr>
                     }
                 </tbody>

@@ -155,6 +155,122 @@ public static class DrugInteractionLevel
     public static readonly string[] All = [Major, Moderate, Minor, HighPriority];
 }
 
+// A vital sign's reference range for one age band (the expansion plan's step 9b): heart rate, respiratory rate and
+// blood pressure differ by age, so a child's value is flagged against a child's range. Loaded from
+// db/reference/35-vital-ranges.sql, which names the source of every row. A sign with no row here keeps the one range
+// ehr.observation_codes gives it (temperature, oxygen saturation, body mass index).
+public class VitalReferenceRange
+{
+    // The vital sign's LOINC code.
+    public required string Code { get; set; }
+
+    // One of AgeBand.
+    public required string Band { get; set; }
+
+    // The band's ages in whole months: from FromMonths, up to but not including ToMonths; null for no upper end.
+    public int FromMonths { get; set; }
+
+    public int? ToMonths { get; set; }
+
+    // A value below Low or above High is outside the range. Either end may be missing, where no source gives one.
+    public decimal? Low { get; set; }
+
+    public decimal? High { get; set; }
+
+    // Where the two numbers come from.
+    public required string Source { get; set; }
+}
+
+// The ranges themselves (step 9b), once, for the seed and for a test that holds db/reference/35-vital-ranges.sql to
+// them. The sources, what each one defines and how its figures were fitted to five bands are in
+// docs/expansion/reference-data.md. A blood pressure source gives the value at or above which a reading needs
+// attention; the High here is one below it, so "above High" says the same.
+public static class VitalRanges
+{
+    const string Bonafide = "Bonafide CP et al., Pediatrics 2013;131(4):e1150 (hospitalized children), 1st and 99th percentiles, widest across the band's ages";
+    const string Table6 = "Flynn JT et al., AAP Clinical Practice Guideline, Pediatrics 2017;140(3):e20171904, Table 6 screening values, highest across the band's ages and both sexes";
+    const string Pals = "; low: PALS hypotension threshold (70 mmHg under 1 year, 70 + 2 x age to 10 years, 90 above), at the band's youngest age";
+    const string AdultRates = "MedlinePlus (NIH), Vital signs, reviewed 2025-01-01";
+    const string AdultBreathing = "StatPearls, Vital Sign Assessment (NIH Bookshelf NBK553213)";
+    const string AdultPressure = "MedlinePlus (NIH), Vital signs (low); AHA/ACC adult categories, stage 1 from 130 or 80 (high)";
+
+    public static readonly IReadOnlyList<(string Code, string Band, decimal? Low, decimal? High, string Source)> All =
+    [
+        ("8867-4", AgeBand.Infant, 91, 186, Bonafide), ("8867-4", AgeBand.YoungChild, 66, 173, Bonafide), ("8867-4", AgeBand.OlderChild, 56, 155, Bonafide),
+        ("8867-4", AgeBand.Adolescent, 48, 138, Bonafide), ("8867-4", AgeBand.Adult, 60, 100, AdultRates),
+        ("9279-1", AgeBand.Infant, 19, 76, Bonafide), ("9279-1", AgeBand.YoungChild, 14, 60, Bonafide), ("9279-1", AgeBand.OlderChild, 13, 46, Bonafide),
+        ("9279-1", AgeBand.Adolescent, 11, 35, Bonafide), ("9279-1", AgeBand.Adult, 12, 20, AdultBreathing),
+        ("8480-6", AgeBand.Infant, 70, null, "No source gives an upper value under 1 year" + Pals), ("8480-6", AgeBand.YoungChild, 72, 103, Table6 + Pals),
+        ("8480-6", AgeBand.OlderChild, 82, 110, Table6 + Pals), ("8480-6", AgeBand.Adolescent, 90, 119, Table6 + Pals), ("8480-6", AgeBand.Adult, 90, 129, AdultPressure),
+        ("8462-4", AgeBand.YoungChild, null, 63, Table6 + "; no source gives a lower value"), ("8462-4", AgeBand.OlderChild, null, 73, Table6 + "; no source gives a lower value"),
+        ("8462-4", AgeBand.Adolescent, null, 79, Table6 + "; no source gives a lower value"), ("8462-4", AgeBand.Adult, 60, 79, AdultPressure),
+    ];
+
+    // The range for a sign at an age in months, or null when the sign has none for that age (it keeps its one range,
+    // or has none, as a diastolic pressure under 1 year).
+    public static (decimal? Low, decimal? High)? For(string code, int months)
+    {
+        var band = AgeBand.Of(months);
+        foreach (var range in All)
+        {
+            if (range.Code == code && range.Band == band)
+            {
+                return (range.Low, range.High);
+            }
+        }
+
+        return null;
+    }
+
+    public static bool IsBanded(string code) => All.Any(range => range.Code == code);
+}
+
+public static class AgeBand
+{
+    public const string Infant = "infant";
+
+    public const string YoungChild = "young-child";
+
+    public const string OlderChild = "older-child";
+
+    public const string Adolescent = "adolescent";
+
+    public const string Adult = "adult";
+
+    public static readonly string[] All = [Infant, YoungChild, OlderChild, Adolescent, Adult];
+
+    // The bands' ages in whole months, as Tahseen set them (2026-11-19): under 1 year, 1 to 5, 6 to 11, 12 to 17, and
+    // 18 and over.
+    public static readonly IReadOnlyList<(string Band, int FromMonths, int? ToMonths)> Ages =
+        [(Infant, 0, 12), (YoungChild, 12, 72), (OlderChild, 72, 144), (Adolescent, 144, 216), (Adult, 216, null)];
+
+    // A person's age in whole months on a day.
+    public static int Months(DateOnly birth, DateOnly on) =>
+        Math.Max(0, ((on.Year - birth.Year) * 12) + on.Month - birth.Month - (on.Day < birth.Day ? 1 : 0));
+
+    public static string Of(int months) => Ages.First(age => months >= age.FromMonths && (age.ToMonths is null || months < age.ToMonths)).Band;
+}
+
+public sealed class VitalReferenceRangeConfiguration : IEntityTypeConfiguration<VitalReferenceRange>
+{
+    public void Configure(EntityTypeBuilder<VitalReferenceRange> range)
+    {
+        range.ToTable("vital_reference_ranges", table =>
+        {
+            table.HasCheckConstraint("ck_vital_reference_ranges_band", $"band IN ({Codes.List(AgeBand.All)})");
+            table.HasCheckConstraint("ck_vital_reference_ranges_range", "low <= high AND (low IS NOT NULL OR high IS NOT NULL)");
+            table.HasCheckConstraint("ck_vital_reference_ranges_ages", "from_months >= 0 AND (to_months IS NULL OR to_months > from_months)");
+        });
+        range.HasKey(r => new { r.Code, r.Band });
+        range.Property(r => r.Code).HasMaxLength(20);
+        range.Property(r => r.Band).HasMaxLength(20);
+        range.Property(r => r.Low).HasPrecision(12, 4);
+        range.Property(r => r.High).HasPrecision(12, 4);
+        range.Property(r => r.Source).HasMaxLength(500);
+        range.HasOne<ObservationCode>().WithMany().HasForeignKey(r => r.Code).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 // Maps the tables above. EhrDbContext picks these up with ApplyConfigurationsFromAssembly.
 public sealed class ObservationCodeConfiguration : IEntityTypeConfiguration<ObservationCode>
 {

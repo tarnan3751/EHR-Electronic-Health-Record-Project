@@ -902,6 +902,23 @@
         padding: 0;
     }
 
+    /* A reading marked entered in error (step 9b): struck through, in the muted ink. */
+    .sc-struck {
+        color: var(--ink-muted);
+    }
+
+    /* Why, in words beside it: the flowsheet shows entries in error only when asked, so there is room. */
+    .sc-struck__reason {
+        font-family: var(--font-sans);
+    }
+
+    /* The chart's up or down mark against the previous reading: a small shape in the muted ink; the words are for
+       screen readers. Not a color: up is not good or bad by itself. */
+    .sc-trendmark {
+        color: var(--ink-muted);
+        font-size: 0.75em;
+    }
+
     /* The vital signs form (step 9): its short fields side by side, as many as fit, one column on a narrow screen. */
     .sc-vitals-fields {
         display: grid;

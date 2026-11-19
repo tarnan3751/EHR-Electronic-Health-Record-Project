@@ -67,8 +67,9 @@ BEGIN
         IF NEW.code = '39156-5' THEN
             SELECT round(w.value / ((h.value / 100) ^ 2), 1) INTO NEW.value
             FROM ehr.observations w, ehr.observations h
-            WHERE w.patient_id = NEW.patient_id AND w.code = '29463-7' AND w.effective_at = NEW.effective_at
+            WHERE w.patient_id = NEW.patient_id AND w.code = '29463-7' AND w.effective_at = NEW.effective_at AND w.status = 'final'
               AND h.patient_id = NEW.patient_id AND h.code = '8302-2' AND h.effective_at = NEW.effective_at AND h.value > 0
+              AND h.status = 'final' -- never from a weight or height marked entered in error (step 9b)
             ORDER BY w.issued_at DESC, h.issued_at DESC
             LIMIT 1;
             IF NEW.value IS NULL THEN
@@ -91,9 +92,33 @@ BEGIN
         NEW.unit := left(test.unit, 20);
         NEW.reference_low := test.reference_low;
         NEW.reference_high := test.reference_high;
+        -- Heart rate, respiratory rate and blood pressure have a range for each age band (step 9b): the patient's age
+        -- on the day the sign was taken picks it. A sign with no banded range keeps the one above.
+        SELECT r.low, r.high INTO NEW.reference_low, NEW.reference_high
+        FROM ehr.vital_reference_ranges r
+        JOIN ehr.patients p ON p.id = NEW.patient_id
+        CROSS JOIN LATERAL (
+            -- Between two timestamps without a zone, so the session's time zone can't move a month boundary.
+            SELECT (extract(year FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                    + extract(month FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int AS months) a
+        WHERE r.code = NEW.code AND greatest(a.months, 0) >= r.from_months AND (r.to_months IS NULL OR greatest(a.months, 0) < r.to_months);
+        IF NOT FOUND THEN
+            -- A sign that has banded ranges but none for this age (a diastolic pressure under 1 year) has no range,
+            -- rather than the adults'. A sign with no banded ranges keeps the one above.
+            IF EXISTS (SELECT 1 FROM ehr.vital_reference_ranges r WHERE r.code = NEW.code) THEN
+                NEW.reference_low := NULL;
+                NEW.reference_high := NULL;
+            ELSE
+                NEW.reference_low := test.reference_low;
+                NEW.reference_high := test.reference_high;
+            END IF;
+        END IF;
         NEW.status := 'final';
         NEW.issued_at := clock_timestamp();
         NEW.note := NULL;
+        NEW.entered_in_error_reason := NULL;
+        NEW.entered_in_error_by := NULL;
+        NEW.entered_in_error_at := NULL;
         RETURN NEW;
     END IF;
 
@@ -132,6 +157,9 @@ BEGIN
     NEW.reference_high := test.reference_high;
     NEW.status := 'final';
     NEW.issued_at := clock_timestamp();
+    NEW.entered_in_error_reason := NULL;
+    NEW.entered_in_error_by := NULL;
+    NEW.entered_in_error_at := NULL;
     RETURN NEW;
 END
 $$;
@@ -156,6 +184,58 @@ BEGIN
 END
 $$;
 REVOKE ALL ON FUNCTION ehr.complete_resulted_order() FROM PUBLIC;
+-- Marking a vital sign "entered in error" (the expansion plan's step 9b; FHIR's entered-in-error status). The one
+-- change an observation takes from the apps, which hold UPDATE on these two columns only (10-grants.sql), under the
+-- panel rule (30-rls.sql). Before the update, as the caller: only a vital sign, only one that is final, only to
+-- entered-in-error, with a reason; who and when are the database's. Nothing unmarks one: the correct value is a new
+-- reading. A result of an order is not corrected this way.
+CREATE OR REPLACE FUNCTION ehr.mark_vital_sign_in_error() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    IF OLD.category IS DISTINCT FROM 'vital-signs' OR OLD.order_id IS NOT NULL THEN
+        RAISE EXCEPTION 'Only a vital sign is marked entered in error' USING ERRCODE = '23514';
+    END IF;
+    IF OLD.status <> 'final' OR NEW.status IS DISTINCT FROM 'entered-in-error' THEN
+        RAISE EXCEPTION 'A recorded vital sign changes only by being marked entered in error, once' USING ERRCODE = '23514';
+    END IF;
+    NEW.entered_in_error_reason := btrim(NEW.entered_in_error_reason);
+    IF NEW.entered_in_error_reason IS NULL OR NEW.entered_in_error_reason !~ '[^[:space:]]' OR char_length(NEW.entered_in_error_reason) > 500 THEN
+        RAISE EXCEPTION 'Say why the vital sign was entered in error, in up to 500 characters' USING ERRCODE = '23514';
+    END IF;
+    NEW.entered_in_error_by := ehr.current_user_id();
+    NEW.entered_in_error_at := clock_timestamp();
+    RETURN NEW;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.mark_vital_sign_in_error() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER observations_mark_in_error
+    BEFORE UPDATE ON ehr.observations
+    -- By the role the apps connect as, as for filing (observations_file above).
+    FOR EACH ROW WHEN (current_user IN ('ehr_app', 'ehr_read'))
+    EXECUTE FUNCTION ehr.mark_vital_sign_in_error();
+
+-- A body mass index is worked out from a weight and a height: when either is marked entered in error, so is the body
+-- mass index of the same moment, with the same reason, by the same person. As the caller, through the rule above.
+CREATE OR REPLACE FUNCTION ehr.mark_body_mass_index_in_error() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    UPDATE ehr.observations o
+    SET status = 'entered-in-error', entered_in_error_reason = NEW.entered_in_error_reason
+    WHERE o.patient_id = NEW.patient_id AND o.category = 'vital-signs' AND o.code = '39156-5'
+      AND o.effective_at = NEW.effective_at AND o.status = 'final';
+    RETURN NULL;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.mark_body_mass_index_in_error() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER observations_mark_body_mass_index
+    AFTER UPDATE ON ehr.observations
+    FOR EACH ROW WHEN (NEW.status = 'entered-in-error' AND OLD.status = 'final' AND NEW.code IN ('29463-7', '8302-2'))
+    EXECUTE FUNCTION ehr.mark_body_mass_index_in_error();
+
 CREATE OR REPLACE TRIGGER observations_complete_order
     AFTER INSERT ON ehr.observations
     FOR EACH ROW WHEN (NEW.order_id IS NOT NULL AND NEW.status = 'final')

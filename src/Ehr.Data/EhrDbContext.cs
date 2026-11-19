@@ -76,6 +76,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // The rest of the reference data (Ehr.Data.Reference): not PHI.
     public DbSet<Reference.ObservationCode> ObservationCodes => Set<Reference.ObservationCode>();
 
+    public DbSet<Reference.VitalReferenceRange> VitalReferenceRanges => Set<Reference.VitalReferenceRange>();
+
     public DbSet<Reference.OrderResultCode> OrderResultCodes => Set<Reference.OrderResultCode>();
 
     public DbSet<Reference.Questionnaire> Questionnaires => Set<Reference.Questionnaire>();

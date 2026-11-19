@@ -23,7 +23,8 @@ echo "Migrations"
 # Npgsql takes the password from PGPASSWORD, so it isn't in the connection string.
 ssl=""
 [ -n "${PGSSLROOTCERT:-}" ] && ssl=";SSL Mode=VerifyFull;Root Certificate=$PGSSLROOTCERT"
-EHR_MIGRATIONS_CONNECTION="Host=$PGHOST;Database=$PGDATABASE;Username=$PGUSER$ssl" efbundle
+# A migration that moves data (VitalSigns, VitalCorrections) is one command: ten minutes, where the driver allows 30 s.
+EHR_MIGRATIONS_CONNECTION="Host=$PGHOST;Database=$PGDATABASE;Username=$PGUSER;Command Timeout=600$ssl" efbundle
 
 echo "Policies"
 for file in /policies/*.sql; do

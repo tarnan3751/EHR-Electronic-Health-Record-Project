@@ -391,7 +391,7 @@ CREATE POLICY encounters_own_select ON ehr.encounters FOR SELECT
 -- Test results and vital signs (PHI). Clinicians read every patient's. A patient reads only their own, and only once
 -- the result is released and finished (Observation.IssuedAt, ObservationStatus.Released): a result still being worked
 -- on, cancelled or entered in error never reaches the portal, even through a bug in the app. A clinician files results
--- and records vital signs for a patient on their active panel; nothing updates or deletes one (10-grants.sql).
+-- and records vital signs for a patient on their active panel. Nothing deletes one; the one update is marking a vital sign entered in error (below, step 9b).
 ALTER TABLE ehr.observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
 
@@ -402,6 +402,29 @@ DROP POLICY IF EXISTS observations_panel_insert ON ehr.observations;
 CREATE POLICY observations_panel_insert ON ehr.observations FOR INSERT
     WITH CHECK (
         (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+-- Marking a vital sign entered in error (step 9b): by a clinician with the patient on their active panel, the rule
+-- for recording one. The trigger decides what the update may be (75-results.sql).
+DROP POLICY IF EXISTS observations_panel_update ON ehr.observations;
+CREATE POLICY observations_panel_update ON ehr.observations FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        -- Marked as the person the statement began as: a statement can't name someone else part-way through.
+        AND entered_in_error_by = (SELECT ehr.current_user_id())
         AND EXISTS (
             SELECT 1 FROM ehr.patient_assignments a
             WHERE a.clinician_id = (SELECT ehr.current_user_id())

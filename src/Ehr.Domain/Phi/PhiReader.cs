@@ -131,7 +131,9 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             HasDrafts = found.Drafts,
             VisitVitals = visitVitals,
             // The newest of each sign, in the flowsheet's order.
-            LatestVitals = [.. latestVitals.GroupBy(v => v.Code).Select(group => group.First()).OrderBy(v => Array.IndexOf(VitalSign.All, v.Code))],
+            // With the reading before it, for the up or down mark, from the same rows: no other statement (step 9b).
+            LatestVitals = [.. latestVitals.GroupBy(v => v.Code).Select(group => group.First() with { Previous = group.Skip(1).FirstOrDefault()?.Value })
+                .OrderBy(v => Array.IndexOf(VitalSign.All, v.Code))],
             Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,
@@ -587,6 +589,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
     // A patient's vital signs (step 9): the latest first, up to 600 values, for the flowsheet and their trends. One
     // recorded read of the patient. Null when the patient isn't the reader's to see.
+    // Entries marked "entered in error" (step 9b) are among them, for the page to leave out or show struck through.
     public async Task<PatientVitals?> VitalsAsync(Guid patientId, CancellationToken cancellationToken)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);

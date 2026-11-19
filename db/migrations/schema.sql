@@ -1313,3 +1313,93 @@ VALUES ('20261119053453_NoteAddenda', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+DROP INDEX ehr.ux_observations_vital_sign_once;
+
+ALTER TABLE ehr.observations ADD entered_in_error_at timestamp with time zone;
+
+ALTER TABLE ehr.observations ADD entered_in_error_by uuid;
+
+ALTER TABLE ehr.observations ADD entered_in_error_reason character varying(500);
+
+CREATE TABLE ehr.vital_reference_ranges (
+    code character varying(20) NOT NULL,
+    band character varying(20) NOT NULL,
+    from_months integer NOT NULL,
+    to_months integer,
+    low numeric(12,4),
+    high numeric(12,4),
+    source character varying(500) NOT NULL,
+    CONSTRAINT pk_vital_reference_ranges PRIMARY KEY (code, band),
+    CONSTRAINT ck_vital_reference_ranges_ages CHECK (from_months >= 0 AND (to_months IS NULL OR to_months > from_months)),
+    CONSTRAINT ck_vital_reference_ranges_band CHECK (band IN ('infant', 'young-child', 'older-child', 'adolescent', 'adult')),
+    CONSTRAINT ck_vital_reference_ranges_range CHECK (low <= high AND (low IS NOT NULL OR high IS NOT NULL)),
+    CONSTRAINT fk_vital_reference_ranges_observation_codes_code FOREIGN KEY (code) REFERENCES ehr.observation_codes (code) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_observations_entered_in_error_by ON ehr.observations (entered_in_error_by);
+
+CREATE UNIQUE INDEX ux_observations_vital_sign_once ON ehr.observations (patient_id, code, effective_at, encounter_id) NULLS NOT DISTINCT WHERE category = 'vital-signs' AND status <> 'entered-in-error';
+
+ALTER TABLE ehr.observations ADD CONSTRAINT ck_observations_entered_in_error CHECK ((entered_in_error_reason IS NULL AND entered_in_error_by IS NULL AND entered_in_error_at IS NULL) OR status = 'entered-in-error');
+
+ALTER TABLE ehr.observations ADD CONSTRAINT fk_observations_staff_users_entered_in_error_by FOREIGN KEY (entered_in_error_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT;
+
+DO $$
+DECLARE
+    forced_observations boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
+    audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
+BEGIN
+    ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
+    IF audited THEN
+        ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
+    END IF;
+
+    CREATE TEMPORARY TABLE vital_ranges_then (code text, from_months int, to_months int, low numeric, high numeric) ON COMMIT DROP;
+    INSERT INTO vital_ranges_then VALUES
+        ('8867-4', 0, 12::int, 91::numeric, 186::numeric),
+        ('8867-4', 12, 72::int, 66::numeric, 173::numeric),
+        ('8867-4', 72, 144::int, 56::numeric, 155::numeric),
+        ('8867-4', 144, 216::int, 48::numeric, 138::numeric),
+        ('8867-4', 216, NULL::int, 60::numeric, 100::numeric),
+        ('9279-1', 0, 12::int, 19::numeric, 76::numeric),
+        ('9279-1', 12, 72::int, 14::numeric, 60::numeric),
+        ('9279-1', 72, 144::int, 13::numeric, 46::numeric),
+        ('9279-1', 144, 216::int, 11::numeric, 35::numeric),
+        ('9279-1', 216, NULL::int, 12::numeric, 20::numeric),
+        ('8480-6', 0, 12::int, 70::numeric, NULL::numeric),
+        ('8480-6', 12, 72::int, 72::numeric, 103::numeric),
+        ('8480-6', 72, 144::int, 82::numeric, 110::numeric),
+        ('8480-6', 144, 216::int, 90::numeric, 119::numeric),
+        ('8480-6', 216, NULL::int, 90::numeric, 129::numeric),
+        ('8462-4', 12, 72::int, NULL::numeric, 63::numeric),
+        ('8462-4', 72, 144::int, NULL::numeric, 73::numeric),
+        ('8462-4', 144, 216::int, NULL::numeric, 79::numeric),
+        ('8462-4', 216, NULL::int, 60::numeric, 79::numeric);
+
+    WITH aged AS (
+        SELECT o.id, o.code,
+            greatest(0, (extract(year FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                + extract(month FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int) AS months
+        FROM ehr.observations o JOIN ehr.patients p ON p.id = o.patient_id
+        WHERE o.category = 'vital-signs' AND o.code IN (SELECT code FROM vital_ranges_then))
+    UPDATE ehr.observations o
+    SET reference_low = r.low, reference_high = r.high
+    FROM aged a
+    LEFT JOIN vital_ranges_then r ON r.code = a.code AND a.months >= r.from_months AND (r.to_months IS NULL OR a.months < r.to_months)
+    WHERE o.id = a.id AND (o.reference_low, o.reference_high) IS DISTINCT FROM (r.low, r.high);
+
+    IF audited THEN
+        ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
+    END IF;
+    IF forced_observations THEN
+        ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
+    END IF;
+END
+$$;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119072440_VitalCorrections', '10.0.13');
+
+COMMIT;
+

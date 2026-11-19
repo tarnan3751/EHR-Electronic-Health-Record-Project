@@ -1950,6 +1950,19 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("encounter_id");
 
+                    b.Property<DateTimeOffset?>("EnteredInErrorAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("entered_in_error_at");
+
+                    b.Property<Guid?>("EnteredInErrorBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entered_in_error_by");
+
+                    b.Property<string>("EnteredInErrorReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("entered_in_error_reason");
+
                     b.Property<DateTimeOffset?>("IssuedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("issued_at");
@@ -1999,6 +2012,9 @@ namespace Ehr.Migrations
                     b.HasIndex("EncounterId")
                         .HasDatabaseName("ix_observations_encounter_id");
 
+                    b.HasIndex("EnteredInErrorBy")
+                        .HasDatabaseName("ix_observations_entered_in_error_by");
+
                     b.HasIndex("OrderId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ix_observations_order_id_code")
@@ -2016,13 +2032,15 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId")
                         .IsUnique()
                         .HasDatabaseName("ux_observations_vital_sign_once")
-                        .HasFilter("category = 'vital-signs'");
+                        .HasFilter("category = 'vital-signs' AND status <> 'entered-in-error'");
 
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId"), false);
 
                     b.ToTable("observations", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_observations_category", "category IN ('laboratory', 'vital-signs')");
+
+                            t.HasCheckConstraint("ck_observations_entered_in_error", "(entered_in_error_reason IS NULL AND entered_in_error_by IS NULL AND entered_in_error_at IS NULL) OR status = 'entered-in-error'");
 
                             t.HasCheckConstraint("ck_observations_reference_range", "reference_low <= reference_high");
 
@@ -2583,6 +2601,55 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Reference.VitalReferenceRange", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Band")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("band");
+
+                    b.Property<int>("FromMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("from_months");
+
+                    b.Property<decimal?>("High")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("numeric(12,4)")
+                        .HasColumnName("high");
+
+                    b.Property<decimal?>("Low")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("numeric(12,4)")
+                        .HasColumnName("low");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("source");
+
+                    b.Property<int?>("ToMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("to_months");
+
+                    b.HasKey("Code", "Band")
+                        .HasName("pk_vital_reference_ranges");
+
+                    b.ToTable("vital_reference_ranges", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_vital_reference_ranges_ages", "from_months >= 0 AND (to_months IS NULL OR to_months > from_months)");
+
+                            t.HasCheckConstraint("ck_vital_reference_ranges_band", "band IN ('infant', 'young-child', 'older-child', 'adolescent', 'adult')");
+
+                            t.HasCheckConstraint("ck_vital_reference_ranges_range", "low <= high AND (low IS NOT NULL OR high IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Scheduling.Appointment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3089,6 +3156,12 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_observations_encounters_encounter_id");
 
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("EnteredInErrorBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_observations_staff_users_entered_in_error_by");
+
                     b.HasOne("Ehr.Data.Patients.Patient", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
@@ -3166,6 +3239,16 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_result_codes_observation_codes_observation_code");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Reference.VitalReferenceRange", b =>
+                {
+                    b.HasOne("Ehr.Data.Reference.ObservationCode", null)
+                        .WithMany()
+                        .HasForeignKey("Code")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_vital_reference_ranges_observation_codes_code");
                 });
 
             modelBuilder.Entity("Ehr.Data.Scheduling.Appointment", b =>

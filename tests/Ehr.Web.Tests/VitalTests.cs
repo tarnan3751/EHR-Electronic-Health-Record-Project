@@ -24,6 +24,23 @@ static class VitalTests
     public static Task<HttpResponseMessage> RecordAtAsync(HttpClient client, Guid patient, string takenAt, params (string Code, string Value)[] values) =>
         PostFormAsync(client, Path(patient), Path(patient), [.. values.Select(v => ($"Values[{v.Code}]", (object)v.Value)), ("TakenAt", takenAt)]);
 
+    public static string ErrorPath(Guid patient, string at) => $"/patients/{patient}/vitals/error?at={at}";
+
+    // "Mark entered in error" for the set taken at `at` ("yyyy-MM-ddTHH:mm:ss", UTC): the readings of these codes, as
+    // the page posts them, by observation ID.
+    public static async Task<HttpResponseMessage> MarkAsync(WebApps apps, HttpClient client, Guid patient, string at, string? reason, params string[] codes)
+    {
+        var ids = (await ProxyTests.QueryAsync(apps,
+            $"SELECT code || ' ' || id FROM ehr.observations WHERE patient_id = @patient AND category = 'vital-signs' AND status = 'final' AND effective_at = '{at}Z'", patient))
+            .Select(line => line.Split(' ')).Where(parts => codes.Contains(parts[0])).Select(parts => parts[1]);
+        (string Name, object Value)[] fields = [.. ids.Select(id => ("Chosen", (object)id)), .. reason is null ? Array.Empty<(string, object)>() : [("Reason", reason)]];
+        return await PostFormAsync(client, ErrorPath(patient, at), ErrorPath(patient, at), fields);
+    }
+
+    // "code value status" for each vital sign of the patient, oldest first, then by code, then as recorded.
+    public static Task<List<string>> StatesAsync(WebApps apps, Guid patient) => ProxyTests.QueryAsync(apps,
+        "SELECT code || ' ' || trim_scale(value) || ' ' || status FROM ehr.observations WHERE patient_id = @patient AND category = 'vital-signs' ORDER BY effective_at, code, issued_at", patient);
+
     // "code value" for each vital sign of the patient, oldest first, then by code.
     public static Task<List<string>> RecordedAsync(WebApps apps, Guid patient) => ProxyTests.QueryAsync(apps,
         "SELECT code || ' ' || trim_scale(value) FROM ehr.observations WHERE patient_id = @patient AND category = 'vital-signs' ORDER BY effective_at, code", patient);

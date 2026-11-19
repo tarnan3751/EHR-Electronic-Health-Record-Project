@@ -45,6 +45,26 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
         Assert.NotEmpty(first.Vitals);
         Assert.Equal(first.Vitals.Select(v => (v.Id, v.EncounterId, v.Code, v.Value)), again.Vitals.Select(v => (v.Id, v.EncounterId, v.Code, v.Value)));
         Assert.Equal("SYN0001235", first.Patient.Mrn);
+
+        // Step 9b: every seeded vital sign carries the range for the patient's age on the day of the visit, and the
+        // seeded clinic has children of every band among them. Children are not all flagged: most values are inside.
+        var seen = new Dictionary<string, (int In, int Out)>();
+        foreach (var chart in Enumerable.Range(0, 3000).Select(SyntheticClinic.Chart))
+        {
+            foreach (var vital in chart.Vitals)
+            {
+                var months = Ehr.Data.Reference.AgeBand.Months(chart.Patient.BirthDate, DateOnly.FromDateTime(vital.EffectiveAt.UtcDateTime));
+                var range = Ehr.Data.Reference.VitalRanges.For(vital.Code!, months);
+                Assert.Equal((range?.Low, range?.High), (vital.ReferenceLow, vital.ReferenceHigh));
+                var band = Ehr.Data.Reference.AgeBand.Of(months);
+                var outside = vital.Value < vital.ReferenceLow || vital.Value > vital.ReferenceHigh;
+                var (inside, flagged) = seen.GetValueOrDefault(band);
+                seen[band] = outside ? (inside, flagged + 1) : (inside + 1, flagged);
+            }
+        }
+
+        Assert.Equal(Ehr.Data.Reference.AgeBand.All.Order(), seen.Keys.Order());
+        Assert.All(seen.Values, counts => Assert.True(counts.In > counts.Out, $"More seeded values outside the range than inside: {counts}"));
         Assert.Equal(7, first.Patient.Id.Version);
     }
 }

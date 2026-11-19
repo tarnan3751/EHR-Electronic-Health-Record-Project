@@ -32,7 +32,7 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
 
     const string Protection = """
         SELECT c.relname || ' forced=' || c.relforcerowsecurity || ' audit=' || (SELECT t.tgenabled::text FROM pg_trigger t WHERE t.tgrelid = c.oid AND t.tgname = c.relname || '_audit')
-        FROM pg_class c WHERE c.oid IN ('ehr.encounters'::regclass, 'ehr.observations'::regclass) ORDER BY 1
+        FROM pg_class c WHERE c.oid IN ('ehr.encounters'::regclass, 'ehr.observations'::regclass, 'ehr.patients'::regclass) ORDER BY 1
         """;
 
     [Fact]
@@ -53,13 +53,26 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
         }
 
         var audited = await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events");
-        string[] protection = ["encounters forced=true audit=O", "observations forced=true audit=O"];
+        string[] protection = ["encounters forced=true audit=O", "observations forced=true audit=O", "patients forced=true audit=O"];
+
+        // A three-year-old, with a heart rate that is ordinary at three and high in an adult (step 9b).
+        var child = await Accounts.PatientAsync(database, clinician);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "UPDATE ehr.patients SET birth_date = (now() - interval '3 years 2 months')::date WHERE id = @patient", ("patient", child));
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start, systolic_mm_hg, diastolic_mm_hg, heart_rate_per_minute)
+            VALUES (gen_random_uuid(), @patient, 'finished', 'AMB', now() - interval '1 hour', 98, 60, 120)
+            """, ("patient", child));
+        audited = await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events");
         Assert.Equal(protection, await AsSuperuserAsync(Protection));
 
         await MigrateAsync(null);
 
         Assert.Equal(
-            ["8462-4 Diastolic blood pressure 92 mm[Hg] 60-84 final true true", "8480-6 Systolic blood pressure 148 mm[Hg] 90-129 final true true",
+            // The ranges are the adults' for this patient's age, as the later VitalCorrections migration leaves them
+            // (step 9b): 60 to 79 for diastolic, where the first migration wrote 60 to 84.
+            ["8462-4 Diastolic blood pressure 92 mm[Hg] 60-79 final true true", "8480-6 Systolic blood pressure 148 mm[Hg] 90-129 final true true",
                 "8867-4 Heart rate 64 /min 60-100 final true true", "8867-4 Heart rate 71 /min 60-100 final true true"],
             await AsSuperuserAsync(
                 """
@@ -69,6 +82,25 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
                 """, ("patient", patient)));
         Assert.Equal(protection, await AsSuperuserAsync(Protection));
         Assert.Equal(audited, await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events"));
+        // The child's signs came out with a three-year-old's ranges (the VitalCorrections migration, step 9b).
+        Assert.Equal(["8462-4 60 none-63", "8480-6 98 72-103", "8867-4 120 66-173"], await AsSuperuserAsync(
+            """
+            SELECT code || ' ' || trim_scale(value) || ' ' || coalesce(trim_scale(reference_low)::text, 'none') || '-' || coalesce(trim_scale(reference_high)::text, 'none')
+            FROM ehr.observations WHERE patient_id = @patient ORDER BY code
+            """, ("patient", child)));
+
+        // Once a reading has been marked entered in error, VitalCorrections is one way: rolling back is refused with
+        // the reason, and nothing is changed.
+        var marked = (await AsSuperuserAsync("SELECT id::text FROM ehr.observations WHERE patient_id = @patient AND code = '8867-4'", ("patient", child))).Single();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "UPDATE ehr.observations SET status = 'entered-in-error', entered_in_error_reason = 'Synthetic', entered_in_error_at = now() WHERE id = @id", ("id", Guid.Parse(marked)));
+        var refused = await Assert.ThrowsAnyAsync<Exception>(() => MigrateAsync(BeforeStep9));
+        Assert.Contains("cannot be rolled back", refused.ToString());
+        Assert.Equal(["entered-in-error"], await AsSuperuserAsync("SELECT status FROM ehr.observations WHERE id = @id", ("id", Guid.Parse(marked))));
+        Assert.Equal(protection, await AsSuperuserAsync(Protection));
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "UPDATE ehr.observations SET status = 'final', entered_in_error_reason = NULL, entered_in_error_at = NULL WHERE id = @id", ("id", Guid.Parse(marked)));
+        audited = await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events");
         // With nobody signed in, the app role still sees none of it.
         Assert.Empty(await Accounts.QueryAsync(database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword), null, "SELECT id::text FROM ehr.observations"));
 

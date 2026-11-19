@@ -18,6 +18,7 @@ db/reference/ddinter/LICENSE.md linguist-generated=false
 # Hand-written, to be read: the interactions taken from FDA labels, and the Wikidata query with its notes. (The query's
 # result, the CSV beside them, stays collapsed.)
 db/reference/60-label-interactions.sql linguist-generated=false
+db/reference/35-vital-ranges.sql linguist-generated=false
 db/reference/wikidata/README.md linguist-generated=false
 db/reference/wikidata/*.rq linguist-generated=false
 db/migrations/*.Designer.cs linguist-generated=true

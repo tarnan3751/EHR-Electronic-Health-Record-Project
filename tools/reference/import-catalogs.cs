@@ -286,7 +286,7 @@ const string Range = "This clinic's range for adults, set for synthetic data fro
     ("1742-6", "lab", "U/L", 7m, 56m), ("1920-8", "lab", "U/L", 10m, 40m), ("1975-2", "lab", "mg/dL", 0.1m, 1.2m),
     ("1751-7", "lab", "g/dL", 3.5m, 5.0m), ("3016-3", "lab", "m[IU]/L", 0.4m, 4.0m), ("62292-8", "lab", "ng/mL", 30m, 100m),
     ("1989-3", "lab", "ng/mL", 30m, 100m),
-    ("8480-6", "vital", "mm[Hg]", 90m, 129m), ("8462-4", "vital", "mm[Hg]", 60m, 84m), ("8867-4", "vital", "/min", 60m, 100m),
+    ("8480-6", "vital", "mm[Hg]", 90m, 129m), ("8462-4", "vital", "mm[Hg]", 60m, 79m), ("8867-4", "vital", "/min", 60m, 100m),
     ("9279-1", "vital", "/min", 12m, 20m), ("8310-5", "vital", "Cel", 36.1m, 37.5m), ("59408-5", "vital", "%", 95m, 100m),
     ("29463-7", "vital", "kg", null, null), ("8302-2", "vital", "cm", null, null), ("39156-5", "vital", "kg/m2", 18.5m, 24.9m),
     ("44261-6", "survey", "{score}", null, 4m), ("70274-6", "survey", "{score}", null, 4m),

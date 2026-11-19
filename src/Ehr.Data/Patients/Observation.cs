@@ -22,6 +22,15 @@ public class Observation
     // The visit a vital sign was taken at, when it was taken at one.
     public Guid? EncounterId { get; set; }
 
+    // A vital sign marked "entered in error" (the expansion plan's step 9b): why, by whom and when. The row is never
+    // deleted; its Status becomes ObservationStatus.EnteredInError, and the correct value is a new reading. The
+    // database sets who and when (db/policies/75-results.sql).
+    public string? EnteredInErrorReason { get; set; }
+
+    public Guid? EnteredInErrorBy { get; set; }
+
+    public DateTimeOffset? EnteredInErrorAt { get; set; }
+
     // The test as a LOINC code, such as 4548-4 for hemoglobin A1c, when it has one.
     public string? Code { get; set; }
 

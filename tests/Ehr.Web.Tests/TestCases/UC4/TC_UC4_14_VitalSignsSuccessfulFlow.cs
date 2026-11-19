@@ -29,7 +29,8 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   clinician. Step 3: the flowsheet has two columns, newest first; "Trends" has a chart for systolic, diastolic and
 //   heart rate and none for weight, each an SVG with a sentence saying what it shows ("down from 148") and a table of
 //   its values; the systolic chart marks one value outside the range. The chart then says of the latest visit "blood
-//   pressure 126/80 mmHg, heart rate 68/min" and lists the newest value of each sign; the desktop app's offline copy
+//   pressure 126/80 mmHg, heart rate 68/min" and lists the newest value of each sign, the systolic with a mark and
+//   the words "down from 148" (step 9b); the desktop app's offline copy
 //   has the same three for the visit.
 // Creator: Tahseen Arnan
 public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
@@ -80,7 +81,7 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         // The desktop app's offline copy has the visit's too.
         chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Contains("blood pressure 126/80 mmHg, heart rate 68/min", Words(chart));
-        Assert.Matches("(?s)data-latest-vitals.*?<strong>Systolic blood pressure</strong>\\s*126 mmHg\\s*<span class=\"sc-muted\">.*?<strong>Weight</strong>\\s*81 kg.*?<strong>Body mass index</strong>\\s*25 kg/m&#xB2;\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", chart);
+        Assert.Matches("(?s)data-latest-vitals.*?<strong>Systolic blood pressure</strong>\\s*126 mmHg\\s*<span class=\"sc-trendmark\" data-direction=\"down\">.*?down from 148</span></span>\\s*<span class=\"sc-muted\">.*?<strong>Weight</strong>\\s*81 kg.*?<strong>Body mass index</strong>\\s*25 kg/m&#xB2;\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", chart);
         var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);
         Assert.Matches("\"systolicMmHg\":126,\"diastolicMmHg\":80,\"heartRatePerMinute\":68", await offline.Content.ReadAsStringAsync(Cancel));
