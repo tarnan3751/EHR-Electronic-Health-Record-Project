@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Ehr.Data.Patients;
+using Ehr.Data.Reference;
 
 namespace Ehr.Seed;
 
@@ -162,6 +163,17 @@ public sealed class SyntheticClinic
                 // Drawn only when taken, in this order, as before.
                 var diastolic = vitals ? systolic - random.Next(38, 56) : 0;
                 var heartRate = vitals ? random.Next(55, 101) : 0;
+                // A child's blood pressure is lower and heart rate faster (step 9b): what was drawn is shifted for the
+                // age band on the day of the visit, with nothing more drawn, so the rest of the chart comes out the same.
+                var (pressureDown, gapDown, rateUp) = AgeBand.Of(AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(start.UtcDateTime))) switch
+                {
+                    AgeBand.Infant => (30, 12, 55),
+                    AgeBand.YoungChild => (18, 8, 35),
+                    AgeBand.OlderChild => (10, 4, 20),
+                    AgeBand.Adolescent => (4, 0, 5),
+                    _ => (0, 0, 0),
+                };
+                (systolic, diastolic, heartRate) = (systolic - pressureDown, diastolic - pressureDown + gapDown, heartRate + rateUp);
                 return (Visit: visit, Vitals: vitals ? new[] { (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic), (VitalSign.HeartRate, heartRate) } : []);
             })
             .ToList();
@@ -181,8 +193,9 @@ public sealed class SyntheticClinic
                 Status = ObservationStatus.Final,
                 Value = vital.Item2,
                 Unit = VitalSigns[vital.Item1].Unit,
-                ReferenceLow = VitalSigns[vital.Item1].Low,
-                ReferenceHigh = VitalSigns[vital.Item1].High,
+                // The range for the patient's age on the day (step 9b), as the database gives a recorded one.
+                ReferenceLow = VitalRanges.For(vital.Item1, AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(visit.Visit.PeriodStart.UtcDateTime)))?.Low,
+                ReferenceHigh = VitalRanges.For(vital.Item1, AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(visit.Visit.PeriodStart.UtcDateTime)))?.High,
                 EffectiveAt = visit.Visit.PeriodStart,
                 IssuedAt = visit.Visit.PeriodStart,
             });
@@ -234,11 +247,12 @@ public sealed class SyntheticClinic
     }
 
     // The three vital signs a seeded visit records, as db/reference names them (ehr.observation_codes).
-    static readonly Dictionary<string, (string Display, string Unit, decimal Low, decimal High)> VitalSigns = new()
+    // Their reference ranges go by age: Ehr.Data.Reference.VitalRanges.
+    static readonly Dictionary<string, (string Display, string Unit)> VitalSigns = new()
     {
-        [VitalSign.Systolic] = ("Systolic blood pressure", "mm[Hg]", 90, 129),
-        [VitalSign.Diastolic] = ("Diastolic blood pressure", "mm[Hg]", 60, 84),
-        [VitalSign.HeartRate] = ("Heart rate", "/min", 60, 100),
+        [VitalSign.Systolic] = ("Systolic blood pressure", "mm[Hg]"),
+        [VitalSign.Diastolic] = ("Diastolic blood pressure", "mm[Hg]"),
+        [VitalSign.HeartRate] = ("Heart rate", "/min"),
     };
 
     public static string Mrn(int index) => $"SYN{index + 1:D7}";

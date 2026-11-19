@@ -409,6 +409,27 @@ CREATE POLICY observations_panel_insert ON ehr.observations FOR INSERT
         )
     );
 
+-- Marking a vital sign entered in error (step 9b): by a clinician with the patient on their active panel, the rule
+-- for recording one. The trigger decides what the update may be (75-results.sql).
+DROP POLICY IF EXISTS observations_panel_update ON ehr.observations;
+CREATE POLICY observations_panel_update ON ehr.observations FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    );
+
 -- Acknowledgments of results (PHI). Clinicians read them, as they read the orders; a clinician with the patient on
 -- their active panel makes one, as themselves. Patients, admins and nobody see none. Never updated or deleted.
 ALTER TABLE ehr.result_acknowledgments ENABLE ROW LEVEL SECURITY;

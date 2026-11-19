@@ -18,6 +18,10 @@
     <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
 </div>
 <h1>Vital signs: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Marked is > 0)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Marked:</span> @Model.Marked @(Model.Marked == 1 ? "reading is" : "readings are") marked entered in error and left out of the flowsheet and trends. Record the correct values as a new set.</p>
+}
 @if (Model.Saved)
 {
     <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> the vital signs are recorded, and the patient can see them in the portal.</p>
@@ -115,13 +119,53 @@ else
                                         <span class="sc-tag sc-tag--warning">@(sign.Value > sign.ReferenceHigh ? "High" : "Low")</span>
                                     }
                                 }
+                                @if (Model.ShowErrors)
+                                {
+                                    @* Entries in error (step 9b): struck through, and said in words too. *@
+                                    foreach (var wrong in Model.ErrorsAt(code, time))
+                                    {
+                                        <span class="sc-struck" data-in-error title="@wrong.EnteredInErrorReason"><s>@wrong.Value!.Value.ToString("0.#")</s> <span class="sc-visually-hidden">entered in error: @wrong.EnteredInErrorReason</span></span>
+                                    }
+                                }
                             </td>
                         }
                     </tr>
                 }
             </tbody>
+            @if (Model.OnPanel && OnPrem.IsReachable)
+            {
+                @* Step 9b: a reading is never deleted or edited. A wrong one is marked entered in error, a set at a time. *@
+                <tfoot>
+                    <tr>
+                        <th scope="row">Correct a set</th>
+                        @foreach (var time in Model.Times)
+                        {
+                            <td>
+                                @if (recorded.Any(code => Model.At(code, time) is not null))
+                                {
+                                    <a asp-page="Error" asp-route-patientId="@patient.Id" asp-route-at="@time.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss")" data-mark-in-error>Mark in error<span class="sc-visually-hidden">, the set taken @time.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</span></a>
+                                }
+                            </td>
+                        }
+                    </tr>
+                </tfoot>
+            }
         </table>
     </div>
+}
+@if (Model.InError > 0)
+{
+    <p class="sc-muted" data-in-error-count>
+        @Model.InError @(Model.InError == 1 ? "reading is" : "readings are") marked entered in error and left out.
+        @if (Model.ShowErrors)
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id">Hide entries in error</a>
+        }
+        else
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-showErrors="true">Show entries in error</a>
+        }
+    </p>
 }
 
 @if (Model.Trends.Count > 0)

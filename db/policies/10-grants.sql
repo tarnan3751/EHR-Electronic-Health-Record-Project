@@ -80,7 +80,7 @@ GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
 -- classes its ingredients belong to and which of those cross-react, and known interactions between ingredients. Read
 -- by both apps; nothing at runtime changes any of it. Its rows are db/reference's generated SQL.
 GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
-    ehr.drug_class_cross_reactions, ehr.drug_interactions TO ehr_app, ehr_read;
+    ehr.drug_class_cross_reactions, ehr.drug_interactions, ehr.vital_reference_ranges TO ehr_app, ehr_read;
 
 -- Test results and vital signs (observations). PHI, like the chart: row-level security and the write-audit trigger
 -- follow. A clinician files the results of a lab order, or records vital signs: INSERT, which a trigger holds to a
@@ -88,6 +88,9 @@ GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaire
 -- range the database knows (75-results.sql). No UPDATE or DELETE: neither is changed once filed. The portal reads them
 -- on either server.
 GRANT SELECT, INSERT ON ehr.observations TO ehr_app;
+-- Marking a vital sign "entered in error" (step 9b): these two columns, and a trigger holds the update to exactly that
+-- (75-results.sql). No other column of an observation is ever updated by the apps.
+GRANT UPDATE (status, entered_in_error_reason) ON ehr.observations TO ehr_app;
 GRANT SELECT ON ehr.observations TO ehr_read;
 
 -- Acknowledgments of an order's results. PHI. Made once: INSERT, never UPDATE or DELETE.

@@ -261,6 +261,12 @@ internal static partial class RenderBenchmark
         var random = new Random(20261115);
         SyntheticChart Anyone() => SyntheticClinic.Chart(random.Next(patients));
         static string Date(SyntheticChart chart) => chart.Patient.BirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        // The panel's seeded sets of vital signs (step 9b): the patient and the time each was taken. A generator of
+        // its own, so the rows after this one pick the patients they always did.
+        var step = patients / Math.Min(PanelSize, patients);
+        var sets = Enumerable.Range(0, panel.Count).SelectMany(i => SyntheticClinic.Chart(i * step).Vitals.Select(v => (Patient: panel[i], At: v.EffectiveAt.UtcDateTime)))
+            .Distinct().Take(200).ToList();
+        var setRandom = new Random(20261122);
 
         return
         [
@@ -312,6 +318,12 @@ internal static partial class RenderBenchmark
             await MeasureAsync(client, times, prefix + $"Inbox, {InboxSize} items", typing: false, () => "/inbox"),
             // Vital signs (step 9): the flowsheet and its trend charts, drawn by the server.
             await MeasureAsync(client, times, prefix + "Vital signs, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}/vitals"),
+            // Step 9b: the page that marks a set's readings entered in error, for a seeded visit's set.
+            await MeasureAsync(client, times, prefix + "Mark vital signs in error form, a patient on the panel", typing: false, () =>
+            {
+                var (patient, at) = sets[setRandom.Next(sets.Count)];
+                return $"/patients/{patient}/vitals/error?at={at:yyyy-MM-ddTHH:mm:ss}";
+            }),
             await MeasureAsync(client, times, prefix + "Chart history, a patient on the panel", typing: false,
                 () => $"/patients/{panel[random.Next(panel.Count)]}/chart-history"),
         ];

@@ -40,6 +40,35 @@ Names are the sources' own, with two changes of form: an ICD-10-CM code is writt
 
 The ranges in `observation_codes` are **this clinic's own**, set for synthetic data from the adult intervals that textbooks and laboratories commonly publish. They are not LOINC's, they don't vary by age or sex, and they are not validated for clinical use. Each row says so in `range_source`.
 
+### Vital-sign ranges by age
+
+Added in the plan's step 9b (Tahseen's decision of 19 November 2026). Heart rate, respiratory rate and blood pressure get a range for each of five age bands: infant (under 1 year), young child (1 to 5), older child (6 to 11), adolescent (12 to 17) and adult. Temperature and oxygen saturation keep one range. The rows are hand-written in `db/reference/35-vital-ranges.sql`, and the same rows are `Ehr.Data.Reference.VitalRanges`, which the seed uses; a test fails if the two differ. The patient's age on the day a sign was taken picks the band.
+
+They flag synthetic values on a flowsheet. **They are not validated for clinical use**, and two of the sources were read second-hand, as said below.
+
+| Sign | Infant | Young child | Older child | Adolescent | Adult |
+|---|---|---|---|---|---|
+| Heart rate, per minute | 91 to 186 | 66 to 173 | 56 to 155 | 48 to 138 | 60 to 100 |
+| Respiratory rate, per minute | 19 to 76 | 14 to 60 | 13 to 46 | 11 to 35 | 12 to 20 |
+| Systolic pressure, mmHg | 70 and up | 72 to 103 | 82 to 110 | 90 to 119 | 90 to 129 |
+| Diastolic pressure, mmHg | none | up to 63 | up to 73 | up to 79 | 60 to 79 |
+
+**Where each comes from, and how it was fitted to five bands:**
+
+- **Children's heart rate and respiratory rate:** Bonafide CP, Brady PW, Keren R, Conway PH, Marsolo K, Daymont C. Development of heart and respiratory rate percentile curves for hospitalized children. *Pediatrics* 2013;131(4):e1150–e1157 (doi:10.1542/peds.2012-2443), Tables 3 and 4, read on PubMed Central (<https://pmc.ncbi.nlm.nih.gov/articles/PMC4074640/>).
+  - The 1st and 99th percentile cut points. The source prints them for thirteen age groups; each band here takes the lowest 1st and the highest 99th among its groups, so a band is wider than any one age in it.
+  - The children measured were on hospital wards, so this is a range for flagging, not a healthy child's range.
+- **Children's blood pressure, upper value:** Flynn JT et al. Clinical Practice Guideline for Screening and Management of High Blood Pressure in Children and Adolescents. *Pediatrics* 2017;140(3):e20171904 (doi:10.1542/peds.2017-1904), Table 6, "screening blood pressure values requiring further evaluation".
+  - The table gives a value for each year of age from 1 to 12, for boys and girls, and 120/80 from 13. Each band here takes the highest in it (104/64, 111/74, 120/80); a reading at or above that is flagged, so the table holds one less. A 12-year-old is therefore flagged only from 120/80, not from the 113/75 the table gives that age.
+  - The table starts at age 1, so an infant has no upper value.
+  - **Read second-hand:** the journal's page refused the request, and the numbers were taken from the Merck Manual's reproduction of the table (<https://www.msdmanuals.com/professional/multimedia/table/screening-blood-pressure-values-in-children-that-need-additional-evaluation>). They should be checked against the guideline itself.
+- **Children's systolic pressure, lower value:** the Pediatric Advanced Life Support definition of hypotension (below 70 under 1 year, below 70 + 2 × age in years to age 10, below 90 above), at the band's youngest age (70, 72, 82, 90).
+  - **Read second-hand** (WikEM, <https://wikem.org/wiki/Vital_signs_(peds)>), not in the American Heart Association's text. No source was found for a child's diastolic lower value, so there is none.
+- **Adults:** heart rate 60 to 100, and blood pressure from 90/60, from MedlinePlus (US National Library of Medicine), "Vital signs", reviewed 1 January 2025 (<https://medlineplus.gov/ency/article/002341.htm>). Respiratory rate 12 to 20 from StatPearls, "Vital Sign Assessment" (<https://www.ncbi.nlm.nih.gov/sites/books/NBK553213/>). The upper blood pressure is one below the American Heart Association and American College of Cardiology's stage 1 (130 systolic or 80 diastolic).
+  - The adult diastolic upper value was 84 before this step, which no source supported; it is 79 now. Readings already recorded were given the new ranges by the `VitalCorrections` migration.
+
+**Rights.** MedlinePlus is a US government work. The two *Pediatrics* articles are copyright American Academy of Pediatrics, StatPearls is CC BY-NC-ND 4.0, and the life-support text is the American Heart Association's. Nothing of theirs is copied here but the numbers, which are facts, each with its citation; no table is reproduced.
+
 ### How drug classes are joined to RxNorm
 
 The FDA's indexing files name a substance and its Established Pharmacologic Classes. DailyMed's two mapping files say which class files and which RxNorm products belong to each drug label. A label whose products have exactly one ingredient between them tells us that ingredient's classes; a class is kept when at least four in five of the ingredient's labels carry it. That gives classes for 1,413 ingredients. For an ingredient with no label of its own, such as one sold only in combinations, the class file's substance is matched through the FDA substance list's RxNorm column, which brings the total to 1,945 of RxNorm's 5,886 ingredients. The rest have no FDA class and get no class check. Classes are kept by name; the class files' own codes are MED-RT's and are not stored.

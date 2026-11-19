@@ -71,7 +71,11 @@ public sealed record OfflineNote(ClinicalNote Note, string SignerName, IReadOnly
 }
 
 // A vital sign's newest value, for the chart's short flowsheet.
-public sealed record LatestVital(string Code, string Display, decimal Value, string? Unit, decimal? ReferenceLow, decimal? ReferenceHigh, DateTimeOffset TakenAt);
+public sealed record LatestVital(string Code, string Display, decimal Value, string? Unit, decimal? ReferenceLow, decimal? ReferenceHigh, DateTimeOffset TakenAt)
+{
+    // The reading before this one, when the chart's query held one (step 9b): for the up or down mark.
+    public decimal? Previous { get; init; }
+}
 
 // A patient's message threads, latest first, already recorded as one read of the patient.
 public sealed record PatientThreads(Patient Patient, IReadOnlyList<Ehr.Domain.Messaging.ThreadEntry> Threads, IReadOnlyList<AllergyIntolerance> Allergies);

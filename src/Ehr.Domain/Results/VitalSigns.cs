@@ -28,6 +28,47 @@ public sealed class VitalSigns(EhrDbContext db)
     public static string Name(string code, string coded) =>
         code == VitalSign.BodyMassIndex ? "Body mass index" : Fields.FirstOrDefault(field => field.Code == code).Label ?? coded;
 
+    // Marks vital signs "entered in error" (step 9b), all or none, with the reason. The rows are never deleted; the
+    // correct values are recorded as a new set. The database decides who may (a clinician with the patient on their
+    // panel), allows only a final vital sign to be marked, sets who and when, and marks the body mass index worked out
+    // from a weight or height marked here (db/policies/30-rls.sql and 75-results.sql). `ids` come from a read of this
+    // patient's vital signs: the caller has checked they are the patient's.
+    public async Task<Marked> MarkInErrorAsync(IReadOnlyCollection<Guid> ids, string reason, CancellationToken cancellationToken)
+    {
+        const string savepoint = "vital_signs_in_error";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+        var rows = ids.Select(id => (object)new Observation { Id = id, Display = "", Status = ObservationStatus.EnteredInError, EnteredInErrorReason = reason }).ToArray();
+        try
+        {
+            foreach (var row in rows)
+            {
+                // Only the two columns the apps may update.
+                var entry = db.Attach(row);
+                entry.Property(nameof(Observation.Status)).IsModified = true;
+                entry.Property(nameof(Observation.EnteredInErrorReason)).IsModified = true;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.ReleaseSavepointAsync(savepoint, cancellationToken);
+            return Marked.Done;
+        }
+        catch (Exception e) when (e is DbUpdateConcurrencyException
+            || e is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation } })
+        {
+            // No row updated: not on the panel (row-level security), or already marked.
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            return Marked.Refused;
+        }
+        finally
+        {
+            foreach (var row in rows)
+            {
+                db.Entry(row).State = EntityState.Detached;
+            }
+        }
+    }
+
     // What is wrong with what was typed, by code ("" for the whole form, "TakenAt" for the time): empty when it can be sent.
     public static Dictionary<string, string> Check(IReadOnlyDictionary<string, string?> typed, DateTimeOffset? takenAt, out List<(string Code, decimal Value)> values)
     {
@@ -80,13 +121,16 @@ public sealed class VitalSigns(EhrDbContext db)
     // Records the set, all or none. Refused when the database said no: the patient isn't on the signed-in clinician's
     // panel, or a value is one it doesn't take. AlreadyRecorded when the same sign is already there for the same
     // moment: a form sent twice records once.
-    public async Task<Recorded> RecordAsync(Guid patient, IReadOnlyList<(string Code, decimal Value)> values, DateTimeOffset takenAt, CancellationToken cancellationToken)
+    // `bodyMassIndex`: whether to record one, when the caller knows better than "a weight and a height are among
+    // the values" (a corrected weight sent beside a height that already stands).
+    public async Task<Recorded> RecordAsync(
+        Guid patient, IReadOnlyList<(string Code, decimal Value)> values, DateTimeOffset takenAt, CancellationToken cancellationToken, bool? bodyMassIndex = null)
     {
         // To the second: the signs of one set share their time, which is how the flowsheet puts them in one column.
         var at = new DateTimeOffset(takenAt.UtcDateTime.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, TimeSpan.Zero);
         var codes = values.Select(value => value.Code).ToList();
         // With a weight and a height, the body mass index too, last: the database works its value out from the two.
-        var rows = values.Concat(codes.Contains(VitalSign.Weight) && codes.Contains(VitalSign.Height) ? [(VitalSign.BodyMassIndex, 0m)] : [])
+        var rows = values.Concat(bodyMassIndex ?? (codes.Contains(VitalSign.Weight) && codes.Contains(VitalSign.Height)) ? [(VitalSign.BodyMassIndex, 0m)] : [])
             .Select(value => (object)new Observation
             {
                 Id = Guid.CreateVersion7(),
@@ -130,6 +174,12 @@ public sealed class VitalSigns(EhrDbContext db)
             }
         }
     }
+}
+
+public enum Marked
+{
+    Done,
+    Refused,
 }
 
 public enum Recorded
@@ -234,7 +284,8 @@ public sealed class Trend
     // there is one, by name otherwise.
     public static IReadOnlyList<Trend> From(IEnumerable<Observation> observations, IReadOnlyList<string>? order = null)
     {
-        var trends = observations.Where(o => o.Code is not null && o.Value is not null)
+        // Never a value marked entered in error (step 9b), or one not finished.
+        var trends = observations.Where(o => o.Code is not null && o.Value is not null && ObservationStatus.Released.Contains(o.Status))
             .GroupBy(o => o.Code!)
             .Where(group => group.Count() >= 2)
             .Select(group =>

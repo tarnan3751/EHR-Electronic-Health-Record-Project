@@ -283,6 +283,11 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         {
                             <span class="sc-tag sc-tag--warning">Low</span>
                         }
+                        @* Up or down against the reading before it (step 9b), in a shape and in words. *@
+                        @if (vital.Previous is { } previous && previous != vital.Value)
+                        {
+                            <span class="sc-trendmark" data-direction="@(vital.Value > previous ? "up" : "down")"><span aria-hidden="true">@(vital.Value > previous ? "▲" : "▼")</span><span class="sc-visually-hidden">@(vital.Value > previous ? "up" : "down") from @previous.ToString("0.#")</span></span>
+                        }
                         <span class="sc-muted">· @vital.TakenAt.UtcDateTime.ToString("yyyy-MM-dd") UTC</span>
                     </li>
                 }

@@ -59,7 +59,9 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
         await MigrateAsync(null);
 
         Assert.Equal(
-            ["8462-4 Diastolic blood pressure 92 mm[Hg] 60-84 final true true", "8480-6 Systolic blood pressure 148 mm[Hg] 90-129 final true true",
+            // The ranges are the adults' for this patient's age, as the later VitalCorrections migration leaves them
+            // (step 9b): 60 to 79 for diastolic, where the first migration wrote 60 to 84.
+            ["8462-4 Diastolic blood pressure 92 mm[Hg] 60-79 final true true", "8480-6 Systolic blood pressure 148 mm[Hg] 90-129 final true true",
                 "8867-4 Heart rate 64 /min 60-100 final true true", "8867-4 Heart rate 71 /min 60-100 final true true"],
             await AsSuperuserAsync(
                 """
