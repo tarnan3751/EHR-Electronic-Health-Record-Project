@@ -92,6 +92,8 @@ public sealed class WebApps : IAsyncLifetime
 
     // The secret both apps share for shipping the cloud app's audit events.
     public const string CloudAuditKey = "a-cloud-audit-key-for-the-tests-only";
+    // The key enrollment codes are hashed with: both apps hold the same one.
+    public const string EnrollmentKey = "tests-only-enrollment-code-key-0123456789";
 
     // Each cloud app keeps its audit queue in its own folder under this one.
     public string CloudAuditRoot { get; } = Path.Combine(Path.GetTempPath(), $"ehr-cloud-audit-{Guid.NewGuid():N}");
@@ -458,6 +460,10 @@ public sealed class WebApps : IAsyncLifetime
                 .UseSetting("Ehr:DataProtection:Certificate", apps.KeyCertificatePath)
                 .UseSetting("Ehr:DataProtection:CertificateKey", apps.KeyCertificateKeyPath)
                 .UseSetting("Ehr:CloudAudit:Key", CloudAuditKey)
+                // Required outside Development (step 6c); the tests' own address, so the links in emails can be followed.
+                .UseSetting("Ehr:Links:ClinicalBaseUrl", Browser.Base.ToString())
+                .UseSetting("Ehr:Links:PortalBaseUrl", Browser.Base.ToString())
+                .UseSetting("Ehr:Enrollment:Key", EnrollmentKey)
                 .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")))
                 // Every test client has the same address, so the limits are out of reach (RateLimitTests lowers them).
                 .UseSetting("RateLimits:PermitLimit", "1000000")

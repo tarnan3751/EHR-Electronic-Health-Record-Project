@@ -58,9 +58,9 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
             if (result == GiveResult.Given)
             {
                 // The email's link lets someone with no portal account create one that sees only this record (step 6b).
-                var code = await invitations.IssueAsync(grant, Email!, HttpContext.RequestAborted);
-                await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, Request, "/portal/sign-in"),
-                    Links.Build(addresses.Value.PortalBaseUrl, Request, $"/portal/invitation?code={code}"), HttpContext.RequestAborted);
+                var code = await invitations.IssueAsync(grant, HttpContext.RequestAborted);
+                await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, "/portal/sign-in"),
+                    Links.Build(addresses.Value.PortalBaseUrl, $"/portal/invitation?code={code}"), HttpContext.RequestAborted);
                 return RedirectToPage(new { patientId, done = "recorded" });
             }
 

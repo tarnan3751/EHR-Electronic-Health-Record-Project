@@ -124,6 +124,8 @@ These follow the failure table in the project overview.
 
 With the internet link or the primary down, off-site pages still load from the replica and, within a couple of seconds, say the system is read-only; a save shows "Not saved: the server is unavailable". With the primary down, saving on-site shows the same.
 
+`EHR_ENROLLMENT_KEY` is the key portal enrollment codes are hashed with. An `.env` made before it existed needs the line added (copy it from `.env.example` and change the value), or the stack won't start.
+
 If the two apps' `Ehr:CloudAudit:Key` (`EHR_CLOUD_AUDIT_KEY`) ever differ, as they can on two real servers, off-site pages don't say read-only, since the on-prem app answers, but the reads served off-site pile up in the cloud app's queue, and `docker compose logs cloud-app` says the keys don't match.
 
 To see the effect:

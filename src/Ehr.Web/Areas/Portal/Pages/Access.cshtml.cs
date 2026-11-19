@@ -63,9 +63,9 @@ public class AccessModel(PhiReader phi, ProxyAccess access, ProxyInvitations inv
             switch (result)
             {
                 case GiveResult.Given:
-                    var code = await invitations.IssueAsync(grant, Email!, HttpContext.RequestAborted);
-                    await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, Request, "/portal/sign-in"),
-                        Links.Build(addresses.Value.PortalBaseUrl, Request, $"/portal/invitation?code={code}"), HttpContext.RequestAborted);
+                    var code = await invitations.IssueAsync(grant, HttpContext.RequestAborted);
+                    await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, "/portal/sign-in"),
+                        Links.Build(addresses.Value.PortalBaseUrl, $"/portal/invitation?code={code}"), HttpContext.RequestAborted);
                     return RedirectToPage(new { done = "given" });
                 case GiveResult.Yourself:
                     errors["Email"] = "That's your own email address. Enter the other person's.";

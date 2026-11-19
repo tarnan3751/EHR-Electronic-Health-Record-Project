@@ -1067,6 +1067,9 @@ internal static partial class RenderBenchmark
             if (connectionString is not null)
             {
                 builder.UseEnvironment(Environments.Production).UseSetting("ConnectionStrings:Ehr", connectionString);
+                // Required outside Development (step 6c). The benchmark sends no email and issues no enrollment code.
+                builder.UseSetting("Ehr:Links:ClinicalBaseUrl", "https://localhost").UseSetting("Ehr:Links:PortalBaseUrl", "https://localhost")
+                    .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
             }
         }
     }
@@ -1089,6 +1092,8 @@ internal static partial class RenderBenchmark
                 .UseSetting("Ehr:OnPrem:Url", OnPremUrl)
                 .UseSetting("Ehr:CloudAudit:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
                 .UseSetting("Ehr:CloudAudit:Directory", queueDirectory)
+                .UseSetting("Ehr:Links:ClinicalBaseUrl", "https://localhost").UseSetting("Ehr:Links:PortalBaseUrl", "https://localhost")
+                .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
                 .UseSetting("Logging:LogLevel:Default", "Warning")
                 .UseSetting("Logging:LogLevel:Microsoft.AspNetCore.DataProtection", "Critical")
                 .UseSetting("Logging:LogLevel:Ehr.Web.CloudAudit.CloudAuditShipper", "Error")
