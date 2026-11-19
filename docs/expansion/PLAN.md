@@ -26,7 +26,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 6c | Security follow-ups: invitation and enrollment lookups, emailed links | done | expansion/step-06c-security-follow-ups | expansion-step-06c | [44436811170](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44436811170) | Inserted by Tahseen; before step 8. Touches `db/policies`; a new required setting; UC 5 (Simar), UC 11 (Luke) |
 | 8 | Ordering safety checks | done | expansion/step-08-order-checks | expansion-step-08 | [44445242631](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44445242631) | Extends UC 1 (Tahseen). Touches `db/policies`; three interaction sources |
 | 9 | Vital signs and trends | done | expansion/step-09-vitals | expansion-step-09 | [44461482885](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44461482885) | Extends UC 4 (Diego) and UC 6 (Simar). Touches `db/policies`; off-site chart nearest the gate |
-| 10 | Addenda to signed notes | in progress | expansion/step-10-addenda | | | Extends UC 14 (Satwik). Touches `db/policies`; desktop offline copy gains signed notes |
+| 10 | Addenda to signed notes | done | expansion/step-10-addenda | expansion-step-10 | [44474875479](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44474875479) | Extends UC 14 (Satwik). Touches `db/policies` and the draft sync; desktops need the new build |
 | 9b | Vital-sign corrections and age-based ranges | not started | | | | Added by Tahseen, 2026-11-19. Before the phase 2 tag |
 | 10b | Addenda and sensitivity follow-ups | not started | | | | Added by Tahseen, 2026-11-19. Before the phase 2 tag |
 | 10c | The off-site audit cost (UC 2) | not started | | | | Added by Tahseen, 2026-11-19. Before the phase 2 tag |
@@ -823,4 +823,5 @@ One entry per session or step: date, step, what was done, measurements (p99, pag
   - *Not looked at:* the desktop app's new "Signed notes" section on screen. Its code is small and uses the app's existing element helpers, and the Rust side is tested, but I did not run the desktop app.
   - *Heads-up:* Satwik (UC 14: the confirmation page has a "Sensitive" box, the signed note's page lists addenda and links to a new addendum page), Sara (UC 7 and 8: the offline panel carries signed notes and addenda in an optional `notes` field), Diego (UC 4: the chart's sensitive notice also counts signed notes).
   - *Open with Tahseen:* whether a colleague on the panel, and not only the signer, should add addenda (built: any panel clinician); whether a signed note should be markable sensitive afterwards (built: no).
-  - *Resume at the end of phase 2:* tag `expansion-phase-2`, push `expansion/phase-2`, complete the phase 2 pull request draft.
+  - *CI:* the first run failed on TC-UC1-17, a keyboard browser test of the results page that this step doesn't touch; it passed three times locally and on a rerun of the same commit. A flake, noted in case it recurs.
+  - *Resume at step 9b,* then 10b and 10c (Tahseen, 2026-11-19), then the end of phase 2.
