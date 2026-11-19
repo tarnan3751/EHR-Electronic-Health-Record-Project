@@ -623,6 +623,13 @@ One entry per decision: date, step, the decision, and why.
   - Each warning names its source: DDInter, ONC via Wikidata, or the FDA label.
   - Report coverage of the catalog's medication pairs before and after, and the pairs still uncovered.
   - Then build step 8 as planned, and keep going with step 9 after it.
+- **2026-11-19, step 6c, as built.**
+  - *Both tables are closed to the app roles.* `ehr_app` and `ehr_read` have no privilege on `ehr.patient_enrollments` or `ehr.proxy_invitations`. Six functions in the new `db/policies/45-codes.sql` run as the tables' owner, set `search_path`, and are executable only by the app roles: issue, find and redeem for each. Find and redeem answer for one code; redeem marks it used in the same statement, so two posts of one code can't both succeed. Issuing is checked in the database too: an enrollment code by a clinician, an invitation only for access the signed-in user gave, to the address that access names (the caller no longer passes an address).
+  - *No rows needed migrating:* both tables already held only hashes.
+  - *Enrollment codes are keyed from now on* (HMAC-SHA-256, `Ehr:Enrollment:Key`, required outside Development). **A code issued before this is stored as a plain SHA-256 and can't be converted without the code itself.** Lookup therefore accepts either form, so codes already handed out keep working until they expire, 14 days at most; after that no plain hash can match anything. Tahseen was asked whether to invalidate outstanding codes at deploy instead and hasn't said; this is the gentler of the two and is one line to tighten (drop the second argument of the two functions).
+  - *Rate limits:* failed codes at `/portal/register` are limited per client address (now tested, with the invitation page). Nothing per account exists to count against before a code is accepted.
+  - *Links:* `Ehr:Links:ClinicalBaseUrl` and `PortalBaseUrl` are checked at startup; outside Development a missing one stops the app with the setting's name and what it is for. `Links.Build` no longer takes the request. In Development an unset address is the local one from `launchSettings.json`, not the request's.
+  - *New setting for deployments and the stack:* `EHR_ENROLLMENT_KEY` in `infra/compose/.env` (in `.env.example`; an older `.env` needs the line added).
 
 ## Log
 

@@ -31,7 +31,7 @@ public class ResendModel(PatientRegistration registration, IOptions<SiteAddresse
         }
 
         await registration.ResendConfirmationAsync(Email!,
-            (userId, token) => Links.Build(links.Value.PortalBaseUrl, Request, $"/portal/confirm?user={userId}&token={Uri.EscapeDataString(token)}"),
+            (userId, token) => Links.Build(links.Value.PortalBaseUrl, $"/portal/confirm?user={userId}&token={Uri.EscapeDataString(token)}"),
             HttpContext.RequestAborted);
         Sent = true;
         return Page();

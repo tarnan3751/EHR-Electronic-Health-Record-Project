@@ -30,7 +30,7 @@ public class ForgotModel(PatientAccounts accounts, IOptions<SiteAddresses> links
         }
 
         await accounts.RequestPasswordResetAsync(Email!,
-            (userId, token) => Links.Build(links.Value.PortalBaseUrl, Request, $"/portal/reset?user={userId}&token={Uri.EscapeDataString(token)}"),
+            (userId, token) => Links.Build(links.Value.PortalBaseUrl, $"/portal/reset?user={userId}&token={Uri.EscapeDataString(token)}"),
             HttpContext.RequestAborted);
         Sent = true;
         return Page();

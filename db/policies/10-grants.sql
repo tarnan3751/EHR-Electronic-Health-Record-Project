@@ -93,19 +93,10 @@ GRANT SELECT ON ehr.observations TO ehr_read;
 GRANT SELECT, INSERT ON ehr.result_acknowledgments TO ehr_app;
 GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 
--- Portal enrollment codes, as hashes. Internal: grants only, no row-level security, because registration looks a
--- code up before anyone is signed in; the hash is useless without the code, which is never stored. The app marks a
--- code redeemed (UPDATE). No DELETE.
-GRANT SELECT, INSERT, UPDATE ON ehr.patient_enrollments TO ehr_app;
-GRANT SELECT ON ehr.patient_enrollments TO ehr_read;
-
--- Invitations to create a proxy-only portal account (step 6b), as hashes. Internal, for the reason enrollment codes
--- are: the page that accepts one runs before anyone is signed in. The hash is useless without the code, which is
--- never stored, and an invitation opens nothing by itself. A row does hold the invited address beside its grant's
--- ID, readable by the app roles with nobody signed in: who was invited, never to whose record. The app marks one redeemed, that column alone. No DELETE.
-GRANT SELECT, INSERT ON ehr.proxy_invitations TO ehr_app;
-GRANT UPDATE (redeemed_at) ON ehr.proxy_invitations TO ehr_app;
-GRANT SELECT ON ehr.proxy_invitations TO ehr_read;
+-- Portal enrollment codes and invitations to create a proxy-only account (step 6c). Internal, and with no grant at
+-- all to the runtime roles: the pages that use them run before anyone is signed in, so anything granted here would be
+-- readable by an app session with nobody signed in, every row of it. They are reached only through the functions in
+-- 45-codes.sql, which run as the tables' owner and answer for one code at a time.
 
 -- Audit events. Restricted: row-level security is enabled and forced, in the policy files that follow; no trigger,
 -- since nothing audits the audit. Append-only: no UPDATE and no DELETE for anyone at runtime. The write-audit

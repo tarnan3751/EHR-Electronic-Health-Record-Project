@@ -11,20 +11,25 @@ namespace Ehr.Domain.Accounts;
 // and the confirmation email proves the address is theirs. The code is redeemed as the account is created, in one
 // transaction, and never works again. An unknown, expired, used or already-registered code gets one answer, and an
 // address that already has an account gets the answer a new one gets, so the page gives nothing away.
-public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbContext db, AuditRecorder audit, IEmailSender email)
+public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbContext db, AuditRecorder audit, IEmailSender email, CodeHasher hasher)
 {
     public async Task<Registration> RegisterAsync(
         string address, string password, string code, Func<Guid, string, string> confirmationLink, string signInLink, string forgotLink,
         CancellationToken cancellationToken)
     {
-        var hash = EnrollmentCodes.Hash(code);
-        var now = DateTimeOffset.UtcNow;
-        var enrollment = await db.PatientEnrollments
-            .SingleOrDefaultAsync(e => e.CodeHash == hash && e.RedeemedAt == null && e.ExpiresAt > now, cancellationToken);
-        if (enrollment is null)
+        // One code at a time, through the database's functions: the app roles can't read the table of codes
+        // (db/policies/45-codes.sql). The keyed hash, and the plain one codes had before they were keyed.
+        var hash = hasher.Enrollment(code);
+        var legacy = EnrollmentCodes.Hash(code);
+        if (await CodeStore.FindEnrollmentAsync(db, hash, legacy, cancellationToken) is not { } enrollment)
         {
             return Registration.InvalidCode;
         }
+
+        // Whatever is saved below is undone together if the code turns out to have been used a moment ago.
+        const string savepoint = "registration";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancellationToken);
 
         // The patient's account, if they have one. A confirmed one is theirs for good; one that was never confirmed
         // (a mistyped address, say) is taken over below by whoever holds a new code from the clinic.
@@ -90,7 +95,12 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
                 return new(false, false, [.. failed.Errors.Select(e => e.Description)]);
             }
 
-            enrollment.RedeemedAt = now;
+            if (await CodeStore.RedeemEnrollmentAsync(db, hash, legacy, cancellationToken) is null)
+            {
+                await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+                return Registration.InvalidCode;
+            }
+
             audit.Record(AuditActions.RegistrationReplaced, patientId: enrollment.PatientId);
             await db.SaveChangesAsync(cancellationToken);
             await SendConfirmationAsync(existing, confirmationLink, cancellationToken);
@@ -103,7 +113,12 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
             return new(false, false, [.. result.Errors.Select(e => e.Description)]);
         }
 
-        enrollment.RedeemedAt = now;
+        if (await CodeStore.RedeemEnrollmentAsync(db, hash, legacy, cancellationToken) is null)
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            return Registration.InvalidCode;
+        }
+
         // Nobody is signed in, so the event has no actor: the patient says whose account it is.
         audit.Record(AuditActions.PatientRegistered, patientId: enrollment.PatientId);
         await db.SaveChangesAsync(cancellationToken);

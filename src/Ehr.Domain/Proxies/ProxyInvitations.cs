@@ -20,18 +20,12 @@ public sealed class ProxyInvitations(EhrDbContext db, UserManager<PatientUser> u
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
 
     // Records an invitation for the grant's address and returns the code for its link. Only the code's hash is kept.
-    public async Task<string> IssueAsync(Guid grant, string proxyEmail, CancellationToken cancellationToken)
+    public async Task<string> IssueAsync(Guid grant, CancellationToken cancellationToken)
     {
         var code = Convert.ToHexString(RandomNumberGenerator.GetBytes(20));
-        db.Add(new ProxyInvitation
-        {
-            Id = Guid.CreateVersion7(),
-            GrantId = grant,
-            Email = proxyEmail.Trim().ToLowerInvariant(),
-            CodeHash = EnrollmentCodes.Hash(code),
-            ExpiresAt = DateTimeOffset.UtcNow + Lifetime,
-        });
-        await db.SaveChangesAsync(cancellationToken);
+        // Through the database's function: it takes the address from the grant, which must be one the signed-in user
+        // gave, and sets the seven days. The app roles can't write or read the table (db/policies/45-codes.sql).
+        await CodeStore.IssueInvitationAsync(db, Guid.CreateVersion7(), grant, EnrollmentCodes.Hash(code), cancellationToken);
         return code;
     }
 
@@ -52,16 +46,12 @@ public sealed class ProxyInvitations(EhrDbContext db, UserManager<PatientUser> u
         const string savepoint = "invitation";
         var transaction = db.Database.CurrentTransaction!;
         await transaction.CreateSavepointAsync(savepoint, cancellationToken);
-        var hash = EnrollmentCodes.Hash(code);
-        var now = DateTimeOffset.UtcNow;
-        var claimed = await db.ProxyInvitations.Where(i => i.CodeHash == hash && i.RedeemedAt == null && i.ExpiresAt > now)
-            .ExecuteUpdateAsync(set => set.SetProperty(i => i.RedeemedAt, now), cancellationToken);
-        if (claimed != 1)
+        if (await CodeStore.RedeemInvitationAsync(db, EnrollmentCodes.Hash(code), cancellationToken) is not { } invitation)
         {
             return Acceptance.Invalid;
         }
 
-        var address = await db.ProxyInvitations.AsNoTracking().Where(i => i.CodeHash == hash).Select(i => i.Email).SingleAsync(cancellationToken);
+        var address = invitation.Email;
         var existing = await users.FindByEmailAsync(address) ?? await users.FindByNameAsync(address);
         if (existing is { EmailConfirmed: true })
         {
@@ -109,17 +99,8 @@ public sealed class ProxyInvitations(EhrDbContext db, UserManager<PatientUser> u
         return Acceptance.Accepted;
     }
 
-    async Task<ProxyInvitation?> FindAsync(string? code, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return null;
-        }
-
-        var hash = EnrollmentCodes.Hash(code);
-        var now = DateTimeOffset.UtcNow;
-        return await db.ProxyInvitations.SingleOrDefaultAsync(i => i.CodeHash == hash && i.RedeemedAt == null && i.ExpiresAt > now, cancellationToken);
-    }
+    async Task<(Guid Id, string Email)?> FindAsync(string? code, CancellationToken cancellationToken) =>
+        string.IsNullOrWhiteSpace(code) ? null : await CodeStore.FindInvitationAsync(db, EnrollmentCodes.Hash(code), cancellationToken);
 }
 
 public enum AcceptanceOutcome

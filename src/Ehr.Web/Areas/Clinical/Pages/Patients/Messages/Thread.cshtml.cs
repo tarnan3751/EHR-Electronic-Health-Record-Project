@@ -55,7 +55,7 @@ public class ThreadModel(
         var errors = SecureMessages.Check(subject: null, Body, reply: true);
         if (errors.Count == 0 && await messages.ReplyAsync(threadId, patientId, MessageSender.Staff, Body!, HttpContext.RequestAborted) == SendResult.Sent)
         {
-            await messages.NotifyPatientAsync(patientId, await phi.UnreadFromStaffAsync(patientId, HttpContext.RequestAborted), Links.Build(addresses.Value.PortalBaseUrl, Request, "/portal/messages"), HttpContext.RequestAborted);
+            await messages.NotifyPatientAsync(patientId, await phi.UnreadFromStaffAsync(patientId, HttpContext.RequestAborted), Links.Build(addresses.Value.PortalBaseUrl, "/portal/messages"), HttpContext.RequestAborted);
             return RedirectToPage(new { patientId, threadId, sent = true });
         }
 
