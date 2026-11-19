@@ -25,7 +25,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 // app forwards the post to the on-prem app; js/orders.js posts it with fetch, so when that fails the form stays filled.
 // Without JavaScript, the cloud app's "Not saved" page shows the order's fields again to copy (UC 2, ShownIfNotSaved).
 [ShownIfNotSaved(nameof(Item), "Details[indication]", "Details[dose]", "Details[route]", "Details[frequency]", "Details[duration]",
-    "Details[reason]", "Details[notes]", nameof(DuplicateReason), nameof(ChangeReason))]
+    "Details[reason]", "Details[notes]", nameof(DuplicateReason), nameof(ChangeReason), nameof(SafetyReason))]
 public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrders orders) : PageModel
 {
     [BindProperty(SupportsGet = true)]
@@ -43,6 +43,10 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
 
     [BindProperty]
     public string? DuplicateReason { get; set; }
+
+    // Step 8: why the order is signed although the database found something against it (an allergy, an interaction).
+    [BindProperty]
+    public string? SafetyReason { get; set; }
 
     // A change: the active order this one replaces, from the query string, and why, which is optional.
     [BindProperty(SupportsGet = true)]
@@ -114,6 +118,17 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             errors["DuplicateReason"] = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
         }
 
+        // Step 8: what the database knows against this order was read with the form. Signing needs a reason then.
+        var safetyReason = string.IsNullOrWhiteSpace(SafetyReason) ? null : SafetyReason.Trim();
+        if (Form.Warnings.Any(OrderSafetyText.NeedsReason) && safetyReason is null)
+        {
+            errors["SafetyReason"] = "Give a reason to sign this order despite the warnings, or cancel.";
+        }
+        else if (safetyReason?.Length > OrderForms.MaximumReasonLength)
+        {
+            errors["SafetyReason"] = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
+        }
+
         var changeReason = string.IsNullOrWhiteSpace(ChangeReason) ? null : ChangeReason.Trim();
         if (changeReason?.Length > OrderForms.MaximumReasonLength)
         {
@@ -126,10 +141,22 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         }
 
         var (order, refusal) = await orders.SignAsync(id, item!, OrderForms.Details(type, Details), Form.Duplicates.Count > 0 ? reason : null,
-            HttpContext.RequestAborted, Replaces, changeReason);
+            HttpContext.RequestAborted, Replaces, changeReason, Form.Warnings.Any(OrderSafetyText.NeedsReason) ? safetyReason : null);
         if (refusal == SignRefusal.Gone)
         {
             return NoLongerActive();
+        }
+
+        if (refusal == SignRefusal.Unsafe)
+        {
+            // Something against the order appeared after the form was read, such as a medication a colleague just
+            // added: the form again, now with the warning and the reason field.
+            if (await LoadAsync(id, item!.Code) is { } changed)
+            {
+                return changed;
+            }
+
+            return Refused(new Dictionary<string, string> { ["SafetyReason"] = "Give a reason to sign this order despite the warnings, or cancel." });
         }
 
         if (order is null)

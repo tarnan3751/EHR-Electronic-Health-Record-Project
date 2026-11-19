@@ -99,7 +99,7 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
     // when the order to replace is no longer active, because someone discontinued or changed it first; nothing is saved.
     public async Task<(Order? Order, SignRefusal? Refusal)> SignAsync(
         Guid patient, OrderCatalogItem item, string details, string? duplicateReason, CancellationToken cancellationToken,
-        Guid? replaces = null, string? changeReason = null)
+        Guid? replaces = null, string? changeReason = null, string? safetyReason = null)
     {
         var order = new Order
         {
@@ -110,6 +110,8 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
             Details = details,
             Status = OrderStatus.Active,
             DuplicateReason = string.IsNullOrWhiteSpace(duplicateReason) ? null : duplicateReason.Trim(),
+            // Kept only when the database finds something against the order (60-orders.sql); required then.
+            SafetyOverrideReason = string.IsNullOrWhiteSpace(safetyReason) ? null : safetyReason.Trim(),
             ReplacesOrderId = replaces,
         };
         var transaction = db.Database.CurrentTransaction!;
@@ -127,6 +129,12 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             refusal = SignRefusal.Duplicate;
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.CheckViolation, ConstraintName: "orders_safety_override" })
+        {
+            // The signing trigger found something against the order and no reason came with it: a warning that
+            // appeared between the form and the signing, such as a medication a colleague just added.
+            refusal = SignRefusal.Unsafe;
         }
         catch (DbUpdateException e) when (replaces is not null && e.InnerException is PostgresException { SqlState: PostgresErrorCodes.CheckViolation })
         {
@@ -211,4 +219,7 @@ public enum SignRefusal
 
     // The order a change replaces is no longer active.
     Gone,
+
+    // The database found a safety warning against the order, and no reason to sign it all the same was given.
+    Unsafe,
 }

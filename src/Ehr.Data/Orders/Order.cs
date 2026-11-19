@@ -36,6 +36,14 @@ public class Order
     // Why the clinician ordered an item the patient already had an active order for; null otherwise.
     public string? DuplicateReason { get; set; }
 
+    // Ordering safety checks (step 8). What the database found against a medication order when it was signed (an
+    // allergy, a drug of a class the patient is allergic to, an interaction with something they take), set by the
+    // database; and why the clinician ordered it all the same, which the database requires when it found anything.
+    // Both null for an order nothing was found against.
+    public string? SafetyWarnings { get; set; }
+
+    public string? SafetyOverrideReason { get; set; }
+
     // Discontinuing: why, and, set by the database, who and when. All three are null while the order is active.
     public string? DiscontinueReason { get; set; }
 

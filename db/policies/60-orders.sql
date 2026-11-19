@@ -60,6 +60,29 @@ BEGIN
             USING ERRCODE = '23505';
     END IF;
 
+    -- Ordering safety checks (step 8, 61-order-safety.sql): what is known against a medication order is found here,
+    -- whatever the client sent, and kept on the order. When any of it is serious (an allergy, a drug of a class the
+    -- patient is allergic to, a major or high-priority interaction), the order is signed only with a reason for going
+    -- ahead, which stays on the order beside what was found; both are in the write audit with the order. A moderate
+    -- or minor interaction is shown and kept, and doesn't stop the order: a reason demanded for everything is a
+    -- reason typed without reading.
+    NEW.safety_warnings := NULL;
+    IF NEW.type = 'medication' THEN
+        SELECT jsonb_agg(jsonb_build_object('kind', w.kind, 'severity', w.severity, 'ordered', w.ordered, 'against', w.against, 'source', w.source)
+                         ORDER BY w.kind, w.against, w.source)
+        INTO NEW.safety_warnings
+        FROM ehr.order_safety_warnings(NEW.patient_id, NEW.catalog_code, NEW.replaces_order_id) w;
+    END IF;
+
+    IF NEW.safety_warnings IS NULL
+       OR NOT jsonb_path_exists(NEW.safety_warnings, '$[*] ? (@.kind != "interaction" || @.severity == "major" || @.severity == "high-priority")') THEN
+        -- Nothing serious was found, so there is nothing to override.
+        NEW.safety_override_reason := NULL;
+    ELSIF coalesce(NEW.safety_override_reason, '') !~ '[^[:space:]]' THEN
+        RAISE EXCEPTION 'This order has safety warnings; give a reason to sign it all the same'
+            USING ERRCODE = '23514', CONSTRAINT = 'orders_safety_override';
+    END IF;
+
     NEW.signed_at := clock_timestamp();
     RETURN NEW;
 END

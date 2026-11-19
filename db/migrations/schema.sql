@@ -1202,3 +1202,13 @@ VALUES ('20261119014012_InteractionSources', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.orders ADD safety_override_reason character varying(500);
+
+ALTER TABLE ehr.orders ADD safety_warnings jsonb;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119014501_OrderSafety', '10.0.13');
+
+COMMIT;
+

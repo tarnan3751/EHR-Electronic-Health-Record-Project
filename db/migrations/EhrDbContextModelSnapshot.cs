@@ -740,6 +740,15 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("replaces_order_id");
 
+                    b.Property<string>("SafetyOverrideReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("safety_override_reason");
+
+                    b.Property<string>("SafetyWarnings")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("safety_warnings");
+
                     b.Property<DateTimeOffset>("SignedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
