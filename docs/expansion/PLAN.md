@@ -25,7 +25,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 7a | Chart render headroom | done | expansion/step-07a-chart-headroom | expansion-step-07a | [44429275145](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44429275145) | Added while working: the chart was at the benchmark gate on CI runners. No behaviour change |
 | 6c | Security follow-ups: invitation and enrollment lookups, emailed links | done | expansion/step-06c-security-follow-ups | expansion-step-06c | [44436811170](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44436811170) | Inserted by Tahseen; before step 8. Touches `db/policies`; a new required setting; UC 5 (Simar), UC 11 (Luke) |
 | 8 | Ordering safety checks | done | expansion/step-08-order-checks | expansion-step-08 | [44445242631](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44445242631) | Extends UC 1 (Tahseen). Touches `db/policies`; three interaction sources |
-| 9 | Vital signs and trends | in progress | expansion/step-09-vitals | | | Extends UC 4 (Diego) and UC 6 (Simar). Touches `db/policies` |
+| 9 | Vital signs and trends | done | expansion/step-09-vitals | expansion-step-09 | [44461482885](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44461482885) | Extends UC 4 (Diego) and UC 6 (Simar). Touches `db/policies`; off-site chart nearest the gate |
 | 10 | Addenda to signed notes | not started | | | | |
 | 11 | Read-only FHIR API | not started | | | | |
 | 12 | Simulated lab | not started | | | | |
