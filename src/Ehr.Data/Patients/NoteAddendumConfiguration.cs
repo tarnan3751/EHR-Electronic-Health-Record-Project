@@ -11,7 +11,11 @@ public sealed class NoteAddendumConfiguration : IEntityTypeConfiguration<NoteAdd
     public void Configure(EntityTypeBuilder<NoteAddendum> addendum)
     {
         addendum.ToTable("note_addenda", table =>
-            table.HasCheckConstraint("ck_note_addenda_text", $"text ~ '[^[:space:]]' AND char_length(text) <= {MaxLength}"));
+        {
+            table.HasCheckConstraint("ck_note_addenda_text", $"text ~ '[^[:space:]]' AND char_length(text) <= {MaxLength}");
+            // Only a sensitive addendum can be sensitive by inheritance.
+            table.HasCheckConstraint("ck_note_addenda_inherited", "sensitive OR NOT sensitive_inherited");
+        });
 
         // To the note and its patient together: an addendum can't name another patient's note.
         addendum.HasOne<ClinicalNote>().WithMany().HasForeignKey(a => new { a.NoteId, a.PatientId })

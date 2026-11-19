@@ -1904,6 +1904,10 @@ namespace Ehr.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sensitive_changed_at");
 
+                    b.Property<bool>("SensitiveInherited")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive_inherited");
+
                     b.Property<Guid?>("SensitiveMarkedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("sensitive_marked_by");
@@ -1944,6 +1948,8 @@ namespace Ehr.Migrations
 
                     b.ToTable("note_addenda", "ehr", t =>
                         {
+                            t.HasCheckConstraint("ck_note_addenda_inherited", "sensitive OR NOT sensitive_inherited");
+
                             t.HasCheckConstraint("ck_note_addenda_text", "text ~ '[^[:space:]]' AND char_length(text) <= 16000");
                         });
                 });

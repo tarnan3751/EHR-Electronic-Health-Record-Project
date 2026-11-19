@@ -137,8 +137,11 @@ CREATE OR REPLACE TRIGGER clinical_notes_sensitivity
     BEFORE UPDATE ON ehr.clinical_notes
     FOR EACH ROW EXECUTE FUNCTION ehr.change_note_sensitivity();
 
--- When a note becomes sensitive, so do its addenda: an addendum to a sensitive note is sensitive. With the same
--- reason, as the caller, through the addenda's own rule below. Unmarking the note leaves each addendum as it is.
+-- When a note becomes sensitive, so do its addenda: an addendum to a sensitive note is sensitive. Each one not already
+-- marked is marked as inherited from the note, with the note's reason. When the note is unmarked, the inherited marks
+-- are cleared with it, and only those: an addendum marked on its own stays marked until it is unmarked itself
+-- (Tahseen's decision of 19 November 2026). As the caller, through the addenda's own rule below, which is what
+-- decides that a mark is inherited.
 CREATE OR REPLACE FUNCTION ehr.mark_note_addenda_sensitive() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -158,6 +161,26 @@ CREATE OR REPLACE TRIGGER clinical_notes_mark_addenda
     AFTER UPDATE ON ehr.clinical_notes
     FOR EACH ROW WHEN (NEW.sensitive AND NOT OLD.sensitive)
     EXECUTE FUNCTION ehr.mark_note_addenda_sensitive();
+
+CREATE OR REPLACE FUNCTION ehr.clear_inherited_addenda_marks() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    UPDATE ehr.note_addenda a SET sensitive = false, sensitive_reason = NEW.sensitive_reason
+    WHERE a.note_id = NEW.id AND a.patient_id = NEW.patient_id AND a.sensitive AND a.sensitive_inherited;
+    -- All of them, or the note isn't unmarked: none may be left sensitive only because of a note that no longer is.
+    IF EXISTS (SELECT 1 FROM ehr.note_addenda a WHERE a.note_id = NEW.id AND a.sensitive_inherited) THEN
+        RAISE EXCEPTION 'The marks the note''s addenda inherited could not be cleared with it' USING ERRCODE = '42501';
+    END IF;
+    RETURN NULL;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.clear_inherited_addenda_marks() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER clinical_notes_clear_inherited
+    AFTER UPDATE ON ehr.clinical_notes
+    FOR EACH ROW WHEN (OLD.sensitive AND NOT NEW.sensitive)
+    EXECUTE FUNCTION ehr.clear_inherited_addenda_marks();
 
 -- The desktop's draft sync must hear that a note's sensitivity changed: it withholds the text of a draft signed as a
 -- sensitive note, and a desktop that has the text removes it (DraftSyncApi, draft_sync.rs). The draft itself is frozen
@@ -203,9 +226,12 @@ BEGIN
 
     NEW.author_id := ehr.current_user_id();
     NEW.signed_at := clock_timestamp();
+    -- Marked by its author, on its own; or, with no mark of its own, sensitive because its note is: inherited, which
+    -- unmarking the note will clear (Tahseen's decision of 19 November 2026).
+    NEW.sensitive_inherited := note_sensitive AND NOT coalesce(NEW.sensitive, false);
     NEW.sensitive := coalesce(NEW.sensitive, false) OR note_sensitive;
-    -- Its author is the person who made it sensitive (step 10b), with no reason to give.
-    NEW.sensitive_marked_by := CASE WHEN NEW.sensitive THEN ehr.current_user_id() END;
+    -- Its author is the person who made it sensitive (step 10b), with no reason to give; nobody is, for an inherited one.
+    NEW.sensitive_marked_by := CASE WHEN NEW.sensitive AND NOT NEW.sensitive_inherited THEN ehr.current_user_id() END;
     NEW.sensitive_reason := NULL;
     NEW.sensitive_changed_at := NULL;
     RETURN NEW;
@@ -231,14 +257,15 @@ CREATE OR REPLACE TRIGGER note_addenda_immutable
     FOR EACH ROW EXECUTE FUNCTION ehr.reject_note_addendum_change();
 
 -- Marking a signed addendum sensitive, or unmarking it (step 10b): the note's rule, for an addendum. Only the person
--- who made it sensitive, or the signer of the note it belongs to, unmarks it; and not while the note is sensitive,
--- since an addendum to a sensitive note is sensitive. Runs as the caller.
+-- who made it sensitive, or the signer of the note it belongs to, unmarks a mark of its own; and never while the note
+-- is sensitive, since an addendum to a sensitive note is sensitive. A mark inherited from the note is made and
+-- cleared by the note's marking and unmarking, above. Runs as the caller.
 CREATE OR REPLACE FUNCTION ehr.change_addendum_sensitivity() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
-    apart constant text[] := ARRAY['sensitive', 'sensitive_marked_by', 'sensitive_reason', 'sensitive_changed_at'];
+    apart constant text[] := ARRAY['sensitive', 'sensitive_inherited', 'sensitive_marked_by', 'sensitive_reason', 'sensitive_changed_at'];
     note_signer uuid;
     note_sensitive boolean;
 BEGIN
@@ -253,22 +280,33 @@ BEGIN
         RAISE EXCEPTION 'Say why, in up to 500 characters' USING ERRCODE = '23514';
     END IF;
 
+    SELECT n.signer_id, n.sensitive INTO note_signer, note_sensitive FROM ehr.clinical_notes n WHERE n.id = OLD.note_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'The signed note is unavailable' USING ERRCODE = '23514';
+    END IF;
+
     IF NEW.sensitive THEN
         IF ehr.current_user_id() IS NULL THEN
             RAISE EXCEPTION 'An addendum is marked sensitive by someone' USING ERRCODE = '42501';
         END IF;
-        NEW.sensitive_marked_by := ehr.current_user_id();
+        -- Marked while its note is sensitive, which only the note's own marking does (an addendum of a sensitive note
+        -- is sensitive already): inherited from the note, by nobody of its own. Marked while the note isn't: its own.
+        NEW.sensitive_inherited := note_sensitive;
+        NEW.sensitive_marked_by := CASE WHEN note_sensitive THEN NULL ELSE ehr.current_user_id() END;
     ELSE
-        SELECT n.signer_id, n.sensitive INTO note_signer, note_sensitive FROM ehr.clinical_notes n WHERE n.id = OLD.note_id;
-        IF NOT FOUND OR note_sensitive THEN
+        -- Never while its note is sensitive, whoever asks and whether the mark is its own or inherited.
+        IF note_sensitive THEN
             RAISE EXCEPTION 'An addendum to a sensitive note is sensitive' USING ERRCODE = '23514';
         END IF;
-        IF ehr.current_user_id() IS NULL
-           -- One marked before anyone was recorded as marking it was marked by its author.
-           OR (ehr.current_user_id() IS DISTINCT FROM coalesce(OLD.sensitive_marked_by, OLD.author_id) AND ehr.current_user_id() IS DISTINCT FROM note_signer) THEN
+        -- An inherited mark goes with the note's, whoever unmarked the note. A mark of its own: only the person who
+        -- made it (its author, if nobody was recorded), or the note's signer.
+        IF NOT OLD.sensitive_inherited
+           AND (ehr.current_user_id() IS NULL
+                OR (ehr.current_user_id() IS DISTINCT FROM coalesce(OLD.sensitive_marked_by, OLD.author_id) AND ehr.current_user_id() IS DISTINCT FROM note_signer)) THEN
             RAISE EXCEPTION 'Only the person who marked an addendum sensitive, or the note''s signer, unmarks it'
                 USING ERRCODE = '42501', CONSTRAINT = 'note_addenda_unmark';
         END IF;
+        NEW.sensitive_inherited := false;
         NEW.sensitive_marked_by := NULL;
     END IF;
     NEW.sensitive_changed_at := clock_timestamp();

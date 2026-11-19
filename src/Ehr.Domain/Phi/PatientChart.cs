@@ -68,6 +68,9 @@ public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt
     // Whether its author is the note's signer (step 10b): one that isn't is labeled as not the note's author.
     public bool ByNoteAuthor { get; init; } = true;
 
+    // Sensitive only because its note is: the mark came from the note and goes with it.
+    public bool SensitiveInherited { get; init; }
+
     // Who made it sensitive, and why and when its sensitivity last changed after it was signed.
     public Guid? SensitiveMarkedBy { get; init; }
 

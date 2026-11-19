@@ -1457,3 +1457,40 @@ VALUES ('20261119083741_NoteSensitivity', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.note_addenda ADD sensitive_inherited boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE ehr.note_addenda ADD CONSTRAINT ck_note_addenda_inherited CHECK (sensitive OR NOT sensitive_inherited);
+
+DO $$
+DECLARE
+    forced_notes boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.clinical_notes'::regclass);
+    forced_addenda boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.note_addenda'::regclass);
+BEGIN
+    ALTER TABLE ehr.clinical_notes NO FORCE ROW LEVEL SECURITY;
+    ALTER TABLE ehr.note_addenda NO FORCE ROW LEVEL SECURITY;
+    ALTER TABLE ehr.note_addenda DISABLE TRIGGER USER;
+
+    UPDATE ehr.note_addenda a
+    SET sensitive_inherited = true, sensitive_marked_by = NULL
+    FROM ehr.clinical_notes n
+    WHERE n.id = a.note_id AND n.sensitive AND a.sensitive
+      AND ((a.sensitive_reason IS NOT NULL AND a.sensitive_reason IS NOT DISTINCT FROM n.sensitive_reason
+            AND a.sensitive_marked_by IS NOT DISTINCT FROM n.sensitive_marked_by)
+           OR (a.sensitive_reason IS NULL AND a.signed_at >= coalesce(n.sensitive_changed_at, n.signed_at)));
+
+    ALTER TABLE ehr.note_addenda ENABLE TRIGGER USER;
+    IF forced_notes THEN
+        ALTER TABLE ehr.clinical_notes FORCE ROW LEVEL SECURITY;
+    END IF;
+    IF forced_addenda THEN
+        ALTER TABLE ehr.note_addenda FORCE ROW LEVEL SECURITY;
+    END IF;
+END
+$$;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261119191644_InheritedSensitivity', '10.0.13');
+
+COMMIT;
+
