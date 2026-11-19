@@ -107,6 +107,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "encounters")] = ["SELECT"],
         [("ehr_app", "observations")] = ["SELECT", "INSERT"],
         [("ehr_read", "observations")] = ["SELECT"],
+        [("ehr_app", "proxy_invitations")] = ["SELECT", "INSERT"],
+        [("ehr_read", "proxy_invitations")] = ["SELECT"],
         [("ehr_app", "patient_enrollments")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_read", "patient_enrollments")] = ["SELECT"],
         // Read by column (ExpectedColumnPrivileges): every one but details, the values a write changed.
@@ -269,6 +271,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_app", "messages", "UPDATE")] = ["read_at"],
         // FR-19: revoking a proxy grant, and the patient allowing sensitive items.
         [("ehr_app", "proxy_grants", "UPDATE")] = ["include_sensitive", "revoked_at", "revoked_by"],
+        // Step 6b: an invitation is marked redeemed.
+        [("ehr_app", "proxy_invitations", "UPDATE")] = ["redeemed_at"],
         // Marking an inbox item done.
         [("ehr_app", "inbox_items", "UPDATE")] = ["done_at"],
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.

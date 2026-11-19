@@ -43,6 +43,52 @@ static class ProxyTests
         return await ReadAsync(chosen);
     }
 
+    // The password every account these tests create signs in with (WebApps.CreatePatientAccountAsync uses it too).
+    public const string Password = "a-patient-portal-password";
+
+    // The invitation link in the latest email to that address: its path and query on this site.
+    public static string InvitationPath(WebApps apps, string email)
+    {
+        var sent = apps.Emails.Sent.Last(message => string.Equals(message.To, email, StringComparison.OrdinalIgnoreCase));
+        var link = new Uri(apps.Emails.Actions[sent.Body].Link);
+        Assert.Equal("/portal/invitation", link.AbsolutePath);
+        return link.PathAndQuery;
+    }
+
+    // Accepts an invitation as its page posts it; the page it answers with.
+    public static async Task<string> AcceptAsync(WebApps apps, string invitation, string name, string password = Password, string? confirm = null)
+    {
+        var client = Client(apps.OnPrem, new CookieContainer());
+        var form = await client.GetStringAsync(invitation, Cancel);
+        if (!form.Contains("name=\"Input.Password\"", StringComparison.Ordinal))
+        {
+            // No form to post: the page already says why (used, expired or unknown).
+            return form;
+        }
+
+        var code = System.Web.HttpUtility.ParseQueryString(invitation[(invitation.IndexOf('?') + 1)..])["code"]!;
+        using var posted = await client.PostAsync("/portal/invitation", Form(("__RequestVerificationToken", Token(form)), ("Input.Code", code), ("Input.Name", name),
+            ("Input.Password", password), ("Input.Confirm", confirm ?? password)), Cancel);
+        return await posted.Content.ReadAsStringAsync(Cancel);
+    }
+
+    // Signs a portal account in on the on-site app; the client, its cookies, and where it landed.
+    public static async Task<(HttpClient Client, CookieContainer Jar, string Path, string Page)> SignInAsync(WebApps apps, string email, string password = Password)
+    {
+        var jar = new CookieContainer();
+        var client = Client(apps.OnPrem, jar);
+        using var signedIn = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password));
+        return (client, jar, PathOf(signedIn), await signedIn.Content.ReadAsStringAsync(Cancel));
+    }
+
+    public static async Task<Guid> AccountIdAsync(WebApps apps, string email)
+    {
+        await using var db = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand("SELECT id FROM ehr.patient_users WHERE normalized_email = upper(@email)", db);
+        command.Parameters.AddWithValue("email", email);
+        return (Guid)(await command.ExecuteScalarAsync(Cancel))!;
+    }
+
     // The grants for a patient's record, oldest first: "email scope sensitive state".
     public static Task<List<string>> GrantsAsync(WebApps apps, Guid patient) => QueryAsync(apps,
         """

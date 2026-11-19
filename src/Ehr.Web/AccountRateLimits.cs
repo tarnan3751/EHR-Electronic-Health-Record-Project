@@ -28,7 +28,7 @@ public static class AccountRateLimits
     static readonly string[] AccountPaths =
     [
         "/sign-in", "/portal/sign-in", "/portal/register", "/portal/forgot", "/portal/resend", "/portal/reset",
-        "/portal/confirm", "/api/desktop/sign-in",
+        "/portal/confirm", "/portal/invitation", "/api/desktop/sign-in",
     ];
 
     // The header the cloud app puts on a request it forwards, so the on-prem app doesn't count every off-site client

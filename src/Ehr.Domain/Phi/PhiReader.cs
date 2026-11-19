@@ -411,21 +411,28 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             : await (
                 from account in db.PatientUsers.AsNoTracking()
                 where patientSide.Contains(account.Id)
-                select new { account.Id, account.PatientId }).ToDictionaryAsync(a => a.Id, a => a.PatientId, cancellationToken);
-        var proxyPatients = accounts.Values.Where(id => id != patientId).Distinct().ToList();
+                select new { account.Id, account.PatientId, account.DisplayName }).ToDictionaryAsync(a => a.Id, a => (a.PatientId, a.DisplayName), cancellationToken);
+        // A proxy who is a patient here is named by their own record; a proxy-only account by the name it gave.
+        var proxyPatients = accounts.Values.Where(a => a.PatientId is not null && a.PatientId != patientId).Select(a => a.PatientId!.Value).Distinct().ToList();
         var proxyNames = asPatient || proxyPatients.Count == 0
             ? []
             : await db.Patients.AsNoTracking().Where(p => proxyPatients.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id, p => $"{p.GivenName} {p.FamilyName}", cancellationToken);
         string FromPatientSide(Guid sender)
         {
-            var byPatient = !accounts.TryGetValue(sender, out var senderPatient) || senderPatient == patientId;
+            var byPatient = !accounts.TryGetValue(sender, out var account) || account.PatientId == patientId;
             if (asPatient)
             {
                 return sender == user.UserId ? "You" : byPatient ? patient.GivenName : "A proxy";
             }
 
-            return byPatient ? $"{patient.GivenName} {patient.FamilyName}" : $"{proxyNames.GetValueOrDefault(senderPatient, "Someone")} (proxy)";
+            if (byPatient)
+            {
+                return $"{patient.GivenName} {patient.FamilyName}";
+            }
+
+            var name = account.PatientId is { } own ? proxyNames.GetValueOrDefault(own) : account.DisplayName;
+            return $"{(string.IsNullOrWhiteSpace(name) ? "Someone" : name)} (proxy)";
         }
 
         var messages = rows.Select(m => new MessageEntry(m.Id, m.SenderKind,

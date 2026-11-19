@@ -161,6 +161,7 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal messages, the patient's own", typing: false, () => "/portal/messages"));
                     results.Add(await MeasureAsync(portal, times, "Portal conversation, the patient's own", typing: false, () => $"/portal/messages/{portalThread}"));
                     results.Add(await MeasureAsync(portal, times, "Portal access, the patient's own", typing: false, () => "/portal/access"));
+                    results.Add(await MeasureAsync(portal, times, "Portal choose, a record shared", typing: false, () => "/portal/choose"));
                     // The same session, now looking at the record it holds a proxy grant for: every page first checks
                     // the grant, and every policy resolves the subject through it.
                     using (var chosen = await PostFormAsync(portal, "/portal/acting", await portal.GetStringAsync("/portal/access"), ("grantId", proxyGrant.ToString())))
@@ -712,7 +713,8 @@ internal static partial class RenderBenchmark
     {
         var client = app.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = Base, HandleCookies = true, AllowAutoRedirect = true });
         using var home = await PostFormAsync(client, "/portal/sign-in", await client.GetStringAsync("/portal/sign-in"), ("Input.Email", email), ("Input.Password", password));
-        if (home.RequestMessage?.RequestUri?.AbsolutePath != "/portal")
+        // An account with a record shared with it lands on the page that asks whose record (step 6b).
+        if (home.RequestMessage?.RequestUri?.AbsolutePath is not ("/portal" or "/portal/choose"))
         {
             throw new InvalidOperationException($"Signing in at the portal ended at {home.RequestMessage?.RequestUri?.AbsolutePath}, not at /portal.");
         }
@@ -889,7 +891,7 @@ internal static partial class RenderBenchmark
         var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
         await using var transaction = await db.Database.BeginTransactionAsync();
         var access = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Proxies.ProxyAccess>();
-        if (await access.GiveAsync(patient, [], proxyEmail, Ehr.Data.Proxies.ProxyScope.RecordAndMessages, includeSensitive: false, 30, CancellationToken.None)
+        if ((await access.GiveAsync(patient, [], proxyEmail, Ehr.Data.Proxies.ProxyScope.RecordAndMessages, includeSensitive: false, 30, CancellationToken.None)).Result
             != Ehr.Domain.Proxies.GiveResult.Given)
         {
             throw new InvalidOperationException("The benchmark's proxy grant was refused.");

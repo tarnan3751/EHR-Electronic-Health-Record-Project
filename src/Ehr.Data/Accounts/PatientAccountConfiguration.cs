@@ -13,6 +13,8 @@ public sealed class PatientAccountConfiguration :
     IEntityTypeConfiguration<PatientUserLogin>,
     IEntityTypeConfiguration<PatientUserToken>
 {
+    public const int MaximumDisplayName = 100;
+
     public void Configure(EntityTypeBuilder<PatientUser> user)
     {
         user.ToTable("patient_users");
@@ -25,8 +27,10 @@ public sealed class PatientAccountConfiguration :
         user.Property(u => u.Email).HasMaxLength(256);
         user.Property(u => u.NormalizedEmail).HasMaxLength(256);
 
-        // One account per patient, and never an account without its patient. Nothing deletes patients, but if
-        // something ever did, the account would stand in the way rather than vanish.
+        user.Property(u => u.DisplayName).HasMaxLength(MaximumDisplayName);
+
+        // One account per patient. An account without one is a proxy-only account (step 6b): any number of those.
+        // Nothing deletes patients, but if something ever did, the account would stand in the way rather than vanish.
         user.HasIndex(u => u.PatientId).IsUnique();
         user.HasOne<Patient>().WithMany().HasForeignKey(u => u.PatientId).OnDelete(DeleteBehavior.Restrict);
 

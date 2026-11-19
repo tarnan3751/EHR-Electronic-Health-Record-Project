@@ -102,6 +102,79 @@ public class ProxyAccessSecurityTests(MigratedDatabase database) : IClassFixture
         }
     }
 
+    // Step 6b: a portal account with no record of its own. By itself it reaches no patient data at all and can give
+    // nobody access to anything; under a grant addressed to it, exactly what any proxy reaches; and when the grant
+    // ends, nothing again.
+    [Fact]
+    public async Task A_proxy_only_account_reaches_only_the_record_shared_with_it()
+    {
+        var (clinician, patient, other) = await PeopleAsync();
+        var (account, email) = await Accounts.ProxyOnlyAccountAsync(database);
+        var proxy = new Person(Guid.Empty, account, email);
+        foreach (var table in new[] { "conditions", "medication_statements", "allergy_intolerances", "encounters" })
+        {
+            await Accounts.ChartRowAsync(database, table, patient.Patient);
+        }
+
+        var thread = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, patient.Account, "INSERT INTO ehr.message_threads (id, patient_id, subject) VALUES (@id, @patient, 'Synthetic subject')",
+            ("id", thread), ("patient", patient.Patient));
+        var tables = new[]
+        {
+            "patients", "observations", "conditions", "medication_statements", "allergy_intolerances", "encounters", "appointments", "message_threads",
+            "messages", "orders", "clinical_notes", "clinical_drafts", "patient_assignments", "break_glass_accesses", "inbox_items", "audit_events",
+            "chart_history", "result_acknowledgments", "proxy_grants",
+        };
+        var everything = string.Join(" + ", tables.Select(table => $"(SELECT count(*) FROM ehr.{table})"));
+
+        foreach (var connection in new[] { App, Read })
+        {
+            // Nothing is shared with it yet: no row of any patient table, and no patient to be.
+            Assert.Equal(["0"], await Accounts.QueryAsync(connection, account, $"SELECT {everything}"));
+            Assert.Equal([""], await Accounts.QueryAsync(connection, account, "SELECT ehr.current_patient_id()"));
+            Assert.Empty(await Accounts.QueryAsync(connection, account, "SELECT grant_id FROM ehr.proxied_records()"));
+        }
+
+        // It has no record to share, and can't share anyone else's or write anywhere.
+        await RefusedAsync(() => GrantAsync(account, patient, other));
+        await RefusedAsync(() => Accounts.ExecuteAsync(App, account, "INSERT INTO ehr.message_threads (id, patient_id, subject) VALUES (gen_random_uuid(), @patient, 'Synthetic')", ("patient", patient.Patient)));
+        await RefusedAsync(() => Accounts.ExecuteAsync(App, account,
+            "INSERT INTO ehr.messages (id, thread_id, patient_id, sender_kind, body) VALUES (gen_random_uuid(), @thread, @patient, 'patient', 'Synthetic')", ("thread", thread), ("patient", patient.Patient)));
+        // Naming a grant that isn't addressed to it changes nothing.
+        var notTheirs = await GrantAsync(patient.Account, patient, other);
+        Assert.Equal(["0"], await ActingAsync(App, account, notTheirs, $"SELECT {everything}"));
+
+        // Shared with it, for the record only: that patient's row and results, the grant itself, and no messages.
+        var grant = await GrantAsync(clinician, patient, proxy);
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal([$"{grant} {patient.Patient}"], await Accounts.QueryAsync(connection, account, "SELECT grant_id || ' ' || patient_id FROM ehr.proxied_records()"));
+            Assert.Equal(["1"], await Accounts.QueryAsync(connection, account, $"SELECT {everything}"));
+            Assert.Equal([patient.Patient.ToString()], await ActingAsync(connection, account, grant, "SELECT id FROM ehr.patients"));
+            Assert.Equal([patient.Patient.ToString()], await ActingAsync(connection, account, grant, Seen));
+            // Not the messages (the grant doesn't include them), and none of what no patient sees. Who is on the
+            // patient's care team is the patient's to see, so it is the proxy's too: that one row.
+            Assert.Equal(["0 1"], await ActingAsync(connection, account, grant,
+                "SELECT (SELECT count(*) FROM ehr.message_threads) + (SELECT count(*) FROM ehr.orders) + (SELECT count(*) FROM ehr.audit_events) || ' ' || (SELECT count(*) FROM ehr.patient_assignments)"));
+        }
+
+        // Still nothing to pass on, acting or not.
+        using (Accounts.ActingUnder(grant))
+        {
+            await RefusedAsync(() => GrantAsync(account, patient, other with { Email = "someone-else@example.com" }));
+        }
+
+        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.proxy_grants SET revoked_at = now() WHERE id = @id", ("id", grant));
+        Assert.Equal(["0"], await ActingAsync(App, account, grant, $"SELECT {everything}"));
+        Assert.Equal(["0"], await Accounts.QueryAsync(Read, account, $"SELECT {everything}"));
+    }
+
+    static async Task RefusedAsync(Func<Task> attempt)
+    {
+        var refused = await Assert.ThrowsAsync<PostgresException>(attempt);
+        Assert.Contains(refused.SqlState, new[] { PostgresErrorCodes.InsufficientPrivilege, PostgresErrorCodes.CheckViolation });
+    }
+
     // A proxy for two patients sees one record at a time: under one grant, nothing of the other, not even their row.
     [Fact]
     public async Task A_proxy_for_two_patients_sees_one_record_at_a_time()

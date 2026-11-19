@@ -1154,3 +1154,29 @@ VALUES ('20261118215809_OrderResults', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.patient_users ALTER COLUMN patient_id DROP NOT NULL;
+
+ALTER TABLE ehr.patient_users ADD display_name character varying(100);
+
+CREATE TABLE ehr.proxy_invitations (
+    id uuid NOT NULL,
+    grant_id uuid NOT NULL,
+    email character varying(256) NOT NULL,
+    code_hash character varying(64) NOT NULL,
+    issued_at timestamp with time zone NOT NULL DEFAULT (now()),
+    expires_at timestamp with time zone NOT NULL,
+    redeemed_at timestamp with time zone,
+    CONSTRAINT pk_proxy_invitations PRIMARY KEY (id),
+    CONSTRAINT fk_proxy_invitations_proxy_grants_grant_id FOREIGN KEY (grant_id) REFERENCES ehr.proxy_grants (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_proxy_invitations_code_hash ON ehr.proxy_invitations (code_hash);
+
+CREATE INDEX ix_proxy_invitations_grant_id ON ehr.proxy_invitations (grant_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261118230602_ProxyOnlyAccounts', '10.0.13');
+
+COMMIT;
+

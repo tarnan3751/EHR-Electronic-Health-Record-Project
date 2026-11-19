@@ -68,6 +68,10 @@ public static class AuditActions
     // A patient whose confirmation link expired or got lost asked for a new one, and it was sent.
     public const string ConfirmationResent = "confirmation_resent";
 
+    // Someone accepted an invitation and created a proxy-only portal account (step 6b). No patient: the account has
+    // no record of its own. The actor is the new account.
+    public const string ProxyAccountCreated = "proxy_account_created";
+
     // A patient whose account was never confirmed (a mistyped address, say) registered again with a new code: the
     // account's address and password were replaced.
     public const string RegistrationReplaced = "registration_replaced";
@@ -78,6 +82,6 @@ public static class AuditActions
         Read, ReadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
         RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
-        RegistrationReplaced,
+        RegistrationReplaced, ProxyAccountCreated,
     ];
 }
