@@ -1347,11 +1347,9 @@ ALTER TABLE ehr.observations ADD CONSTRAINT fk_observations_staff_users_entered_
 
 DO $$
 DECLARE
-    forced_patients boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.patients'::regclass);
     forced_observations boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
     audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
 BEGIN
-    ALTER TABLE ehr.patients NO FORCE ROW LEVEL SECURITY;
     ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
     IF audited THEN
         ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
@@ -1381,8 +1379,8 @@ BEGIN
 
     WITH aged AS (
         SELECT o.id, o.code,
-            greatest(0, (extract(year FROM age((o.effective_at AT TIME ZONE 'UTC')::date, p.birth_date)) * 12
-                + extract(month FROM age((o.effective_at AT TIME ZONE 'UTC')::date, p.birth_date)))::int) AS months
+            greatest(0, (extract(year FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                + extract(month FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int) AS months
         FROM ehr.observations o JOIN ehr.patients p ON p.id = o.patient_id
         WHERE o.category = 'vital-signs' AND o.code IN (SELECT code FROM vital_ranges_then))
     UPDATE ehr.observations o
@@ -1393,9 +1391,6 @@ BEGIN
 
     IF audited THEN
         ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
-    END IF;
-    IF forced_patients THEN
-        ALTER TABLE ehr.patients FORCE ROW LEVEL SECURITY;
     END IF;
     IF forced_observations THEN
         ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;

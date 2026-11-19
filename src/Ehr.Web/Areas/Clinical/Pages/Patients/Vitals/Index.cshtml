@@ -9,7 +9,9 @@
     var patient = Model.Vitals.Patient;
     ViewData["Title"] = $"Vital signs: {patient.FamilyName}, {patient.GivenName}";
     var names = Model.Vitals.Signs.GroupBy(sign => sign.Code!).ToDictionary(group => group.Key, group => group.First());
-    var recorded = VitalSign.All.Where(names.ContainsKey).ToList();
+    // The signs with something to show in the sets listed: a value that stands, or, when they are shown, one in error.
+    var recorded = VitalSign.All.Where(code => names.ContainsKey(code)
+        && Model.Times.Any(time => Model.At(code, time) is not null || Model.ShowErrors && Model.ErrorsAt(code, time).Any())).ToList();
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Vitals.Allergies)" />
@@ -124,7 +126,7 @@ else
                                     @* Entries in error (step 9b): struck through, and said in words too. *@
                                     foreach (var wrong in Model.ErrorsAt(code, time))
                                     {
-                                        <span class="sc-struck" data-in-error title="@wrong.EnteredInErrorReason"><s>@wrong.Value!.Value.ToString("0.#")</s> <span class="sc-visually-hidden">entered in error: @wrong.EnteredInErrorReason</span></span>
+                                        <span class="sc-struck" data-in-error><s>@wrong.Value!.Value.ToString("0.#")</s> <span class="sc-struck__reason">entered in error: @wrong.EnteredInErrorReason</span></span>
                                     }
                                 }
                             </td>
@@ -152,6 +154,19 @@ else
             }
         </table>
     </div>
+}
+@if (Model.MoreSets || Model.Earlier)
+{
+    <p class="sc-muted">
+        @if (Model.Earlier)
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id">Show the latest @IndexModel.Columns sets only</a>
+        }
+        else
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-earlier="true" data-earlier-sets>Show earlier sets</a>
+        }
+    </p>
 }
 @if (Model.InError > 0)
 {

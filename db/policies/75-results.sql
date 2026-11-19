@@ -98,8 +98,9 @@ BEGIN
         FROM ehr.vital_reference_ranges r
         JOIN ehr.patients p ON p.id = NEW.patient_id
         CROSS JOIN LATERAL (
-            SELECT (extract(year FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date, p.birth_date)) * 12
-                    + extract(month FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date, p.birth_date)))::int AS months) a
+            -- Between two timestamps without a zone, so the session's time zone can't move a month boundary.
+            SELECT (extract(year FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                    + extract(month FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int AS months) a
         WHERE r.code = NEW.code AND greatest(a.months, 0) >= r.from_months AND (r.to_months IS NULL OR greatest(a.months, 0) < r.to_months);
         IF NOT FOUND THEN
             -- A sign that has banded ranges but none for this age (a diastolic pressure under 1 year) has no range,

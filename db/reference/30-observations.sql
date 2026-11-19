@@ -33,7 +33,7 @@ COPY incoming_observation_codes (code, display, kind, unit, reference_low, refer
 62292-8	25-Hydroxyvitamin D3+25-Hydroxyvitamin D2 [Mass/volume] in Serum or Plasma	lab	ng/mL	30	100	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N
 1989-3	25-hydroxyvitamin D3 [Mass/volume] in Serum or Plasma	lab	ng/mL	30	100	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N
 8480-6	Systolic blood pressure	vital	mm[Hg]	90	129	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N
-8462-4	Diastolic blood pressure	vital	mm[Hg]	60	84	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N
+8462-4	Diastolic blood pressure	vital	mm[Hg]	60	79	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N
 8867-4	Heart rate	vital	/min	60	100	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N
 9279-1	Respiratory rate	vital	/min	12	20	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N
 8310-5	Body temperature	vital	Cel	36.1	37.5	This clinic's range for adults, set for synthetic data from commonly published intervals; not validated for clinical use.	\N

@@ -100,16 +100,17 @@ namespace Ehr.Migrations
             // Written by hand. Vital signs recorded before this step carry the adults' reference range whatever the
             // patient's age. They get the range for the patient's age on the day each was taken, from the same
             // figures db/reference/35-vital-ranges.sql loads (that file runs after the migrations, so they are
-            // repeated here). As in the VitalSigns migration: forced row-level security is lifted for the owner
-            // while the rows are corrected, and the audit trigger is paused, since no value changes.
+            // repeated here). As in the VitalSigns migration: forced row-level security is lifted on observations for
+            // the owner while the rows are corrected, and the audit trigger is paused, since no value changes. The
+            // patients table is left as it is: its owner may read it (the patients_owner_select policy), so it takes
+            // no lock here. On 900,000 vital signs the whole migration took 17 seconds on a laptop, during which
+            // reads of observations wait; the migration job allows it ten minutes (infra/migrate).
             migrationBuilder.Sql("""
                 DO $$
                 DECLARE
-                    forced_patients boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.patients'::regclass);
                     forced_observations boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
                     audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
                 BEGIN
-                    ALTER TABLE ehr.patients NO FORCE ROW LEVEL SECURITY;
                     ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
                     IF audited THEN
                         ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
@@ -139,8 +140,8 @@ namespace Ehr.Migrations
 
                     WITH aged AS (
                         SELECT o.id, o.code,
-                            greatest(0, (extract(year FROM age((o.effective_at AT TIME ZONE 'UTC')::date, p.birth_date)) * 12
-                                + extract(month FROM age((o.effective_at AT TIME ZONE 'UTC')::date, p.birth_date)))::int) AS months
+                            greatest(0, (extract(year FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                                + extract(month FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int) AS months
                         FROM ehr.observations o JOIN ehr.patients p ON p.id = o.patient_id
                         WHERE o.category = 'vital-signs' AND o.code IN (SELECT code FROM vital_ranges_then))
                     UPDATE ehr.observations o
@@ -151,9 +152,6 @@ namespace Ehr.Migrations
 
                     IF audited THEN
                         ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
-                    END IF;
-                    IF forced_patients THEN
-                        ALTER TABLE ehr.patients FORCE ROW LEVEL SECURITY;
                     END IF;
                     IF forced_observations THEN
                         ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
@@ -166,6 +164,30 @@ namespace Ehr.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // One way once it has been used: the schema this returns to has no place for an entry in error (its
+            // flowsheet would show one as a reading, and a reading beside its correction breaks the older once-only
+            // rule). Refused with the reason, rather than failing part-way.
+            migrationBuilder.Sql("""
+                DO $$
+                DECLARE
+                    forced boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
+                    marked bigint;
+                BEGIN
+                    -- Forced row-level security would hide every row from the owner, and the check would pass blind.
+                    ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
+                    SELECT count(*) INTO marked FROM ehr.observations WHERE entered_in_error_at IS NOT NULL;
+                    IF forced THEN
+                        ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
+                    END IF;
+                    IF marked > 0 THEN
+                        RAISE EXCEPTION 'VitalCorrections cannot be rolled back: vital signs have been marked entered in error';
+                    END IF;
+                    -- The update policy names a column this drops (db/policies/30-rls.sql makes it again when run).
+                    DROP POLICY IF EXISTS observations_panel_update ON ehr.observations;
+                END
+                $$;
+                """);
+
             migrationBuilder.DropForeignKey(
                 name: "fk_observations_staff_users_entered_in_error_by",
                 schema: "ehr",

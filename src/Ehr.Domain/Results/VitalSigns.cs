@@ -190,7 +190,12 @@ public enum Recorded
 }
 
 // One value of a test or a vital sign at a time.
-public sealed record TrendPoint(DateTimeOffset At, decimal Value);
+// With the reference range the value was recorded against: a vital sign's goes by the patient's age on the day it
+// was taken (step 9b), so one chart's points can have different ranges.
+public sealed record TrendPoint(DateTimeOffset At, decimal Value, decimal? Low = null, decimal? High = null)
+{
+    public bool IsOutside => (Low is not null && Value < Low) || (High is not null && Value > High);
+}
 
 // The values of one test or vital sign over time, with where each sits on a small chart (step 9). The chart is drawn
 // by the server as SVG, with no script, and its numbers are also given as a table: the chart is never the only way
@@ -237,7 +242,11 @@ public sealed class Trend
 
     public bool HasRange => Low is not null || High is not null;
 
-    public bool IsOutside(TrendPoint point) => (Low is not null && point.Value < Low) || (High is not null && point.Value > High);
+    // Each point against the range it was recorded with, not the latest one.
+    public static bool IsOutside(TrendPoint point) => point.IsOutside;
+
+    // Whether the points were recorded against more than one range: a child who grew into another age band.
+    public bool RangesDiffer => Points.Select(point => (point.Low, point.High)).Distinct().Count() > 1;
 
     public decimal X(int index) => Points.Count == 1 ? Width / 2m : Left + (index * (Width - Left - Right) / (Points.Count - 1));
 
@@ -273,7 +282,8 @@ public sealed class Trend
             var change = last.Value == first.Value ? "the same as" : last.Value > first.Value ? "up from" : "down from";
             return $"{Title}: {Points.Count} values from {first.At.UtcDateTime:MMM d, yyyy} to {last.At.UtcDateTime:MMM d, yyyy}. "
                 + $"Latest {last.Value:0.####}{(Unit is null ? "" : " " + Unit)}, {change} {first.Value:0.####}."
-                + (HasRange ? $" Reference range {RangeText}." : "");
+                + (HasRange ? $" Reference range {RangeText}." : "")
+                + (RangesDiffer ? " That range is for the latest reading; earlier ones are marked against the range for the patient's age then." : "");
         }
     }
 
@@ -293,7 +303,8 @@ public sealed class Trend
                 var latest = group.OrderByDescending(o => o.EffectiveAt).ThenByDescending(o => o.IssuedAt).First();
                 // Two values of one moment stay in the order they were released (the chart's own sort keeps it).
                 return new Trend(group.Key, latest.Display, latest.Unit, latest.ReferenceLow, latest.ReferenceHigh,
-                    group.OrderBy(o => o.EffectiveAt).ThenBy(o => o.IssuedAt).ThenBy(o => o.Id).Select(o => new TrendPoint(o.EffectiveAt, o.Value!.Value)));
+                    group.OrderBy(o => o.EffectiveAt).ThenBy(o => o.IssuedAt).ThenBy(o => o.Id)
+                        .Select(o => new TrendPoint(o.EffectiveAt, o.Value!.Value, o.ReferenceLow, o.ReferenceHigh)));
             });
         var places = order?.Select((code, place) => (code, place)).ToDictionary(item => item.code, item => item.place);
         return [.. places is null

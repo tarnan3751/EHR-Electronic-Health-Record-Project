@@ -40,9 +40,9 @@ else
                 </label>
                 first = false;
             }
-            @if (Model.Readings.Any(reading => reading.Code == VitalSign.BodyMassIndex))
+            @if (Model.HasBodyMassIndex)
             {
-                <p class="sc-field__hint">Marking the weight or the height also marks the body mass index worked out from them.</p>
+                <p class="sc-field__hint">The body mass index isn't listed: marking the weight or the height also marks the body mass index worked out from them.</p>
             }
             @if (Model.Errors.TryGetValue("Chosen", out var chosenError))
             {
@@ -61,7 +61,7 @@ else
             }
         </div>
         <div class="sc-actions">
-            <button type="submit" class="sc-btn sc-btn--primary" data-confirm-in-error>Mark entered in error</button>
+            <button type="submit" class="sc-btn sc-btn--primary" data-mark-entered-in-error>Mark entered in error</button>
             <a class="sc-btn" asp-page="Index" asp-route-patientId="@patient.Id">Cancel</a>
         </div>
     </form>

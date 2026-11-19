@@ -85,7 +85,7 @@ GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaire
 -- Test results and vital signs (observations). PHI, like the chart: row-level security and the write-audit trigger
 -- follow. A clinician files the results of a lab order, or records vital signs: INSERT, which a trigger holds to a
 -- final result of one of the order's tests, or to a vital sign with no order, each with the name, unit and reference
--- range the database knows (75-results.sql). No UPDATE or DELETE: neither is changed once filed. The portal reads them
+-- range the database knows (75-results.sql). No DELETE, and no UPDATE but the one below: neither is changed once filed. The portal reads them
 -- on either server.
 GRANT SELECT, INSERT ON ehr.observations TO ehr_app;
 -- Marking a vital sign "entered in error" (step 9b): these two columns, and a trigger holds the update to exactly that

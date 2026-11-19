@@ -73,7 +73,7 @@ public class TC_UC4_20_VitalSignErrorRefusedAndOffSite(WebApps apps) : IClassFix
         Assert.DoesNotContain("data-mark-in-error", await cutOff.GetStringAsync(Path(patient), Cancel));
         var readOnly = await cutOff.GetStringAsync(ErrorPath(patient, set), Cancel);
         Assert.Contains("Readings can't be marked until the clinic's server is back.", readOnly);
-        Assert.DoesNotContain("data-confirm-in-error", readOnly);
+        Assert.DoesNotContain("data-mark-entered-in-error", readOnly);
         using var notSaved = await cutOff.PostAsync(ErrorPath(patient, set), Form(("__RequestVerificationToken", own), ("Reason", "During the outage.")), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);
         Assert.Equal([$"{Temperature} 36.8 final", $"{HeartRate} 72 entered-in-error"], await StatesAsync(apps, patient));

@@ -34,6 +34,9 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
     public DateTimeOffset Taken { get; private set; }
 
+    // Whether the set has a body mass index worked out from its weight and height.
+    public bool HasBodyMassIndex { get; private set; }
+
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
     public async Task<IActionResult> OnGetAsync(Guid patientId) => await LoadAsync(patientId) ?? Page();
@@ -98,8 +101,11 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
         Vitals = read;
         Taken = new DateTimeOffset(at, TimeSpan.Zero);
-        Readings = [.. read.Signs.Where(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final)
+        // Not the body mass index: it isn't a reading. It follows its weight and height, and the database marks it with
+        // either (ticking it beside them made the second update find it already marked, and the whole set was refused).
+        Readings = [.. read.Signs.Where(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code != VitalSign.BodyMassIndex)
             .OrderBy(sign => Array.IndexOf(VitalSign.All, sign.Code))];
+        HasBodyMassIndex = read.Signs.Any(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code == VitalSign.BodyMassIndex);
         return Readings.Count == 0 ? RedirectToPage("Index", new { patientId }) : null;
     }
 }

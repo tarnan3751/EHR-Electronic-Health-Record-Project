@@ -39,6 +39,7 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 - Ordering safety checks (the plan's step 8): a medication order is checked against the patient's coded allergies and drug classes, and against what they take for known interactions from DDInter, the ONC high-priority list and FDA labels. Serious warnings need a recorded reason to override. Decision support for this demonstration system, not a complete clinical reference. See `docs/UC1.md` and `docs/expansion/reference-data.md`.
 - Vital signs and trends (the plan's step 9): blood pressure, heart rate, temperature, respiratory rate, oxygen saturation, weight and height are recorded as coded observations, with the body mass index worked out by the database; the chart lists the newest value of each, its vital signs page has the flowsheet, and vital signs and lab values have trend charts drawn by the server as SVG, with the reference range and a table of the numbers, for clinicians and in the portal (`docs/UC4.md`, `docs/UC6.md`).
 - Addenda to signed notes (the plan's step 10): a signed note stays locked, and a clinician with the patient on their panel signs addenda that are shown after it with author and time. A note can be signed as sensitive and an addendum marked sensitive; both follow the rules for sensitive items. The desktop app's offline chart shows signed notes and their addenda, except sensitive ones (`docs/UC14.md`).
+- Vital-sign corrections and ranges by age (the plan's step 9b): a wrong reading is marked entered in error with a reason, kept in the record and left out of every view unless asked for, and the correct value is a new reading; heart rate, respiratory rate and blood pressure are flagged against the range for the patient's age (`docs/UC4.md`, `docs/expansion/reference-data.md`).
 
 **Not built yet:** editing visits, sending orders to a lab or pharmacy, and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
@@ -63,7 +64,7 @@ tests/
 db/
   migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
   policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
-  reference/        the standard codes chart entries are picked from, as SQL: generated, but for one hand-written file (docs/expansion/reference-data.md)
+  reference/        the standard codes chart entries are picked from, as SQL: generated, but for two hand-written files (docs/expansion/reference-data.md)
 docs/               each use case's guide, and brand (the SwiftChart brand guide and tokens.json, the source of truth for the UI's styling)
 tools/              brand/sync.cs: writes the tokens' CSS and the desktop app's copy of the shared CSS, fonts and logos
                     reference/import.cs: writes db/reference from pinned releases of the standard code lists

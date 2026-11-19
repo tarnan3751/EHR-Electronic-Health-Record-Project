@@ -49,7 +49,9 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         Assert.Contains($"/patients/{patient}/vitals/error?at={Uri.EscapeDataString(yesterday + ":00")}", flowsheet);
         var form = await session.Client.GetStringAsync(ErrorPath(patient, yesterday + ":00"), Cancel);
         Assert.Contains("Which readings are wrong?", form);
-        Assert.Contains("Marking the weight or the height also marks the body mass index", form);
+        Assert.Contains("marking the weight or the height also marks the body mass index", form);
+        // The body mass index is not a reading to tick: it follows its weight and height.
+        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(form, "name=\"Chosen\"").Count);
 
         using var marked = await MarkAsync(apps, session.Client, patient, yesterday + ":00", "Typed 180 for 108.", Systolic, Weight);
         var page = await ReadAsync(marked);
@@ -58,7 +60,7 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         Assert.DoesNotContain("180", System.Text.RegularExpressions.Regex.Match(page, "(?s)<tbody>.*?Systolic blood pressure.*?</tr>").Value);
         Assert.DoesNotContain($"data-trend=\"{Systolic}\"", page);
         Assert.Contains($"data-trend=\"{Diastolic}\"", page);
-        Assert.DoesNotContain("data-in-error ", page);
+        Assert.DoesNotContain("sc-struck", page);
         Assert.Equal(
             [$"{Weight} 81 entered-in-error", $"{BodyMassIndex} 25 entered-in-error", $"{Height} 180 final", $"{Diastolic} 92 final", $"{Systolic} 180 entered-in-error", $"{HeartRate} 72 final",
                 $"{Diastolic} 80 final", $"{Systolic} 126 final", $"{HeartRate} 68 final"],
@@ -68,8 +70,8 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
             patient));
 
         var shown = await session.Client.GetStringAsync(Path(patient) + "?showErrors=true", Cancel);
-        Assert.Matches("(?s)<span class=\"sc-struck\" data-in-error title=\"Typed 180 for 108.\"><s>180</s> <span class=\"sc-visually-hidden\">entered in error: Typed 180 for 108.</span>", shown);
-        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(shown, "data-in-error title=").Count);
+        Assert.Matches("(?s)<span class=\"sc-struck\" data-in-error><s>180</s> <span class=\"sc-struck__reason\">entered in error: Typed 180 for 108.</span>", shown);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(shown, "<span class=\"sc-struck\" data-in-error>").Count);
 
         // The set typed again with the right systolic. The diastolic, which stands, is left as it is.
         using var corrected = await RecordAtAsync(session.Client, patient, yesterday, (Systolic, "108"), (Diastolic, "92"));
@@ -99,5 +101,43 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
             Assert.DoesNotContain(">180<", view.Replace("180 cm", "", StringComparison.Ordinal));
             Assert.DoesNotContain("\"systolicMmHg\":180", view);
         }
+    }
+
+    // A whole set is wrong (the wrong patient): every reading is ticked, weight and height among them, and the body
+    // mass index goes with them. Then a weight corrected by itself gets its body mass index back, and a set older than
+    // the six the flowsheet lists can still be reached and corrected.
+    [Fact]
+    public async Task A_whole_set_is_marked_and_a_weight_corrected_alone_gets_its_body_mass_index_and_an_older_set_can_be_reached()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps);
+        var times = Enumerable.Range(1, 8).Select(days => DateTime.UtcNow.AddDays(-days).ToString("yyyy-MM-ddTHH:mm")).ToList();
+        foreach (var time in times)
+        {
+            using var recorded = await RecordAtAsync(session.Client, patient, time, (Systolic, "120"), (Diastolic, "70"), (HeartRate, "70"), (Weight, "81"), (Height, "180"));
+            Assert.Equal(System.Net.HttpStatusCode.OK, recorded.StatusCode);
+        }
+
+        using var whole = await MarkAsync(apps, session.Client, patient, times[0] + ":00", "Wrong patient.", Systolic, Diastolic, HeartRate, Weight, Height);
+        Assert.Contains("Marked: 5 readings", Words(await ReadAsync(whole)));
+        Assert.Equal(6, (await StatesAsync(apps, patient)).Count(state => state.EndsWith("entered-in-error", StringComparison.Ordinal)));
+
+        // The weight alone, in the second set: marked, then typed again by itself. The height stands.
+        using var weight = await MarkAsync(apps, session.Client, patient, times[1] + ":00", "Weighed with a coat on.", Weight);
+        Assert.Contains("Marked:", Words(await ReadAsync(weight)));
+        using var corrected = await RecordAtAsync(session.Client, patient, times[1], (Weight, "79"));
+        Assert.Contains("Saved:", await ReadAsync(corrected));
+        Assert.Contains($"{BodyMassIndex} 24.4 final", await StatesAsync(apps, patient));
+
+        // The eighth set is beyond the six listed: "Show earlier sets" lists it, with its "Mark in error" link.
+        var flowsheet = await session.Client.GetStringAsync(Path(patient), Cancel);
+        var oldest = Uri.EscapeDataString(times[7] + ":00");
+        Assert.DoesNotContain(oldest, flowsheet);
+        Assert.Contains("data-earlier-sets", flowsheet);
+        var earlier = await session.Client.GetStringAsync(Path(patient) + "?earlier=true", Cancel);
+        Assert.Contains($"/patients/{patient}/vitals/error?at={oldest}", earlier);
+        using var old = await MarkAsync(apps, session.Client, patient, times[7] + ":00", "Cuff too small.", Systolic);
+        Assert.Contains("Marked:", Words(await ReadAsync(old)));
+        // And with entries in error shown, that old one is among them.
+        Assert.Contains("entered in error: Cuff too small.", await session.Client.GetStringAsync(Path(patient) + "?showErrors=true", Cancel));
     }
 }

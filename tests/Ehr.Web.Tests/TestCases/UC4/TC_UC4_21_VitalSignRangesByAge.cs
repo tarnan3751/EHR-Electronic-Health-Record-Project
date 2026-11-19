@@ -59,4 +59,27 @@ public class TC_UC4_21_VitalSignRangesByAge(WebApps apps) : IClassFixture<WebApp
         Assert.Contains("High", Row(young, "Diastolic blood pressure"));
         Assert.Contains("High", Row(young, "Body temperature"));
     }
+
+    // A trend marks each point against the range it was recorded with: a child who has since grown into the next age
+    // band keeps the earlier reading unmarked if it was inside the range for their age then.
+    [Fact]
+    public async Task A_trend_marks_each_reading_against_the_range_for_the_age_it_was_taken_at()
+    {
+        var (clinician, _, session) = await OnPanelAsync(apps);
+        var child = await apps.InsertPatientAsync("Synthetic", "Growing");
+        await apps.AssignAsync(clinician, child);
+        // Six years and a month old: a young child two months ago (heart rate up to 173), an older child now (155).
+        await ProxyTests.QueryAsync(apps, "UPDATE ehr.patients SET birth_date = (now() - interval '6 years 1 month')::date WHERE id = @patient RETURNING id::text", child);
+
+        using var before = await RecordAsync(session.Client, child, 62 * 24 * 60, (HeartRate, "160"));
+        using var now = await RecordAsync(session.Client, child, 10, (HeartRate, "100"));
+        var page = await ReadAsync(now);
+
+        Assert.Equal([$"{HeartRate} 66-173", $"{HeartRate} 56-155"], await ProxyTests.QueryAsync(apps,
+            "SELECT code || ' ' || trim_scale(reference_low) || '-' || trim_scale(reference_high) FROM ehr.observations WHERE patient_id = @patient ORDER BY effective_at", child));
+        Assert.DoesNotContain("sc-trend__point--outside", page);
+        Assert.DoesNotContain("160, outside the range", page);
+        Assert.Contains("Reference range 56 to 155. That range is for the latest reading; earlier ones are marked against the range for the patient's age then.", Words(page));
+        Assert.DoesNotContain("High", System.Text.RegularExpressions.Regex.Match(page, "(?s)<th scope=\"row\">Heart rate.*?</tr>").Value);
+    }
 }

@@ -137,6 +137,26 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => MarkAsync(clinician, patient, "718-7"));
     }
 
+    // One statement can't record someone else as the person who marked a reading by changing who is signed in between
+    // its rows: the policy holds the row to the person the statement began as.
+    [Fact]
+    public async Task A_statement_cannot_name_someone_else_as_the_person_who_marked_a_reading()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        await RecordAsync(clinician, patient);
+        await RecordAsync(clinician, patient, HeartRate, 72m);
+
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(App, clinician,
+            """
+            UPDATE ehr.observations
+            SET status = 'entered-in-error',
+                entered_in_error_reason = 'Synthetic' || CASE WHEN code = '8867-4' THEN left(set_config('app.user_id', @other, true), 0) ELSE '' END
+            WHERE patient_id = @patient
+            """, ("patient", patient), ("other", admin.ToString())));
+        Assert.All(await StateAsync(patient), state => Assert.EndsWith("final none none none", state));
+    }
+
     [Fact]
     public async Task Marking_a_weight_or_height_marks_the_body_mass_index_worked_out_from_it_and_none_is_worked_out_from_an_entry_in_error()
     {
