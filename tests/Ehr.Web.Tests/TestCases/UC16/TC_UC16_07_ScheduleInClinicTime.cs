@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 //   3. Open the appointment.
 //   4. Open the next day's schedule on an app whose clinic is in UTC.
 //   5. Try to book 02:30 on 14 March 2027.
-// Expected result: Step 1: the time field is labeled with the clinic's zone; the chart lists the appointment at
+// Expected result: Step 1: the time field is labeled "clinic time"; the chart lists the appointment at
 //   23:30 with the zone's abbreviation; it is stored at that moment, which in UTC is early the next day. Step 2: the
 //   day's schedule lists it as "23:30 to 23:50" with the abbreviation and says times are clinic time; the next day's
 //   doesn't list it. Step 3: the page shows the clinic's day and time, and the form to reschedule holds them. Step 4:
@@ -48,7 +48,7 @@ public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebAp
         var label = clock.Label(start);
 
         var form = await session.Client.GetStringAsync(NewPath(patient), Cancel);
-        Assert.Matches("Time, clinic time, C[SD]T <span>\\(required\\)</span>", form);
+        Assert.Contains("Time, clinic time <span>(required)</span>", form);
         using var booked = await BookAsync(session.Client, patient, clinician.Id, Day(7), "23:30", "Synthetic: late clinic");
         Assert.Equal(HttpStatusCode.OK, booked.StatusCode);
         Assert.Contains($"<strong>{Day(7)} 23:30 {label}</strong> · 20 minutes · Dr. Schedule Central", await ReadAsync(booked));

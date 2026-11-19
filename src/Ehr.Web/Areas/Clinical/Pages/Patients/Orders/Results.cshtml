@@ -141,7 +141,7 @@ else
                 first = false;
             }
             <div class="sc-field">
-                <label for="result-collected">Sample collected (@Clinic.FieldLabel(DateTimeOffset.UtcNow)) <span>(required)</span></label>
+                <label for="result-collected">Sample collected (@Clinic.ClockName) <span>(required)</span></label>
                 <input id="result-collected" class="sc-field__input" type="datetime-local" name="CollectedAt" value="@Model.CollectedAt" required
                        aria-invalid="@(Model.Errors.ContainsKey("CollectedAt") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("CollectedAt") ? "result-collected-error" : null)">
                 @if (Model.Errors.TryGetValue("CollectedAt", out var collectedError))

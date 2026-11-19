@@ -390,8 +390,6 @@ function chartSection(title, rows, none = 'None recorded.') {
       : el('p', { className: 'sc-muted', textContent: none }));
 }
 
-// Signed notes, read-only, each followed by its addenda in the order they were signed. Sensitive notes and addenda
-// are never kept on this device; the line above the visits says how many items were left out.
 // A time from the offline copy on the clinic's clock, labeled: "2026-11-15 14:05 CST". The copy says which zone;
 // one made before it did, or naming a zone this machine doesn't know, is shown in UTC, labeled, as before.
 function clinicStamp(text, zone, withTime = true) {
@@ -409,6 +407,8 @@ function clinicStamp(text, zone, withTime = true) {
   }
 }
 
+// Signed notes, read-only, each followed by its addenda in the order they were signed. Sensitive notes and addenda
+// are never kept on this device; the line above the visits says how many items were left out.
 function signedNotes(notes, zone) {
   const stamp = (text) => clinicStamp(text, zone);
   const part = (title, text) => [el('h5', { textContent: title }), el('p', { className: 'sc-note__text', textContent: text })];

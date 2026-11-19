@@ -57,5 +57,5 @@ public static class AppointmentForm
 
     // "09:30 to 09:50 CST": the clinic's clock, labeled.
     public static string Time(Ehr.Domain.Time.ClinicTime clinic, AppointmentEntry appointment) =>
-        $"{clinic.Plain(appointment.StartsAt, "HH:mm")} to {clinic.Format(appointment.StartsAt.AddMinutes(appointment.Minutes), "HH:mm")}";
+        clinic.Range(appointment.StartsAt, appointment.StartsAt.AddMinutes(appointment.Minutes));
 }

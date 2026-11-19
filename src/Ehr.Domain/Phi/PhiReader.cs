@@ -688,7 +688,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return [.. latestFirst ? entries.OrderByDescending(a => a.StartsAt).ThenBy(a => a.Id) : entries.OrderBy(a => a.StartsAt).ThenBy(a => a.Id)];
     }
 
-    // A clinician's day (FR-17): their appointments that start on that day, UTC, earliest first, whatever their
+    // A clinician's day (FR-17): their appointments that start between two moments (a day of the clinic's calendar, step 10d), earliest first, whatever their
     // status. Each patient named is a recorded read of that patient, as in a list of patients.
     public async Task<IReadOnlyList<AppointmentEntry>> ScheduleAsync(Guid clinician, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
     {

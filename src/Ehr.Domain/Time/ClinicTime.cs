@@ -13,8 +13,6 @@ namespace Ehr.Domain.Time;
 // macOS and Windows, so they are configured, not looked up.
 public sealed class ClinicTime
 {
-    public const string Section = "Ehr:Clinic";
-
     readonly string? standard;
 
     readonly string? daylight;
@@ -30,6 +28,15 @@ public sealed class ClinicTime
         {
             throw new InvalidOperationException(
                 $"Ehr:Clinic:TimeZone is \"{Id}\", which isn't a time zone this server knows. Use an IANA name, such as America/Chicago.", e);
+        }
+
+        // The desktop app is sent this name and can only use an IANA one: a Windows name the server happens to know
+        // ("Central Standard Time") is turned into its IANA name, or refused.
+        if (Id != "UTC" && !Zone.HasIanaId)
+        {
+            Id = TimeZoneInfo.TryConvertWindowsIdToIanaId(Zone.Id, out var iana)
+                ? iana
+                : throw new InvalidOperationException($"Ehr:Clinic:TimeZone is \"{Id}\", which isn't an IANA name. Use one, such as America/Chicago.");
         }
 
         var parts = abbreviations?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? [];
@@ -125,6 +132,11 @@ public sealed class ClinicTime
         return From(midnight)!.Value;
     }
 
-    // Where a field's label says which clock it takes: "UTC", or "clinic time, CST".
-    public string FieldLabel(DateTimeOffset moment) => IsUtc ? "UTC" : $"clinic time, {Label(moment)}";
+    // Where a field's label, or a table's heading, says which clock: "UTC" or "clinic time". No abbreviation: the
+    // time typed may be on the other side of a clock change from now.
+    public string ClockName => IsUtc ? "UTC" : "clinic time";
+
+    // "09:30 to 09:50 CST"; with each end's own label when the clocks change between them: "01:50 CDT to 01:10 CST".
+    public string Range(DateTimeOffset from, DateTimeOffset to, string format = "HH:mm") =>
+        Label(from) == Label(to) ? $"{Plain(from, format)} to {Format(to, format)}" : $"{Format(from, format)} to {Format(to, format)}";
 }

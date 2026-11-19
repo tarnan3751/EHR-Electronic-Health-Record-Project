@@ -70,7 +70,7 @@ else
             </div>
         }
             <div class="sc-field">
-                <label for="vital-taken">Taken (@Clinic.FieldLabel(DateTimeOffset.UtcNow)) <span>(required)</span></label>
+                <label for="vital-taken">Taken (@Clinic.ClockName) <span>(required)</span></label>
                 <input id="vital-taken" class="sc-field__input" type="datetime-local" name="TakenAt" value="@Model.TakenAt" required autofocus="@(focus == "TakenAt")"
                        aria-invalid="@(Model.Errors.ContainsKey("TakenAt") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("TakenAt") ? "vital-taken-error" : null)">
                 @if (Model.Errors.TryGetValue("TakenAt", out var takenError))
@@ -94,7 +94,7 @@ else
 {
     <div class="sc-table-wrap">
         <table class="sc-table" data-flowsheet>
-            <caption class="sc-visually-hidden">The latest @Model.Times.Count sets of vital signs, newest first. Times are @(Clinic.IsUtc ? "UTC" : "clinic time").</caption>
+            <caption class="sc-visually-hidden">The latest @Model.Times.Count sets of vital signs, newest first. Times are @Clinic.ClockName.</caption>
             <thead>
                 <tr>
                     <th scope="col">Vital sign</th>
@@ -145,7 +145,7 @@ else
                             <td>
                                 @if (recorded.Any(code => Model.At(code, time) is not null))
                                 {
-                                    <a asp-page="Error" asp-route-patientId="@patient.Id" asp-route-at="@time.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss")" data-mark-in-error>Mark in error<span class="sc-visually-hidden">, the set taken @time.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</span></a>
+                                    <a asp-page="Error" asp-route-patientId="@patient.Id" asp-route-at="@time.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss")" data-mark-in-error>Mark in error<span class="sc-visually-hidden">, the set taken @Clinic.Format(time)</span></a>
                                 }
                             </td>
                         }

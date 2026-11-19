@@ -24,9 +24,11 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   4. As an administrator on the Chicago app, open the audit log for the patient.
 // Expected result: Step 1: the field is labeled "Taken (clinic time, CST)" (CDT in summer) and holds the clinic's
 //   time now. Step 2: saved; the flowsheet's column is headed with the time typed and the zone's abbreviation; the
-//   reading is stored at that moment in UTC; the link to mark the set in error still names the moment in UTC; the
+//   reading is stored at that moment in UTC (the field's label is "Taken (clinic time)"); the link to mark the set in error still names the moment in UTC; the
 //   chart shows the clinic's day. Step 3: the same reading is headed with its UTC time, labeled UTC. Step 4: the
-//   audit log's times are headed "When (UTC)" and none carries the clinic's abbreviation.
+//   audit log's times are headed "When (UTC)", the reading's event is at its UTC time, and none carries the clinic's
+//   abbreviation. Also: a second reading makes a trend, whose table is in clinic time; a time the clocks skip is
+//   refused with its own message; the desktop's offline copy names the clinic's zone.
 // Creator: Tahseen Arnan
 public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebApps>
 {
@@ -42,7 +44,7 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
         var now = DateTimeOffset.UtcNow;
 
         var form = await session.Client.GetStringAsync(Path(patient), Cancel);
-        Assert.Contains($"Taken ({clock.FieldLabel(now)}) <span>(required)</span>", form);
+        Assert.Contains("Taken (clinic time) <span>(required)</span>", form);
         var offered = System.Text.RegularExpressions.Regex.Match(form, "id=\"vital-taken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value;
         var offeredAt = clock.From(DateTime.ParseExact(offered, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture))!.Value;
         Assert.InRange(offeredAt, now.AddMinutes(-2), now.AddMinutes(2));
@@ -64,6 +66,23 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Contains($"· {clock.Day(taken)}</span>", chart);
 
+        // A second reading makes a trend: its sentence and its table are on the clinic's clock too.
+        var earlier = taken.AddDays(-1);
+        using var second = await RecordAtAsync(session.Client, patient, clock.Plain(earlier, "yyyy-MM-ddTHH:mm"), (HeartRate, "80"));
+        var trends = await ReadAsync(second);
+        Assert.Contains("<th scope=\"col\">Taken (clinic time)</th>", trends);
+        Assert.Contains($"<td class=\"sc-table__mono\">{clock.Format(earlier)}</td>", trends);
+        Assert.Contains($"2 values from {clock.Plain(earlier, "MMM d, yyyy")} to {clock.Plain(taken, "MMM d, yyyy")}.", Words(trends));
+
+        // The hour Chicago's clocks skipped on 8 March 2026: said, not taken for a missing time.
+        using var skipped = await RecordAtAsync(session.Client, patient, "2026-03-08T02:30", (HeartRate, "70"));
+        Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, skipped.StatusCode);
+        Assert.Contains("That time doesn&#x27;t exist on that day: the clocks go forward.", await skipped.Content.ReadAsStringAsync(Cancel));
+
+        // The desktop's offline copy says which zone its times are shown in.
+        using var offline = await DesktopSignInTests.PostAsync(chicago, "/api/desktop/offline-panel", await apps.DesktopSignInAsync(chicago, clinician));
+        Assert.Contains("\"clinicTimeZone\":\"America/Chicago\"", await offline.Content.ReadAsStringAsync(Cancel));
+
         // A clinic in UTC: the same reading, at the same moment, on its own clock.
         var utc = await utcSession.Client.GetStringAsync(Path(patient), Cancel);
         Assert.Contains($"<th scope=\"col\" class=\"sc-table__mono\">{taken.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} UTC</th>", utc);
@@ -74,6 +93,10 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
         var log = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}", Cancel);
         Assert.Contains("<th>When (UTC)</th>", log);
         Assert.Contains("observations", log);
+        // The reading's own event, at its UTC time: not moved to the clinic's clock with the label left off.
+        var written = (await ProxyTests.QueryAsync(apps,
+            "SELECT to_char(max(occurred_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') FROM ehr.audit_events WHERE patient_id = @patient AND table_name = 'observations' AND action = 'insert'", patient)).Single();
+        Assert.Contains(written, log);
         Assert.DoesNotMatch("\\d{2}:\\d{2}(:\\d{2})? C[SD]T", log);
     }
 }

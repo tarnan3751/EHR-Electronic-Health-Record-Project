@@ -59,6 +59,12 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
         // Only the tests the order reports that still wait for a result: anything else typed is ignored.
         var waiting = Order.Tests.Where(test => test.Value is null).Select(test => test.Code).ToHashSet(StringComparer.Ordinal);
         var errors = LabResults.Check(Values.Where(value => waiting.Contains(value.Key)).ToDictionary(), collected, out var values);
+        if (collected is null && typed != default && errors.ContainsKey(nameof(CollectedAt)))
+        {
+            // A time was typed, and the clinic's clocks skip it that day.
+            errors[nameof(CollectedAt)] = "That time doesn't exist on that day: the clocks go forward. Enter the time on the clinic's clock.";
+        }
+
         if (errors.Count == 0)
         {
             if (Order.OpenToResults && await results.FileAsync(patientId, orderId, values, collected!.Value, HttpContext.RequestAborted))

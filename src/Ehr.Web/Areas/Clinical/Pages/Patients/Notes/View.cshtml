@@ -83,7 +83,7 @@ else
                 }
                 @if (Model.OnPanel && OnPrem.IsReachable && !(addendum.Sensitive && Model.Note.Sensitive))
                 {
-                    <p><a asp-page="Sensitivity" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-addendum="@addendum.Id" data-addendum-sensitivity>@(addendum.Sensitive ? "Unmark as sensitive" : "Mark sensitive")<span class="sc-visually-hidden">, the addendum by @addendum.AuthorName signed @addendum.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</span></a></p>
+                    <p><a asp-page="Sensitivity" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-addendum="@addendum.Id" data-addendum-sensitivity>@(addendum.Sensitive ? "Unmark as sensitive" : "Mark sensitive")<span class="sc-visually-hidden">, the addendum by @addendum.AuthorName signed @Clinic.Format(addendum.SignedAt)</span></a></p>
                 }
             </li>
         }

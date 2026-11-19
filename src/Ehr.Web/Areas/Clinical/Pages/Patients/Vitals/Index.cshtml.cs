@@ -88,6 +88,12 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         DateTimeOffset? taken = DateTime.TryParseExact(TakenAt, ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"], CultureInfo.InvariantCulture,
             DateTimeStyles.None, out var typed) ? clinic.From(typed) : null;
         var errors = VitalSigns.Check(Values, taken, out var values);
+        if (taken is null && typed != default && errors.ContainsKey(nameof(TakenAt)))
+        {
+            // A time was typed, and the clinic's clocks skip it that day.
+            errors[nameof(TakenAt)] = "That time doesn't exist on that day: the clocks go forward. Enter the time on the clinic's clock.";
+        }
+
         if (errors.Count == 0)
         {
             // Correcting a set (step 9b): after a reading is marked entered in error, the set is typed again with the

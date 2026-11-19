@@ -27,7 +27,15 @@ public class ClinicTimeTests
         Assert.Equal("2026-07-04 18:30 CDT", ChicagoClock.Format(Utc(2026, 7, 4, 23, 30)));
         // The day is the clinic's: early on the 16th in UTC is still the 15th there.
         Assert.Equal("2026-11-15", ChicagoClock.Day(Utc(2026, 11, 16, 3)));
-        Assert.Equal("clinic time, CST", ChicagoClock.FieldLabel(Utc(2026, 11, 15, 20)));
+        Assert.Equal("clinic time", ChicagoClock.ClockName);
+        Assert.Equal("09:30 to 09:50 CST", ChicagoClock.Range(Utc(2026, 11, 15, 15, 30), Utc(2026, 11, 15, 15, 50)));
+        // Across the hour that happens twice, each end says which.
+        Assert.Equal("01:50 CDT to 01:10 CST", ChicagoClock.Range(Utc(2026, 11, 1, 6, 50), Utc(2026, 11, 1, 7, 10)));
+        // The labels at the moments the clocks change.
+        Assert.Equal("CST", ChicagoClock.Label(Utc(2026, 3, 8, 7, 59)));
+        Assert.Equal("CDT", ChicagoClock.Label(Utc(2026, 3, 8, 8)));
+        Assert.Equal("CDT", ChicagoClock.Label(Utc(2026, 11, 1, 6, 59)));
+        Assert.Equal("CST", ChicagoClock.Label(Utc(2026, 11, 1, 7)));
         Assert.Null(ChicagoClock.Format((DateTimeOffset?)null));
     }
 
@@ -43,7 +51,7 @@ public class ClinicTimeTests
         {
             Assert.True(utc.IsUtc);
             Assert.Equal("2026-11-15 20:05 UTC", utc.Format(Utc(2026, 11, 15, 20, 5)));
-            Assert.Equal("UTC", utc.FieldLabel(Utc(2026, 11, 15, 20)));
+            Assert.Equal("UTC", utc.ClockName);
             Assert.Equal(Utc(2026, 11, 15, 9, 30), utc.From(new DateTime(2026, 11, 15, 9, 30, 0)));
         }
     }
@@ -81,6 +89,13 @@ public class ClinicTimeTests
         Assert.Equal(ChicagoId, ClinicTime.FromSettings(ChicagoId, "CST,CDT", development: false).Id);
         Assert.Contains("Nowhere/Invented", Assert.Throws<InvalidOperationException>(() => new ClinicTime("Nowhere/Invented")).Message);
         Assert.Throws<InvalidOperationException>(() => new ClinicTime(ChicagoId, "CST"));
+        // A zone with no offset in winter is not UTC.
+        Assert.False(new ClinicTime("Europe/London").IsUtc);
+        // A Windows name the server knows becomes its IANA name, which is what the desktop app is sent.
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Central Standard Time", out _))
+        {
+            Assert.Equal(ChicagoId, new ClinicTime("Central Standard Time").Id);
+        }
         Assert.Throws<InvalidOperationException>(() => new ClinicTime(ChicagoId, "Central Standard Time,CDT"));
     }
 }
