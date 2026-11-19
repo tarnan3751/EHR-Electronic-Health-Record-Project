@@ -51,7 +51,7 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
         Assert.Equal(["0"], await AsSuperuserAsync(
             """
             SELECT ((SELECT count(*) FROM pg_policies WHERE schemaname = 'ehr' AND policyname IN ('clinical_notes_panel_update', 'clinical_notes_owner_select', 'note_addenda_panel_update'))
-                + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'ehr'::regnamespace AND proname IN ('change_note_sensitivity', 'change_addendum_sensitivity', 'deliver_addendum', 'log_note_sensitivity_change', 'mark_note_addenda_sensitive')))::text
+                + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'ehr'::regnamespace AND proname IN ('change_note_sensitivity', 'change_addendum_sensitivity', 'deliver_addendum', 'log_note_sensitivity_change', 'mark_note_addenda_sensitive', 'clear_inherited_addenda_marks')))::text
             """));
 
         // As the schema was before step 9: a visit with all three, one with a heart rate only, one with none.

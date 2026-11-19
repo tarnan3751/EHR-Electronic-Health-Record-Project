@@ -238,6 +238,13 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
                     ? "This can't be unmarked: an addendum to a sensitive note is sensitive, or it has already been unmarked."
                     : "This has already been changed. Open the note again."]);
         }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected })
+        {
+            // Someone changed the note's sensitivity and an addendum's at the same moment, and the database refused
+            // this one of the two. Nothing was changed.
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return new(409, ["Someone else was changing this note at the same moment. Nothing was changed. Open the note again."]);
+        }
         finally
         {
             db.Entry(row).State = EntityState.Detached;

@@ -25,11 +25,11 @@ else
 }
 @if (!Model.Sensitive)
 {
-    <p class="sc-prose">Its text doesn't change. Once sensitive, it is left out until someone asks for sensitive items, each view of it is recorded, and it is never kept offline@(Model.Entry is null ? "; its addenda become sensitive with it" : ""). Views of it before now are already in the audit log. @(Model.IsSigner ? "Only you can unmark it, as the note's signer and the person who marked it." : "Only you, or the note's signer, can unmark it.")</p>
+    <p class="sc-prose">Its text doesn't change. Once sensitive, it is left out until someone asks for sensitive items, each view of it is recorded, and it is never kept offline@(Model.Entry is null ? "; its addenda become sensitive with it, until it is unmarked" : ""). Views of it before now are already in the audit log. @(Model.IsSigner ? "Only you can unmark it, as the note's signer and the person who marked it." : "Only you, or the note's signer, can unmark it.")</p>
 }
 else
 {
-    <p class="sc-prose">Its text doesn't change. Unmarked, it is shown with the rest of the chart again.@(Model.Entry is null ? " Its addenda stay as they are: unmark each one that should be." : "")</p>
+    <p class="sc-prose">Its text doesn't change. Unmarked, it is shown with the rest of the chart again.@(Model.Entry is null ? " The addenda that are sensitive only because this note is are unmarked with it. One that was marked on its own stays marked until it is unmarked itself." : "")</p>
 }
 @if (!OnPrem.IsReachable)
 {

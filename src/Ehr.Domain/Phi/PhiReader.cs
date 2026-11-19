@@ -921,6 +921,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
                 db.StaffUsers.Where(u => u.Id == a.AuthorId).Select(u => u.DisplayName).FirstOrDefault() ?? "")
             {
                 ByNoteAuthor = a.AuthorId == note.SignerId,
+                SensitiveInherited = a.SensitiveInherited,
                 SensitiveMarkedBy = a.SensitiveMarkedBy,
                 SensitiveReason = a.SensitiveReason,
                 SensitiveChangedAt = a.SensitiveChangedAt,

@@ -81,7 +81,7 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         Assert.Equal(views, await ViewsAsync());
         page = await session.Client.GetStringAsync(NotePath(patient, ordinary) + "?sensitive=true", Cancel);
         Assert.Contains("Sensitive addenda shown: your view of them is recorded.", Words(page));
-        Assert.Matches("(?s)<span class=\"sc-tag sc-tag--warning\">Sensitive</span>\\s*</p>\\s*<p class=\"sc-note__text\">Synthetic sensitive addendum\\.", page);
+        Assert.Matches("(?s)<span class=\"sc-tag sc-tag--warning\" data-addendum-sensitive=\"own\">Sensitive</span>\\s*</p>\\s*<p class=\"sc-note__text\">Synthetic sensitive addendum\\.", page);
         Assert.Equal(views + 1, await ViewsAsync());
         Assert.Equal(
             [$"{clinician.Id} true Synthetic addendum to the sensitive note.", $"{clinician.Id} true Synthetic sensitive addendum.", $"{clinician.Id} false Synthetic ordinary addendum."],

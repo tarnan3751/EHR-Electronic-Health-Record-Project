@@ -24,6 +24,12 @@ public sealed class NoteAddendum
 
     public bool Sensitive { get; set; }
 
+    // Sensitive because its note is, and for no other reason (Tahseen's decision of 19 November 2026): set when the
+    // note is marked, or when the addendum is signed to a note that is already sensitive, and cleared, with the mark,
+    // when the note is unmarked. An addendum marked on its own is not inherited, and stays marked until it is
+    // unmarked itself. The database decides it (db/policies/50-clinical-notes.sql).
+    public bool SensitiveInherited { get; set; }
+
     // Who made it sensitive (the expansion plan's step 10b): its signer or author when it was signed sensitive, or
     // whoever marked it afterwards. Null while it isn't sensitive. Only that person, or the note's signer, unmarks it.
     public Guid? SensitiveMarkedBy { get; set; }

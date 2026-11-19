@@ -72,13 +72,14 @@ else
                     <span class="sc-muted">· signed <time datetime="@addendum.SignedAt.ToString("O")">@Clinic.Format(addendum.SignedAt)</time></span>
                     @if (addendum.Sensitive)
                     {
-                        <span class="sc-tag sc-tag--warning">Sensitive</span>
+                        @* Inherited from the note: it goes when the note is unmarked. Its own: until it is unmarked itself. *@
+                        <span class="sc-tag sc-tag--warning" data-addendum-sensitive="@(addendum.SensitiveInherited ? "inherited" : "own")">@(addendum.SensitiveInherited ? "Sensitive with the note" : "Sensitive")</span>
                     }
                 </p>
                 <p class="sc-note__text">@addendum.Text</p>
                 @if (addendum.SensitiveReason is not null)
                 {
-                    <p class="sc-muted">@Model.Change(addendum.Sensitive, addendum.SensitiveMarkedBy) @Clinic.Format(addendum.SensitiveChangedAt): @addendum.SensitiveReason</p>
+                    <p class="sc-muted">@(addendum.SensitiveInherited ? "Sensitive with the note" : Model.Change(addendum.Sensitive, addendum.SensitiveMarkedBy)) @Clinic.Format(addendum.SensitiveChangedAt): @addendum.SensitiveReason</p>
                 }
                 @if (Model.OnPanel && OnPrem.IsReachable && !(addendum.Sensitive && Model.Note.Sensitive))
                 {

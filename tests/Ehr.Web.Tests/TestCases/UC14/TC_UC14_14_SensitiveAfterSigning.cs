@@ -24,15 +24,16 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   2. Open the chart, the note, the draft sync and the offline copy.
 //   3. As the second colleague, open the page to unmark it, and post a reason to it.
 //   4. As the signer, unmark it with "Marked the wrong note."
-//   5. As the signer, unmark the addendum; then, as the second colleague, mark it with "Mentions a family member."
+//   5. As the signer, try to unmark the addendum; then, as the second colleague, mark it with "Mentions a family member."
 // Expected result: Step 1: without a reason, 422 "Say why, so the record shows it."; with one, "Saved: it is marked
 //   sensitive". Step 2: the chart leaves the note out and counts it; the note's page says "Sensitive note: your view of
 //   it is recorded." and shows the reason and time; the text is unchanged; its addendum is sensitive; the draft sync
 //   withholds the draft's text; the offline copy has no note and counts one sensitive item. Step 3: the page says only
 //   the person who marked it, or the note's signer, can unmark it, with no form; the post is answered 403 and nothing
-//   changes. Step 4: unmarked, with the reason shown; the chart lists the note again; its addendum is still sensitive.
-//   Step 5: the addendum is unmarked by the signer and shown without asking; then marked again by the colleague, and
-//   left out of the note's page until asked for.
+//   changes. Step 4: unmarked, with the reason shown; the chart lists the note again; its addendum, sensitive only
+//   because the note was, is unmarked with it and shown. Step 5: unmarking the addendum again is answered 409; marked
+//   on its own by the colleague, it is left out of the note's page until asked for, stays marked when the note is marked
+//   and unmarked again, and is then unmarked by the note's signer and shown.
 // Creator: Tahseen Arnan
 public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebApps>
 {
@@ -86,7 +87,8 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         using var twice = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, "Patient asked for it.");
         Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
         Assert.Contains("It is already marked sensitive. Nothing was changed.", Words(await twice.Content.ReadAsStringAsync(Cancel)));
-        Assert.Equal([$"note true {first.Id} Patient asked for it.", $"addendum true {first.Id} Patient asked for it."], await SensitivityAsync(apps, patient));
+        // The addendum's mark is inherited from the note's: nobody marked it itself.
+        Assert.Equal([$"note true {first.Id} Patient asked for it.", "addendum true none Patient asked for it."], await SensitivityAsync(apps, patient));
         Assert.Equal(text, await ProxyTests.QueryAsync(apps, "SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
 
         var chart = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
@@ -122,14 +124,15 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         Assert.Matches("data-sensitivity-reason>Unmarked as sensitive [^<]*UTC: Marked the wrong note\\.", page);
         // After unmarking, the desktop's sync sends the draft's text again.
         Assert.Contains("cough for two days", await PullAsync(System.Text.Json.JsonDocument.Parse(drafts).RootElement.GetProperty("watermark").GetString()!));
-        Assert.Equal(["note false none Marked the wrong note.", $"addendum true {first.Id} Patient asked for it."], await SensitivityAsync(apps, patient));
+        // The addendum's mark was the note's: it goes with it, and the addendum is shown without asking.
+        Assert.Equal(["note false none Marked the wrong note.", "addendum false none Marked the wrong note."], await SensitivityAsync(apps, patient));
         Assert.DoesNotContain("Sensitive items hidden", Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel)));
-        Assert.Contains("Sensitive addenda hidden: 1 addendum is not shown.", Words(page));
+        Assert.DoesNotContain("Sensitive addenda hidden", Words(page));
+        Assert.Contains("Synthetic addendum: culture negative.", page);
 
-        // The addendum: unmarked by the note's signer, then marked again by another clinician.
+        // The addendum, not marked now: unmarking it changes nothing; then it is marked on its own by another clinician.
         using var shown = await ChangeSensitivityAsync(session.Client, patient, note, mark: false, "Not sensitive.", addendum);
-        Assert.Contains("Synthetic addendum: culture negative.", await ReadAsync(shown));
-        Assert.Equal("addendum false none Not sensitive.", (await SensitivityAsync(apps, patient))[1]);
+        Assert.Equal(HttpStatusCode.Conflict, shown.StatusCode);
         var views = await apps.AuditEventsAsync(AuditActions.ReadSensitive, second.Id, patient);
         using var again = await ChangeSensitivityAsync(bystander.Client, patient, note, mark: true, "Mentions a family member.", addendum);
         // The person who marked it is shown it once more, which is a recorded view; after that it is left out.
@@ -139,5 +142,14 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         page = await session.Client.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.DoesNotContain("Synthetic addendum: culture negative.", page);
         Assert.Contains("Sensitive addenda hidden: 1 addendum is not shown.", Words(page));
+
+        // Marking and unmarking the note leaves the addendum's own mark, and the colleague's name on it.
+        using var noteAgain = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, "Patient asked for it.");
+        using var noteBack = await ChangeSensitivityAsync(marker.Client, patient, note, mark: false, "Marked the wrong note.");
+        Assert.Equal($"addendum true {second.Id} Mentions a family member.", (await SensitivityAsync(apps, patient))[1]);
+        // The note's signer may unmark what someone else marked: through the page, and it is shown without asking.
+        using var unmarkedBySigner = await ChangeSensitivityAsync(session.Client, patient, note, mark: false, "Not sensitive.", addendum);
+        Assert.Contains("Synthetic addendum: culture negative.", await ReadAsync(unmarkedBySigner));
+        Assert.Equal("addendum false none Not sensitive.", (await SensitivityAsync(apps, patient))[1]);
     }
 }
