@@ -61,21 +61,24 @@ BEGIN
     END IF;
 
     -- Ordering safety checks (step 8, 61-order-safety.sql): what is known against a medication order is found here,
-    -- whatever the client sent, and kept on the order. When any of it is serious (an allergy, a drug of a class the
-    -- patient is allergic to, a major or high-priority interaction), the order is signed only with a reason for going
-    -- ahead, which stays on the order beside what was found; both are in the write audit with the order. A moderate
+    -- whatever the client sent, and kept on the order. When any of it is serious (an allergy, a drug of a class known
+    -- to cross-react with one the patient is allergic to, a major or high-priority interaction), the order is signed
+    -- only with a reason for going ahead, which stays on the order beside what was found; both are in the write audit with the order. A moderate
     -- or minor interaction is shown and kept, and doesn't stop the order: a reason demanded for everything is a
     -- reason typed without reading.
     NEW.safety_warnings := NULL;
     IF NEW.type = 'medication' THEN
-        SELECT jsonb_agg(jsonb_build_object('kind', w.kind, 'severity', w.severity, 'ordered', w.ordered, 'against', w.against, 'source', w.source)
+        -- A medication marked sensitive is not named in what is kept: an order's audit details are open to admins.
+        SELECT jsonb_agg(jsonb_build_object('kind', w.kind, 'severity', w.severity, 'ordered', w.ordered,
+                             'against', CASE WHEN w.against_sensitive THEN 'a medication marked sensitive' ELSE w.against END, 'source', w.source)
                          ORDER BY w.kind, w.against, w.source)
         INTO NEW.safety_warnings
         FROM ehr.order_safety_warnings(NEW.patient_id, NEW.catalog_code, NEW.replaces_order_id) w;
     END IF;
 
     IF NEW.safety_warnings IS NULL
-       OR NOT jsonb_path_exists(NEW.safety_warnings, '$[*] ? (@.kind != "interaction" || @.severity == "major" || @.severity == "high-priority")') THEN
+       OR NOT jsonb_path_exists(NEW.safety_warnings,
+              '$[*] ? (@.kind == "allergy" || @.source == "cross-reactivity" || @.severity == "major" || @.severity == "high-priority")') THEN
         -- Nothing serious was found, so there is nothing to override.
         NEW.safety_override_reason := NULL;
     ELSIF coalesce(NEW.safety_override_reason, '') !~ '[^[:space:]]' THEN
@@ -129,9 +132,11 @@ BEGIN
         RAISE EXCEPTION 'An order changes only once, from active to discontinued' USING ERRCODE = '23514';
     END IF;
 
-    IF (NEW.id, NEW.patient_id, NEW.type, NEW.catalog_code, NEW.details, NEW.signer_id, NEW.signed_at, NEW.duplicate_reason, NEW.replaces_order_id)
+    IF (NEW.id, NEW.patient_id, NEW.type, NEW.catalog_code, NEW.details, NEW.signer_id, NEW.signed_at, NEW.duplicate_reason, NEW.replaces_order_id,
+        NEW.safety_warnings, NEW.safety_override_reason)
        IS DISTINCT FROM
-       (OLD.id, OLD.patient_id, OLD.type, OLD.catalog_code, OLD.details, OLD.signer_id, OLD.signed_at, OLD.duplicate_reason, OLD.replaces_order_id) THEN
+       (OLD.id, OLD.patient_id, OLD.type, OLD.catalog_code, OLD.details, OLD.signer_id, OLD.signed_at, OLD.duplicate_reason, OLD.replaces_order_id,
+        OLD.safety_warnings, OLD.safety_override_reason) THEN
         RAISE EXCEPTION 'A signed order is never edited' USING ERRCODE = '42501';
     END IF;
 

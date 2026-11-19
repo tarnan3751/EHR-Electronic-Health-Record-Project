@@ -6,8 +6,9 @@
 -- Each row: the two ingredients' RxNorm codes, a level, what the label says in this project's words, and the label it
 -- was read from, with its DailyMed set ID. The words are a paraphrase kept close to the label; nothing is added that
 -- the label doesn't say. The level is this project's reading of the label, not the label's own word: "major" where the
--- label contraindicates the pair, carries a boxed warning about it, or reports a serious outcome; "moderate" where it
--- says to monitor or adjust a dose; "minor" otherwise.
+-- label contraindicates the pair, carries a boxed warning about it, reports a serious outcome (toxicity, serotonin
+-- syndrome, renal failure), or says one drug's concentration rises by more than half; "moderate" where it says to
+-- monitor or adjust a dose; "minor" otherwise.
 --
 -- To add a pair: read the label, add a row, and say which label and section. Applied as ehr_owner after db/policies;
 -- safe to run again: it makes the table hold exactly these rows for the source 'fda-label'.
@@ -63,7 +64,7 @@ INSERT INTO incoming_label_interactions (one, other, level, detail, citation) VA
      'The lisinopril label says potassium-sparing diuretics, spironolactone among them, can increase the risk of hyperkalemia, and that if they are used together the patient''s serum potassium should be monitored frequently.',
      'FDA label: LISINOPRIL tablet (Quallent Pharmaceuticals Health), section 7, Drug Interactions. DailyMed set ID f2e09150-22f2-4028-b214-917d686200ad: https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=f2e09150-22f2-4028-b214-917d686200ad (read 19 November 2026).'),
     -- lisinopril + lithium
-    ('29046', '6448', 'moderate',
+    ('29046', '6448', 'major',
      'The lisinopril label says lithium toxicity has been reported in patients taking lithium with drugs that cause sodium to be eliminated, including ACE inhibitors, that it was usually reversible when both were stopped, and to monitor serum lithium levels during concurrent use.',
      'FDA label: LISINOPRIL tablet (Quallent Pharmaceuticals Health), section 7, Drug Interactions. DailyMed set ID f2e09150-22f2-4028-b214-917d686200ad: https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=f2e09150-22f2-4028-b214-917d686200ad (read 19 November 2026).'),
     -- metoprolol + verapamil

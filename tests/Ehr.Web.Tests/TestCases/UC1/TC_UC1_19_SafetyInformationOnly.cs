@@ -43,7 +43,7 @@ public class TC_UC1_19_SafetyInformationOnly(WebApps apps) : IClassFixture<WebAp
         using var uncoded = await SignAsync(session.Client, patient, "Amoxicillin 500 mg capsule");
         Assert.Equal($"/patients/{patient}", PathOf(uncoded));
         Assert.Equal(["-|-"], await OrdersAsync(apps, patient));
-        Assert.Contains("Only coded allergies and medications are checked, and no warning doesn't mean a combination is safe.",
+        Assert.Contains("Only coded allergies and medications are checked, and only items with a drug code, and no warning doesn't mean a combination is safe.",
             Words(await session.Client.GetStringAsync(FormPath(patient, "medication"), Cancel)));
         Assert.DoesNotContain("data-safety-disclaimer", await session.Client.GetStringAsync(FormPath(patient, "lab"), Cancel));
 

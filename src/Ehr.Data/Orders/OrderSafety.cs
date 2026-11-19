@@ -22,6 +22,7 @@ public static class OrderSafety
     {
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
+        // against_sensitive is for what the database keeps on the order; the clinician ordering sees the name.
         command.CommandText = "SELECT kind, severity, ordered, against, source, detail, citation FROM ehr.order_safety_warnings(@patient, @code, @replaces)";
         foreach (var (name, value) in new (string, object)[] { ("patient", patient), ("code", catalogCode), ("replaces", (object?)replaces ?? DBNull.Value) })
         {

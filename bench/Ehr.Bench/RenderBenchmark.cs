@@ -782,6 +782,9 @@ internal static partial class RenderBenchmark
                     CatalogCode = item.Code,
                     Details = "{}",
                     Status = OrderStatus.Active,
+                    // The seeded patients take medications of their own, some of which interact with what is ordered
+                    // here (step 8): the database then signs the order only with a reason, and drops one it doesn't need.
+                    SafetyOverrideReason = item.Type == OrderType.Medication ? "Synthetic: benchmark order" : null,
                 };
                 db.Add(order);
                 if (stopped.Contains(item))

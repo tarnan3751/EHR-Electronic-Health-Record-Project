@@ -89,19 +89,30 @@ public class OrderSafetySecurityTests(MigratedDatabase database) : IClassFixture
     [Fact]
     public async Task A_drug_of_the_same_class_or_of_a_cross_reactive_class_is_warned_about()
     {
+        // Another penicillin: a class the cross-reactivity table names, so it stops the order.
         var (clinician, patient) = await OnPanelAsync();
         await AllergyAsync(patient, "ampicillin");
-        Assert.Equal(["allergy-class|moderate|amoxicillin|ampicillin|fda-class"],
+        Assert.Equal(["allergy-class|moderate|amoxicillin|ampicillin|cross-reactivity"],
             await Accounts.QueryAsync(App, clinician, Warnings, ("patient", patient), ("code", "SYN-MED-005")));
         await NeedsAReasonAsync(clinician, patient, "SYN-MED-005");
 
-        // A cephalosporin allergy and a penicillin: the curated cross-reactivity table, with its note and its source.
+        // A cephalosporin allergy and a penicillin: the curated table's row, with its note and its source.
         var (other, second) = await OnPanelAsync();
         await AllergyAsync(second, "cephalexin");
         Assert.Equal(["allergy-class|cross-reactivity|true|true"], await Accounts.QueryAsync(App, other,
             "SELECT kind || '|' || source || '|' || (detail LIKE '%cephalosporin%') || '|' || (citation LIKE 'Khan DA%') FROM ehr.order_safety_warnings(@patient, 'SYN-MED-005')",
             ("patient", second)));
         await NeedsAReasonAsync(other, second, "SYN-MED-005");
+
+        // Another drug of an FDA class the table doesn't name (two ACE inhibitors): a note, kept on the order, and no
+        // reason needed. FDA classes group drugs by how they act, which is not how most allergies run.
+        var (fourth, classmate) = await OnPanelAsync();
+        await AllergyAsync(classmate, "enalapril");
+        Assert.Equal(["allergy-class|minor|lisinopril|enalapril|fda-class"],
+            await Accounts.QueryAsync(App, fourth, Warnings, ("patient", classmate), ("code", "SYN-MED-001")));
+        var noted = Guid.CreateVersion7();
+        await SignAsync(fourth, classmate, "SYN-MED-001", null, noted);
+        Assert.Equal(["- allergy-class:minor:fda-class"], await OrderRowAsync(noted));
 
         // An allergy that is no longer active, or to something else, warns about nothing.
         var (third, unaffected) = await OnPanelAsync();
@@ -111,6 +122,47 @@ public class OrderSafetySecurityTests(MigratedDatabase database) : IClassFixture
         var order = Guid.CreateVersion7();
         await SignAsync(third, unaffected, "SYN-MED-005", "Synthetic: a reason nothing called for", order);
         Assert.Equal(["- -"], await OrderRowAsync(order));
+    }
+
+    // A medication marked sensitive is named to the clinician who is ordering, and not in what the order keeps: an
+    // order's audit details are open to admins, who never see sensitive items (step 2b).
+    [Fact]
+    public async Task A_sensitive_medication_is_not_named_in_what_the_order_and_its_audit_keep()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        await TakingAsync(patient, "phenelzine");
+        await AsSuperuserAsync("UPDATE ehr.medication_statements SET sensitive = true WHERE patient_id = @patient", ("patient", patient));
+        Assert.Contains("interaction|high-priority|sertraline|phenelzine|onc", await Accounts.QueryAsync(App, clinician, Warnings, ("patient", patient), ("code", "SYN-MED-007")));
+
+        var order = Guid.CreateVersion7();
+        await SignAsync(clinician, patient, "SYN-MED-007", "Synthetic: washout complete", order);
+        Assert.Equal(["a medication marked sensitive"], (await Accounts.QueryAsync(database.SuperuserConnectionString, null,
+            "SELECT DISTINCT w->>'against' FROM ehr.orders o, jsonb_array_elements(o.safety_warnings) w WHERE o.id = @id", ("id", order))));
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        Assert.Equal(["false"], await Accounts.QueryAsync(App, admin,
+            """
+            SELECT bool_or(d.details::text ILIKE '%phenelzine%')::text
+            FROM ehr.audit_events e, ehr.shown_audit_details(ARRAY[e.id]) d WHERE e.table_name = 'orders' AND e.row_id = @id
+            """, ("id", order)));
+    }
+
+    // A product with two ingredients that interact with each other, ordered again while the patient takes it: a
+    // refill is not an interaction with itself.
+    [Fact]
+    public async Task A_combination_product_does_not_interact_with_itself()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var product = (await Accounts.QueryAsync(database.SuperuserConnectionString, null,
+            """
+            SELECT i.code FROM ehr.order_catalog_items i
+            JOIN ehr.drug_ingredients a ON a.product_code = i.standard_code
+            JOIN ehr.drug_ingredients b ON b.product_code = i.standard_code AND b.ingredient_code > a.ingredient_code
+            JOIN ehr.drug_interactions x ON x.ingredient_a = a.ingredient_code AND x.ingredient_b = b.ingredient_code AND x.level = 'major'
+            WHERE i.type = 'medication' ORDER BY i.code LIMIT 1
+            """)).Single();
+        await SignAsync(clinician, patient, product, null);
+
+        Assert.Empty(await Accounts.QueryAsync(App, clinician, Warnings, ("patient", patient), ("code", product)));
     }
 
     [Fact]

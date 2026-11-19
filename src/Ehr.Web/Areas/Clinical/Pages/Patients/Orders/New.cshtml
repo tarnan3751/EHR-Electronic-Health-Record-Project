@@ -141,7 +141,7 @@ else
         }
         @if (Model.KnownType == Ehr.Data.Orders.OrderType.Medication)
         {
-            <p class="sc-muted" data-safety-disclaimer>Medication orders are checked against the patient's coded allergies and medications. @OrderSafetyText.Disclaimer</p>
+            <p class="sc-muted" data-safety-disclaimer>Medication orders with a drug code are checked against the patient's coded allergies and medications. @OrderSafetyText.Disclaimer</p>
         }
         @if (replaced is not null)
         {

@@ -10,17 +10,18 @@ namespace Ehr.Domain.Orders;
 public static class OrderSafetyText
 {
     public const string Disclaimer =
-        "Decision support for this demonstration system, not a complete clinical reference. Only coded allergies and medications are checked, "
+        "Decision support for this demonstration system, not a complete clinical reference. Only coded allergies and medications are checked, and only items with a drug code, "
         + "and no warning doesn't mean a combination is safe.";
 
     // Where DDInter can be consulted when there is internet. Its download files don't give addresses for single pairs.
     public const string DdInterChecker = "https://ddinter2.scbdd.com/inter-checker/";
 
-    // Whether a warning stops the order until a reason is given: an allergy, a class the patient is allergic to, a
-    // major or high-priority interaction. The database's signing trigger holds the same rule (60-orders.sql). A
-    // moderate or minor interaction is shown and kept on the order without one.
+    // Whether a warning stops the order until a reason is given: an allergy, a class known to cross-react with one
+    // the patient is allergic to, a major or high-priority interaction. The database's signing trigger holds the same
+    // rule (60-orders.sql). A moderate or minor interaction, and a drug that only shares an FDA class with an
+    // allergy, are shown and kept on the order without one.
     public static bool NeedsReason(SafetyWarning warning) =>
-        warning.Kind != "interaction" || warning.Severity is DrugInteractionLevel.Major or DrugInteractionLevel.HighPriority;
+        warning.Kind == "allergy" || warning.Source == "cross-reactivity" || warning.Severity is DrugInteractionLevel.Major or DrugInteractionLevel.HighPriority;
 
     // Allergies first, then interactions from the most severe.
     public static IEnumerable<SafetyWarning> Ordered(IEnumerable<SafetyWarning> warnings) =>
@@ -31,7 +32,8 @@ public static class OrderSafetyText
     public static string Heading(SafetyWarning warning) => warning.Kind switch
     {
         "allergy" => $"Allergy: {warning.Ordered}",
-        "allergy-class" => $"Possible cross-sensitivity: {warning.Ordered}, and an allergy to {warning.Against}",
+        "allergy-class" when warning.Source == "cross-reactivity" => $"Possible cross-sensitivity: {warning.Ordered}, and an allergy to {warning.Against}",
+        "allergy-class" => $"Same class as an allergy: {warning.Ordered}, and an allergy to {warning.Against}",
         _ => $"Interaction: {warning.Ordered} with {warning.Against}",
     };
 
@@ -47,7 +49,8 @@ public static class OrderSafetyText
     public static string Advice(SafetyWarning warning) => warning.Kind switch
     {
         "allergy" => $"The chart records an allergy to {warning.Against}. Don't order it unless the allergy has been ruled out.",
-        "allergy-class" => "A drug of a related class can cause the same reaction. Check what the reaction was before ordering.",
+        "allergy-class" when warning.Source == "cross-reactivity" => "A drug of a related class can cause the same reaction. Check what the reaction was before ordering.",
+        "allergy-class" => "Check what the reaction was.",
         _ => warning.Severity switch
         {
             DrugInteractionLevel.HighPriority => "On the list of interactions an electronic record should always stop for. Avoid the combination.",

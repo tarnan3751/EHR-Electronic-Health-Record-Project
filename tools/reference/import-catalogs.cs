@@ -211,8 +211,9 @@ using (var unii = Open("unii.zip", "e768525350d17e0eedfa179e62563226e9da0a3d5bda
     }
 }
 
-// Which classes cross-react in an allergic patient. Curated: a row needs a published source. A class always
-// cross-reacts with itself, which the check does without a row.
+// Which classes cross-react in an allergic patient. Curated: a row needs a published source. A class named here is
+// also taken to cross-react within itself; any other class shared with an allergy is only noted
+// (db/policies/61-order-safety.sql).
 const string PracticeParameter = "Khan DA, Banerji A, Blumenthal KG, et al. Drug allergy: a 2022 practice parameter update. J Allergy Clin Immunol. 2022;150(6):1333-1393.";
 (string A, string B, string Note)[] crossReactions =
 [
@@ -473,15 +474,20 @@ const string oncCitation = "ONC high-priority drug-drug interactions (Phansalkar
 var ingredientCodes = rxType.Where(pair => pair.Value == "IN").Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal);
 var onc = new SortedSet<(string A, string B)>();
 var (oncRows, oncUnknown) = (0, 0);
+var oncUnmatched = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 using (var reader = new StreamReader(Path.Combine(root, "db", "reference", "wikidata", oncCsv), Encoding.UTF8))
 {
     foreach (var row in Csv(reader))
     {
         oncRows++;
-        var (a, b) = (row["a_rxnorm"], row["b_rxnorm"]);
-        if (a == b || !ingredientCodes.Contains(a) || !ingredientCodes.Contains(b))
+        // Wikidata's code is usually the RxNorm ingredient. Where it is another RxNorm concept for the same drug
+        // (bosentan's is), the drug is found by its name instead.
+        var a = ingredientCodes.Contains(row["a_rxnorm"]) ? row["a_rxnorm"] : Ingredient(row["a_label"]);
+        var b = ingredientCodes.Contains(row["b_rxnorm"]) ? row["b_rxnorm"] : Ingredient(row["b_label"]);
+        if (a is null || b is null || a == b)
         {
             oncUnknown++;
+            oncUnmatched.Add(a is null ? row["a_label"] : row["b_label"]);
             continue;
         }
 
@@ -495,6 +501,7 @@ Write("50-onc-interactions.sql",
     new Table("drug_interactions", ["ingredient_a", "ingredient_b", "source", "level", "citation"], 3,
         [.. onc.Select(pair => new[] { pair.A, pair.B, "onc", "high-priority", oncCitation })], Scope: "t.source = 'onc'"));
 Console.WriteLine($"drug_interactions (ONC)     {onc.Count,8:N0}  from {oncRows:N0} statements: {oncUnknown:N0} with a side that isn't a RxNorm ingredient");
+Console.WriteLine($"  ONC drugs not matched: {string.Join(", ", oncUnmatched)}");
 return 0;
 
 // ---- Helpers -----------------------------------------------------------------------------------------------------

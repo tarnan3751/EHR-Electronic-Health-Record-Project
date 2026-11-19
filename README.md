@@ -61,7 +61,7 @@ tests/
 db/
   migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
   policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
-  reference/        the standard codes chart entries are picked from, as generated SQL (docs/expansion/reference-data.md)
+  reference/        the standard codes chart entries are picked from, as SQL: generated, but for one hand-written file (docs/expansion/reference-data.md)
 docs/               each use case's guide, and brand (the SwiftChart brand guide and tokens.json, the source of truth for the UI's styling)
 tools/              brand/sync.cs: writes the tokens' CSS and the desktop app's copy of the shared CSS, fonts and logos
                     reference/import.cs: writes db/reference from pinned releases of the standard code lists

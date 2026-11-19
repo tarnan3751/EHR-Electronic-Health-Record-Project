@@ -40,8 +40,8 @@ Added in the expansion plan's step 8 (Tahseen Arnan).
 
 - **What is checked.** When a medication order is signed, the database checks it against the patient's coded allergies (the drug itself, another drug of the same FDA class, and classes known to cross-react) and against what the patient takes (active medications on the chart and other active medication orders) for known interactions.
 - **What the form shows.** Each warning names the problem, with its severity, one general line of advice, and its source: the chart, DDInter 2.0, the ONC high-priority list (by way of Wikidata), or an FDA label, with what the label says and where to read it.
-- **What stops the order.** An allergy, a drug of a related class, or a major or high-priority interaction: the form comes back headed **Check before signing**, with the cursor in **Reason for ordering despite the warnings**. Give a reason and sign, or cancel. The reason and what was found are kept on the order and in the write audit.
-- **What doesn't.** A moderate or minor interaction is shown under **Be aware** and kept on the order, without asking for a reason. The first **Sign order** brings the notes up with the cursor on the button; pressing it again signs.
+- **What stops the order.** An allergy; a drug of a class known to cross-react with one the patient is allergic to (the penicillins, cephalosporins and penems, from a curated table); or a major or high-priority interaction: the form comes back headed **Check before signing**, with the cursor in **Reason for ordering despite the warnings**. Give a reason and sign, or cancel. The reason and what was found are kept on the order and in the write audit.
+- **What doesn't.** A moderate or minor interaction, and a drug that only shares an FDA class with an allergy (those classes group drugs by how they act, which is not how most allergies run), are shown under **Be aware** and kept on the order, without asking for a reason. The first **Sign order** brings the notes up with the cursor on the button; pressing it again signs.
 - **What it is not.** The form says so on every medication order: decision support for this demonstration system, not a complete clinical reference. Only coded allergies and medications are checked, and no warning doesn't mean a combination is safe. `docs/expansion/reference-data.md` says what the interaction data covers and what it doesn't.
 
 ## Decisions
@@ -175,7 +175,9 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - An interaction is known only if one of three sources has the pair. Whole classes are still thin (an ACE inhibitor with an angiotensin receptor blocker beyond lisinopril with losartan, for example): see `docs/expansion/reference-data.md`.
 - A DDInter warning links to DDInter's interaction checker, not to a page for the pair.
 - The reason for overriding is kept on the order and in the audit, but the chart doesn't show it beside the order yet.
-- A warning names a medication the patient takes even when it is marked sensitive: the clinician signing the order needs to know.
+- A warning names a medication the patient takes even when it is marked sensitive: the clinician signing the order needs to know. What the order and its audit keep says only "a medication marked sensitive", since administrators can read an order's audit details.
+- An item with no drug code (the albuterol inhaler among the common items) can't be checked, and the form says only coded items are.
+- A warning that appears between opening the form and signing is caught by the database and shown; adding a medication at the same instant as an order is signed can slip past.
 - Doses, kidney function, age and pregnancy are not considered.
 - The form's behaviour with `fetch` in a browser is checked by hand; the tests cover the server side.
 - With `--stack`, the render benchmark leaves its 600 orders on the primary, as it leaves its audit events.
