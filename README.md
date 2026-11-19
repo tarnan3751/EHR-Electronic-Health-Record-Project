@@ -147,8 +147,8 @@ The account is created at the next start if there are no staff accounts yet. The
 
 | Setting | What it is |
 |---|---|
-| `Ehr:Links:ClinicalBaseUrl` and `Ehr:Links:PortalBaseUrl` | The addresses people reach the clinical app and the portal at. Every link the app emails (password reset, confirmation, invitation, staff set-up) is built from these and never from the request, whose Host header is its sender's to write. |
-| `Ehr:Enrollment:Key` | A secret of at least 32 characters that portal enrollment codes are hashed with, so a copy of the table can't be searched for codes. Both apps hold the same one. Changing it makes codes already handed out stop working. |
+| `Ehr:Links:ClinicalBaseUrl` and `Ehr:Links:PortalBaseUrl` | The addresses people reach the clinical app and the portal at. Every link the app hands out (the emailed ones for password reset, confirmation and invitation, and the staff set-up link shown to an admin) is built from these and never from the request, whose Host header is its sender's to write. |
+| `Ehr:Enrollment:Key` | A secret of at least 32 characters that portal enrollment codes are hashed with, so a copy of the table can't be searched for codes. For the on-prem app only: the cloud app forwards registration and is not given it. Changing it makes codes already handed out stop working. |
 
 The local server stack sets them from `infra/compose/.env` (`EHR_ENROLLMENT_KEY`; the addresses are in `compose.yaml`).
 

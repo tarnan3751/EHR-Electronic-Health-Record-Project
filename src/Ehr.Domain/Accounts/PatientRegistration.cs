@@ -21,22 +21,35 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
         // (db/policies/45-codes.sql). The keyed hash, and the plain one codes had before they were keyed.
         var hash = hasher.Enrollment(code);
         var legacy = EnrollmentCodes.Hash(code);
-        if (await CodeStore.FindEnrollmentAsync(db, hash, legacy, cancellationToken) is not { } enrollment)
+        // The code is used up first, in one statement: of two registrations with the same code, the second waits on
+        // the row and then finds it used, instead of both going on to create an account. Every way out below that
+        // doesn't register undoes it, with whatever else was saved, so the code is still good.
+        const string savepoint = "registration";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+        if (await CodeStore.RedeemEnrollmentAsync(db, hash, legacy, cancellationToken) is not { } enrollment)
         {
             return Registration.InvalidCode;
         }
 
-        // Whatever is saved below is undone together if the code turns out to have been used a moment ago.
-        const string savepoint = "registration";
-        var transaction = db.Database.CurrentTransaction!;
-        await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+        PatientUser? existing = null;
+        async Task<Registration> UnusedAsync(Registration answer)
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            if (existing is not null)
+            {
+                db.Entry(existing).State = EntityState.Detached;
+            }
+
+            return answer;
+        }
 
         // The patient's account, if they have one. A confirmed one is theirs for good; one that was never confirmed
         // (a mistyped address, say) is taken over below by whoever holds a new code from the clinic.
-        var existing = await db.PatientUsers.FirstOrDefaultAsync(u => u.PatientId == enrollment.PatientId, cancellationToken);
+        existing = await db.PatientUsers.FirstOrDefaultAsync(u => u.PatientId == enrollment.PatientId, cancellationToken);
         if (existing is { EmailConfirmed: true })
         {
-            return Registration.InvalidCode;
+            return await UnusedAsync(Registration.InvalidCode);
         }
 
         // The password is checked before the address is looked at, so its errors say nothing about the address.
@@ -49,7 +62,7 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
 
         if (errors.Count > 0)
         {
-            return new(false, false, errors);
+            return await UnusedAsync(new(false, false, errors));
         }
 
         // UC5's "email already registered" course (Simar Rekhi): the address belongs to another patient's account.
@@ -58,6 +71,8 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
         var owner = await users.FindByEmailAsync(address) ?? await users.FindByNameAsync(address);
         if (owner is not null && owner.Id != existing?.Id)
         {
+            // The code stays unused: undone first, so what the emails below save is kept.
+            await UnusedAsync(Registration.Registered);
             // The work a registration does, so this answer takes as long.
             users.PasswordHasher.HashPassword(user, password);
             if (owner.EmailConfirmed)
@@ -92,13 +107,7 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
             };
             if (changes.FirstOrDefault(c => !c.Succeeded) is { } failed)
             {
-                return new(false, false, [.. failed.Errors.Select(e => e.Description)]);
-            }
-
-            if (await CodeStore.RedeemEnrollmentAsync(db, hash, legacy, cancellationToken) is null)
-            {
-                await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-                return Registration.InvalidCode;
+                return await UnusedAsync(new(false, false, [.. failed.Errors.Select(e => e.Description)]));
             }
 
             audit.Record(AuditActions.RegistrationReplaced, patientId: enrollment.PatientId);
@@ -110,13 +119,7 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
         var result = await users.CreateAsync(user, password);
         if (!result.Succeeded)
         {
-            return new(false, false, [.. result.Errors.Select(e => e.Description)]);
-        }
-
-        if (await CodeStore.RedeemEnrollmentAsync(db, hash, legacy, cancellationToken) is null)
-        {
-            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-            return Registration.InvalidCode;
+            return await UnusedAsync(new(false, false, [.. result.Errors.Select(e => e.Description)]));
         }
 
         // Nobody is signed in, so the event has no actor: the patient says whose account it is.

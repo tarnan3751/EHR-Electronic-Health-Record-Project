@@ -23,9 +23,6 @@ x-web-app: &web-app
     # hold (see "Encryption" in the README).
     Ehr__DataProtection__Certificate: /certs/example.com.pem
     Ehr__DataProtection__CertificateKey: /certs/example.com-key.pem
-    # The key portal enrollment codes are hashed with (HMAC-SHA-256), so a copy of the table can't be searched for
-    # codes. Both apps hold it; the app won't start without it.
-    Ehr__Enrollment__Key: ${EHR_ENROLLMENT_KEY:?set it in infra/compose/.env}
     # The secret the cloud app ships its audit events to the on-prem app with; both apps hold it.
     Ehr__CloudAudit__Key: ${EHR_CLOUD_AUDIT_KEY:?set it in infra/compose/.env}
 
@@ -99,6 +96,9 @@ services:
     environment:
       <<: *web-app-env
       Ehr__Site: OnPrem
+      # The key portal enrollment codes are hashed with (HMAC-SHA-256), so a copy of the table can't be searched for
+      # codes. Only the on-prem app holds it: the cloud app forwards registration and has a copy of that table.
+      Ehr__Enrollment__Key: ${EHR_ENROLLMENT_KEY:?set it in infra/compose/.env}
       # Reads and writes the primary as ehr_app.
       ConnectionStrings__Ehr: "Host=onprem-db;Database=ehr;Username=ehr_app;Password=${EHR_APP_PASSWORD:?set it in infra/compose/.env};SSL Mode=VerifyFull;Root Certificate=/certs/rootCA.pem"
       # The first admin, created when there are no staff accounts yet. Optional: empty values skip it with a warning.

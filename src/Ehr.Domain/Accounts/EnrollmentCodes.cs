@@ -29,14 +29,22 @@ public static class EnrollmentCodes
 }
 
 // Ehr:Enrollment: the key enrollment codes are hashed with (HMAC-SHA-256). From configuration, never the repository;
-// at least 32 characters. Required outside Development, where the app refuses to start without it.
+// at least 32 characters. Required on the on-prem app outside Development, where it refuses to start without it.
 public sealed class CodeHasher
 {
     public const string Setting = "Ehr:Enrollment:Key";
 
     public const int MinimumKeyLength = 32;
 
-    readonly byte[] key;
+    readonly byte[]? key;
+
+    // For the cloud app, which never hashes a code: registering and issuing are posts it forwards to the clinic's
+    // server. It holds a copy of the codes' table, so it is not given the key that would let that copy be searched.
+    public static CodeHasher None { get; } = new();
+
+    CodeHasher()
+    {
+    }
 
     public CodeHasher(string key)
     {
@@ -50,5 +58,7 @@ public sealed class CodeHasher
 
     // The keyed hash an enrollment code is stored and looked up by.
     public string Enrollment(string code) =>
-        Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.ASCII.GetBytes(EnrollmentCodes.Normalize(code))));
+        key is null
+            ? throw new InvalidOperationException("This site holds no enrollment key: enrollment codes are handled on the clinic's server.")
+            : Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.ASCII.GetBytes(EnrollmentCodes.Normalize(code))));
 }

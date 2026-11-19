@@ -37,8 +37,14 @@ public sealed class SiteAddresses
                     + "The app won't start without it: the links it emails are built from this address and never from a request.");
         }
 
-        return Uri.TryCreate(value, UriKind.Absolute, out var address) && address.Scheme is "https" or "http"
-            ? value.TrimEnd('/')
-            : throw new InvalidOperationException($"{Section}:{name} must be an absolute address starting with https://, not \"{value}\".");
+        // Exactly a site's address: https (http only in Development), a host, perhaps a port, and nothing else. No
+        // spaces around it, no user name, path, query or fragment: any of those would end up inside every link.
+        var plain = Uri.TryCreate(value, UriKind.Absolute, out var address)
+            && (address.Scheme == Uri.UriSchemeHttps || (development && address.Scheme == Uri.UriSchemeHttp))
+            && value == value.Trim() && address.UserInfo.Length == 0 && address.AbsolutePath == "/" && address.Query.Length == 0 && address.Fragment.Length == 0;
+        return plain
+            ? address!.GetLeftPart(UriPartial.Authority)
+            : throw new InvalidOperationException(
+                $"{Section}:{name} must be a site's address starting with https://, with nothing after the host and port, such as https://portal.example.com:9443; not \"{value}\".");
     }
 }

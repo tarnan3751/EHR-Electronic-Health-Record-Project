@@ -51,23 +51,26 @@ builder.Services.AddScoped<Ehr.Domain.Inbox.StaffInbox>();
 builder.Services.AddEhrAccounts(builder.Configuration);
 builder.Services.AddSingleton(new AuditSource(site == Site.OnPrem ? AuditSources.OnPrem : AuditSources.Cloud));
 
-// The addresses the app's emailed links are built from, and the key enrollment codes are hashed with: required outside
-// Development, so a deployment that forgot one fails here, at startup, with what to set (step 6c).
+// The addresses the app's links are built from: required outside Development, so a deployment that forgot one fails
+// here, at startup, with what to set (step 6c).
 var siteAddresses = SiteAddresses.Checked(builder.Configuration.GetSection(SiteAddresses.Section).Get<SiteAddresses>(), builder.Environment.IsDevelopment());
 builder.Services.PostConfigure<SiteAddresses>(addresses =>
 {
     addresses.ClinicalBaseUrl = siteAddresses.ClinicalBaseUrl;
     addresses.PortalBaseUrl = siteAddresses.PortalBaseUrl;
 });
-var enrollmentKey = builder.Configuration[CodeHasher.Setting] is { Length: > 0 } configuredKey
-    ? configuredKey
-    : builder.Environment.IsDevelopment()
-        // Not a secret: a development database's enrollment codes are synthetic.
-        ? "development-only enrollment code key, not a secret"
-        : throw new InvalidOperationException(
-            $"Set {CodeHasher.Setting} to a secret of at least {CodeHasher.MinimumKeyLength} characters. The app won't start without it: "
-            + "portal enrollment codes are stored as a hash keyed with it.");
-builder.Services.AddSingleton(new CodeHasher(enrollmentKey));
+// Only the on-prem app hashes enrollment codes (the cloud app forwards those posts), so only it holds the key: the
+// cloud server has a copy of the codes' table, and the key beside it would undo what the key is for.
+builder.Services.AddSingleton(site != Site.OnPrem
+    ? CodeHasher.None
+    : new CodeHasher(builder.Configuration[CodeHasher.Setting] is { Length: > 0 } configuredKey
+        ? configuredKey
+        : builder.Environment.IsDevelopment()
+            // Not a secret: a development database's enrollment codes are synthetic.
+            ? "development-only enrollment code key, not a secret"
+            : throw new InvalidOperationException(
+                $"Set {CodeHasher.Setting} to a secret of at least {CodeHasher.MinimumKeyLength} characters. The app won't start without it: "
+                + "portal enrollment codes are stored as a hash keyed with it.")));
 
 // The anonymous account POSTs are limited per client address, and account emails per recipient (AccountRateLimits).
 var rateLimits = builder.Configuration.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>() ?? new RateLimitOptions();
