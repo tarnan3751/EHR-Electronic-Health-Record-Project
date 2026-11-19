@@ -661,6 +661,7 @@ One entry per decision: date, step, the decision, and why.
   - *Units* are stored as UCUM and shown the usual way for four of them (mmHg, °C, kg/m², per minute).
   - *Reference ranges for vital signs* are the adult ones in `db/reference`, applied to everyone. Ranges by age are not built; a child's values will be flagged against adult ranges.
   - *Desktop:* the offline copy keeps a visit's blood pressure and heart rate, with the API's contract unchanged (read from observations now). The full flowsheet is not in the offline copy.
+  - *CI's web app job has 30 minutes, up from 15.* Step 9's first run was cancelled at the limit with no test failing: the step before it finished in 14 minutes 43 seconds, and this one adds tests. No test was removed or skipped to fit.
   - *The entry form is first on the page:* with it at the bottom, the starting cursor scrolled the page past the flowsheet (found in the screenshots).
 
 ## Log
