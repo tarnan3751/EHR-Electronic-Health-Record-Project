@@ -83,7 +83,12 @@ public sealed record ChartHistory(Patient Patient, IReadOnlyList<ChartChange> Ch
 // UC 1 (Tahseen Arnan): a patient as the order form shows them, already recorded as one read of the patient: the
 // banner's name and allergies, and, once an item is picked, the patient's active orders for it, for the duplicate warning.
 // Replaced is the active order a change replaces, or the one being discontinued; it is never among the duplicates.
-public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<ActiveOrder> Duplicates, ActiveOrder? Replaced);
+public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<ActiveOrder> Duplicates, ActiveOrder? Replaced)
+{
+    // Step 8: what the database knows against ordering the chosen item for this patient (an allergy, a class the
+    // patient is allergic to, an interaction with something they take). Empty until an item is chosen.
+    public IReadOnlyList<Ehr.Data.Orders.SafetyWarning> Warnings { get; init; } = [];
+}
 
 // UC 1: a patient's discontinued orders as their page lists them, already recorded as one read of the patient. More is
 // set when there are more than the page asked for.

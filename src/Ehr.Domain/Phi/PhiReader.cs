@@ -224,9 +224,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             ? []
             : await ActiveOrders(id, catalogCode, except: replaces).ToListAsync(cancellationToken);
 
+        var warnings = catalogCode is null ? [] : await OrderSafety.WarningsAsync(db, id, catalogCode, replaces, cancellationToken);
+
         audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
         await db.SaveChangesAsync(cancellationToken);
-        return new OrderForm(patient, allergies, duplicates, replaced);
+        return new OrderForm(patient, allergies, duplicates, replaced) { Warnings = warnings };
     }
 
     // UC 1: a patient's discontinued orders, newest first, each with who discontinued it, when and why, and the order

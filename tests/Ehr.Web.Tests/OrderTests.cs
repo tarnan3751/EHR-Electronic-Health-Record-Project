@@ -43,7 +43,9 @@ public class OrderTests(WebApps apps) : IClassFixture<WebApps>
             request.Headers.Add("HX-Request", "true");
         }
 
-        request.Content = Form([("__RequestVerificationToken", token), ("Item", item),
+        // SafetySeen: as a clinician who has already been shown any notes that don't stop the order (step 8). The
+        // form's own two presses are walked in TC-UC1-19.
+        request.Content = Form([("__RequestVerificationToken", token), ("Item", item), ("SafetySeen", "true"),
             .. details.Select(d => ($"Details[{d.Name}]", (object)d.Value)), .. reason is null ? [] : new[] { ("DuplicateReason", (object)reason) }]);
         return await client.SendAsync(request, Cancel);
     }
@@ -85,7 +87,7 @@ public class OrderTests(WebApps apps) : IClassFixture<WebApps>
         token ??= Token(await client.GetStringAsync(ChangePath(patient, type, order), Cancel));
         using var request = new HttpRequestMessage(HttpMethod.Post, ChangePath(patient, type, order));
         request.Headers.Add("HX-Request", "true");
-        request.Content = Form([("__RequestVerificationToken", token), ("Item", item),
+        request.Content = Form([("__RequestVerificationToken", token), ("Item", item), ("SafetySeen", "true"),
             .. details.Select(d => ($"Details[{d.Name}]", (object)d.Value)),
             .. changeReason is null ? [] : new[] { ("ChangeReason", (object)changeReason) },
             .. duplicateReason is null ? [] : new[] { ("DuplicateReason", (object)duplicateReason) }]);

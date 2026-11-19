@@ -740,6 +740,15 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("replaces_order_id");
 
+                    b.Property<string>("SafetyOverrideReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("safety_override_reason");
+
+                    b.Property<string>("SafetyWarnings")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("safety_warnings");
+
                     b.Property<DateTimeOffset>("SignedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -2356,13 +2365,30 @@ namespace Ehr.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("ingredient_b");
 
+                    b.Property<string>("Source")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("ddinter")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Citation")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("citation");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("detail");
+
                     b.Property<string>("Level")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("level");
 
-                    b.HasKey("IngredientA", "IngredientB")
+                    b.HasKey("IngredientA", "IngredientB", "Source")
                         .HasName("pk_drug_interactions");
 
                     b.HasIndex("IngredientB")
@@ -2370,9 +2396,11 @@ namespace Ehr.Migrations
 
                     b.ToTable("drug_interactions", "ehr", t =>
                         {
-                            t.HasCheckConstraint("ck_drug_interactions_level", "level IN ('major', 'moderate', 'minor')");
+                            t.HasCheckConstraint("ck_drug_interactions_level", "level IN ('major', 'moderate', 'minor', 'high-priority')");
 
                             t.HasCheckConstraint("ck_drug_interactions_order", "ingredient_a < ingredient_b");
+
+                            t.HasCheckConstraint("ck_drug_interactions_source", "source IN ('ddinter', 'onc', 'fda-label')");
                         });
                 });
 

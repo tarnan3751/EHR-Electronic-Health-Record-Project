@@ -30,6 +30,8 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         order.Property(o => o.Details).HasColumnType("jsonb");
         order.Property(o => o.Status).HasMaxLength(20);
         order.Property(o => o.DuplicateReason).HasMaxLength(500);
+        order.Property(o => o.SafetyWarnings).HasColumnType("jsonb");
+        order.Property(o => o.SafetyOverrideReason).HasMaxLength(500);
         order.Property(o => o.DiscontinueReason).HasMaxLength(500);
         // The database's, as for signed notes: the signed-in user, and the time (db/policies/60-orders.sql sets it again).
         order.Property(o => o.SignerId).HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");

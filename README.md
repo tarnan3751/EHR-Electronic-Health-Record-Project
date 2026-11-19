@@ -36,6 +36,8 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 
 - Results (the plan's step 7): a clinician files a lab order's results against it, the order becomes resulted, values outside their reference range are flagged and listed first, the clinician who signed the order finds them in their inbox, they or a colleague on the patient's care team acknowledges them, and the patient sees them in the portal. See `docs/UC1.md`.
 
+- Ordering safety checks (the plan's step 8): a medication order is checked against the patient's coded allergies and drug classes, and against what they take for known interactions from DDInter, the ONC high-priority list and FDA labels. Serious warnings need a recorded reason to override. Decision support for this demonstration system, not a complete clinical reference. See `docs/UC1.md` and `docs/expansion/reference-data.md`.
+
 **Not built yet:** editing visits, sending orders to a lab or pharmacy, and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
 ## Layout
@@ -59,7 +61,7 @@ tests/
 db/
   migrations/       EF Core migrations (the Ehr.Migrations project) and the SQL they produce, schema.sql
   policies/         RLS, triggers, roles, grants (hand-written, human-reviewed)
-  reference/        the standard codes chart entries are picked from, as generated SQL (docs/expansion/reference-data.md)
+  reference/        the standard codes chart entries are picked from, as SQL: generated, but for one hand-written file (docs/expansion/reference-data.md)
 docs/               each use case's guide, and brand (the SwiftChart brand guide and tokens.json, the source of truth for the UI's styling)
 tools/              brand/sync.cs: writes the tokens' CSS and the desktop app's copy of the shared CSS, fonts and logos
                     reference/import.cs: writes db/reference from pinned releases of the standard code lists

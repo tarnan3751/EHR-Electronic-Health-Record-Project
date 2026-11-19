@@ -891,6 +891,11 @@
         margin: 0;
     }
 
+    /* A list inside a notice, such as an order's safety warnings: a long address in a citation wraps inside it. */
+    .sc-notice .sc-list li {
+        overflow-wrap: anywhere;
+    }
+
     .sc-notice a {
         color: inherit;
         font-weight: 600;
