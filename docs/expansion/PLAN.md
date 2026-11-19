@@ -23,6 +23,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 7 | Order → result → acknowledgment | done | expansion/step-07-results | expansion-step-07 | [44414981634](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44414981634) | Extends UC 1 (Tahseen); UC 6 (Simar), UC 15. Touches `db/policies` and authorization |
 | 6b | Proxy-only portal accounts, and choosing a record after sign-in | done | expansion/step-06b-proxy-accounts | expansion-step-06b | [44423758634](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44423758634) | Inserted by Tahseen; done after step 7. Touches `db/policies` and authorization; UC 5, UC 6 (Simar), UC 11 (Luke) |
 | 7a | Chart render headroom | done | expansion/step-07a-chart-headroom | expansion-step-07a | [44429275145](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44429275145) | Added while working: the chart was at the benchmark gate on CI runners. No behaviour change |
+| 6c | Security follow-ups: invitation and enrollment lookups, emailed links | in progress | expansion/step-06c-security-follow-ups | | | Inserted by Tahseen; before step 8. Touches `db/policies` |
 | 8 | Ordering safety checks | not started | | | | |
 | 9 | Vital signs and trends | not started | | | | |
 | 10 | Addenda to signed notes | not started | | | | |
@@ -299,10 +300,18 @@ At the end of phase 1, every FR in the course document is built. Write the phase
 - **Touches:** `db/policies` and authorization. **Affects:** UC 5, UC 6 (heads-up for Simar in the step's notes).
 - **In the repo:** portal accounts are `ehr.patient_users` with `patient_id NOT NULL` and a unique index on it; the Patient policy requires the `EhrClaims.PatientId` claim (`EhrPolicies`), which `PatientClaimsPrincipalFactory` adds; `ehr.own_patient_id()` reads that column; `PortalSubject` and `PortalSubjectFilter` (step 6) decide a page's patient; registration is UC 5's (`Areas/Portal/Pages/Account`), with single-use codes; step 6's limit "a proxy must already be a patient" is what this step lifts.
 
+**Step 6c. Security follow-ups** (inserted by Tahseen on 2026-11-19; done after step 6b and before step 8)
+- **Invitations.** The accept page looks up a single invitation by its token through a `SECURITY DEFINER` function owned by the table's owner (`search_path` set, `EXECUTE` revoked from `PUBLIC` and granted only to the app role). The app role's direct access to the invitations table is revoked. Only a hash of each token is stored.
+- **Enrollment codes** get the same treatment, since they follow the same pattern. They are short enough to type, so guessing is the risk, not timing: confirm failed entries are rate-limited, add a test if not, record their length and entropy, and store them as a keyed hash (HMAC-SHA-256 with a server-side key from configuration, never committed) so a leaked table can't be brute-forced offline. Invitation tokens stay plain SHA-256.
+- **Prove with security tests** that the app role, with nobody signed in, can't list invitations or enrollment codes, and that the function returns only the one row for a valid, unexpired token.
+- **Emailed links.** The portal's base address is a required setting outside Development: the app refuses to start without it, with a clear message. A link (password reset, confirmation, invitation) is never built from the request's Host header. Tests for both. The bug is also on `main`: note it for Luke in the phase 2 pull request description.
+- **Touches:** `db/policies` (list it for review).
+- **In the repo:** `ehr.proxy_invitations` and `ehr.patient_enrollments` are Internal tables read directly by `ProxyInvitations`, `PatientRegistration` and `PatientEnrollments`; both already hold only SHA-256 hashes (`EnrollmentCodes.Hash`). Links are built by `Links.Build(baseUrl, request, path)` in 12 places, for staff set-up links as well as the portal's, from `SiteAddresses` (`Ehr:Links`), falling back to the request when the setting is empty. Anonymous account POSTs are limited per client address by `AccountRateLimits`.
+
 **Step 8. Ordering safety checks**
 - **The checks:** a medication order is checked against the patient's coded allergies, including drug-class cross-sensitivity from step 2a's class data, and against active medications for known interactions.
 - **The warning** names the problem. Overriding it requires a reason, which is recorded and audited.
-- **The data** stays local, with no outside service (NFR-08). Interactions come from DDInter 2.0 only (decision log, 2026-11-18 and 2026-11-19). **Before building:** measure coverage and report to Tahseen (decision log, 2026-11-19). **Advice shown:** the severity, one short generic line per severity level written for this project, and a link to the pair's DDInter page for when there is internet. Never scrape DDInter's website.
+- **The data** stays local, with no outside service (NFR-08). Interactions come from DDInter 2.0, supplemented where it has gaps (decision log, 2026-11-19, "Step 8, DDInter's gaps"): the ONC high-priority pairs from Wikidata's "significant drug interaction" (P769) statements, and a small hand-written table citing FDA labels. Each warning names its source. **Before building:** measure coverage and report to Tahseen (decision log, 2026-11-19). **Advice shown:** the severity, one short generic line per severity level written for this project, and a link to the pair's DDInter page for when there is internet. Never scrape DDInter's website.
 - **Affects:** UC 1.
 - **In the repo:** the order form already loads the patient's allergies for its banner (`PhiReader.OrderFormAsync`) and has the duplicate warning with a required reason (`duplicate_reason`), the pattern the override follows.
 
@@ -458,6 +467,10 @@ Open questions for Tahseen are listed at the end of the log's step entries; the 
 
 Heads-up to use-case owners: Diego (UC 3/4: the chart gained sections and editing), Simar (UC 5/6: the portal gained appointments, messages, Access and a changed app bar), Luke (UC 11/12: the audit view hides sensitive values and message text), everyone (the app bar gained Schedule and Inbox).
 
+### Phase 2: close the clinical loops (draft, to be completed at the end of the phase)
+
+- **For Luke (UC 11, UC 12), about `main`:** before step 6c, every link the app emails (password reset, confirmation, staff set-up) was built from the request's Host header whenever `Ehr:Links` wasn't set, so a request with a forged Host could make the app email someone a link to another site, carrying their token. That code is on `main` today (`Links.Build` in `src/Ehr.Web/Accounts/Links.cs`). Step 6c makes both base addresses required outside Development and removes the fallback. Until this phase is merged, a deployment from `main` must set `Ehr__Links__ClinicalBaseUrl` and `Ehr__Links__PortalBaseUrl`.
+
 ## Decision log
 
 One entry per decision: date, step, the decision, and why.
@@ -599,6 +612,17 @@ One entry per decision: date, step, the decision, and why.
   - **Older than this step, noted by the review:** when `Ehr:Links:PortalBaseUrl` isn't set, emailed links (password reset, confirmation, and now invitations) are built from the request's Host header. The stack sets it; a deployment must.
   - *Left open:* opening "Whose record?" (a GET) drops the choice of record, by design; an invitation isn't cancelled when its access is removed (the account it creates sees nothing); no way to turn a proxy-only account into a patient's; the clinic has no list of proxy-only accounts; no keyboard-only browser test, as these are portal pages.
 - **2026-11-19, step 7a, added while working (not in Tahseen's plan): the chart's render time.** After step 6b's CI run failed once and then passed at 19.7 ms against the 20 ms gate, the chart was measured: one page was about sixteen database round trips, and that is most of its time (CI runners take about twice this Mac for each). The chart's first query now also says which occasional sections have anything in them (upcoming appointments, conversations, resulted orders, signed notes, the reader's drafts), and the page skips the queries for the empty ones. Nothing a clinician sees changes, and the audit event is the same one. It helps the usual chart, where most of those are empty; a patient with every section filled costs what it did. If the chart reaches the gate again, the next step is fetching several sections in one round trip, which is a bigger change to how the PHI reader is written.
+- **2026-11-19, Tahseen's decisions on step 6b's open points: step 6c.**
+  - *Step 6c is added,* after 6b and before step 8; its text is under phase 1's steps.
+  - *Looking up by hash is enough; no constant-time comparison is added.* A row is found by the hash of the token through the table's unique index, so the stored hash always equals the computed one, and comparing them again would check nothing. The comparison the index makes is of hashes of random tokens: someone guessing can't choose an input whose hash starts with a wanted prefix, so its timing gives them nothing to work with.
+  - *Enrollment codes are short enough to type, so guessing is the risk.* They are 12 characters from a 32-symbol alphabet, about 60 bits, valid for 14 days. Failed entries are limited per source: registration is one of the anonymous account POSTs held to 30 per 5 minutes per client address ("Too many attempts"); a test for failed codes at `/portal/register` is added, since the existing one posts to sign-in. There is nothing per account to count against: no account exists until a code is accepted, and a wrong code names no patient. Online guessing is not practical at that rate; a leaked table could be searched offline, so codes are stored as HMAC-SHA-256 with a key from configuration. Invitation tokens are 160 random bits and stay plain SHA-256.
+  - *Emailed links:* agreed to make both base addresses (clinical and portal) required outside Development and to remove the Host-header fallback from every link the app sends, staff set-up links included.
+- **2026-11-19, Tahseen's decision on step 8, DDInter's gaps: supplement DDInter rather than ship around the gaps.**
+  - Add the ONC high-priority pairs from Wikidata's "significant drug interaction" (P769) statements, which are CC0, pinned to a dated query result committed under `db/reference`, and mark them "high priority".
+  - For the remaining important pairs in the order catalog that neither source covers, add a small hand-written table. Each entry cites the drug's FDA label (DailyMed, public domain) and quotes or paraphrases its Drug Interactions section.
+  - Each warning names its source: DDInter, ONC via Wikidata, or the FDA label.
+  - Report coverage of the catalog's medication pairs before and after, and the pairs still uncovered.
+  - Then build step 8 as planned, and keep going with step 9 after it.
 
 ## Log
 
