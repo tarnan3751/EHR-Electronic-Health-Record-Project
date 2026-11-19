@@ -21,12 +21,11 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   "Synthetic addendum three: signed later."; reasons "Patient asked for it.", "Marked the wrong note."
 // Steps:
 //   1. Mark the note sensitive, then sign a third addendum to it.
-//   2. Open the note without asking for sensitive items, then asking; open the offline copy.
+//   2. Open the chart without asking for sensitive items, then the note; open the offline copy.
 //   3. Unmark the note, and open it and the offline copy again.
 // Expected result: Step 1: all three addenda are sensitive; the first and third are recorded as inherited from the
-//   note, the second keeps its own mark. Step 2: without asking, the page has none of the note's or the addenda's
-//   text and no view is recorded; asking, it shows them, the inherited ones labeled "Sensitive with the note", and
-//   the view is recorded; the offline copy has none of the texts. Step 3: the first and third addenda are unmarked
+//   note, the second keeps its own mark. Step 2: the chart leaves the note out and no view is recorded; the note's
+//   page shows them, the inherited ones labeled "Sensitive with the note", and the view is recorded; the offline copy has none of the texts. Step 3: the first and third addenda are unmarked
 //   with the note's reason and shown; the second is still sensitive, left out until asked for, and not in the
 //   offline copy, which counts it.
 // Creator: Tahseen Arnan

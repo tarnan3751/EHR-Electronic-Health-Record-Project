@@ -211,7 +211,7 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
             Assert.Equal(["false none none none"], await StateAsync(table, id));
 
             // The text, who and when: no privilege. As the tables' owner, who has every privilege: the trigger.
-            foreach (var column in new[] { table == "clinical_notes" ? "plan = 'Changed'" : "text = 'Changed', sensitive_inherited = true", table == "clinical_notes" ? "signer_id = gen_random_uuid()" : "sensitive_inherited = true", "sensitive_marked_by = gen_random_uuid()", "sensitive_changed_at = '2000-01-01'", "patient_id = gen_random_uuid()" })
+            foreach (var column in new[] { table == "clinical_notes" ? "plan = 'Changed'" : "text = 'Changed'", table == "clinical_notes" ? "signer_id = gen_random_uuid()" : "sensitive_inherited = true", "sensitive_marked_by = gen_random_uuid()", "sensitive_changed_at = '2000-01-01'", "patient_id = gen_random_uuid()" })
             {
                 await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(App, signer, $"UPDATE ehr.{table} SET {column} WHERE id = @id", ("id", id)));
             }
@@ -254,11 +254,8 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         Assert.Empty(await AsSuperuserAsync(items, ("patient", theirs)));
     }
 
-    // Tahseen's question (2026-11-19): if someone viewed it before it was marked, the audit log already shows that.
-    // A view recorded before the mark is still there after it, unchanged, with its time before the mark's. A proxy is
-    // the case he named: today the database gives a proxy no signed note or addendum at all, with or without sensitive
-    // items in their grant, so a proxy has no view of one to show; that is proved here too, so the day notes reach the
-    // portal this test has to be revisited.
+    // Tahseen's decision of 19 November 2026 (step 10e): marking a note marks its addenda as inherited from it,
+    // unmarking it clears only the inherited marks, and an addendum marked on its own stays marked.
     [Fact]
     public async Task Marking_a_note_marks_its_addenda_as_inherited_and_unmarking_it_clears_only_those()
     {
@@ -338,6 +335,93 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         Assert.Equal("b marked on its own: false false none Reviewed.", (await AllAsync())[1]);
     }
 
+    // An addendum's own mark changed at the very moment its note's is: the two wait for each other. Unmarked while the
+    // note is being marked, it ends sensitive with the note; marked while the note is being unmarked, it ends with a
+    // mark of its own, never an inherited one with no sensitive note behind it. Two connections each time.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_addendum_changed_while_its_note_is_being_changed_waits_for_it(bool noteIsBeingMarked)
+    {
+        var (signer, patient, note, _) = await SignedAsync();
+        var colleague = await ColleagueAsync(patient);
+        var addendum = await AddendumAsync(colleague, patient, note);
+        if (noteIsBeingMarked)
+        {
+            await ChangeAsync(colleague, "note_addenda", addendum, sensitive: true);
+        }
+        else
+        {
+            // The note is sensitive, then unmarked while the addendum (unmarked with it at once below) is marked again.
+            await ChangeAsync(signer, "clinical_notes", note, sensitive: true);
+        }
+
+        var cancel = TestContext.Current.CancellationToken;
+        async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginAsync(Guid user)
+        {
+            var connection = new NpgsqlConnection(App);
+            await connection.OpenAsync(cancel);
+            var transaction = await connection.BeginTransactionAsync(cancel);
+            await using var set = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction);
+            set.Parameters.AddWithValue("user", user.ToString());
+            await set.ExecuteNonQueryAsync(cancel);
+            return (connection, transaction);
+        }
+
+        NpgsqlCommand Command(string table, Guid id, bool sensitive, NpgsqlConnection connection, NpgsqlTransaction transaction)
+        {
+            var command = new NpgsqlCommand($"UPDATE ehr.{table} SET sensitive = @sensitive, sensitive_reason = 'Synthetic' WHERE id = @id", connection, transaction);
+            command.Parameters.AddWithValue("sensitive", sensitive);
+            command.Parameters.AddWithValue("id", id);
+            return command;
+        }
+
+        var (first, firstTransaction) = await BeginAsync(noteIsBeingMarked ? colleague : signer);
+        var (second, secondTransaction) = await BeginAsync(noteIsBeingMarked ? signer : colleague);
+        await using (first)
+        await using (second)
+        {
+            if (noteIsBeingMarked)
+            {
+                // The addendum's marker unmarks it and hasn't committed; the note's mark waits, then marks it again.
+                await using var unmark = Command("note_addenda", addendum, sensitive: false, first, firstTransaction);
+                Assert.Equal(1, await unmark.ExecuteNonQueryAsync(cancel));
+                await using var mark = Command("clinical_notes", note, sensitive: true, second, secondTransaction);
+                var waiting = mark.ExecuteNonQueryAsync(cancel);
+                Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), cancel)));
+                await firstTransaction.CommitAsync(cancel);
+                Assert.Equal(1, await waiting);
+                await secondTransaction.CommitAsync(cancel);
+                Assert.Equal(["true true true"], await AsSuperuserAsync(
+                    "SELECT n.sensitive || ' ' || a.sensitive || ' ' || a.sensitive_inherited FROM ehr.note_addenda a JOIN ehr.clinical_notes n ON n.id = a.note_id WHERE a.id = @id", ("id", addendum)));
+            }
+            else
+            {
+                // The note's unmark has cleared the addendum's inherited mark and hasn't committed; marking the
+                // addendum waits for it, then finds the note not sensitive: a mark of its own, or nothing to change.
+                await using var unmark = Command("clinical_notes", note, sensitive: false, first, firstTransaction);
+                Assert.Equal(1, await unmark.ExecuteNonQueryAsync(cancel));
+                await using var mark = Command("note_addenda", addendum, sensitive: true, second, secondTransaction);
+                var waiting = mark.ExecuteNonQueryAsync(cancel);
+                Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), cancel)));
+                await firstTransaction.CommitAsync(cancel);
+                Assert.Equal(1, await waiting);
+                await secondTransaction.CommitAsync(cancel);
+                Assert.Equal([$"false true false {colleague}"], await AsSuperuserAsync(
+                    "SELECT n.sensitive || ' ' || a.sensitive || ' ' || a.sensitive_inherited || ' ' || a.sensitive_marked_by FROM ehr.note_addenda a JOIN ehr.clinical_notes n ON n.id = a.note_id WHERE a.id = @id", ("id", addendum)));
+            }
+        }
+
+        // Whatever the order: no addendum is left with an inherited mark and no sensitive note behind it.
+        Assert.Equal(["0"], await AsSuperuserAsync(
+            "SELECT count(*)::text FROM ehr.note_addenda a JOIN ehr.clinical_notes n ON n.id = a.note_id WHERE a.note_id = @note AND (a.sensitive_inherited AND NOT n.sensitive OR n.sensitive AND NOT a.sensitive)", ("note", note)));
+    }
+
+    // Tahseen's question (2026-11-19): if someone viewed it before it was marked, the audit log already shows that.
+    // A view recorded before the mark is still there after it, unchanged, with its time before the mark's. A proxy is
+    // the case he named: today the database gives a proxy no signed note or addendum at all, with or without sensitive
+    // items in their grant, so a proxy has no view of one to show; that is proved here too, so the day notes reach the
+    // portal this test has to be revisited.
     [Fact]
     public async Task Views_made_before_a_note_was_marked_stay_in_the_audit_log_and_a_proxy_is_given_no_note_to_view()
     {

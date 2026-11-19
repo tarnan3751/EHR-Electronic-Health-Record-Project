@@ -1476,7 +1476,10 @@ BEGIN
     FROM ehr.clinical_notes n
     WHERE n.id = a.note_id AND n.sensitive AND a.sensitive
       AND ((a.sensitive_reason IS NOT NULL AND a.sensitive_reason IS NOT DISTINCT FROM n.sensitive_reason
-            AND a.sensitive_marked_by IS NOT DISTINCT FROM n.sensitive_marked_by)
+            AND a.sensitive_marked_by IS NOT DISTINCT FROM n.sensitive_marked_by
+            -- Marked by the note's marking, which stamps the addendum after the note in the same
+            -- statement: one marked on its own earlier, in the same words, keeps its own mark.
+            AND a.sensitive_changed_at >= n.sensitive_changed_at)
            OR (a.sensitive_reason IS NULL AND a.signed_at >= coalesce(n.sensitive_changed_at, n.signed_at)));
 
     ALTER TABLE ehr.note_addenda ENABLE TRIGGER USER;

@@ -32,7 +32,8 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   the person who marked it, or the note's signer, can unmark it, with no form; the post is answered 403 and nothing
 //   changes. Step 4: unmarked, with the reason shown; the chart lists the note again; its addendum, sensitive only
 //   because the note was, is unmarked with it and shown. Step 5: unmarking the addendum again is answered 409; marked
-//   on its own by the colleague, it is left out of the note's page until asked for.
+//   on its own by the colleague, it is left out of the note's page until asked for, stays marked when the note is marked
+//   and unmarked again, and is then unmarked by the note's signer and shown.
 // Creator: Tahseen Arnan
 public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebApps>
 {
@@ -141,5 +142,14 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         page = await session.Client.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.DoesNotContain("Synthetic addendum: culture negative.", page);
         Assert.Contains("Sensitive addenda hidden: 1 addendum is not shown.", Words(page));
+
+        // Marking and unmarking the note leaves the addendum's own mark, and the colleague's name on it.
+        using var noteAgain = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, "Patient asked for it.");
+        using var noteBack = await ChangeSensitivityAsync(marker.Client, patient, note, mark: false, "Marked the wrong note.");
+        Assert.Equal($"addendum true {second.Id} Mentions a family member.", (await SensitivityAsync(apps, patient))[1]);
+        // The note's signer may unmark what someone else marked: through the page, and it is shown without asking.
+        using var unmarkedBySigner = await ChangeSensitivityAsync(session.Client, patient, note, mark: false, "Not sensitive.", addendum);
+        Assert.Contains("Synthetic addendum: culture negative.", await ReadAsync(unmarkedBySigner));
+        Assert.Equal("addendum false none Not sensitive.", (await SensitivityAsync(apps, patient))[1]);
     }
 }

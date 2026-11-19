@@ -280,6 +280,12 @@ BEGIN
         RAISE EXCEPTION 'Say why, in up to 500 characters' USING ERRCODE = '23514';
     END IF;
 
+    -- One at a time with the note being marked or unmarked (ehr.change_note_sensitivity takes the same lock), so the
+    -- note read next is the note as it will stand: without it, an addendum unmarked while its note was being marked
+    -- could stay unmarked, and one marked while its note was being unmarked could keep an inherited mark with no note
+    -- behind it. This row is locked already, so the two can meet in a deadlock, which the database ends by refusing
+    -- one of them; the app asks that person to try again.
+    PERFORM pg_advisory_xact_lock(hashtextextended('ehr.clinical_notes:' || OLD.note_id::text, 0));
     SELECT n.signer_id, n.sensitive INTO note_signer, note_sensitive FROM ehr.clinical_notes n WHERE n.id = OLD.note_id;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'The signed note is unavailable' USING ERRCODE = '23514';
