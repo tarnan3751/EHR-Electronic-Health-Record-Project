@@ -71,7 +71,11 @@ Rules:
 - **A notice about a state starts with the state**, then a colon: "Read-only:", "Emergency access:". The word carries the meaning; the color only supports it.
 - **Dictation proposes; the clinician decides.** Say "proposed" and "awaiting your review", never "diagnosed", "decided" or "filled in for you". Say what was not carried over and why ("dictation never places orders or changes the allergy list").
 - **Clinician screens can be terse**, using MRN and standard clinical abbreviations. **The portal is for patients**: spell labels out ("Medical record number", "Date of birth"), explain results in plain language, and never show internal IDs or audit details.
-- **Dates** in clinician views and tables are `YYYY-MM-DD`, with 24-hour times (`2026-11-15 14:05`). The portal writes a result's date out for patients ("Nov 2, 2026"). Say "UTC" when a time is in UTC.
+- **Dates** in clinician views and tables are `YYYY-MM-DD`, with 24-hour times, on the clinic's clock and labeled with its zone: `2026-11-15 14:05 CST`. The clinic has one configured time zone (`Ehr:Clinic:TimeZone`); the label is the zone's abbreviation for that moment (`CST`, `CDT`), or its offset (`UTC-6`) where no abbreviations are configured. A date with no time needs no label. A field that takes a time says which clock: "Taken (clinic time, CST)". Label every time, in a table of times too: a screen reader lands on one cell at a time.
+  - The desktop app shows its offline copy's times the same way, in the clinic's zone, not the laptop's.
+  - **The audit log is the exception: it is in UTC, labeled "UTC".** It is the record of what happened when, read across sites and long after, and one clock with no daylight saving is the one that can't be misread.
+  - The portal writes a result's date out for patients ("Nov 2, 2026") and still labels its times "UTC"; moving the portal to the clinic's clock is not done yet.
+  - Never show a time with no label, and never the reader's own device's zone.
 - **Names** in clinician views are charted "Family, Given" ("Rivera, Ana"); the portal greets patients by given name.
 
 ## Color

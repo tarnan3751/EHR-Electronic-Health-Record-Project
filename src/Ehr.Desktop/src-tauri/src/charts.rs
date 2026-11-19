@@ -40,6 +40,11 @@ pub struct Chart {
     /// its addenda in order. Absent from copies made before they were sent.
     #[serde(default)]
     pub notes: Vec<SignedNote>,
+    /// The clinic's time zone, an IANA name: this copy's times are shown in
+    /// it, labeled. Absent from copies made before it was sent, which are
+    /// shown in UTC as before.
+    #[serde(default)]
+    pub clinic_time_zone: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]

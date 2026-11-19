@@ -4,12 +4,12 @@ using Ehr.Domain.Scheduling;
 
 namespace Ehr.Web.Areas.Clinical.Pages.Schedule;
 
-// What the booking and rescheduling forms have in common: a day, a time (UTC, as everywhere in the app), a length and
+// What the booking and rescheduling forms have in common: a day, a time (the clinic's clock, step 10d; stored in UTC), a length and
 // a reason, and what is wrong with them.
 public static class AppointmentForm
 {
     // The start, or null with the fields' messages added to errors.
-    public static DateTimeOffset? Check(string? day, string? time, int minutes, string? reason, Dictionary<string, string> errors)
+    public static DateTimeOffset? Check(Ehr.Domain.Time.ClinicTime clinic, string? day, string? time, int minutes, string? reason, Dictionary<string, string> errors)
     {
         DateTimeOffset? start = null;
         if (!DateOnly.TryParseExact(day?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
@@ -22,8 +22,13 @@ public static class AppointmentForm
         }
         else
         {
-            start = new DateTimeOffset(date.ToDateTime(clock), TimeSpan.Zero);
-            if (start < DateTimeOffset.UtcNow.AddMinutes(-5))
+            // The day and time are the clinic's (step 10d). An hour the clocks skip that day names no moment.
+            start = clinic.From(date.ToDateTime(clock));
+            if (start is null)
+            {
+                errors["Time"] = "That time doesn't exist on that day: the clocks go forward. Choose another.";
+            }
+            else if (start < DateTimeOffset.UtcNow.AddMinutes(-5))
             {
                 errors["Day"] = "Choose a time that hasn't passed.";
             }
@@ -50,7 +55,7 @@ public static class AppointmentForm
         return errors.Count == 0 ? start : null;
     }
 
-    // "09:30 to 09:50 UTC"
-    public static string Time(AppointmentEntry appointment) =>
-        $"{appointment.StartsAt.UtcDateTime:HH:mm} to {appointment.StartsAt.UtcDateTime.AddMinutes(appointment.Minutes):HH:mm} UTC";
+    // "09:30 to 09:50 CST": the clinic's clock, labeled.
+    public static string Time(Ehr.Domain.Time.ClinicTime clinic, AppointmentEntry appointment) =>
+        $"{clinic.Plain(appointment.StartsAt, "HH:mm")} to {clinic.Format(appointment.StartsAt.AddMinutes(appointment.Minutes), "HH:mm")}";
 }

@@ -690,10 +690,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
     // A clinician's day (FR-17): their appointments that start on that day, UTC, earliest first, whatever their
     // status. Each patient named is a recorded read of that patient, as in a list of patients.
-    public async Task<IReadOnlyList<AppointmentEntry>> ScheduleAsync(Guid clinician, DateOnly day, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<AppointmentEntry>> ScheduleAsync(Guid clinician, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
     {
-        var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var to = from.AddDays(1);
         var appointments = await AppointmentEntriesAsync(
             db.Appointments.Where(a => a.ClinicianId == clinician && a.StartsAt >= from && a.StartsAt < to), latestFirst: false, cancellationToken);
         if (appointments.Count > 0)

@@ -324,7 +324,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                     <li>
                         <strong>@Clinic.Format(appointment.StartsAt)</strong> · @appointment.Minutes minutes · @appointment.Clinician
                         <br>@appointment.Reason
-                        <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")">Open</a></span>
+                        <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @Clinic.Format(appointment.StartsAt)">Open</a></span>
                     </li>
                 }
             </ul>

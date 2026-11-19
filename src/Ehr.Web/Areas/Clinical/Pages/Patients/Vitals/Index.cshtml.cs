@@ -17,7 +17,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Vitals;
 [ShownIfNotSaved(
     "Values[8480-6]", "Values[8462-4]", "Values[8867-4]", "Values[8310-5]", "Values[9279-1]", "Values[59408-5]", "Values[29463-7]", "Values[8302-2]",
     nameof(TakenAt))]
-public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, VitalSigns vitals) : MessagePage(assignments, breakGlass)
+public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, VitalSigns vitals, Ehr.Domain.Time.ClinicTime clinic) : MessagePage(assignments, breakGlass)
 {
     // How many sets the flowsheet shows side by side, and how many with "Show earlier sets": as many as a trend draws.
     public const int Columns = 6;
@@ -34,7 +34,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     [BindProperty]
     public Dictionary<string, string?> Values { get; set; } = [];
 
-    // When they were taken, UTC, as a datetime-local field sends it.
+    // When they were taken, on the clinic's clock (step 10d), as a datetime-local field sends it.
     [BindProperty]
     public string? TakenAt { get; set; }
 
@@ -73,7 +73,8 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
     public async Task<IActionResult> OnGetAsync(Guid patientId)
     {
-        TakenAt ??= DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+        // The clinic's clock, which is what the field takes (step 10d).
+        TakenAt ??= clinic.Now.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
         return await LoadAsync(patientId, writing: false) ?? Page();
     }
 
@@ -85,7 +86,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         }
 
         DateTimeOffset? taken = DateTime.TryParseExact(TakenAt, ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"], CultureInfo.InvariantCulture,
-            DateTimeStyles.None, out var typed) ? new DateTimeOffset(typed, TimeSpan.Zero) : null;
+            DateTimeStyles.None, out var typed) ? clinic.From(typed) : null;
         var errors = VitalSigns.Check(Values, taken, out var values);
         if (errors.Count == 0)
         {

@@ -45,7 +45,7 @@ else
                 @foreach (var appointment in Model.Appointments)
                 {
                     <tr data-appointment="@appointment.Status">
-                        <td class="sc-table__mono">@AppointmentForm.Time(appointment)</td>
+                        <td class="sc-table__mono">@AppointmentForm.Time(Clinic, appointment)</td>
                         <td><a asp-page="/Patients/Chart" asp-route-id="@appointment.PatientId">@appointment.PatientName</a> <span class="sc-table__mono">@appointment.PatientMrn</span></td>
                         @if (Model.ShowsReason(appointment))
                         {
@@ -56,11 +56,11 @@ else
                             <td class="sc-table__muted">Not on your panel</td>
                         }
                         <td><span class="sc-tag @(appointment.Status == AppointmentStatus.Cancelled || appointment.Status == AppointmentStatus.NoShow ? "sc-tag--warning" : appointment.Status == AppointmentStatus.Fulfilled ? "sc-tag--success" : null)">@AppointmentStatus.Names[appointment.Status]</span></td>
-                        <td><a asp-page="Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @appointment.PatientName, @AppointmentForm.Time(appointment)">Open</a></td>
+                        <td><a asp-page="Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @appointment.PatientName, @AppointmentForm.Time(Clinic, appointment)">Open</a></td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
 }
-<p class="sc-muted">Times are UTC. To book an appointment, open the patient's chart.</p>
+<p class="sc-muted">Times are @(Clinic.IsUtc ? "UTC" : "clinic time"). To book an appointment, open the patient's chart.</p>
