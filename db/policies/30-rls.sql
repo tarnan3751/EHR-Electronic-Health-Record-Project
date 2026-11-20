@@ -432,6 +432,12 @@ CREATE POLICY observations_panel_update ON ehr.observations FOR UPDATE
         )
     );
 
+-- The check that a blood pressure reading is whole (step 9c, ehr.check_vital_reading in 75-results.sql) runs as the
+-- table's owner, which forced row-level security binds too: this lets it see every value of a reading, and nothing
+-- else. The owner's alone; the runtime roles have their own policies above.
+DROP POLICY IF EXISTS observations_owner_select ON ehr.observations;
+CREATE POLICY observations_owner_select ON ehr.observations FOR SELECT TO ehr_owner USING (true);
+
 -- Acknowledgments of results (PHI). Clinicians read them, as they read the orders; a clinician with the patient on
 -- their active panel makes one, as themselves. Patients, admins and nobody see none. Never updated or deleted.
 ALTER TABLE ehr.result_acknowledgments ENABLE ROW LEVEL SECURITY;

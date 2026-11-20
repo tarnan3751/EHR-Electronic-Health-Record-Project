@@ -2018,6 +2018,10 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
 
+                    b.Property<Guid?>("ReadingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reading_id");
+
                     b.Property<decimal?>("ReferenceHigh")
                         .HasPrecision(12, 4)
                         .HasColumnType("numeric(12,4)")
@@ -2064,21 +2068,26 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "EffectiveAt")
                         .HasDatabaseName("ix_observations_patient_id_effective_at");
 
-                    b.HasIndex("PatientId", "Category", "Code", "EffectiveAt")
-                        .HasDatabaseName("ix_observations_patient_id_category_code_effective_at");
+                    b.HasIndex("ReadingId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_observations_reading")
+                        .HasFilter("reading_id IS NOT NULL");
 
-                    b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId")
+                    b.HasIndex("PatientId", "Code", "EffectiveAt")
                         .IsUnique()
                         .HasDatabaseName("ux_observations_vital_sign_once")
                         .HasFilter("category = 'vital-signs' AND status <> 'entered-in-error'");
 
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId"), false);
+                    b.HasIndex("PatientId", "Category", "Code", "EffectiveAt")
+                        .HasDatabaseName("ix_observations_patient_id_category_code_effective_at");
 
                     b.ToTable("observations", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_observations_category", "category IN ('laboratory', 'vital-signs')");
 
                             t.HasCheckConstraint("ck_observations_entered_in_error", "(entered_in_error_reason IS NULL AND entered_in_error_by IS NULL AND entered_in_error_at IS NULL) OR status = 'entered-in-error'");
+
+                            t.HasCheckConstraint("ck_observations_reading", "(reading_id IS NOT NULL) = (category = 'vital-signs' AND code IS NOT NULL AND code IN ('8480-6', '8462-4'))");
 
                             t.HasCheckConstraint("ck_observations_reference_range", "reference_low <= reference_high");
 

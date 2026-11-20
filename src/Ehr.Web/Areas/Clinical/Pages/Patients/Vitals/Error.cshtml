@@ -36,9 +36,21 @@ else
                 var id = $"reading-{reading.Id}";
                 <label class="sc-check" for="@id">
                     <input type="checkbox" id="@id" name="Chosen" value="@reading.Id" checked="@Model.Chosen.Contains(reading.Id)" autofocus="@(first && !Model.Errors.ContainsKey("Reason"))">
-                    @VitalSigns.Name(reading.Code!, reading.Display) <span class="sc-table__mono">@reading.Value!.Value.ToString("0.#") @Units.Shown(reading.Unit)</span>
+                    @if (reading.ReadingId is { } pressure && Model.Diastolic.GetValueOrDefault(pressure) is { } diastolic)
+                    {
+                        @* A blood pressure is one reading (step 9c): both its numbers, marked together. *@
+                        @:Blood pressure <span class="sc-table__mono">@reading.Value!.Value.ToString("0.#")/@diastolic.Value!.Value.ToString("0.#") @Units.Shown(reading.Unit)</span>
+                    }
+                    else
+                    {
+                        @VitalSigns.Name(reading.Code!, reading.Display) <span class="sc-table__mono">@reading.Value!.Value.ToString("0.#") @Units.Shown(reading.Unit)</span>
+                    }
                 </label>
                 first = false;
+            }
+            @if (Model.Diastolic.Count > 0)
+            {
+                <p class="sc-field__hint">A blood pressure is one reading: marking it marks both of its numbers.</p>
             }
             @if (Model.HasBodyMassIndex)
             {

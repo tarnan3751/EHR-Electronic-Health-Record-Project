@@ -17,11 +17,11 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Test data: Reason "Typed 180 for 108."
 // Steps:
 //   1. Open the vital signs page. Press Tab until "Mark in error" has the focus, and press Enter.
-//   2. Press Space (the cursor starts on the first reading, the systolic pressure). Press Tab until the reason has
-//      the focus, type it, and press Enter.
+//   2. Press Space (the cursor starts on the first reading, the blood pressure). Press Tab until the reason has the
+//      focus, type it, and press Enter.
 // Expected result: Step 1 opens the page with the first reading's box focused. Step 2 marks it: the vital signs page
-//   says "Marked:" and the systolic pressure is entered in error in the record, the diastolic not. Every focused
-//   control shows the focus ring, and the pages report no script errors.
+//   says "Marked:" and the blood pressure, both its numbers (step 9c), is entered in error in the record. Every
+//   focused control shows the focus ring, and the pages report no script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -59,7 +59,7 @@ public class TC_UC4_22_Nfr12_VitalSignErrorKeyboardFirst(WebApps apps) : IClassF
         await page.WaitForURLAsync(url => url.Contains("marked=1", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("Marked:", await page.Locator(".sc-notice--success").TextContentAsync());
 
-        Assert.Equal([$"{Diastolic} 92 final", $"{Systolic} 180 entered-in-error"], await StatesAsync(apps, patient));
+        Assert.Equal([$"{Diastolic} 92 entered-in-error", $"{Systolic} 180 entered-in-error"], await StatesAsync(apps, patient));
         Assert.Empty(errors);
     }
 }
