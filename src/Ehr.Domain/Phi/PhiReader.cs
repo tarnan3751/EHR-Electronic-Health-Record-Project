@@ -1042,10 +1042,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
                 .Select(m => (Guid?)m.PatientId).SingleOrDefaultAsync(cancellationToken),
             "conditions" => await db.Conditions.AsNoTracking().Where(c => c.Id == id && (sensitive || !c.Sensitive))
                 .Select(c => (Guid?)c.PatientId).SingleOrDefaultAsync(cancellationToken),
-            // Two plain conditions, each an index answers (the key, and ux_observations_reading): asked as one choice
-            // between them, the database read every observation.
-            "observations" => await db.Observations.AsNoTracking()
-                .Where(o => ((o.ReadingId == null && o.Id == id) || o.ReadingId == id) && o.Status != ObservationStatus.EnteredInError)
+            "observations" => await ObservationById(id).AsNoTracking().Where(o => o.Status != ObservationStatus.EnteredInError)
                 .Select(o => (Guid?)o.PatientId).FirstOrDefaultAsync(cancellationToken),
             "appointments" => await AppointmentPatientAsync(id, cancellationToken),
             _ => throw new ArgumentException($"No entries of '{table}' are read by ID.", nameof(table)),
@@ -1088,43 +1085,46 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
     // A patient's test results and vital signs, or those of one category, the latest taken first, up to the limit, with
     // how many there are in all; none entered in error. A blood pressure is one entry, its reading (step 9c): the
-    // systolic value, found by the reading's ID, with the diastolic of the same reading beside it, fetched by that ID in
-    // the same statement; so the limit and the total count a reading once, and nothing pairs values by their time. The
-    // database holds a reading to one standing systolic and one standing diastolic, or both in error (75-results.sql).
-    // Each value says whether its unit is its code's UCUM unit.
+    // systolic value, with the diastolic of the same reading beside it, paired here by the reading's ID, never by time;
+    // so the limit and the total count a reading once. The database holds a reading to one standing systolic and one
+    // standing diastolic, taken at one time, or both in error (75-results.sql). Each value says whether its unit is its
+    // code's UCUM unit.
     public async Task<PatientEntries<ObservationEntry>> ObservationsAsync(
         Guid patientId, Guid? only, string? category, int limit, CancellationToken cancellationToken)
     {
-        var matching = db.Observations.AsNoTracking().Where(o => o.PatientId == patientId
-            && (only == null || (o.ReadingId == null && o.Id == only) || o.ReadingId == only)
-            && (category == null || o.Category == category) && o.Status != ObservationStatus.EnteredInError
-            && (o.Code == null || o.Code != VitalSign.Diastolic));
-        // A join on the reading's ID, which an index answers for each value listed (ux_observations_reading); a reading
-        // has one diastolic. Asked as "the first diastolic of the reading", EF Core numbers every diastolic in the table.
-        var rows = await (
-            from o in matching.OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).ThenBy(o => o.Id).Take(limit)
-            // Only a diastolic standing as its systolic stands: the database keeps a reading whole, and this keeps the
-            // read from ever joining a systolic to a diastolic in another state.
-            join d in db.Observations.Where(d => d.Code == VitalSign.Diastolic) on new { o.ReadingId, o.Status } equals new { d.ReadingId, d.Status } into diastolics
-            from d in diastolics.DefaultIfEmpty()
-            orderby o.EffectiveAt descending, o.Code, o.Id
-            select new
-            {
-                Value = o,
-                Ucum = db.ObservationCodes.Any(c => c.Code == o.Code && c.Unit == o.Unit),
-                Diastolic = d,
-                DiastolicUcum = d != null && db.ObservationCodes.Any(c => c.Code == d.Code && c.Unit == d.Unit),
-            })
+        var matching = (only is { } id ? ObservationById(id) : db.Observations).AsNoTracking()
+            .Where(o => o.PatientId == patientId && (category == null || o.Category == category) && o.Status != ObservationStatus.EnteredInError);
+        // A search reads the patient's rows alone, by their index, both values of a reading among them, and twice the
+        // limit of them, since an entry is at most two rows. A diastolic comes before its systolic (same time, and its
+        // code sorts first), so the rows read never hold a reading's systolic without its diastolic. Nothing is joined:
+        // a join to the diastolics, on a key no index answered, read all of them for each request (step 11's benchmark).
+        var rows = await (only is null ? matching.OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).ThenBy(o => o.Id).Take(2 * limit) : matching)
+            .Select(o => new { Value = o, Ucum = db.ObservationCodes.Any(c => c.Code == o.Code && c.Unit == o.Unit) })
             .ToListAsync(cancellationToken);
-        var entries = rows.Select(row => new ObservationEntry(row.Value, row.Ucum)
+        var diastolics = rows.Where(row => row.Value.ReadingId is not null && row.Value.Code == VitalSign.Diastolic)
+            .ToDictionary(row => row.Value.ReadingId!.Value, row => new ObservationEntry(row.Value, row.Ucum));
+        var all = rows.Where(row => row.Value.Code != VitalSign.Diastolic).Select(row => new ObservationEntry(row.Value, row.Ucum)
         {
-            Diastolic = row.Diastolic is null ? null : new ObservationEntry(row.Diastolic, row.DiastolicUcum),
+            // Only a diastolic standing as its systolic stands: the database keeps a reading whole, and this keeps the
+            // read from ever pairing a systolic with a diastolic in another state.
+            Diastolic = row.Value.ReadingId is { } reading && diastolics.TryGetValue(reading, out var diastolic)
+                && diastolic.Observation.Status == row.Value.Status ? diastolic : null,
         }).ToList();
-        // How many there are in all is asked for only when the limit may have cut the list: never for one entry read by
-        // its ID, which is all there can be.
-        var total = only is not null || entries.Count < limit ? entries.Count : await matching.CountAsync(cancellationToken);
-        return await RecordAsync(patientId, only, new PatientEntries<ObservationEntry>(entries, total), sensitive: false, cancellationToken);
+        // How many there are in all is asked for only when the limit may have cut the rows: never for one entry read by
+        // its ID, which is all there can be. Each row but a reading's diastolic is an entry, so the count is of one table.
+        var total = only is not null || rows.Count < 2 * limit ? all.Count
+            : await matching.CountAsync(o => o.Code == null || o.Code != VitalSign.Diastolic, cancellationToken);
+        return await RecordAsync(patientId, only, new PatientEntries<ObservationEntry>([.. all.Take(limit)], total), sensitive: false, cancellationToken);
     }
+
+    // An observation by its ID, or a blood pressure reading's two values by the reading's ID (step 9c); never a value of
+    // a reading by its own ID, which is not an entry. Each part looks up a unique key, the primary key or
+    // ux_observations_reading's (reading_id, code), which the planner costs as one row whatever its statistics say,
+    // rather than one condition across the two columns, whose plan is the planner's to choose.
+    IQueryable<Observation> ObservationById(Guid id) =>
+        db.Observations.Where(o => o.Id == id && o.ReadingId == null)
+            .Concat(db.Observations.Where(o => o.ReadingId == id && o.Code == VitalSign.Systolic))
+            .Concat(db.Observations.Where(o => o.ReadingId == id && o.Code == VitalSign.Diastolic));
 
     // A patient's appointments, every status, the latest first, up to the limit, with how many there are in all.
     public async Task<PatientEntries<AppointmentEntry>> AllAppointmentsAsync(Guid patientId, Guid? only, int limit, CancellationToken cancellationToken)

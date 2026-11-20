@@ -38,7 +38,9 @@ namespace Ehr.Bench;
 // (NFR-03). The apps run in memory, so a request's time is the server's own: authentication, the page's queries and
 // the reads it records, and rendering, with no network in it.
 // Each kind of request is made 100 times to warm up, then 1,000 times one after another, and the times are reported as
-// percentiles, with two parts of each apart from the rest: inserting the audit events of the page's reads, and
+// percentiles. One that takes over a minute in all stops the run (RowLimit): at the budget's 20 ms each, its 1,100
+// requests take 22 seconds, so a query gone wrong fails the run at once instead of holding CI until it times out. The
+// percentiles have two parts of each request apart from the rest: inserting the audit events of the page's reads, and
 // committing its transaction, which waits for them to reach the disk. That wait is only there when the database's
 // fsync, synchronous_commit and full_page_writes are on, as they are on the stack's primary and in the PostgreSQL the
 // benchmark starts itself (MigratedDatabase.Durable; the tests' own have them off). It prints the three as it read
@@ -67,6 +69,8 @@ internal static partial class RenderBenchmark
     const int WarmUp = 100;
 
     const int Measured = 1_000;
+
+    static readonly TimeSpan RowLimit = TimeSpan.FromMinutes(1);
 
     const int PanelSize = 100;
 
@@ -433,15 +437,22 @@ internal static partial class RenderBenchmark
     }
 
     // Times one kind of request, after warming it up, and its audit events' insert and its commit within it. Every
-    // answer must be the page itself.
+    // answer must be the page itself, and all of them must come within RowLimit.
     static async Task<Result> MeasureAsync(HttpClient client, DatabaseTimes times, string name, bool typing, Func<string> next)
     {
         var addresses = Enumerable.Range(0, WarmUp + Measured).Select(_ => next()).ToList();
         var total = new double[Measured];
         var audit = new double[Measured];
         var commit = new double[Measured];
+        var row = Stopwatch.StartNew();
         for (var i = 0; i < addresses.Count; i++)
         {
+            if (row.Elapsed > RowLimit)
+            {
+                throw new InvalidOperationException(
+                    $"{name}: stopped after {i:N0} of {addresses.Count:N0} requests, which took over {RowLimit.TotalSeconds:0} seconds; at {BudgetMilliseconds} ms each, all of them take {addresses.Count * BudgetMilliseconds / 1000:0} seconds.");
+            }
+
             using var request = new HttpRequestMessage(HttpMethod.Get, addresses[i]);
             if (typing)
             {
