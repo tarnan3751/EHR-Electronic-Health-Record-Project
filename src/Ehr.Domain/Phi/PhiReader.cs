@@ -1029,9 +1029,10 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
     // Whose entry it is, for the API's gate, which comes before anything is read: the patient's ID and nothing else, or
     // null when the reader has no such entry. A sensitive diagnosis or medication is found only when sensitive items
-    // were asked for, and an entry in error, or an observation of a code left out, never is: so none of those is
-    // revealed. Not a recorded read; the read that follows the gate is.
-    public async Task<Guid?> EntryPatientAsync(string table, Guid id, bool sensitive, IReadOnlyCollection<string> leaveOut, CancellationToken cancellationToken) =>
+    // were asked for, and an entry in error never is: so none of those is revealed. A blood pressure is found by its
+    // reading's ID (step 9c), never by the ID of one of its two values, which are not entries of their own. Not a recorded
+    // read; the read that follows the gate is.
+    public async Task<Guid?> EntryPatientAsync(string table, Guid id, bool sensitive, CancellationToken cancellationToken) =>
         table switch
         {
             "allergy_intolerances" => await db.AllergyIntolerances.AsNoTracking().Where(a => a.Id == id)
@@ -1041,9 +1042,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
                 .Select(m => (Guid?)m.PatientId).SingleOrDefaultAsync(cancellationToken),
             "conditions" => await db.Conditions.AsNoTracking().Where(c => c.Id == id && (sensitive || !c.Sensitive))
                 .Select(c => (Guid?)c.PatientId).SingleOrDefaultAsync(cancellationToken),
+            // Two plain conditions, each an index answers (the key, and ux_observations_reading): asked as one choice
+            // between them, the database read every observation.
             "observations" => await db.Observations.AsNoTracking()
-                .Where(o => o.Id == id && o.Status != ObservationStatus.EnteredInError && (o.Code == null || !leaveOut.Contains(o.Code)))
-                .Select(o => (Guid?)o.PatientId).SingleOrDefaultAsync(cancellationToken),
+                .Where(o => ((o.ReadingId == null && o.Id == id) || o.ReadingId == id) && o.Status != ObservationStatus.EnteredInError)
+                .Select(o => (Guid?)o.PatientId).FirstOrDefaultAsync(cancellationToken),
             "appointments" => await AppointmentPatientAsync(id, cancellationToken),
             _ => throw new ArgumentException($"No entries of '{table}' are read by ID.", nameof(table)),
         };
@@ -1084,17 +1087,37 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     }
 
     // A patient's test results and vital signs, or those of one category, the latest taken first, up to the limit, with
-    // how many there are in all; none entered in error, and none of the codes the caller leaves out. Each says whether its
-    // unit is its code's UCUM unit.
+    // how many there are in all; none entered in error. A blood pressure is one entry, its reading (step 9c): the
+    // systolic value, found by the reading's ID, with the diastolic of the same reading beside it, fetched by that ID in
+    // the same statement; so the limit and the total count a reading once, and nothing pairs values by their time. The
+    // database holds a reading to one standing systolic and one standing diastolic, or both in error (75-results.sql).
+    // Each value says whether its unit is its code's UCUM unit.
     public async Task<PatientEntries<ObservationEntry>> ObservationsAsync(
-        Guid patientId, Guid? only, string? category, IReadOnlyCollection<string> leaveOut, int limit, CancellationToken cancellationToken)
+        Guid patientId, Guid? only, string? category, int limit, CancellationToken cancellationToken)
     {
-        var matching = db.Observations.AsNoTracking().Where(o => o.PatientId == patientId && (only == null || o.Id == only)
+        var matching = db.Observations.AsNoTracking().Where(o => o.PatientId == patientId
+            && (only == null || (o.ReadingId == null && o.Id == only) || o.ReadingId == only)
             && (category == null || o.Category == category) && o.Status != ObservationStatus.EnteredInError
-            && (o.Code == null || !leaveOut.Contains(o.Code)));
-        var entries = await matching.OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).ThenBy(o => o.Id).Take(limit)
-            .Select(o => new ObservationEntry(o, db.ObservationCodes.Any(c => c.Code == o.Code && c.Unit == o.Unit)))
+            && (o.Code == null || o.Code != VitalSign.Diastolic));
+        // A join on the reading's ID, which an index answers for each value listed (ux_observations_reading); a reading
+        // has one diastolic. Asked as "the first diastolic of the reading", EF Core numbers every diastolic in the table.
+        var rows = await (
+            from o in matching.OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).ThenBy(o => o.Id).Take(limit)
+            join d in db.Observations.Where(d => d.Code == VitalSign.Diastolic) on o.ReadingId equals d.ReadingId into diastolics
+            from d in diastolics.DefaultIfEmpty()
+            orderby o.EffectiveAt descending, o.Code, o.Id
+            select new
+            {
+                Value = o,
+                Ucum = db.ObservationCodes.Any(c => c.Code == o.Code && c.Unit == o.Unit),
+                Diastolic = d,
+                DiastolicUcum = d != null && db.ObservationCodes.Any(c => c.Code == d.Code && c.Unit == d.Unit),
+            })
             .ToListAsync(cancellationToken);
+        var entries = rows.Select(row => new ObservationEntry(row.Value, row.Ucum)
+        {
+            Diastolic = row.Diastolic is null ? null : new ObservationEntry(row.Diastolic, row.DiastolicUcum),
+        }).ToList();
         // How many there are in all is asked for only when the limit may have cut the list: never for one entry read by
         // its ID, which is all there can be.
         var total = only is not null || entries.Count < limit ? entries.Count : await matching.CountAsync(cancellationToken);

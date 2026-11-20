@@ -30,6 +30,17 @@ static class FhirConformance
     // The resource the JSON holds, parsed strictly and valid against R4 and the profiles it claims.
     public static T Valid<T>(string json) where T : Resource
     {
+        var (resource, problems) = Check(json);
+        Assert.True(problems.Count == 0, $"Not valid against R4: {string.Join("; ", problems)}\n{json}");
+        return Assert.IsAssignableFrom<T>(resource);
+    }
+
+    // What is wrong with the JSON as R4, with the profiles it claims: the strict parse's failure, or every error and
+    // warning the validator reports. Empty when nothing is. For a control case, which must fail.
+    public static List<string> Problems(string json) => Check(json).Problems;
+
+    static (Resource? Resource, List<string> Problems) Check(string json)
+    {
         Resource resource;
         try
         {
@@ -37,8 +48,7 @@ static class FhirConformance
         }
         catch (DeserializationFailedException failure)
         {
-            Assert.Fail($"Not valid R4 JSON: {failure.Message}\n{json}");
-            throw;
+            return (null, [$"Not valid R4 JSON: {failure.Message}"]);
         }
 
         OperationOutcome outcome;
@@ -47,11 +57,8 @@ static class FhirConformance
             outcome = R4.Value.Validate(resource);
         }
 
-        var issues = outcome.Issue
+        return (resource, [.. outcome.Issue
             .Where(issue => issue.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal or OperationOutcome.IssueSeverity.Warning)
-            .Select(issue => $"{issue.Severity} {issue.Code}: {issue.Details?.Text} at {string.Join(", ", issue.Expression ?? [])}")
-            .ToList();
-        Assert.True(issues.Count == 0, $"Not valid against R4: {string.Join("; ", issues)}\n{json}");
-        return Assert.IsAssignableFrom<T>(resource);
+            .Select(issue => $"{issue.Severity} {issue.Code}: {issue.Details?.Text} at {string.Join(", ", issue.Expression ?? [])}")]);
     }
 }

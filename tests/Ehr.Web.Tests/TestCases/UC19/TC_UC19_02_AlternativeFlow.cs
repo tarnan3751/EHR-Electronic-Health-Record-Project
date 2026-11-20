@@ -11,30 +11,37 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 // Test Case ID: TC-UC19-02
 // Purpose / scenario: The other ways a read goes. Sensitive diagnoses and medications are left out until asked for with
 //   show-sensitive=true, which is recorded as a view of sensitive items and marks them restricted. Emergency access
-//   started in the clinical app opens the API as the panel does. A vital sign marked entered in error, and every blood
-//   pressure reading, is left out. A search with more matches than the limit says so.
+//   started in the clinical app opens the API as the panel does. A vital sign marked entered in error is left out, and
+//   so is a blood pressure reading marked in error, whole. A patient whose only vital signs are blood pressures gets one
+//   Observation for each reading. A search with more matches than the limit says so.
 // Type: Functional (alternative flow)
 // Requirements: proposed FR-53, with FR-06, FR-32, FR-39 (proposed) and FR-50 (proposed)
 // Use case: UC 19, Read a patient's record through the FHIR API
 // Preconditions: As TC-UC19-01. A second clinician without the patient on their panel. A second patient on the first
-//   clinician's panel with 601 glucose results.
+//   clinician's panel with 601 glucose results. A third with two blood pressure readings and no other vital sign.
 // Inputs and system conditions: GET /fhir/Condition and /fhir/MedicationStatement, searched and read, with and
 //   without show-sensitive=true; POST /patients/{id}/reason in the clinical app; POST /patients/{id}/vitals/error;
 //   GET /fhir/Observation, searched with and without a category, and read; on the on-site app.
 // Test data: Generalized anxiety disorder (F41.1, sensitive by its code) and sertraline (marked sensitive); the reason
-//   "Synthetic: covering for a colleague today"; the heart rate marked in error with "Synthetic: taken from the wrong
-//   patient"; 601 results of glucose (LOINC 2345-7).
+//   "Synthetic: covering for a colleague today"; the heart rate and the blood pressure reading marked in error with
+//   "Synthetic: taken from the wrong patient"; 601 results of glucose (LOINC 2345-7); readings of 131/85 and 122/79
+//   mmHg, an hour apart.
 // Steps:
 //   1. Search diagnoses and medications, then read the sensitive ones by ID; then the same with show-sensitive=true.
 //   2. As the second clinician, search the diagnoses; give a reason in the clinical app; search again.
-//   3. Mark the heart rate in error; search the vital signs, and read the heart rate, the systolic and the diastolic.
+//   3. Search the vital signs; mark the heart rate and the blood pressure's systolic in error; search the vital signs
+//      again, with each form of the category, and the results; read the heart rate, the reading, the systolic and the
+//      diastolic.
 //   4. Search the second patient's results.
+//   5. Search the third patient's observations, and read each reading by its ID.
 // Expected result: Step 1: without the parameter each search leaves the sensitive entry out and says "1 sensitive entry
 //   was left out", and the read by ID is not found; each answered search is one read of the patient. With it, each is
 //   included with meta.security R (v3-Confidentiality), the other entries without; each request is one read of
-//   sensitive items and no plain read. Step 2: 403, then the diagnoses. Step 3: no heart rate, systolic or diastolic in
-//   the search, which says blood pressure isn't served yet (a laboratory search doesn't), and each read is not found.
-//   Step 4: total 601, the newest 600, and a warning that only those are included. Every answer is valid R4.
+//   sensitive items and no plain read. Step 2: 403, then the diagnoses. Step 3: the reading at first; after the marks,
+//   both of the reading's values in error, and no heart rate and no reading in the search, which says nothing besides
+//   its entries; each read is not found. Step 4: total 601, the newest 600, and a warning that only those are included.
+//   Step 5: total 2, two Observations of LOINC 85354-9 claiming the bp profile, the newer first (122/79), each read by
+//   its reading's ID; one recorded read per request. Every answer is valid R4.
 // Creator: Tahseen Arnan
 public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -76,7 +83,7 @@ public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Fact]
-    public async Task Emergency_access_opens_the_api_and_entries_in_error_and_blood_pressure_are_left_out()
+    public async Task Emergency_access_opens_the_api_and_entries_in_error_are_left_out_a_blood_pressure_reading_whole()
     {
         var chart = await ChartAsync(apps, "Dr. Fhir Panel");
 
@@ -93,26 +100,64 @@ public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Single(Searched<R4.Condition>(await GetAsync(covering.Client, $"/fhir/Condition?patient={chart.Patient}")).Matches);
         Expect(await GetAsync(covering.Client, $"/fhir/Patient/{chart.Patient}"), HttpStatusCode.OK);
 
-        // 3. A heart rate in error, and blood pressure, which isn't served yet.
-        using (var marked = await VitalTests.MarkAsync(apps, chart.Session.Client, chart.Patient, chart.VitalsAt, "Synthetic: taken from the wrong patient", VitalSign.HeartRate))
+        // 3. The blood pressure is served, as its reading; then a heart rate and the reading in error. Marking the
+        // reading's systolic marks the reading, both values (step 9c).
+        Assert.Contains(Searched<R4.Observation>(await GetAsync(chart.Session.Client, $"/fhir/Observation?patient={chart.Patient}&category=vital-signs")).Matches,
+            observation => observation.Id == chart.Reading.ToString());
+        using (var marked = await VitalTests.MarkAsync(apps, chart.Session.Client, chart.Patient, chart.VitalsAt, "Synthetic: taken from the wrong patient",
+            VitalSign.HeartRate, VitalSign.Systolic))
         {
             Assert.Equal(["8867-4 72 entered-in-error"], (await VitalTests.StatesAsync(apps, chart.Patient)).Where(s => s.StartsWith("8867-4", StringComparison.Ordinal)));
+            Assert.Equal(["8480-6 128 entered-in-error none R1", "8462-4 82 entered-in-error none R1"], await VitalTests.ReadingsAsync(apps, chart.Patient));
         }
 
         foreach (var category in new[] { "vital-signs", "http://terminology.hl7.org/CodeSystem/observation-category|vital-signs" })
         {
             var (_, signs, notes) = Searched<R4.Observation>(await GetAsync(chart.Session.Client, $"/fhir/Observation?patient={chart.Patient}&category={Uri.EscapeDataString(category)}"));
             Assert.Equal(["29463-7", "39156-5", "59408-5", "8302-2", "8310-5", "9279-1"], signs.Select(o => o.Code.Coding.Single().Code).Order(StringComparer.Ordinal));
-            Assert.Equal(["Blood pressure readings are not served by this API yet."], notes);
+            Assert.Empty(notes);
         }
 
         var (_, results, labNotes) = Searched<R4.Observation>(await GetAsync(chart.Session.Client, $"/fhir/Observation?patient={chart.Patient}&category=laboratory"));
         Assert.Equal(["3016-3", "4548-4"], results.Select(o => o.Code.Coding.Single().Code).Order(StringComparer.Ordinal));
         Assert.Empty(labNotes);
-        foreach (var code in new[] { VitalSign.HeartRate, VitalSign.Systolic, VitalSign.Diastolic })
+        foreach (var id in new[] { chart.Vitals[VitalSign.HeartRate], chart.Reading, chart.Vitals[VitalSign.Systolic], chart.Vitals[VitalSign.Diastolic] })
         {
-            Refused(await GetAsync(chart.Session.Client, $"/fhir/Observation/{chart.Vitals[code]}"), HttpStatusCode.NotFound, "not-found");
+            Refused(await GetAsync(chart.Session.Client, $"/fhir/Observation/{id}"), HttpStatusCode.NotFound, "not-found");
         }
+    }
+
+    [Fact]
+    public async Task A_patient_whose_only_vital_signs_are_blood_pressures_gets_one_observation_for_each_reading()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Fhir Pressure", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Synthetic", "Fhirpressure");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        foreach (var (minutesAgo, systolic, diastolic) in new[] { (90, "131", "85"), (30, "122", "79") })
+        {
+            using var recorded = await VitalTests.RecordAsync(session.Client, patient, minutesAgo, (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic));
+            Assert.Equal(VitalTests.Path(patient), PathOf(recorded));
+        }
+
+        var before = await ReadsAsync(apps, clinician.Id, patient);
+        var (bundle, found, notes) = Searched<R4.Observation>(await GetAsync(session.Client, $"/fhir/Observation?patient={patient}"));
+        Assert.Equal((2, 2), (bundle.Total, found.Count));
+        Assert.Empty(notes);
+        Assert.All(found, reading =>
+        {
+            Assert.Equal(("85354-9", "http://hl7.org/fhir/StructureDefinition/bp"), (reading.Code.Coding.Single().Code, reading.Meta!.Profile.Single()));
+            Assert.Equal(["8480-6", "8462-4"], reading.Component.Select(component => component.Code.Coding.Single().Code));
+        });
+        Assert.Equal(["122/79", "131/85"], found.Select(reading => string.Join("/", reading.Component.Select(component => Assert.IsType<R4.Quantity>(component.Value).Value))));
+        var readings = await ProxyTests.QueryAsync(apps, "SELECT DISTINCT reading_id::text FROM ehr.observations WHERE patient_id = @patient", patient);
+        Assert.Equal(readings.Order(StringComparer.Ordinal), found.Select(reading => reading.Id).Order(StringComparer.Ordinal));
+        foreach (var reading in readings)
+        {
+            Assert.Equal(reading, FhirConformance.Valid<R4.Observation>(Expect(await GetAsync(session.Client, $"/fhir/Observation/{reading}"), HttpStatusCode.OK).Json).Id);
+        }
+
+        Assert.Equal((before.Reads + 3, before.Sensitive), await ReadsAsync(apps, clinician.Id, patient));
     }
 
     [Fact]

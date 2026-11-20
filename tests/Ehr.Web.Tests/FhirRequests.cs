@@ -29,8 +29,11 @@ static class FhirRequests
         public Guid Anxiety { get; init; }
         public Guid HemoglobinA1c { get; init; }
         public Guid Thyrotropin { get; init; }
-        // The set of vital signs, by LOINC code, and when it was taken ("yyyy-MM-ddTHH:mm:ss", UTC).
+        // The set of vital signs, each value's ID by LOINC code, and when it was taken ("yyyy-MM-ddTHH:mm:ss", UTC).
         public IReadOnlyDictionary<string, Guid> Vitals { get; init; } = new Dictionary<string, Guid>();
+
+        // The ID of the set's blood pressure reading (step 9c), which its two values share.
+        public Guid Reading { get; init; }
         public string VitalsAt { get; init; } = "";
         public Guid Booked { get; init; }
         public Guid Cancelled { get; init; }
@@ -75,6 +78,8 @@ static class FhirRequests
         var vitals = (await ProxyTests.QueryAsync(apps, "SELECT code || ' ' || id FROM ehr.observations WHERE patient_id = @patient AND category = 'vital-signs'", patient))
             .Select(row => row.Split(' ')).ToDictionary(row => row[0], row => Guid.Parse(row[1]));
         Assert.Equal(9, vitals.Count);
+        var reading = Guid.Parse((await ProxyTests.QueryAsync(apps,
+            "SELECT DISTINCT reading_id::text FROM ehr.observations WHERE patient_id = @patient AND reading_id IS NOT NULL", patient)).Single());
 
         var day = AppointmentTests.Day(0);
         foreach (var (time, reason) in new[] { ("09:30", "Synthetic: blood pressure check"), ("11:00", "Synthetic: medication review") })
@@ -104,6 +109,7 @@ static class FhirRequests
                 note: "Synthetic: we'll talk about this at your next visit."),
             Thyrotropin = await apps.InsertResultAsync(patient, "Thyroid stimulating hormone", "3016-3", 2.1m, "mIU/L", 0.4m, 4.0m, effective, effective),
             Vitals = vitals,
+            Reading = reading,
             VitalsAt = new DateTime(taken.Year, taken.Month, taken.Day, taken.Hour, taken.Minute, 0).ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture),
             Booked = appointments[0],
             Cancelled = appointments[1],

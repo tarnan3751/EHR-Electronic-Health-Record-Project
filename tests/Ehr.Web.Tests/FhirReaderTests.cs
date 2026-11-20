@@ -19,9 +19,6 @@ public class FhirReaderTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
-    // The blood pressure codes the API leaves out (FhirObservations.LeftOut).
-    static readonly string[] LeftOut = [VitalSign.Systolic, VitalSign.Diastolic];
-
     [Fact]
     public async Task A_read_by_id_is_one_query_and_never_counts_and_a_search_cut_by_its_limit_does()
     {
@@ -39,10 +36,27 @@ public class FhirReaderTests(WebApps apps) : IClassFixture<WebApps>
 
         await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
         commands.Executed.Clear();
-        var observation = await reader.ObservationsAsync(chart.Patient, chart.Vitals[VitalSign.HeartRate], category: null, LeftOut, limit: 1, Cancel);
+        var observation = await reader.ObservationsAsync(chart.Patient, chart.Vitals[VitalSign.HeartRate], category: null, limit: 1, Cancel);
         Assert.Equal((1, 1), (observation.Entries.Count, observation.Total));
         Assert.Single(Sent("observations"));
         Assert.False(Counted());
+
+        // A blood pressure reading by its ID: its two values in one statement, paired by the reading, and no count.
+        commands.Executed.Clear();
+        var reading = await reader.ObservationsAsync(chart.Patient, chart.Reading, category: null, limit: 1, Cancel);
+        var pressure = Assert.Single(reading.Entries);
+        Assert.Equal(1, reading.Total);
+        Assert.Equal((VitalSign.Systolic, chart.Reading, VitalSign.Diastolic, chart.Reading),
+            (pressure.Observation.Code, pressure.Observation.ReadingId, pressure.Diastolic?.Observation.Code, pressure.Diastolic?.Observation.ReadingId));
+        Assert.Single(Sent("observations"));
+        Assert.False(Counted());
+
+        // Neither value's own ID is an entry: not found, by the gate's question or by the read.
+        foreach (var value in new[] { chart.Vitals[VitalSign.Systolic], chart.Vitals[VitalSign.Diastolic] })
+        {
+            Assert.Null(await reader.EntryPatientAsync("observations", value, sensitive: false, Cancel));
+            Assert.Empty((await reader.ObservationsAsync(chart.Patient, value, category: null, limit: 1, Cancel)).Entries);
+        }
 
         commands.Executed.Clear();
         var appointment = await reader.AllAppointmentsAsync(chart.Patient, chart.Booked, limit: 1, Cancel);
@@ -50,11 +64,17 @@ public class FhirReaderTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Single(Sent("appointments"));
         Assert.False(Counted());
 
-        // The capture sees a count when there is one: a search the limit cut asks how many there are in all.
+        // A search counts a reading once: the seven other vital signs and the one reading.
+        var signs = await reader.ObservationsAsync(chart.Patient, only: null, ObservationCategory.VitalSigns, limit: 600, Cancel);
+        Assert.Equal((8, 8), (signs.Entries.Count, signs.Total));
+        Assert.Equal(chart.Reading, Assert.Single(signs.Entries, entry => entry.Diastolic is not null).Observation.ReadingId);
+
+        // The capture sees a count when there is one: a search the limit cut asks how many there are in all, readings
+        // once each.
         commands.Executed.Clear();
-        var cut = await reader.ObservationsAsync(chart.Patient, only: null, category: null, LeftOut, limit: 1, Cancel);
+        var cut = await reader.ObservationsAsync(chart.Patient, only: null, ObservationCategory.VitalSigns, limit: 1, Cancel);
         Assert.Single(cut.Entries);
-        Assert.True(cut.Total > 1);
+        Assert.Equal(8, cut.Total);
         Assert.True(Counted());
         await transaction.RollbackAsync(Cancel);
     }

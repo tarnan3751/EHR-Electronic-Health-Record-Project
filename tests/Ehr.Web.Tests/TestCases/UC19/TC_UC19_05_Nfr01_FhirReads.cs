@@ -13,10 +13,11 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 //   18 with durability on, seeded with 50,000 synthetic patients; the on-site app, and then the cloud app with its link
 //   to the on-site server down, in memory; a clinician with 100 patients on their panel.
 // Inputs and system conditions: GET /fhir/Patient/{id}, GET /fhir/Observation?patient={id}, GET
-//   /fhir/Condition?patient={id}&show-sensitive=true and GET /fhir/Observation/{id}, for patients on the panel, each 100
-//   times to warm up and then 1,000 times, on-site and off-site.
-// Test data: The synthetic clinic (bench/Ehr.Seed): each patient's seeded results and vital signs, diagnoses
-//   (sensitive ones among them) and visits.
+//   /fhir/Condition?patient={id}&show-sensitive=true and GET /fhir/Observation/{id} of a blood pressure reading, for
+//   patients on the panel who have a blood pressure reading, each 100 times to warm up and then 1,000 times, on-site
+//   and off-site.
+// Test data: The synthetic clinic (bench/Ehr.Seed): each patient's seeded results and vital signs, blood pressure
+//   readings among them, diagnoses (sensitive ones among them) and visits.
 // Steps:
 //   1. Run the benchmark with --results, as PerformanceResults.cs says.
 //   2. Run this test case against that file.

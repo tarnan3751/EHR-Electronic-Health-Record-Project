@@ -94,7 +94,7 @@ public class TC_UC19_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var patient = FhirConformance.Valid<R4.Patient>(Expect(await GetAsync(offSite, $"/fhir/Patient/{chart.Patient}"), HttpStatusCode.OK).Json);
         Assert.Equal(chart.Mrn, patient.Identifier.Single().Value);
         var (_, observations, _) = Searched<R4.Observation>(await GetAsync(offSite, $"/fhir/Observation?patient={chart.Patient}"));
-        Assert.Equal(9, observations.Count);
+        Assert.Equal(10, observations.Count);
         var (_, conditions, _) = Searched<R4.Condition>(await GetAsync(offSite, $"/fhir/Condition?patient={chart.Patient}&show-sensitive=true"));
         Assert.Equal(2, conditions.Count);
         Assert.Equal([["read patients"], ["read patients"], ["read_sensitive patients"]], watched.Writes);

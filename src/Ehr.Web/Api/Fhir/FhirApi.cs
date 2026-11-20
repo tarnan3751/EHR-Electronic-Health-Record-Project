@@ -207,14 +207,9 @@ public static class FhirApi
                 return search.LeftOut(conditions.SensitiveLeftOut)
                     .Answer(conditions.Entries.Select(c => (c.Id, (object)FhirResources.Condition(c))), conditions.Total);
             case "Observation":
-                var observations = await phi.ObservationsAsync(patientId, only: null, category, FhirObservations.LeftOut, SearchLimit, cancel);
-                if (FhirObservations.CoversVitalSigns(category))
-                {
-                    search.Note(FhirObservations.BloodPressureNotServed);
-                }
-
-                return search.Answer(observations.Entries.Zip(FhirObservations.Map(observations.Entries), (entry, resource) => (entry.Observation.Id, (object)resource)),
-                    observations.Total);
+                // A blood pressure's ID is its reading's, not one of its values' (FhirObservations).
+                var observations = await phi.ObservationsAsync(patientId, only: null, category, SearchLimit, cancel);
+                return search.Answer(FhirObservations.Map(observations.Entries).Select(mapped => (mapped.Id, (object)mapped.Resource)), observations.Total);
             default:
                 var appointments = await phi.AllAppointmentsAsync(patientId, only: null, SearchLimit, cancel);
                 return search.Answer(appointments.Entries.Select(a => (a.Id, (object)FhirResources.Appointment(a))), appointments.Total);
@@ -248,7 +243,7 @@ public static class FhirApi
         }
 
         // A patient is gated before anything is read, as the chart is: whether or not there is one with this ID.
-        var patientId = type == "Patient" ? key : await phi.EntryPatientAsync(served.Table, key, sensitive, FhirObservations.LeftOut, cancel);
+        var patientId = type == "Patient" ? key : await phi.EntryPatientAsync(served.Table, key, sensitive, cancel);
         if (patientId is not { } patient)
         {
             return Refusal(StatusCodes.Status404NotFound);
@@ -265,7 +260,7 @@ public static class FhirApi
             "AllergyIntolerance" => (await phi.AllergiesAsync(patient, key, 1, cancel)).Entries.Select(FhirResources.Allergy).SingleOrDefault(),
             "MedicationStatement" => (await phi.MedicationsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(FhirResources.Medication).SingleOrDefault(),
             "Condition" => (await phi.ConditionsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(FhirResources.Condition).SingleOrDefault(),
-            "Observation" => FhirObservations.Map((await phi.ObservationsAsync(patient, key, null, FhirObservations.LeftOut, 1, cancel)).Entries).SingleOrDefault(),
+            "Observation" => FhirObservations.Map((await phi.ObservationsAsync(patient, key, null, 1, cancel)).Entries).Select(mapped => mapped.Resource).SingleOrDefault(),
             _ => (await phi.AllAppointmentsAsync(patient, key, 1, cancel)).Entries.Select(FhirResources.Appointment).SingleOrDefault(),
         };
         return resource is null ? Refusal(StatusCodes.Status404NotFound) : Answer(StatusCodes.Status200OK, resource);

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Nodes;
 using Ehr.Data.Patients;
 using Xunit;
 using static Ehr.Web.Tests.FhirRequests;
@@ -21,12 +22,13 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 //   MedicationStatement, Condition, Observation and Appointment; on the on-site app.
 // Test data: Patient "Synthetic Fhirchart"; penicillin G (RxNorm 7980) and peanut (UNII QE1QX6B99R); lisinopril (RxNorm
 //   314076); hypertension (ICD-10-CM I10); hemoglobin A1c 6.9 % (LOINC 4548-4) and thyrotropin 2.1 "mIU/L" (3016-3);
-//   vital signs 128/82 mmHg, 72/min, 36.8 Cel, 16/min, 97 %, 70.5 kg, 172 cm; appointments "Synthetic: blood pressure
+//   vital signs 128/82 mmHg (one blood pressure reading), 72/min, 36.8 Cel, 16/min, 97 %, 70.5 kg, 172 cm; appointments "Synthetic: blood pressure
 //   check" and "Synthetic: medication review", cancelled with "Synthetic: the patient asked to move it".
 // Steps:
 //   1. Read the capability statement.
 //   2. Read the patient by ID, then search for them by MRN, bare and with the system.
-//   3. Search each kind of entry by the patient, then read one or two of each by ID.
+//   3. Search each kind of entry by the patient, then read one or two of each by ID: the blood pressure by its
+//      reading's ID, and then by the ID of each of its two values.
 //   4. Count the reads recorded about the patient.
 // Expected result: Every answer is application/fhir+json, Cache-Control no-store, and parses strictly and validates
 //   against R4 and the profiles it claims, with no error or warning. Step 1 lists the six types, read and search-type
@@ -34,10 +36,12 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 //   date; each search finds the one patient, with its address under the configured site address. Step 3: each code
 //   with its system (RxNorm, UNII, ICD-10-CM, LOINC), the hemoglobin A1c in UCUM and the thyrotropin's unit as text
 //   only; each vital sign in the vital-signs category, in UCUM, claiming its R4 profile (oxygen saturation the base
-//   vital-signs profile); no blood pressure reading, and a note that they aren't served yet; times in UTC; the
-//   appointments with their status, start, end, length, reason and participants, and the cancellation's reason; the
-//   sensitive medication and diagnosis left out. Step 4: one recorded read for each request of steps 2 and 3, fifteen,
-//   and none for step 1; no read of sensitive items.
+//   vital-signs profile); the blood pressure as one Observation whose id is the reading's, LOINC 85354-9, claiming the
+//   bp profile, with its systolic (8480-6) and diastolic (8462-4) as components in mm[Hg] with their reference ranges,
+//   and neither value an Observation of its own (by its own ID, 404); the same panel without its diastolic fails the bp
+//   profile; times in UTC; the appointments with their status, start, end, length, reason and participants, and the
+//   cancellation's reason; the sensitive medication and diagnosis left out. Step 4: one recorded read for each answered
+//   request of steps 2 and 3, sixteen, and none for step 1 or the two not found; no read of sensitive items.
 // Creator: Tahseen Arnan
 public class TC_UC19_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -97,8 +101,9 @@ public class TC_UC19_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         var observations = await GetAsync(client, $"/fhir/Observation?patient={chart.Patient}");
         var (_, found2, notes) = Searched<R4.Observation>(observations);
         var byCode = found2.ToDictionary(o => o.Code!.Coding.Single().Code!);
-        Assert.Equal(["29463-7", "3016-3", "39156-5", "4548-4", "59408-5", "8302-2", "8310-5", "8867-4", "9279-1"], byCode.Keys.Order(StringComparer.Ordinal));
-        Assert.Contains("Blood pressure readings are not served by this API yet.", notes);
+        Assert.Equal(["29463-7", "3016-3", "39156-5", "4548-4", "59408-5", "8302-2", "8310-5", "85354-9", "8867-4", "9279-1"],
+            byCode.Keys.Order(StringComparer.Ordinal));
+        Assert.Empty(notes);
         Assert.All(found2, o => Assert.Equal("http://loinc.org", o.Code.Coding.Single().System));
         var a1c = byCode["4548-4"];
         var a1cValue = Assert.IsType<R4.Quantity>(a1c.Value);
@@ -120,6 +125,20 @@ public class TC_UC19_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal((unit, "http://unitsofmeasure.org"), (quantity.Code, quantity.System));
         }
 
+        // The blood pressure: one Observation for the reading, its id the reading's, its two values as components.
+        var pressure = byCode["85354-9"];
+        Assert.Equal(chart.Reading.ToString(), pressure.Id);
+        Assert.Equal("http://hl7.org/fhir/StructureDefinition/bp", pressure.Meta!.Profile.Single());
+        Assert.Equal(("vital-signs", "Blood pressure", R4.ObservationStatus.Final, null),
+            (pressure.Category.Single().Coding.Single().Code, pressure.Code.Text, pressure.Status, pressure.Value));
+        Assert.Equal(["8480-6 128 mm[Hg] http://unitsofmeasure.org", "8462-4 82 mm[Hg] http://unitsofmeasure.org"], pressure.Component.Select(component =>
+        {
+            var quantity = Assert.IsType<R4.Quantity>(component.Value);
+            return $"{component.Code.Coding.Single().Code} {quantity.Value} {quantity.Code} {quantity.System}";
+        }));
+        Assert.All(pressure.Component, component => Assert.NotEmpty(component.ReferenceRange));
+        Assert.Equal(Assert.IsType<R4.FhirDateTime>(byCode[VitalSign.HeartRate].Effective).Value, Assert.IsType<R4.FhirDateTime>(pressure.Effective).Value);
+
         Assert.Matches("\"effectiveDateTime\":\"[0-9-]{10}T[0-9:.]+Z\"", observations.Json);
         // The column keeps four decimal places; the API drops the trailing zeros, so 70.5 kg is 70.5, not 70.5000.
         Assert.Contains("\"value\":70.5,", observations.Json);
@@ -127,6 +146,19 @@ public class TC_UC19_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         {
             Expect(await GetAsync(client, $"/fhir/Observation/{id}"), HttpStatusCode.OK);
         }
+
+        // The reading by its ID, valid against the bp profile; its values by theirs, not found.
+        var reading = Expect(await GetAsync(client, $"/fhir/Observation/{chart.Reading}"), HttpStatusCode.OK);
+        Assert.Equal(chart.Reading.ToString(), FhirConformance.Valid<R4.Observation>(reading.Json).Id);
+        foreach (var value in new[] { chart.Vitals[VitalSign.Systolic], chart.Vitals[VitalSign.Diastolic] })
+        {
+            Refused(await GetAsync(client, $"/fhir/Observation/{value}"), HttpStatusCode.NotFound, "not-found");
+        }
+
+        // The check is real: the same reading without its diastolic fails R4's bp profile.
+        var halved = JsonNode.Parse(reading.Json)!;
+        halved["component"]!.AsArray().RemoveAt(1);
+        Assert.Contains(FhirConformance.Problems(halved.ToJsonString()), problem => problem.Contains("DiastolicBP", StringComparison.Ordinal));
 
         // Appointments: booked, and cancelled with its reason.
         var (_, appointments, _) = Searched<R4.Appointment>(await GetAsync(client, $"/fhir/Appointment?patient={chart.Patient}"));
@@ -140,8 +172,9 @@ public class TC_UC19_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
             booked.Participant.Select(p => $"{p.Actor!.Reference} {p.Actor.Display}"));
         Assert.All(booked.Participant, p => Assert.Equal(R4.ParticipationStatus.Accepted, p.Status));
 
-        // 4. One read of the patient for each request of steps 2 and 3: three of the patient, three of allergies, two each
-        // of medications, diagnoses and appointments, three of results and vital signs. Nothing of sensitive items.
-        Assert.Equal((before.Reads + 15, before.Sensitive), await ReadsAsync(apps, chart.Clinician.Id, chart.Patient));
+        // 4. One read of the patient for each request of steps 2 and 3 that was answered: three of the patient, three of
+        // allergies, two each of medications, diagnoses and appointments, four of results and vital signs. Nothing of
+        // sensitive items, and nothing for the two values not found.
+        Assert.Equal((before.Reads + 16, before.Sensitive), await ReadsAsync(apps, chart.Clinician.Id, chart.Patient));
     }
 }

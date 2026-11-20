@@ -127,8 +127,9 @@ internal static class FhirResources
                 + "accepts no JSON is refused with 406. A search needs its patient (or, for Patient, the MRN), returns at most "
                 + $"{FhirApi.SearchLimit} entries, with total giving how many matched, and has no paging. {FhirApi.SearchOrder} A parameter not "
                 + "listed here is refused with 400, here as everywhere; _format is taken for JSON. Sensitive diagnoses and medications are left "
-                + "out unless show-sensitive=true is given, which is recorded, and are then marked restricted. Blood pressure readings are not "
-                + "served yet.",
+                + "out unless show-sensitive=true is given, which is recorded, and are then marked restricted. A blood pressure is one "
+                + "Observation for each reading, LOINC 85354-9 with its systolic and diastolic as components, whose id is the reading's: its "
+                + "two values are not Observations of their own.",
                 new RestSecurity(false,
                     "Sign in to the clinical app as a clinician (its cookie, with the second factor). A patient's records are served only while the "
                     + "patient is on your panel or under emergency access you started in the clinical app; each read is recorded as the pages' are."),

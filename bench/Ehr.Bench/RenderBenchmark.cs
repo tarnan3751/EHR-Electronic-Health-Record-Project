@@ -341,20 +341,32 @@ internal static partial class RenderBenchmark
 
     // The FHIR API (the expansion plan's step 11, UC 19), last, with generators of its own, so the rows above make the
     // requests they always did: a patient; their results and vital signs, the API's largest answer; their diagnoses
-    // with the sensitive ones asked for, a read of sensitive items; and an observation by ID, which asks whose it is
-    // before the gate. The observations' IDs come from the API itself, once, before the rows.
+    // with the sensitive ones asked for, a read of sensitive items; and a blood pressure reading by its ID, which asks
+    // whose it is before the gate and reads the reading's two values together. The searches and the reads go to the
+    // panel's patients who have a blood pressure reading, so the readings are always among what is measured; their
+    // readings' IDs come from the API itself, once, before the rows.
     static async Task<List<Result>> MeasureFhirAsync(HttpClient client, DatabaseTimes times, string prefix, List<Guid> panel)
     {
-        var observations = new List<Guid>();
-        foreach (var patient in panel.Take(20))
+        var measured = new List<Guid>();
+        var readings = new List<Guid>();
+        foreach (var patient in panel)
         {
-            using var found = JsonDocument.Parse(await client.GetStringAsync($"/fhir/Observation?patient={patient}"));
-            if (found.RootElement.TryGetProperty("entry", out var entries))
+            using var found = JsonDocument.Parse(await client.GetStringAsync($"/fhir/Observation?patient={patient}&category=vital-signs"));
+            var pressures = !found.RootElement.TryGetProperty("entry", out var entries)
+                ? []
+                : entries.EnumerateArray().Select(entry => entry.GetProperty("resource"))
+                    .Where(resource => resource.GetProperty("code").GetProperty("coding")[0].GetProperty("code").GetString() == "85354-9")
+                    .Select(resource => Guid.Parse(resource.GetProperty("id").GetString()!)).ToList();
+            if (pressures.Count > 0)
             {
-                observations.AddRange(entries.EnumerateArray()
-                    .Where(entry => entry.GetProperty("search").GetProperty("mode").GetString() == "match")
-                    .Select(entry => Guid.Parse(entry.GetProperty("resource").GetProperty("id").GetString()!)));
+                measured.Add(patient);
+                readings.AddRange(pressures);
             }
+        }
+
+        if (measured.Count < panel.Count / 2)
+        {
+            throw new InvalidOperationException($"Only {measured.Count} of the panel's {panel.Count} patients have a blood pressure reading to measure.");
         }
 
         var patients = new Random(20261125);
@@ -363,13 +375,13 @@ internal static partial class RenderBenchmark
         var byId = new Random(20261128);
         return
         [
-            await MeasureAsync(client, times, prefix + "FHIR patient, a patient on the panel", typing: false, () => $"/fhir/Patient/{panel[patients.Next(panel.Count)]}"),
+            await MeasureAsync(client, times, prefix + "FHIR patient, a patient on the panel", typing: false, () => $"/fhir/Patient/{measured[patients.Next(measured.Count)]}"),
             await MeasureAsync(client, times, prefix + "FHIR observations, a patient on the panel", typing: false,
-                () => $"/fhir/Observation?patient={panel[searched.Next(panel.Count)]}"),
+                () => $"/fhir/Observation?patient={measured[searched.Next(measured.Count)]}"),
             await MeasureAsync(client, times, prefix + "FHIR conditions with sensitive items, a patient on the panel", typing: false,
-                () => $"/fhir/Condition?patient={panel[sensitive.Next(panel.Count)]}&show-sensitive=true"),
+                () => $"/fhir/Condition?patient={measured[sensitive.Next(measured.Count)]}&show-sensitive=true"),
             await MeasureAsync(client, times, prefix + "FHIR observation by ID, a patient on the panel", typing: false,
-                () => $"/fhir/Observation/{observations[byId.Next(observations.Count)]}"),
+                () => $"/fhir/Observation/{readings[byId.Next(readings.Count)]}"),
         ];
     }
 

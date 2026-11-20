@@ -212,4 +212,9 @@ public sealed record PatientEntries<T>(IReadOnlyList<T> Entries, int Total)
 
 // A test result or vital sign for the FHIR API, and whether its unit is the UCUM unit the reference data gives its code
 // (ehr.observation_codes), which is what lets the API call it a UCUM unit.
-public sealed record ObservationEntry(Observation Observation, bool UcumUnit);
+public sealed record ObservationEntry(Observation Observation, bool UcumUnit)
+{
+    // For a blood pressure, whose entry is its reading (step 9c): this is the systolic value, and this the diastolic of
+    // the same reading.
+    public ObservationEntry? Diastolic { get; init; }
+}
