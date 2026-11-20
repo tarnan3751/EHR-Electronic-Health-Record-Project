@@ -9,11 +9,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ehr.Web.Areas.Clinical.Pages.Patients.Vitals;
 
-// A patient's vital signs (the expansion plan's step 9): the flowsheet, the latest sets side by side; a trend for each
-// sign with more than one value; and recording a new set. Open to whoever the chart is open to; only a clinician with
-// the patient on their panel records (MessagePage's gate). The database names each sign, gives it its unit and
-// reference range, and works out the body mass index (db/policies/75-results.sql). Off-site it is read from the cloud
-// copy and the form's post is forwarded to the clinic's server.
+// A patient's vital signs (the expansion plan's step 9): the flowsheet, the latest sets side by side, a blood pressure
+// as one reading (step 9c); a trend for each sign with more than one value; and recording a new set. Open to whoever
+// the chart is open to; only a clinician with the patient on their panel records (MessagePage's gate). The database
+// names each sign, gives it its unit and reference range, and works out the body mass index
+// (db/policies/75-results.sql). Off-site it is read from the cloud copy and the form's post is forwarded to the
+// clinic's server.
 [ShownIfNotSaved(
     "Values[8480-6]", "Values[8462-4]", "Values[8867-4]", "Values[8310-5]", "Values[9279-1]", "Values[59408-5]", "Values[29463-7]", "Values[8302-2]",
     nameof(TakenAt))]
@@ -67,6 +68,17 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
     public Observation? At(string code, DateTimeOffset time) =>
         Vitals.Signs.FirstOrDefault(sign => sign.Code == code && sign.EffectiveAt == time && ObservationStatus.Released.Contains(sign.Status));
+
+    // The blood pressure that stands at a time, its two numbers from one reading (step 9c).
+    public BloodPressure? PressureAt(DateTimeOffset time) => Pressures.FirstOrDefault(pressure => pressure.TakenAt == time && pressure.Stands);
+
+    // The blood pressures entered in error at a time, each its reading's values, systolic first.
+    public IEnumerable<IReadOnlyList<Observation>> PressureErrorsAt(DateTimeOffset time) =>
+        Vitals.Signs.Where(sign => VitalSign.BloodPressure.Contains(sign.Code) && sign.EffectiveAt == time && sign.Status == ObservationStatus.EnteredInError)
+            .GroupBy(sign => sign.ReadingId)
+            .Select(reading => (IReadOnlyList<Observation>)[.. reading.OrderBy(sign => Array.IndexOf(VitalSign.All, sign.Code))]);
+
+    IReadOnlyList<BloodPressure> Pressures { get; set; } = [];
 
     public static bool IsOutside(Observation sign) =>
         (sign.ReferenceLow is { } low && sign.Value < low) || (sign.ReferenceHigh is { } high && sign.Value > high);
@@ -145,7 +157,9 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         }
 
         Vitals = read;
-        InError = read.Signs.Count(sign => sign.Status == ObservationStatus.EnteredInError);
+        // A blood pressure entered in error counts once: it is one reading (step 9c).
+        InError = read.Signs.Where(sign => sign.Status == ObservationStatus.EnteredInError).DistinctBy(sign => sign.ReadingId ?? sign.Id).Count();
+        Pressures = BloodPressure.Readings(read.Signs);
         // The sets shown: those with a value that stands, and, when entries in error are shown, theirs too.
         var times = read.Signs.Where(sign => ShowErrors ? sign.Status == ObservationStatus.EnteredInError || ObservationStatus.Released.Contains(sign.Status) : ObservationStatus.Released.Contains(sign.Status))
             .Select(sign => sign.EffectiveAt).Distinct().OrderByDescending(time => time).ToList();
@@ -153,7 +167,8 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         var columns = Earlier || ShowErrors ? EarlierColumns : Columns;
         Times = [.. times.Take(columns)];
         MoreSets = times.Count > columns;
-        Trends = Trend.From(read.Signs, VitalSign.All);
+        // A blood pressure's two numbers are charted for each whole reading read (step 9c).
+        Trends = Trend.From(BloodPressure.Whole(read.Signs), VitalSign.All);
         return null;
     }
 }

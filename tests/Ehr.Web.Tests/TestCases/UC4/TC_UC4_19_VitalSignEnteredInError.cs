@@ -24,14 +24,15 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Choose "Show entries in error".
 //   3. Record 108/92 for yesterday's time; then 108/95; then weight 79 with height 180.
 //   4. Open the chart, the offline copy, and the patient's portal results.
-// Expected result: Step 1: "Marked: 2 readings"; the page says 4 readings are marked (the diastolic pressure is marked
-//   with the systolic, a blood pressure being one reading, step 9c; and the body mass index worked out from the
-//   weight with it); yesterday's column no longer has 180, 92, 81 or the body mass index; there is no blood pressure
-//   trend (one of each value stands). The readings are in the database as entered-in-error with the reason, the
-//   clinician and the time. Step 2: 180, 92, 81 and 25 are shown struck through, with the reason in words. Step 3:
-//   108/92 is saved, a new reading; yesterday's column shows 108 and the systolic trend returns, "Latest 126 mmHg, up
-//   from 108"; 108/95 is refused, a blood pressure already standing for that time. Step 4: the chart's latest
-//   systolic is 126 "up from 108"; nothing anywhere shows 180; the portal charts systolic from 108 to 126.
+// Expected result: Step 1: "Marked: 2 readings"; the page says 3 readings are marked (a blood pressure is one
+//   reading, both its numbers marked, step 9c; and the body mass index worked out from the weight is marked with
+//   it); yesterday's column no longer has 180/92, 81 or the body mass index; there is no blood pressure trend (one of
+//   each value stands). The four values are in the database as entered-in-error with the reason, the clinician and
+//   the time. Step 2: 180/92, 81 and 25 are shown struck through, with the reason in words. Step 3: 108/92 is saved,
+//   a new reading; yesterday's column shows 108/92 and the systolic trend returns, "Latest 126 mmHg, up from 108";
+//   108/95 is refused, a blood pressure already standing for that time. Step 4: the chart's latest blood pressure is
+//   126/80 "High" with no up or down mark, its numbers having moved opposite ways from 108/92; nothing anywhere
+//   shows 180; the portal charts systolic from 108 to 126.
 // Creator: Tahseen Arnan
 public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<WebApps>
 {
@@ -57,8 +58,8 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         using var marked = await MarkAsync(apps, session.Client, patient, yesterday + ":00", "Typed 180 for 108.", Systolic, Weight);
         var page = await ReadAsync(marked);
         Assert.Contains("Marked: 2 readings are marked entered in error", Words(page));
-        Assert.Contains("4 readings are marked entered in error and left out.", Words(page));
-        Assert.DoesNotContain("180", System.Text.RegularExpressions.Regex.Match(page, "(?s)<tbody>.*?Systolic blood pressure.*?</tr>").Value);
+        Assert.Contains("3 readings are marked entered in error and left out.", Words(page));
+        Assert.DoesNotContain("180", System.Text.RegularExpressions.Regex.Match(page, "(?s)<tbody>.*?Blood pressure.*?</tr>").Value);
         Assert.DoesNotContain($"data-trend=\"{Systolic}\"", page);
         Assert.DoesNotContain($"data-trend=\"{Diastolic}\"", page);
         Assert.DoesNotContain("sc-struck", page);
@@ -71,8 +72,8 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
             patient));
 
         var shown = await session.Client.GetStringAsync(Path(patient) + "?showErrors=true", Cancel);
-        Assert.Matches("(?s)<span class=\"sc-struck\" data-in-error><s>180</s> <span class=\"sc-struck__reason\">entered in error: Typed 180 for 108.</span>", shown);
-        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(shown, "<span class=\"sc-struck\" data-in-error>").Count);
+        Assert.Matches("(?s)<span class=\"sc-struck\" data-in-error><s>180/92</s> <span class=\"sc-struck__reason\">entered in error: Typed 180 for 108.</span>", shown);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(shown, "<span class=\"sc-struck\" data-in-error>").Count);
 
         // The blood pressure typed again, both numbers: a new reading.
         using var corrected = await RecordAtAsync(session.Client, patient, yesterday, (Systolic, "108"), (Diastolic, "92"));
@@ -91,7 +92,8 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         Assert.Contains($"{BodyMassIndex} 24.4 final", await StatesAsync(apps, patient));
 
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Matches("(?s)<strong>Systolic blood pressure</strong>\\s*126 mmHg\\s*<span class=\"sc-trendmark\" data-direction=\"up\">.*?up from 108</span>", chart);
+        // 108/92 to 126/80: one number up, the other down, so no mark (step 9c). High: the diastolic is above 79.
+        Assert.Matches("(?s)<strong>Blood pressure</strong>\\s*126/80 mmHg\\s*<span class=\"sc-tag sc-tag--warning\">High</span>\\s*<span class=\"sc-muted\">", chart);
         Assert.Matches("(?s)<strong>Weight</strong>\\s*79 kg", chart);
         var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);

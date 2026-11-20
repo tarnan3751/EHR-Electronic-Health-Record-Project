@@ -273,20 +273,21 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var vital in Model.Chart.LatestVitals)
                 {
                     <li>
-                        <strong>@Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display)</strong>
-                        @vital.Value.ToString("0.#") @Ehr.Domain.Results.Units.Shown(vital.Unit)
-                        @if (vital.Value > vital.ReferenceHigh)
+                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range. *@
+                        <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
+                        @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
+                        @if (vital.IsHigh)
                         {
                             <span class="sc-tag sc-tag--warning">High</span>
                         }
-                        else if (vital.Value < vital.ReferenceLow)
+                        @if (vital.IsLow)
                         {
                             <span class="sc-tag sc-tag--warning">Low</span>
                         }
                         @* Up or down against the reading before it (step 9b), in a shape and in words. *@
-                        @if (vital.Previous is { } previous && previous != vital.Value)
+                        @if (vital.Direction is { } direction)
                         {
-                            <span class="sc-trendmark" data-direction="@(vital.Value > previous ? "up" : "down")"><span aria-hidden="true">@(vital.Value > previous ? "▲" : "▼")</span><span class="sc-visually-hidden">@(vital.Value > previous ? "up" : "down") from @previous.ToString("0.#")</span></span>
+                            <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
                         }
                         <span class="sc-muted">· @vital.TakenAt.UtcDateTime.ToString("yyyy-MM-dd") UTC</span>
                     </li>

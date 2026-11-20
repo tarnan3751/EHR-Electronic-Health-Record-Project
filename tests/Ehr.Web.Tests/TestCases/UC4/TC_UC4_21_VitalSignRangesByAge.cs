@@ -20,8 +20,8 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Record the same set for the child.
 // Expected result: Step 1: heart rate, respiratory rate and temperature are tagged High; 106/66 is not. Step 2: the
 //   heart rate and respiratory rate are not tagged (a three-year-old's ranges are 66 to 173 and 14 to 60); the
-//   systolic and diastolic pressures are tagged High (above 103 and 63); the temperature is tagged High, as the
-//   adult's is. Each stored reading has the range for the patient's age.
+//   blood pressure, one reading (step 9c), is tagged High (both numbers above 103 and 63); the temperature is tagged
+//   High, as the adult's is. Each stored value has the range for the patient's age.
 // Creator: Tahseen Arnan
 public class TC_UC4_21_VitalSignRangesByAge(WebApps apps) : IClassFixture<WebApps>
 {
@@ -52,11 +52,10 @@ public class TC_UC4_21_VitalSignRangesByAge(WebApps apps) : IClassFixture<WebApp
         Assert.Equal(["8310-5 36.1-37.5 high", $"{Diastolic} none-63 high", $"{Systolic} 72-103 high", $"{HeartRate} 66-173", "9279-1 14-60"], await RangesAsync(apps, child));
         static string Row(string page, string name) => System.Text.RegularExpressions.Regex.Match(page, $"(?s)<th scope=\"row\">{name}.*?</tr>").Value;
         Assert.Contains("High", Row(grown, "Heart rate"));
-        Assert.DoesNotContain("High", Row(grown, "Systolic blood pressure"));
+        Assert.DoesNotContain("High", Row(grown, "Blood pressure"));
         Assert.DoesNotContain("High", Row(young, "Heart rate"));
         Assert.DoesNotContain("High", Row(young, "Respiratory rate"));
-        Assert.Contains("High", Row(young, "Systolic blood pressure"));
-        Assert.Contains("High", Row(young, "Diastolic blood pressure"));
+        Assert.Contains("High", Row(young, "Blood pressure"));
         Assert.Contains("High", Row(young, "Body temperature"));
     }
 

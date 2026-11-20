@@ -105,8 +105,40 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var code in recorded)
+                @foreach (var code in recorded.Where(code => code != VitalSign.Diastolic || !recorded.Contains(VitalSign.Systolic)))
                 {
+                    if (VitalSign.BloodPressure.Contains(code))
+                    {
+                        @* A blood pressure is one reading (step 9c): its two numbers from one reading, flagged when either is outside its range. *@
+                        <tr>
+                            <th scope="row">Blood pressure <span class="sc-muted">(@Units.Shown(names[code].Unit))</span></th>
+                            @foreach (var time in Model.Times)
+                            {
+                                <td class="sc-table__mono">
+                                    @if (Model.PressureAt(time) is { } pressure)
+                                    {
+                                        @pressure.Text
+                                        @if (pressure.IsHigh)
+                                        {
+                                            <span class="sc-tag sc-tag--warning">High</span>
+                                        }
+                                        @if (pressure.IsLow)
+                                        {
+                                            <span class="sc-tag sc-tag--warning">Low</span>
+                                        }
+                                    }
+                                    @if (Model.ShowErrors)
+                                    {
+                                        foreach (var wrong in Model.PressureErrorsAt(time))
+                                        {
+                                            <span class="sc-struck" data-in-error><s>@string.Join("/", wrong.Select(value => value.Value!.Value.ToString("0.#")))</s> <span class="sc-struck__reason">entered in error: @wrong[0].EnteredInErrorReason</span></span>
+                                        }
+                                    }
+                                </td>
+                            }
+                        </tr>
+                        continue;
+                    }
                     <tr>
                         <th scope="row">@names[code].Display <span class="sc-muted">(@Units.Shown(names[code].Unit))</span></th>
                         @foreach (var time in Model.Times)
