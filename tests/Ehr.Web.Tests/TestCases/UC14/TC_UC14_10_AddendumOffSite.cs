@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 using static Ehr.Web.Tests.NoteAddendumTests;
@@ -41,6 +42,9 @@ public class TC_UC14_10_AddendumOffSite(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([$"{clinician.Id} false Synthetic addendum signed off-site."], await AddendaAsync(apps, patient));
         var token = Token(await session.Client.GetStringAsync(AddendumPath(patient, note), Cancel));
 
+        // The cut-off app learns the clinic's server is down from its audit shipper, every couple of seconds: make it
+        // look now, so the page is read knowing it, however soon after start-up this runs.
+        Assert.False(await apps.CloudCutOff.Services.GetRequiredService<Ehr.Web.CloudAudit.CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Client(apps.CloudCutOff, session.Jar);
         var readOnly = await cutOff.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.Contains(History, readOnly);
