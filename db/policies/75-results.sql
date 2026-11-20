@@ -50,17 +50,22 @@ BEGIN
 
         -- One moment of one patient at a time (step 9c): a value for a patient and time waits here while another
         -- transaction records one for the same, and then finds it, with its visit and its reading. Keyed on the
-        -- instant, not its text, so the session's time zone can't change the key.
+        -- instant, not its text, so the session's time zone can't change the key. And no visit of the patient starts
+        -- meanwhile: a check-in waits for this transaction, or this for the check-in, so the value is either there
+        -- for the check-in to tie to its visit or finds the visit itself (ehr.attach_vital_signs, below).
         PERFORM pg_advisory_xact_lock(hashtextextended('ehr.observations:' || NEW.patient_id::text || ':' || extract(epoch FROM NEW.effective_at)::text, 0));
+        PERFORM pg_advisory_xact_lock_shared(hashtextextended('ehr.encounters:' || NEW.patient_id::text, 0));
 
-        -- The visit it was taken at is decided once (step 9c), from the time it was taken, not the moment its row is
-        -- inserted. The first value recorded for the patient at that time decides it, and every later value of the
-        -- moment, standing or entered in error, takes the same visit whatever it names, so a check-in between two
-        -- values of one moment can't split them. For the first value: the patient's visit that was held and had
-        -- already begun when it was taken, within the twelve hours before, the latest of them, if there is one;
-        -- never a visit that began after it was taken, so a sign taken before a check-in has no visit whenever it is
-        -- typed. A visit the client names for the first value must be that one. The chart and the offline copy show
-        -- a visit's vital signs with the visit.
+        -- The visit it was taken at is decided from the time it was taken alone (steps 9c and, after Tahseen's answers,
+        -- 9c's follow-up), not the moment its row is inserted: the patient's visit that was held and began no later
+        -- than fifteen minutes after it was taken, within the twelve hours before, the latest of them, if there is
+        -- one. So a sign taken in the waiting room up to fifteen minutes before the check-in belongs to the visit. The
+        -- first value recorded for the patient at that time decides it, and every later value of the moment,
+        -- standing or entered in error, takes the same visit whatever it names, so a check-in between two values of
+        -- one moment can't split them; a check-in after the moment was recorded ties the whole moment to its visit
+        -- when the rule gives that visit (ehr.attach_vital_signs, below), so typing a set before or after the
+        -- check-in ends the same. A visit the client names for the first value must be the rule's. The chart and the
+        -- offline copy show a visit's vital signs with the visit.
         SELECT o.encounter_id, true INTO moment_visit, moment_known
         FROM ehr.observations o
         WHERE o.patient_id = NEW.patient_id AND o.category = 'vital-signs' AND o.effective_at = NEW.effective_at
@@ -70,12 +75,12 @@ BEGIN
             SELECT e.id INTO moment_visit
             FROM ehr.encounters e
             WHERE e.patient_id = NEW.patient_id AND e.status NOT IN ('planned', 'cancelled', 'entered-in-error')
-              AND e.period_start <= NEW.effective_at
+              AND e.period_start <= NEW.effective_at + interval '15 minutes'
               AND e.period_start >= NEW.effective_at - interval '12 hours'
             ORDER BY e.period_start DESC, e.id
             LIMIT 1;
             IF NEW.encounter_id IS NOT NULL AND NEW.encounter_id IS DISTINCT FROM moment_visit THEN
-                RAISE EXCEPTION 'A vital sign belongs to the visit of the same patient that was held and had begun when it was taken'
+                RAISE EXCEPTION 'A vital sign belongs to the visit of the same patient that was held when it was taken, or began within fifteen minutes after'
                     USING ERRCODE = '23514';
             END IF;
         END IF;
@@ -357,6 +362,46 @@ CREATE CONSTRAINT TRIGGER observations_reading_deleted
     FOR EACH ROW WHEN (OLD.reading_id IS NOT NULL)
     EXECUTE FUNCTION ehr.check_vital_reading();
 COMMIT;
+
+-- A check-in ties the vital signs already recorded to the visit it starts, when the rule ehr.file_result decides a
+-- moment's visit by (above) now gives this one (Tahseen's answer on step 9c): a moment taken up to fifteen minutes
+-- before the visit began, or after it began, within the twelve hours after, that has no visit or the visit of one that
+-- began before this one. So a sign's visit depends on the time it was taken alone, whether it was typed before the
+-- check-in or after it. A moment moves whole, every value of it, standing or entered in error, so a reading is never
+-- split, and its reading check (ehr.check_vital_reading) runs at the commit as for any change of visit. Only the
+-- visit's own patient's vital signs, and only their visit: nothing else changes. After the insert of a visit the
+-- apps make (a check-in, by a clinician with the patient on their panel, 30-rls.sql), as the tables' owner, since
+-- the apps may not change an observation's visit (10-grants.sql); the owner's own policy lets it
+-- (observations_owner_update, 30-rls.sql). Each value moved is a change of its visit, audited as any write is, as the
+-- person checking the patient in. It waits for any transaction recording a value for the patient, and they for it
+-- (the lock ehr.file_result takes), so none is missed.
+CREATE OR REPLACE FUNCTION ehr.attach_vital_signs() RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    -- As for filing (above): under a snapshot taken earlier, the update could miss a value committed since.
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
+        RAISE EXCEPTION 'A visit is started in a READ COMMITTED transaction' USING ERRCODE = '0A000';
+    END IF;
+    PERFORM pg_advisory_xact_lock(hashtextextended('ehr.encounters:' || NEW.patient_id::text, 0));
+
+    UPDATE ehr.observations o SET encounter_id = NEW.id
+    WHERE o.patient_id = NEW.patient_id AND o.category = 'vital-signs'
+      AND o.effective_at >= NEW.period_start - interval '15 minutes' AND o.effective_at <= NEW.period_start + interval '12 hours'
+      AND (o.encounter_id IS NULL
+           OR EXISTS (SELECT 1 FROM ehr.encounters e WHERE e.id = o.encounter_id AND e.period_start < NEW.period_start));
+    RETURN NULL;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.attach_vital_signs() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER encounters_attach_vital_signs
+    AFTER INSERT ON ehr.encounters
+    -- For a visit the apps start, as for filing (observations_file above); a visit that is only planned, or was
+    -- cancelled or entered in error, is not one a vital sign is taken at.
+    FOR EACH ROW WHEN (current_user IN ('ehr_app', 'ehr_read') AND NEW.status NOT IN ('planned', 'cancelled', 'entered-in-error'))
+    EXECUTE FUNCTION ehr.attach_vital_signs();
 
 CREATE OR REPLACE TRIGGER observations_complete_order
     AFTER INSERT ON ehr.observations
