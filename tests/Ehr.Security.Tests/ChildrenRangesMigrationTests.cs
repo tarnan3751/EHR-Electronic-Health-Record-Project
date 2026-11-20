@@ -54,15 +54,16 @@ public class ChildrenRangesMigrationTests(MigratedDatabase database) : IClassFix
             """,
             ("patient", patient), ("code", code), ("value", value), ("low", (object?)low ?? DBNull.Value), ("high", (object?)high ?? DBNull.Value), ("taken", Taken));
 
-    // A blood pressure, one reading (step 9c), as step 9b ranged it.
-    Task InsertPressureAsync(Guid patient, decimal systolic, decimal? systolicLow, decimal? systolicHigh, decimal diastolic, decimal? diastolicLow, decimal? diastolicHigh) =>
+    // A blood pressure, one reading (step 9c), as step 9b ranged it; standing, or entered in error.
+    Task InsertPressureAsync(Guid patient, decimal systolic, decimal? systolicLow, decimal? systolicHigh, decimal diastolic, decimal? diastolicLow, decimal? diastolicHigh,
+        string status = "final") =>
         Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             """
             INSERT INTO ehr.observations (id, patient_id, reading_id, category, code, display, status, value, reference_low, reference_high, effective_at, issued_at)
-            VALUES (gen_random_uuid(), @patient, @reading, 'vital-signs', '8480-6', 'Synthetic', 'final', @systolic, @systolic_low, @systolic_high, @taken, @taken),
-                   (gen_random_uuid(), @patient, @reading, 'vital-signs', '8462-4', 'Synthetic', 'final', @diastolic, @diastolic_low, @diastolic_high, @taken, @taken)
+            VALUES (gen_random_uuid(), @patient, @reading, 'vital-signs', '8480-6', 'Synthetic', @status, @systolic, @systolic_low, @systolic_high, @taken, @taken),
+                   (gen_random_uuid(), @patient, @reading, 'vital-signs', '8462-4', 'Synthetic', @status, @diastolic, @diastolic_low, @diastolic_high, @taken, @taken)
             """,
-            ("patient", patient), ("reading", Guid.CreateVersion7()), ("taken", Taken), ("systolic", systolic), ("systolic_low", (object?)systolicLow ?? DBNull.Value),
+            ("patient", patient), ("reading", Guid.CreateVersion7()), ("taken", Taken), ("status", status), ("systolic", systolic), ("systolic_low", (object?)systolicLow ?? DBNull.Value),
             ("systolic_high", (object?)systolicHigh ?? DBNull.Value), ("diastolic", diastolic), ("diastolic_low", (object?)diastolicLow ?? DBNull.Value),
             ("diastolic_high", (object?)diastolicHigh ?? DBNull.Value));
 
@@ -81,23 +82,25 @@ public class ChildrenRangesMigrationTests(MigratedDatabase database) : IClassFix
 
     static readonly string[] Report =
     [
-        "Migration 9d: heart rate (8867-4): 2 readings re-ranged",
+        "Migration 9d: heart rate (8867-4): 2 standing values re-ranged",
         "Migration 9d: heart rate (8867-4): 1 newly flagged (1 High)",
         "Migration 9d: heart rate (8867-4): 0 no longer flagged",
         "Migration 9d: heart rate (8867-4): 0 changed from one flag to another",
-        "Migration 9d: respiratory rate (9279-1): 1 readings re-ranged",
+        "Migration 9d: respiratory rate (9279-1): 1 standing values re-ranged",
         "Migration 9d: respiratory rate (9279-1): 1 newly flagged (1 High)",
         "Migration 9d: respiratory rate (9279-1): 0 no longer flagged",
         "Migration 9d: respiratory rate (9279-1): 0 changed from one flag to another",
-        "Migration 9d: systolic blood pressure (8480-6): 5 readings re-ranged",
+        "Migration 9d: systolic blood pressure (8480-6): 5 standing values re-ranged",
         "Migration 9d: systolic blood pressure (8480-6): 2 newly flagged (2 needs follow-up)",
         "Migration 9d: systolic blood pressure (8480-6): 1 no longer flagged (1 Low)",
         "Migration 9d: systolic blood pressure (8480-6): 1 changed from one flag to another (1 High to needs follow-up)",
-        "Migration 9d: diastolic blood pressure (8462-4): 4 readings re-ranged",
+        "Migration 9d: diastolic blood pressure (8462-4): 4 standing values re-ranged",
         "Migration 9d: diastolic blood pressure (8462-4): 2 newly flagged (2 needs follow-up)",
         "Migration 9d: diastolic blood pressure (8462-4): 0 no longer flagged",
         "Migration 9d: diastolic blood pressure (8462-4): 1 changed from one flag to another (1 High to needs follow-up)",
-        "Migration 9d: in all, 12 readings re-ranged; 6 newly flagged, 1 no longer flagged, 2 changed from one flag to another",
+        "Migration 9d: blood pressure: 5 standing readings re-ranged; 2 newly flagged, 1 no longer flagged, 1 changed from one flag to another",
+        "Migration 9d: in all, 12 standing values re-ranged; 6 newly flagged, 1 no longer flagged, 2 changed from one flag to another",
+        "Migration 9d: 2 values entered in error re-ranged too, which no page flags",
     ];
 
     [Fact]
@@ -129,6 +132,10 @@ public class ChildrenRangesMigrationTests(MigratedDatabase database) : IClassFix
         var teen = await PatientAsync(clinician, new DateOnly(2009, 2, 1), "male");
         await InsertPressureAsync(teen, 118, 90, 119, 78, null, 79);
         await InsertAsync(teen, "8867-4", 70, 48, 138);
+        // A boy of 5 whose 112/70 was marked entered in error: given the new range too, but no page flags it, so it is
+        // counted apart.
+        var marked = await PatientAsync(clinician, new DateOnly(2021, 6, 1), "male");
+        await InsertPressureAsync(marked, 112, 72, 103, 70, null, 63, status: "entered-in-error");
         // An adult, whose ranges don't change.
         var adult = await PatientAsync(clinician, new DateOnly(1980, 1, 1), "female");
         await InsertPressureAsync(adult, 120, 90, 129, 80, 60, 79);
@@ -144,6 +151,7 @@ public class ChildrenRangesMigrationTests(MigratedDatabase database) : IClassFix
         Assert.Equal(["9279-1 30 14-25 normal"], await RangesAsync(ten));
         Assert.Equal(["8462-4 53 none-52 screening", "8480-6 99 none-98 screening"], await RangesAsync(other));
         Assert.Equal(["8462-4 78 none-80 screening", "8480-6 118 none-120 screening", "8867-4 70 43-104 normal"], await RangesAsync(teen));
+        Assert.Equal(["8462-4 70 none-63 screening", "8480-6 112 none-103 screening"], await RangesAsync(marked));
         Assert.Equal(["8462-4 80 60-79 normal", "8480-6 120 90-129 normal", "8867-4 72 60-100 normal"], await RangesAsync(adult));
         // The ranges themselves, as db/reference loads them; no audit event; the protection back.
         Assert.Equal(["82"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.vital_reference_ranges"));

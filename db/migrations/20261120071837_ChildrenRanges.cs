@@ -89,13 +89,15 @@ namespace Ehr.Migrations
             // migrations: the table is given them now, where the codes they name are loaded (a database being set up
             // has none yet, and db/reference fills it), so that readings and ranges agree the moment this ends. Every
             // vital sign of these four is then given the range for the patient's age on the day it was taken and sex,
-            // as ehr.file_result gives one (db/policies/75-results.sql), entries in error too. As in VitalCorrections:
+            // as ehr.file_result gives one (db/policies/75-results.sql), values entered in error too. As in VitalCorrections:
             // forced row-level security is lifted on observations for the owner while it runs and the audit trigger
             // paused, since no value changes; the patients table is read through its owner's policy. Only the range
             // columns change, which the readings' check (observations_reading_changed) doesn't run for, so nothing is
-            // left waiting at the commit. It reports, for each sign, how many readings were re-ranged and how their
-            // flags changed, and the totals, with RAISE NOTICE, which the migration job prints (DatabaseNotices). Its
-            // run time is in docs/expansion/PLAN.md's log, step 9d.
+            // left waiting at the commit. It reports, with RAISE NOTICE, which the migration job prints
+            // (DatabaseNotices): for each sign, how many standing values were re-ranged and how their flags changed;
+            // the same for blood pressure counted in readings, as the pages show it; the totals; and, apart, how many
+            // values entered in error were re-ranged, which no page flags. Its run time is in docs/expansion/PLAN.md's
+            // decision log, step 9d.
             migrationBuilder.Sql("""
                 DO $$
                 DECLARE
@@ -105,6 +107,9 @@ namespace Ehr.Migrations
                     change record;
                     counted bigint;
                     detail text;
+                    newly bigint;
+                    cleared bigint;
+                    switched bigint;
                 BEGIN
                     CREATE TEMPORARY TABLE ranges_now (code text, sex text, from_months int, to_months int, low numeric, high numeric, kind text, source text) ON COMMIT DROP;
                     INSERT INTO ranges_now (code, sex, from_months, to_months, low, high, kind, source) VALUES
@@ -283,16 +288,18 @@ namespace Ehr.Migrations
                         ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
                     END IF;
 
-                    -- Each reading's range now, beside the one it had: for a sex other than male or female, the higher low
+                    -- Each value's range now, beside the one it had: for a sex other than male or female, the higher low
                     -- and the lower high of both sexes' rows; none for a blood pressure under 1 year.
                     CREATE TEMPORARY TABLE regraded ON COMMIT DROP AS
                     WITH aged AS (
-                        SELECT o.id, o.code, o.value, o.reference_low, o.reference_high, o.reference_kind, p.gender,
+                        SELECT o.id, o.code, o.value, o.status <> 'entered-in-error' AS standing, o.reading_id, o.reference_low, o.reference_high,
+                            o.reference_kind, p.gender,
                             greatest(0, (extract(year FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
                                 + extract(month FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int) AS months
                         FROM ehr.observations o JOIN ehr.patients p ON p.id = o.patient_id
                         WHERE o.category = 'vital-signs' AND o.code IN (SELECT code FROM ranges_now))
-                    SELECT a.id, a.code, a.value, a.reference_low AS old_low, a.reference_high AS old_high, a.reference_kind AS old_kind, n.low, n.high, n.kind
+                    SELECT a.id, a.code, a.value, a.standing, a.reading_id, a.reference_low AS old_low, a.reference_high AS old_high, a.reference_kind AS old_kind,
+                        n.low, n.high, n.kind
                     FROM aged a
                     CROSS JOIN LATERAL (
                         SELECT max(r.low) AS low, min(r.high) AS high, coalesce(max(r.kind), 'normal') AS kind
@@ -300,15 +307,16 @@ namespace Ehr.Migrations
                         WHERE r.code = a.code AND a.months >= r.from_months AND (r.to_months IS NULL OR a.months < r.to_months)
                           AND (r.sex = 'any' OR r.sex = a.gender OR a.gender NOT IN ('male', 'female'))) n;
 
-                    -- The flags before and after, as the pages work them out (Ehr.Domain's VitalFlag).
+                    -- Each value's flag before and after, as the pages work them out (Ehr.Domain's VitalFlag), and whether
+                    -- its range changes. Only standing values are flagged on a page, so only they are counted as flags;
+                    -- values entered in error are given the new range too, and counted apart.
                     CREATE TEMPORARY TABLE flag_moves ON COMMIT DROP AS
-                    SELECT code,
+                    SELECT code, standing, reading_id, (old_low, old_high, old_kind) IS DISTINCT FROM (low, high, kind) AS changed,
                         CASE WHEN old_kind = 'screening' THEN CASE WHEN value >= old_high THEN 'needs follow-up' END
                              WHEN value > old_high THEN 'High' WHEN value < old_low THEN 'Low' END AS before,
                         CASE WHEN kind = 'screening' THEN CASE WHEN value >= high THEN 'needs follow-up' END
                              WHEN value > high THEN 'High' WHEN value < low THEN 'Low' END AS after
-                    FROM regraded
-                    WHERE (old_low, old_high, old_kind) IS DISTINCT FROM (low, high, kind);
+                    FROM regraded;
 
                     UPDATE ehr.observations o SET reference_low = g.low, reference_high = g.high, reference_kind = g.kind
                     FROM regraded g
@@ -325,8 +333,8 @@ namespace Ehr.Migrations
                         SELECT * FROM (VALUES (1, '8867-4', 'heart rate'), (2, '9279-1', 'respiratory rate'), (3, '8480-6', 'systolic blood pressure'),
                             (4, '8462-4', 'diastolic blood pressure')) s(place, code, name) ORDER BY place
                     LOOP
-                        SELECT count(*) INTO counted FROM flag_moves m WHERE m.code = sign.code;
-                        RAISE NOTICE 'Migration 9d: % (%): % readings re-ranged', sign.name, sign.code, counted;
+                        SELECT count(*) INTO counted FROM flag_moves m WHERE m.code = sign.code AND m.standing AND m.changed;
+                        RAISE NOTICE 'Migration 9d: % (%): % standing values re-ranged', sign.name, sign.code, counted;
                         FOR change IN
                             SELECT * FROM (VALUES (1, 'newly flagged'), (2, 'no longer flagged'), (3, 'changed from one flag to another')) c(place, name) ORDER BY place
                         LOOP
@@ -335,7 +343,7 @@ namespace Ehr.Migrations
                                 SELECT count(*) AS n,
                                     CASE change.place WHEN 1 THEN m.after WHEN 2 THEN m.before ELSE m.before || ' to ' || m.after END AS what
                                 FROM flag_moves m
-                                WHERE m.code = sign.code
+                                WHERE m.code = sign.code AND m.standing AND m.changed
                                   AND CASE change.place
                                       WHEN 1 THEN m.before IS NULL AND m.after IS NOT NULL
                                       WHEN 2 THEN m.before IS NOT NULL AND m.after IS NULL
@@ -344,10 +352,28 @@ namespace Ehr.Migrations
                             RAISE NOTICE 'Migration 9d: % (%): % %', sign.name, sign.code, counted, change.name || detail;
                         END LOOP;
                     END LOOP;
-                    RAISE NOTICE 'Migration 9d: in all, % readings re-ranged; % newly flagged, % no longer flagged, % changed from one flag to another',
-                        (SELECT count(*) FROM flag_moves), (SELECT count(*) FROM flag_moves WHERE before IS NULL AND after IS NOT NULL),
-                        (SELECT count(*) FROM flag_moves WHERE before IS NOT NULL AND after IS NULL),
-                        (SELECT count(*) FROM flag_moves WHERE before IS NOT NULL AND after IS NOT NULL AND before <> after);
+                    -- Blood pressure as the pages show it, one reading of two values with the flags of both: the standing
+                    -- readings with a value re-ranged.
+                    SELECT count(*), count(*) FILTER (WHERE r.before = '{}' AND r.after <> '{}'), count(*) FILTER (WHERE r.before <> '{}' AND r.after = '{}'),
+                        count(*) FILTER (WHERE r.before <> '{}' AND r.after <> '{}' AND r.before <> r.after)
+                    INTO counted, newly, cleared, switched
+                    FROM (
+                        SELECT coalesce(array_agg(DISTINCT m.before ORDER BY m.before) FILTER (WHERE m.before IS NOT NULL), '{}') AS before,
+                            coalesce(array_agg(DISTINCT m.after ORDER BY m.after) FILTER (WHERE m.after IS NOT NULL), '{}') AS after
+                        FROM flag_moves m
+                        WHERE m.standing AND m.reading_id IS NOT NULL
+                        GROUP BY m.reading_id
+                        HAVING bool_or(m.changed)) r;
+                    RAISE NOTICE 'Migration 9d: blood pressure: % standing readings re-ranged; % newly flagged, % no longer flagged, % changed from one flag to another',
+                        counted, newly, cleared, switched;
+                    SELECT count(*), count(*) FILTER (WHERE before IS NULL AND after IS NOT NULL), count(*) FILTER (WHERE before IS NOT NULL AND after IS NULL),
+                        count(*) FILTER (WHERE before IS NOT NULL AND after IS NOT NULL AND before <> after)
+                    INTO counted, newly, cleared, switched
+                    FROM flag_moves WHERE standing AND changed;
+                    RAISE NOTICE 'Migration 9d: in all, % standing values re-ranged; % newly flagged, % no longer flagged, % changed from one flag to another',
+                        counted, newly, cleared, switched;
+                    SELECT count(*) INTO counted FROM flag_moves WHERE NOT standing AND changed;
+                    RAISE NOTICE 'Migration 9d: % values entered in error re-ranged too, which no page flags', counted;
                 END
                 $$;
                 """);
