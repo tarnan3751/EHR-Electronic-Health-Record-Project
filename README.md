@@ -52,7 +52,7 @@ Folders describe their intended contents; most are still empty.
 
 ```
 src/
-  Ehr.Web/          ASP.NET Core Razor Pages host: Areas/Clinical, Areas/Portal, Api/Sync, Api/Dictation
+  Ehr.Web/          ASP.NET Core Razor Pages host: Areas/Clinical, Areas/Portal, Api/Sync, Api/Dictation, Api/Fhir
   Ehr.Domain/       services, authorization policies, PHI reader, FHIR-shaped models
   Ehr.Data/         EF Core + Dapper on Npgsql: read and write contexts, RLS interceptor
   Ehr.Design/       Razor class library: the SwiftChart tokens, shared CSS, fonts and logos (wwwroot), shared partials, htmx, Alpine.js
@@ -240,15 +240,15 @@ A read-only FHIR R4 API, on both servers, for clinicians (`src/Ehr.Web/Api/Fhir`
 | Request | What it returns |
 |---|---|
 | `GET /fhir/metadata` | The capability statement: what is served, and how |
-| `GET /fhir/Patient/{id}`, `GET /fhir/Patient?identifier={MRN}` | The patient. The MRN can also be given as `http://swiftchart.example/fhir/sid/mrn\|{MRN}` |
+| `GET /fhir/Patient/{id}`, `GET /fhir/Patient?identifier={MRN}` | The patient. The MRN can also be given as `http://swiftchart.example/fhir/sid/mrn\|{MRN}`. A search by MRN finds a patient only when you may read their record: any other MRN, a patient's or nobody's, gets the same empty Bundle, and nothing is recorded |
 | `GET /fhir/{type}?patient={id}` | A `searchset` Bundle of the patient's entries: `AllergyIntolerance`, `MedicationStatement`, `Condition`, `Observation` (also `&category=laboratory` or `vital-signs`) and `Appointment` |
 | `GET /fhir/{type}/{id}` | One entry |
 
-- **Only a patient on the clinician's panel**, or under emergency access already started in the clinical app; otherwise 403. Each request is one recorded read of the patient, as a page's is, and off-site it goes through the cloud app's audit queue before the answer is sent.
+- **Only a patient on the clinician's panel**, or under emergency access already started in the clinical app; otherwise 403 (or, for a search by MRN, nothing found). Each request is one recorded read of the patient, as a page's is, and off-site it goes through the cloud app's audit queue before the answer is sent.
 - **Sensitive diagnoses and medications** are left out unless `show-sensitive=true` is added, which is recorded as the chart's "Show sensitive items" is; they then carry `meta.security` R (restricted).
 - **Blood pressure readings are not served yet**, until how a systolic is paired with its diastolic is decided (`docs/expansion/PLAN.md`, step 11). The other vital signs claim R4's vital-sign profiles.
-- **A search** returns at most 600 entries, the latest first, with `total` giving how many matched, and no paging. A parameter the capability statement doesn't list is refused with 400; any method but GET with 405.
-- **Every answer** is `application/fhir+json`, `Cache-Control: no-store`, with no CORS headers.
+- **A search** returns at most 600 entries, with `total` giving how many matched, and no paging. Each type comes newest first by its own date: allergies by when they were recorded, medications by when they were started, diagnoses by onset, results and vital signs by when they were taken, appointments by their start; entries with no date last. A parameter the capability statement doesn't list is refused with 400, at `/fhir/metadata` too; any method but GET with 405.
+- **Every answer** is `application/fhir+json`, `Cache-Control: no-store`, with no CORS headers. A request whose `Accept` header takes no JSON is refused with 406 (`_format=json` overrides it).
 - **Conformance** is checked in the tests with the Firely .NET SDK (BSD-3-Clause), offline: every answer is parsed strictly and validated against R4's definitions and the profiles it claims (`tests/Ehr.Web.Tests/FhirConformance.cs`). The app itself writes the JSON and has no FHIR package.
 
 ## Database changes

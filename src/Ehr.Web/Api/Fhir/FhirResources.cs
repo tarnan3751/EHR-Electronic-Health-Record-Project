@@ -123,10 +123,12 @@ internal static class FhirResources
         [
             new Rest(
                 "server",
-                "Read-only: reads and searches by patient, nothing else. Every response is application/fhir+json, never cached. A search needs its "
-                + $"patient (or, for Patient, the MRN), returns at most {FhirApi.SearchLimit} entries, the latest first, with total giving how many matched, "
-                + "and has no paging; a parameter not listed here is refused with 400. Sensitive diagnoses and medications are left out unless "
-                + "show-sensitive=true is given, which is recorded, and are then marked restricted. Blood pressure readings are not served yet.",
+                "Read-only: reads and searches by patient, nothing else. Every response is application/fhir+json, never cached; a request that "
+                + "accepts no JSON is refused with 406. A search needs its patient (or, for Patient, the MRN), returns at most "
+                + $"{FhirApi.SearchLimit} entries, with total giving how many matched, and has no paging. {FhirApi.SearchOrder} A parameter not "
+                + "listed here is refused with 400, here as everywhere; _format is taken for JSON. Sensitive diagnoses and medications are left "
+                + "out unless show-sensitive=true is given, which is recorded, and are then marked restricted. Blood pressure readings are not "
+                + "served yet.",
                 new RestSecurity(false,
                     "Sign in to the clinical app as a clinician (its cookie, with the second factor). A patient's records are served only while the "
                     + "patient is on your panel or under emergency access you started in the clinical app; each read is recorded as the pages' are."),
@@ -141,7 +143,8 @@ internal static class FhirResources
     static readonly Dictionary<(string Type, string Name), SearchParam> SearchParameters = new()
     {
         [("Patient", "identifier")] = new("identifier", "http://hl7.org/fhir/SearchParameter/Patient-identifier", "token",
-            $"The MRN, alone or as {MrnSystem}|MRN."),
+            $"The MRN, alone or as {MrnSystem}|MRN. Finds the patient only while you may read their record; any other MRN, a patient's or "
+            + "nobody's, finds nothing, the same empty Bundle, and nothing is recorded."),
         [("AllergyIntolerance", "patient")] = PatientParameter("clinical-patient"),
         [("MedicationStatement", "patient")] = PatientParameter("clinical-patient"),
         [("Condition", "patient")] = PatientParameter("clinical-patient"),

@@ -24,10 +24,8 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
     // A panel can't be narrowed, so it lists more: a lower cap would hide the clinician's own patients.
     public const int PanelLimit = 100;
 
-    // The longest a name and an MRN can be (PatientConfiguration).
+    // The longest a name can be (PatientConfiguration); an MRN's is PhiReader's.
     const int MaximumNameLength = 100;
-
-    const int MaximumMrnLength = 20;
 
     [BindProperty(SupportsGet = true)]
     public SearchQuery Search { get; set; } = SearchQuery.None;
@@ -124,13 +122,11 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
             }
         }
 
-        if (mrn is { Length: > MaximumMrnLength })
+        if (mrn is not null && !PhiReader.CouldBeMrn(mrn))
         {
-            problems.Add($"An MRN has at most {MaximumMrnLength} characters.");
-        }
-        else if (mrn?.Any(char.IsControl) == true)
-        {
-            problems.Add("The MRN has a control character in it. Type it again.");
+            problems.Add(mrn.Length > PhiReader.MaximumMrnLength
+                ? $"An MRN has at most {PhiReader.MaximumMrnLength} characters."
+                : "The MRN has a control character in it. Type it again.");
         }
 
         Problems = problems;

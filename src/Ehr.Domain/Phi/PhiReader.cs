@@ -341,6 +341,13 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // The shortest name a search takes. Every patient listed is a recorded read, and one letter matches hundreds.
     public const int MinimumNameLength = 2;
 
+    // The longest an MRN is (PatientConfiguration). A value longer than that, or with a control character in it, such
+    // as a NUL, which PostgreSQL refuses in text, can't be an MRN: the patient search page and the FHIR API refuse it
+    // before asking the database.
+    public const int MaximumMrnLength = 20;
+
+    public static bool CouldBeMrn(string mrn) => mrn.Length <= MaximumMrnLength && !mrn.Any(char.IsControl);
+
     // Patients matching every criterion given: a given or family name that starts with the name, in any case; the date
     // of birth; the MRN, exactly. At least one is required, and a name of at least MinimumNameLength characters.
     public Task<PatientList> SearchPatientsAsync(string? name, DateOnly? birthDate, string? mrn, int limit, CancellationToken cancellationToken)
@@ -1051,13 +1058,15 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return await EntriesAsync(patientId, only, all, sensitiveShown: false, sensitiveLeftOut: 0, limit, cancellationToken);
     }
 
-    // A patient's medications, every status but entered in error, by name. Sensitive ones only when asked for; like the
-    // chart, they are read either way and left out here, so the API can say how many it left out.
+    // A patient's medications, every status but entered in error, the latest started first, undated last. Sensitive ones
+    // only when asked for; like the chart, they are read either way and left out here, so the API can say how many it
+    // left out.
     public async Task<PatientEntries<MedicationStatement>> MedicationsAsync(Guid patientId, Guid? only, bool sensitive, int limit, CancellationToken cancellationToken)
     {
         var all = await db.MedicationStatements.AsNoTracking()
             .Where(m => m.PatientId == patientId && (only == null || m.Id == only) && m.Status != MedicationStatementStatus.EnteredInError)
-            .OrderBy(m => m.Display).ThenBy(m => m.Id).ToListAsync(cancellationToken);
+            .OrderBy(m => m.EffectiveStart == null).ThenByDescending(m => m.EffectiveStart).ThenBy(m => m.Display).ThenBy(m => m.Id)
+            .ToListAsync(cancellationToken);
         var left = sensitive ? 0 : all.RemoveAll(m => m.Sensitive);
         return await EntriesAsync(patientId, only, all, sensitive, left, limit, cancellationToken);
     }
@@ -1084,8 +1093,9 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         var entries = await matching.OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).ThenBy(o => o.Id).Take(limit)
             .Select(o => new ObservationEntry(o, db.ObservationCodes.Any(c => c.Code == o.Code && c.Unit == o.Unit)))
             .ToListAsync(cancellationToken);
-        // Only a number, about the rows already read: counted only when the limit cut the list.
-        var total = entries.Count < limit ? entries.Count : await matching.CountAsync(cancellationToken);
+        // How many there are in all is asked for only when the limit may have cut the list: never for one entry read by
+        // its ID, which is all there can be.
+        var total = only is not null || entries.Count < limit ? entries.Count : await matching.CountAsync(cancellationToken);
         return await RecordAsync(patientId, only, new PatientEntries<ObservationEntry>(entries, total), sensitive: false, cancellationToken);
     }
 
@@ -1094,7 +1104,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     {
         var matching = db.Appointments.Where(a => a.PatientId == patientId && (only == null || a.Id == only));
         var entries = await AppointmentEntriesAsync(matching.OrderByDescending(a => a.StartsAt).ThenBy(a => a.Id).Take(limit), latestFirst: true, cancellationToken);
-        var total = entries.Count < limit ? entries.Count : await matching.CountAsync(cancellationToken);
+        var total = only is not null || entries.Count < limit ? entries.Count : await matching.CountAsync(cancellationToken);
         return await RecordAsync(patientId, only, new PatientEntries<AppointmentEntry>(entries, total), sensitive: false, cancellationToken);
     }
 

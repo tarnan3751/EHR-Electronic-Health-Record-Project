@@ -19,7 +19,9 @@ namespace Ehr.Web.Api.Fhir;
 // page, and a refusal is a 401 or 403 rather than a redirect to sign in (AccountServiceCollectionExtensions), answered
 // with an OperationOutcome (UseFhirErrors). Then the chart's gate, for each patient, before anything about them is read:
 // on the clinician's panel, or under emergency access already in force (BreakGlass; the API offers no way to start it).
-// A patient who isn't gets 403; an entry the database doesn't give this reader, 404.
+// A patient who isn't gets 403; an entry the database doesn't give this reader, 404. A search by MRN is the exception:
+// it finds nothing for a patient the clinician may not read, exactly as for an MRN that doesn't exist, so it can't be
+// used to learn who is a patient here.
 //
 // Every read goes through the PHI reader, recorded as the page that shows the same thing records it: one read of the
 // patient per request, or a read of their sensitive items when show-sensitive=true asked for those (sensitive
@@ -28,16 +30,22 @@ namespace Ehr.Web.Api.Fhir;
 // commits before any of the answer is written. Off-site the cloud app reads its copy and its events go to its audit
 // queue, written before the response is sent (CloudAuditFlushMiddleware), as a page's are.
 //
-// Every answer is application/fhir+json, never cached. Errors are OperationOutcomes with fixed text: nothing from the
-// request or the record. A search returns at most SearchLimit entries, the latest first, with the total; a parameter the
-// capability statement doesn't list is refused. Nothing writes: any other method is 405 (off-site, the cloud app
-// forwards it to the clinic's server, as every write, and its answer comes back).
+// Every answer is application/fhir+json, never cached; a client whose Accept header takes no JSON gets 406. Errors are
+// OperationOutcomes with fixed text: nothing from the request or the record. A search returns at most SearchLimit
+// entries, with the total, each type newest first by its own date (SearchOrder), undated entries last; a parameter the
+// capability statement doesn't list is refused, at /fhir/metadata too. Nothing writes: any other method is 405
+// (off-site, the cloud app forwards it to the clinic's server, as every write, and its answer comes back).
 public static class FhirApi
 {
     public const string ContentType = "application/fhir+json; charset=utf-8";
 
     // The most entries a search returns: the most values the vital signs page and the portal's results read (PhiReader).
     public const int SearchLimit = 600;
+
+    // The order a search returns each type's entries in (PhiReader), as the capability statement says it.
+    public const string SearchOrder = "Each search returns the newest first, by its own date: allergies by when they were recorded, medications by "
+        + "when they were started, diagnoses by onset, results and vital signs by when they were taken, and appointments by their start; "
+        + "entries with no date come last.";
 
     // Includes sensitive diagnoses and medications, which are otherwise left out (Tahseen's name for it: in FHIR a
     // parameter named "sensitive" would read as a filter).
@@ -61,7 +69,9 @@ public static class FhirApi
     public static RouteGroupBuilder MapFhirApi(this IEndpointRouteBuilder endpoints)
     {
         var fhir = endpoints.MapGroup(AccountSchemes.FhirPath);
-        fhir.MapGet("/metadata", (IOptions<SiteAddresses> addresses) => Answer(StatusCodes.Status200OK, FhirResources.Capabilities(BaseUrl(addresses))));
+        fhir.AddEndpointFilter(JsonAcceptedAsync);
+        fhir.MapGet("/metadata", (HttpContext context, IOptions<SiteAddresses> addresses) =>
+            Unsupported(context.Request.Query, []) ?? Answer(StatusCodes.Status200OK, FhirResources.Capabilities(BaseUrl(addresses))));
         fhir.MapGet("/{type}", SearchAsync).AddEndpointFilter(InTransactionAsync);
         fhir.MapGet("/{type}/{id}", ReadAsync).AddEndpointFilter(InTransactionAsync);
         // Everything else under /fhir: any method but GET is 405, so every write is refused, and any other GET is 404.
@@ -111,7 +121,8 @@ public static class FhirApi
                 return Refusal(StatusCodes.Status400BadRequest, "required", "A search for patients needs identifier: the MRN.");
             }
 
-            // The MRN, alone or with the clinic's system. With another system it is no identifier of this clinic's.
+            // The MRN, alone or with the clinic's system. With another system it is no identifier of this clinic's. A value
+            // that can't be an MRN (the patient search page's rule) is refused before the database is asked.
             var identifier = query["identifier"].ToString();
             var mrn = identifier.Split('|') switch
             {
@@ -120,20 +131,18 @@ public static class FhirApi
                 [_, { Length: > 0 }] => null,
                 _ => "",
             };
-            if (mrn is "")
+            if (mrn is "" || (mrn is not null && !PhiReader.CouldBeMrn(mrn)))
             {
                 return Refusal(StatusCodes.Status400BadRequest, "invalid", "identifier is the MRN, alone or as system|MRN.");
             }
 
+            // A patient the clinician may not read is not found, as an MRN that is nobody's isn't: the two answers are the
+            // same, so the search can't tell anyone whether a patient off their panel exists. Neither read anything about
+            // a patient, so neither is recorded.
             search.Parameter("identifier", identifier);
-            if (mrn is null || await phi.PatientIdByMrnAsync(mrn, cancel) is not { } found)
+            if (mrn is null || await phi.PatientIdByMrnAsync(mrn, cancel) is not { } found || !await MayReadAsync(found, assignments, breakGlass, cancel))
             {
                 return search.Answer([], 0);
-            }
-
-            if (!await MayReadAsync(found, assignments, breakGlass, cancel))
-            {
-                return Refusal(StatusCodes.Status403Forbidden, "forbidden", OffPanel);
             }
 
             return await phi.PatientAsync(found, cancel) is { } patient
@@ -266,6 +275,20 @@ public static class FhirApi
     static async Task<bool> MayReadAsync(Guid patient, PatientAssignments assignments, BreakGlass breakGlass, CancellationToken cancellationToken) =>
         await assignments.IsOnPanelAsync(patient, cancellationToken) || await breakGlass.ActiveUntilAsync(patient, cancellationToken) is not null;
 
+    // FHIR JSON or nothing: a client whose Accept header takes none of these gets 406, before anything is read. _format,
+    // when given, decides instead, as FHIR has it, and Unsupported takes only JSON there.
+    static async ValueTask<object?> JsonAcceptedAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    {
+        var request = context.HttpContext.Request;
+        var accepted = request.GetTypedHeaders().Accept;
+        return request.Query.ContainsKey("_format") || accepted.Count == 0
+            || accepted.Any(type => type.Quality is not 0 && JsonTypes.Contains(type.MediaType.Value, StringComparer.OrdinalIgnoreCase))
+            ? await next(context)
+            : Refusal(StatusCodes.Status406NotAcceptable, "not-supported", "This API answers in JSON only, as application/fhir+json.");
+    }
+
+    static readonly string[] JsonTypes = ["*/*", "application/*", "application/json", "application/fhir+json"];
+
     // One database transaction for the request, as DatabaseTransactionFilter gives a page (which doesn't run here):
     // UserContextInterceptor makes the clinician its first statement, for row-level security, and the read's audit
     // event commits with it, before the answer is written.
@@ -395,7 +418,7 @@ public static class FhirApi
             var entries = matches.Select(match => new BundleEntry($"{baseUrl}/{type}/{match.Id}", match.Resource, new BundleSearch("match"))).ToList();
             if (total > entries.Count)
             {
-                Note($"Only the latest {entries.Count} of the {total} matches are included: this server has no paging.", "warning");
+                Note($"Only the first {entries.Count} of the {total} matches, the newest first, are included: this server has no paging.", "warning");
             }
 
             entries.AddRange(notes.Select(note => new BundleEntry(

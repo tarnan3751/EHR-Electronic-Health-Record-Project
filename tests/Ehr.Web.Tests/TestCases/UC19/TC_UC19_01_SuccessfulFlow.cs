@@ -121,7 +121,7 @@ public class TC_UC19_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         }
 
         Assert.Matches("\"effectiveDateTime\":\"[0-9-]{10}T[0-9:.]+Z\"", observations.Json);
-        // A decimal as precise as it was recorded, not as the column keeps it.
+        // The column keeps four decimal places; the API drops the trailing zeros, so 70.5 kg is 70.5, not 70.5000.
         Assert.Contains("\"value\":70.5,", observations.Json);
         foreach (var id in new[] { chart.Vitals[VitalSign.HeartRate], chart.HemoglobinA1c })
         {

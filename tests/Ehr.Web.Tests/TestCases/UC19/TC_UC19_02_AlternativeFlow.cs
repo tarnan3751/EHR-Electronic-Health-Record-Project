@@ -34,7 +34,7 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 //   included with meta.security R (v3-Confidentiality), the other entries without; each request is one read of
 //   sensitive items and no plain read. Step 2: 403, then the diagnoses. Step 3: no heart rate, systolic or diastolic in
 //   the search, which says blood pressure isn't served yet (a laboratory search doesn't), and each read is not found.
-//   Step 4: total 601, the latest 600, and a warning that only those are included. Every answer is valid R4.
+//   Step 4: total 601, the newest 600, and a warning that only those are included. Every answer is valid R4.
 // Creator: Tahseen Arnan
 public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -137,7 +137,7 @@ public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var (bundle, found, notes) = Searched<R4.Observation>(await GetAsync(chart.Session.Client, $"/fhir/Observation?patient={patient}&category=laboratory"));
         Assert.Equal(601, bundle.Total);
         Assert.Equal(600, found.Count);
-        Assert.Equal(["Only the latest 600 of the 601 matches are included: this server has no paging."], notes);
+        Assert.Equal(["Only the first 600 of the 601 matches, the newest first, are included: this server has no paging."], notes);
         Assert.Equal(R4.OperationOutcome.IssueSeverity.Warning,
             Assert.IsType<R4.OperationOutcome>(bundle.Entry.Single(e => e.Search?.Mode == R4.Bundle.SearchEntryMode.Outcome).Resource).Issue.Single().Severity);
         // The oldest, taken 601 hours ago, is the one left out.

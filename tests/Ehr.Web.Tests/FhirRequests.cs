@@ -133,11 +133,15 @@ static class FhirRequests
     public static Task<Answer> GetAsync(HttpClient client, string path, params (string Name, string Value)[] headers) =>
         SendAsync(client, HttpMethod.Get, path, headers);
 
-    // A request as a FHIR client makes it, asking for FHIR JSON.
+    // A request as a FHIR client makes it, asking for FHIR JSON unless the headers given say what to accept.
     public static async Task<Answer> SendAsync(HttpClient client, HttpMethod method, string path, params (string Name, string Value)[] headers)
     {
         using var request = new HttpRequestMessage(method, path);
-        request.Headers.Accept.ParseAdd("application/fhir+json");
+        if (!headers.Any(header => header.Name == "Accept"))
+        {
+            request.Headers.Accept.ParseAdd("application/fhir+json");
+        }
+
         foreach (var (name, value) in headers)
         {
             request.Headers.TryAddWithoutValidation(name, value);

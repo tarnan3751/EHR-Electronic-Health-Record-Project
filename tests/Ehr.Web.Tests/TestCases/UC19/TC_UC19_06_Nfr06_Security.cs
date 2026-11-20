@@ -1,16 +1,20 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 using static Ehr.Web.Tests.FhirRequests;
+using R4 = Hl7.Fhir.Model;
 
 namespace Ehr.Web.Tests.TestCases.UC19;
 
 // Test Case ID: TC-UC19-06
 // Purpose / scenario: Only a clinician gets anything from the FHIR API, and only for a patient on their panel. Anyone
 //   else is refused with a status and an OperationOutcome in fixed words, never sent to a sign-in page, and nothing is
-//   read or recorded. No answer is kept in a browser's or a proxy's cache, and none lets a page on another site read it.
+//   read or recorded. A search by MRN doesn't tell a clinician whether a patient off their panel exists: it answers as
+//   for an MRN that is nobody's. No answer is kept in a browser's or a proxy's cache, and none lets a page on another
+//   site read it.
 // Type: Non-functional (security: who may read, and what is kept)
 // Requirements: NFR-06, with FR-29 and FR-32
 // Use case: UC 19, Read a patient's record through the FHIR API
@@ -19,17 +23,19 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 // Inputs and system conditions: GET /fhir/metadata, GET /fhir/Patient/{id}, GET /fhir/Observation?patient={id}, GET
 //   /fhir/Condition/{id} and GET /fhir/Patient?identifier={MRN}, as each caller, on the on-site app; the same without
 //   signing in, with an Origin header of another site, and as an OPTIONS request.
-// Test data: The patient of TC-UC19-01; Origin "https://elsewhere.example".
+// Test data: The patient of TC-UC19-01; Origin "https://elsewhere.example"; the MRN "SYN-NOT-AN-MRN", nobody's.
 // Steps:
 //   1. Without signing in, make each request, then again from another site's page, and as OPTIONS.
 //   2. Make each request as the admin, as the portal account, with the desktop app's token, and as the clinician
-//      without the patient on their panel.
-//   3. Count the reads recorded about the patient.
+//      without the patient on their panel; as that clinician, also search for the MRN that is nobody's.
+//   3. Count the reads recorded about the patient, and those by the second clinician.
 // Expected result: Step 1: 401, code login, with no Location header. Step 2: the admin 403, code forbidden ("This API
 //   is for clinicians."); the portal account and the desktop token 401, since the API reads only the clinical app's
-//   sign-in; the other clinician 403 for every request about the patient, metadata aside. Every answer is
-//   application/fhir+json with Cache-Control no-store and no Access-Control-* header, and none holds the patient's
-//   name, MRN or ID. Step 3: no read and no read of sensitive items, by anyone.
+//   sign-in; the other clinician 403 for every read and search about the patient, metadata aside, but the search by the
+//   patient's MRN, which is 200 with an empty searchset, the same, byte for byte, as the answer for the MRN that is
+//   nobody's, but for the self link, which repeats what was asked. Every answer is application/fhir+json with
+//   Cache-Control no-store and no Access-Control-* header, and no refusal holds the patient's name, MRN or ID. Step 3: no
+//   read and no read of sensitive items, by anyone.
 // Creator: Tahseen Arnan
 public class TC_UC19_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
 {
@@ -41,7 +47,9 @@ public class TC_UC19_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
         var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("A Fhir Admin", StaffRoles.Admin));
         var portal = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, chart.Patient);
         var token = await apps.DesktopSignInAsync(apps.OnPrem, chart.Clinician);
-        var elsewhere = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Dr. Fhir Elsewhere", StaffRoles.Clinician));
+        var colleague = await apps.CreateStaffAsync("Dr. Fhir Elsewhere", StaffRoles.Clinician);
+        var elsewhere = await SignInAsync(apps.OnPrem, colleague);
+        var colleagueReads = await apps.AuditEventsAsync(AuditActions.Read, colleague.Id);
         var reads = await apps.AuditEventsAsync(AuditActions.Read, patientId: chart.Patient);
         var sensitive = await apps.AuditEventsAsync(AuditActions.ReadSensitive, patientId: chart.Patient);
         string[] aboutThePatient =
@@ -84,14 +92,30 @@ public class TC_UC19_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
         }
 
         Expect(await GetAsync(elsewhere.Client, "/fhir/metadata"), HttpStatusCode.OK);
-        foreach (var path in aboutThePatient)
+        foreach (var path in aboutThePatient.Where(path => !path.Contains("identifier=", StringComparison.Ordinal)))
         {
             var refused = await GetAsync(elsewhere.Client, path, ("Origin", "https://elsewhere.example"));
             Assert.StartsWith("This patient isn't on your panel.", Refused(refused, HttpStatusCode.Forbidden, "forbidden").Issue.Single().Diagnostics);
             NothingOfThePatient(refused);
         }
 
+        // The search by MRN: the patient's and one that is nobody's get the same answer, but for the self link.
+        var known = await GetAsync(elsewhere.Client, $"/fhir/Patient?identifier={chart.Mrn}", ("Origin", "https://elsewhere.example"));
+        var nobodys = await GetAsync(elsewhere.Client, "/fhir/Patient?identifier=SYN-NOT-AN-MRN", ("Origin", "https://elsewhere.example"));
+        foreach (var answer in new[] { known, nobodys })
+        {
+            var (bundle, matches, notes) = Searched<R4.Patient>(answer);
+            Assert.Equal((0, 0, 0), (bundle.Total, matches.Count, notes.Count));
+        }
+
+        // The Bundle's links, and the comma before them, cut out of its JSON as it was sent.
+        static string WithoutLinks(string json) => Regex.Replace(json, ",\"link\":\\[[^\\]]*\\]", "");
+        Assert.NotEqual(known.Json, WithoutLinks(known.Json));
+        Assert.Equal(WithoutLinks(nobodys.Json), WithoutLinks(known.Json));
+        Assert.Equal(nobodys.Headers.Order(StringComparer.Ordinal), known.Headers.Order(StringComparer.Ordinal));
+
         // 3. Nothing was read.
+        Assert.Equal(colleagueReads, await apps.AuditEventsAsync(AuditActions.Read, colleague.Id));
         Assert.Equal(reads, await apps.AuditEventsAsync(AuditActions.Read, patientId: chart.Patient));
         Assert.Equal(sensitive, await apps.AuditEventsAsync(AuditActions.ReadSensitive, patientId: chart.Patient));
     }
