@@ -344,7 +344,13 @@ DROP TRIGGER IF EXISTS observations_reading_changed ON ehr.observations;
 CREATE CONSTRAINT TRIGGER observations_reading_changed
     AFTER UPDATE ON ehr.observations
     DEFERRABLE INITIALLY DEFERRED
-    FOR EACH ROW WHEN (OLD.reading_id IS NOT NULL OR NEW.reading_id IS NOT NULL)
+    -- Only when what the check reads changes: the reading, its patient, time or visit, or a value's status or code.
+    -- An update of anything else, such as a migration giving readings a new reference range, has nothing to check
+    -- and leaves nothing waiting for the commit, so the same transaction can still alter the table to lift and put
+    -- back its protection (PostgreSQL refuses to alter a table with checks still to run).
+    FOR EACH ROW WHEN ((OLD.reading_id IS NOT NULL OR NEW.reading_id IS NOT NULL)
+        AND (OLD.reading_id, OLD.patient_id, OLD.effective_at, OLD.encounter_id, OLD.status, OLD.code)
+            IS DISTINCT FROM (NEW.reading_id, NEW.patient_id, NEW.effective_at, NEW.encounter_id, NEW.status, NEW.code))
     EXECUTE FUNCTION ehr.check_vital_reading();
 DROP TRIGGER IF EXISTS observations_reading_deleted ON ehr.observations;
 CREATE CONSTRAINT TRIGGER observations_reading_deleted

@@ -333,6 +333,34 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.Equal(["8480-6 150 final none R1", "8462-4 95 final none R1"], await StateAsync(patient));
     }
 
+    // A later migration that gives readings a new reference range (step 9d) changes nothing the check reads: it leaves no
+    // check waiting for the commit, so it can lift and put back the table's protection in the same transaction. A change
+    // to what a reading is made of still waits for the check, and is refused when it would leave a reading half.
+    [Fact]
+    public async Task Only_a_change_to_what_a_reading_is_made_of_waits_for_the_check()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var visit = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(Superuser, null,
+            "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (@id, @patient, 'finished', 'AMB', now() - interval '1 day')",
+            ("id", visit), ("patient", patient));
+        await RecordPressureAsync(clinician, patient, 150m, 95m);
+        const string reranged = "UPDATE ehr.observations SET reference_high = reference_high + 1 WHERE patient_id = @patient AND code IN ('8480-6', '8462-4'); ";
+        const string altered = "ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;";
+
+        await Accounts.ExecuteAsync(Superuser, null, reranged + altered, ("patient", patient));
+        Assert.Equal(["130", "80"], await AsSuperuserAsync(
+            "SELECT trim_scale(reference_high)::text FROM ehr.observations WHERE patient_id = @patient ORDER BY code DESC", ("patient", patient)));
+
+        await RefusedAsync(PostgresErrorCodes.ObjectInUse, () => Accounts.ExecuteAsync(Superuser, null,
+            "UPDATE ehr.observations SET status = 'entered-in-error' WHERE patient_id = @patient AND code = '8480-6'; " + altered, ("patient", patient)));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => Accounts.ExecuteAsync(Superuser, null,
+            "UPDATE ehr.observations SET encounter_id = @visit WHERE patient_id = @patient AND code = '8480-6'", ("patient", patient), ("visit", visit)));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => Accounts.ExecuteAsync(Superuser, null,
+            "UPDATE ehr.observations SET effective_at = effective_at - interval '1 minute' WHERE patient_id = @patient AND code = '8462-4'", ("patient", patient)));
+        Assert.Equal(["8480-6 150 final none R1", "8462-4 95 final none R1"], await StateAsync(patient));
+    }
+
     // Two transactions recording a blood pressure for one patient and time: the second waits for the first, then finds
     // its reading and is refused; nothing is left half.
     [Fact]
