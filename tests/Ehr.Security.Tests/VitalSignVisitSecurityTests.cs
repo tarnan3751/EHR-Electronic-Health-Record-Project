@@ -8,8 +8,9 @@ namespace Ehr.Security.Tests;
 // Step 9c's follow-up, after Tahseen's answers: a vital sign belongs to the patient's visit that was held when it was
 // taken or began within fifteen minutes after, decided from the time taken alone, whether it was typed before the
 // check-in or after it (db/policies/75-results.sql: ehr.file_result, and ehr.attach_vital_signs, which ties the
-// moments already recorded to the visit a check-in starts). What the check-in may change, who can make it change
-// anything, and two transactions at once.
+// moments already recorded to the visit a check-in starts). A visit the apps insert is a check-in starting now
+// (ehr.check_in_visit), so no visit dated to suit can take a vital sign. What the check-in may change, who can make it
+// change anything, two visits starting at one instant, and two transactions at once.
 public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const string Systolic = "8480-6";
@@ -24,8 +25,8 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
 
     string Superuser => database.SuperuserConnectionString;
 
-    // The visit's start in these tests: an hour ago, to the second.
-    static readonly DateTime Start = new(DateTime.UtcNow.AddHours(-1).Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+    // Now, to the second: a check-in's start, which must be within a minute of the database's clock.
+    static DateTime Now() => new(DateTime.UtcNow.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
 
     const string Insert = """
         INSERT INTO ehr.observations (id, patient_id, encounter_id, category, code, display, status, value, effective_at)
@@ -86,10 +87,11 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     public async Task A_sign_taken_up_to_fifteen_minutes_before_the_check_in_belongs_to_the_visit_whether_typed_before_or_after_it(bool typedBefore)
     {
         var (clinician, patient) = await OnPanelAsync();
+        var start = Now();
         (string Code, decimal Value, DateTime At)[] signs =
         [
-            (HeartRate, 60m, Start.AddMinutes(-20)), (HeartRate, 61m, Start.AddMinutes(-15).AddSeconds(-1)), (HeartRate, 62m, Start.AddMinutes(-15)),
-            (HeartRate, 63m, Start.AddMinutes(-10)), (HeartRate, 64m, Start.AddMinutes(5)),
+            (HeartRate, 60m, start.AddMinutes(-20)), (HeartRate, 61m, start.AddMinutes(-15).AddSeconds(-1)), (HeartRate, 62m, start.AddMinutes(-15)),
+            (HeartRate, 63m, start.AddMinutes(-10)), (HeartRate, 64m, start.AddMinutes(2)),
         ];
         async Task RecordAllAsync()
         {
@@ -104,7 +106,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
             await RecordAllAsync();
         }
 
-        var visit = await CheckInAsync(clinician, patient, Start);
+        var visit = await CheckInAsync(clinician, patient, start);
         if (!typedBefore)
         {
             await RecordAllAsync();
@@ -114,22 +116,25 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     }
 
     // The check-in moves a moment whole, its values in error too, and changes nothing but their visit: not another
-    // patient's, not a result of an order, not a moment outside the window. Each value moved is a change of its visit
-    // only, audited as the person checking the patient in; the reading check passes for the moved readings in the
-    // check-in's own transaction.
+    // patient's, not a result of an order, not a moment outside the window, before it or later than the clock allows a
+    // time to be typed. Each value moved is a change of its visit only, audited as the person checking the patient in;
+    // the reading check passes for the moved readings in the check-in's own transaction.
     [Fact]
     public async Task A_check_in_moves_whole_moments_of_its_own_patient_and_changes_nothing_but_their_visit()
     {
         var (clinician, patient) = await OnPanelAsync();
         var (otherClinician, other) = await OnPanelAsync();
-        var taken = Start.AddMinutes(-5);
+        var start = Now();
+        var taken = start.AddMinutes(-5);
         await RecordPressureAsync(clinician, patient, 150m, 95m, taken);
         await RecordAsync(clinician, patient, HeartRate, 70m, taken);
         await Accounts.ExecuteAsync(App, clinician,
             "UPDATE ehr.observations SET status = 'entered-in-error', entered_in_error_reason = 'Synthetic: cuff too small.' WHERE patient_id = @patient AND code = '8462-4'",
             ("patient", patient));
         await RecordPressureAsync(clinician, patient, 140m, 90m, taken);
-        await RecordAsync(clinician, patient, HeartRate, 66m, Start.AddMinutes(-30));
+        await RecordAsync(clinician, patient, HeartRate, 66m, start.AddMinutes(-30));
+        // Past the apps, an hour ahead: later than any time a check-in now could take.
+        await Accounts.ExecuteAsync(Superuser, null, Insert, Values(patient, HeartRate, 90m, start.AddHours(1)));
         await RecordAsync(otherClinician, other, HeartRate, 80m, taken);
         var order = Guid.CreateVersion7();
         await Accounts.ExecuteAsync(App, clinician,
@@ -148,9 +153,10 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
 
         // In one transaction with the check-in: the reading check, moved to the statement, passes.
         var visit = Guid.CreateVersion7();
-        await Accounts.ExecuteAsync(App, clinician, Visit + "; SET CONSTRAINTS ALL IMMEDIATE;", VisitValues(visit, patient, Start));
+        await Accounts.ExecuteAsync(App, clinician, Visit + "; SET CONSTRAINTS ALL IMMEDIATE;", VisitValues(visit, patient, start));
 
-        Assert.Equal(["8867-4 66 none", "718-7 13.5 none", "8462-4 90 visit", "8462-4 95 visit", "8480-6 140 visit", "8480-6 150 visit", "8867-4 70 visit"],
+        Assert.Equal(
+            ["8867-4 66 none", "718-7 13.5 none", "8462-4 90 visit", "8462-4 95 visit", "8480-6 140 visit", "8480-6 150 visit", "8867-4 70 visit", "8867-4 90 none"],
             await VisitsAsync(patient, visit));
         Assert.Equal(["8867-4 80 none"], await VisitsAsync(other));
         Assert.Equal(before, await AsSuperuserAsync(rows, ("patients", both)));
@@ -166,47 +172,127 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
             "SELECT count(*)::text FROM ehr.audit_events WHERE table_name = 'observations' AND patient_id = ANY(@patients)", ("patients", both)));
     }
 
-    // The rule's latest visit: a moment tied to a visit that began earlier moves to one that begins within fifteen
-    // minutes after it was taken; one taken longer before that visit keeps the earlier one.
+    // The rule's latest visit: a moment tied to a visit that began earlier the same day moves to one that begins within
+    // fifteen minutes after it was taken; one taken longer before that visit keeps the earlier one.
     [Fact]
     public async Task A_moment_on_an_earlier_visit_moves_to_a_visit_that_begins_within_fifteen_minutes_after_it()
     {
         var (clinician, patient) = await OnPanelAsync();
-        var earlier = await CheckInAsync(clinician, patient, Start.AddHours(-2));
-        await RecordAsync(clinician, patient, HeartRate, 70m, Start.AddMinutes(-20));
-        await RecordPressureAsync(clinician, patient, 120m, 80m, Start.AddMinutes(-10));
+        var start = Now();
+        // A visit begun two hours ago, as one checked in then would be: loaded past the apps, which start visits only now.
+        var earlier = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(Superuser, null, Visit, VisitValues(earlier, patient, start.AddHours(-2)));
+        await RecordAsync(clinician, patient, HeartRate, 70m, start.AddMinutes(-20));
+        await RecordPressureAsync(clinician, patient, 120m, 80m, start.AddMinutes(-10));
         Assert.Equal(["8867-4 70 earlier", "8462-4 80 earlier", "8480-6 120 earlier"], await VisitsAsync(patient, earlier: earlier));
 
-        var visit = await CheckInAsync(clinician, patient, Start);
+        var visit = await CheckInAsync(clinician, patient, start);
 
         Assert.Equal(["8867-4 70 earlier", "8462-4 80 visit", "8480-6 120 visit"], await VisitsAsync(patient, visit, earlier));
     }
 
-    // Only a visit the apps start, by someone allowed to: a clinician without the patient on their panel, an admin, the
-    // read-only role, a visit that is only planned or was cancelled, and a visit inserted past the apps change nothing;
-    // and the app's role can neither change a visit itself nor call the function.
+    // Two visits of one patient starting at the same instant: the one with the smaller ID, as ehr.file_result picks it,
+    // whichever is checked in first and whether the set is typed before the check-ins or after them.
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task Two_visits_starting_at_one_instant_give_a_set_the_same_visit_whatever_the_order(bool smallerFirst, bool typedBefore)
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var start = Now();
+        var ids = new[] { Guid.CreateVersion7(), Guid.CreateVersion7() }.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray();
+        if (typedBefore)
+        {
+            await RecordPressureAsync(clinician, patient, 120m, 80m, start.AddMinutes(-5));
+        }
+
+        foreach (var id in smallerFirst ? ids : ids.Reverse())
+        {
+            await Accounts.ExecuteAsync(App, clinician, Visit, VisitValues(id, patient, start));
+        }
+
+        if (!typedBefore)
+        {
+            await RecordPressureAsync(clinician, patient, 120m, 80m, start.AddMinutes(-5));
+        }
+
+        Assert.Equal(["8462-4 80 visit", "8480-6 120 visit"], await VisitsAsync(patient, ids[0]));
+    }
+
+    // Only a visit the apps start, by someone allowed to, as a check-in starting now: a clinician without the patient on
+    // their panel, an admin and the read-only role are refused; so is any visit the apps insert that isn't in progress
+    // or doesn't start within a minute of now; a visit inserted past the apps changes nothing; and the app's role can
+    // neither change a visit itself nor call the functions.
     [Fact]
     public async Task Only_a_check_in_by_a_clinician_with_the_patient_on_their_panel_ties_vital_signs_to_a_visit()
     {
         var (clinician, patient) = await OnPanelAsync();
-        await RecordAsync(clinician, patient, HeartRate, 70m, Start.AddMinutes(-5));
+        var start = Now();
+        await RecordAsync(clinician, patient, HeartRate, 70m, start.AddMinutes(-5));
         var outsider = await Accounts.StaffAsync(database, StaffRoles.Clinician);
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
 
-        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => CheckInAsync(outsider, patient, Start));
-        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => CheckInAsync(admin, patient, Start));
-        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(Read, clinician, Visit, VisitValues(Guid.CreateVersion7(), patient, Start)));
-        await CheckInAsync(clinician, patient, Start, "planned");
-        await CheckInAsync(clinician, patient, Start, "cancelled");
-        await Accounts.ExecuteAsync(Superuser, null, Visit, VisitValues(Guid.CreateVersion7(), patient, Start));
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => CheckInAsync(outsider, patient, start));
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => CheckInAsync(admin, patient, start));
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(Read, clinician, Visit, VisitValues(Guid.CreateVersion7(), patient, start)));
+        foreach (var status in new[] { "planned", "arrived", "finished", "cancelled", "entered-in-error" })
+        {
+            await RefusedAsync(PostgresErrorCodes.CheckViolation, () => CheckInAsync(clinician, patient, start, status));
+        }
+
+        foreach (var off in new[] { start.AddMinutes(-10), start.AddMinutes(-2), start.AddMinutes(3), start.AddHours(2) })
+        {
+            await RefusedAsync(PostgresErrorCodes.CheckViolation, () => CheckInAsync(clinician, patient, off));
+        }
+
+        await Accounts.ExecuteAsync(Superuser, null, Visit, VisitValues(Guid.CreateVersion7(), patient, start));
         Assert.Equal(["8867-4 70 none"], await VisitsAsync(patient));
 
         var visit = Guid.Parse((await AsSuperuserAsync("SELECT id::text FROM ehr.encounters WHERE patient_id = @patient AND status = 'in-progress'", ("patient", patient))).Single());
         await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(App, clinician,
             "UPDATE ehr.observations SET encounter_id = @visit WHERE patient_id = @patient", ("visit", visit), ("patient", patient)));
-        Assert.Equal(["false false"], await AsSuperuserAsync(
-            "SELECT has_function_privilege('ehr_app', 'ehr.attach_vital_signs()', 'EXECUTE')::text || ' ' || has_function_privilege('ehr_read', 'ehr.attach_vital_signs()', 'EXECUTE')::text"));
+        Assert.Equal(["false false false false"], await AsSuperuserAsync(
+            """
+            SELECT has_function_privilege('ehr_app', 'ehr.attach_vital_signs()', 'EXECUTE')::text || ' ' || has_function_privilege('ehr_read', 'ehr.attach_vital_signs()', 'EXECUTE')::text
+                || ' ' || has_function_privilege('ehr_app', 'ehr.check_in_visit()', 'EXECUTE')::text || ' ' || has_function_privilege('ehr_read', 'ehr.check_in_visit()', 'EXECUTE')::text
+            """));
         Assert.Equal(["8867-4 70 none"], await VisitsAsync(patient));
+    }
+
+    // The step's review: a clinician with the patient on their panel inserting, as the app, a visit dated two years ago,
+    // finished or in progress, to take the patient's two-year-old blood pressure and heart rate. Refused, and nothing
+    // moves. And once a check-in has tied a moment, nothing the apps do moves it but another check-in within fifteen
+    // minutes after it was taken: not a value of the moment naming no visit or another, not a visit dated to suit.
+    [Fact]
+    public async Task A_visit_dated_to_suit_takes_no_vital_sign_and_a_moment_tied_at_check_in_stays()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        var start = Now();
+        var old = start.AddYears(-2);
+        await RecordPressureAsync(clinician, patient, 120m, 80m, old);
+        await RecordAsync(clinician, patient, HeartRate, 72m, old);
+        foreach (var status in new[] { "finished", "in-progress" })
+        {
+            await RefusedAsync(PostgresErrorCodes.CheckViolation, () => CheckInAsync(clinician, patient, old.AddMinutes(5), status));
+        }
+
+        Assert.Equal(["8462-4 80 none", "8480-6 120 none", "8867-4 72 none"], await VisitsAsync(patient));
+
+        var taken = start.AddMinutes(-5);
+        await RecordAsync(clinician, patient, HeartRate, 70m, taken);
+        var visit = await CheckInAsync(clinician, patient, start);
+        var other = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(Superuser, null, Visit, VisitValues(other, patient, start.AddMinutes(-1)));
+        await RecordAsync(clinician, patient, "8310-5", 37m, taken);
+        await RecordAsync(clinician, patient, "9279-1", 16m, taken, other);
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => CheckInAsync(clinician, patient, taken.AddMinutes(3)));
+
+        Assert.Equal(["8462-4 80 none", "8480-6 120 none", "8867-4 72 none", "8310-5 37 visit", "8867-4 70 visit", "9279-1 16 visit"], await VisitsAsync(patient, visit));
+        Assert.Empty(await AsSuperuserAsync(
+            "SELECT e.row_id::text FROM ehr.audit_events e WHERE e.table_name = 'observations' AND e.patient_id = @patient AND e.details ? 'encounter_id' AND e.row_id IN (SELECT o.id FROM ehr.observations o WHERE o.patient_id = @patient AND o.effective_at = @old)",
+            ("patient", patient), ("old", old)));
     }
 
     // A transaction of the app's, held open, as `user`.
@@ -244,17 +330,18 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     {
         var (clinician, patient) = await OnPanelAsync();
         var visit = Guid.CreateVersion7();
+        var start = Now();
         var (recording, recordingTransaction) = await BeginAsync(clinician);
         var (checkingIn, checkingInTransaction) = await BeginAsync(clinician);
         await using (recording)
         await using (checkingIn)
         {
             var (first, firstTransaction, firstSql, firstValues) = valueFirst
-                ? (recording, recordingTransaction, Insert, Values(patient, HeartRate, 70m, Start.AddMinutes(-5)))
-                : (checkingIn, checkingInTransaction, Visit, VisitValues(visit, patient, Start));
+                ? (recording, recordingTransaction, Insert, Values(patient, HeartRate, 70m, start.AddMinutes(-5)))
+                : (checkingIn, checkingInTransaction, Visit, VisitValues(visit, patient, start));
             var (second, secondTransaction, secondSql, secondValues) = valueFirst
-                ? (checkingIn, checkingInTransaction, Visit, VisitValues(visit, patient, Start))
-                : (recording, recordingTransaction, Insert, Values(patient, HeartRate, 70m, Start.AddMinutes(-5)));
+                ? (checkingIn, checkingInTransaction, Visit, VisitValues(visit, patient, start))
+                : (recording, recordingTransaction, Insert, Values(patient, HeartRate, 70m, start.AddMinutes(-5)));
             Assert.Equal(1, await ExecuteAsync(first, firstTransaction, firstSql, firstValues));
             var waiting = ExecuteAsync(second, secondTransaction, secondSql, secondValues);
             await WaitsAsync(waiting);
