@@ -24,14 +24,14 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Type the first set and choose "Record vital signs".
 //   3. Type the second set and choose "Record vital signs".
 // Expected result: Step 1: the page says "No vital signs recorded." and shows the form. Step 2: "Saved:"; the
-//   flowsheet lists systolic 148 "High", diastolic 92 "High", heart rate 72, weight 81, height 180 and body mass
-//   index 25 "High", each with the clinic's own name and unit; no trend yet; the write is in the audit log under the
+//   flowsheet lists blood pressure 148/92 "High" (one reading, step 9c), heart rate 72, weight 81, height 180 and body
+//   mass index 25 "High", each with the clinic's own name and unit; no trend yet; the write is in the audit log under the
 //   clinician. Step 3: the flowsheet has two columns, newest first; "Trends" has a chart for systolic, diastolic and
 //   heart rate and none for weight, each an SVG with a sentence saying what it shows ("down from 148") and a table of
 //   its values; the systolic chart marks one value outside the range. The chart then says of the latest visit "blood
-//   pressure 126/80 mmHg, heart rate 68/min" and lists the newest value of each sign, the systolic with a mark and
-//   the words "down from 148" (step 9b); the desktop app's offline copy
-//   has the same three for the visit.
+//   pressure 126/80 mmHg, heart rate 68/min" and lists the newest value of each sign, the blood pressure as "126/80
+//   mmHg", "High" for its diastolic, with a mark and the words "down from 148/92" (steps 9b and 9c); the desktop
+//   app's offline copy has the same three for the visit.
 // Creator: Tahseen Arnan
 public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -55,7 +55,8 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
             (Systolic, "148"), (Diastolic, "92"), (HeartRate, "72"), (Weight, "81"), (Height, "180"));
         var page = await ReadAsync(first);
         Assert.Contains("Saved:", page);
-        Assert.Matches("(?s)Systolic blood pressure <span class=\"sc-muted\">\\(mmHg\\)</span></th>\\s*<td class=\"sc-table__mono\">\\s*148\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", page);
+        Assert.Matches("(?s)Blood pressure <span class=\"sc-muted\">\\(mmHg\\)</span></th>\\s*<td class=\"sc-table__mono\">\\s*148/92\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", page);
+        Assert.DoesNotContain("<th scope=\"row\">Systolic blood pressure", page);
         Assert.Matches("(?s)Body mass index \\(BMI\\) \\[Ratio\\] <span class=\"sc-muted\">\\(kg/m&#xB2;\\)</span></th>\\s*<td class=\"sc-table__mono\">\\s*25\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", page);
         Assert.DoesNotContain("data-trend", page);
         Assert.Equal([$"{Weight} 81", $"{BodyMassIndex} 25", $"{Height} 180", $"{Diastolic} 92", $"{Systolic} 148", $"{HeartRate} 72"], await RecordedAsync(apps, patient));
@@ -65,7 +66,7 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         using var second = await RecordAsync(session.Client, patient, 10, (Systolic, "126"), (Diastolic, "80"), (HeartRate, "68"));
         page = await ReadAsync(second);
         Assert.Contains("The latest 2 sets of vital signs, newest first.", page);
-        Assert.Matches("(?s)Systolic blood pressure <span[^>]*>[^<]*</span></th>\\s*<td class=\"sc-table__mono\">\\s*126\\s*</td>\\s*<td class=\"sc-table__mono\">\\s*148", page);
+        Assert.Matches("(?s)Blood pressure <span[^>]*>[^<]*</span></th>\\s*<td class=\"sc-table__mono\">\\s*126/80\\s*<span class=\"sc-tag sc-tag--warning\">High</span>\\s*</td>\\s*<td class=\"sc-table__mono\">\\s*148/92", page);
         Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(page, "<figure class=\"sc-trend\"").Count);
         Assert.Contains($"data-trend=\"{Systolic}\"", page);
         Assert.DoesNotContain($"data-trend=\"{Weight}\"", page);
@@ -81,7 +82,7 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         // The desktop app's offline copy has the visit's too.
         chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Contains("blood pressure 126/80 mmHg, heart rate 68/min", Words(chart));
-        Assert.Matches("(?s)data-latest-vitals.*?<strong>Systolic blood pressure</strong>\\s*126 mmHg\\s*<span class=\"sc-trendmark\" data-direction=\"down\">.*?down from 148</span></span>\\s*<span class=\"sc-muted\">.*?<strong>Weight</strong>\\s*81 kg.*?<strong>Body mass index</strong>\\s*25 kg/m&#xB2;\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", chart);
+        Assert.Matches("(?s)data-latest-vitals.*?<strong>Blood pressure</strong>\\s*126/80 mmHg\\s*<span class=\"sc-tag sc-tag--warning\">High</span>\\s*<span class=\"sc-trendmark\" data-direction=\"down\">.*?down from 148/92</span></span>\\s*<span class=\"sc-muted\">.*?<strong>Weight</strong>\\s*81 kg.*?<strong>Body mass index</strong>\\s*25 kg/m&#xB2;\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", chart);
         var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);
         Assert.Matches("\"systolicMmHg\":126,\"diastolicMmHg\":80,\"heartRatePerMinute\":68", await offline.Content.ReadAsStringAsync(Cancel));

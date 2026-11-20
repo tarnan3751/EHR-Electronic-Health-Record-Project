@@ -11,8 +11,9 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Vitals;
 
 // Marking readings of one set of vital signs "entered in error" (the expansion plan's step 9b), with a reason. Nothing
 // is deleted or edited: the readings stay in the record, marked, and are left out of the flowsheet, the trends, the
-// chart and the offline copy; the correct values are recorded as a new set. Only a clinician with the patient on their
-// panel (MessagePage's gate, as for recording). Off-site the post is forwarded to the clinic's server.
+// chart and the offline copy; the correct values are recorded as a new set. A blood pressure is one reading, its two
+// numbers marked together (step 9c). Only a clinician with the patient on their panel (MessagePage's gate, as for
+// recording). Off-site the post is forwarded to the clinic's server.
 [ShownIfNotSaved(nameof(Reason))]
 public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, VitalSigns vitals) : MessagePage(assignments, breakGlass)
 {
@@ -29,8 +30,11 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
     public PatientVitals Vitals { get; private set; } = null!;
 
-    // The set's readings that stand, in the flowsheet's order.
+    // The set's readings that stand, in the flowsheet's order: a blood pressure by its systolic value.
     public IReadOnlyList<Observation> Readings { get; private set; } = [];
+
+    // The diastolic value of each blood pressure reading listed, by reading ID (step 9c).
+    public IReadOnlyDictionary<Guid, Observation> Diastolic { get; private set; } = new Dictionary<Guid, Observation>();
 
     public DateTimeOffset Taken { get; private set; }
 
@@ -103,8 +107,11 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         Taken = new DateTimeOffset(at, TimeSpan.Zero);
         // Not the body mass index: it isn't a reading. It follows its weight and height, and the database marks it with
         // either (ticking it beside them made the second update find it already marked, and the whole set was refused).
-        Readings = [.. read.Signs.Where(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code != VitalSign.BodyMassIndex)
+        // A blood pressure is one reading (step 9c), listed by its systolic: the database marks the diastolic with it.
+        Readings = [.. read.Signs.Where(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code is not (VitalSign.BodyMassIndex or VitalSign.Diastolic))
             .OrderBy(sign => Array.IndexOf(VitalSign.All, sign.Code))];
+        Diastolic = read.Signs.Where(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code == VitalSign.Diastolic)
+            .ToDictionary(sign => sign.ReadingId!.Value);
         HasBodyMassIndex = read.Signs.Any(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code == VitalSign.BodyMassIndex);
         return Readings.Count == 0 ? RedirectToPage("Index", new { patientId }) : null;
     }

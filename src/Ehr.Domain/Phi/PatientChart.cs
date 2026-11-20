@@ -56,8 +56,13 @@ public sealed record PatientChart(
     public IReadOnlyList<Ehr.Domain.Results.ResultedOrder> Resulted { get; init; } = [];
 }
 
-// The vital signs a visit shows on the chart; null where one wasn't taken.
-public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal? HeartRate);
+// The vital signs a visit shows on the chart; null where one wasn't taken. The blood pressure is one reading's two
+// numbers (step 9c).
+public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal? HeartRate)
+{
+    public static VisitVitals Of(Ehr.Domain.Results.BloodPressure? pressure, decimal? heartRate) =>
+        new(pressure?.Systolic.Value, pressure?.Diastolic.Value, heartRate);
+}
 
 // A signed note as the chart lists it: when it was signed and whether it is sensitive. Not its text.
 public sealed record SignedNoteEntry(Guid Id, DateTimeOffset SignedAt, bool Sensitive);
@@ -99,6 +104,49 @@ public sealed record LatestVital(string Code, string Display, decimal Value, str
 {
     // The reading before this one, when the chart's query held one (step 9b): for the up or down mark.
     public decimal? Previous { get; init; }
+
+    // For a blood pressure, which is one reading (step 9c): this is its systolic, and this the diastolic of the same
+    // reading, with the diastolic of the reading before.
+    public LatestVital? Diastolic { get; init; }
+
+    // Up or down from the reading before: for a blood pressure, only when its two numbers didn't move opposite ways.
+    public string? Direction
+    {
+        get
+        {
+            var moves = new[] { (Value, Previous), (Diastolic?.Value, Diastolic?.Previous) }.Where(move => move.Item1 is not null && move.Item2 is not null)
+                .Select(move => Math.Sign(move.Item1!.Value - move.Item2!.Value)).ToList();
+            if (moves.Count == 0 || (Diastolic is not null && moves.Count < 2) || moves.Contains(1) == moves.Contains(-1))
+            {
+                return null;
+            }
+
+            return moves.Contains(1) ? "up" : "down";
+        }
+    }
+
+    // The value as the chart shows it, and the reading before, the same way: "126/80" for a blood pressure.
+    public string Shown => Diastolic is null ? $"{Value:0.#}" : $"{Value:0.#}/{Diastolic.Value:0.#}";
+
+    public string PreviousShown => Diastolic is null ? $"{Previous:0.#}" : $"{Previous:0.#}/{Diastolic.Previous:0.#}";
+
+    public bool IsHigh => Value > ReferenceHigh || Diastolic?.Value > Diastolic?.ReferenceHigh;
+
+    public bool IsLow => Value < ReferenceLow || Diastolic?.Value < Diastolic?.ReferenceLow;
+
+    // The newest blood pressure among these readings, newest first: its systolic, with the diastolic of the same
+    // reading, each with the value of the reading before it.
+    public static IEnumerable<LatestVital> Pressure(IReadOnlyList<Ehr.Domain.Results.BloodPressure> readings)
+    {
+        if (readings.Count > 0)
+        {
+            var (latest, before) = (readings[0], readings.Count > 1 ? readings[1] : null);
+            yield return Of(latest.Systolic) with { Previous = before?.Systolic.Value, Diastolic = Of(latest.Diastolic) with { Previous = before?.Diastolic.Value } };
+        }
+    }
+
+    public static LatestVital Of(Observation value) =>
+        new(value.Code!, value.Display, value.Value!.Value, value.Unit, value.ReferenceLow, value.ReferenceHigh, value.EffectiveAt);
 }
 
 // A patient's message threads, latest first, already recorded as one read of the patient.
