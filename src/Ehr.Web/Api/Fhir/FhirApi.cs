@@ -30,7 +30,7 @@ namespace Ehr.Web.Api.Fhir;
 // commits before any of the answer is written. Off-site the cloud app reads its copy and its events go to its audit
 // queue, written before the response is sent (CloudAuditFlushMiddleware), as a page's are.
 //
-// Every answer is application/fhir+json, never cached; a client whose Accept header takes no JSON gets 406. Errors are
+// Every answer is application/fhir+json, never cached; a GET whose Accept header doesn't take it gets 406. Errors are
 // OperationOutcomes with fixed text: nothing from the request or the record. A search returns at most SearchLimit
 // entries, with the total, each type newest first by its own date (SearchOrder), undated entries last; a parameter the
 // capability statement doesn't list is refused, at /fhir/metadata too. Nothing writes: any other method is 405
@@ -270,19 +270,38 @@ public static class FhirApi
     static async Task<bool> MayReadAsync(Guid patient, PatientAssignments assignments, BreakGlass breakGlass, CancellationToken cancellationToken) =>
         await assignments.IsOnPanelAsync(patient, cancellationToken) || await breakGlass.ActiveUntilAsync(patient, cancellationToken) is not null;
 
-    // FHIR JSON or nothing: a client whose Accept header takes none of these gets 406, before anything is read. _format,
-    // when given, decides instead, as FHIR has it, and Unsupported takes only JSON there.
+    // FHIR JSON or nothing: a GET whose Accept header doesn't take application/fhir+json gets 406, before anything is
+    // read. Any other method is 405 first, whatever it accepts (the catch-all route answers it). _format, when given,
+    // decides instead, as FHIR has it, and Unsupported takes only JSON there.
     static async ValueTask<object?> JsonAcceptedAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var request = context.HttpContext.Request;
-        var accepted = request.GetTypedHeaders().Accept;
-        return request.Query.ContainsKey("_format") || accepted.Count == 0
-            || accepted.Any(type => type.Quality is not 0 && JsonTypes.Contains(type.MediaType.Value, StringComparer.OrdinalIgnoreCase))
+        return !HttpMethods.IsGet(request.Method) || request.Query.ContainsKey("_format") || TakesJson(request.GetTypedHeaders().Accept)
             ? await next(context)
             : Refusal(StatusCodes.Status406NotAcceptable, "not-supported", "This API answers in JSON only, as application/fhir+json.");
     }
 
-    static readonly string[] JsonTypes = ["*/*", "application/*", "application/json", "application/fhir+json"];
+    // Whether an Accept header takes application/fhir+json, which is all this API sends. As RFC 9110 (12.5.1) has it,
+    // the most specific range that matches decides, by its q: application/fhir+json itself, then application/*, then */*
+    // (a parameter other than q doesn't make one more specific here). application/json is taken as asking for this
+    // API's JSON, as _format=application/json is, unless application/fhir+json is named. No Accept header, or none
+    // that can be read, takes anything.
+    static bool TakesJson(IList<Microsoft.Net.Http.Headers.MediaTypeHeaderValue> accepted)
+    {
+        if (accepted.Count == 0)
+        {
+            return true;
+        }
+
+        bool Named(string type) => accepted.Any(range => string.Equals(range.MediaType.Value, type, StringComparison.OrdinalIgnoreCase));
+        bool Takes(string type) => accepted.Where(range => string.Equals(range.MediaType.Value, type, StringComparison.OrdinalIgnoreCase))
+            .Max(range => range.Quality ?? 1) > 0;
+        var decides = FhirJsonRanges.FirstOrDefault(Named);
+        return (decides is not null && Takes(decides)) || (!Named("application/fhir+json") && Named("application/json") && Takes("application/json"));
+    }
+
+    // The ranges that match application/fhir+json, the most specific first.
+    static readonly string[] FhirJsonRanges = ["application/fhir+json", "application/*", "*/*"];
 
     // One database transaction for the request, as DatabaseTransactionFilter gives a page (which doesn't run here):
     // UserContextInterceptor makes the clinician its first statement, for row-level security, and the read's audit

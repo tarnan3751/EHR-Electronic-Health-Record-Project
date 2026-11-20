@@ -123,8 +123,9 @@ internal static class FhirResources
         [
             new Rest(
                 "server",
-                "Read-only: reads and searches by patient, nothing else. Every response is application/fhir+json, never cached; a request that "
-                + "accepts no JSON is refused with 406. A search needs its patient (or, for Patient, the MRN), returns at most "
+                "Read-only: reads and searches by patient, nothing else. Every response is application/fhir+json, never cached; a read or search "
+                + "whose Accept header doesn't take application/fhir+json is refused with 406 (the most specific matching range decides, as RFC "
+                + "9110 has it; application/json is taken as asking for it), and any other method with 405. A search needs its patient (or, for Patient, the MRN), returns at most "
                 + $"{FhirApi.SearchLimit} entries, with total giving how many matched, and has no paging. {FhirApi.SearchOrder} A parameter not "
                 + "listed here is refused with 400, here as everywhere; _format is taken for JSON. Sensitive diagnoses and medications are left "
                 + "out unless show-sensitive=true is given, which is recorded, and are then marked restricted. A blood pressure is one "

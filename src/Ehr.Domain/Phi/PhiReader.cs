@@ -1103,7 +1103,9 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         // has one diastolic. Asked as "the first diastolic of the reading", EF Core numbers every diastolic in the table.
         var rows = await (
             from o in matching.OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).ThenBy(o => o.Id).Take(limit)
-            join d in db.Observations.Where(d => d.Code == VitalSign.Diastolic) on o.ReadingId equals d.ReadingId into diastolics
+            // Only a diastolic standing as its systolic stands: the database keeps a reading whole, and this keeps the
+            // read from ever joining a systolic to a diastolic in another state.
+            join d in db.Observations.Where(d => d.Code == VitalSign.Diastolic) on new { o.ReadingId, o.Status } equals new { d.ReadingId, d.Status } into diastolics
             from d in diastolics.DefaultIfEmpty()
             orderby o.EffectiveAt descending, o.Code, o.Id
             select new

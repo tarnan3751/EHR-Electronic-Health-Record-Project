@@ -46,11 +46,14 @@ internal static class FhirObservations
     // The profiles vital signs claim, for the capability statement's supportedProfile.
     public static IEnumerable<string> Profiles => VitalSignProfiles.Values.Distinct();
 
-    // Each entry as an Observation, with its ID: a blood pressure's is its reading's.
+    // Each entry as an Observation, with its ID: a blood pressure's is its reading's. A blood pressure value without the
+    // other value of its reading is left out, never sent alone under its own ID: the database keeps readings whole, so
+    // this is a guard against what can't be stored, not a case that happens.
     public static IReadOnlyList<(Guid Id, FhirObservation Resource)> Map(IEnumerable<ObservationEntry> entries) =>
-        [.. entries.Select(entry => entry.Diastolic is { } diastolic
-            ? (entry.Observation.ReadingId!.Value, Reading(entry, diastolic))
-            : (entry.Observation.Id, Map(entry)))];
+        [.. entries.Where(entry => entry.Diastolic is not null || !VitalSign.BloodPressure.Contains(entry.Observation.Code))
+            .Select(entry => entry.Diastolic is { } diastolic
+                ? (entry.Observation.ReadingId!.Value, Reading(entry, diastolic))
+                : (entry.Observation.Id, Map(entry)))];
 
     static FhirObservation Map(ObservationEntry entry)
     {

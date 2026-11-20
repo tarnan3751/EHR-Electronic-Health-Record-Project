@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Data.Patients;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 using static Ehr.Web.Tests.FhirRequests;
@@ -21,8 +22,9 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 // Preconditions: As TC-UC19-01. An admin, signed in; the patient's own portal account, signed in; the desktop app's
 //   session token of the patient's clinician; a second clinician without the patient on their panel, signed in.
 // Inputs and system conditions: GET /fhir/metadata, GET /fhir/Patient/{id}, GET /fhir/Observation?patient={id}, GET
-//   /fhir/Condition/{id} and GET /fhir/Patient?identifier={MRN}, as each caller, on the on-site app; the same without
-//   signing in, with an Origin header of another site, and as an OPTIONS request.
+//   /fhir/Condition/{id}, GET /fhir/Observation/{id} of a heart rate and of a blood pressure reading (by the reading's
+//   ID) and GET /fhir/Patient?identifier={MRN}, as each caller, on the on-site app; the same without signing in, with an
+//   Origin header of another site, and as an OPTIONS request.
 // Test data: The patient of TC-UC19-01; Origin "https://elsewhere.example"; the MRN "SYN-NOT-AN-MRN", nobody's.
 // Steps:
 //   1. Without signing in, make each request, then again from another site's page, and as OPTIONS.
@@ -55,6 +57,8 @@ public class TC_UC19_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
         string[] aboutThePatient =
         [
             $"/fhir/Patient/{chart.Patient}", $"/fhir/Observation?patient={chart.Patient}", $"/fhir/Condition/{chart.Hypertension}",
+            // An observation by its ID and a blood pressure by its reading's: the gate's lookup takes each kind of ID.
+            $"/fhir/Observation/{chart.Vitals[VitalSign.HeartRate]}", $"/fhir/Observation/{chart.Reading}",
             $"/fhir/Patient?identifier={chart.Mrn}",
         ];
 
