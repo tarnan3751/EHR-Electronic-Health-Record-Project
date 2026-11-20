@@ -28,8 +28,9 @@ namespace Ehr.Migrations
             //   1. Every vital sign of a patient's moment (the time it was taken) gets the visit of the first one
             //      recorded there, as the database now decides it; a check-in between two values could split them.
             //      The first values' visits are not decided again.
-            //   2. Where a sign has more than one standing value at a moment, the most recently entered (issued_at,
-            //      then id) is kept and the others are marked entered in error, "duplicate resolved by migration 9c".
+            //   2. Where a sign other than blood pressure has more than one standing value at a moment, the most
+            //      recently entered (issued_at, then id) is kept and the others are marked entered in error,
+            //      "duplicate resolved by migration 9c". Blood pressure goes by pairs, in 4.
             //   A row with no code, which only an insert past the apps could leave, is no sign: 1 and 2 leave it as it
             //   is (the older schema's index, which a rollback makes again, held two of them at one moment apart only
             //   by their visits).
@@ -39,22 +40,33 @@ namespace Ehr.Migrations
             //      exactly as ehr.file_result (db/policies/75-results.sql) works one out: the newest final weight and
             //      height of the moment, rounded to one decimal, the name, unit and range of observation_codes (or a
             //      range for the patient's age, were there one for the body mass index), refused outside 1 to 500.
-            //   4. A standing blood pressure value whose partner was marked in error alone, under step 9b, is marked
-            //      too, "partner value was marked in error before readings existed (migration 9c)" (Tahseen's rule).
-            //   5. A standing blood pressure value that never had a partner (only an insert past the apps could leave
-            //      one) is marked "blood pressure value without its partner (migration 9c)".
-            //   6. Each standing systolic and diastolic of a moment become one reading. Values in error get readings
+            //   4. A moment's standing blood pressure is the most recent pair entered together whose two values both
+            //      stand (Tahseen's rule, 20 November: a reading must be a pair that was entered together). Values were
+            //      entered together when one transaction wrote them, which the data shows as their inserts' audit
+            //      events having the same time (the transaction's start) and person; values with no insert event, which
+            //      the seed and the VitalSigns migration loaded, were entered together when they have the same
+            //      issued_at (both give a visit's values the visit's start). Every other standing blood pressure value
+            //      of the moment is marked entered in error: an older pair whose values both stand, "duplicate
+            //      resolved by migration 9c"; where a pair stands, any other value, "not entered together with a
+            //      standing partner (migration 9c)"; where none does, a value whose partner, entered with it, was marked
+            //      in error alone under step 9b, "partner value was marked in error before readings existed (migration
+            //      9c)" (Tahseen's rule); a value that never had a partner, the moment holding no value of the other
+            //      sign (only an insert past the apps could leave one), "blood pressure value without its partner
+            //      (migration 9c)"; and any other, "not entered together with a standing partner (migration 9c)".
+            //   5. Each standing systolic and diastolic of a moment become one reading. Values in error get readings
             //      too: a moment's systolic and diastolic in error share one only when they were marked together (the
             //      same reason, by the same person, within a second of each other: one statement marks them
             //      microseconds apart); any other has one of its own, so no reason is hidden behind another.
-            // 1 to 5 change patient data and are audited, as the write-audit trigger records any change: with nobody
+            // 1 to 4 change patient data and are audited, as the write-audit trigger records any change: with nobody
             // signed in, the audit page shows "System" as who, and the reason is in the change; the body mass index
-            // worked out again is an insert by "System". 6 fills a new column, not audited, as VitalCorrections
+            // worked out again is an insert by "System". 5 fills a new column, not audited, as VitalCorrections
             // re-ranged readings. Marked rows have no one recorded as marking them. As in VitalCorrections, forced
             // row-level security is lifted on observations for the owner while it runs. The body mass index's cascade
             // is paused: 3 marks the body mass index itself, with a reason of its own. It reports each count with
             // RAISE NOTICE, which the migration job prints (DatabaseNotices). Its run time is in
-            // docs/expansion/PLAN.md's log, step 9c; the migration job allows ten minutes (infra/migrate).
+            // docs/expansion/PLAN.md's log, step 9c; the migration job allows ten minutes (infra/migrate). Rule 4 was
+            // changed in place after Tahseen's answers on step 9c, which said no rerun is needed: no database that had
+            // already run this migration holds a moment it would decide differently (the decision log, 20 November).
             migrationBuilder.Sql("""
                 DO $$
                 DECLARE
@@ -67,6 +79,7 @@ namespace Ehr.Migrations
                     indexes_again bigint;
                     partners bigint;
                     unpaired bigint;
+                    unpartnered bigint;
                     readings bigint;
                     apart bigint;
                 BEGIN
@@ -97,7 +110,8 @@ namespace Ehr.Migrations
 
                     WITH ranked AS (
                         SELECT id, row_number() OVER (PARTITION BY patient_id, code, effective_at ORDER BY issued_at DESC NULLS LAST, id DESC) AS place
-                        FROM ehr.observations WHERE category = 'vital-signs' AND code IS NOT NULL AND status <> 'entered-in-error'),
+                        FROM ehr.observations
+                        WHERE category = 'vital-signs' AND code IS NOT NULL AND code NOT IN ('8480-6', '8462-4') AND status <> 'entered-in-error'),
                     marked AS (
                         UPDATE ehr.observations o
                         SET status = 'entered-in-error', entered_in_error_reason = 'duplicate resolved by migration 9c', entered_in_error_at = clock_timestamp()
@@ -145,29 +159,67 @@ namespace Ehr.Migrations
                     WHERE b.value >= 1 AND b.value <= 500;
                     GET DIAGNOSTICS indexes_again = ROW_COUNT;
 
-                    -- Each moment's blood pressure: which of its two values stand, and which are there at all.
+                    -- Each blood pressure value with what it was entered with: its insert's audit event, the time of
+                    -- the transaction that wrote it and who; or, loaded with none, its issued_at.
+                    CREATE TEMPORARY TABLE pressure_values ON COMMIT DROP AS
+                    SELECT o.id, o.patient_id, o.effective_at, o.code, o.status <> 'entered-in-error' AS standing, o.issued_at,
+                        i.occurred_at IS NOT NULL AS logged, coalesce(i.occurred_at, o.issued_at) AS entered_at, i.actor_id AS entered_by
+                    FROM ehr.observations o
+                    LEFT JOIN LATERAL (
+                        SELECT e.occurred_at, e.actor_id FROM ehr.audit_events e
+                        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'insert' AND e.row_id = o.id
+                        ORDER BY e.occurred_at
+                        LIMIT 1) i ON true
+                    WHERE o.category = 'vital-signs' AND o.code IN ('8480-6', '8462-4');
+
+                    -- The values of a moment entered together: a pair when one systolic and one diastolic.
+                    CREATE TEMPORARY TABLE pressure_entries ON COMMIT DROP AS
+                    SELECT patient_id, effective_at, logged, entered_at, entered_by,
+                        count(*) FILTER (WHERE code = '8480-6') = 1 AND count(*) FILTER (WHERE code = '8462-4') = 1 AS pair,
+                        bool_and(standing) AS standing, max(issued_at) AS latest
+                    FROM pressure_values
+                    GROUP BY patient_id, effective_at, logged, entered_at, entered_by;
+
+                    -- Each moment's blood pressure: the most recent pair entered together whose two values stand.
+                    CREATE TEMPORARY TABLE pressure_kept ON COMMIT DROP AS
+                    SELECT DISTINCT ON (patient_id, effective_at) patient_id, effective_at, logged, entered_at, entered_by
+                    FROM pressure_entries WHERE pair AND standing
+                    ORDER BY patient_id, effective_at, latest DESC, entered_at DESC;
+
+                    WITH marks AS (
+                        SELECT v.id,
+                            CASE
+                                WHEN n.pair AND n.standing THEN 'duplicate resolved by migration 9c'
+                                WHEN k.patient_id IS NOT NULL THEN 'not entered together with a standing partner (migration 9c)'
+                                WHEN n.pair THEN 'partner value was marked in error before readings existed (migration 9c)'
+                                WHEN NOT EXISTS (SELECT 1 FROM pressure_values w WHERE w.patient_id = v.patient_id AND w.effective_at = v.effective_at AND w.code <> v.code)
+                                    THEN 'blood pressure value without its partner (migration 9c)'
+                                ELSE 'not entered together with a standing partner (migration 9c)'
+                            END AS reason
+                        FROM pressure_values v
+                        JOIN pressure_entries n ON n.patient_id = v.patient_id AND n.effective_at = v.effective_at AND n.logged = v.logged
+                            AND n.entered_at = v.entered_at AND n.entered_by IS NOT DISTINCT FROM v.entered_by
+                        LEFT JOIN pressure_kept k ON k.patient_id = v.patient_id AND k.effective_at = v.effective_at
+                        WHERE v.standing
+                          AND NOT (k.patient_id IS NOT NULL AND k.logged = v.logged AND k.entered_at = v.entered_at AND k.entered_by IS NOT DISTINCT FROM v.entered_by)),
+                    marked AS (
+                        UPDATE ehr.observations o
+                        SET status = 'entered-in-error', entered_in_error_reason = m.reason, entered_in_error_at = clock_timestamp()
+                        FROM marks m WHERE o.id = m.id
+                        RETURNING o.entered_in_error_reason AS reason)
+                    SELECT duplicates + count(*) FILTER (WHERE reason = 'duplicate resolved by migration 9c'),
+                        count(*) FILTER (WHERE reason = 'partner value was marked in error before readings existed (migration 9c)'),
+                        count(*) FILTER (WHERE reason = 'blood pressure value without its partner (migration 9c)'),
+                        count(*) FILTER (WHERE reason = 'not entered together with a standing partner (migration 9c)')
+                    INTO duplicates, partners, unpaired, unpartnered
+                    FROM marked;
+
+                    -- Each moment's blood pressure now: whether a systolic and a diastolic stand.
                     CREATE TEMPORARY TABLE pressure_moments ON COMMIT DROP AS
                     SELECT patient_id, effective_at,
-                        bool_or(code = '8480-6' AND status <> 'entered-in-error') AS systolic, bool_or(code = '8462-4' AND status <> 'entered-in-error') AS diastolic,
-                        bool_or(code = '8480-6') AS any_systolic, bool_or(code = '8462-4') AS any_diastolic
+                        bool_or(code = '8480-6' AND status <> 'entered-in-error') AS systolic, bool_or(code = '8462-4' AND status <> 'entered-in-error') AS diastolic
                     FROM ehr.observations WHERE category = 'vital-signs' AND code IN ('8480-6', '8462-4')
                     GROUP BY patient_id, effective_at;
-
-                    UPDATE ehr.observations o
-                    SET status = 'entered-in-error', entered_in_error_reason = 'partner value was marked in error before readings existed (migration 9c)',
-                        entered_in_error_at = clock_timestamp()
-                    FROM pressure_moments m
-                    WHERE o.patient_id = m.patient_id AND o.effective_at = m.effective_at AND o.category = 'vital-signs' AND o.status <> 'entered-in-error'
-                      AND (o.code = '8480-6' AND NOT m.diastolic AND m.any_diastolic OR o.code = '8462-4' AND NOT m.systolic AND m.any_systolic);
-                    GET DIAGNOSTICS partners = ROW_COUNT;
-
-                    UPDATE ehr.observations o
-                    SET status = 'entered-in-error', entered_in_error_reason = 'blood pressure value without its partner (migration 9c)',
-                        entered_in_error_at = clock_timestamp()
-                    FROM pressure_moments m
-                    WHERE o.patient_id = m.patient_id AND o.effective_at = m.effective_at AND o.category = 'vital-signs' AND o.status <> 'entered-in-error'
-                      AND (o.code = '8480-6' AND NOT m.any_diastolic OR o.code = '8462-4' AND NOT m.any_systolic);
-                    GET DIAGNOSTICS unpaired = ROW_COUNT;
 
                     IF audited THEN
                         ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
@@ -215,6 +267,7 @@ namespace Ehr.Migrations
                     RAISE NOTICE 'Migration 9c: % body mass index values worked out again from the weight and height kept (audited)', indexes_again;
                     RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error because their partner was, "partner value was marked in error before readings existed (migration 9c)" (audited)', partners;
                     RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that never had a partner, "blood pressure value without its partner (migration 9c)" (audited)', unpaired;
+                    RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that were not entered together with a standing partner, "not entered together with a standing partner (migration 9c)" (audited)', unpartnered;
                     RAISE NOTICE 'Migration 9c: % standing blood pressure values made into % readings; % values in error given readings', readings, readings / 2, apart;
                 END
                 $$;

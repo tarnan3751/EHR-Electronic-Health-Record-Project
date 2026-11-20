@@ -10,7 +10,9 @@ namespace Ehr.Security.Tests;
 
 // The expansion plan's step 9c: the VitalReadings migration puts the vital signs already recorded in the shape the new
 // rules need, by hand, as the tables' owner. On a database in use (policies applied, as after any deploy), with rows
-// shaped as steps 9 and 9b could leave them, this proves each kind of change and its count in the migration's report,
+// shaped as steps 9 and 9b could leave them (each set entered in one transaction, as the pages wrote it, or loaded with
+// no audit event, as the seed and the VitalSigns migration did), this proves each kind of change and its count in the
+// migration's report,
 // that each change to patient data is an audit event and the reading IDs are not, that the protection is back
 // afterwards, and that the migration goes down and up again. A database of its own: it migrates down and up.
 public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
@@ -47,6 +49,31 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
             """,
             ("patient", patient), ("visit", (object?)visit ?? DBNull.Value), ("code", (object?)code ?? DBNull.Value), ("value", value), ("minutes", minutes),
             ("in_error", inError), ("reason", reason), ("marked_ago", markedAgo), ("taken", Taken));
+
+    // Values entered together, in one transaction, as the vital signs page entered a set: `minutes` after the moment for
+    // each, as above, at the visit if one is given.
+    Task InsertTogetherAsync(Guid patient, params (string Code, decimal Value, int Minutes, bool InError)[] values) => InsertTogetherAsync(patient, null, values);
+
+    Task InsertTogetherAsync(Guid patient, Guid? visit, params (string Code, decimal Value, int Minutes, bool InError)[] values) =>
+        Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            string.Concat(values.Select((_, i) =>
+                "INSERT INTO ehr.observations (id, patient_id, encounter_id, category, code, display, status, value, effective_at, issued_at, entered_in_error_reason, entered_in_error_at) "
+                + $"VALUES (gen_random_uuid(), @patient, @visit, 'vital-signs', @code{i}, 'Synthetic', CASE WHEN @in_error{i} THEN 'entered-in-error' ELSE 'final' END, @value{i}, "
+                + $"@taken, @taken + make_interval(mins => @minutes{i}), CASE WHEN @in_error{i} THEN 'Synthetic: typed wrong' END, CASE WHEN @in_error{i} THEN now() END);")),
+            [("patient", patient), ("visit", (object?)visit ?? DBNull.Value), ("taken", Taken),
+                .. values.SelectMany((value, i) => new (string, object)[] { ($"code{i}", value.Code), ($"value{i}", value.Value), ($"minutes{i}", value.Minutes), ($"in_error{i}", value.InError) })]);
+
+    // A visit's blood pressure loaded with no audit event and one issued_at, as the seed and the VitalSigns migration
+    // loaded them.
+    Task LoadAsync(Guid patient, decimal systolic, decimal diastolic) =>
+        Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            SET LOCAL session_replication_role = replica;
+            INSERT INTO ehr.observations (id, patient_id, category, code, display, status, value, effective_at, issued_at)
+            VALUES (gen_random_uuid(), @patient, 'vital-signs', '8480-6', 'Synthetic', 'final', @systolic, @taken, @taken),
+                   (gen_random_uuid(), @patient, 'vital-signs', '8462-4', 'Synthetic', 'final', @diastolic, @taken, @taken);
+            """,
+            ("patient", patient), ("systolic", systolic), ("diastolic", diastolic), ("taken", Taken));
 
     static readonly DateTime Taken = new(2026, 11, 1, 9, 0, 0, DateTimeKind.Utc);
 
@@ -97,6 +124,7 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
     const string Duplicate = "duplicate resolved by migration 9c";
     const string Partner = "partner value was marked in error before readings existed (migration 9c)";
     const string Unpaired = "blood pressure value without its partner (migration 9c)";
+    const string Unpartnered = "not entered together with a standing partner (migration 9c)";
     const string Index = "body mass index of a value marked as a duplicate (migration 9c)";
 
     [Fact]
@@ -107,18 +135,39 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
         Assert.Empty(await MigrateAsync(Before));
         Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM information_schema.columns WHERE table_schema = 'ehr' AND table_name = 'observations' AND column_name = 'reading_id'"));
 
-        // Failure A of step 9c: 120/80 with no visit, the diastolic marked in error, and after a check-in 120/78.
+        // Failure A of step 9c: 120/80 with no visit, the diastolic marked in error, and after a check-in 78 typed alone
+        // (step 9b's correction of one number). No pair entered together stands: the systolic's partner is in error,
+        // and the 78 was entered alone.
         var a = await PatientAsync();
         var aVisit = await VisitAsync(a);
-        await InsertAsync(a, "8480-6", 120m, 1);
-        await InsertAsync(a, "8462-4", 80m, 2, inError: true);
+        await InsertTogetherAsync(a, ("8480-6", 120m, 1, false), ("8462-4", 80m, 2, true));
         await InsertAsync(a, "8462-4", 78m, 10, visit: aVisit);
-        // Failure B: 120/80 with no visit, and after a check-in 130 for the same time, beside the diastolic.
+        // Failure B: 120/80 with no visit, and after a check-in 130 typed alone for the same time, beside the diastolic:
+        // 120/80, the pair entered together, stands.
         var b = await PatientAsync();
         var bVisit = await VisitAsync(b);
-        await InsertAsync(b, "8480-6", 120m, 1);
-        await InsertAsync(b, "8462-4", 80m, 2);
+        await InsertTogetherAsync(b, ("8480-6", 120m, 1, false), ("8462-4", 80m, 2, false));
         await InsertAsync(b, "8480-6", 130m, 10, visit: bVisit);
+        // Tahseen's example: 120/80, then 130/85 typed whole after a check-in, then the 85 marked in error: 120/80.
+        var example = await PatientAsync();
+        var exampleVisit = await VisitAsync(example);
+        await InsertTogetherAsync(example, ("8480-6", 120m, 1, false), ("8462-4", 80m, 2, false));
+        await InsertTogetherAsync(example, exampleVisit, ("8480-6", 130m, 10, false), ("8462-4", 85m, 11, true));
+        // Two pairs entered whole, both standing (the second after a check-in, which the older index allowed): the
+        // latest stands, the older is a duplicate. And a systolic and a diastolic typed separately, neither with a
+        // partner entered with it.
+        var twoPairs = await PatientAsync();
+        var twoPairsVisit = await VisitAsync(twoPairs);
+        await InsertTogetherAsync(twoPairs, ("8480-6", 120m, 1, false), ("8462-4", 80m, 2, false));
+        await InsertTogetherAsync(twoPairs, twoPairsVisit, ("8480-6", 130m, 10, false), ("8462-4", 85m, 11, false));
+        var separately = await PatientAsync();
+        await InsertAsync(separately, "8480-6", 118m, 1);
+        await InsertAsync(separately, "8462-4", 76m, 5);
+        // A blood pressure loaded with no audit event, then 130 typed alone for the same moment after a check-in.
+        var loaded = await PatientAsync();
+        var loadedVisit = await VisitAsync(loaded);
+        await LoadAsync(loaded, 124m, 78m);
+        await InsertAsync(loaded, "8480-6", 130m, 10, visit: loadedVisit);
         // A heart rate recorded twice for one moment, at two visits.
         var twice = await PatientAsync();
         var twiceVisit = await VisitAsync(twice);
@@ -126,18 +175,14 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
         await InsertAsync(twice, "8867-4", 72m, 2);
         // A systolic whose diastolic was marked in error alone (step 9b), and one that never had a diastolic.
         var partner = await PatientAsync();
-        await InsertAsync(partner, "8480-6", 120m, 1);
-        await InsertAsync(partner, "8462-4", 80m, 2, inError: true);
+        await InsertTogetherAsync(partner, ("8480-6", 120m, 1, false), ("8462-4", 80m, 2, true));
         var lone = await PatientAsync();
         await InsertAsync(lone, "8480-6", 120m, 1);
         // A plain set; a blood pressure marked in error whole; and a systolic in error with no diastolic at all.
         var plain = await PatientAsync();
-        await InsertAsync(plain, "8480-6", 118m, 1);
-        await InsertAsync(plain, "8462-4", 76m, 2);
-        await InsertAsync(plain, "8867-4", 64m, 3);
+        await InsertTogetherAsync(plain, ("8480-6", 118m, 1, false), ("8462-4", 76m, 2, false), ("8867-4", 64m, 3, false));
         var wrong = await PatientAsync();
-        await InsertAsync(wrong, "8480-6", 140m, 1, inError: true);
-        await InsertAsync(wrong, "8462-4", 90m, 2, inError: true);
+        await InsertTogetherAsync(wrong, ("8480-6", 140m, 1, true), ("8462-4", 90m, 2, true));
         var half = await PatientAsync();
         await InsertAsync(half, "8480-6", 150m, 1, inError: true);
         // The two halves of a blood pressure marked in error an hour apart, as two corrections: two readings, so that
@@ -168,18 +213,30 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
 
         Assert.Equal(
             [
-                "Migration 9c: 4 vital signs moved to the visit of the first value recorded at their moment (audited)",
-                $"Migration 9c: 3 duplicate values marked entered in error, \"{Duplicate}\" (audited)",
+                "Migration 9c: 9 vital signs moved to the visit of the first value recorded at their moment (audited)",
+                $"Migration 9c: 4 duplicate values marked entered in error, \"{Duplicate}\" (audited)",
                 $"Migration 9c: 1 body mass index values marked entered in error, \"{Index}\" (audited)",
                 "Migration 9c: 1 body mass index values worked out again from the weight and height kept (audited)",
-                $"Migration 9c: 1 blood pressure values marked entered in error because their partner was, \"{Partner}\" (audited)",
+                $"Migration 9c: 2 blood pressure values marked entered in error because their partner was, \"{Partner}\" (audited)",
                 $"Migration 9c: 1 blood pressure values marked entered in error that never had a partner, \"{Unpaired}\" (audited)",
-                "Migration 9c: 6 standing blood pressure values made into 3 readings; 10 values in error given readings",
+                $"Migration 9c: 6 blood pressure values marked entered in error that were not entered together with a standing partner, \"{Unpartnered}\" (audited)",
+                "Migration 9c: 10 standing blood pressure values made into 5 readings; 19 values in error given readings",
             ],
             report);
 
-        Assert.Equal(["8480-6 120 final none none R1", "8462-4 80 entered-in-error Synthetic: typed wrong none R2", "8462-4 78 final none none R1"], await StateAsync(a));
-        Assert.Equal([$"8480-6 120 entered-in-error {Duplicate} none R1", "8462-4 80 final none none R2", "8480-6 130 final none none R2"], await StateAsync(b));
+        // A: no pair entered together stands, so nothing does; each value its own reading, its own reason.
+        Assert.Equal(
+            [$"8480-6 120 entered-in-error {Partner} none R1", "8462-4 80 entered-in-error Synthetic: typed wrong none R2", $"8462-4 78 entered-in-error {Unpartnered} none R3"],
+            await StateAsync(a));
+        Assert.Equal(["8480-6 120 final none none R1", "8462-4 80 final none none R1", $"8480-6 130 entered-in-error {Unpartnered} none R2"], await StateAsync(b));
+        Assert.Equal(
+            ["8480-6 120 final none none R1", "8462-4 80 final none none R1", $"8480-6 130 entered-in-error {Unpartnered} none R2", "8462-4 85 entered-in-error Synthetic: typed wrong none R3"],
+            await StateAsync(example));
+        Assert.Equal(
+            [$"8480-6 120 entered-in-error {Duplicate} none R1", $"8462-4 80 entered-in-error {Duplicate} none R1", "8480-6 130 final none none R2", "8462-4 85 final none none R2"],
+            await StateAsync(twoPairs));
+        Assert.Equal([$"8480-6 118 entered-in-error {Unpartnered} none R1", $"8462-4 76 entered-in-error {Unpartnered} none R1"], await StateAsync(separately));
+        Assert.Equal(["8462-4 78 final none none R1", "8480-6 124 final none none R1", $"8480-6 130 entered-in-error {Unpartnered} none R2"], await StateAsync(loaded));
         Assert.Equal([$"8867-4 70 entered-in-error {Duplicate} visit none", "8867-4 72 final none visit none"], await StateAsync(twice));
         // Marked apart (the diastolic under step 9b, the systolic by the migration): a reading each, each reason kept.
         Assert.Equal([$"8480-6 120 entered-in-error {Partner} none R1", "8462-4 80 entered-in-error Synthetic: typed wrong none R2"], await StateAsync(partner));
@@ -201,9 +258,12 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
         Assert.Equal(
             new[]
             {
-                $"8462-4 78 visit {a}", $"8480-6 130 visit {b}", $"8867-4 72 visit {twice}", $"29463-7 79 visit {weighed}",
-                $"8480-6 120 marked {b} {Duplicate}", $"8867-4 70 marked {twice} {Duplicate}", $"8480-6 120 marked {partner} {Partner}", $"8480-6 120 marked {lone} {Unpaired}",
-                $"29463-7 81 marked {weighed} {Duplicate}", $"39156-5 25 marked {weighed} {Index}",
+                $"8462-4 78 visit {a}", $"8480-6 130 visit {b}", $"8867-4 72 visit {twice}", $"29463-7 79 visit {weighed}", $"8480-6 130 visit {example}",
+                $"8462-4 85 visit {example}", $"8480-6 130 visit {twoPairs}", $"8462-4 85 visit {twoPairs}", $"8480-6 130 visit {loaded}",
+                $"8480-6 120 marked {a} {Partner}", $"8462-4 78 marked {a} {Unpartnered}", $"8480-6 130 marked {b} {Unpartnered}", $"8867-4 70 marked {twice} {Duplicate}",
+                $"8480-6 120 marked {partner} {Partner}", $"8480-6 120 marked {lone} {Unpaired}", $"29463-7 81 marked {weighed} {Duplicate}", $"39156-5 25 marked {weighed} {Index}",
+                $"8480-6 130 marked {example} {Unpartnered}", $"8480-6 120 marked {twoPairs} {Duplicate}", $"8462-4 80 marked {twoPairs} {Duplicate}",
+                $"8480-6 118 marked {separately} {Unpartnered}", $"8462-4 76 marked {separately} {Unpartnered}", $"8480-6 130 marked {loaded} {Unpartnered}",
             }.Order(StringComparer.Ordinal),
             (await AsSuperuserAsync(
                 """
@@ -211,7 +271,7 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
                 FROM ehr.audit_events e JOIN ehr.observations o ON o.id = e.row_id
                 WHERE e.table_name = 'observations' AND e.action = 'update' AND e.actor_id IS NULL AND e.occurred_at > now() - interval '10 minutes'
                   AND NOT e.details ? 'reading_id' AND e.patient_id = ANY(@patients)
-                """, ("patients", new[] { a, b, twice, partner, lone, plain, wrong, half, apart, weighed, uncoded }))).Order(StringComparer.Ordinal));
+                """, ("patients", new[] { a, b, example, twoPairs, separately, loaded, twice, partner, lone, plain, wrong, half, apart, weighed, uncoded }))).Order(StringComparer.Ordinal));
         // The body mass index worked out again is an insert by nobody signed in, with its values.
         Assert.Equal(["insert none 24.4 final"], await AsSuperuserAsync(
             """
@@ -219,7 +279,7 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
             FROM ehr.audit_events e JOIN ehr.observations o ON o.id = e.row_id
             WHERE e.table_name = 'observations' AND e.patient_id = @patient AND e.action = 'insert' AND o.code = '39156-5' AND o.status = 'final'
             """, ("patient", weighed)));
-        Assert.Equal(audited + 11, int.Parse((await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events")).Single()));
+        Assert.Equal(audited + 24, int.Parse((await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events")).Single()));
         Assert.Equal(protection, await AsSuperuserAsync(Protection));
 
         // Down: the readings go, the marks and the visits stay. Up again: nothing more to mark or move.
@@ -235,10 +295,11 @@ public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixtu
                 "Migration 9c: 0 body mass index values worked out again from the weight and height kept (audited)",
                 $"Migration 9c: 0 blood pressure values marked entered in error because their partner was, \"{Partner}\" (audited)",
                 $"Migration 9c: 0 blood pressure values marked entered in error that never had a partner, \"{Unpaired}\" (audited)",
-                "Migration 9c: 6 standing blood pressure values made into 3 readings; 10 values in error given readings",
+                $"Migration 9c: 0 blood pressure values marked entered in error that were not entered together with a standing partner, \"{Unpartnered}\" (audited)",
+                "Migration 9c: 10 standing blood pressure values made into 5 readings; 19 values in error given readings",
             ],
             await MigrateAsync(null));
-        Assert.Equal(audited + 11, int.Parse((await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events")).Single()));
+        Assert.Equal(audited + 24, int.Parse((await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events")).Single()));
         Assert.Equal(protection, await AsSuperuserAsync(Protection));
 
         // And db/policies applies over the migrated rows, as the migration job does next.
