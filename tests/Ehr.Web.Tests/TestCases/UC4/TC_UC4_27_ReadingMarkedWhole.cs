@@ -27,7 +27,9 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   the blood pressure marks both of its numbers. Step 2: 422, "Choose at least one reading."; nothing is marked.
 //   Step 3: "Marked: 1 reading"; the page counts 1 reading marked; both numbers are entered in error with the reason
 //   and the clinician; the heart rate stands. Step 4: 150/95 is struck through once, with the reason. Step 5: saved;
-//   the flowsheet shows 140/90, a reading of its own.
+//   the flowsheet shows 140/90, a reading of its own. And a systolic marked in error alone before readings existed, as
+//   the VitalReadings migration leaves one beside the reading that corrected it, is struck through with a dash for its
+//   diastolic: "150/— entered in error: ...".
 // Creator: Tahseen Arnan
 public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
 {
@@ -71,5 +73,32 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
         Assert.Matches("(?s)Blood pressure <span[^>]*>[^<]*</span></th>\\s*<td class=\"sc-table__mono\">\\s*140/90\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", await ReadAsync(corrected));
         Assert.Equal(["8480-6 150 entered-in-error none R1", "8462-4 95 entered-in-error none R1", "8480-6 140 final none R2", "8462-4 90 final none R2"],
             await ReadingsAsync(apps, patient));
+    }
+
+    // A systolic marked in error alone under step 9b, its diastolic left standing and paired by the VitalReadings
+    // migration with the systolic typed to correct it: a reading of its own, in error, shown with a dash for the half
+    // it doesn't have.
+    [Fact]
+    public async Task A_blood_pressure_value_marked_alone_before_readings_is_shown_with_a_dash()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps);
+        var taken = DateTime.UtcNow.AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm");
+        using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "140"), (Diastolic, "90"));
+        Assert.Contains("Saved:", await ReadAsync(recorded));
+        await ProxyTests.QueryAsync(apps,
+            """
+            INSERT INTO ehr.observations (id, patient_id, reading_id, category, code, display, status, value, unit, reference_low, reference_high, effective_at, issued_at,
+                entered_in_error_reason, entered_in_error_at)
+            SELECT gen_random_uuid(), patient_id, gen_random_uuid(), 'vital-signs', code, display, 'entered-in-error', 150, unit, reference_low, reference_high, effective_at,
+                issued_at - interval '1 minute', 'Synthetic: typed 150 for 140.', now()
+            FROM ehr.observations WHERE patient_id = @patient AND code = '8480-6'
+            RETURNING id::text
+            """, patient);
+
+        var shown = await session.Client.GetStringAsync(Path(patient) + "?showErrors=true", Cancel);
+        var row = Words(System.Text.RegularExpressions.Regex.Match(shown, "(?s)<th scope=\"row\">Blood pressure.*?</tr>").Value);
+        Assert.Contains("140/90", row);
+        Assert.Contains("150/— entered in error: Synthetic: typed 150 for 140.", row);
+        Assert.Contains("1 reading is marked entered in error and left out.", Words(shown));
     }
 }

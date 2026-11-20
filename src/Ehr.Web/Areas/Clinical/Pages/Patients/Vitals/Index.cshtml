@@ -131,7 +131,7 @@ else
                                     {
                                         foreach (var wrong in Model.PressureErrorsAt(time))
                                         {
-                                            <span class="sc-struck" data-in-error><s>@string.Join("/", wrong.Select(value => value.Value!.Value.ToString("0.#")))</s> <span class="sc-struck__reason">entered in error: @wrong[0].EnteredInErrorReason</span></span>
+                                            <span class="sc-struck" data-in-error><s>@IndexModel.PressureShown(wrong)</s> <span class="sc-struck__reason">entered in error: @wrong[0].EnteredInErrorReason</span></span>
                                         }
                                     }
                                 </td>

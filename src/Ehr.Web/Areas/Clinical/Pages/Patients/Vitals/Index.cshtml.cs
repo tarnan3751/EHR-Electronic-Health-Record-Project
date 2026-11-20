@@ -80,6 +80,11 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
     IReadOnlyList<BloodPressure> Pressures { get; set; } = [];
 
+    // A blood pressure's values in error as one value, "120/80"; a half marked alone before readings existed shows a
+    // dash for the other, "120/—".
+    public static string PressureShown(IReadOnlyList<Observation> values) =>
+        string.Join("/", VitalSign.BloodPressure.Select(code => values.FirstOrDefault(value => value.Code == code)?.Value?.ToString("0.#") ?? "—"));
+
     public static bool IsOutside(Observation sign) =>
         (sign.ReferenceLow is { } low && sign.Value < low) || (sign.ReferenceHigh is { } high && sign.Value > high);
 
