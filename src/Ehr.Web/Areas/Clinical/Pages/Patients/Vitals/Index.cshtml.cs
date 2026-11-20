@@ -85,9 +85,6 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     public static string PressureShown(IReadOnlyList<Observation> values) =>
         string.Join("/", VitalSign.BloodPressure.Select(code => values.FirstOrDefault(value => value.Code == code)?.Value?.ToString("0.#") ?? "—"));
 
-    public static bool IsOutside(Observation sign) =>
-        (sign.ReferenceLow is { } low && sign.Value < low) || (sign.ReferenceHigh is { } high && sign.Value > high);
-
     public async Task<IActionResult> OnGetAsync(Guid patientId)
     {
         TakenAt ??= DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);

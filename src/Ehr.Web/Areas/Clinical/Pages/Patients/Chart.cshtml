@@ -276,13 +276,9 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range. *@
                         <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
                         @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
-                        @if (vital.IsHigh)
+                        @foreach (var flag in vital.Flags)
                         {
-                            <span class="sc-tag sc-tag--warning">High</span>
-                        }
-                        @if (vital.IsLow)
-                        {
-                            <span class="sc-tag sc-tag--warning">Low</span>
+                            <span class="sc-tag sc-tag--warning">@flag</span>
                         }
                         @* Up or down against the reading before it (step 9b), in a shape and in words. *@
                         @if (vital.Direction is { } direction)

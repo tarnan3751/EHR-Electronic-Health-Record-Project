@@ -118,13 +118,9 @@ else
                                     @if (Model.PressureAt(time) is { } pressure)
                                     {
                                         @pressure.Text
-                                        @if (pressure.IsHigh)
+                                        @foreach (var flag in pressure.Flags)
                                         {
-                                            <span class="sc-tag sc-tag--warning">High</span>
-                                        }
-                                        @if (pressure.IsLow)
-                                        {
-                                            <span class="sc-tag sc-tag--warning">Low</span>
+                                            <span class="sc-tag sc-tag--warning">@flag</span>
                                         }
                                     }
                                     @if (Model.ShowErrors)
@@ -148,9 +144,9 @@ else
                                 @if (sign is not null)
                                 {
                                     @sign.Value!.Value.ToString("0.#")
-                                    @if (IndexModel.IsOutside(sign))
+                                    @if (VitalFlag.Of(sign) is { } flag)
                                     {
-                                        <span class="sc-tag sc-tag--warning">@(sign.Value > sign.ReferenceHigh ? "High" : "Low")</span>
+                                        <span class="sc-tag sc-tag--warning">@flag</span>
                                     }
                                 }
                                 @if (Model.ShowErrors)

@@ -130,9 +130,10 @@ public sealed record LatestVital(string Code, string Display, decimal Value, str
 
     public string PreviousShown => Diastolic is null ? $"{Previous:0.#}" : $"{Previous:0.#}/{Diastolic.Previous:0.#}";
 
-    public bool IsHigh => Value > ReferenceHigh || Diastolic?.Value > Diastolic?.ReferenceHigh;
+    // Its flags, each once, a blood pressure's systolic first: "High" or "Low" (VitalFlag).
+    public IReadOnlyList<string> Flags => [.. new[] { Flag, Diastolic?.Flag }.OfType<string>().Distinct()];
 
-    public bool IsLow => Value < ReferenceLow || Diastolic?.Value < Diastolic?.ReferenceLow;
+    string? Flag => Results.VitalFlag.Of(Value, ReferenceLow, ReferenceHigh);
 
     // The newest blood pressure among these readings, newest first: its systolic, with the diastolic of the same
     // reading, each with the value of the reading before it.

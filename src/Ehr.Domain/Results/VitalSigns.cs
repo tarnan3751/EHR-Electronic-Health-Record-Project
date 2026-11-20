@@ -195,7 +195,10 @@ public enum Recorded
 // was taken (step 9b), so one chart's points can have different ranges.
 public sealed record TrendPoint(DateTimeOffset At, decimal Value, decimal? Low = null, decimal? High = null)
 {
-    public bool IsOutside => (Low is not null && Value < Low) || (High is not null && Value > High);
+    // "High" or "Low" (VitalFlag), or null.
+    public string? Flag => VitalFlag.Of(Value, Low, High);
+
+    public bool IsOutside => Flag is not null;
 }
 
 // The values of one test or vital sign over time, with where each sits on a small chart (step 9). The chart is drawn
