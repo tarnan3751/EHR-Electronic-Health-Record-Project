@@ -36,4 +36,9 @@
     <!-- The version ArchUnitNET depends on; the architecture tests also use it directly. -->
     <PackageVersion Include="Mono.Cecil" Version="0.11.6" />
   </ItemGroup>
+
+  <ItemGroup Label="UCUM, in the web tests only (Firely's Fhir.Metrics, BSD-3-Clause; the expansion plan's step 11)">
+    <!-- To check every unit the reference data and the seed record (UcumTests). -->
+    <PackageVersion Include="Fhir.Metrics" Version="1.4.0" />
+  </ItemGroup>
 </Project>

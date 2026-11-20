@@ -416,7 +416,8 @@ public sealed class SyntheticClinic
         new("J06.9", "Acute upper respiratory infection, unspecified", 0.15, 0, 0.8, [], [], [], [], "Cough", Passing: true),
     ];
 
-    // Common primary-care lab tests: LOINC code, name, unit, the normal range and how many decimals results have.
+    // Common primary-care lab tests: LOINC code, name, unit (UCUM, as db/reference gives each code's: UcumTests), the
+    // normal range and how many decimals results have.
     static readonly (string Code, string Display, string Unit, decimal? Low, decimal High, int Decimals)[] LabTests =
     [
         ("4548-4", "Hemoglobin A1c", "%", 4.0m, 5.6m, 1),
@@ -430,7 +431,7 @@ public sealed class SyntheticClinic
         ("2160-0", "Creatinine", "mg/dL", 0.6m, 1.3m, 2),
         ("2823-3", "Potassium", "mmol/L", 3.5m, 5.1m, 1),
         ("2951-2", "Sodium", "mmol/L", 135m, 145m, 0),
-        ("3016-3", "Thyroid stimulating hormone", "mIU/L", 0.4m, 4.0m, 2),
+        ("3016-3", "Thyroid stimulating hormone", "m[IU]/L", 0.4m, 4.0m, 2),
         ("1989-3", "Vitamin D, 25-hydroxy", "ng/mL", 30m, 100m, 0),
     ];
 
