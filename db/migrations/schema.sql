@@ -1509,6 +1509,8 @@ DECLARE
     cascading boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_mark_body_mass_index');
     moved bigint;
     duplicates bigint;
+    indexes_marked bigint;
+    indexes_again bigint;
     partners bigint;
     unpaired bigint;
     readings bigint;
@@ -1520,27 +1522,74 @@ BEGIN
     END IF;
 
     WITH split AS (
-        SELECT patient_id, effective_at FROM ehr.observations WHERE category = 'vital-signs'
+        SELECT patient_id, effective_at FROM ehr.observations WHERE category = 'vital-signs' AND code IS NOT NULL
         GROUP BY patient_id, effective_at
         HAVING count(DISTINCT encounter_id) + max(CASE WHEN encounter_id IS NULL THEN 1 ELSE 0 END) > 1),
     firsts AS (
         SELECT DISTINCT ON (o.patient_id, o.effective_at) o.patient_id, o.effective_at, o.encounter_id
         FROM ehr.observations o JOIN split s ON s.patient_id = o.patient_id AND s.effective_at = o.effective_at
-        WHERE o.category = 'vital-signs'
+        WHERE o.category = 'vital-signs' AND o.code IS NOT NULL
         ORDER BY o.patient_id, o.effective_at, o.issued_at, o.id)
     UPDATE ehr.observations o SET encounter_id = f.encounter_id
     FROM firsts f
-    WHERE o.category = 'vital-signs' AND o.patient_id = f.patient_id AND o.effective_at = f.effective_at
+    WHERE o.category = 'vital-signs' AND o.code IS NOT NULL AND o.patient_id = f.patient_id AND o.effective_at = f.effective_at
       AND o.encounter_id IS DISTINCT FROM f.encounter_id;
     GET DIAGNOSTICS moved = ROW_COUNT;
 
+    -- The moments where a weight or a height was marked as a duplicate, and those whose body mass index
+    -- was marked for it.
+    CREATE TEMPORARY TABLE measure_duplicates (patient_id uuid, effective_at timestamptz) ON COMMIT DROP;
+    CREATE TEMPORARY TABLE index_marks (patient_id uuid, effective_at timestamptz) ON COMMIT DROP;
+
     WITH ranked AS (
         SELECT id, row_number() OVER (PARTITION BY patient_id, code, effective_at ORDER BY issued_at DESC NULLS LAST, id DESC) AS place
-        FROM ehr.observations WHERE category = 'vital-signs' AND status <> 'entered-in-error')
-    UPDATE ehr.observations o
-    SET status = 'entered-in-error', entered_in_error_reason = 'duplicate resolved by migration 9c', entered_in_error_at = clock_timestamp()
-    FROM ranked r WHERE o.id = r.id AND r.place > 1;
-    GET DIAGNOSTICS duplicates = ROW_COUNT;
+        FROM ehr.observations WHERE category = 'vital-signs' AND code IS NOT NULL AND status <> 'entered-in-error'),
+    marked AS (
+        UPDATE ehr.observations o
+        SET status = 'entered-in-error', entered_in_error_reason = 'duplicate resolved by migration 9c', entered_in_error_at = clock_timestamp()
+        FROM ranked r WHERE o.id = r.id AND r.place > 1
+        RETURNING o.patient_id, o.effective_at, o.code),
+    measures AS (
+        INSERT INTO measure_duplicates SELECT DISTINCT patient_id, effective_at FROM marked WHERE code IN ('29463-7', '8302-2'))
+    SELECT count(*) INTO duplicates FROM marked;
+
+    WITH marked AS (
+        UPDATE ehr.observations o
+        SET status = 'entered-in-error', entered_in_error_reason = 'body mass index of a value marked as a duplicate (migration 9c)',
+            entered_in_error_at = clock_timestamp()
+        FROM measure_duplicates d
+        WHERE o.patient_id = d.patient_id AND o.effective_at = d.effective_at AND o.category = 'vital-signs' AND o.code = '39156-5'
+          AND o.status <> 'entered-in-error'
+        RETURNING o.patient_id, o.effective_at)
+    INSERT INTO index_marks SELECT DISTINCT patient_id, effective_at FROM marked;
+    GET DIAGNOSTICS indexes_marked = ROW_COUNT;
+
+    INSERT INTO ehr.observations (id, patient_id, encounter_id, category, code, display, status, value, unit, reference_low, reference_high,
+        effective_at, issued_at)
+    SELECT uuidv7(), m.patient_id, b.encounter_id, 'vital-signs', '39156-5', left(c.display, 200), 'final', b.value, left(c.unit, 20),
+        CASE WHEN banded.found THEN band.low ELSE c.reference_low END, CASE WHEN banded.found THEN band.high ELSE c.reference_high END,
+        m.effective_at, clock_timestamp()
+    FROM index_marks m
+    CROSS JOIN LATERAL (
+        SELECT w.encounter_id, round(w.value / ((h.value / 100) ^ 2), 1) AS value
+        FROM ehr.observations w, ehr.observations h
+        WHERE w.patient_id = m.patient_id AND w.code = '29463-7' AND w.effective_at = m.effective_at AND w.status = 'final'
+          AND h.patient_id = m.patient_id AND h.code = '8302-2' AND h.effective_at = m.effective_at AND h.value > 0
+          AND h.status = 'final'
+        ORDER BY w.issued_at DESC, h.issued_at DESC
+        LIMIT 1) b
+    JOIN ehr.observation_codes c ON c.code = '39156-5' AND c.kind = 'vital'
+    CROSS JOIN (SELECT EXISTS (SELECT 1 FROM ehr.vital_reference_ranges r WHERE r.code = '39156-5') AS found) banded
+    LEFT JOIN LATERAL (
+        SELECT r.low, r.high
+        FROM ehr.vital_reference_ranges r
+        JOIN ehr.patients p ON p.id = m.patient_id
+        CROSS JOIN LATERAL (
+            SELECT (extract(year FROM age((m.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                    + extract(month FROM age((m.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int AS months) a
+        WHERE r.code = '39156-5' AND greatest(a.months, 0) >= r.from_months AND (r.to_months IS NULL OR greatest(a.months, 0) < r.to_months)) band ON true
+    WHERE b.value >= 1 AND b.value <= 500;
+    GET DIAGNOSTICS indexes_again = ROW_COUNT;
 
     -- Each moment's blood pressure: which of its two values stand, and which are there at all.
     CREATE TEMPORARY TABLE pressure_moments ON COMMIT DROP AS
@@ -1570,20 +1619,27 @@ BEGIN
         ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
     END IF;
 
+    -- One reading ID for each moment, drawn once: materialized, so no plan can draw it once a row.
+    WITH moments AS MATERIALIZED (
+        SELECT patient_id, effective_at, uuidv7() AS reading FROM pressure_moments WHERE systolic AND diastolic)
     UPDATE ehr.observations o SET reading_id = r.reading
-    FROM (SELECT patient_id, effective_at, uuidv7() AS reading FROM pressure_moments WHERE systolic AND diastolic) r
+    FROM moments r
     WHERE o.patient_id = r.patient_id AND o.effective_at = r.effective_at AND o.category = 'vital-signs'
       AND o.code IN ('8480-6', '8462-4') AND o.status <> 'entered-in-error';
     GET DIAGNOSTICS readings = ROW_COUNT;
 
-    WITH loose AS (
-        SELECT id, patient_id, effective_at,
+    WITH loose AS MATERIALIZED (
+        SELECT id, patient_id, effective_at, code, entered_in_error_reason AS reason, entered_in_error_by AS marker, entered_in_error_at AS marked,
             count(*) FILTER (WHERE code = '8480-6') OVER moment AS systolics, count(*) FILTER (WHERE code = '8462-4') OVER moment AS diastolics
         FROM ehr.observations
         WHERE category = 'vital-signs' AND code IN ('8480-6', '8462-4') AND reading_id IS NULL
         WINDOW moment AS (PARTITION BY patient_id, effective_at)),
-    pairs AS (
-        SELECT patient_id, effective_at, uuidv7() AS reading FROM loose WHERE systolics = 1 AND diastolics = 1 GROUP BY patient_id, effective_at)
+    pairs AS MATERIALIZED (
+        SELECT s.patient_id, s.effective_at, uuidv7() AS reading
+        FROM loose s JOIN loose d ON d.patient_id = s.patient_id AND d.effective_at = s.effective_at AND d.code = '8462-4'
+        WHERE s.code = '8480-6' AND s.systolics = 1 AND s.diastolics = 1
+          AND s.reason IS NOT DISTINCT FROM d.reason AND s.marker IS NOT DISTINCT FROM d.marker
+          AND abs(extract(epoch FROM s.marked - d.marked)) <= 1)
     UPDATE ehr.observations o SET reading_id = coalesce(p.reading, uuidv7())
     FROM loose l LEFT JOIN pairs p ON p.patient_id = l.patient_id AND p.effective_at = l.effective_at
     WHERE o.id = l.id;
@@ -1601,6 +1657,8 @@ BEGIN
 
     RAISE NOTICE 'Migration 9c: % vital signs moved to the visit of the first value recorded at their moment (audited)', moved;
     RAISE NOTICE 'Migration 9c: % duplicate values marked entered in error, "duplicate resolved by migration 9c" (audited)', duplicates;
+    RAISE NOTICE 'Migration 9c: % body mass index values marked entered in error, "body mass index of a value marked as a duplicate (migration 9c)" (audited)', indexes_marked;
+    RAISE NOTICE 'Migration 9c: % body mass index values worked out again from the weight and height kept (audited)', indexes_again;
     RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error because their partner was, "partner value was marked in error before readings existed (migration 9c)" (audited)', partners;
     RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that never had a partner, "blood pressure value without its partner (migration 9c)" (audited)', unpaired;
     RAISE NOTICE 'Migration 9c: % standing blood pressure values made into % readings; % values in error given readings', readings, readings / 2, apart;
