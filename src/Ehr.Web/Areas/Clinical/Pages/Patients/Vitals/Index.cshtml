@@ -109,7 +109,8 @@ else
                 {
                     if (VitalSign.BloodPressure.Contains(code))
                     {
-                        @* A blood pressure is one reading (step 9c): its two numbers from one reading, flagged when either is outside its range. *@
+                        @* A blood pressure is one reading (step 9c): its two numbers from one reading, flagged when either is outside its range,
+                           or a child's at or above its screening value (step 9d). *@
                         <tr>
                             <th scope="row">Blood pressure <span class="sc-muted">(@Units.Shown(names[code].Unit))</span></th>
                             @foreach (var time in Model.Times)

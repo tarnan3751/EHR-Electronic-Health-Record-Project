@@ -273,7 +273,8 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var vital in Model.Chart.LatestVitals)
                 {
                     <li>
-                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range. *@
+                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range, or a
+                           child's at or above its screening value (step 9d). *@
                         <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
                         @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
                         @foreach (var flag in vital.Flags)

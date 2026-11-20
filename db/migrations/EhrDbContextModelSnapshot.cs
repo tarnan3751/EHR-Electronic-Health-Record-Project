@@ -2027,6 +2027,14 @@ namespace Ehr.Migrations
                         .HasColumnType("numeric(12,4)")
                         .HasColumnName("reference_high");
 
+                    b.Property<string>("ReferenceKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("normal")
+                        .HasColumnName("reference_kind");
+
                     b.Property<decimal?>("ReferenceLow")
                         .HasPrecision(12, 4)
                         .HasColumnType("numeric(12,4)")
@@ -2088,6 +2096,8 @@ namespace Ehr.Migrations
                             t.HasCheckConstraint("ck_observations_entered_in_error", "(entered_in_error_reason IS NULL AND entered_in_error_by IS NULL AND entered_in_error_at IS NULL) OR status = 'entered-in-error'");
 
                             t.HasCheckConstraint("ck_observations_reading", "(reading_id IS NOT NULL) = (category = 'vital-signs' AND code IS NOT NULL AND code IN ('8480-6', '8462-4'))");
+
+                            t.HasCheckConstraint("ck_observations_reference_kind", "reference_kind IN ('normal', 'screening')");
 
                             t.HasCheckConstraint("ck_observations_reference_range", "reference_low <= reference_high");
 
@@ -2655,10 +2665,12 @@ namespace Ehr.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("code");
 
-                    b.Property<string>("Band")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("band");
+                    b.Property<string>("Sex")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("any")
+                        .HasColumnName("sex");
 
                     b.Property<int>("FromMonths")
                         .HasColumnType("integer")
@@ -2668,6 +2680,14 @@ namespace Ehr.Migrations
                         .HasPrecision(12, 4)
                         .HasColumnType("numeric(12,4)")
                         .HasColumnName("high");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("normal")
+                        .HasColumnName("kind");
 
                     b.Property<decimal?>("Low")
                         .HasPrecision(12, 4)
@@ -2684,16 +2704,20 @@ namespace Ehr.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("to_months");
 
-                    b.HasKey("Code", "Band")
+                    b.HasKey("Code", "Sex", "FromMonths")
                         .HasName("pk_vital_reference_ranges");
 
                     b.ToTable("vital_reference_ranges", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_vital_reference_ranges_ages", "from_months >= 0 AND (to_months IS NULL OR to_months > from_months)");
 
-                            t.HasCheckConstraint("ck_vital_reference_ranges_band", "band IN ('infant', 'young-child', 'older-child', 'adolescent', 'adult')");
+                            t.HasCheckConstraint("ck_vital_reference_ranges_kind", "kind IN ('normal', 'screening')");
 
                             t.HasCheckConstraint("ck_vital_reference_ranges_range", "low <= high AND (low IS NOT NULL OR high IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_vital_reference_ranges_screening", "kind <> 'screening' OR (low IS NULL AND high IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_vital_reference_ranges_sex", "sex IN ('male', 'female', 'any')");
                         });
                 });
 

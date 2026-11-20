@@ -109,26 +109,23 @@ BEGIN
         NEW.unit := left(test.unit, 20);
         NEW.reference_low := test.reference_low;
         NEW.reference_high := test.reference_high;
-        -- Heart rate, respiratory rate and blood pressure have a range for each age band (step 9b): the patient's age
-        -- on the day the sign was taken picks it. A sign with no banded range keeps the one above.
-        SELECT r.low, r.high INTO NEW.reference_low, NEW.reference_high
-        FROM ehr.vital_reference_ranges r
-        JOIN ehr.patients p ON p.id = NEW.patient_id
-        CROSS JOIN LATERAL (
-            -- Between two timestamps without a zone, so the session's time zone can't move a month boundary.
-            SELECT (extract(year FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
-                    + extract(month FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int AS months) a
-        WHERE r.code = NEW.code AND greatest(a.months, 0) >= r.from_months AND (r.to_months IS NULL OR greatest(a.months, 0) < r.to_months);
-        IF NOT FOUND THEN
-            -- A sign that has banded ranges but none for this age (a diastolic pressure under 1 year) has no range,
-            -- rather than the adults'. A sign with no banded ranges keeps the one above.
-            IF EXISTS (SELECT 1 FROM ehr.vital_reference_ranges r WHERE r.code = NEW.code) THEN
-                NEW.reference_low := NULL;
-                NEW.reference_high := NULL;
-            ELSE
-                NEW.reference_low := test.reference_low;
-                NEW.reference_high := test.reference_high;
-            END IF;
+        NEW.reference_kind := 'normal';
+        -- Heart rate, respiratory rate and blood pressure have a range for each age, and a child's blood pressure for
+        -- each sex too (steps 9b and 9d): the patient's age in whole months on the day the sign was taken picks it,
+        -- and their sex. A patient whose sex is other or unknown is held to both sexes' rows: the higher low and the
+        -- lower high, so flagged sooner. A child's blood pressure range is a screening value (kind 'screening': a value
+        -- at or above it needs follow-up). A sign with ranges by age but none for this age (blood pressure under 1
+        -- year) has no range, rather than the adults'; a sign with none by age keeps the one above.
+        IF EXISTS (SELECT 1 FROM ehr.vital_reference_ranges r WHERE r.code = NEW.code) THEN
+            SELECT max(r.low), min(r.high), coalesce(max(r.kind), 'normal') INTO NEW.reference_low, NEW.reference_high, NEW.reference_kind
+            FROM ehr.vital_reference_ranges r
+            JOIN ehr.patients p ON p.id = NEW.patient_id
+            CROSS JOIN LATERAL (
+                -- Between two timestamps without a zone, so the session's time zone can't move a month boundary.
+                SELECT (extract(year FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                        + extract(month FROM age((NEW.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int AS months) a
+            WHERE r.code = NEW.code AND greatest(a.months, 0) >= r.from_months AND (r.to_months IS NULL OR greatest(a.months, 0) < r.to_months)
+              AND (r.sex = 'any' OR r.sex = p.gender OR p.gender NOT IN ('male', 'female'));
         END IF;
         -- Blood pressure is one reading (step 9c): a systolic and its diastolic share a reading ID, the database's,
         -- whatever the client sent. A value joins the standing reading of its moment that lacks it, which is its
@@ -187,6 +184,7 @@ BEGIN
     NEW.unit := left(test.unit, 20);
     NEW.reference_low := test.reference_low;
     NEW.reference_high := test.reference_high;
+    NEW.reference_kind := 'normal';
     NEW.reading_id := NULL;
     NEW.status := 'final';
     NEW.issued_at := clock_timestamp();
