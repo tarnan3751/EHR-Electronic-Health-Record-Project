@@ -45,14 +45,17 @@ namespace Ehr.Migrations
             //      entered together when one transaction wrote them, which the data shows as their inserts' audit
             //      events having the same time (the transaction's start) and person; values with no insert event, which
             //      the seed and the VitalSigns migration loaded, were entered together when they have the same
-            //      issued_at (both give a visit's values the visit's start). Every other standing blood pressure value
-            //      of the moment is marked entered in error: an older pair whose values both stand, "duplicate
-            //      resolved by migration 9c"; where a pair stands, any other value, "not entered together with a
-            //      standing partner (migration 9c)"; where none does, a value whose partner, entered with it, was marked
-            //      in error alone under step 9b, "partner value was marked in error before readings existed (migration
-            //      9c)" (Tahseen's rule); a value that never had a partner, the moment holding no value of the other
-            //      sign (only an insert past the apps could leave one), "blood pressure value without its partner
-            //      (migration 9c)"; and any other, "not entered together with a standing partner (migration 9c)".
+            //      issued_at and the visit they were loaded for (both give a visit's values the visit's start, so two
+            //      visits starting at one instant load two pairs with one issued_at; of two such pairs, the one holding
+            //      the moment's first value, whose visit 1 gives the moment, stands). Every other standing blood
+            //      pressure value of the moment is marked entered in error: an older pair whose values both stand,
+            //      "duplicate resolved by migration 9c"; where a pair stands, any other value, "not entered together
+            //      with a standing partner (migration 9c)"; where none does, a value whose partner, entered with it,
+            //      was marked in error alone under step 9b, "partner value was marked in error before readings existed
+            //      (migration 9c)" (Tahseen's rule); a value that never had a partner, the moment holding no value of
+            //      the other sign (only an insert past the apps could leave one), "blood pressure value without its
+            //      partner (migration 9c)"; and any other, "not entered together with a standing partner (migration
+            //      9c)".
             //   5. Each standing systolic and diastolic of a moment become one reading. Values in error get readings
             //      too: a moment's systolic and diastolic in error share one only when they were marked together (the
             //      same reason, by the same person, within a second of each other: one statement marks them
@@ -87,6 +90,29 @@ namespace Ehr.Migrations
                     IF cascading THEN
                         ALTER TABLE ehr.observations DISABLE TRIGGER observations_mark_body_mass_index;
                     END IF;
+
+                    -- Each blood pressure value with what it was entered with, before 1 moves any visit: its insert's
+                    -- audit event, the time of the transaction that wrote it and who; or, loaded with none, its
+                    -- issued_at and the visit it was loaded for (two visits starting at one instant load two pairs with
+                    -- one issued_at). That visit is the one it had before its visit was first moved, which every move
+                    -- records, so a run after a rollback finds the same.
+                    CREATE TEMPORARY TABLE pressure_values ON COMMIT DROP AS
+                    SELECT o.id, o.patient_id, o.effective_at, o.code, o.status <> 'entered-in-error' AS standing, o.issued_at,
+                        i.occurred_at IS NOT NULL AS logged, coalesce(i.occurred_at, o.issued_at) AS entered_at, i.actor_id AS entered_by,
+                        CASE WHEN i.occurred_at IS NOT NULL THEN NULL WHEN m.moved THEN m.was ELSE o.encounter_id END AS loaded_for
+                    FROM ehr.observations o
+                    LEFT JOIN LATERAL (
+                        SELECT e.occurred_at, e.actor_id FROM ehr.audit_events e
+                        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'insert' AND e.row_id = o.id
+                        ORDER BY e.occurred_at
+                        LIMIT 1) i ON true
+                    LEFT JOIN LATERAL (
+                        SELECT true AS moved, (e.details -> 'encounter_id' ->> 'old')::uuid AS was FROM ehr.audit_events e
+                        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'update' AND e.row_id = o.id
+                          AND e.details ? 'encounter_id'
+                        ORDER BY e.occurred_at, e.id
+                        LIMIT 1) m ON true
+                    WHERE o.category = 'vital-signs' AND o.code IN ('8480-6', '8462-4');
 
                     WITH split AS (
                         SELECT patient_id, effective_at FROM ehr.observations WHERE category = 'vital-signs' AND code IS NOT NULL
@@ -159,32 +185,21 @@ namespace Ehr.Migrations
                     WHERE b.value >= 1 AND b.value <= 500;
                     GET DIAGNOSTICS indexes_again = ROW_COUNT;
 
-                    -- Each blood pressure value with what it was entered with: its insert's audit event, the time of
-                    -- the transaction that wrote it and who; or, loaded with none, its issued_at.
-                    CREATE TEMPORARY TABLE pressure_values ON COMMIT DROP AS
-                    SELECT o.id, o.patient_id, o.effective_at, o.code, o.status <> 'entered-in-error' AS standing, o.issued_at,
-                        i.occurred_at IS NOT NULL AS logged, coalesce(i.occurred_at, o.issued_at) AS entered_at, i.actor_id AS entered_by
-                    FROM ehr.observations o
-                    LEFT JOIN LATERAL (
-                        SELECT e.occurred_at, e.actor_id FROM ehr.audit_events e
-                        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'insert' AND e.row_id = o.id
-                        ORDER BY e.occurred_at
-                        LIMIT 1) i ON true
-                    WHERE o.category = 'vital-signs' AND o.code IN ('8480-6', '8462-4');
-
                     -- The values of a moment entered together: a pair when one systolic and one diastolic.
                     CREATE TEMPORARY TABLE pressure_entries ON COMMIT DROP AS
-                    SELECT patient_id, effective_at, logged, entered_at, entered_by,
+                    SELECT patient_id, effective_at, logged, entered_at, entered_by, loaded_for,
                         count(*) FILTER (WHERE code = '8480-6') = 1 AND count(*) FILTER (WHERE code = '8462-4') = 1 AS pair,
-                        bool_and(standing) AS standing, max(issued_at) AS latest
+                        bool_and(standing) AS standing, max(issued_at) AS latest, min(id::text) AS first_id
                     FROM pressure_values
-                    GROUP BY patient_id, effective_at, logged, entered_at, entered_by;
+                    GROUP BY patient_id, effective_at, logged, entered_at, entered_by, loaded_for;
 
-                    -- Each moment's blood pressure: the most recent pair entered together whose two values stand.
+                    -- Each moment's blood pressure: the most recent pair entered together whose two values stand. Two
+                    -- loaded for two visits starting at one instant are equally recent: the one holding the moment's
+                    -- first value, whose visit 1 gives the moment, stands.
                     CREATE TEMPORARY TABLE pressure_kept ON COMMIT DROP AS
-                    SELECT DISTINCT ON (patient_id, effective_at) patient_id, effective_at, logged, entered_at, entered_by
+                    SELECT DISTINCT ON (patient_id, effective_at) patient_id, effective_at, logged, entered_at, entered_by, loaded_for
                     FROM pressure_entries WHERE pair AND standing
-                    ORDER BY patient_id, effective_at, latest DESC, entered_at DESC;
+                    ORDER BY patient_id, effective_at, latest DESC, entered_at DESC, first_id;
 
                     WITH marks AS (
                         SELECT v.id,
@@ -198,10 +213,11 @@ namespace Ehr.Migrations
                             END AS reason
                         FROM pressure_values v
                         JOIN pressure_entries n ON n.patient_id = v.patient_id AND n.effective_at = v.effective_at AND n.logged = v.logged
-                            AND n.entered_at = v.entered_at AND n.entered_by IS NOT DISTINCT FROM v.entered_by
+                            AND n.entered_at = v.entered_at AND n.entered_by IS NOT DISTINCT FROM v.entered_by AND n.loaded_for IS NOT DISTINCT FROM v.loaded_for
                         LEFT JOIN pressure_kept k ON k.patient_id = v.patient_id AND k.effective_at = v.effective_at
                         WHERE v.standing
-                          AND NOT (k.patient_id IS NOT NULL AND k.logged = v.logged AND k.entered_at = v.entered_at AND k.entered_by IS NOT DISTINCT FROM v.entered_by)),
+                          AND NOT (k.patient_id IS NOT NULL AND k.logged = v.logged AND k.entered_at = v.entered_at AND k.entered_by IS NOT DISTINCT FROM v.entered_by
+                                   AND k.loaded_for IS NOT DISTINCT FROM v.loaded_for)),
                     marked AS (
                         UPDATE ehr.observations o
                         SET status = 'entered-in-error', entered_in_error_reason = m.reason, entered_in_error_at = clock_timestamp()
