@@ -87,13 +87,26 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         DateTimeOffset? taken = DateTime.TryParseExact(TakenAt, ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"], CultureInfo.InvariantCulture,
             DateTimeStyles.None, out var typed) ? new DateTimeOffset(typed, TimeSpan.Zero) : null;
         var errors = VitalSigns.Check(Values, taken, out var values);
+        var standing = Vitals.Signs.Where(sign => sign.EffectiveAt == taken && sign.Status == ObservationStatus.Final).ToList();
+        bool Stands((string Code, decimal Value) value) => standing.Any(sign => sign.Code == value.Code && sign.Value == value.Value);
+        // Correcting a set (step 9b): after a reading is marked entered in error, the set is typed again with the right
+        // value. A value that already stands for that moment, the same, is not recorded twice or refused: it is left as
+        // it is. A blood pressure is one reading (step 9c): left when both its numbers are the ones that stand, and
+        // otherwise sent whole, as a new reading.
+        var pressure = values.Where(value => VitalSign.BloodPressure.Contains(value.Code)).ToList();
+        var fresh = values.Where(value => VitalSign.BloodPressure.Contains(value.Code) ? !pressure.All(Stands) : !Stands(value)).ToList();
+        // A different value for a sign that already has one at that moment is refused here, saying what to do (step
+        // 9c). The database refuses it too, whatever visit the patient has since been checked in for.
+        foreach (var (code, _) in fresh.Where(value => value.Code != VitalSign.Diastolic
+            && standing.Any(sign => sign.Code == value.Code || (value.Code == VitalSign.Systolic && sign.Code == VitalSign.Diastolic))))
+        {
+            errors[code] = code == VitalSign.Systolic
+                ? "A blood pressure already stands for that time. Mark it entered in error first, then record the correct one."
+                : "A value already stands for this sign at that time. Mark it entered in error first, then record the correct one.";
+        }
+
         if (errors.Count == 0)
         {
-            // Correcting a set (step 9b): after a reading is marked entered in error, the set is typed again with the
-            // right value. A value that already stands for that moment, the same, is not recorded twice or refused:
-            // it is left as it is. A different one is refused by the database, as before.
-            var standing = Vitals.Signs.Where(sign => sign.EffectiveAt == taken && sign.Status == ObservationStatus.Final).ToList();
-            var fresh = values.Where(value => !standing.Any(sign => sign.Code == value.Code && sign.Value == value.Value)).ToList();
             // A body mass index when a weight or height is new, the other is typed or already stands, and none stands
             // for that moment: a weight corrected alone gets its body mass index back.
             bool Has(string code) => values.Any(value => value.Code == code) || standing.Any(sign => sign.Code == code);
@@ -104,7 +117,9 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
                 case Recorded.Saved:
                     return RedirectToPage(new { patientId, saved = true });
                 case Recorded.AlreadyRecorded:
-                    errors[""] = "Vital signs are already recorded for that time. Check the flowsheet, or change the time.";
+                    errors[""] = fresh.Count == 0
+                        ? "Vital signs are already recorded for that time. Check the flowsheet, or change the time."
+                        : "A value already stands for one of these signs at that time. Mark it entered in error first, then record the correct one.";
                     break;
                 default:
                     errors[""] = "The vital signs couldn't be saved. Reload the page and try again.";

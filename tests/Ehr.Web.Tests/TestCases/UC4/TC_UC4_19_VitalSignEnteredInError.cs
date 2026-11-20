@@ -19,18 +19,19 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   ?showErrors=true; GET /patients/{id}; POST /api/desktop/offline-panel; GET /portal/results.
 // Test data: Reason "Typed 180 for 108."; the correct systolic, 108, and the correct weight, 79.
 // Steps:
-//   1. On the flowsheet, follow "Mark in error" under yesterday's set. Tick the systolic pressure and the weight, type
+//   1. On the flowsheet, follow "Mark in error" under yesterday's set. Tick the blood pressure and the weight, type
 //      the reason, and choose "Mark entered in error".
 //   2. Choose "Show entries in error".
 //   3. Record 108/92 for yesterday's time; then 108/95; then weight 79 with height 180.
 //   4. Open the chart, the offline copy, and the patient's portal results.
-// Expected result: Step 1: "Marked: 2 readings"; the page says 3 readings are marked (the body mass index worked out
-//   from the weight is marked with it); yesterday's column no longer has 180, 81 or the body mass index; there is no
-//   systolic trend (one value stands), and the diastolic trend remains. The readings are in the database as
-//   entered-in-error with the reason, the clinician and the time. Step 2: 180, 81 and 25 are shown struck through,
-//   with the reason in words. Step 3: saved; yesterday's column shows 108 and the systolic trend returns, "Latest 126
-//   mmHg, up from 108". Step 4: the chart's latest systolic is 126 "up from 108"; nothing anywhere shows 180; the
-//   portal charts systolic from 108 to 126.
+// Expected result: Step 1: "Marked: 2 readings"; the page says 4 readings are marked (the diastolic pressure is marked
+//   with the systolic, a blood pressure being one reading, step 9c; and the body mass index worked out from the
+//   weight with it); yesterday's column no longer has 180, 92, 81 or the body mass index; there is no blood pressure
+//   trend (one of each value stands). The readings are in the database as entered-in-error with the reason, the
+//   clinician and the time. Step 2: 180, 92, 81 and 25 are shown struck through, with the reason in words. Step 3:
+//   108/92 is saved, a new reading; yesterday's column shows 108 and the systolic trend returns, "Latest 126 mmHg, up
+//   from 108"; 108/95 is refused, a blood pressure already standing for that time. Step 4: the chart's latest
+//   systolic is 126 "up from 108"; nothing anywhere shows 180; the portal charts systolic from 108 to 126.
 // Creator: Tahseen Arnan
 public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<WebApps>
 {
@@ -50,39 +51,40 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         var form = await session.Client.GetStringAsync(ErrorPath(patient, yesterday + ":00"), Cancel);
         Assert.Contains("Which readings are wrong?", form);
         Assert.Contains("marking the weight or the height also marks the body mass index", form);
-        // The body mass index is not a reading to tick: it follows its weight and height.
-        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(form, "name=\"Chosen\"").Count);
+        // The body mass index is not a reading to tick: it follows its weight and height. A blood pressure is one.
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(form, "name=\"Chosen\"").Count);
 
         using var marked = await MarkAsync(apps, session.Client, patient, yesterday + ":00", "Typed 180 for 108.", Systolic, Weight);
         var page = await ReadAsync(marked);
         Assert.Contains("Marked: 2 readings are marked entered in error", Words(page));
-        Assert.Contains("3 readings are marked entered in error and left out.", Words(page));
+        Assert.Contains("4 readings are marked entered in error and left out.", Words(page));
         Assert.DoesNotContain("180", System.Text.RegularExpressions.Regex.Match(page, "(?s)<tbody>.*?Systolic blood pressure.*?</tr>").Value);
         Assert.DoesNotContain($"data-trend=\"{Systolic}\"", page);
-        Assert.Contains($"data-trend=\"{Diastolic}\"", page);
+        Assert.DoesNotContain($"data-trend=\"{Diastolic}\"", page);
         Assert.DoesNotContain("sc-struck", page);
         Assert.Equal(
-            [$"{Weight} 81 entered-in-error", $"{BodyMassIndex} 25 entered-in-error", $"{Height} 180 final", $"{Diastolic} 92 final", $"{Systolic} 180 entered-in-error", $"{HeartRate} 72 final",
+            [$"{Weight} 81 entered-in-error", $"{BodyMassIndex} 25 entered-in-error", $"{Height} 180 final", $"{Diastolic} 92 entered-in-error", $"{Systolic} 180 entered-in-error", $"{HeartRate} 72 final",
                 $"{Diastolic} 80 final", $"{Systolic} 126 final", $"{HeartRate} 68 final"],
             await StatesAsync(apps, patient));
-        Assert.Equal(Enumerable.Repeat($"Typed 180 for 108. {clinician.Id} true", 3), await ProxyTests.QueryAsync(apps,
+        Assert.Equal(Enumerable.Repeat($"Typed 180 for 108. {clinician.Id} true", 4), await ProxyTests.QueryAsync(apps,
             "SELECT entered_in_error_reason || ' ' || entered_in_error_by || ' ' || (entered_in_error_at > now() - interval '1 minute') FROM ehr.observations WHERE patient_id = @patient AND status = 'entered-in-error'",
             patient));
 
         var shown = await session.Client.GetStringAsync(Path(patient) + "?showErrors=true", Cancel);
         Assert.Matches("(?s)<span class=\"sc-struck\" data-in-error><s>180</s> <span class=\"sc-struck__reason\">entered in error: Typed 180 for 108.</span>", shown);
-        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(shown, "<span class=\"sc-struck\" data-in-error>").Count);
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(shown, "<span class=\"sc-struck\" data-in-error>").Count);
 
-        // The set typed again with the right systolic. The diastolic, which stands, is left as it is.
+        // The blood pressure typed again, both numbers: a new reading.
         using var corrected = await RecordAtAsync(session.Client, patient, yesterday, (Systolic, "108"), (Diastolic, "92"));
         page = await ReadAsync(corrected);
         Assert.Contains("Saved:", page);
         Assert.Contains("Latest 126 mmHg, up from 108.", Words(page));
         Assert.Equal(1, (await StatesAsync(apps, patient)).Count(state => state == $"{Diastolic} 92 final"));
         Assert.Contains($"{Systolic} 108 final", await StatesAsync(apps, patient));
-        // A different diastolic for a moment that has one is still refused: mark the standing one in error first.
+        // A different diastolic for a moment that has a blood pressure is refused: mark the standing one in error first.
         using var clash = await RecordAtAsync(session.Client, patient, yesterday, (Systolic, "108"), (Diastolic, "95"));
-        Assert.Contains("Vital signs are already recorded for that time.", Words(await clash.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("A blood pressure already stands for that time. Mark it entered in error first, then record the correct one.",
+            Words(await clash.Content.ReadAsStringAsync(Cancel)));
         // The weight corrected beside the height that stands: a new body mass index is worked out.
         using var weighed = await RecordAtAsync(session.Client, patient, yesterday, (Weight, "79"), (Height, "180"));
         Assert.Contains("Saved:", await ReadAsync(weighed));
@@ -117,8 +119,9 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
             Assert.Equal(System.Net.HttpStatusCode.OK, recorded.StatusCode);
         }
 
+        // The blood pressure is one reading, ticked by its systolic: the diastolic isn't offered, and the database marks it.
         using var whole = await MarkAsync(apps, session.Client, patient, times[0] + ":00", "Wrong patient.", Systolic, Diastolic, HeartRate, Weight, Height);
-        Assert.Contains("Marked: 5 readings", Words(await ReadAsync(whole)));
+        Assert.Contains("Marked: 4 readings", Words(await ReadAsync(whole)));
         Assert.Equal(6, (await StatesAsync(apps, patient)).Count(state => state.EndsWith("entered-in-error", StringComparison.Ordinal)));
 
         // The weight alone, in the second set: marked, then typed again by itself. The height stands.

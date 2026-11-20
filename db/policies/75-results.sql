@@ -19,6 +19,8 @@ DECLARE
     test ehr.observation_codes%ROWTYPE;
     lowest numeric;
     highest numeric;
+    moment_known boolean;
+    moment_visit uuid;
 BEGIN
     -- As for signing an order (60-orders.sql): under a snapshot taken earlier, the checks below could miss an
     -- acknowledgment that has since been committed.
@@ -26,10 +28,11 @@ BEGIN
         RAISE EXCEPTION 'A result is filed in a READ COMMITTED transaction' USING ERRCODE = '0A000';
     END IF;
 
-    -- A vital sign (step 9) answers no order. It is one of the vital-sign codes, taken no later than now, at a visit of
-    -- the same patient when it names one; its name, unit and reference range are the database's own, as for a result;
-    -- it is final and released at once. A body mass index is never the client's number: it is worked out here from the
-    -- weight and height recorded for the same moment, and refused without them.
+    -- A vital sign (step 9) answers no order. It is one of the vital-sign codes, taken no later than now, at the visit
+    -- its moment was decided to belong to (step 9c); its name, unit and reference range are the database's own, as for
+    -- a result; it is final and released at once. A body mass index is never the client's number: it is worked out here
+    -- from the weight and height recorded for the same moment, and refused without them. A blood pressure value is one
+    -- half of a reading (step 9c).
     IF NEW.order_id IS NULL THEN
         IF NEW.category IS DISTINCT FROM 'vital-signs' THEN
             RAISE EXCEPTION 'A result is filed against the order that asked for it' USING ERRCODE = '23514';
@@ -45,10 +48,26 @@ BEGIN
             RAISE EXCEPTION 'A vital sign is taken in a lifetime, and not in the future' USING ERRCODE = '23514';
         END IF;
 
-        -- The visit it was taken at. Named: a visit of the same patient that was held. Not named: the patient's visit
-        -- that was held and began in the twelve hours before it was taken (or within fifteen minutes after), the
-        -- latest of them, if there is one; the chart and the offline copy show a visit's vital signs with the visit.
-        IF NEW.encounter_id IS NOT NULL THEN
+        -- One moment of one patient at a time (step 9c): a value for a patient and time waits here while another
+        -- transaction records one for the same, and then finds it, with its visit and its reading. Keyed on the
+        -- instant, not its text, so the session's time zone can't change the key.
+        PERFORM pg_advisory_xact_lock(hashtextextended('ehr.observations:' || NEW.patient_id::text || ':' || extract(epoch FROM NEW.effective_at)::text, 0));
+
+        -- The visit it was taken at is decided once for its moment (step 9c): by the first value recorded for the
+        -- patient at that time, standing or entered in error, whatever this row names, so a check-in between two
+        -- values of one moment can't split them. For the first value of a moment, as before: named, a visit of the
+        -- same patient that was held; not named, the patient's visit that was held and began in the twelve hours
+        -- before it was taken (or within fifteen minutes after), the latest of them, if there is one. The first
+        -- value's visit can still depend on which visits exist when it is recorded. The chart and the offline copy
+        -- show a visit's vital signs with the visit.
+        SELECT o.encounter_id, true INTO moment_visit, moment_known
+        FROM ehr.observations o
+        WHERE o.patient_id = NEW.patient_id AND o.category = 'vital-signs' AND o.effective_at = NEW.effective_at
+        ORDER BY o.issued_at, o.id
+        LIMIT 1;
+        IF moment_known THEN
+            NEW.encounter_id := moment_visit;
+        ELSIF NEW.encounter_id IS NOT NULL THEN
             IF NOT EXISTS (SELECT 1 FROM ehr.encounters e
                            WHERE e.id = NEW.encounter_id AND e.patient_id = NEW.patient_id
                              AND e.status NOT IN ('planned', 'cancelled', 'entered-in-error')) THEN
@@ -113,6 +132,21 @@ BEGIN
                 NEW.reference_high := test.reference_high;
             END IF;
         END IF;
+        -- Blood pressure is one reading (step 9c): a systolic and its diastolic share a reading ID, the database's,
+        -- whatever the client sent. A value joins the standing reading of its moment that lacks it, which is its
+        -- partner entered in the same transaction; otherwise it starts a new one. The reading is checked whole when
+        -- the transaction commits (ehr.check_vital_reading, below).
+        IF NEW.code IN ('8480-6', '8462-4') THEN
+            SELECT o.reading_id INTO NEW.reading_id
+            FROM ehr.observations o
+            WHERE o.patient_id = NEW.patient_id AND o.category = 'vital-signs' AND o.effective_at = NEW.effective_at
+              AND o.code IN ('8480-6', '8462-4') AND o.code <> NEW.code AND o.status <> 'entered-in-error'
+              AND NOT EXISTS (SELECT 1 FROM ehr.observations s WHERE s.reading_id = o.reading_id AND s.code = NEW.code)
+            LIMIT 1;
+            NEW.reading_id := coalesce(NEW.reading_id, uuidv7());
+        ELSE
+            NEW.reading_id := NULL;
+        END IF;
         NEW.status := 'final';
         NEW.issued_at := clock_timestamp();
         NEW.note := NULL;
@@ -155,6 +189,7 @@ BEGIN
     NEW.unit := left(test.unit, 20);
     NEW.reference_low := test.reference_low;
     NEW.reference_high := test.reference_high;
+    NEW.reading_id := NULL;
     NEW.status := 'final';
     NEW.issued_at := clock_timestamp();
     NEW.entered_in_error_reason := NULL;
@@ -235,6 +270,91 @@ CREATE OR REPLACE TRIGGER observations_mark_body_mass_index
     AFTER UPDATE ON ehr.observations
     FOR EACH ROW WHEN (NEW.status = 'entered-in-error' AND OLD.status = 'final' AND NEW.code IN ('29463-7', '8302-2'))
     EXECUTE FUNCTION ehr.mark_body_mass_index_in_error();
+
+-- A blood pressure is one reading (step 9c): marking either of its values entered in error marks the other too, in the
+-- same statement, with the same reason. As the caller, through the rule above and the panel policy (30-rls.sql), so
+-- each value is its own audited change. Only as the person who marked the first: a statement that has changed who is
+-- signed in since then is refused, so it can't name someone else for the other value (step 9b's rule for one row).
+CREATE OR REPLACE FUNCTION ehr.mark_reading_in_error() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    IF current_user IN ('ehr_app', 'ehr_read') AND NEW.entered_in_error_by IS DISTINCT FROM ehr.current_user_id() THEN
+        RAISE EXCEPTION 'A reading is marked entered in error by one person' USING ERRCODE = '42501';
+    END IF;
+    UPDATE ehr.observations o
+    SET status = 'entered-in-error', entered_in_error_reason = NEW.entered_in_error_reason
+    WHERE o.reading_id = NEW.reading_id AND o.id <> NEW.id AND o.status <> 'entered-in-error';
+    RETURN NULL;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.mark_reading_in_error() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER observations_mark_reading
+    AFTER UPDATE ON ehr.observations
+    FOR EACH ROW WHEN (NEW.status = 'entered-in-error' AND OLD.status <> 'entered-in-error' AND NEW.reading_id IS NOT NULL)
+    EXECUTE FUNCTION ehr.mark_reading_in_error();
+
+-- A blood pressure reading (step 9c) is a systolic and a diastolic of one patient, taken at one time at one visit, that
+-- stand together or are entered in error together: when a transaction commits, each reading it touched has both values
+-- standing or none. So a lone value can't be left behind, and a correction is a new reading (a value can't join one
+-- whose other value is in error). Constraint triggers, deferred to the commit so the two values can be inserted one
+-- after the other; for every role, the tables' owner and superusers too. The function runs as its owner so it sees every
+-- value of the reading whoever the session says is signed in (observations_owner_select, 30-rls.sql): a check that saw
+-- nothing would pass. Two systolics or two diastolics in one reading are refused at once by an index
+-- (ux_observations_reading), and a reading's values are only blood pressures (ck_observations_reading).
+CREATE OR REPLACE FUNCTION ehr.check_vital_reading() RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+    readings uuid[] := ARRAY[]::uuid[];
+    reading uuid;
+BEGIN
+    IF TG_OP <> 'DELETE' THEN
+        readings := readings || NEW.reading_id;
+    END IF;
+    IF TG_OP <> 'INSERT' THEN
+        readings := readings || OLD.reading_id;
+    END IF;
+    FOREACH reading IN ARRAY readings LOOP
+        CONTINUE WHEN reading IS NULL;
+        IF EXISTS (
+            SELECT 1 FROM ehr.observations o WHERE o.reading_id = reading
+            HAVING count(DISTINCT o.patient_id) > 1 OR count(DISTINCT o.effective_at) > 1
+                OR count(DISTINCT o.encounter_id) + max(CASE WHEN o.encounter_id IS NULL THEN 1 ELSE 0 END) > 1
+                OR count(*) FILTER (WHERE o.status <> 'entered-in-error') NOT IN (0, 2)) THEN
+            RAISE EXCEPTION 'A blood pressure reading is a systolic and a diastolic of one patient, time and visit, standing together or entered in error together'
+                USING ERRCODE = '23514';
+        END IF;
+    END LOOP;
+    RETURN NULL;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.check_vital_reading() FROM PUBLIC;
+-- A constraint trigger can't be replaced in place: dropped and made again, in one transaction, so no commit passes
+-- between the two unchecked (the drop waits for any transaction with rows written).
+BEGIN;
+DROP TRIGGER IF EXISTS observations_reading_inserted ON ehr.observations;
+CREATE CONSTRAINT TRIGGER observations_reading_inserted
+    AFTER INSERT ON ehr.observations
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW WHEN (NEW.reading_id IS NOT NULL)
+    EXECUTE FUNCTION ehr.check_vital_reading();
+DROP TRIGGER IF EXISTS observations_reading_changed ON ehr.observations;
+CREATE CONSTRAINT TRIGGER observations_reading_changed
+    AFTER UPDATE ON ehr.observations
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW WHEN (OLD.reading_id IS NOT NULL OR NEW.reading_id IS NOT NULL)
+    EXECUTE FUNCTION ehr.check_vital_reading();
+DROP TRIGGER IF EXISTS observations_reading_deleted ON ehr.observations;
+CREATE CONSTRAINT TRIGGER observations_reading_deleted
+    AFTER DELETE ON ehr.observations
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW WHEN (OLD.reading_id IS NOT NULL)
+    EXECUTE FUNCTION ehr.check_vital_reading();
+COMMIT;
 
 CREATE OR REPLACE TRIGGER observations_complete_order
     AFTER INSERT ON ehr.observations

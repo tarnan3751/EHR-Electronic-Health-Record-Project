@@ -31,8 +31,9 @@ public sealed class VitalSigns(EhrDbContext db)
     // Marks vital signs "entered in error" (step 9b), all or none, with the reason. The rows are never deleted; the
     // correct values are recorded as a new set. The database decides who may (a clinician with the patient on their
     // panel), allows only a final vital sign to be marked, sets who and when, and marks the body mass index worked out
-    // from a weight or height marked here (db/policies/30-rls.sql and 75-results.sql). `ids` come from a read of this
-    // patient's vital signs: the caller has checked they are the patient's.
+    // from a weight or height marked here, and the other value of a blood pressure reading (step 9c), so `ids` names
+    // one value of each reading (db/policies/30-rls.sql and 75-results.sql). `ids` come from a read of this patient's
+    // vital signs: the caller has checked they are the patient's.
     public async Task<Marked> MarkInErrorAsync(IReadOnlyCollection<Guid> ids, string reason, CancellationToken cancellationToken)
     {
         const string savepoint = "vital_signs_in_error";

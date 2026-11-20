@@ -1497,3 +1497,124 @@ VALUES ('20261119191644_InheritedSensitivity', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+DROP INDEX ehr.ux_observations_vital_sign_once;
+
+ALTER TABLE ehr.observations ADD reading_id uuid;
+
+DO $$
+DECLARE
+    forced boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
+    audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
+    cascading boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_mark_body_mass_index');
+    moved bigint;
+    duplicates bigint;
+    partners bigint;
+    unpaired bigint;
+    readings bigint;
+    apart bigint;
+BEGIN
+    ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
+    IF cascading THEN
+        ALTER TABLE ehr.observations DISABLE TRIGGER observations_mark_body_mass_index;
+    END IF;
+
+    WITH split AS (
+        SELECT patient_id, effective_at FROM ehr.observations WHERE category = 'vital-signs'
+        GROUP BY patient_id, effective_at
+        HAVING count(DISTINCT encounter_id) + max(CASE WHEN encounter_id IS NULL THEN 1 ELSE 0 END) > 1),
+    firsts AS (
+        SELECT DISTINCT ON (o.patient_id, o.effective_at) o.patient_id, o.effective_at, o.encounter_id
+        FROM ehr.observations o JOIN split s ON s.patient_id = o.patient_id AND s.effective_at = o.effective_at
+        WHERE o.category = 'vital-signs'
+        ORDER BY o.patient_id, o.effective_at, o.issued_at, o.id)
+    UPDATE ehr.observations o SET encounter_id = f.encounter_id
+    FROM firsts f
+    WHERE o.category = 'vital-signs' AND o.patient_id = f.patient_id AND o.effective_at = f.effective_at
+      AND o.encounter_id IS DISTINCT FROM f.encounter_id;
+    GET DIAGNOSTICS moved = ROW_COUNT;
+
+    WITH ranked AS (
+        SELECT id, row_number() OVER (PARTITION BY patient_id, code, effective_at ORDER BY issued_at DESC NULLS LAST, id DESC) AS place
+        FROM ehr.observations WHERE category = 'vital-signs' AND status <> 'entered-in-error')
+    UPDATE ehr.observations o
+    SET status = 'entered-in-error', entered_in_error_reason = 'duplicate resolved by migration 9c', entered_in_error_at = clock_timestamp()
+    FROM ranked r WHERE o.id = r.id AND r.place > 1;
+    GET DIAGNOSTICS duplicates = ROW_COUNT;
+
+    -- Each moment's blood pressure: which of its two values stand, and which are there at all.
+    CREATE TEMPORARY TABLE pressure_moments ON COMMIT DROP AS
+    SELECT patient_id, effective_at,
+        bool_or(code = '8480-6' AND status <> 'entered-in-error') AS systolic, bool_or(code = '8462-4' AND status <> 'entered-in-error') AS diastolic,
+        bool_or(code = '8480-6') AS any_systolic, bool_or(code = '8462-4') AS any_diastolic
+    FROM ehr.observations WHERE category = 'vital-signs' AND code IN ('8480-6', '8462-4')
+    GROUP BY patient_id, effective_at;
+
+    UPDATE ehr.observations o
+    SET status = 'entered-in-error', entered_in_error_reason = 'partner value was marked in error before readings existed (migration 9c)',
+        entered_in_error_at = clock_timestamp()
+    FROM pressure_moments m
+    WHERE o.patient_id = m.patient_id AND o.effective_at = m.effective_at AND o.category = 'vital-signs' AND o.status <> 'entered-in-error'
+      AND (o.code = '8480-6' AND NOT m.diastolic AND m.any_diastolic OR o.code = '8462-4' AND NOT m.systolic AND m.any_systolic);
+    GET DIAGNOSTICS partners = ROW_COUNT;
+
+    UPDATE ehr.observations o
+    SET status = 'entered-in-error', entered_in_error_reason = 'blood pressure value without its partner (migration 9c)',
+        entered_in_error_at = clock_timestamp()
+    FROM pressure_moments m
+    WHERE o.patient_id = m.patient_id AND o.effective_at = m.effective_at AND o.category = 'vital-signs' AND o.status <> 'entered-in-error'
+      AND (o.code = '8480-6' AND NOT m.any_diastolic OR o.code = '8462-4' AND NOT m.any_systolic);
+    GET DIAGNOSTICS unpaired = ROW_COUNT;
+
+    IF audited THEN
+        ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
+    END IF;
+
+    UPDATE ehr.observations o SET reading_id = r.reading
+    FROM (SELECT patient_id, effective_at, uuidv7() AS reading FROM pressure_moments WHERE systolic AND diastolic) r
+    WHERE o.patient_id = r.patient_id AND o.effective_at = r.effective_at AND o.category = 'vital-signs'
+      AND o.code IN ('8480-6', '8462-4') AND o.status <> 'entered-in-error';
+    GET DIAGNOSTICS readings = ROW_COUNT;
+
+    WITH loose AS (
+        SELECT id, patient_id, effective_at,
+            count(*) FILTER (WHERE code = '8480-6') OVER moment AS systolics, count(*) FILTER (WHERE code = '8462-4') OVER moment AS diastolics
+        FROM ehr.observations
+        WHERE category = 'vital-signs' AND code IN ('8480-6', '8462-4') AND reading_id IS NULL
+        WINDOW moment AS (PARTITION BY patient_id, effective_at)),
+    pairs AS (
+        SELECT patient_id, effective_at, uuidv7() AS reading FROM loose WHERE systolics = 1 AND diastolics = 1 GROUP BY patient_id, effective_at)
+    UPDATE ehr.observations o SET reading_id = coalesce(p.reading, uuidv7())
+    FROM loose l LEFT JOIN pairs p ON p.patient_id = l.patient_id AND p.effective_at = l.effective_at
+    WHERE o.id = l.id;
+    GET DIAGNOSTICS apart = ROW_COUNT;
+
+    IF audited THEN
+        ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
+    END IF;
+    IF cascading THEN
+        ALTER TABLE ehr.observations ENABLE TRIGGER observations_mark_body_mass_index;
+    END IF;
+    IF forced THEN
+        ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
+    END IF;
+
+    RAISE NOTICE 'Migration 9c: % vital signs moved to the visit of the first value recorded at their moment (audited)', moved;
+    RAISE NOTICE 'Migration 9c: % duplicate values marked entered in error, "duplicate resolved by migration 9c" (audited)', duplicates;
+    RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error because their partner was, "partner value was marked in error before readings existed (migration 9c)" (audited)', partners;
+    RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that never had a partner, "blood pressure value without its partner (migration 9c)" (audited)', unpaired;
+    RAISE NOTICE 'Migration 9c: % standing blood pressure values made into % readings; % values in error given readings', readings, readings / 2, apart;
+END
+$$;
+
+CREATE UNIQUE INDEX ux_observations_reading ON ehr.observations (reading_id, code) WHERE reading_id IS NOT NULL;
+
+CREATE UNIQUE INDEX ux_observations_vital_sign_once ON ehr.observations (patient_id, code, effective_at) WHERE category = 'vital-signs' AND status <> 'entered-in-error';
+
+ALTER TABLE ehr.observations ADD CONSTRAINT ck_observations_reading CHECK ((reading_id IS NOT NULL) = (category = 'vital-signs' AND code IS NOT NULL AND code IN ('8480-6', '8462-4')));
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261120032936_VitalReadings', '10.0.13');
+
+COMMIT;
+

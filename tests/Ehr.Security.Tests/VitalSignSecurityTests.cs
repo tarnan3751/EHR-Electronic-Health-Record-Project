@@ -12,7 +12,7 @@ namespace Ehr.Security.Tests;
 // the client's number; a result of an order is still filed only against its order; nothing is edited or deleted.
 public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    const string Systolic = "8480-6";
+    const string HeartRate = "8867-4";
     const string Weight = "29463-7";
     const string Height = "8302-2";
     const string BodyMassIndex = "39156-5";
@@ -38,7 +38,7 @@ public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<M
     }
 
     Task RecordAsync(
-        Guid? user, Guid patient, string code = Systolic, decimal value = 142m, string category = "vital-signs", Guid? visit = null, DateTime? at = null,
+        Guid? user, Guid patient, string code = HeartRate, decimal value = 142m, string category = "vital-signs", Guid? visit = null, DateTime? at = null,
         string? connection = null) =>
         Accounts.ExecuteAsync(connection ?? App, user, Vital, ("id", Guid.CreateVersion7()), ("patient", patient), ("visit", (object?)visit ?? DBNull.Value),
             ("category", category), ("code", code), ("value", value), ("at", at ?? Taken));
@@ -66,7 +66,7 @@ public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<M
 
         await RecordAsync(clinician, patient, visit: visit);
 
-        Assert.Equal(["Systolic blood pressure|mm[Hg]|90.0000|129.0000|final|true|142.0000|vital-signs|none|none"], await AsSuperuserAsync(
+        Assert.Equal(["Heart rate|/min|60.0000|100.0000|final|true|142.0000|vital-signs|none|none"], await AsSuperuserAsync(
             """
             SELECT display || '|' || unit || '|' || reference_low || '|' || reference_high || '|' || status || '|' || (issued_at > now() - interval '1 minute') || '|' || value
                 || '|' || category || '|' || coalesce(note, 'none') || '|' || coalesce(order_id::text, 'none')
@@ -150,10 +150,11 @@ public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<M
             "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (@id, @patient, 'cancelled', 'AMB', now() - interval '20 minutes')",
             ("id", cancelled), ("patient", patient));
 
-        // Naming no visit: the one held in the hours before. A day earlier: none. A cancelled visit can't be named.
+        // Naming no visit: the one held in the hours before. A day earlier: none. A cancelled visit can't be named (at a
+        // moment of its own: a value at a moment that has one takes that one's visit, step 9c).
         await RecordAsync(clinician, patient);
         await RecordAsync(clinician, patient, at: Taken.AddDays(-1));
-        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, code: "8867-4", value: 70m, visit: cancelled));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, code: "8310-5", value: 37m, visit: cancelled, at: Taken.AddMinutes(-5)));
 
         Assert.Equal([$"none", $"{visit}"], await AsSuperuserAsync(
             "SELECT coalesce(encounter_id::text, 'none') FROM ehr.observations WHERE patient_id = @patient ORDER BY effective_at", ("patient", patient)));
@@ -175,7 +176,7 @@ public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<M
         // A form sent twice records once.
         await RecordAsync(clinician, patient);
         await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => RecordAsync(clinician, patient, value: 150m));
-        Assert.Equal(["29463-7 700", "8302-2 20", "8480-6 142"], await AsSuperuserAsync(
+        Assert.Equal(["29463-7 700", "8302-2 20", "8867-4 142"], await AsSuperuserAsync(
             "SELECT code || ' ' || trim_scale(value) FROM ehr.observations WHERE patient_id = @patient ORDER BY code", ("patient", patient)));
     }
 

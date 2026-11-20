@@ -44,4 +44,25 @@ static class VitalTests
     // "code value" for each vital sign of the patient, oldest first, then by code.
     public static Task<List<string>> RecordedAsync(WebApps apps, Guid patient) => ProxyTests.QueryAsync(apps,
         "SELECT code || ' ' || trim_scale(value) FROM ehr.observations WHERE patient_id = @patient AND category = 'vital-signs' ORDER BY effective_at, code", patient);
+
+    // "code value status visit reading" for each blood pressure value of the patient, in the order recorded (step 9c):
+    // the visit as "visit" or "none", each reading as R1, R2... in the order readings first appear.
+    public static async Task<List<string>> ReadingsAsync(WebApps apps, Guid patient)
+    {
+        var readings = new List<string>();
+        return [.. (await ProxyTests.QueryAsync(apps,
+            """
+            SELECT code || ' ' || trim_scale(value) || ' ' || status || ' ' || CASE WHEN encounter_id IS NULL THEN 'none' ELSE 'visit' END || ' ' || reading_id
+            FROM ehr.observations WHERE patient_id = @patient AND category = 'vital-signs' AND code IN ('8480-6', '8462-4') ORDER BY issued_at
+            """, patient)).Select(row =>
+            {
+                var reading = row[(row.LastIndexOf(' ') + 1)..];
+                if (!readings.Contains(reading))
+                {
+                    readings.Add(reading);
+                }
+
+                return $"{row[..row.LastIndexOf(' ')]} R{readings.IndexOf(reading) + 1}";
+            })];
+    }
 }
