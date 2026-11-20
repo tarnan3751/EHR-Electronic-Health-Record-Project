@@ -53,35 +53,33 @@ BEGIN
         -- instant, not its text, so the session's time zone can't change the key.
         PERFORM pg_advisory_xact_lock(hashtextextended('ehr.observations:' || NEW.patient_id::text || ':' || extract(epoch FROM NEW.effective_at)::text, 0));
 
-        -- The visit it was taken at is decided once for its moment (step 9c): by the first value recorded for the
-        -- patient at that time, standing or entered in error, whatever this row names, so a check-in between two
-        -- values of one moment can't split them. For the first value of a moment, as before: named, a visit of the
-        -- same patient that was held; not named, the patient's visit that was held and began in the twelve hours
-        -- before it was taken (or within fifteen minutes after), the latest of them, if there is one. The first
-        -- value's visit can still depend on which visits exist when it is recorded. The chart and the offline copy
-        -- show a visit's vital signs with the visit.
+        -- The visit it was taken at is decided once (step 9c), from the time it was taken, not the moment its row is
+        -- inserted. The first value recorded for the patient at that time decides it, and every later value of the
+        -- moment, standing or entered in error, takes the same visit whatever it names, so a check-in between two
+        -- values of one moment can't split them. For the first value: the patient's visit that was held and had
+        -- already begun when it was taken, within the twelve hours before, the latest of them, if there is one;
+        -- never a visit that began after it was taken, so a sign taken before a check-in has no visit whenever it is
+        -- typed. A visit the client names for the first value must be that one. The chart and the offline copy show
+        -- a visit's vital signs with the visit.
         SELECT o.encounter_id, true INTO moment_visit, moment_known
         FROM ehr.observations o
         WHERE o.patient_id = NEW.patient_id AND o.category = 'vital-signs' AND o.effective_at = NEW.effective_at
         ORDER BY o.issued_at, o.id
         LIMIT 1;
-        IF moment_known THEN
-            NEW.encounter_id := moment_visit;
-        ELSIF NEW.encounter_id IS NOT NULL THEN
-            IF NOT EXISTS (SELECT 1 FROM ehr.encounters e
-                           WHERE e.id = NEW.encounter_id AND e.patient_id = NEW.patient_id
-                             AND e.status NOT IN ('planned', 'cancelled', 'entered-in-error')) THEN
-                RAISE EXCEPTION 'A vital sign is taken at a visit of the same patient that was held' USING ERRCODE = '23514';
-            END IF;
-        ELSE
-            SELECT e.id INTO NEW.encounter_id
+        IF NOT coalesce(moment_known, false) THEN
+            SELECT e.id INTO moment_visit
             FROM ehr.encounters e
             WHERE e.patient_id = NEW.patient_id AND e.status NOT IN ('planned', 'cancelled', 'entered-in-error')
-              AND e.period_start <= NEW.effective_at + interval '15 minutes'
+              AND e.period_start <= NEW.effective_at
               AND e.period_start >= NEW.effective_at - interval '12 hours'
             ORDER BY e.period_start DESC, e.id
             LIMIT 1;
+            IF NEW.encounter_id IS NOT NULL AND NEW.encounter_id IS DISTINCT FROM moment_visit THEN
+                RAISE EXCEPTION 'A vital sign belongs to the visit of the same patient that was held and had begun when it was taken'
+                    USING ERRCODE = '23514';
+            END IF;
         END IF;
+        NEW.encounter_id := moment_visit;
 
         IF NEW.code = '39156-5' THEN
             SELECT round(w.value / ((h.value / 100) ^ 2), 1) INTO NEW.value
