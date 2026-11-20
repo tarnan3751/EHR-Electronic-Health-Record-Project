@@ -31,6 +31,8 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 10b | Addenda and sensitivity follow-ups | done | expansion/step-10b-note-followups | expansion-step-10b | [44503967398](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44503967398) | Added by Tahseen, 2026-11-19. Touches `db/policies`; a signed note now takes one update, its sensitivity |
 | 10c | The off-site audit cost (UC 2) | done | expansion/step-10c-offsite-audit | expansion-step-10c | [44559427426](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44559427426) | Added by Tahseen, 2026-11-19. Cause confirmed: the queue's flush to disk; a request's events now go together. End of phase 2: `expansion-phase-2` |
 | 10e | Phase 2 decisions: inherited sensitivity, the diastolic citation | done, except the children's ranges | expansion/step-10e-phase-2-decisions | expansion-step-10e | [44623600306](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44623600306) | Added by Tahseen, 2026-11-19, after phase 2 was tagged. Extends UC 14. The children's ranges wait on the two source tables |
+| 9c | Vital-sign readings | in progress | expansion/step-09c-readings | | | Added by Tahseen, 2026-11-19, from a defect step 11 found. A phase 2 follow-up, built on `expansion/phase-2`, not on phase 3's work. Touches db/policies; needs a migration |
+| 9d | Children's ranges from the primary sources | not started | | | | Tahseen's phase 2 decision 3, now that he has supplied the two source PDFs. A phase 2 follow-up, after 9c |
 | 10d | Clinic time zone | in progress | expansion/step-10d-time-zone | | | Added by Tahseen, 2026-11-19. First step of phase 3. Parked in one local commit while 10e is done |
 | 11 | Read-only FHIR API | not started | | | | |
 | 12 | Simulated lab | not started | | | | |
@@ -357,6 +359,18 @@ At the end of phase 1, every FR in the course document is built. Write the phase
 - **Affects:** UC 2.
 
 ### Phase 3: connect to other systems
+
+**Step 9c. Vital-sign readings** (added by Tahseen, 2026-11-19; a phase 2 follow-up, done before step 11's blood pressure)
+- **One standing value:** at most one standing value per patient, sign and time taken, whatever the visit, enforced by the database. A different value for the same moment is refused with a clear message, before or after check-in.
+- **The visit is decided once,** from the time the sign was taken, not the moment its row is inserted, so a check-in in between can't split a reading.
+- **Blood pressure is one reading:** systolic and diastolic share a reading ID, assigned when they are entered together. The database requires exactly one standing systolic and one standing diastolic per reading. Marking either in error marks the whole reading in error, and a correction is a new reading with both values. The vital signs page, trends, the chart's latest value and the desktop app's offline copy read blood pressure by reading.
+- **Existing data:** the migration groups standing blood pressure rows into readings by patient and time. Where a moment has duplicates, the most recently entered value is kept and the others are marked entered in error with the reason "duplicate resolved by migration 9c", audited. A standing value whose partner is in error is marked entered in error too, with the reason "partner value was marked in error before readings existed (migration 9c)", audited and counted separately. The migration reports how many rows it touched.
+- **Then step 11** builds the FHIR blood pressure panel from the reading ID and drops its "held back" note.
+
+**Step 9d. Children's ranges from the primary sources** (Tahseen's decision of 19 November; a phase 2 follow-up, after step 9c)
+- **Heart rate and respiratory rate:** Fleming et al., Lancet 2011, Web Appendix: Web Table 5 (heart rate) and Web Table 4 (respiratory rate), the 1st and 99th centiles as the flag limits for each of its 13 age groups.
+- **Blood pressure:** the 2017 AAP guideline (Flynn et al., Pediatrics 140(3):e20171904), Table 6, "Screening BP Values Requiring Further Evaluation", by age and sex, read from the original. Children's blood pressure flags are labeled "needs follow-up", not "abnormal": the table is for screening only.
+- **Cite both** in `docs/expansion/reference-data.md` with the table numbers and the page each value came from. Re-range existing readings and report how many flags changed.
 
 **Step 10d. Clinic time zone** (added by Tahseen, 2026-11-19; the first step of phase 3)
 - One configured clinic time zone (`America/Chicago` for the local stack). Clinician pages and the desktop app show times in it, labeled.
@@ -831,6 +845,16 @@ One entry per decision: date, step, the decision, and why.
   - *Not covered by a kept test:* the backfill's and the Down's handling of existing rows; the reviewer proved both defects with throwaway tests, and the fixes were checked by reading. `VitalSignMigrationTests` still proves the migration goes down and up.
   - **Open, for Tahseen:** an addendum signed to a note that is already sensitive is always inherited through the app, so unmarking the note shows it again. Its author has no way to say "keep this one sensitive whatever happens to the note" until the note is unmarked. Offering the tick on that form would do it. Built: not offered.
   - *The tag `expansion-phase-2` is left where it is* (step 10c): moving it needs Tahseen's word. The branch `expansion/phase-2` is moved forward to include this step.
+
+- **2026-11-19, Tahseen: step 9c, "Vital-sign readings", before step 11's blood pressure.**
+  - *What step 11 found.* Asked to send each blood pressure as one FHIR Observation, the developer agent first checked whether a systolic can be paired with its diastolic, and it can't be, reliably. Nothing ties the two rows but the patient and the time; the visit is looked up afresh for each row when it is inserted, and the uniqueness rule includes the visit. Reproduced through the pages: (A) 120/80 recorded before check-in, the patient checked in, the diastolic marked in error and 120/78 typed: the systolic has no visit and the new diastolic has one. (B) 120/80 recorded, check-in, then 130/80 typed for the same time: saved, leaving two standing systolics for one moment. (C) the same with no check-in between is refused, as step 9b meant. B is a step 9b defect.
+  - *His decision, "Option 1, done at the root":* the points now under "Step 9c" above, in his words. It touches `db/policies` and needs a migration: listed for line-by-line review.
+- **2026-11-19, Tahseen's three answers.**
+  1. *Unpaired blood pressure values (step 9c):* "agreed. The migration marks a standing value whose partner is in error as entered in error too, with the reason 'partner value was marked in error before readings existed (migration 9c)', audited and counted separately from the duplicates in the report."
+  2. *Children's ranges:* the two source PDFs are in `~/swiftchart-expansion-scratch/reference/children-ranges/` (outside the repo; not committed). Fleming's Web Table 5 and Web Table 4, 1st and 99th centiles, for each of its 13 age groups. The AAP guideline's Table 6 by age and sex, "from this original, not a reproduction: the Merck Manual and another copy disagree on at least one value". Children's blood pressure flags read "needs follow-up", not "abnormal". Both cited with table numbers and the page each value came from; existing readings re-ranged, and the number of flags that changed reported. This is step 9d.
+  3. *The phase 2 tag:* "don't move expansion-phase-2. If expansion/phase-2 can fast-forward to a commit that adds only the phase 2 follow-ups and step 9c, with no phase 3 work, fast-forward it with a normal push and tag that commit expansion-phase-2.1. If it can't, leave phase 2 as it is", and say in both pull request descriptions that the defect is fixed in phase 3.
+  - *It can, and that is what is being done.* `expansion/phase-2` stands at step 10e, before any phase 3 work. Steps 9c and 9d are therefore built on `expansion/phase-2`, not on `expansion/integration` (which already has step 10d): each is merged into `expansion/phase-2` with a normal push, the last is tagged `expansion-phase-2.1`, and `expansion/phase-2` is then merged into `expansion/integration`. This departs from the branch workflow's "merge into integration" for these two steps only.
+  - *A leftover:* the local branch `expansion/step-09c-vital-readings`, started from the integration branch before answer 3, holds one plan commit and is not used or pushed. Deleting a branch is Tahseen's to allow.
 
 ## Log
 
