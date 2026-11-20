@@ -335,6 +335,41 @@ internal static partial class RenderBenchmark
             }),
             await MeasureAsync(client, times, prefix + "Chart history, a patient on the panel", typing: false,
                 () => $"/patients/{panel[random.Next(panel.Count)]}/chart-history"),
+            .. await MeasureFhirAsync(client, times, prefix, panel),
+        ];
+    }
+
+    // The FHIR API (the expansion plan's step 11, UC 19), last, with generators of its own, so the rows above make the
+    // requests they always did: a patient; their results and vital signs, the API's largest answer; their diagnoses
+    // with the sensitive ones asked for, a read of sensitive items; and an observation by ID, which asks whose it is
+    // before the gate. The observations' IDs come from the API itself, once, before the rows.
+    static async Task<List<Result>> MeasureFhirAsync(HttpClient client, DatabaseTimes times, string prefix, List<Guid> panel)
+    {
+        var observations = new List<Guid>();
+        foreach (var patient in panel.Take(20))
+        {
+            using var found = JsonDocument.Parse(await client.GetStringAsync($"/fhir/Observation?patient={patient}"));
+            if (found.RootElement.TryGetProperty("entry", out var entries))
+            {
+                observations.AddRange(entries.EnumerateArray()
+                    .Where(entry => entry.GetProperty("search").GetProperty("mode").GetString() == "match")
+                    .Select(entry => Guid.Parse(entry.GetProperty("resource").GetProperty("id").GetString()!)));
+            }
+        }
+
+        var patients = new Random(20261125);
+        var searched = new Random(20261126);
+        var sensitive = new Random(20261127);
+        var byId = new Random(20261128);
+        return
+        [
+            await MeasureAsync(client, times, prefix + "FHIR patient, a patient on the panel", typing: false, () => $"/fhir/Patient/{panel[patients.Next(panel.Count)]}"),
+            await MeasureAsync(client, times, prefix + "FHIR observations, a patient on the panel", typing: false,
+                () => $"/fhir/Observation?patient={panel[searched.Next(panel.Count)]}"),
+            await MeasureAsync(client, times, prefix + "FHIR conditions with sensitive items, a patient on the panel", typing: false,
+                () => $"/fhir/Condition?patient={panel[sensitive.Next(panel.Count)]}&show-sensitive=true"),
+            await MeasureAsync(client, times, prefix + "FHIR observation by ID, a patient on the panel", typing: false,
+                () => $"/fhir/Observation/{observations[byId.Next(observations.Count)]}"),
         ];
     }
 
