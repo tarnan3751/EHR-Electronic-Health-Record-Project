@@ -37,6 +37,14 @@
     <PackageVersion Include="Mono.Cecil" Version="0.11.6" />
   </ItemGroup>
 
+  <ItemGroup Label="FHIR conformance, in the web tests only (Firely .NET SDK, BSD-3-Clause; the expansion plan's step 11)">
+    <!-- Strict parsing of the FHIR API's answers, and R4's own definitions (the specification's package, used offline). -->
+    <PackageVersion Include="Hl7.Fhir.R4" Version="6.8.0" />
+    <PackageVersion Include="Hl7.Fhir.Specification.Data.R4" Version="6.8.0" />
+    <!-- Validates them against the R4 core profiles, the vital-sign profiles among them. Built on Hl7.Fhir.R4 6.8.0. -->
+    <PackageVersion Include="Firely.Fhir.Validation.R4" Version="3.6.0" />
+  </ItemGroup>
+
   <ItemGroup Label="UCUM, in the web tests only (Firely's Fhir.Metrics, BSD-3-Clause; the expansion plan's step 11)">
     <!-- To check every unit the reference data and the seed record (UcumTests). -->
     <PackageVersion Include="Fhir.Metrics" Version="1.4.0" />

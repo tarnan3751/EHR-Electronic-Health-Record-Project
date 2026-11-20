@@ -40,11 +40,14 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // The desktop app is not a browser, and the pages' scripts read the status: a refused API request gets a 401, never
-    // a redirect to the sign-in page, whether the API takes the desktop token or the staff cookie (dictation).
+    // a redirect to the sign-in page, whether the API takes the desktop token or the staff cookie (dictation, and the
+    // FHIR API, which isn't under /api).
     [Theory]
     [InlineData("GET", "/api/sync/quick-texts?since=0")]
     [InlineData("POST", "/api/desktop/sign-out")]
     [InlineData("POST", "/api/dictation/sessions")]
+    [InlineData("GET", "/fhir/metadata")]
+    [InlineData("GET", "/fhir/Patient/00000000-0000-0000-0000-000000000001")]
     public async Task The_apis_answer_an_anonymous_request_with_401(string method, string path)
     {
         using var client = Client(apps.OnPrem, new CookieContainer(), followRedirects: false);

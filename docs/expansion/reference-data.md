@@ -84,6 +84,21 @@ The FDA's indexing files name a substance and its Established Pharmacologic Clas
 
 Two rows, both from Khan DA, Banerji A, Blumenthal KG, et al. Drug allergy: a 2022 practice parameter update. *J Allergy Clin Immunol.* 2022;150(6):1333-1393: penicillins with cephalosporins, and penicillins with carbapenems. A class always cross-reacts with itself. Adding a row needs a published source.
 
+## Systems the FHIR API names
+
+The FHIR API (the plan's step 11, `docs/UC19.md`) sends each code with its system's canonical FHIR address:
+
+| Codes | System |
+| --- | --- |
+| RxNorm (medications, drug allergens) | `http://www.nlm.nih.gov/research/umls/rxnorm` |
+| FDA UNII (other allergens) | `http://fdasis.nlm.nih.gov` |
+| ICD-10-CM (diagnoses) | `http://hl7.org/fhir/sid/icd-10-cm` |
+| LOINC (results, vital signs) | `http://loinc.org` |
+| UCUM (units) | `http://unitsofmeasure.org` |
+| The clinic's medical record numbers | `http://swiftchart.example/fhir/sid/mrn`, the clinic's own (Tahseen's decision, 19 November 2026), with the identifier type MR from `http://terminology.hl7.org/CodeSystem/v2-0203` |
+
+"No known allergy" has the app's own marker for a code, which has no system, so it is sent as text alone.
+
 ## Licenses and attribution
 
 - **RxNorm.** The Current Prescribable Content needs no license. This product uses publicly available data courtesy of the U.S. National Library of Medicine (NLM), National Institutes of Health, Department of Health and Human Services; NLM is not responsible for the product and does not endorse or recommend this or any other product. The data here is the release named above and may not be current. The full RxNorm release, which needs a UMLS license, is not used.
