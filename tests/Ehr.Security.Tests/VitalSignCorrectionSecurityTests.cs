@@ -17,6 +17,7 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
     const string Systolic = "8480-6";
     const string Diastolic = "8462-4";
     const string HeartRate = "8867-4";
+    const string Temperature = "8310-5";
     const string Weight = "29463-7";
     const string Height = "8302-2";
     const string BodyMassIndex = "39156-5";
@@ -37,12 +38,22 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         return (clinician, patient);
     }
 
-    Task RecordAsync(Guid clinician, Guid patient, string code = Systolic, decimal value = 180m, DateTime? at = null) =>
+    // Heart rate unless another sign is named: a blood pressure value is recorded with its partner (RecordPressureAsync).
+    Task RecordAsync(Guid clinician, Guid patient, string code = HeartRate, decimal value = 180m, DateTime? at = null) =>
         Accounts.ExecuteAsync(App, clinician,
             "INSERT INTO ehr.observations (id, patient_id, category, code, display, status, value, effective_at) VALUES (gen_random_uuid(), @patient, 'vital-signs', @code, 'x', 'final', @value, @at)",
             ("patient", patient), ("code", code), ("value", value), ("at", at ?? Taken));
 
-    Task MarkAsync(Guid? user, Guid patient, string code = Systolic, string reason = "  Typed 180 for 108.  ", string? connection = null) =>
+    // A blood pressure, its two values in one transaction, as one reading (step 9c).
+    Task RecordPressureAsync(Guid clinician, Guid patient, decimal systolic, decimal diastolic) =>
+        Accounts.ExecuteAsync(App, clinician,
+            """
+            INSERT INTO ehr.observations (id, patient_id, category, code, display, status, value, effective_at) VALUES (gen_random_uuid(), @patient, 'vital-signs', '8480-6', 'x', 'final', @systolic, @at);
+            INSERT INTO ehr.observations (id, patient_id, category, code, display, status, value, effective_at) VALUES (gen_random_uuid(), @patient, 'vital-signs', '8462-4', 'x', 'final', @diastolic, @at);
+            """,
+            ("patient", patient), ("systolic", systolic), ("diastolic", diastolic), ("at", Taken));
+
+    Task MarkAsync(Guid? user, Guid patient, string code = HeartRate, string reason = "  Typed 180 for 108.  ", string? connection = null) =>
         Accounts.ExecuteAsync(connection ?? App, user, Mark, ("patient", patient), ("code", code), ("reason", reason));
 
     Task<List<string>> AsSuperuserAsync(string sql, params (string Name, object Value)[] parameters) =>
@@ -68,7 +79,7 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
 
         await MarkAsync(clinician, patient);
 
-        Assert.Equal([$"{Systolic} 180 entered-in-error Typed 180 for 108. {clinician} true"], await StateAsync(patient));
+        Assert.Equal([$"{HeartRate} 180 entered-in-error Typed 180 for 108. {clinician} true"], await StateAsync(patient));
         // Audited as a change, with the reason; and the patient no longer sees the reading.
         Assert.Single(await AsSuperuserAsync(
             "SELECT id::text FROM ehr.audit_events WHERE table_name = 'observations' AND action = 'update' AND patient_id = @patient AND actor_id = @actor AND details::text LIKE '%Typed 180 for 108.%'",
@@ -106,7 +117,7 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         }
 
         await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(App, clinician, $"DELETE FROM ehr.observations {mine}", ("patient", patient)));
-        Assert.Equal([$"{Systolic} 180 final none none none"], await StateAsync(patient));
+        Assert.Equal([$"{HeartRate} 180 final none none none"], await StateAsync(patient));
     }
 
     [Fact]
@@ -125,7 +136,7 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         }
 
         await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => MarkAsync(clinician, patient, connection: Read));
-        Assert.Equal([$"{Systolic} 180 final none none none"], await StateAsync(patient));
+        Assert.Equal([$"{HeartRate} 180 final none none none"], await StateAsync(patient));
 
         // A laboratory result is not corrected this way.
         var order = Guid.CreateVersion7();
@@ -145,13 +156,13 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         var (clinician, patient) = await OnPanelAsync();
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
         await RecordAsync(clinician, patient);
-        await RecordAsync(clinician, patient, HeartRate, 72m);
+        await RecordAsync(clinician, patient, Temperature, 37m);
 
         await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.ExecuteAsync(App, clinician,
             """
             UPDATE ehr.observations
             SET status = 'entered-in-error',
-                entered_in_error_reason = 'Synthetic' || CASE WHEN code = '8867-4' THEN left(set_config('app.user_id', @other, true), 0) ELSE '' END
+                entered_in_error_reason = 'Synthetic' || CASE WHEN code = '8310-5' THEN left(set_config('app.user_id', @other, true), 0) ELSE '' END
             WHERE patient_id = @patient
             """, ("patient", patient), ("other", admin.ToString())));
         Assert.All(await StateAsync(patient), state => Assert.EndsWith("final none none none", state));
@@ -191,8 +202,7 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
             "UPDATE ehr.patients SET birth_date = (now() - make_interval(months => @months, days => 3))::date WHERE id = @patient", ("months", months), ("patient", patient));
 
         await RecordAsync(clinician, patient, HeartRate, 90m);
-        await RecordAsync(clinician, patient, Systolic, 100m);
-        await RecordAsync(clinician, patient, Diastolic, 60m);
+        await RecordPressureAsync(clinician, patient, 100m, 60m);
         // Temperature has one range at every age.
         await RecordAsync(clinician, patient, "8310-5", 37m);
 

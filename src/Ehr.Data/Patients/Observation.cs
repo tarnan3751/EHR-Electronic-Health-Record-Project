@@ -31,6 +31,11 @@ public class Observation
 
     public DateTimeOffset? EnteredInErrorAt { get; set; }
 
+    // The blood pressure reading a systolic or diastolic value belongs to (the expansion plan's step 9c): the two values
+    // entered together share it, and stand or are entered in error together. The database gives it; null for every
+    // other sign and for results (db/policies/75-results.sql).
+    public Guid? ReadingId { get; set; }
+
     // The test as a LOINC code, such as 4548-4 for hemoglobin A1c, when it has one.
     public string? Code { get; set; }
 
@@ -85,6 +90,9 @@ public static class VitalSign
 
     // In the order a flowsheet lists them.
     public static readonly string[] All = [Systolic, Diastolic, HeartRate, Temperature, RespiratoryRate, OxygenSaturation, Weight, Height, BodyMassIndex];
+
+    // The two values of one blood pressure reading (step 9c).
+    public static readonly string[] BloodPressure = [Systolic, Diastolic];
 }
 
 // FHIR R4's Observation status codes, the values Observation.Status may hold.

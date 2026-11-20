@@ -902,9 +902,14 @@
         padding: 0;
     }
 
-    /* A reading marked entered in error (step 9b): struck through, in the muted ink. */
+    /* A reading marked entered in error (step 9b): struck through, in the muted ink. On a line of its own, and its
+       reason wraps even in a table cell that otherwise doesn't, so a long reason can't push the page sideways. */
     .sc-struck {
+        display: block;
         color: var(--ink-muted);
+        white-space: normal;
+        min-width: 16ch;
+        max-width: 40ch;
     }
 
     /* Why, in words beside it: the flowsheet shows entries in error only when asked, so there is room. */
@@ -1279,11 +1284,20 @@
 
     /* Table container: a border round the table, a header that stays in view, and room to scroll when narrow. */
     .sc-table-wrap {
+        /* Positioned, so text hidden for screen readers inside a cell (which is placed absolutely) stays inside the
+           container and can't widen the page. */
+        position: relative;
         border: 1px solid var(--line);
         border-radius: var(--radius-sm);
         overflow: clip;
         margin: 0 0 var(--space-4);
         background: var(--surface-raised);
+    }
+
+    /* A table that grows sideways, a column for each set of readings: it scrolls inside its container at any width,
+       and the page never does. */
+    .sc-table-wrap--wide {
+        overflow-x: auto;
     }
 
     .sc-table th {

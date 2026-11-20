@@ -23,6 +23,19 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
         await Seeded.AssertProtectedAsync(database);
         // Synthetic rows in an empty clinic, loaded with the trigger off: no write-audit events.
         Assert.Equal(0, await Seeded.WriteEventsAsync(database));
+        // Each visit's blood pressure is one reading (step 9c). The seed loads them with the database's check of readings
+        // off, as it does the audit trigger, so every reading is checked here as the database would: one patient, time and
+        // visit, and exactly one standing systolic and one standing diastolic, nothing else.
+        Assert.Equal(["true 0"], await Accounts.QueryAsync(database.SuperuserConnectionString, null,
+            """
+            SELECT (count(*) > 0) || ' ' || count(*) FILTER (WHERE NOT whole)
+            FROM (
+                SELECT reading_id IS NOT NULL AND count(*) = 2 AND count(DISTINCT patient_id) = 1 AND count(DISTINCT effective_at) = 1
+                    AND count(DISTINCT encounter_id) + max(CASE WHEN encounter_id IS NULL THEN 1 ELSE 0 END) = 1
+                    AND count(*) FILTER (WHERE code = '8480-6' AND status <> 'entered-in-error') = 1
+                    AND count(*) FILTER (WHERE code = '8462-4' AND status <> 'entered-in-error') = 1 AS whole
+                FROM ehr.observations WHERE code IN ('8480-6', '8462-4') GROUP BY reading_id) r
+            """));
 
         // Once there are patients, the seed refuses, and nothing changes.
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -43,7 +56,7 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
         Assert.Equal(first.Visits.Select(v => (v.Id, v.PeriodStart)), again.Visits.Select(v => (v.Id, v.PeriodStart)));
         // The vital signs taken at the visits are observations (step 9): the same ones, with the same values.
         Assert.NotEmpty(first.Vitals);
-        Assert.Equal(first.Vitals.Select(v => (v.Id, v.EncounterId, v.Code, v.Value)), again.Vitals.Select(v => (v.Id, v.EncounterId, v.Code, v.Value)));
+        Assert.Equal(first.Vitals.Select(v => (v.Id, v.EncounterId, v.ReadingId, v.Code, v.Value)), again.Vitals.Select(v => (v.Id, v.EncounterId, v.ReadingId, v.Code, v.Value)));
         Assert.Equal("SYN0001235", first.Patient.Mrn);
 
         // Step 9b: every seeded vital sign carries the range for the patient's age on the day of the visit, and the

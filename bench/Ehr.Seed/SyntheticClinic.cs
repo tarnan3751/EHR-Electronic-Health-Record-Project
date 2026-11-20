@@ -182,11 +182,15 @@ public sealed class SyntheticClinic
         var vitalSigns = visitsWithVitals.SelectMany(visit =>
         {
             var ids = new SplitMix64(BitConverter.ToUInt64(visit.Visit.Id.ToByteArray(), 8));
+            // The visit's blood pressure is one reading (step 9c): its ID from a generator seeded by the visit's other
+            // half, so no other ID shifts.
+            var reading = Uuid7(visit.Visit.PeriodStart, new SplitMix64(BitConverter.ToUInt64(visit.Visit.Id.ToByteArray(), 0)));
             return visit.Vitals.Select(vital => new Observation
             {
                 Id = Uuid7(visit.Visit.PeriodStart, ids),
                 PatientId = patientId,
                 EncounterId = visit.Visit.Id,
+                ReadingId = VitalSign.BloodPressure.Contains(vital.Item1) ? reading : null,
                 Category = ObservationCategory.VitalSigns,
                 Code = vital.Item1,
                 Display = VitalSigns[vital.Item1].Display,

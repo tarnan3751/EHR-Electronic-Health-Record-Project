@@ -17,6 +17,9 @@ public sealed class ObservationConfiguration : IEntityTypeConfiguration<Observat
             // A reason, a person and a time belong to an entry in error, and to nothing else.
             table.HasCheckConstraint("ck_observations_entered_in_error",
                 $"(entered_in_error_reason IS NULL AND entered_in_error_by IS NULL AND entered_in_error_at IS NULL) OR status = '{ObservationStatus.EnteredInError}'");
+            // A reading belongs to a blood pressure value, and every blood pressure value has one (step 9c).
+            table.HasCheckConstraint("ck_observations_reading",
+                $"(reading_id IS NOT NULL) = (category = '{ObservationCategory.VitalSigns}' AND code IS NOT NULL AND code IN ({Codes.List(VitalSign.BloodPressure)}))");
         });
 
         observation.Property(o => o.Code).HasMaxLength(20);
@@ -25,12 +28,17 @@ public sealed class ObservationConfiguration : IEntityTypeConfiguration<Observat
         observation.HasOne<Encounter>().WithMany().HasForeignKey(o => o.EncounterId).OnDelete(DeleteBehavior.Restrict);
         // A patient's values of one test or vital sign over time: a trend, and the latest of each.
         observation.HasIndex(o => new { o.PatientId, o.Category, o.Code, o.EffectiveAt });
-        // One value of a vital sign for a patient at a moment (and a visit): a form sent twice records once. A
-        // visit's absence counts as a value, so two with no visit collide too. An entry in error doesn't count
-        // (step 9b): the correct value is recorded for the same moment.
-        observation.HasIndex(o => new { o.PatientId, o.Code, o.EffectiveAt, o.EncounterId })
-            .IsUnique().AreNullsDistinct(false).HasFilter($"category = 'vital-signs' AND status <> '{ObservationStatus.EnteredInError}'")
+        // One standing value of a vital sign for a patient at a moment, whatever the visit (step 9c): a form sent twice
+        // records once, and a different value waits until the one standing is marked entered in error. An entry in
+        // error doesn't count (step 9b): the correct value is recorded for the same moment.
+        observation.HasIndex(o => new { o.PatientId, o.Code, o.EffectiveAt })
+            .IsUnique().HasFilter($"category = 'vital-signs' AND status <> '{ObservationStatus.EnteredInError}'")
             .HasDatabaseName("ux_observations_vital_sign_once");
+        // A blood pressure reading has one systolic and one diastolic, standing or not (step 9c); also how the check
+        // that a reading is whole finds its values (db/policies/75-results.sql).
+        observation.HasIndex(o => new { o.ReadingId, o.Code })
+            .IsUnique().HasFilter("reading_id IS NOT NULL")
+            .HasDatabaseName("ux_observations_reading");
         observation.Property(o => o.EnteredInErrorReason).HasMaxLength(500);
         observation.HasOne<Accounts.StaffUser>().WithMany().HasForeignKey(o => o.EnteredInErrorBy).OnDelete(DeleteBehavior.Restrict);
         observation.Property(o => o.Display).HasMaxLength(200);

@@ -95,8 +95,10 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
                 .Where(o => ObservationStatus.Released.Contains(o.Status))
                 .OrderByDescending(o => o.EffectiveAt).ThenByDescending(o => o.IssuedAt).ToList();
         decimal? At(Guid visit, string code) => newestVitals.FirstOrDefault(o => o.EncounterId == visit && o.Code == code)?.Value;
-        var visitVitals = encounters.ToDictionary(e => e.Id, e => new VisitVitals(At(e.Id, VitalSign.Systolic), At(e.Id, VitalSign.Diastolic), At(e.Id, VitalSign.HeartRate)));
-        var latestVitals = newestVitals.Select(o => new LatestVital(o.Code!, o.Display, o.Value!.Value, o.Unit, o.ReferenceLow, o.ReferenceHigh, o.EffectiveAt));
+        // A blood pressure is one reading (step 9c): a visit's, and the newest, are each one reading's two numbers.
+        var pressures = BloodPressure.Readings(newestVitals);
+        var visitVitals = encounters.ToDictionary(e => e.Id, e => VisitVitals.Of(pressures.FirstOrDefault(p => p.Systolic.EncounterId == e.Id), At(e.Id, VitalSign.HeartRate)));
+        var latestVitals = newestVitals.Where(o => !VitalSign.BloodPressure.Contains(o.Code)).Select(LatestVital.Of);
         var orders = await ActiveOrders(id, catalogCode: null).ToListAsync(cancellationToken);
         // Only when the discontinue page sent the clinician here: whether that order is this patient's, and discontinued.
         var confirmed = discontinued is not null && await db.Orders.AsNoTracking()
@@ -147,7 +149,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             // The newest of each sign, in the flowsheet's order.
             // With the reading before it, for the up or down mark, from the same rows: no other statement (step 9b).
             LatestVitals = [.. latestVitals.GroupBy(v => v.Code).Select(group => group.First() with { Previous = group.Skip(1).FirstOrDefault()?.Value })
-                .OrderBy(v => Array.IndexOf(VitalSign.All, v.Code))],
+                .Concat(LatestVital.Pressure(pressures)).OrderBy(v => Array.IndexOf(VitalSign.All, v.Code))],
             Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,

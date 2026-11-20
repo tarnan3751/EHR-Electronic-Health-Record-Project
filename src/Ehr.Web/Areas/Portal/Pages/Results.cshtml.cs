@@ -34,6 +34,7 @@ public class ResultsModel(PortalSubject subject, PhiReader phi) : PageModel
         Available = results is not null;
         Results = results?.Results ?? [];
         ResultTrends = Ehr.Domain.Results.Trend.From(Results);
-        VitalTrends = Ehr.Domain.Results.Trend.From(results?.Vitals ?? [], VitalSign.All);
+        // A blood pressure's two numbers for each whole reading read (step 9c); the charts are as they were.
+        VitalTrends = Ehr.Domain.Results.Trend.From(Ehr.Domain.Results.BloodPressure.Whole(results?.Vitals ?? []), VitalSign.All);
     }
 }
