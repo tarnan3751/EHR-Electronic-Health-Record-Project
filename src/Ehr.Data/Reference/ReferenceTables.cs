@@ -57,15 +57,17 @@ public class OrderResultCode
     public required string ObservationCode { get; set; }
 }
 
-// A questionnaire a patient fills in before a visit: PHQ-9 and GAD-7, each by its LOINC panel code. The definition is
-// one JSON document: the items with their LOINC codes and texts, the answers with their scores, and the score's
-// severity bands.
+// A questionnaire a patient fills in before a visit: PHQ-9 and GAD-7, each by its LOINC panel code, worded as their
+// authors' forms are (the expansion plan's step 13e). Its rows are hand-written in db/reference/36-questionnaires.sql,
+// which describes the definition's shape and cites each source.
 public class Questionnaire
 {
     public required string Code { get; set; }
 
     public required string Title { get; set; }
 
+    // One JSON document: the prompt, the questions with their LOINC codes and texts, the lists of answers with their
+    // scores, the total, its severity bands, the score that needs follow-up, and the authors' attribution line.
     public required string Definition { get; set; }
 
     // The notice its owner asks for, from LOINC's EXTERNAL_COPYRIGHT_NOTICE.

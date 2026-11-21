@@ -3,8 +3,10 @@
 //   db/reference/20-order-catalog.sql          what can be ordered beyond the clinic's common items: LOINC's
 //                                              Universal Lab Orders Value Set, and RxNorm's clinical drugs
 //   db/reference/30-observations.sql           the results, vital signs and survey scores the clinic records (LOINC
-//                                              codes, UCUM units, this clinic's reference ranges), which results a
-//                                              common lab order produces, and the PHQ-9 and GAD-7 questionnaires
+//                                              codes, UCUM units, this clinic's reference ranges), and which
+//                                              results a common lab order produces. The PHQ-9 and GAD-7 are
+//                                              hand-written in db/reference/36-questionnaires.sql, worded as their
+//                                              authors' forms are (the expansion plan's step 13e)
 //   db/reference/40-drug-classes.sql           each drug product's ingredients (RxNorm), each ingredient's FDA
 //                                              Established Pharmacologic Classes, and which classes cross-react
 //   db/reference/ddinter/10-drug-interactions.sql   interactions between ingredients, from DDInter 2.0, which has
@@ -36,7 +38,6 @@ using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 var sourcesAt = Array.IndexOf(args, "--sources");
@@ -289,7 +290,9 @@ const string Range = "This clinic's range for adults, set for synthetic data fro
     ("8480-6", "vital", "mm[Hg]", 90m, 129m), ("8462-4", "vital", "mm[Hg]", 60m, 79m), ("8867-4", "vital", "/min", 60m, 100m),
     ("9279-1", "vital", "/min", 12m, 20m), ("8310-5", "vital", "Cel", 36.1m, 37.5m), ("59408-5", "vital", "%", 95m, 100m),
     ("29463-7", "vital", "kg", null, null), ("8302-2", "vital", "cm", null, null), ("39156-5", "vital", "kg/m2", 18.5m, 24.9m),
-    ("44261-6", "survey", "{score}", null, 4m), ("70274-6", "survey", "{score}", null, 4m),
+    // A questionnaire's total has no range: it is scored, banded and flagged by the questionnaire's own definition
+    // (db/reference/36-questionnaires.sql, the expansion plan's step 13e).
+    ("44261-6", "survey", "{score}", null, null), ("70274-6", "survey", "{score}", null, null),
 ];
 var observationRows = observations.Select(o => new[]
 {
@@ -311,65 +314,16 @@ var observationRows = observations.Select(o => new[]
 ];
 var resultRows = panels.SelectMany(panel => panel.Orders.SelectMany(order => panel.Results.Select(result => new[] { order, result }))).ToList();
 
-// PHQ-9 and GAD-7, from LOINC's panels: the items in order, with their texts and codes, the answers with their scores,
-// the total's code, and the severity bands their authors published (Kroenke, Spitzer and Williams 2001; Spitzer,
-// Kroenke, Williams and Löwe 2006).
-var answerLists = new Dictionary<string, List<(int Sequence, string Code, string Text, string Score)>>(StringComparer.Ordinal);
-using (var answers = Open("loinc.zip", LoincSha, "AccessoryFiles/AnswerFile/AnswerList.csv"))
-{
-    foreach (var row in Csv(answers))
-    {
-        Into(answerLists, row["AnswerListId"]).Add((Whole(row["SequenceNumber"]), row["AnswerStringId"], row["DisplayText"], row["Score"]));
-    }
-}
-
-var panelItems = new Dictionary<string, List<(int Sequence, string Code)>>(StringComparer.Ordinal);
-using (var forms = Open("loinc.zip", LoincSha, "AccessoryFiles/PanelsAndForms/PanelsAndForms.csv"))
-{
-    foreach (var row in Csv(forms).Where(row => row["ParentLoinc"] is "44249-1" or "69737-5" && row["Loinc"] != row["ParentLoinc"]))
-    {
-        Into(panelItems, row["ParentLoinc"]).Add((Whole(row["SEQUENCE"]), row["Loinc"]));
-    }
-}
-
-// The answers every scored item of both questionnaires takes, with their scores (LOINC answer list LL358-3).
-var scored = answerLists["LL358-3"].OrderBy(answer => answer.Sequence)
-    .Select(answer => new { code = answer.Code, text = answer.Text, score = int.Parse(answer.Score, CultureInfo.InvariantCulture) }).ToArray();
-(string Panel, string Title, string Total, string Unscored, (int From, int To, string Band)[] Bands)[] forms2 =
-[
-    ("44249-1", "Patient Health Questionnaire (PHQ-9)", "44261-6", "69722-7",
-        [(0, 4, "Minimal"), (5, 9, "Mild"), (10, 14, "Moderate"), (15, 19, "Moderately severe"), (20, 27, "Severe")]),
-    ("69737-5", "Generalized Anxiety Disorder scale (GAD-7)", "70274-6", "",
-        [(0, 4, "Minimal"), (5, 9, "Mild"), (10, 14, "Moderate"), (15, 21, "Severe")]),
-];
-var questionnaireRows = forms2.Select(form =>
-{
-    var items = panelItems[form.Panel].OrderBy(item => item.Sequence).Where(item => item.Code != form.Total && item.Code != form.Unscored)
-        // LOINC's name for the item, without the method it adds in brackets ("[Reported.PHQ]").
-        .Select(item => new { code = item.Code, text = Regex.Replace(loinc[item.Code]["LONG_COMMON_NAME"], "\\s*\\[[^\\]]*\\]$", "") }).ToArray();
-    var definition = JsonSerializer.Serialize(new
-    {
-        prompt = "Over the last 2 weeks, how often have you been bothered by any of the following problems?",
-        items,
-        answers = scored,
-        total = form.Total,
-        bands = form.Bands.Select(band => new { from = band.From, to = band.To, band = band.Band }),
-    });
-    return new[] { form.Panel, form.Title, definition, Blank(loinc[form.Panel]["EXTERNAL_COPYRIGHT_NOTICE"]) };
-}).ToList();
-
 Write("30-observations.sql",
-    "The results, vital signs and survey scores the clinic records (LOINC codes, UCUM units, this clinic's reference ranges), which\n"
-    + "-- results a common lab order produces, and the PHQ-9 and GAD-7 questionnaires.\n"
+    "The results, vital signs and survey scores the clinic records (LOINC codes, UCUM units, this clinic's reference ranges), and which\n"
+    + "-- results a common lab order produces. The PHQ-9 and GAD-7 themselves are db/reference/36-questionnaires.sql.\n"
     + "-- This material contains content from LOINC (http://loinc.org). LOINC is copyright © Regenstrief Institute, Inc. and the Logical\n"
     + "-- Observation Identifiers Names and Codes (LOINC) Committee and is available at no cost under the license at\n"
     + "-- http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc.",
     new Table("observation_codes", ["code", "display", "kind", "unit", "reference_low::numeric", "reference_high::numeric", "range_source", "copyright"], 1, observationRows),
-    new Table("order_result_codes", ["catalog_code", "observation_code"], 2, resultRows),
-    new Table("questionnaires", ["code", "title", "definition::jsonb", "copyright"], 1, questionnaireRows));
+    new Table("order_result_codes", ["catalog_code", "observation_code"], 2, resultRows));
 Console.WriteLine($"observation_codes           {observationRows.Count,8:N0}");
 Console.WriteLine($"order_result_codes          {resultRows.Count,8:N0}");
-Console.WriteLine($"questionnaires              {questionnaireRows.Count,8:N0}  ({string.Join(", ", forms2.Select(form => $"{form.Title}: {panelItems[form.Panel].Count(item => item.Code != form.Total && item.Code != form.Unscored)} items"))})");
 
 // ---- DDInter 2.0: interactions between two drugs, by name, with a level --------------------------------------------
 
@@ -649,8 +603,6 @@ static IEnumerable<Dictionary<string, string>> Csv(TextReader reader)
 }
 
 static List<T> Into<T>(Dictionary<string, List<T>> map, string key) => map.TryGetValue(key, out var list) ? list : map[key] = [];
-
-static int Whole(string value) => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number : 0;
 
 static string? Number(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
 
