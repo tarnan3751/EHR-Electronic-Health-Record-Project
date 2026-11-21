@@ -1780,6 +1780,83 @@
 }
 
 @layer pages {
+    /* On paper (docs/brand: Print). Any page prints as its content alone: no app bar, bands, buttons or anything marked
+       sc-screen-only. Its ink is the brand navy on no ground, whatever the theme on screen: the color tokens are set
+       again for the page, to the brand's own colors, which no theme changes, or to nothing, so a dark screen doesn't print
+       light text. Tables aren't clipped or scrolled, a row or an entry isn't split across pages, and a heading stays with
+       what follows it. Nothing here applies on screen. */
+    @media print {
+        /* The page's own ground is the paper's, in the light scheme: tokens.css sets the scheme on the root outside the
+           layers, so only an important declaration here wins over it. */
+        :root {
+            color-scheme: light !important;
+        }
+
+        .sc-app {
+            --surface: transparent;
+            --surface-subtle: transparent;
+            --surface-raised: transparent;
+            --line: color-mix(in srgb, var(--brand-navy) 25%, transparent);
+            --line-strong: color-mix(in srgb, var(--brand-navy) 50%, transparent);
+            --ink: var(--brand-navy);
+            --ink-muted: var(--brand-navy);
+            --accent-ink: var(--brand-navy);
+            --danger: var(--brand-navy);
+            --warning: var(--brand-navy);
+            --success: var(--brand-navy);
+            --info: var(--brand-navy);
+            --status-unknown: var(--brand-navy);
+            --danger-soft: transparent;
+            --warning-soft: transparent;
+            --success-soft: transparent;
+            --info-soft: transparent;
+            --accent-soft: transparent;
+            --row-flagged: transparent;
+            --shadow-float: none;
+            --shadow-dialog: none;
+        }
+
+        .sc-appbar,
+        .sc-skip,
+        .sc-notice--band,
+        .sc-screen-only,
+        .sc-btn,
+        button {
+            display: none;
+        }
+
+        .sc-page,
+        .sc-page--reading,
+        .sc-page--form {
+            max-width: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .sc-banner,
+        .sc-table th {
+            position: static;
+        }
+
+        .sc-table-wrap {
+            overflow: visible;
+        }
+
+        tr,
+        dl.record,
+        .sc-results > li,
+        .sc-result {
+            break-inside: avoid;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            break-after: avoid;
+        }
+    }
+
     /* The "Not saved" page: what was typed, kept to copy, each entry in a read-only box under its name. */
     .sc-kept label {
         display: flex;

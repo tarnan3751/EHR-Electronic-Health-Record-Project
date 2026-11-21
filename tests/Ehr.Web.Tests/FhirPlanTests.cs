@@ -19,11 +19,12 @@ namespace Ehr.Web.Tests;
 // to the blood pressure diastolics once read every diastolic in the table for each request: on the benchmark's 50,000
 // patients a search took a second, and its row didn't finish in CI's half hour. Here, in a database of its own seeded
 // with a clinic big enough for a whole-table read to cost something, with autovacuum off, every query the API's reads
-// send is EXPLAINed as it is sent, as ehr_app with a clinician in context: first with the statistics cleared, as after
-// a bulk load nobody analyzed, then analyzed. None may read the whole of a table the seed filled. The plan is checked
-// rather than a time, so the test holds on any machine however busy, and that join showed as a sequential scan at any
-// size. Its one limit: it looks for sequential scans and nothing else. A plan that reads a whole table some other way,
-// such as a full index scan or an index probed once for each of many rows, passes it; the benchmark times the reads.
+// send, and the portal's download's (step 13b), is EXPLAINed as it is sent, as ehr_app with a clinician in context:
+// first with the statistics cleared, as after a bulk load nobody analyzed, then analyzed. None may read the whole of a
+// table the seed filled. The plan is checked rather than a time, so the test holds on any machine however busy, and
+// that join showed as a sequential scan at any size. Its one limit: it looks for sequential scans and nothing else. A
+// plan that reads a whole table some other way, such as a full index scan or an index probed once for each of many
+// rows, passes it; the benchmark times the reads.
 public class FhirPlanTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const int Patients = 10_000;
@@ -97,6 +98,8 @@ public class FhirPlanTests(MigratedDatabase database) : IClassFixture<MigratedDa
         Assert.Single((await reader.ObservationsAsync(patient, plain, category: null, 1, Cancel)).Entries);
         Assert.Empty((await reader.ObservationsAsync(patient, systolic, category: null, 1, Cancel)).Entries);
         Assert.Empty((await reader.AllAppointmentsAsync(patient, only: null, 600, Cancel)).Entries);
+        // The portal's download (step 13b): the same reads, results and vital signs only once released.
+        Assert.Contains((await reader.DownloadRecordAsync(patient, sensitive: true, 600, Cancel))!.VitalSigns.Entries, e => e.Diastolic is not null);
         await transaction.RollbackAsync(Cancel);
 
         var scans = plans.Explained

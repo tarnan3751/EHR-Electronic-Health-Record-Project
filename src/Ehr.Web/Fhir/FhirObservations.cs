@@ -4,7 +4,8 @@ using Ehr.Domain.Results;
 
 namespace Ehr.Web.Fhir;
 
-// Test results and vital signs as the FHIR API sends them (the expansion plan's step 11).
+// Test results and vital signs as the app sends them in FHIR: the clinician API (the expansion plan's step 11) and the
+// portal's download (step 13b).
 //
 // Each carries its category (laboratory or vital-signs), its LOINC code and, when its unit is its code's UCUM unit
 // (ehr.observation_codes), that unit with UCUM's system and code; otherwise the unit as text. Vital signs claim FHIR R4's

@@ -1222,13 +1222,18 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // unit is its code's UCUM unit.
     public async Task<PatientEntries<ObservationEntry>> ObservationsAsync(
         Guid patientId, Guid? only, string? category, int limit, CancellationToken cancellationToken) =>
-        await RecordAsync(patientId, only, await ReadObservationsAsync(patientId, only, category, limit, cancellationToken), sensitive: false, cancellationToken);
+        await RecordAsync(patientId, only, await ReadObservationsAsync(patientId, only, category, released: false, limit, cancellationToken), sensitive: false, cancellationToken);
 
+    // `released`: only those released as the portal's results page has them (ResultsAsync), for the portal's download.
     async Task<PatientEntries<ObservationEntry>> ReadObservationsAsync(
-        Guid patientId, Guid? only, string? category, int limit, CancellationToken cancellationToken)
+        Guid patientId, Guid? only, string? category, bool released, int limit, CancellationToken cancellationToken)
     {
         var matching = (only is { } id ? ObservationById(id) : db.Observations).AsNoTracking()
             .Where(o => o.PatientId == patientId && (category == null || o.Category == category) && o.Status != ObservationStatus.EnteredInError);
+        if (released)
+        {
+            matching = matching.Where(o => o.IssuedAt != null && ObservationStatus.Released.Contains(o.Status));
+        }
         // A search reads the patient's rows alone, by their index, both values of a reading among them, and twice the
         // limit of them, since an entry is one row, or two for a reading. A reading's diastolic comes before its systolic
         // (same time, and its code sorts first), so the rows read never hold a reading's systolic without its diastolic,
@@ -1283,6 +1288,50 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // Entries read whole: the total before the limit, then the limit.
     static PatientEntries<T> Entries<T>(List<T> all, int sensitiveLeftOut, int limit) =>
         new([.. all.Take(limit)], all.Count) { SensitiveLeftOut = sensitiveLeftOut };
+
+    // The portal's download of a patient's record (the expansion plan's step 13b): what the record holds that the portal
+    // may hand its subject, read as the FHIR API reads it, with its limit for each kind of entry: their allergies, every
+    // status; medications, every status but entered in error, and diagnoses, every status, sensitive ones only when asked
+    // for; test results and vital signs once released, as the portal's results page has them (the rule
+    // observations_own_released_select holds, asked here too, as ResultsAsync asks it), each kind read apart so neither
+    // crowds out the other; and appointments, every status. Row-level security returns the record the session is looking
+    // at and only what its rule allows: a proxy's sensitive items only when the patient allowed them.
+
+    // For the file: one recorded download of the patient, apart from a view since the file leaves the portal, or a
+    // download of their sensitive items when they were asked for. Null when the session may read no such patient.
+    public async Task<PatientRecord?> DownloadRecordAsync(Guid patientId, bool sensitive, int limit, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var record = await ReadRecordAsync(patient, sensitive, limit, cancellationToken);
+        audit.Record(sensitive ? AuditActions.DownloadSensitive : AuditActions.Download, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return record;
+    }
+
+    // For the printable page, which is a view: the record with its visit summaries, read by VisitSummariesAsync as the
+    // portal's summaries page reads them, which records the view as that page does, a read of the patient (of their
+    // sensitive items when asked for) and a read of each summary shown. Null when the session may read no such patient.
+    public async Task<PatientRecord?> PrintableRecordAsync(Guid patientId, bool sensitive, int limit, int summaries, CancellationToken cancellationToken) =>
+        await VisitSummariesAsync(patientId, sensitive, summaries, cancellationToken) is { } read
+            ? await ReadRecordAsync(read.Patient, sensitive, limit, cancellationToken) with { Summaries = read }
+            : null;
+
+    async Task<PatientRecord> ReadRecordAsync(Patient patient, bool sensitive, int limit, CancellationToken cancellationToken) => new(
+        patient,
+        await ReadAllergiesAsync(patient.Id, only: null, limit, cancellationToken),
+        await ReadMedicationsAsync(patient.Id, only: null, sensitive, limit, cancellationToken),
+        await ReadConditionsAsync(patient.Id, only: null, sensitive, limit, cancellationToken),
+        await ReadObservationsAsync(patient.Id, only: null, ObservationCategory.Laboratory, released: true, limit, cancellationToken),
+        await ReadObservationsAsync(patient.Id, only: null, ObservationCategory.VitalSigns, released: true, limit, cancellationToken),
+        await ReadAppointmentsAsync(patient.Id, only: null, limit, cancellationToken))
+    {
+        SensitiveShown = sensitive,
+    };
 
     // One view of one patient, one event; nothing for a read by ID that found nothing.
     async Task<PatientEntries<T>> RecordAsync<T>(Guid patientId, Guid? only, PatientEntries<T> read, bool sensitive, CancellationToken cancellationToken)

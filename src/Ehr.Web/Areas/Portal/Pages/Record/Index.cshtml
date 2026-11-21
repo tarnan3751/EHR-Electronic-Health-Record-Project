@@ -1,0 +1,37 @@
+@page "/portal/record"
+@model IndexModel
+@{
+    var own = Model.ActingFor is null;
+    ViewData["Title"] = own ? "Download my record" : "Download this record";
+}
+<h1>@ViewData["Title"]</h1>
+@if (Model.Unavailable)
+{
+    <p class="sc-notice sc-notice--danger">@(own ? "Your record is" : "The record is") not available right now. Contact the clinic if this continues.</p>
+}
+<div class="sc-prose">
+    <p>@(own ? "A copy of your record" : $"A copy of {Model.ActingFor}'s record"), as the portal has it now: allergies, medications, diagnoses, test results once they are released, vital signs and appointments.</p>
+    <ul>
+        <li><strong>As a file (FHIR):</strong> the standard format other clinics and health apps can read. It doesn't hold visit summaries yet.</li>
+        <li><strong>As a printable page:</strong> the same, with the visit summaries, laid out to print or to save as a PDF.</li>
+    </ul>
+    <p class="sc-muted">Neither holds the care team's notes, messages, or who has looked at the record.</p>
+</div>
+@* Said before anything is downloaded: the copy is the person's to look after once it leaves the portal. *@
+<p class="sc-notice sc-notice--warning" data-download-warning><span class="sc-notice__state">Health information:</span> the file and the printable page hold @(own ? "your" : "this person's") health information. Once you download or print them, where they go is your responsibility: anyone who has the file or the paper can read it, and the clinic can't take it back. On a computer you share, delete the file when you're done.</p>
+@* A GET form, so the cloud app answers it too: the box asks for sensitive items, and each button names what it makes. A
+   proxy the patient didn't allow sensitive items is offered no box: for them there are none. *@
+<form method="get" class="sc-stack">
+    @if (Model.MaySeeSensitive)
+    {
+        <div class="sc-field">
+            <label class="sc-check" for="record-sensitive"><input type="checkbox" id="record-sensitive" name="sensitive" value="true" checked="@Model.Sensitive" aria-describedby="record-sensitive-hint"> Include sensitive items</label>
+            <p class="sc-field__hint" id="record-sensitive-hint">Diagnoses, medications and visit summaries marked sensitive are left out unless you include them. Including them is recorded.</p>
+        </div>
+    }
+    <div class="sc-actions">
+        <button type="submit" class="sc-btn sc-btn--primary" name="handler" value="File">Download as a file (FHIR)</button>
+        <button type="submit" class="sc-btn" asp-page="/Record/Print">Open a printable page</button>
+    </div>
+</form>
+<p><a asp-page="/Index">@(own ? "Back to my record" : "Back to the record")</a></p>

@@ -47,6 +47,7 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 - A read-only FHIR R4 API (the plan's step 11): a clinician's client reads a patient on their panel, their allergies, medications, diagnoses, results, vital signs (a blood pressure as one reading) and appointments, coded as the record is, with the clinical app's sign-in; each read is recorded as a page's is, and sensitive items are left out unless asked for. See [FHIR API](#fhir-api) and `docs/UC19.md`.
 - Results from a lab (the plan's step 12): a lab's system, with a key of its own, is handed the lab orders waiting for results, with only what it needs, and files their results through the same database rule as a clinician's filing; each order handed over and each result filed is audited as the lab's. The simulated lab (`src/Ehr.Lab.Simulator`) plays one, in the local stack too, with results that fit each patient's diagnoses. See [Simulated lab](#simulated-lab) and `docs/UC20.md`.
 - Visit summaries (the plan's step 13a): from a signed note, a clinician with the patient on their panel writes and releases a summary for the patient in three plain-language parts, refused while it has an internal code, an identifier, the patient's record number or a whole section of the note in it; the patient, and whoever they share their record with, reads it in the portal under the rules for sensitive items, and the patient is emailed that there is something new, with no health details. A released summary is never edited: a wrong one is withdrawn with a reason and leaves a dated placeholder in the portal. The notes themselves never reach the portal. See `docs/UC14.md` and `docs/UC6.md`.
+- Download my record (the plan's step 13b): from the portal's home, the patient, or a proxy as their access allows, downloads their record as one FHIR R4 file (allergies, medications, diagnoses, released results, vital signs and appointments, from the FHIR API's own mapping, with ids made for the file) or opens it as a page laid out to print, with the visit summaries. Sensitive items only when asked for; never notes, entries in error or unreleased results; each download recorded apart from a view. Pages print as their content alone. See `docs/UC6.md`.
 
 **Not built yet:** editing visits, sending orders to a pharmacy, a real lab's interface (step 12's door is there for one; a simulated lab uses it), and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
@@ -56,7 +57,7 @@ Folders describe their intended contents; most are still empty.
 
 ```
 src/
-  Ehr.Web/          ASP.NET Core Razor Pages host: Areas/Clinical, Areas/Portal, Api/Sync, Api/Dictation, Api/Fhir, Api/Lab
+  Ehr.Web/          ASP.NET Core Razor Pages host: Areas/Clinical, Areas/Portal, Api/Sync, Api/Dictation, Api/Fhir, Api/Lab, Fhir (the FHIR mapping)
   Ehr.Domain/       services, authorization policies, PHI reader, FHIR-shaped models
   Ehr.Data/         EF Core + Dapper on Npgsql: read and write contexts, RLS interceptor
   Ehr.Design/       Razor class library: the SwiftChart tokens, shared CSS, fonts and logos (wwwroot), shared partials, htmx, Alpine.js
@@ -242,7 +243,7 @@ It writes `eval/results/latest.json`: word error rate overall and per tag, date 
 
 ## FHIR API
 
-A read-only FHIR R4 API, on both servers, for clinicians (`src/Ehr.Web/Api/Fhir`, UC 19 in `docs/UC19.md`). It uses the clinical app's own sign-in: sign in there as a clinician, and the API reads that cookie. A refusal is a 401 or 403 with an OperationOutcome, never a redirect.
+A read-only FHIR R4 API, on both servers, for clinicians (`src/Ehr.Web/Api/Fhir`, UC 19 in `docs/UC19.md`). Its resources come from a mapping of their own (`src/Ehr.Web/Fhir`), which the portal's "Download my record" uses too, with ids made for the patient's file (`docs/UC6.md`). It uses the clinical app's own sign-in: sign in there as a clinician, and the API reads that cookie. A refusal is a 401 or 403 with an OperationOutcome, never a redirect.
 
 | Request | What it returns |
 |---|---|

@@ -9,11 +9,11 @@ namespace Ehr.Web.Fhir;
 // The FHIR R4 the app writes (the expansion plan's step 11): the parts of FHIR R4's JSON it uses, as small records that
 // System.Text.Json writes, with nothing empty (FHIR's JSON has no nulls and no empty lists, so the mapping leaves them
 // null and the writer leaves them out), and the mapping from the PHI reader's rows. Observations have their own file,
-// FhirObservations.cs. It is kept apart from the clinician API that serves it (Api/Fhir, which writes its capability
-// statement itself, FhirCapabilities.cs), so that another door can send the same resources from the same mapping. Every
-// code comes from the record as step 2a's reference data coded it, with its standard system; an entry with no code is
-// sent as text. Times are instants in UTC. The tests check every response against the R4 specification
-// (tests/Ehr.Web.Tests/FhirConformance.cs).
+// FhirObservations.cs. One mapping, two doors: the clinician API (Api/Fhir, which writes its capability statement
+// itself, FhirCapabilities.cs) and the portal's download of a patient's record (step 13b, FhirRecord.cs), each with the
+// ids it writes (FhirIds). Every code comes from the record as step 2a's reference data coded it, with its standard
+// system; an entry with no code is sent as text. Times are instants in UTC. The tests check every response against the
+// R4 specification (tests/Ehr.Web.Tests/FhirConformance.cs).
 internal static class FhirResources
 {
     public const string ContentType = "application/fhir+json; charset=utf-8";
