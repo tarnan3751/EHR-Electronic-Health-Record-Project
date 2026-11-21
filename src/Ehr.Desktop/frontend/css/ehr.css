@@ -790,6 +790,50 @@
         accent-color: var(--primary);
     }
 
+    /* A question answered by choosing one of its answers (a pre-visit form, step 13e): a fieldset whose legend is the
+       question, and each answer a whole-width label with its radio button, as tall as a portal control. The arrow keys
+       move between a question's answers; the focus ring is the radio button's own. */
+    .sc-choice {
+        border: 0;
+        padding: 0;
+        margin: 0 0 var(--space-6);
+        max-width: var(--width-reading);
+    }
+
+    .sc-choice > legend {
+        padding: 0;
+        margin-bottom: var(--space-2);
+        font-size: inherit;
+        line-height: inherit;
+        font-weight: 600;
+    }
+
+    .sc-choice__option {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        min-height: 44px;
+        margin-top: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        cursor: pointer;
+    }
+
+    .sc-choice__option:has(input:checked) {
+        border-color: var(--primary);
+        background: var(--surface-subtle);
+    }
+
+    .sc-choice__option input {
+        flex: none;
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        accent-color: var(--primary);
+    }
+
     /* Notice. It starts with its state, so the color only supports the words. */
     .sc-notice {
         border-radius: var(--radius-md);
