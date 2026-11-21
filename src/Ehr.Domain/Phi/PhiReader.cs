@@ -10,6 +10,7 @@ using Ehr.Domain.Audit;
 using Ehr.Domain.Messaging;
 using Ehr.Domain.Orders;
 using Ehr.Domain.Proxies;
+using Ehr.Domain.Refills;
 using Ehr.Domain.Results;
 using Ehr.Domain.Scheduling;
 using Microsoft.EntityFrameworkCore;
@@ -1349,6 +1350,45 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     {
         SensitiveShown = sensitive,
     };
+
+    // Refill requests (the expansion plan's step 13d).
+
+    // The portal's refill page for the record the session is looking at: the medications it may ask to renew (active and
+    // coded, as row-level security lets the portal read them: none entered in error, a sensitive one only where the
+    // patient's rule allows), but those with a request waiting; its requests, latest first, up to the limit, as the
+    // database gives the portal them (ehr.portal_refill_requests: the portal reads no row of the table); and whether
+    // anyone on the patient's panel could answer one. Sensitive medications and requests are left out unless asked for,
+    // and asking is recorded as a view of the patient's sensitive items, in place of the plain read: one recorded read of
+    // the patient. Null when the session may read no such patient.
+    public async Task<PatientRefills?> RefillsAsync(Guid patientId, bool sensitive, int limit, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var requests = await RefillRequestQueries.PortalAsync(db, limit, cancellationToken);
+        var waiting = requests.Where(r => r.Status == RefillRequestStatus.Requested).Select(r => r.MedicationStatementId).ToHashSet();
+        var medications = (await db.MedicationStatements.AsNoTracking()
+            .Where(m => m.PatientId == patientId && m.Status == MedicationStatementStatus.Active && m.Code != null)
+            .OrderBy(m => m.Display).ThenBy(m => m.Id)
+            .Select(m => new RenewableMedication(m.Id, m.Display, m.Dosage, m.Sensitive)).ToListAsync(cancellationToken))
+            .Where(m => !waiting.Contains(m.Id)).ToList();
+        var now = DateTimeOffset.UtcNow;
+        var careTeam = await (
+            from assignment in db.PatientAssignments
+            join staff in db.StaffUsers on assignment.ClinicianId equals staff.Id
+            where assignment.PatientId == patientId && assignment.EndedAt == null && staff.Roles.Contains(Ehr.Data.Accounts.StaffRoles.Clinician)
+                && (staff.LockoutEnd == null || staff.LockoutEnd <= now)
+            select assignment.Id).AnyAsync(cancellationToken);
+        var hidden = sensitive ? 0 : medications.Count(m => m.Sensitive) + requests.Count(r => r.Sensitive);
+
+        audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new PatientRefills(patient, sensitive ? medications : [.. medications.Where(m => !m.Sensitive)],
+            sensitive ? requests : [.. requests.Where(r => !r.Sensitive)], hidden, sensitive, careTeam);
+    }
 
     // One view of one patient, one event; nothing for a read by ID that found nothing.
     async Task<PatientEntries<T>> RecordAsync<T>(Guid patientId, Guid? only, PatientEntries<T> read, bool sensitive, CancellationToken cancellationToken)
