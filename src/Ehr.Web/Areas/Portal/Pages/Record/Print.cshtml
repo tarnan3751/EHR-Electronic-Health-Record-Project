@@ -251,8 +251,9 @@ else
         <h2 class="sc-panel__title" id="record-summaries">Visit summaries</h2>
         @if (summaries.Summaries.Count >= SummariesModel.Limit)
         {
-            @* The reader gives the newest of them, as Visit summaries has them, and doesn't say how many more there are. *@
-            <p class="sc-muted" data-summaries-cut>Only the newest @SummariesModel.Limit visit summaries are shown.</p>
+            @* The reader gives the newest of them, as Visit summaries has them, and doesn't say whether there are more: so
+               the page says what it holds at most, true whether or not any were left out. *@
+            <p class="sc-muted" data-summaries-cut>This page shows at most the @SummariesModel.Limit newest visit summaries.</p>
         }
         @if (items.Count == 0)
         {
