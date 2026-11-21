@@ -78,16 +78,22 @@ CREATE OR REPLACE FUNCTION ehr.record_views(older_than timestamptz, newer_than t
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
 AS $$
-    -- Who is looking, read once. For a proxy without sensitive items, with the patient's panel history: who had the
-    -- patient on their panel, from when and until when, a few rows. It is read for every such proxy's page, whatever the
-    -- page holds, before anything else, so the page's time doesn't depend on whether there are views it leaves out (a
-    -- review found that reading it only when a staff member's view needed it told a proxy, by the page's time, that one
-    -- such view existed). By a scan of the panels' table, since no index finds one patient's ended assignments.
-    WITH viewer AS MATERIALIZED (
+    -- Who is looking, worked out once, by itself: kept apart so PostgreSQL can't write these calls into the scan below,
+    -- where they would run for every row of the panels' table (a review measured 0.6 s a page at 60,000 rows).
+    WITH who AS MATERIALIZED (
+        SELECT ehr.current_patient_id() AS subject, ehr.current_user_id() AS account, ehr.acting_grant_id() IS NULL AS own,
+               ehr.portal_sees_sensitive() AS sees_sensitive, ehr.portal_may_message() AS sees_messages,
+               now() - interval '12 months' AS since
+    ),
+    -- And, for a proxy without sensitive items, the patient's panel history: who had the patient on their panel, from
+    -- when and until when, a few rows. It is read for every such proxy's page, whatever the page holds, before anything
+    -- else, so the page's time doesn't depend on whether there are views it leaves out (a review found that reading it
+    -- only when a staff member's view needed it told a proxy, by the page's time, that one such view existed). By one
+    -- scan of the panels' table, comparing each row with the patient's ID, since no index finds one patient's ended
+    -- assignments.
+    viewer AS MATERIALIZED (
         SELECT c.*, h.panel_clinicians, h.panel_from, h.panel_until
-        FROM (SELECT ehr.current_patient_id() AS subject, ehr.current_user_id() AS account, ehr.acting_grant_id() IS NULL AS own,
-                     ehr.portal_sees_sensitive() AS sees_sensitive, ehr.portal_may_message() AS sees_messages,
-                     now() - interval '12 months' AS since) c
+        FROM who c
         CROSS JOIN LATERAL (
             SELECT array_agg(a.clinician_id) AS panel_clinicians, array_agg(a.assigned_at) AS panel_from,
                    array_agg(coalesce(a.ended_at, 'infinity')) AS panel_until

@@ -684,6 +684,80 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
             "SELECT count(*) FILTER (WHERE ended_at IS NOT NULL) || ' ' || count(*) FROM ehr.patient_assignments WHERE patient_id = @patient", ("patient", patient)));
     }
 
+    // The panel history is read with the patient's ID worked out once: the session's context functions never run for each
+    // row of the panels' table (a review measured 0.6 s a page when they did, at 60,000 rows), nor for each row of any other
+    // table the function reads. Read from the plan auto_explain gives for the statement inside the function, as a proxy
+    // without sensitive items, on a table of some thousands of rows: no filter or index condition names a function of the
+    // schema, so each is a value worked out once.
+    [Fact]
+    public async Task The_panel_history_is_read_without_the_session_worked_out_for_each_row()
+    {
+        var (_, patient, own) = await PatientAsync();
+        var proxy = await ProxyAsync(own, patient, includeSensitive: false);
+        var colleague = await StaffAsync("Dr. Olive", StaffRoles.Clinician);
+        var elsewhere = await Accounts.PatientAsync(database, colleague);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at)
+            SELECT gen_random_uuid(), @patient, @clinician, now() - make_interval(days => 400 + n), now() - make_interval(days => 399 + n)
+            FROM generate_series(1, 3000) AS n
+            """, ("patient", elsewhere), ("clinician", colleague));
+
+        var plans = new List<string>();
+        await using (var connection = new Npgsql.NpgsqlConnection(database.SuperuserConnectionString))
+        {
+            await connection.OpenAsync(Cancel);
+            connection.Notice += (_, notice) => plans.Add(notice.Notice.MessageText);
+            await using var transaction = await connection.BeginTransactionAsync(Cancel);
+            foreach (var sql in new[]
+            {
+                "LOAD 'auto_explain'", "SET LOCAL auto_explain.log_min_duration = 0", "SET LOCAL auto_explain.log_nested_statements = on",
+                "SET LOCAL auto_explain.log_analyze = on", "SET LOCAL auto_explain.log_timing = off", "SET LOCAL auto_explain.log_level = notice",
+                "SET LOCAL client_min_messages = notice", "SET LOCAL ROLE ehr_app",
+                $"SELECT set_config('app.user_id', '{proxy.Account}', true), set_config('app.acting_grant', '{proxy.Grant}', true)",
+                "SELECT count(*) FROM ehr.record_views(NULL, NULL)",
+            })
+            {
+                await using var command = new Npgsql.NpgsqlCommand(sql, connection, transaction);
+                await command.ExecuteNonQueryAsync(Cancel);
+            }
+        }
+
+        // Each scan of the panels' table with the lines that describe it, down to the next node.
+        var scans = plans.SelectMany(plan =>
+        {
+            var lines = plan.Split('\n');
+            return lines.Select((line, index) => (line, index)).Where(node => node.line.Contains(" on patient_assignments ", StringComparison.Ordinal))
+                .Select(node => string.Join('\n', lines.Skip(node.index).TakeWhile((line, offset) => offset == 0 || !line.Contains("->", StringComparison.Ordinal))));
+        }).ToList();
+        var history = Assert.Single(scans, scan => scan.Contains("Seq Scan", StringComparison.Ordinal) && !scan.Contains("never executed", StringComparison.Ordinal));
+        Assert.True(int.Parse(System.Text.RegularExpressions.Regex.Match(history, @"Rows Removed by Filter: (\d+)").Groups[1].Value, CultureInfo.InvariantCulture) >= 3000, history);
+        Assert.All(scans, scan => Assert.DoesNotMatch(@"ehr\.\w+\(", scan));
+        var body = Assert.Single(plans, plan => plan.Contains(" on audit_events ", StringComparison.Ordinal));
+        Assert.All(body.Split('\n').Where(line => line.Contains("Filter:", StringComparison.Ordinal) || line.Contains("Cond:", StringComparison.Ordinal)),
+            line => Assert.DoesNotMatch(@"ehr\.\w+\(", line));
+    }
+
+    // The twelve months bound what a page reads before it is cut: a record with more than a page of views from before
+    // them, and three inside them, gives the three and no more to come.
+    [Fact]
+    public async Task Views_from_before_the_twelve_months_never_reach_a_page()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), now() - make_interval(days => 370 + n), @actor, 'read', 'patients', @patient, @patient, 'onprem', false
+            FROM generate_series(1, 60) AS n
+            """, ("actor", clinician), ("patient", patient));
+        for (var minute = 1; minute <= 3; minute++)
+        {
+            await EventAsync(patient, clinician, "read", "patients", minute);
+        }
+
+        Assert.Equal(Enumerable.Repeat("staff|Dr. Alder|clinician|record|false|false", 3), await ViewsAsync(App, own, null));
+    }
+
     // Every table of patient data, and the log itself, is named by the part rule, so a new one is a decision: which part,
     // and whether a proxy without sensitive items may see a view of it. A table the rule doesn't name is the record to the
     // patient and hidden from such a proxy (the proxy test above). The list is the one ProtectionTests keeps.
