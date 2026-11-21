@@ -7,7 +7,12 @@ using Ehr.Data.Audit;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Phi;
 using Ehr.Testing;
+using Ehr.Web.Areas.Portal.Pages;
+using Ehr.Web.CloudAudit;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 using static Ehr.Web.Tests.NoteAddendumTests;
@@ -167,6 +172,113 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
 
         static string Message(string page, int index) =>
             Words(Regex.Match(page, $"<p id=\"summary-error-{index}\">(.*?)</p>").Groups[1].Value);
+    }
+
+    // At the page's cap, fifty summaries, the portal's page records 51 reads a view: the patient's and one for each
+    // summary shown. On-site they are written in one statement, and off-site given to the cloud app's queue in one
+    // write; the page still shows all fifty. Every statement the read sends is counted as Npgsql traces it, EF Core's
+    // and the raw ones alike.
+    [Fact]
+    public async Task At_the_cap_the_portal_records_its_reads_in_one_statement_on_site_and_one_queue_write_off_site()
+    {
+        var (clinician, _, person) = await PortalPatientAsync(apps, "Capped");
+        await FiftyAsync(apps, clinician.Id, person.Patient);
+
+        // The patient's reads recorded so far, by table.
+        Task<List<string>> ReadsAsync() => ProxyTests.QueryAsync(apps,
+            "SELECT table_name || ' ' || count(*) FROM ehr.audit_events WHERE patient_id = @patient AND action = 'read' AND actor_id IS NOT NULL GROUP BY table_name ORDER BY table_name",
+            person.Patient);
+        var before = await ReadsAsync();
+
+        // On-site, through the reader, as the patient's own portal account.
+        using var read = new Activity("visit-summaries-at-the-cap").Start();
+        var sent = new List<string>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "Npgsql",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity =>
+            {
+                if (activity.RootId == read.RootId)
+                {
+                    lock (sent)
+                    {
+                        sent.Add(activity.GetTagItem("db.query.text") as string ?? "");
+                    }
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(listener);
+        var user = new UserContext { UserId = person.Account };
+        var options = new DbContextOptionsBuilder<EhrDbContext>();
+        EhrDbContext.Configure(options, apps.Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+        options.AddInterceptors(new UserContextInterceptor(user));
+        await using (var db = new EhrDbContext(options.Options))
+        {
+            var reader = new PhiReader(db, new AuditRecorder(db, user, new AuditSource(AuditSources.OnPrem)), user);
+            await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+            Assert.Equal(SummariesModel.Limit, (await reader.VisitSummariesAsync(person.Patient, sensitive: false, SummariesModel.Limit, Cancel))!.Summaries.Count);
+            await transaction.CommitAsync(Cancel);
+        }
+
+        read.Stop();
+        var written = Assert.Single(sent, text => text.Contains("ehr.audit_events", StringComparison.Ordinal));
+        Assert.Equal(1, Regex.Count(written, "INSERT INTO"));
+        Assert.Equal([$"patients {Count(before, "patients") + 1}", $"visit_summaries {SummariesModel.Limit}"], await ReadsAsync());
+
+        // The page itself, on-site: all fifty.
+        Assert.Equal(SummariesModel.Limit, Regex.Count(await PortalAsync(person.Client), "data-summary=\"standing\""));
+
+        // Off-site: one write to the queue, of all 51, and all fifty shown.
+        var queue = new CountedQueue(apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>());
+        await using var cloud = apps.CloudCutOff.WithWebHostBuilder(builder => builder.ConfigureTestServices(services => services.AddSingleton<IDurableAuditQueue>(queue)));
+        Assert.Equal(SummariesModel.Limit, Regex.Count(await PortalAsync(Client(cloud, person.Jar)), "data-summary=\"standing\""));
+        Assert.Equal([SummariesModel.Limit + 1], queue.Writes);
+    }
+
+    static int Count(List<string> reads, string table) =>
+        reads.Where(read => read.StartsWith(table + " ", StringComparison.Ordinal)).Select(read => int.Parse(read[(table.Length + 1)..], CultureInfo.InvariantCulture)).SingleOrDefault();
+
+    // The cloud app's queue, counting each write and how many events it held.
+    sealed class CountedQueue(IDurableAuditQueue queue) : IDurableAuditQueue
+    {
+        public List<int> Writes { get; } = [];
+
+        public void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents)
+        {
+            queue.Enqueue(auditEvents);
+            Writes.Add(auditEvents.Count);
+        }
+    }
+
+    // Fifty notes signed and a summary released for each, as the clinician, in one transaction.
+    static async Task FiftyAsync(WebApps apps, Guid clinician, Guid patient)
+    {
+        await using var connection = new NpgsqlConnection(apps.Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+        await connection.OpenAsync(Cancel);
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT set_config('app.user_id', @clinician::text, true);
+            INSERT INTO ehr.clinical_drafts
+                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
+            SELECT d, @patient, @clinician, 'Synthetic plain text', 1, 'Synthetic history.', 'Synthetic assessment.', 'Synthetic plan.', 1, false
+            FROM unnest(@drafts) AS d;
+            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan)
+            SELECT n.id, n.draft, @patient, 1, 'Synthetic history.', 'Synthetic assessment.', 'Synthetic plan.'
+            FROM unnest(@notes, @drafts) AS n(id, draft);
+            INSERT INTO ehr.visit_summaries (id, note_id, patient_id, talked_about, found, next_steps, sensitive)
+            SELECT uuidv7(), n, @patient, @talked, @found, @next, false FROM unnest(@notes) AS n;
+            """, connection, transaction);
+        command.Parameters.AddWithValue("clinician", clinician);
+        command.Parameters.AddWithValue("patient", patient);
+        command.Parameters.AddWithValue("drafts", Enumerable.Range(0, SummariesModel.Limit).Select(_ => Guid.CreateVersion7()).ToArray());
+        command.Parameters.AddWithValue("notes", Enumerable.Range(0, SummariesModel.Limit).Select(_ => Guid.CreateVersion7()).ToArray());
+        command.Parameters.AddWithValue("talked", TalkedAbout);
+        command.Parameters.AddWithValue("found", Found);
+        command.Parameters.AddWithValue("next", NextSteps);
+        await command.ExecuteNonQueryAsync(Cancel);
+        await transaction.CommitAsync(Cancel);
     }
 
     // The chart shows which signed notes have a summary in the portal from the notes statement it already makes: the

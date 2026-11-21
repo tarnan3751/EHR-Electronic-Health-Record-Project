@@ -5,7 +5,8 @@ namespace Ehr.Domain.Audit;
 
 // Records what the app itself must record: PHI reads (PhiReader), sign-ins, and account events. Writes to PHI tables
 // are recorded by the database trigger instead (db/policies/40-audit.sql). An event joins the request's unit of work
-// and commits with its transaction, so a read without its record is impossible. The actor is the signed-in user
+// and commits with its transaction, so a read without its record is impossible; RecordAllAsync writes its events at
+// once, in that transaction, so they commit with it too. The actor is the signed-in user
 // unless the caller knows better, as at a sign-in, where the user isn't signed in yet. On the cloud site, whose database
 // is a replica that takes no writes, the host registers an IAuditQueue and events go there instead.
 public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource source, IAuditQueue? queue = null)
@@ -23,6 +24,23 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
     // site's queue goes to disk once for the list rather than once a row.
     public void RecordReads(string tableName, IEnumerable<(Guid PatientId, Guid RowId)> rows) =>
         Store([.. rows.Select(row => New(AuditActions.Read, row.PatientId, tableName, row.RowId, reason: null, actorId: null, details: null))]);
+
+    // Several reads at once, such as a page with a read of the patient and of each of many of their rows: written
+    // together, on-site in one statement at once, in the caller's transaction (AuditEventBatch), where events recorded
+    // one by one each take a statement of their own when the unit of work is saved; on the cloud site, given to the
+    // queue together, as RecordReads gives them.
+    public async Task RecordAllAsync(IEnumerable<(string Action, Guid PatientId, string TableName, Guid RowId)> reads, CancellationToken cancellationToken)
+    {
+        AuditEvent[] auditEvents = [.. reads.Select(read => New(read.Action, read.PatientId, read.TableName, read.RowId, reason: null, actorId: null, details: null))];
+        if (queue is null)
+        {
+            await AuditEventBatch.InsertAsync(db, auditEvents, cancellationToken);
+        }
+        else
+        {
+            queue.Enqueue(auditEvents);
+        }
+    }
 
     AuditEvent New(string action, Guid? patientId, string? tableName, Guid? rowId, string? reason, Guid? actorId, string? details) => new()
     {

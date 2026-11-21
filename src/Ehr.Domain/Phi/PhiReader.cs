@@ -1063,13 +1063,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         var withdrawn = await VisitSummaryChecks.WithdrawnAsync(db, cancellationToken);
         var hidden = sensitive ? 0 : standing.Count(s => s.Sensitive) + withdrawn.Count(w => w.Sensitive);
         List<PortalVisitSummary> shown = sensitive ? standing : [.. standing.Where(s => !s.Sensitive)];
-        audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
-        if (shown.Count > 0)
-        {
-            audit.RecordReads(SummariesTable, shown.Select(s => (patient.Id, s.Id)));
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
+        // Up to the page's limit and one: in one statement, or one write to the cloud app's queue.
+        await audit.RecordAllAsync(
+            [(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id),
+                .. shown.Select(s => (AuditActions.Read, patient.Id, SummariesTable, s.Id))],
+            cancellationToken);
         return new PatientVisitSummaries(patient, shown, sensitive ? withdrawn : [.. withdrawn.Where(w => !w.Sensitive)], hidden, sensitive);
     }
 
