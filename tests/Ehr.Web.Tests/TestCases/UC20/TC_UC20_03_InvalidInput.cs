@@ -28,7 +28,8 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 //   3. POST hemoglobin 9.1 to the count, then 9.2.
 //   4. GET the hand-over with since not a number, twice, and beside another parameter.
 //   5. POST each of the shapes JSON readers commonly let through: a null result, null fields, a number in a string, a
-//      field twice, a top-level array or null, an empty body, a time that isn't one, a number too large to read.
+//      field twice, a top-level array or null, an empty body, a time that isn't one, a time with neither a Z nor an
+//      offset (which would be read in the server's own zone), a date alone, a number too large to read.
 // Expected result: Step 1: 415 unsupported for the text, 413 too-large for the large body, 400 malformed for the rest.
 //   Step 2: 404 unknown-order for the unknown order and the X-ray; 409 discontinued; 409 closed; 422 not-reported;
 //   422 wrong-unit; 422 in-the-future. Step 3: 204, then 409 different-result, and 9.1 stays. Steps 4 and 5: 400
@@ -149,6 +150,8 @@ public class TC_UC20_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         """{"collectedAt":null,"results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}""",
         """{"collectedAt":"2026-11-20T15:00:00Z","results":null}""",
         """{"collectedAt":"yesterday","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}""",
         """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":1e400,"unit":"g/dL"}]}""",
         """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}],"results2":[]}""",
     ];

@@ -793,9 +793,12 @@ CREATE POLICY orders_panel_update ON ehr.orders FOR UPDATE
 -- runtime role is or can become the owner, so an app session that sets app.lab_door itself gains nothing for its own
 -- statements. A function that runs as the owner sees through them only while the setting is open: inside the lab's two
 -- functions, the triggers their writes fire (ehr.file_result, the order's completion) do, as they must; outside them,
--- none does, unless a session set the value by hand and then called one, and no function that runs as its owner reads
--- these tables but the lab's two (LabSecurityTests keeps that list). Without them the door would see nothing, and the
--- acknowledgment check in ehr.file_result would pass for want of finding one.
+-- none does, unless a session set the value by hand and then called one, and no function that runs as its owner names
+-- these tables but the lab's two, trigger functions included (LabSecurityTests keeps that list, from what a
+-- SQL-standard body depends on and from the whole definition of any other, in any case and spacing). The list can't see
+-- a function that runs as the owner and reaches these tables another way: through a helper that runs as its caller,
+-- through a trigger its own writes fire, or through SQL it builds as it runs. Without these policies the door would see
+-- nothing, and the acknowledgment check in ehr.file_result would pass for want of finding one.
 --   orders: read and lock lab orders, and complete one when its first result is filed (60-orders.sql holds that
 --     update to the status alone); no other kind of order is seen.
 --   observations: insert a result of an order, nothing else (ehr.file_result holds such a row to a laboratory result

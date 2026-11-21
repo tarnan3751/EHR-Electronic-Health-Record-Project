@@ -53,7 +53,8 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
 
     // Until the lab's watermark has passed the transactions that signed the patient's lab orders. Any transaction still
     // running from before them, such as autovacuum's analyze, holds it back for a moment, as it would a lab's; a test
-    // that asks at once would be handed nothing yet.
+    // that asks at once would be handed nothing yet. Past 30 seconds it fails, rather than let a later assertion fail
+    // for another reason, or pass on nothing handed over.
     async Task SettledAsync(Guid patient)
     {
         for (var tries = 0; tries < 600; tries++)
@@ -69,6 +70,8 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
 
             await Task.Delay(TimeSpan.FromMilliseconds(50), Cancel);
         }
+
+        Assert.Fail("The lab's watermark did not pass the transaction that signed the patient's lab order within 30 seconds: a transaction still running holds it back.");
     }
 
     // Where the lab would start asking now: every transaction before it has finished.
@@ -176,6 +179,51 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
 
     static async Task RefusedAsync(string state, Func<Task> attempt) =>
         Assert.Equal(state, (await Assert.ThrowsAsync<PostgresException>(attempt)).SqlState);
+
+    // A statement in a session of the owner's own, with nobody signed in and app.lab_door set as asked, in a
+    // transaction that is rolled back: how many rows it wrote, and the order's status after it, as the session sees it.
+    async Task<(int Written, string? Status)> AsOwnerAsync(bool doorOpen, string sql, Guid patient, Guid? order = null)
+    {
+        await using var connection = new NpgsqlConnection(database.OwnerConnectionString);
+        await connection.OpenAsync(Cancel);
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        await SetUserAsync(connection, transaction, null);
+        await using (var door = new NpgsqlCommand("SELECT set_config('app.lab_door', @door, true)", connection, transaction))
+        {
+            door.Parameters.AddWithValue("door", doorOpen ? "open" : "");
+            await door.ExecuteNonQueryAsync(Cancel);
+        }
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("patient", patient);
+        command.Parameters.Add(new NpgsqlParameter("order", NpgsqlDbType.Uuid) { Value = (object?)order ?? DBNull.Value });
+        var written = await command.ExecuteNonQueryAsync(Cancel);
+        await using var status = new NpgsqlCommand("SELECT status FROM ehr.orders WHERE id = @order", connection, transaction);
+        status.Parameters.Add(new NpgsqlParameter("order", NpgsqlDbType.Uuid) { Value = (object?)order ?? DBNull.Value });
+        var after = (string?)await status.ExecuteScalarAsync(Cancel);
+        await transaction.RollbackAsync(Cancel);
+        return (written, after);
+    }
+
+    // The functions that run as the owner and name a table whose owner policies ask for app.lab_door (30-rls.sql),
+    // trigger functions too. A function with a SQL-standard body (RETURN, BEGIN ATOMIC) keeps no source text, but the
+    // tables it uses are recorded as what it depends on; any other is matched by its whole definition, in any case and
+    // spacing, quoted or not, and by bare names too where its search_path holds ehr. Observations count where a
+    // function inserts into them, since reading and updating them are the owner's already; a SQL-standard body that
+    // uses them at all counts, since what it does with them isn't recorded.
+    const string NamesTheDoorsTables = """
+        SELECT p.proname FROM pg_proc p
+        WHERE p.prosecdef AND p.proowner = 'ehr_owner'::regrole
+          AND CASE WHEN p.prosqlbody IS NOT NULL THEN EXISTS (
+                  SELECT FROM pg_depend d
+                  WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.refclassid = 'pg_class'::regclass
+                    AND d.refobjid IN ('ehr.orders'::regclass, 'ehr.conditions'::regclass, 'ehr.result_acknowledgments'::regclass, 'ehr.observations'::regclass))
+              ELSE pg_get_functiondef(p.oid) ~* '"?ehr"?\s*\.\s*"?(orders|conditions|result_acknowledgments)\M|\minsert\s+into\s+"?ehr"?\s*\.\s*"?observations\M'
+                OR (EXISTS (SELECT FROM unnest(p.proconfig) AS c WHERE c ~* '^search_path=.*\mehr\M')
+                    AND pg_get_functiondef(p.oid) ~* '\m"?(orders|conditions|result_acknowledgments)\M|\minsert\s+into\s+"?observations\M')
+              END
+        ORDER BY p.proname
+        """;
 
     // The door's own refusal of a caller: insufficient_privilege, named so the app tells it from any other.
     static async Task KeyRefusedAsync(Func<Task> attempt)
@@ -656,15 +704,64 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         Assert.Equal("filed", await FileAsync(Key, open, Hemoglobin));
         Assert.Equal("closed", await FileAsync(Key, acknowledged, [("777-3", 250m, "10*3/uL")]));
 
-        // No function that runs as its owner reads the door's tables but the lab's two: a new one is a decision to make
+        // No function that runs as its owner names the door's tables but the lab's two: a new one is a decision to make
         // about app.lab_door (30-rls.sql).
-        Assert.Equal(["file_lab_results", "lab_orders"], await AsSuperuserAsync(
+        Assert.Equal(["file_lab_results", "lab_orders"], await AsSuperuserAsync(NamesTheDoorsTables));
+    }
+
+    // The list above finds each kind of function its first version missed: one that runs as the owner with a
+    // SQL-standard body, which keeps no source text (the review's probe was one); a trigger function that names a table
+    // in capitals with spaces around the dot; and one that names it bare, with ehr on its search_path. Each is made
+    // here and dropped after.
+    [Fact]
+    public async Task The_list_of_functions_that_name_the_doors_tables_misses_none()
+    {
+        await MigratedDatabase.ExecuteAsync(database.OwnerConnectionString,
             """
-            SELECT p.proname FROM pg_proc p
-            WHERE p.pronamespace = 'ehr'::regnamespace AND p.prosecdef
-              AND p.prosrc ~ '(ehr\.orders|ehr\.conditions|ehr\.result_acknowledgments|INSERT INTO ehr\.observations)'
-            ORDER BY p.proname
-            """));
+            CREATE FUNCTION ehr.test_guard_standard(patient uuid) RETURNS bigint LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+            RETURN (SELECT count(*) FROM ehr.orders WHERE patient_id = patient) + (SELECT count(*) FROM ehr.conditions WHERE patient_id = patient);
+            CREATE FUNCTION ehr.test_guard_trigger() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+            AS $$ BEGIN PERFORM 1 FROM EHR . ORDERS WHERE id = NEW.id; RETURN NEW; END $$;
+            CREATE FUNCTION ehr.test_guard_path(patient uuid) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = ehr, pg_temp
+            AS $$ BEGIN RETURN (SELECT count(*) FROM result_acknowledgments WHERE patient_id = patient); END $$;
+            """);
+        try
+        {
+            Assert.Equal(["file_lab_results", "lab_orders", "test_guard_path", "test_guard_standard", "test_guard_trigger"],
+                await AsSuperuserAsync(NamesTheDoorsTables));
+        }
+        finally
+        {
+            await MigratedDatabase.ExecuteAsync(database.OwnerConnectionString,
+                "DROP FUNCTION ehr.test_guard_standard(uuid); DROP FUNCTION ehr.test_guard_trigger(); DROP FUNCTION ehr.test_guard_path(uuid)");
+        }
+
+        Assert.Equal(["file_lab_results", "lab_orders"], await AsSuperuserAsync(NamesTheDoorsTables));
+    }
+
+    // The door's two writing policies, each on its own, in a session of the owner's own, which ehr.file_result leaves
+    // alone (75-results.sql), so only the policy stands in the way. Closed, an update reaches no order (it has no
+    // WHERE, so only the update policy is asked, not the select policy a WHERE brings in) and a result is refused.
+    // Open, a result of the lab order is inserted and completes the order, as the door's filing does, through the
+    // update policy; an order of another kind isn't reached; and a result of no order is refused.
+    [Fact]
+    public async Task Each_of_the_doors_writing_policies_holds_only_while_the_door_is_open()
+    {
+        var (clinician, patient) = await PanelAsync();
+        var lab = await SignAsync(clinician, patient);
+        var medication = await SignAsync(clinician, patient, "SYN-MED-001", "medication");
+        const string Complete = "UPDATE ehr.orders SET status = 'completed'";
+        const string Result = """
+            INSERT INTO ehr.observations (id, patient_id, order_id, category, code, display, status, value, effective_at)
+            VALUES (uuidv7(), @patient, @order, 'laboratory', '718-7', 'x', 'final', 9.1, now())
+            """;
+
+        Assert.Equal(0, (await AsOwnerAsync(doorOpen: false, Complete, patient)).Written);
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => AsOwnerAsync(doorOpen: false, Result, patient, lab));
+
+        Assert.Equal((1, "completed"), await AsOwnerAsync(doorOpen: true, Result, patient, lab));
+        Assert.Equal((0, null), await AsOwnerAsync(doorOpen: true, Complete + " WHERE id = @order", patient, medication));
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => AsOwnerAsync(doorOpen: true, Result, patient));
     }
 
     // Each layer that withholds a sensitive diagnosis from the lab, on its own (step 12): the owner's policy on

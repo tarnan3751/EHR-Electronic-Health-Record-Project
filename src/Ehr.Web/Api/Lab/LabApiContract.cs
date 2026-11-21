@@ -38,7 +38,8 @@ internal static class LabJson
 {
     // camelCase, as the web's JSON is, and strict: a field neither side knows is refused, not dropped; a required one
     // can't be left out or null; a field can't come twice; and a number is a number, not a string. Every time is read
-    // with any offset, as the instant it names, and written in UTC with a Z.
+    // with a Z or any offset, as the instant it names, never without one, which would be read in this machine's own
+    // zone; and written in UTC with a Z.
     public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
@@ -52,7 +53,9 @@ internal static class LabJson
     sealed class UtcTimes : JsonConverter<DateTimeOffset>
     {
         public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            reader.GetDateTimeOffset().ToUniversalTime();
+            reader.GetDateTime().Kind == DateTimeKind.Unspecified
+                ? throw new JsonException("A time with neither a Z nor an offset.")
+                : reader.GetDateTimeOffset().ToUniversalTime();
 
         public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
             writer.WriteStringValue(value.UtcDateTime);

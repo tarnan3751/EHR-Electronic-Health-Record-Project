@@ -43,7 +43,8 @@ static class LabTests
 
     // Until the lab's watermark has passed the transactions that signed the patient's lab orders. Any transaction still
     // running from before them, such as autovacuum's analyze, holds it back for a moment, as it would a real lab's; a
-    // test that asks at once would be handed nothing yet.
+    // test that asks at once would be handed nothing yet. Past 30 seconds it fails, rather than let a later assertion
+    // fail for another reason, or pass on nothing handed over.
     public static async Task SettledAsync(WebApps apps, Guid patient)
     {
         for (var tries = 0; tries < 600; tries++)
@@ -60,6 +61,8 @@ static class LabTests
 
             await Task.Delay(TimeSpan.FromMilliseconds(50), Cancel);
         }
+
+        Assert.Fail("The lab's watermark did not pass the transaction that signed the patient's lab order within 30 seconds: a transaction still running holds it back.");
     }
 
     public static async Task<(HttpResponseMessage Response, JsonElement Body)> HandOverAsync(HttpClient client, string since)

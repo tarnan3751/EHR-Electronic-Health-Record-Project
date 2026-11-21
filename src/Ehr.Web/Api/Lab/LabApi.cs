@@ -88,8 +88,8 @@ public static class LabApi
     }
 
     // Whether the request carries any way of being signed in to the app: an Authorization header (the desktop app's
-    // token, or anything else), or a cookie of one of the app's sign-ins, whole or in chunks. By their presence, not by
-    // whether they are still good: the lab has no reason to send any.
+    // token, or anything else), or a cookie of one of the app's sign-ins, whole or in chunks, its name in any case. By
+    // their presence, not by whether they are still good: the lab has no reason to send any.
     static bool CarriesCredentials(HttpContext context)
     {
         if (context.User.Identity?.IsAuthenticated == true || context.Request.Headers.ContainsKey("Authorization"))
@@ -99,7 +99,7 @@ public static class LabApi
 
         var cookies = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
         var names = SignInSchemes.Select(scheme => cookies.Get(scheme).Cookie.Name).OfType<string>().ToList();
-        return context.Request.Cookies.Keys.Any(cookie => names.Any(name => cookie.StartsWith(name, StringComparison.Ordinal)));
+        return context.Request.Cookies.Keys.Any(cookie => names.Any(name => cookie.StartsWith(name, StringComparison.OrdinalIgnoreCase)));
     }
 
     static async Task<IResult> HandOverAsync(HttpContext context, PhiReader reader, EhrDbContext db, string presented, CancellationToken cancellationToken)

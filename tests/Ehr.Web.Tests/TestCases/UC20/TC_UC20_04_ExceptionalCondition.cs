@@ -26,7 +26,8 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 //   for them; they are signed in on both sites, the desktop app has a session token, and the patient has a portal
 //   account, signed in.
 // Inputs and system conditions: GET /api/lab/orders and POST /api/lab/orders/{id}/results on the on-site app with no
-//   key, a wrong key, and the lab's key beside the clinician's cookie, the portal cookie and the desktop token; the
+//   key, a wrong key, and the lab's key beside the clinician's cookie, the portal cookie, the desktop token and a
+//   cookie named as each sign-in's in other letter cases; the
 //   same with the lab's key on the cloud site, with its link to the on-site app up and cut off; on an on-site app with
 //   no Ehr:Lab:Key; and with the database holding no key's hash. GET /patients/{id}/orders/{order}/results in each
 //   case. The simulated lab's code, in process.
@@ -34,7 +35,8 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 // Steps:
 //   1. Ask for orders and post results on the on-site app without a key, with a wrong key, with the clinician's cookie
 //      and with the desktop token alone; then with the lab's key beside the clinician's cookie, beside the patient's
-//      portal cookie, and beside the desktop token.
+//      portal cookie, beside the desktop token, and beside a cookie named as each sign-in's in other letter cases
+//      (__host-ehr.staff, __HOST-EHR.PATIENT, and a chunk of __Host-ehr.staffpending), with a value that isn't one.
 //   2. On the cloud site, with the lab's key: ask for orders; post results; post again with the link cut off.
 //   3. On an on-site app without Ehr:Lab:Key: ask and post.
 //   4. With the database holding no key's hash: ask, post, and open the results page; then with it back, open it again.
@@ -101,6 +103,14 @@ public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             }
 
             await RefusedAsync(signedIn, HttpStatusCode.Unauthorized, "unauthorized");
+        }
+
+        // A sign-in's cookie by its name in any case, and whatever its value.
+        foreach (var cookie in new[] { "__host-ehr.staff=x", "__HOST-EHR.PATIENT=x", "__Host-ehr.staffpendingC1=x" })
+        {
+            var withCookie = Client(apps.OnPrem);
+            withCookie.DefaultRequestHeaders.Add("Cookie", cookie);
+            await RefusedAsync(withCookie, HttpStatusCode.Unauthorized, "unauthorized");
         }
 
         // Step 2.
