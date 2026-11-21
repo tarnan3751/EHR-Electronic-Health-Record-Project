@@ -751,10 +751,12 @@ CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
 -- through ehr.withdrawn_visit_summaries (52-visit-summaries.sql). An earlier build had a policy for the portal's reads,
 -- visit_summaries_own_select: it is dropped. The note and its addenda stay out of the portal: those two functions are
 -- the portal's only way to anything written from a note. A clinician with the patient on their active panel releases
--- one, as themselves, and withdraws one or changes its sensitivity: a summary withdrawn in this transaction is
--- withdrawn as the person the statement began as (the trigger sets who first); one withdrawn before keeps whoever did
--- it. The trigger holds every change and decides who may unmark (52-visit-summaries.sql). Nothing deletes one
--- (10-grants.sql). Admins and nobody see none.
+-- one, as themselves, and withdraws one or changes its sensitivity, a withdrawn one's too. Who withdrew one and when
+-- are the trigger's, from the person signed in as the row changes; it holds every change and decides who may unmark
+-- (52-visit-summaries.sql). A statement that changes who is signed in part-way could record someone else as having
+-- withdrawn one: the known limit of a note's mark (step 10b) and a reading in error (step 9b), which needs arbitrary
+-- SQL as the app's role, and with that anyone can be signed in as anyone. Nothing deletes one (10-grants.sql). Admins
+-- and nobody see none.
 ALTER TABLE ehr.visit_summaries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.visit_summaries FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS visit_summaries_clinician_select ON ehr.visit_summaries;
@@ -784,7 +786,6 @@ CREATE POLICY visit_summaries_panel_update ON ehr.visit_summaries FOR UPDATE
     )
     WITH CHECK (
         (SELECT ehr.is_clinician())
-        AND (withdrawn_at IS NULL OR withdrawn_at < now() OR withdrawn_by = (SELECT ehr.current_user_id()))
         AND EXISTS (
             SELECT 1 FROM ehr.patient_assignments a
             WHERE a.clinician_id = (SELECT ehr.current_user_id())

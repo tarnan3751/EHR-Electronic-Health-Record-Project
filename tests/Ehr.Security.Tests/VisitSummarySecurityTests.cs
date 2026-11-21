@@ -783,6 +783,55 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
             "SELECT s.sensitive || ' ' || s.sensitive_inherited FROM ehr.visit_summaries s WHERE s.note_id = @note", ("note", note)));
     }
 
+    // A colleague withdraws the note's summary, and commits, while the signer's transaction is open; the signer then
+    // marks the note, marks an addendum, signs a sensitive addendum or marks the summary itself. The change is theirs to
+    // make: the withdrawn summary follows it, or is marked, and stays withdrawn by the colleague. Two connections.
+    [Theory]
+    [InlineData("mark-note")]
+    [InlineData("mark-addendum")]
+    [InlineData("sign-sensitive-addendum")]
+    [InlineData("mark-summary")]
+    public async Task A_change_after_a_colleagues_withdrawal_committed_while_the_transaction_was_open_is_made(string change)
+    {
+        var (signer, patient, note) = await SignedAsync();
+        var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, colleague, patient);
+        var addendum = await AddendumAsync(signer, patient, note);
+        var summary = await ReleaseAsync(signer, patient, note);
+
+        await using (var connection = new NpgsqlConnection(App))
+        {
+            await connection.OpenAsync(Cancel);
+            await using var transaction = await connection.BeginTransactionAsync(Cancel);
+            await using (var set = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction))
+            {
+                set.Parameters.AddWithValue("user", signer.ToString());
+                await set.ExecuteNonQueryAsync(Cancel);
+            }
+
+            // Withdrawn by the colleague, committed after the signer's transaction began.
+            await WithdrawAsync(colleague, summary);
+
+            await using var alter = new NpgsqlCommand(change switch
+            {
+                "mark-note" => "UPDATE ehr.clinical_notes SET sensitive = true, sensitive_reason = 'Synthetic' WHERE id = @note",
+                "mark-addendum" => "UPDATE ehr.note_addenda SET sensitive = true, sensitive_reason = 'Synthetic' WHERE id = @addendum",
+                "sign-sensitive-addendum" => "INSERT INTO ehr.note_addenda (id, note_id, patient_id, author_id, text, sensitive) VALUES (gen_random_uuid(), @note, @patient, @author, 'Synthetic sensitive addendum.', true)",
+                _ => "UPDATE ehr.visit_summaries SET sensitive = true, sensitive_reason = 'Synthetic' WHERE id = @summary",
+            }, connection, transaction);
+            foreach (var (name, value) in new (string, object)[] { ("note", note), ("addendum", addendum), ("patient", patient), ("author", signer), ("summary", summary) })
+            {
+                alter.Parameters.AddWithValue(name, value);
+            }
+
+            Assert.Equal(1, await alter.ExecuteNonQueryAsync(Cancel));
+            await transaction.CommitAsync(Cancel);
+        }
+
+        Assert.Equal([change == "mark-summary" ? $"true false {signer} Synthetic" : $"true true none {Inherited}"], await MarkOfAsync(summary));
+        Assert.Equal([$"{colleague}"], await AsSuperuserAsync("SELECT withdrawn_by::text FROM ehr.visit_summaries WHERE id = @id", ("id", summary)));
+    }
+
     // Under a snapshot older than the note's lock, the sensitivity of the note and its addenda could be read as it was
     // before a change the lock waited for: releasing a summary, and changing a note's or an addendum's sensitivity or
     // signing a sensitive addendum, are refused outside READ COMMITTED.
