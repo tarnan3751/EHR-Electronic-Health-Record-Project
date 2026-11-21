@@ -1,0 +1,457 @@
+using System.Globalization;
+using Ehr.Data.Accounts;
+using Ehr.Testing;
+using Xunit;
+
+namespace Ehr.Security.Tests;
+
+// The expansion plan's step 13c: what a portal session may learn from the audit log about who viewed the record it is
+// looking at, and nothing more, as the runtime roles, in SQL of its own (db/policies/42-record-views.sql). The log is
+// still the admins' alone to read (30-rls.sql); ehr.record_views is the one door, for the session's own record only:
+// the reads and the lab's hand-overs of the last 12 months, by who, when and which part, emergency access marked, never
+// an ID, a table name, a reason or a write. The patient sees every view; a proxy only staff members', the lab's and
+// their own, without sensitive views or note reads unless the patient allowed them sensitive items, and without
+// conversation reads unless they may read messages. A page holds whole moments and is the same whether or not there
+// are views a proxy is not shown.
+public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
+{
+    static CancellationToken Cancel => TestContext.Current.CancellationToken;
+
+    string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
+
+    string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
+
+    // Every line of a page, as "who|name|role|part|emergency|more", in the function's order.
+    const string Lines = """
+        SELECT who || '|' || coalesce(name, '') || '|' || coalesce(role, '') || '|' || part || '|' || emergency || '|' || more
+        FROM ehr.record_views(@older::timestamptz, @newer::timestamptz)
+        """;
+
+    // Every line of a page with its moment, to the microsecond, in UTC.
+    const string Timed = """
+        SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '|' || who || '|' || part || '|' || more
+        FROM ehr.record_views(@older::timestamptz, @newer::timestamptz)
+        """;
+
+    Task<List<string>> AsSuperuserAsync(string sql, params (string Name, object Value)[] parameters) =>
+        Accounts.QueryAsync(database.SuperuserConnectionString, null, sql, parameters);
+
+    async Task<List<string>> ViewsAsync(string connection, Guid? user, Guid? grant, DateTimeOffset? older = null, DateTimeOffset? newer = null, string sql = Lines)
+    {
+        using (grant is { } acting ? Accounts.ActingUnder(acting) : null)
+        {
+            return await Accounts.QueryAsync(connection, user, sql, ("older", (object?)older ?? DBNull.Value), ("newer", (object?)newer ?? DBNull.Value));
+        }
+    }
+
+    // A staff account with a name of its own.
+    async Task<Guid> StaffAsync(string name, params string[] roles)
+    {
+        var id = await Accounts.StaffAsync(database, roles);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "UPDATE ehr.staff_users SET display_name = @name WHERE id = @id", ("name", name), ("id", id));
+        return id;
+    }
+
+    // An event of the log, as the PHI reader, the triggers or the lab's door would have written it, so many minutes ago.
+    Task EventAsync(Guid patient, Guid? actor, string action, string? table, double minutesAgo, string source = "onprem", bool sensitive = false, string? reason = null) =>
+        Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, reason)
+            VALUES (uuidv7(), now() - make_interval(secs => @minutes * 60), @actor, @action, @table, gen_random_uuid(), @patient, @source, @sensitive, @reason)
+            """,
+            ("patient", patient), ("actor", (object?)actor ?? DBNull.Value), ("action", action), ("table", (object?)table ?? DBNull.Value), ("minutes", minutesAgo),
+            ("source", source), ("sensitive", sensitive), ("reason", (object?)reason ?? DBNull.Value));
+
+    // A proxy for the patient with a portal account of their own, given access by the patient. The account, its
+    // address and the grant.
+    async Task<(Guid Account, string Email, Guid Grant)> ProxyAsync(Guid patientAccount, Guid patient, bool includeSensitive, string scope = "record-and-messages")
+    {
+        var (account, email) = await Accounts.ProxyOnlyAccountAsync(database);
+        var grant = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, patientAccount,
+            """
+            INSERT INTO ehr.proxy_grants (id, patient_id, proxy_email, scope, include_sensitive, expires_at, granted_by, granted_at, granted_by_kind)
+            VALUES (@id, @patient, @email, @scope, @sensitive, now() + interval '30 days', gen_random_uuid(), '2000-01-01', 'patient')
+            """, ("id", grant), ("patient", patient), ("email", email), ("scope", scope), ("sensitive", includeSensitive));
+        return (account, email, grant);
+    }
+
+    // A patient with a portal account of their own, and the clinician who added them.
+    async Task<(Guid Clinician, Guid Patient, Guid Account)> PatientAsync()
+    {
+        var clinician = await StaffAsync("Dr. Alder", StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        return (clinician, patient, await Accounts.PatientAccountAsync(database, patient));
+    }
+
+    [Fact]
+    public async Task The_patient_is_shown_every_view_of_their_record_and_nothing_else()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        var admin = await StaffAsync("Avery Admin", StaffRoles.Admin);
+        var (allowed, allowedEmail, _) = await ProxyAsync(own, patient, includeSensitive: true);
+        var (without, withoutEmail, _) = await ProxyAsync(own, patient, includeSensitive: false);
+        var (_, otherPatient, otherAccount) = await PatientAsync();
+
+        // Shown, newest first: each read, by whom, of which part.
+        await EventAsync(patient, clinician, "read", "patients", 1);
+        await EventAsync(patient, clinician, "read_sensitive", "patients", 2);
+        await EventAsync(patient, clinician, "read", "clinical_notes", 3);
+        await EventAsync(patient, clinician, "read", "clinical_drafts", 4);
+        await EventAsync(patient, clinician, "read", "ai_note_reviews", 5);
+        await EventAsync(patient, clinician, "read", "message_threads", 6);
+        await EventAsync(patient, own, "read", "visit_summaries", 7);
+        await EventAsync(patient, own, "read", "audit_events", 8);
+        await EventAsync(patient, allowed, "read", "patients", 9);
+        await EventAsync(patient, without, "read", "patients", 10);
+        await EventAsync(patient, null, "sent_to_lab", "orders", 11, source: "lab");
+        await EventAsync(patient, admin, "read", "patients", 12);
+        // Step 13b's downloads, whichever lane lands first.
+        await EventAsync(patient, clinician, "download", "patients", 13);
+        await EventAsync(patient, own, "download_sensitive", "patients", 14);
+        // A read of a note marked sensitive since; a read of a table no part names.
+        await EventAsync(patient, clinician, "read", "clinical_notes", 15, sensitive: true);
+        await EventAsync(patient, clinician, "read", "proxy_grants", 16);
+        // Never shown: a write, a sign-in, the emergency-access reason, account and system events, a hand-over in any
+        // other shape, a read older than 12 months, another patient's.
+        await EventAsync(patient, clinician, "insert", "conditions", 20);
+        await EventAsync(patient, clinician, "update", "patients", 21);
+        await EventAsync(patient, own, "sign_in", null, 22);
+        await EventAsync(patient, clinician, "break_glass", "break_glass_accesses", 23, reason: "Synthetic reason: seen in the emergency department.");
+        await EventAsync(patient, null, "read", "patients", 24);
+        await EventAsync(patient, clinician, "ai_review_staged", "ai_note_reviews", 25);
+        await EventAsync(patient, clinician, "sent_to_lab", "orders", 26, source: "lab");
+        await EventAsync(patient, null, "sent_to_lab", "orders", 27);
+        await EventAsync(patient, null, "enrollment_issued", null, 28);
+        await EventAsync(patient, clinician, "read", "patients", 60 * 24 * 400);
+        await EventAsync(otherPatient, clinician, "read", "patients", 30);
+        await EventAsync(otherPatient, otherAccount, "read", "patients", 31);
+
+        string[] expected =
+        [
+            "staff|Dr. Alder|clinician|record|false|false",
+            "staff|Dr. Alder|clinician|record-sensitive|false|false",
+            "staff|Dr. Alder|clinician|note|false|false",
+            "staff|Dr. Alder|clinician|note|false|false",
+            "staff|Dr. Alder|clinician|note|false|false",
+            "staff|Dr. Alder|clinician|messages|false|false",
+            "you|||summary|false|false",
+            "you|||views|false|false",
+            $"proxy|{allowedEmail}||record|false|false",
+            $"proxy|{withoutEmail}||record|false|false",
+            "lab|||lab-order|false|false",
+            "staff|Avery Admin|administrator|record|false|false",
+            "staff|Dr. Alder|clinician|download|false|false",
+            "you|||download-sensitive|false|false",
+            "staff|Dr. Alder|clinician|note|false|false",
+            "staff|Dr. Alder|clinician|record|false|false",
+        ];
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal(expected, await ViewsAsync(connection, own, null));
+        }
+
+        // The other patient sees their own two views, none of these.
+        Assert.Equal(["staff|Dr. Alder|clinician|record|false|false", "you|||record|false|false"], await ViewsAsync(App, otherAccount, null));
+    }
+
+    [Fact]
+    public async Task A_proxy_is_shown_staff_views_the_labs_and_their_own_as_their_access_allows()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        var full = await ProxyAsync(own, patient, includeSensitive: true);
+        var plain = await ProxyAsync(own, patient, includeSensitive: false);
+        var recordOnly = await ProxyAsync(own, patient, includeSensitive: true, scope: "record");
+        var revoked = await ProxyAsync(own, patient, includeSensitive: true);
+        await Accounts.ExecuteAsync(App, own, "UPDATE ehr.proxy_grants SET revoked_at = now() WHERE id = @id", ("id", revoked.Grant));
+        var expired = await ProxyAsync(own, patient, includeSensitive: true);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "UPDATE ehr.proxy_grants SET expires_at = now() - interval '1 second' WHERE id = @id", ("id", expired.Grant));
+        var (_, _, otherAccount) = await PatientAsync();
+        var outsider = await StaffAsync("Dr. Birch", StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, outsider, patient);
+        var admin = await StaffAsync("Avery Admin", StaffRoles.Admin);
+
+        await EventAsync(patient, clinician, "read", "patients", 1);
+        await EventAsync(patient, clinician, "read_sensitive", "patients", 2);
+        await EventAsync(patient, clinician, "read", "clinical_notes", 3);
+        await EventAsync(patient, clinician, "read", "message_threads", 4);
+        await EventAsync(patient, clinician, "read", "visit_summaries", 5, sensitive: true);
+        await EventAsync(patient, clinician, "download_sensitive", "patients", 6);
+        await EventAsync(patient, null, "sent_to_lab", "orders", 7, source: "lab");
+        await EventAsync(patient, own, "read", "patients", 8);
+        foreach (var proxy in new[] { full, plain, recordOnly })
+        {
+            await EventAsync(patient, proxy.Account, "read", "patients", 9);
+        }
+
+        await EventAsync(patient, full.Account, "read", "audit_events", 10);
+
+        const string Mine = "you|||record|false|false";
+        string[] staff = ["staff|Dr. Alder|clinician|record|false|false"];
+        string[] sensitive = ["staff|Dr. Alder|clinician|record-sensitive|false|false", "staff|Dr. Alder|clinician|note|false|false"];
+        string[] messages = ["staff|Dr. Alder|clinician|messages|false|false"];
+        string[] markedAndDownloaded = ["staff|Dr. Alder|clinician|summary|false|false", "staff|Dr. Alder|clinician|download-sensitive|false|false"];
+        string[] lab = ["lab|||lab-order|false|false"];
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal([.. staff, .. sensitive, .. messages, .. markedAndDownloaded, .. lab, Mine, "you|||views|false|false"],
+                await ViewsAsync(connection, full.Account, full.Grant));
+            // No sensitive items: no line for a view of them, nor for a note, nor for anything marked sensitive.
+            Assert.Equal([.. staff, .. messages, .. lab, Mine], await ViewsAsync(connection, plain.Account, plain.Grant));
+            // No messages: no line for a conversation.
+            Assert.Equal([.. staff, .. sensitive, .. markedAndDownloaded, .. lab, Mine], await ViewsAsync(connection, recordOnly.Account, recordOnly.Grant));
+            // Nothing at all for access that ended, a grant named by someone it isn't addressed to, another patient
+            // acting under it, a proxy-only account on its own, a clinician (even with the patient on their panel), an
+            // admin, or nobody.
+            foreach (var (user, grant) in new (Guid?, Guid?)[]
+            {
+                (revoked.Account, revoked.Grant), (expired.Account, expired.Grant), (plain.Account, full.Grant), (otherAccount, full.Grant),
+                (full.Account, null), (clinician, null), (outsider, null), (admin, null), (null, null), (null, full.Grant),
+            })
+            {
+                Assert.Empty(await ViewsAsync(connection, user, grant));
+            }
+        }
+
+        // The other patient's own page has nothing of this record.
+        Assert.Empty(await ViewsAsync(App, otherAccount, null));
+    }
+
+    [Fact]
+    public async Task A_staff_read_is_marked_as_emergency_access_only_inside_a_window_and_off_the_panel()
+    {
+        var (_, patient, own) = await PatientAsync();
+        var away = await StaffAsync("Dr. Cedar", StaffRoles.Clinician);
+        var onPanel = await StaffAsync("Dr. Dogwood", StaffRoles.Clinician);
+        var joined = await StaffAsync("Dr. Elm", StaffRoles.Clinician);
+        const string Reason = "Synthetic reason: brought in unconscious.";
+
+        // A window from two hours ago to two hours ahead for each; Dr. Dogwood has had the patient on their panel all
+        // along; Dr. Elm added them 30 minutes ago, and had them on the panel once before, a day ago, for an hour.
+        foreach (var clinician in new[] { away, onPanel, joined })
+        {
+            await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+                "INSERT INTO ehr.break_glass_accesses (id, patient_id, clinician_id, reason, granted_at, expires_at) VALUES (gen_random_uuid(), @patient, @clinician, @reason, now() - interval '2 hours', now() + interval '2 hours')",
+                ("patient", patient), ("clinician", clinician), ("reason", Reason));
+            await EventAsync(patient, clinician, "break_glass", "break_glass_accesses", 120, reason: Reason);
+        }
+
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at) VALUES
+                (gen_random_uuid(), @patient, @onPanel, now() - interval '1 day', NULL),
+                (gen_random_uuid(), @patient, @joined, now() - interval '1 day', now() - interval '23 hours'),
+                (gen_random_uuid(), @patient, @joined, now() - interval '30 minutes', NULL)
+            """, ("patient", patient), ("onPanel", onPanel), ("joined", joined));
+
+        await EventAsync(patient, away, "read", "patients", 10);
+        await EventAsync(patient, away, "read", "clinical_notes", 11);
+        // Before the window: no emergency access then.
+        await EventAsync(patient, away, "read", "patients", 180);
+        await EventAsync(patient, onPanel, "read", "patients", 12);
+        // Dr. Elm: on the panel now, not an hour ago.
+        await EventAsync(patient, joined, "read", "patients", 13);
+        await EventAsync(patient, joined, "read", "patients", 60);
+        // The patient's own read is never marked.
+        await EventAsync(patient, own, "read", "patients", 14);
+
+        Assert.Equal(
+            [
+                "staff|Dr. Cedar|clinician|record|true|false",
+                "staff|Dr. Cedar|clinician|note|true|false",
+                "staff|Dr. Dogwood|clinician|record|false|false",
+                "staff|Dr. Elm|clinician|record|false|false",
+                "you|||record|false|false",
+                "staff|Dr. Elm|clinician|record|true|false",
+                "staff|Dr. Cedar|clinician|record|false|false",
+            ], await ViewsAsync(App, own, null));
+        // The reason is the clinic's: no line holds it, in any column.
+        var whole = await ViewsAsync(App, own, null, sql: "SELECT r::text FROM ehr.record_views(@older::timestamptz, @newer::timestamptz) r");
+        Assert.Equal(7, whole.Count);
+        Assert.DoesNotContain(whole, line => line.Contains("unconscious", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_staff_member_is_named_as_their_account_is_now_even_when_it_is_disabled()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        await EventAsync(patient, clinician, "read", "patients", 5);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "UPDATE ehr.staff_users SET display_name = 'Dr. Alder-Fir' WHERE id = @id", ("id", clinician));
+        await Accounts.LockOutAsync(database, clinician);
+
+        Assert.Equal(["staff|Dr. Alder-Fir|clinician|record|false|false"], await ViewsAsync(App, own, null));
+    }
+
+    [Fact]
+    public async Task Pages_hold_whole_moments_reach_every_view_once_and_answer_every_argument()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        // 120 views a minute apart, and three more at one moment, 49.5 minutes ago: the newest page's 50th, 51st and
+        // 52nd lines.
+        for (var minute = 1; minute <= 120; minute++)
+        {
+            await EventAsync(patient, clinician, "read", "patients", minute);
+        }
+
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), m.at, @actor, 'read', 'patients', @patient, @patient, 'onprem', false
+            FROM (SELECT now() - interval '49.5 minutes' AS at) m, generate_series(1, 3)
+            """, ("actor", clinician), ("patient", patient));
+
+        // Older, from the newest, to the end; then newer, from the oldest, back to the start.
+        var older = await PagesAsync(own, newest: true);
+        var newer = await PagesAsync(own, newest: false);
+        foreach (var pages in new[] { older, newer })
+        {
+            var times = pages.SelectMany(page => page).Select(line => line.Split('|')[0]).ToList();
+            Assert.Equal(123, times.Count);
+            // Every moment on one page only: the three at one moment together.
+            Assert.All(pages.SelectMany((page, index) => page.Select(line => (Time: line.Split('|')[0], index))).GroupBy(line => line.Time),
+                moment => Assert.Single(moment.Select(line => line.index).Distinct()));
+            Assert.Contains(pages, page => page.Count(line => line.StartsWith(Moment(pages, 3), StringComparison.Ordinal)) == 3);
+        }
+
+        Assert.Equal(older.SelectMany(page => page).Select(line => line.Split('|')[0]), newer.AsEnumerable().Reverse().SelectMany(page => page).Select(line => line.Split('|')[0]));
+        // The newest page stops before the three, which can't all fit: 49 lines, and more to come.
+        Assert.Equal(49, older[0].Count);
+        Assert.All(older[0], line => Assert.EndsWith("|true", line, StringComparison.Ordinal));
+        Assert.All(older[^1], line => Assert.EndsWith("|false", line, StringComparison.Ordinal));
+
+        var newest = await ViewsAsync(App, own, null, sql: Timed);
+        // Both moments given: older wins.
+        Assert.Equal(await ViewsAsync(App, own, null, older: Time(newest[^1]), sql: Timed),
+            await ViewsAsync(App, own, null, older: Time(newest[^1]), newer: Time(newest[0]), sql: Timed));
+        // Older than the end of time is the newest page; newer than its start, the oldest.
+        Assert.Equal(newest, await ViewsAsync(App, own, null, older: DateTimeOffset.MaxValue.ToUniversalTime(), sql: Timed));
+        Assert.Equal(newer[0], await ViewsAsync(App, own, null, newer: DateTimeOffset.MinValue.ToUniversalTime(), sql: Timed));
+        // Nothing before the window, nor after now.
+        Assert.Empty(await ViewsAsync(App, own, null, older: DateTimeOffset.UtcNow.AddMonths(-13)));
+        Assert.Empty(await ViewsAsync(App, own, null, newer: DateTimeOffset.UtcNow.AddMinutes(5)));
+        // Infinity either way, as PostgreSQL spells it.
+        Assert.Equal(newest, await AsInfinityAsync(own, "older", "infinity"));
+        Assert.Equal(newer[0], await AsInfinityAsync(own, "newer", "-infinity"));
+        Assert.Empty(await AsInfinityAsync(own, "older", "-infinity"));
+        Assert.Empty(await AsInfinityAsync(own, "newer", "infinity"));
+    }
+
+    // The moment of the first line on any page that has that many lines at it.
+    static string Moment(List<List<string>> pages, int count) =>
+        pages.SelectMany(page => page).GroupBy(line => line.Split('|')[0]).First(moment => moment.Count() == count).Key;
+
+    static DateTimeOffset Time(string line) =>
+        DateTimeOffset.Parse(line.Split('|')[0], CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
+
+    // The page for one moment given as PostgreSQL spells infinity, the other moment not given.
+    Task<List<string>> AsInfinityAsync(Guid user, string argument, string value) =>
+        Accounts.QueryAsync(App, user, Timed.Replace($"@{argument}::timestamptz", $"'{value}'::timestamptz", StringComparison.Ordinal),
+            (argument == "older" ? "newer" : "older", DBNull.Value));
+
+    // Every page of a record's views, by "Older" from the newest or by "Newer" from the oldest, with their moments, as
+    // the portal would follow them; each page in the function's order, newest first.
+    async Task<List<List<string>>> PagesAsync(Guid user, bool newest, Guid? grant = null)
+    {
+        var pages = new List<List<string>>();
+        DateTimeOffset? older = null;
+        DateTimeOffset? newer = newest ? null : DateTimeOffset.UtcNow.AddMonths(-13);
+        while (true)
+        {
+            var page = await ViewsAsync(App, user, grant, older, newer, Timed);
+            if (page.Count == 0)
+            {
+                return pages;
+            }
+
+            pages.Add(page);
+            if (page[0].EndsWith("|false", StringComparison.Ordinal))
+            {
+                return pages;
+            }
+
+            older = newest ? Time(page[^1]) : null;
+            newer = newest ? null : Time(page[0]);
+            Assert.True(pages.Count < 10, "Paging didn't end.");
+        }
+    }
+
+    [Fact]
+    public async Task A_proxys_pages_are_the_same_whether_or_not_there_are_views_it_is_not_shown()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        var proxy = await ProxyAsync(own, patient, includeSensitive: false, scope: "record");
+        var other = await ProxyAsync(own, patient, includeSensitive: true);
+        for (var minute = 1; minute <= 110; minute++)
+        {
+            await EventAsync(patient, minute % 10 == 0 ? proxy.Account : clinician, "read", "patients", minute);
+        }
+
+        var before = await PagesAsync(proxy.Account, newest: true, proxy.Grant);
+        var beforeNewer = await PagesAsync(proxy.Account, newest: false, proxy.Grant);
+
+        // Views this proxy is not shown, around and between theirs, at the same moments as some, and past the last
+        // page: the patient's own, another proxy's, sensitive ones, note reads and conversations, and writes.
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), now() - make_interval(secs => n * 13), k.actor, k.action, k.table_name, gen_random_uuid(), @patient, 'onprem', k.sensitive
+            FROM generate_series(1, 700) AS n
+            CROSS JOIN LATERAL (VALUES
+                (@own, 'read', 'patients', false), (@other, 'read', 'patients', false), (@clinician, 'read_sensitive', 'patients', false),
+                (@clinician, 'read', 'clinical_notes', false), (@clinician, 'read', 'message_threads', false),
+                (@clinician, 'read', 'visit_summaries', true), (@clinician, 'insert', 'conditions', false)) AS k(actor, action, table_name, sensitive)
+            WHERE n % 7 = (CASE k.action WHEN 'insert' THEN 6 ELSE 0 END) OR k.actor = @own
+            """, ("patient", patient), ("own", own), ("other", other.Account), ("clinician", clinician));
+        // And the patient's own view at each moment the proxy is shown one.
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), e.occurred_at, @own, 'read', 'patients', @patient, @patient, 'onprem', false
+            FROM ehr.audit_events e WHERE e.patient_id = @patient AND e.actor_id IN (@clinician, @proxy)
+            """, ("patient", patient), ("own", own), ("clinician", clinician), ("proxy", proxy.Account));
+        Assert.True(int.Parse((await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events WHERE patient_id = @patient", ("patient", patient))).Single(),
+            CultureInfo.InvariantCulture) > 900);
+
+        Assert.Equal(before, await PagesAsync(proxy.Account, newest: true, proxy.Grant));
+        Assert.Equal(beforeNewer, await PagesAsync(proxy.Account, newest: false, proxy.Grant));
+        Assert.Equal(3, before.Count);
+    }
+
+    [Fact]
+    public async Task The_function_is_the_one_door_and_says_nothing_but_its_columns()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        await EventAsync(patient, clinician, "read", "patients", 1);
+
+        // The log itself is still the admins' alone: no row of it for the patient, through either role, and no policy
+        // on it but those it had.
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal(["0"], await Accounts.QueryAsync(connection, own, "SELECT count(*)::text FROM ehr.audit_events"));
+        }
+
+        Assert.Equal(["audit_events_admin_select", "audit_events_insert", "audit_events_owner_mark", "audit_events_owner_select"],
+            await AsSuperuserAsync("SELECT policyname::text FROM pg_policies WHERE schemaname = 'ehr' AND tablename = 'audit_events' ORDER BY policyname"));
+
+        // Two moments in; a time, words and marks out; no ID of any kind.
+        Assert.Equal(
+            ["emergency boolean o", "more boolean o", "name text o", "newer_than timestamp with time zone i", "occurred_at timestamp with time zone o",
+                "older_than timestamp with time zone i", "part text o", "role text o", "who text o"],
+            await AsSuperuserAsync(
+                """
+                SELECT a.name || ' ' || format_type(a.type, NULL) || ' ' || CASE a.mode WHEN 'i' THEN 'i' ELSE 'o' END FROM unnest(
+                    (SELECT p.proallargtypes FROM pg_proc p WHERE p.oid = 'ehr.record_views'::regproc),
+                    (SELECT p.proargnames FROM pg_proc p WHERE p.oid = 'ehr.record_views'::regproc),
+                    (SELECT p.proargmodes FROM pg_proc p WHERE p.oid = 'ehr.record_views'::regproc)) AS a(type, name, mode) ORDER BY a.name
+                """));
+
+        // Runs as its owner, for the runtime roles only.
+        Assert.Equal(["true true true false"], await AsSuperuserAsync(
+            """
+            SELECT p.prosecdef::text || ' ' || has_function_privilege('ehr_app', p.oid, 'EXECUTE')::text || ' '
+                || has_function_privilege('ehr_read', p.oid, 'EXECUTE')::text || ' '
+                || EXISTS (SELECT FROM aclexplode(p.proacl) WHERE grantee = 0)::text
+            FROM pg_proc p WHERE p.oid = 'ehr.record_views'::regproc
+            """));
+    }
+}

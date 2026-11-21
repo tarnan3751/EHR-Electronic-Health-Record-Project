@@ -241,6 +241,10 @@ CREATE POLICY break_glass_accesses_own_select ON ehr.break_glass_accesses FOR SE
 DROP POLICY IF EXISTS break_glass_accesses_own_insert ON ehr.break_glass_accesses;
 CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR INSERT
     WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
+-- For the tables' owner alone, which ehr.record_views runs as (42-record-views.sql): it marks a view made inside a
+-- window, and returns no reason. No runtime role is or can become it.
+DROP POLICY IF EXISTS break_glass_accesses_owner_select ON ehr.break_glass_accesses;
+CREATE POLICY break_glass_accesses_owner_select ON ehr.break_glass_accesses FOR SELECT TO ehr_owner USING (true);
 
 -- The rest of the chart (PHI): allergies, medications, diagnoses and visits, each row one patient's. Clinicians read
 -- every patient's; a patient reads their own. A visit is inserted when a patient is checked in for an appointment
@@ -469,7 +473,8 @@ CREATE POLICY observations_own_released_select ON ehr.observations FOR SELECT
         AND issued_at IS NOT NULL
         AND status IN ('final', 'amended', 'corrected'));
 
--- Audit events (restricted). Admins read. Anyone the grants let insert may insert: the app role for read and
+-- Audit events (restricted). Admins read; a portal session reads the views of the record it is looking at only through
+-- ehr.record_views (42-record-views.sql), never here. Anyone the grants let insert may insert: the app role for read and
 -- sign-in events, and the write-audit trigger (40-audit.sql), which runs as the table's owner and is bound by this
 -- policy too because RLS is forced. Nothing deletes, and the one update is the trigger marking an event sensitive
 -- (below, and 40-audit.sql); the runtime roles have neither grant (10-grants.sql).
