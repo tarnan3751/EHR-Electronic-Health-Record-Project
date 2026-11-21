@@ -433,12 +433,18 @@ GRANT EXECUTE ON FUNCTION ehr.withdrawn_visit_summaries() TO ehr_app, ehr_read;
 -- Whether a summary the caller has just withdrawn had been viewed in the portal (Tahseen's decision of 21 November
 -- 2026: if so, the patient is emailed). Viewed means the portal recorded a read of that summary, which it does for each
 -- summary its page shows (PhiReader.VisitSummariesAsync), by a portal account: the patient's own or a proxy's. Its own
--- read of the summary's row is the only one there is, so no comparison of clocks is needed: a withdrawn summary is shown
--- to nobody in the portal. A view made off-site reaches this log when the cloud app ships it, every couple of seconds,
--- so one not yet shipped at the moment of withdrawal is missed. The caller can't read the audit log: this answers only
--- for a summary withdrawn in the caller's own transaction, by the caller, a clinician. Runs as its owner, reading the
--- summary and the audit log through the owner's policies (30-rls.sql); its search_path is pinned, and only the app's
--- role may call it.
+-- read of the summary's row is the only one there is, so no comparison of clocks is needed: a withdrawn summary is
+-- shown to nobody in the portal. The caller can't read the audit log, so this answers only for the summary this
+-- transaction withdrew, by the caller, a clinician, since it began: the summary's row as this statement sees it was
+-- written by this transaction, a savepoint of it included. Its xmin is then a transaction ID at or after this
+-- transaction's own, compared as PostgreSQL compares them (modulo 2^32), and still in progress; under READ COMMITTED no
+-- other transaction's uncommitted row is visible, so a visible row written by a transaction in progress is this one's.
+-- Its limits: a clinician can withdraw a summary, ask and roll back, which leaves no trace; and a view is inferred from
+-- audit rows, which SQL run as the app's role, or the cloud app's shipper, can insert. Either way the most it does is
+-- send the patient one generic email. A view made off-site while the link to the clinic is down reaches the audit log
+-- only when the link is back (the cloud app holds it until then), so a summary withdrawn in between counts as not
+-- viewed and no email is sent. Runs as its owner, reading the summary and the audit log through the owner's policies
+-- (30-rls.sql); its search_path is pinned, and only the app's role may call it.
 CREATE OR REPLACE FUNCTION ehr.withdrawn_summary_was_viewed(summary uuid) RETURNS boolean
     LANGUAGE sql
     STABLE
@@ -448,9 +454,15 @@ AS $$
     SELECT EXISTS (
         SELECT 1
         FROM ehr.visit_summaries s
+        CROSS JOIN (SELECT pg_current_xact_id_if_assigned()::text::bigint AS id) AS this
+        CROSS JOIN LATERAL (SELECT (s.xmin::text::bigint - this.id % 4294967296 + 4294967296) % 4294967296 AS after) AS writer
         JOIN ehr.audit_events e ON e.patient_id = s.patient_id AND e.table_name = 'visit_summaries' AND e.row_id = s.id AND e.action = 'read'
         JOIN ehr.patient_users u ON u.id = e.actor_id
-        WHERE s.id = summary AND s.withdrawn_at >= now() AND s.withdrawn_by = (SELECT ehr.current_user_id()) AND (SELECT ehr.is_clinician()))
+        WHERE s.id = summary
+          AND CASE WHEN s.withdrawn_at >= now() AND s.withdrawn_by = (SELECT ehr.current_user_id()) AND (SELECT ehr.is_clinician())
+                        AND writer.after < 2147483648
+                   THEN pg_xact_status((this.id + writer.after)::text::xid8) = 'in progress'
+                   ELSE false END)
 $$;
 REVOKE ALL ON FUNCTION ehr.withdrawn_summary_was_viewed(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION ehr.withdrawn_summary_was_viewed(uuid) TO ehr_app;

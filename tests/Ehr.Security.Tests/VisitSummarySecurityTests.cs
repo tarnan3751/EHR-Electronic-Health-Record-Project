@@ -660,14 +660,15 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
 
     // Whether a summary just withdrawn had been viewed in the portal (Tahseen's decision of 21 November 2026: then the
     // patient is emailed): by the portal's record of a read of that summary by the patient's account or a proxy's. A
-    // clinician's read doesn't count. Answered only for the caller's own withdrawal, in the caller's transaction.
+    // clinician's read doesn't count. Answered only for the summary the caller's own transaction withdrew, a savepoint
+    // of it included, as the app withdraws one.
     [Fact]
     public async Task A_withdrawn_summary_was_viewed_only_when_the_portal_recorded_a_read_of_it()
     {
         var (clinician, patient, note) = await SignedAsync();
         var own = await Accounts.PatientAccountAsync(database, patient);
         var (proxy, grant) = await ProxyAsync(own, patient, includeSensitive: false);
-        async Task<string> WithdrawAndAskAsync(Guid summary, Guid? asker = null)
+        async Task<string> WithdrawAndAskAsync(Guid summary, Guid? asker = null, string? savepoint = null)
         {
             await using var connection = new NpgsqlConnection(App);
             await connection.OpenAsync(Cancel);
@@ -678,10 +679,25 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
                 await set.ExecuteNonQueryAsync(Cancel);
             }
 
+            if (savepoint is not null)
+            {
+                await transaction.SaveAsync("withdrawing", Cancel);
+            }
+
             await using (var withdraw = new NpgsqlCommand("UPDATE ehr.visit_summaries SET withdrawn_reason = 'Wrong visit.' WHERE id = @id", connection, transaction))
             {
                 withdraw.Parameters.AddWithValue("id", summary);
                 Assert.Equal(1, await withdraw.ExecuteNonQueryAsync(Cancel));
+            }
+
+            switch (savepoint)
+            {
+                case "released":
+                    await transaction.ReleaseAsync("withdrawing", Cancel);
+                    break;
+                case "rolled back":
+                    await transaction.RollbackAsync("withdrawing", Cancel);
+                    break;
             }
 
             if (asker is { } other)
@@ -724,12 +740,51 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         await ViewAsync(proxy, grant, byProxy);
         Assert.Equal("true", await WithdrawAndAskAsync(byProxy));
 
+        // Withdrawn under a savepoint, as the app withdraws one: once it is released, answered; rolled back, not withdrawn.
+        var underSavepoint = await ReleaseAsync(clinician, patient, note);
+        await ViewAsync(own, null, underSavepoint);
+        Assert.Equal("true", await WithdrawAndAskAsync(underSavepoint, savepoint: "released"));
+        var rolledBack = await ReleaseAsync(clinician, patient, note, "Rolled back.");
+        await ViewAsync(own, null, rolledBack);
+        Assert.Equal("false", await WithdrawAndAskAsync(rolledBack, savepoint: "rolled back"));
+        await WithdrawAsync(clinician, rolledBack);
+
         // Somebody else asking about it, in the same transaction: no answer.
         var asked = await ReleaseAsync(clinician, patient, note);
         await ViewAsync(own, null, asked);
         Assert.Equal("false", await WithdrawAndAskAsync(asked, await Accounts.StaffAsync(database, StaffRoles.Clinician)));
         // Asked later, in another transaction, even by the clinician who withdrew it: no answer.
         Assert.Equal(["false"], await Accounts.QueryAsync(App, clinician, "SELECT ehr.withdrawn_summary_was_viewed(@id)::text", ("id", byPatient)));
+
+        // Nor in a transaction of the same clinician's that was open while another of theirs withdrew it and committed:
+        // the row isn't this transaction's.
+        var elsewhere = await ReleaseAsync(clinician, patient, note);
+        await ViewAsync(own, null, elsewhere);
+        var other = await ReleaseAsync(clinician, patient, await NoteAsync(clinician, patient));
+        await using (var connection = new NpgsqlConnection(App))
+        {
+            await connection.OpenAsync(Cancel);
+            await using var transaction = await connection.BeginTransactionAsync(Cancel);
+            await using (var set = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction))
+            {
+                set.Parameters.AddWithValue("user", clinician.ToString());
+                await set.ExecuteNonQueryAsync(Cancel);
+            }
+
+            // This transaction withdraws a summary of its own, so it has an ID of its own.
+            await using (var withdraw = new NpgsqlCommand("UPDATE ehr.visit_summaries SET withdrawn_reason = 'Wrong visit.' WHERE id = @id", connection, transaction))
+            {
+                withdraw.Parameters.AddWithValue("id", other);
+                Assert.Equal(1, await withdraw.ExecuteNonQueryAsync(Cancel));
+            }
+
+            await WithdrawAsync(clinician, elsewhere);
+            await using var ask = new NpgsqlCommand("SELECT ehr.withdrawn_summary_was_viewed(@id)::text", connection, transaction);
+            ask.Parameters.AddWithValue("id", elsewhere);
+            Assert.Equal("false", (string)(await ask.ExecuteScalarAsync(Cancel))!);
+            await transaction.CommitAsync(Cancel);
+        }
+
         // The read role may not ask.
         await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => Accounts.QueryAsync(Read, clinician, "SELECT ehr.withdrawn_summary_was_viewed(@id)::text", ("id", byPatient)));
     }
