@@ -39,7 +39,7 @@ else
             {
                 @if (item.Summary is { } summary)
                 {
-                    <li class="sc-result" data-summary="standing">
+                    <li class="sc-result sc-result--plain" data-summary="standing">
                         <h2>@summary.NoteSignedAt.UtcDateTime.ToString("MMM d, yyyy") UTC</h2>
                         <p class="sc-muted">Written by @summary.ReleasedBy@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</p>
                         <h3>@parts[0]</h3>
@@ -53,7 +53,7 @@ else
                 else
                 {
                     @* Tahseen's decision of 21 November 2026: the date and nothing else, not the text, the reason or who. *@
-                    <li class="sc-result" data-summary="withdrawn">
+                    <li class="sc-result sc-result--plain" data-summary="withdrawn">
                         <p>A visit summary from @item.Date.UtcDateTime.ToString("MMM d, yyyy") UTC was withdrawn by your care team. Contact the clinic if you have questions.</p>
                     </li>
                 }
