@@ -5,7 +5,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test Case ID: TC-UC6-49
 // Purpose / scenario: Who viewed my record takes under 15 ms of server time at the 99th percentile on-site, and under
 //   20 ms excluding the commit off-site, as the patient and as a proxy, for records with many views in the audit log,
-//   most of the proxy's record's views being ones the proxy is not shown.
+//   the proxy's record's being views the proxy is not shown, so that each of their pages reads the whole year.
 // Type: Non-functional (performance)
 // Requirements: NFR-01, NFR-03, NFR-04
 // Use case: UC 6, View my results and appointments in the portal
@@ -13,7 +13,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   18 with durability on, seeded with 50,000 synthetic patients; the on-site and the off-site app in memory, the
 //   off-site one with its link to the on-site server down; a portal account for a seeded patient, who is also a proxy,
 //   without sensitive items, for another; each record has 20,000 views over the last 12 months beyond those the run's
-//   own pages make, and 19 of 20 of the second record's are ones its proxy is not shown.
+//   own pages make; the proxy, who has no sensitive items, is shown none of the second record's, all of them views of
+//   sensitive items or notes, another account's, or a clinician's from before the patient was on their panel.
 // Inputs and system conditions: GET /portal/views as the patient and as the proxy, each 100 times to warm up and then
 //   1,000 times, on-site and off-site.
 // Test data: The synthetic clinic (bench/Ehr.Seed) and the benchmark's own views.

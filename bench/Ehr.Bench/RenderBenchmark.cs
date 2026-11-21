@@ -1371,10 +1371,11 @@ internal static partial class RenderBenchmark
     const int ViewsPerRecord = 20_000;
 
     // Step 13c: a year of views of each record in the audit log, 26 minutes apart, beyond those the run's own pages make.
-    // One in twenty is the clinician's read of the record, which anyone looking at the record is shown; the rest are
-    // views the proxy of the second record, who has no sensitive items, is not shown and a page of theirs reads past
-    // (of sensitive items, of a note, of a summary marked sensitive, by another portal account), and events that are no
-    // view at all (a sign-in, writes). The first record's patient is shown all but those. As the database's superuser,
+    // One in twenty is the clinician's read of the record; the rest are views of sensitive items, of a note, of a
+    // summary marked sensitive, or by another portal account, and events that are no view at all (a sign-in, writes).
+    // The first record's patient is shown all the views. The proxy of the second, who has no sensitive items, is shown
+    // none of them, not even the clinician's, made before the run put the record on the clinician's panel: so a page of
+    // theirs reads past the whole year, the most a page can read. As the database's superuser,
     // in the benchmark's own database only: with --stack the pages read the run's own views.
     static async Task FillViewsAsync(MigratedDatabase? database, Guid clinicianId, params Guid[] records)
     {
