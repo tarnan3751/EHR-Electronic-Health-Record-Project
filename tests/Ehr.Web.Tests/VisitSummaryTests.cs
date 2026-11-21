@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Ehr.Data;
 using Ehr.Data.Audit;
 using Ehr.Domain.Audit;
@@ -10,7 +12,7 @@ using static Ehr.Web.Tests.NoteAddendumTests;
 
 namespace Ehr.Web.Tests;
 
-// Visit summaries (the expansion plan's step 13a): helpers for the test cases TC-UC14-18 to 25 and TC-UC6-15 to 21,
+// Visit summaries (the expansion plan's step 13a): helpers for the test cases TC-UC14-18 to 25 and TC-UC6-15 to 23,
 // and the chart's one supporting test. What the database refuses whatever the app does is in Ehr.Security.Tests
 // (VisitSummarySecurityTests).
 public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
@@ -57,6 +59,38 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
     // The patient's standing summary of a note, when there is one: its ID.
     public static async Task<Guid> StandingAsync(WebApps apps, Guid patient) =>
         Guid.Parse((await ProxyTests.QueryAsync(apps, "SELECT id::text FROM ehr.visit_summaries WHERE patient_id = @patient AND withdrawn_at IS NULL ORDER BY released_at DESC LIMIT 1", patient)).Single());
+
+    // A clinician with a patient on their panel, and the patient signed in to the portal (step 13a's portal tests).
+    internal static async Task<(StaffAccount Clinician, Session Session, ProxyTests.Person Patient)> PortalPatientAsync(WebApps apps, string family = "Summaries")
+    {
+        var clinician = await apps.ClinicianAsync();
+        var person = await ProxyTests.PersonAsync(apps, "Synthetic", family);
+        await apps.AssignAsync(clinician, person.Patient);
+        return (clinician, await SignInAsync(apps.OnPrem, clinician), person);
+    }
+
+    // Someone the patient gives access to their record, signed in and looking at it: their session and the grant.
+    internal static async Task<(ProxyTests.Person Proxy, Guid Grant)> ProxyForAsync(WebApps apps, ProxyTests.Person patient, string family, bool sensitive, string scope = "record")
+    {
+        var proxy = await ProxyTests.PersonAsync(apps, "Synthetic", family);
+        await ProxyTests.GiveAsync(patient, proxy.Email, scope, sensitive);
+        var grant = Guid.Parse((await ProxyTests.QueryAsync(apps,
+            $"SELECT id::text FROM ehr.proxy_grants WHERE patient_id = @patient AND lower(proxy_email) = lower('{proxy.Email}') AND revoked_at IS NULL", patient.Patient)).Single());
+        await ProxyTests.ViewAsync(proxy, grant);
+        return (proxy, grant);
+    }
+
+    // The portal's visit summaries, as its client reads them, sensitive ones asked for or not.
+    public static Task<string> PortalAsync(HttpClient client, bool sensitive = false) =>
+        client.GetStringAsync("/portal/summaries" + (sensitive ? "?sensitive=true" : ""), Cancel);
+
+    // A page's markup without its form tokens, which differ on every response.
+    public static string WithoutTokens(string html) => Regex.Replace(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"[^\"]*\"", "");
+
+    // A note's date as the portal shows it: as the results page dates a result.
+    public static async Task<string> PortalDateAsync(WebApps apps, Guid patient, Guid note) =>
+        DateTimeOffset.Parse((await ProxyTests.QueryAsync(apps, $"SELECT to_char(signed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') FROM ehr.clinical_notes WHERE patient_id = @patient AND id = '{note}'", patient)).Single(),
+            CultureInfo.InvariantCulture).UtcDateTime.ToString("MMM d, yyyy", CultureInfo.InvariantCulture) + " UTC";
 
     // The emails sent to an address, oldest first.
     public static List<(string To, string Subject, string Body)> EmailsTo(WebApps apps, string address) =>

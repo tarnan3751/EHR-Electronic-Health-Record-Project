@@ -22,6 +22,8 @@
         </dl>
     </section>
     <p><a asp-page="/Results" class="sc-btn sc-btn--primary">@(own ? "See your test results" : "See test results")</a></p>
+    @* Step 13a: what the care team wrote for the patient after a visit. *@
+    <p><a asp-page="/Summaries" class="sc-btn">@(own ? "See your visit summaries" : "See visit summaries")</a></p>
     <section class="sc-panel" aria-labelledby="home-appointments">
         <h2 class="sc-panel__title" id="home-appointments">@(own ? "Your next appointments" : "Next appointments")</h2>
         @if (Model.Upcoming.Count > 0)
