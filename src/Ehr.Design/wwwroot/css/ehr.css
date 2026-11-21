@@ -1221,7 +1221,8 @@
         border-radius: var(--radius-lg);
     }
 
-    /* A plain list of record lines, one per row. */
+    /* A plain list of record lines, one per row. A word too long for the line, such as an email address on a phone,
+       wraps inside it. */
     .sc-list {
         list-style: none;
         padding: 0;
@@ -1231,6 +1232,7 @@
         margin: 0;
         padding: var(--space-2) 0;
         border-bottom: 1px solid var(--line);
+        overflow-wrap: anywhere;
     }
 
     .sc-list > li:last-child {

@@ -270,6 +270,8 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("a sign-out with no actor")]
     [InlineData("a sign-out of an empty patient")]
     [InlineData("a hand-over to the lab")]
+    [InlineData("a view of who viewed with a row")]
+    [InlineData("a view of who viewed as sensitive")]
     public async Task Only_reads_of_one_patient_by_a_signed_in_account_are_taken(string what)
     {
         var good = Event(Guid.CreateVersion7());
@@ -325,6 +327,16 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
                 bad.TableName = "orders";
                 bad.RowId = Guid.CreateVersion7();
                 break;
+            // The portal's "Who viewed my record" (step 13c) is a read of the patient's part of the log, which names
+            // no row, and only a plain read.
+            case "a view of who viewed with a row":
+                bad = ViewsEvent(Guid.CreateVersion7());
+                bad.RowId = bad.PatientId;
+                break;
+            case "a view of who viewed as sensitive":
+                bad = ViewsEvent(Guid.CreateVersion7());
+                bad.Action = AuditActions.ReadSensitive;
+                break;
         }
 
         using var response = await PostAsync(what == "null" ? [good, null] : [good, bad], WebApps.CloudAuditKey);
@@ -350,6 +362,17 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.True(await RecordedAsync(staff.Id));
         Assert.True(await RecordedAsync(patient.Id));
+    }
+
+    [Fact]
+    public async Task A_view_of_who_viewed_the_record_is_taken_in_its_one_shape()
+    {
+        var view = ViewsEvent(Guid.CreateVersion7());
+
+        using var response = await PostAsync([view], WebApps.CloudAuditKey);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(await RecordedAsync(view.Id));
     }
 
     [Fact]
@@ -431,6 +454,15 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         TableName = "patients",
         RowId = patient,
     };
+
+    // The portal's "Who viewed my record" as the PHI reader records it (step 13c): the patient's part of the log, no row.
+    static AuditEvent ViewsEvent(Guid patient)
+    {
+        var view = Event(patient);
+        view.TableName = "audit_events";
+        view.RowId = null;
+        return view;
+    }
 
     // Whether the event with this ID is in the audit log, read as the superuser.
     async Task<bool> RecordedAsync(Guid id)
