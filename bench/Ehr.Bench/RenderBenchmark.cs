@@ -198,6 +198,9 @@ internal static partial class RenderBenchmark
                 }));
                 // Kept to the end, off-site rows included: the off-site portal rows use the same session.
                 var portalSession = new CookieContainer();
+                // Download my record (step 13b) is measured for the seeded patient with the most entries too.
+                var (largestUserId, largestEmail, largestPassword, _) = await CreatePatientAccountAsync(app, LargestRecord(patients, portalPatient));
+                var largestSession = new CookieContainer();
                 try
                 {
                     using var portal = await PortalSignInAsync(app, portalSession, patientEmail, patientPassword);
@@ -209,6 +212,8 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal access, the patient's own", typing: false, () => "/portal/access"));
                     results.Add(await MeasureAsync(portal, times, "Portal choose, a record shared", typing: false, () => "/portal/choose"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
+                    // Download my record (step 13b): the page, the FHIR file and the printable page.
+                    results.AddRange(await MeasureRecordAsync(portal, times, "", "the patient's own", page: true));
                     // The same session, now looking at the record it holds a proxy grant for: every page first checks
                     // the grant, and every policy resolves the subject through it.
                     using (var chosen = await PostFormAsync(portal, "/portal/acting", await portal.GetStringAsync("/portal/access"), ("grantId", proxyGrant.ToString())))
@@ -222,6 +227,12 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal home, as a proxy", typing: false, () => "/portal"));
                     results.Add(await MeasureAsync(portal, times, "Portal results, as a proxy", typing: false, () => "/portal/results"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+                    results.AddRange(await MeasureRecordAsync(portal, times, "", "as a proxy", page: false));
+                    // And for the seeded patient whose record has the most entries, with a session of its own.
+                    using (var largest = await PortalSignInAsync(app, largestSession, largestEmail, largestPassword))
+                    {
+                        results.AddRange(await MeasureRecordAsync(largest, times, "", "the largest seeded record", page: false));
+                    }
 
                     if (database is null)
                     {
@@ -231,7 +242,7 @@ internal static partial class RenderBenchmark
                     else
                     {
                         await SettleAsync(database);
-                        results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession));
+                        results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -239,6 +250,7 @@ internal static partial class RenderBenchmark
                 finally
                 {
                     await LockOutPatientAsync(app, patientUserId);
+                    await LockOutPatientAsync(app, largestUserId);
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -422,7 +434,7 @@ internal static partial class RenderBenchmark
     static async Task<List<Result>> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
-        CookieContainer portalSession)
+        CookieContainer portalSession, CookieContainer largestSession)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -465,6 +477,7 @@ internal static partial class RenderBenchmark
             }));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+            results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "as a proxy", page: false));
             using (var mine = await PostFormAsync(portal, "/portal/acting?handler=Mine", await portal.GetStringAsync("/portal/summaries")))
             {
                 if (mine.RequestMessage?.RequestUri?.AbsolutePath != "/portal")
@@ -474,6 +487,9 @@ internal static partial class RenderBenchmark
             }
 
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
+            results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "the patient's own", page: true));
+            using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
+            results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
             return results;
         }
         finally
@@ -620,6 +636,20 @@ internal static partial class RenderBenchmark
 
         Console.WriteLine($"  {name}: done");
         return new Result(name, total, audit, commit);
+    }
+
+    // Download my record (step 13b), as the session's record: its page (when asked), the FHIR file and the printable page.
+    static async Task<List<Result>> MeasureRecordAsync(HttpClient portal, DatabaseTimes times, string site, string whose, bool page)
+    {
+        var results = new List<Result>();
+        if (page)
+        {
+            results.Add(await MeasureAsync(portal, times, $"{site}Portal record page, {whose}", typing: false, () => "/portal/record"));
+        }
+
+        results.Add(await MeasureAsync(portal, times, $"{site}Portal record file, {whose}", typing: false, () => "/portal/record?handler=File"));
+        results.Add(await MeasureAsync(portal, times, $"{site}Portal printable record, {whose}", typing: false, () => "/portal/record/print"));
+        return results;
     }
 
     // One kind of request's times: the whole request, and within it the audit events' insert and the commit.
@@ -942,12 +972,23 @@ internal static partial class RenderBenchmark
 
     // A confirmed portal account, with a random password nobody keeps, for the last patient in the clinic with at least
     // three released results.
-    static async Task<(Guid Id, string Email, string Password, Guid Patient)> CreatePatientAccountAsync(BenchApp app, int patients)
-    {
-        var patient = Enumerable.Range(0, patients).Reverse()
+    static Task<(Guid Id, string Email, string Password, Guid Patient)> CreatePatientAccountAsync(BenchApp app, int patients) =>
+        CreatePatientAccountAsync(app, Enumerable.Range(0, patients).Reverse()
             .Select(SyntheticClinic.Chart)
             .First(chart => chart.Results.Count(r => r.IssuedAt is not null) >= 3)
-            .Patient.Id;
+            .Patient.Id);
+
+    // The seeded patient whose record has the most entries the download holds, besides the one given, who has an account
+    // already: the first of them in the clinic's order.
+    static Guid LargestRecord(int patients, Guid besides) => Enumerable.Range(0, patients)
+        .Select(SyntheticClinic.Chart)
+        .Where(chart => chart.Patient.Id != besides)
+        .MaxBy(chart => chart.Allergies.Count + chart.Medications.Count + chart.Conditions.Count + chart.Results.Count + chart.Vitals.Count)!
+        .Patient.Id;
+
+    // A confirmed portal account, with a random password nobody keeps, for this patient.
+    static async Task<(Guid Id, string Email, string Password, Guid Patient)> CreatePatientAccountAsync(BenchApp app, Guid patient)
+    {
         await using var scope = app.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<PatientUser>>();
         var email = $"bench-patient-{Guid.NewGuid():N}@example.test";
