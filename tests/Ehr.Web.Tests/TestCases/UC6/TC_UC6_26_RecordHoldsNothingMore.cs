@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Ehr.Data.Patients;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
@@ -12,12 +13,14 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Purpose / scenario: The copy holds what the portal lets the patient see and nothing more, even with sensitive items
 //   asked for: never a signed note, an addendum or a draft, never a withdrawn summary's text, never a value entered in
 //   error, never a result not yet released or not final, never an appointment's cancellation reason, and nothing from
-//   the audit log. The file holds no kind of resource but those it is for.
+//   the audit log. The file holds no kind of resource but those it is for. The printable page's visit summaries and
+//   placeholders are exactly what Visit summaries shows, so the two can't drift apart.
 // Type: Functional (alternative flow: what the copy leaves out)
 // Requirements: proposed FR-56, FR-16, proposed FR-50, proposed FR-55
 // Use case: UC 6, View my results and appointments in the portal
 // Preconditions: As TC-UC6-24. Dr. Nothingmore, with the patient on their panel, has signed a note and an addendum to
-//   it, and has a draft for the patient; has released a summary and withdrawn it; has marked the blood pressure reading
+//   it, and has a draft for the patient; has released a summary and withdrawn it, and released a summary of a second
+//   note; has marked the blood pressure reading
 //   entered in error. The record also holds a medication entered in error, a result not yet released and a preliminary
 //   one.
 // Inputs and system conditions: GET /portal/record?handler=File&sensitive=true and /portal/record/print?sensitive=true,
@@ -31,7 +34,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Open the printable page, sensitive items included.
 // Expected result: Neither has any of the test data's words, nor the blood pressure reading in error. The file holds only
 //   Patient, AllergyIntolerance, MedicationStatement, Condition, Observation and Appointment resources, and its results
-//   are the two released ones. The page has the withdrawn summary's placeholder, as the summaries page has it.
+//   are the two released ones. The page has the standing summary, then the withdrawn summary's placeholder: the same
+//   items, in the same order and with the same words, as /portal/summaries?sensitive=true renders.
 // Creator: Tahseen Arnan
 public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebApps>
 {
@@ -59,6 +63,12 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
         using (var withdrawn = await WithdrawAsync(client, chart.Patient, note, await StandingAsync(apps, chart.Patient)))
         {
             Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+        }
+
+        // And a summary that stands, of a second note.
+        using (var released = await ReleaseAsync(client, chart.Patient, await SignedNoteAsync(client, chart.Patient)))
+        {
+            Assert.Contains("Released:", Words(await ReadAsync(released)));
         }
 
         using (await VitalTests.MarkAsync(apps, client, chart.Patient, chart.VitalsAt, "Synthetic: wrong cuff size", VitalSign.Systolic))
@@ -96,5 +106,16 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
         Assert.Contains(observations, o => o.Code?.Coding.Any(c => c.Code == VitalSign.HeartRate) == true);
         Assert.DoesNotContain("128/82", Words(page));
         Assert.Contains("was withdrawn by your care team.", Words(page));
+
+        // The printable page's summaries and placeholders are the summaries page's: the same items, in the same order,
+        // with the same words, so the two can't drift apart.
+        var printed = SummaryItems(page);
+        Assert.Equal(["standing", "withdrawn"], printed.Select(item => item.Kind));
+        Assert.Equal(SummaryItems(await PortalAsync(patient.Client, sensitive: true)), printed);
     }
+
+    // Each visit summary or placeholder on a page, in order: its kind and its words, white space run together.
+    static List<(string Kind, string Words)> SummaryItems(string html) =>
+        [.. Regex.Matches(html, "<li\\b[^>]*\\bdata-summary=\"(?<kind>[a-z]+)\"[^>]*>(?<body>.*?)</li>", RegexOptions.Singleline)
+            .Select(item => (item.Groups["kind"].Value, Regex.Replace(Words(item.Groups["body"].Value), "\\s+", " ").Trim()))];
 }

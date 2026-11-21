@@ -272,6 +272,8 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("a hand-over to the lab")]
     [InlineData("a download of another row")]
     [InlineData("a download from another table")]
+    [InlineData("a download of a signed note")]
+    [InlineData("a download of a visit summary")]
     public async Task Only_reads_of_one_patient_by_a_signed_in_account_are_taken(string what)
     {
         var good = Event(Guid.CreateVersion7());
@@ -335,6 +337,17 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
             case "a download from another table":
                 bad.Action = AuditActions.DownloadSensitive;
                 bad.TableName = "observations";
+                break;
+            // Shapes a read may have and a download may not: a download is of the record, never of one row in it.
+            case "a download of a signed note":
+                bad.Action = AuditActions.Download;
+                bad.TableName = "clinical_notes";
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            case "a download of a visit summary":
+                bad.Action = AuditActions.DownloadSensitive;
+                bad.TableName = "visit_summaries";
+                bad.RowId = Guid.CreateVersion7();
                 break;
         }
 
