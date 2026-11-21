@@ -590,6 +590,26 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.Equal(["false false none Not private."], await MarkOfAsync(summary));
     }
 
+    // A note with no addendum: nothing changes an addendum to run the addenda's trigger, so only the notes' own
+    // (clinical_notes_follow_summaries) carries the note's mark to its summaries, the withdrawn one too, and takes it off.
+    [Fact]
+    public async Task A_note_with_no_addenda_carries_its_mark_to_its_summaries_and_takes_it_off()
+    {
+        var (signer, patient, note) = await SignedAsync();
+        var withdrawn = await ReleaseAsync(signer, patient, note, "Withdrawn one.");
+        await WithdrawAsync(signer, withdrawn);
+        var summary = await ReleaseAsync(signer, patient, note);
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.note_addenda WHERE note_id = @note", ("note", note)));
+
+        await ChangeAsync(signer, "clinical_notes", note, sensitive: true, "Patient asked for it.");
+        Assert.Equal([$"true true none {Inherited}"], await MarkOfAsync(summary));
+        Assert.Equal([$"true true none {Inherited}"], await MarkOfAsync(withdrawn));
+
+        await ChangeAsync(signer, "clinical_notes", note, sensitive: false, "Marked the wrong note.");
+        Assert.Equal([$"false false none {Cleared}"], await MarkOfAsync(summary));
+        Assert.Equal([$"false false none {Cleared}"], await MarkOfAsync(withdrawn));
+    }
+
     [Fact]
     public async Task Marks_hide_a_summarys_values_from_an_administrator_in_the_audit_log()
     {
