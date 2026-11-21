@@ -47,6 +47,10 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public bool Own => subject.Acting is null;
 
+    // The patient always; a proxy only when the patient allowed them sensitive items. Only these are shown views from
+    // outside the care team, emergency access among them (42-record-views.sql), so only these are told what it means.
+    public bool MaySeeSensitive => subject.Acting is null || subject.Acting.IncludeSensitive;
+
     public async Task OnGetAsync()
     {
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
@@ -110,7 +114,8 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
         "you" => "You",
         "lab" => "The lab",
         "staff" => view.Name ?? "A member of staff",
-        // Only the patient is shown a proxy's views (42-record-views.sql), by the address they gave access to.
+        // Only the patient is shown a proxy's views (42-record-views.sql), by the address they gave access to. The other
+        // words can't occur at runtime: every account that reads a record is a staff or a portal account.
         _ => view.Name is { } address && own ? address : "Someone the record is shared with",
     };
 

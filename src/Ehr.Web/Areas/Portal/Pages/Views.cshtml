@@ -12,14 +12,18 @@
 else
 {
     @* What is listed, in the patient's words: every time the record or part of it was shown to someone, which the audit
-       log records, over the window the database looks at (db/policies/42-record-views.sql). A proxy is shown the care
-       team's views, the lab's and their own, and is told so in words that say nothing of anyone else. *@
+       log records, over the window the database looks at (db/policies/42-record-views.sql). A proxy is told whose views
+       they are shown in words that say nothing of anyone else: every staff member's when the patient allowed them
+       sensitive items, otherwise the care team's alone, the lab's and their own. *@
     <p class="sc-muted">
-        @(own ? "Each time your record, or part of it, was shown to someone" : "Each time the record, or part of it, was shown to the care team, the lab or you")
+        @(own ? "Each time your record, or part of it, was shown to someone"
+            : Model.MaySeeSensitive ? "Each time the record, or part of it, was shown to the clinic's staff, the lab or you"
+            : "Each time the record, or part of it, was shown to the patient's care team, the lab or you")
         in the last @ViewsModel.Months months, newest first. A clinician's search, list or schedule that showed @(own ? "your" : "the patient's") name counts.
         Times are UTC, and a view from the last minute may not be listed yet.
     </p>
-    @if (Model.Lines.Any(line => line.Emergency))
+    @* Only to someone who may be shown a view through emergency access: the patient, and a proxy with sensitive items. *@
+    @if (Model.MaySeeSensitive && Model.Lines.Any(line => line.Emergency))
     {
         <p class="sc-notice sc-notice--warning" data-emergency="explained"><span class="sc-notice__state">Emergency access:</span> a clinician who wasn't on @(own ? "your" : "the patient's") care team opened the record and gave the clinic a reason, which the clinic reviews.</p>
     }
