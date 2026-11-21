@@ -16,7 +16,7 @@ namespace Ehr.Domain.Notes;
 // 52-visit-summaries.sql). When its rule about codes refuses one, the rule is asked again, so the page can say what to
 // change: a summary released is checked once. Nothing is copied from the note: the clinician writes it. Marking one sensitive afterwards is ClinicalNotes.SetSensitivityAsync's, as
 // for a note or an addendum.
-public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuthority authority, IEmailSender email)
+public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuthority authority, PortalNotices notices)
 {
     public const int MaxLength = VisitSummaryConfiguration.MaxLength;
 
@@ -168,23 +168,12 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
         }
     }
 
-    // Tells the patient, at their own portal account's address, that there is something new in their portal: that
-    // and a link, nothing else. No word of what it is, no names and no health details, whether the summary is sensitive
-    // or not. Never a proxy, as for messages. A patient with no confirmed portal account gets nothing. Sent when a summary
-    // is released, at most once a day (the page asks PhiReader.SummariesReleasedTodayAsync: the few emails an address may
-    // be sent in an hour, CappedEmailSender, are also what a password reset draws on), and when one the patient or a
-    // proxy had viewed is withdrawn, whatever was sent that day (Tahseen's decision of 21 November 2026).
-    public async Task NotifyPatientAsync(Guid patient, string portalLink, CancellationToken cancel)
-    {
-        var address = await db.PatientUsers.AsNoTracking().Where(u => u.PatientId == patient && u.EmailConfirmed)
-            .Select(u => u.Email).FirstOrDefaultAsync(cancel);
-        if (address is not null)
-        {
-            await email.SendAsync(address, "There is something new in your patient portal",
-                "Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.",
-                new EmailAction("See what's new", portalLink), cancel);
-        }
-    }
+    // Tells the patient, at their own portal account's address, that there is something new in their portal, with
+    // nothing about the summary (PortalNotices). Sent when a summary is released, at most once a day (the page asks
+    // PhiReader.SummariesReleasedTodayAsync: the few emails an address may be sent in an hour, CappedEmailSender, are
+    // also what a password reset draws on), and when one the patient or a proxy had viewed is withdrawn, whatever was
+    // sent that day (Tahseen's decision of 21 November 2026).
+    public Task NotifyPatientAsync(Guid patient, string portalLink, CancellationToken cancel) => notices.SomethingNewAsync(patient, portalLink, cancel);
 
     // What the page says about one thing the rule found, naming it and where it is.
     static string Explain(VisitSummaryProblem problem)

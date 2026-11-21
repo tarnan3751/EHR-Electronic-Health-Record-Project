@@ -30,6 +30,8 @@ builder.Services.AddEhrData(connectionString);
 builder.Services.AddScoped<QuickTextSaver>();
 builder.Services.AddScoped<Ehr.Domain.Notes.ClinicalNotes>();
 builder.Services.AddScoped<Ehr.Domain.Notes.VisitSummaries>();
+// The portal's "something new" email, which visit summaries and refill requests send.
+builder.Services.AddScoped<Ehr.Domain.Accounts.PortalNotices>();
 builder.Services.AddScoped<Ehr.Domain.Notes.NoteReviews>();
 builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Site.OnPrem));
 // Which of the two apps this is, for the few pages that write as part of a read (marking a message read) and so must
