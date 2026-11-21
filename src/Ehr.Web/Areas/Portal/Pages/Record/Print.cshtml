@@ -282,7 +282,7 @@ else
                     {
                         @* Tahseen's decision of 21 November 2026, as on the summaries page: the date and nothing else. *@
                         <li data-summary="withdrawn">
-                            <p>A visit summary from @item.Date.UtcDateTime.ToString("MMM d, yyyy") UTC was withdrawn by your care team. Contact the clinic if you have questions.</p>
+                            <partial name="_WithdrawnSummary" model="item.Date" />
                         </li>
                     }
                 }
