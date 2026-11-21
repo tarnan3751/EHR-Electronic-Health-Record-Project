@@ -37,7 +37,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 11 | Read-only FHIR API | done | expansion/step-11-fhir-api | expansion-step-11 | [44844959277](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44844959277) | New use case UC 19; proposed FR-53. Authorization change: a new API group. Blood pressure waited for step 9c |
 | 11b | FHIR: a child's screening value | done | expansion/step-11b-fhir-screening-values | expansion-step-11b | [44848677796](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44848677796) | Mine: found when steps 9d and 11 met on the integration branch |
 | 12 | Simulated lab | done | expansion/step-12-simulated-lab | expansion-step-12, expansion-phase-3 | [44873790074](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44873790074) | New use case UC 20; proposed FR-54. Authorization change (a keyed service door) and db/policies; migration `LabKeys`. Last step of phase 3 |
-| 13a | Visit summaries | not started | | | | |
+| 13a | Visit summaries | in progress | expansion/step-13a-visit-summaries | | | Extends UC 6 and UC 14. Touches db/policies; a new table |
 | 13b | Download my record | not started | | | | |
 | 13c | Who viewed my record | not started | | | | |
 | 13d | Refill requests | not started | | | | |
@@ -47,6 +47,7 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 16 | Ambient listening | not started | | | | asks first |
 | 17 | Languages beyond English | not started | | | | asks first |
 | 18 | Session timeouts, emergency-access review | not started | | | | |
+| 18a | The admin audit view without clinical text | not started | | | | Added by Tahseen, 2026-11-21, with his answers on step 13a. After step 18 |
 | 19 | Passkeys | not started | | | | |
 | 20 | Desktop distribution | not started | | | | part asks first |
 | 21 | Real deployment and operations | not started | | | | asks first |
@@ -435,6 +436,11 @@ All of these use the portal's sizes, work for proxies (step 6) under the sensiti
 - An admin workflow to mark each emergency access as reviewed, with a note, through the inbox.
 - It can run any time after step 3.
 - **In the repo:** cookie lifetimes are set in `src/Ehr.Domain/Accounts/AccountServiceCollectionExtensions.cs`; emergency access is `ehr.break_glass_accesses` and the flagged rows at `/admin/audit` (`Admin/Audit.cshtml`), with no reviewed state. Admins have no access to patient data: the review shows the patient by ID, as the audit page does.
+
+**Step 18a. The admin audit view without clinical text** (added by Tahseen, 2026-11-21; after step 18)
+- "The admin audit view shows who did what to which record, but no clinical text for any patient data, sensitive or not."
+- **In the repo:** `/admin/audit` (`Admin/Audit.cshtml`) shows an event's details through `ehr.shown_audit_details`, which today hides them only for sensitive events; the write-audit trigger (`ehr.record_write`, `db/policies/40-audit.sql`) stores the written values. Administrators therefore see the text of orders, results, non-sensitive notes and, since step 13a, non-sensitive visit summaries. Raised as an open point in steps 2b, 7 and 13a.
+- Note it in the phase 4 pull request draft (his instruction), since step 13a adds another kind of text administrators can read until this step is done.
 
 **Step 19. Passkeys**
 - Passkeys as a second factor, using the framework's built-in support if this .NET version has it. Recovery paths don't change.
