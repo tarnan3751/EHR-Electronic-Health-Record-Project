@@ -45,9 +45,9 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 - Note follow-ups (the plan's step 10b): an addendum written by someone other than the note's signer is labeled and reaches the signer's inbox; a signed note or addendum can be marked sensitive after signing, with a reason, and only the person who marked it or the note's signer can unmark it (`docs/UC14.md`). Marking a note marks its addenda as inherited from it, and unmarking the note clears only those marks (step 10e).
 - Off-site audit cost (the plan's step 10c): off-site, a request's audit events are written to the cloud app's queue together, with one flush to disk, before any of the page is sent; a page whose events can't be written is not sent (`docs/UC2.md`).
 - A read-only FHIR R4 API (the plan's step 11): a clinician's client reads a patient on their panel, their allergies, medications, diagnoses, results, vital signs (a blood pressure as one reading) and appointments, coded as the record is, with the clinical app's sign-in; each read is recorded as a page's is, and sensitive items are left out unless asked for. See [FHIR API](#fhir-api) and `docs/UC19.md`.
-- A lab's door (the plan's step 12): a lab's system, with a key of its own, is handed the lab orders waiting for results, with only what it needs, and files their results through the same database rule as a clinician's filing; each order handed over and each result filed is audited as the lab's. See [Simulated lab](#simulated-lab) and `docs/UC20.md`.
+- Results from a lab (the plan's step 12): a lab's system, with a key of its own, is handed the lab orders waiting for results, with only what it needs, and files their results through the same database rule as a clinician's filing; each order handed over and each result filed is audited as the lab's. The simulated lab (`src/Ehr.Lab.Simulator`) plays one, in the local stack too, with results that fit each patient's diagnoses. See [Simulated lab](#simulated-lab) and `docs/UC20.md`.
 
-**Not built yet:** editing visits, sending orders to a pharmacy, a real lab's interface (step 12's door is there for one), and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
+**Not built yet:** editing visits, sending orders to a pharmacy, a real lab's interface (step 12's door is there for one; a simulated lab uses it), and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
 ## Layout
 
@@ -60,6 +60,7 @@ src/
   Ehr.Data/         EF Core + Dapper on Npgsql: read and write contexts, RLS interceptor
   Ehr.Design/       Razor class library: the SwiftChart tokens, shared CSS, fonts and logos (wwwroot), shared partials, htmx, Alpine.js
   Ehr.Desktop/      Tauri 2 app: src-tauri (Rust shell, SQLCipher, sync) + frontend (with its copy of the shared CSS, fonts and logos)
+  Ehr.Lab.Simulator/ the simulated lab: asks the on-prem app for lab orders and files synthetic results, over HTTP only
   Ehr.Dictation/    setup_models.py (downloads both models) and its tests; sidecar (Python: MedASR, K2 Horizon, the checks), schema (note schema and prompt), contract (the sidecar's answers, pinned), llama-server config
 tests/
   Ehr.Security.Tests/      RLS, role, and audit gates against real PostgreSQL 18
@@ -272,6 +273,14 @@ A lab's system is handed the lab orders waiting for results and files their resu
 - **Key:** the migration job stores the SHA-256 of `EHR_LAB_KEY`, which must be the on-prem app's `Ehr:Lab:Key`; without it no hash is stored and nothing gets in. To change it, change both, run the migration job again and restart the on-prem app; calls in between are refused and a lab tries again.
 - **The results page** of an order still waiting says "Lab connected:" when a key is stored; entering results by hand stays, for when the lab can't send them.
 
+**The simulated lab** (`src/Ehr.Lab.Simulator`) is a lab's system for development and the local stack: it asks every few seconds, keeps each order until its results are due, 5 to 30 seconds after it was signed, and posts values drawn from the clinic's own ranges, as the hand-over gives them: above or below for the diagnoses that move a test (type 1 or 2 diabetes, lipid disorders, hypothyroidism, vitamin D deficiency, chronic kidney disease, anemias: the table is in `docs/UC20.md`), and out of range now and then otherwise. The same order gets the same values every time, so two labs at once, or one started again, file each result once. The local stack runs it as its `lab` service when `EHR_LAB_KEY` is set in `infra/compose/.env`. To run it yourself against the stack, put the stack's key in the environment without typing it on the command line, where the shell's history would keep it (PowerShell 7: `$env:EHR_LAB_KEY = Read-Host -MaskInput "Lab key"`; zsh or bash: `read -rs EHR_LAB_KEY && export EHR_LAB_KEY`), then:
+
+```
+dotnet run --project src/Ehr.Lab.Simulator -- --base-url https://ehr.example.com:8443 --certificate infra/compose/certs/example.com.pem
+```
+
+`--certificate` trusts the stack's certificate as it is, for a machine that doesn't trust mkcert's root. The address must be `https://`: `--allow-http` lets an `http://` one through, for testing on one machine only. `--poll-seconds`, `--min-delay-seconds`, `--max-delay-seconds` and `--abnormal-rate` change its pace and its odds (`src/Ehr.Lab.Simulator/Program.cs`). Without `EHR_LAB_KEY` it says so and stops. It never prints the key.
+
 ## Database changes
 
 The schema comes from EF Core migrations in `db/migrations`; roles, grants, row-level security and triggers are hand-written SQL in `db/policies`. Reference data, the standard codes chart entries are picked from, is generated SQL in `db/reference` (`docs/expansion/reference-data.md`). The migration job (`infra/migrate`) applies all three to the primary, as `ehr_owner`, every time the server stack starts, and then stores the hash of the lab's key from `EHR_LAB_KEY`, or none when it isn't set (see [Simulated lab](#simulated-lab)); the replica gets them by replication. CI's stack job runs the same job.
@@ -314,7 +323,7 @@ starts its own PostgreSQL 18, seeds it, runs the on-prem app in memory, and prin
 | Job | What it checks |
 |---|---|
 | Web app | Restores packages (a high or critical security advisory fails the run), builds in Release, then runs `dotnet format --verify-no-changes` and `dotnet test` |
-| Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that the clinic's home sends an anonymous browser to sign in, the sign-in pages load over HTTPS on all three sites, and the sync API refuses an anonymous request (the on-prem app reads the primary; the cloud app reads the replica), both databases accept connections over TLS only, the replica and Barman are streaming, and `barman check` passes |
+| Server stack | Starts the local server stack (`infra/compose`), including the migration job, then checks that the clinic's home sends an anonymous browser to sign in, the sign-in pages load over HTTPS on all three sites, and the sync API refuses an anonymous request (the on-prem app reads the primary; the cloud app reads the replica), the lab's door hands over orders on the on-prem site with the lab's key and isn't on the cloud site, and the lab service runs, both databases accept connections over TLS only, the replica and Barman are streaming, and `barman check` passes |
 | Desktop | `cargo fmt --check`, `cargo clippy` (warnings count as errors) and `cargo build`, on macOS (Apple Silicon) and Windows (x64) |
 | Dictation | The tests for `src/Ehr.Dictation/setup_models.py`, against a fake Hugging Face Hub; the dictation sidecar's and the eval's tests, with the packages their `uv.lock` files pin and stand-ins for the models; and the eval gate, which checks that the committed results in `eval/results/latest.json` come from this commit's prompt, note schema, parameters, sidecar code, eval code and test set, cover every script with every recording sorted, show no order or allergy change and no retracted value without a warning that the owner hasn't accepted in `eval/known-limitations.toml`, and score no lower than the accepted baseline (see [Dictation](#dictation)) |
 | Dictation image | Builds the dictation sidecar's image on an x86-64 and an arm64 runner, and checks that it runs as a non-root user, has ffmpeg and the note schema, and refuses to start without its keys. Nothing is pushed. |

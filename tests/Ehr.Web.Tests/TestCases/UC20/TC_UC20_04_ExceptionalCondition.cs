@@ -1,4 +1,5 @@
 using System.Net;
+using Ehr.Lab.Simulator;
 using Ehr.Testing;
 using Ehr.Web.Api.Lab;
 using Microsoft.AspNetCore.Hosting;
@@ -33,11 +34,14 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 //   2. On the cloud site, with the lab's key: ask for orders; post results; post again with the link cut off.
 //   3. On an on-site app without Ehr:Lab:Key: ask and post.
 //   4. With the database holding no key's hash: ask, post, and open the results page; then with it back, open it again.
+//   5. Sign a TSH. Run a round of the simulated lab, which is handed it; discontinue the TSH; run a round once its
+//      results are due.
 // Expected result: Step 1: 401 unauthorized each. Step 2: the ask finds no door (401, with no lab's answer, as for
 //   any address before sign-in) and isn't forwarded; the post is forwarded without X-Lab-Key and refused 401
 //   unauthorized; cut off, 503 "Not saved". Step 3: no door, each.
-//   Step 4: 503 not-ready each, and the page has no "Lab connected"; with the hash back, it says "Lab connected:". No
-//   result is filed and no order handed over.
+//   Step 4: 503 not-ready each, and the page has no "Lab connected"; with the hash back, it says "Lab connected:". Until
+//   then no result is filed and no order handed over. Step 5: the lab is handed the TSH, then told it was discontinued
+//   and drops it; nothing is filed.
 // Creator: Tahseen Arnan
 public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -129,5 +133,20 @@ public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             await session.Client.GetStringAsync(Path(patient, order), Cancel));
         Assert.Equal(["0"], await ResultsOnFileAsync(apps, patient));
         Assert.Equal(0, await apps.AuditEventsAsync("sent_to_lab", patientId: patient));
+
+        // Step 5: discontinued while the lab works on it.
+        var since = await WatermarkAsync(apps);
+        var thyroid = await SignedAsync(session.Client, patient, "lab", "Thyroid-stimulating hormone (TSH)", Cbc);
+        var log = new List<string>();
+        var lab = new LabSimulator(Client(apps.OnPrem), LabSettings.Default, log.Add, since);
+        Assert.Equal(new LabRound(1, 0, 0, 1), await lab.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(-1), Cancel));
+        using (await DiscontinueAsync(session.Client, patient, thyroid, "Synthetic: no longer needed"))
+        {
+        }
+
+        Assert.Equal(new LabRound(0, 0, 1, 0), await lab.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(1), Cancel));
+        Assert.Equal($"Order {thyroid}: the clinic takes no results for it from this lab (discontinued); dropped.", log[^1]);
+        Assert.Equal(["0"], await ResultsOnFileAsync(apps, patient));
+        Assert.Equal(1, await apps.AuditEventsAsync("sent_to_lab", patientId: patient));
     }
 }

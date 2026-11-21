@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- CI gates: each layer calls only the one below it; PHI reads go only through the PHI reader. -->
+  <!-- CI gates: each layer calls only the one below it, and the simulated lab calls none of them; PHI reads go only
+       through the PHI reader. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -16,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ehr.Web\Ehr.Web.csproj" />
+    <!-- Checked to reference none of the app's assemblies (LayeringTests). -->
+    <ProjectReference Include="..\..\src\Ehr.Lab.Simulator\Ehr.Lab.Simulator.csproj" />
   </ItemGroup>
 
 </Project>
