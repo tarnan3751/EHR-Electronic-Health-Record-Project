@@ -181,9 +181,26 @@ internal static partial class RenderBenchmark
                 var portalThread = await WritePortalThreadAsync(app, clinicianId, portalPatient);
                 // Proxy access (FR-19): the clinician records the portal patient as a proxy for one of the panel.
                 var proxyGrant = await RecordProxyAsync(app, clinicianId, panel[0], patientEmail);
+                // Visit summaries (step 13a): six for the portal patient and six for the record they are a proxy for, two of
+                // each sensitive and one withdrawn. The form that writes one, for the notes above, which have none, and
+                // the one that withdraws one, for these. A generator of its own, so the rows after them pick as they did.
+                var summarized = await ReleaseSummariesAsync(app, clinicianId, [portalPatient, panel[0]]);
+                var summaryRandom = new Random(20261125);
+                results.Add(await MeasureAsync(client, times, "Visit summary form, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note) = noted[summaryRandom.Next(noted.Count)];
+                    return $"/patients/{patient}/notes/{note}/summary";
+                }));
+                results.Add(await MeasureAsync(client, times, "Withdraw summary form, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
+                    return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
+                }));
+                // Kept to the end, off-site rows included: the off-site portal rows use the same session.
+                var portalSession = new CookieContainer();
                 try
                 {
-                    using var portal = await PortalSignInAsync(app, patientEmail, patientPassword);
+                    using var portal = await PortalSignInAsync(app, portalSession, patientEmail, patientPassword);
                     results.Add(await MeasureAsync(portal, times, "Portal results, the patient's own", typing: false, () => "/portal/results"));
                     results.Add(await MeasureAsync(portal, times, "Portal appointments, the patient's own", typing: false, () => "/portal/appointments"));
                     results.Add(await MeasureAsync(portal, times, "Portal home, the patient's own", typing: false, () => "/portal"));
@@ -191,6 +208,7 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal conversation, the patient's own", typing: false, () => $"/portal/messages/{portalThread}"));
                     results.Add(await MeasureAsync(portal, times, "Portal access, the patient's own", typing: false, () => "/portal/access"));
                     results.Add(await MeasureAsync(portal, times, "Portal choose, a record shared", typing: false, () => "/portal/choose"));
+                    results.Add(await MeasureAsync(portal, times, "Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
                     // The same session, now looking at the record it holds a proxy grant for: every page first checks
                     // the grant, and every policy resolves the subject through it.
                     using (var chosen = await PostFormAsync(portal, "/portal/acting", await portal.GetStringAsync("/portal/access"), ("grantId", proxyGrant.ToString())))
@@ -203,23 +221,24 @@ internal static partial class RenderBenchmark
 
                     results.Add(await MeasureAsync(portal, times, "Portal home, as a proxy", typing: false, () => "/portal"));
                     results.Add(await MeasureAsync(portal, times, "Portal results, as a proxy", typing: false, () => "/portal/results"));
+                    results.Add(await MeasureAsync(portal, times, "Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+
+                    if (database is null)
+                    {
+                        Console.WriteLine("Off-site: not measured with --stack, which has no ehr_read login for the replica.");
+                        Console.WriteLine("The lab's door: not measured with --stack, whose lab key is in the stack's .env alone.");
+                    }
+                    else
+                    {
+                        await SettleAsync(database);
+                        results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession));
+                        // The lab's door (step 12), last, so every row before it makes the requests it always did.
+                        results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
+                    }
                 }
                 finally
                 {
                     await LockOutPatientAsync(app, patientUserId);
-                }
-
-                if (database is null)
-                {
-                    Console.WriteLine("Off-site: not measured with --stack, which has no ehr_read login for the replica.");
-                    Console.WriteLine("The lab's door: not measured with --stack, whose lab key is in the stack's .env alone.");
-                }
-                else
-                {
-                    await SettleAsync(database);
-                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted));
-                    // The lab's door (step 12), last, so every row before it makes the requests it always did.
-                    results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -402,7 +421,8 @@ internal static partial class RenderBenchmark
     // audit queue goes in a folder of its own, deleted at the end.
     static async Task<List<Result>> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
-        string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted)
+        string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
+        CookieContainer portalSession)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -429,6 +449,31 @@ internal static partial class RenderBenchmark
                 var (patient, note) = noted[noteRandom.Next(noted.Count)];
                 return $"/patients/{patient}/notes/{note}";
             }));
+            // Visit summaries (step 13a), with the same generator's draws as on-site: the clinician's two forms (which,
+            // during an outage, say why nothing can be released or withdrawn), then the portal page, first as the proxy
+            // the on-site rows ended as, then back on the patient's own record, through the cloud app's own switch.
+            var summaryRandom = new Random(20261125);
+            results.Add(await MeasureAsync(client, times, "Off-site, Visit summary form, a patient on the panel", typing: false, () =>
+            {
+                var (patient, note) = noted[summaryRandom.Next(noted.Count)];
+                return $"/patients/{patient}/notes/{note}/summary";
+            }));
+            results.Add(await MeasureAsync(client, times, "Off-site, Withdraw summary form, a patient on the panel", typing: false, () =>
+            {
+                var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
+                return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
+            }));
+            using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+            using (var mine = await PostFormAsync(portal, "/portal/acting?handler=Mine", await portal.GetStringAsync("/portal/summaries")))
+            {
+                if (mine.RequestMessage?.RequestUri?.AbsolutePath != "/portal")
+                {
+                    throw new InvalidOperationException("Going back to the patient's own record off-site did not end at /portal.");
+                }
+            }
+
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
             return results;
         }
         finally
@@ -912,10 +957,11 @@ internal static partial class RenderBenchmark
         return (user.Id, email, password, patient);
     }
 
-    // Signs a patient in at the portal, as a browser does, and returns a client with the session's cookies.
-    static async Task<HttpClient> PortalSignInAsync(BenchApp app, string email, string password)
+    // Signs a patient in at the portal, as a browser does, and returns a client with the session's cookies, which are kept
+    // in `session` for the off-site rows.
+    static async Task<HttpClient> PortalSignInAsync(BenchApp app, CookieContainer session, string email, string password)
     {
-        var client = app.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = Base, HandleCookies = true, AllowAutoRedirect = true });
+        var client = app.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
         using var home = await PostFormAsync(client, "/portal/sign-in", await client.GetStringAsync("/portal/sign-in"), ("Input.Email", email), ("Input.Password", password));
         // An account with a record shared with it lands on the page that asks whose record (step 6b).
         if (home.RequestMessage?.RequestUri?.AbsolutePath is not ("/portal" or "/portal/choose"))
@@ -1127,6 +1173,73 @@ internal static partial class RenderBenchmark
 
         await transaction.CommitAsync();
         return noted;
+    }
+
+    // Step 13a: for each patient, six signed notes and a visit summary of each, through the app's own service and the
+    // database's rules: two ticked sensitive, and one withdrawn and released again, so the portal has a placeholder. The
+    // patients are on the clinician's panel. The standing summaries.
+    static async Task<List<(Guid Patient, Guid Note, Guid Summary)>> ReleaseSummariesAsync(BenchApp app, Guid clinicianId, Guid[] patients)
+    {
+        var standing = new List<(Guid, Guid, Guid)>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var summaries = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.VisitSummaries>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        foreach (var patient in patients)
+        {
+            for (var i = 0; i < 6; i++)
+            {
+                var draft = new Ehr.Data.Patients.ClinicalDraft
+                {
+                    Id = Guid.CreateVersion7(),
+                    PatientId = patient,
+                    ClinicianId = clinicianId,
+                    Body = "Synthetic note",
+                    Version = 1,
+                    History = "Synthetic history: a check-up.",
+                    Assessment = "Synthetic assessment: well.",
+                    Plan = "Synthetic plan: see you in a year.",
+                    StructuredVersion = 1,
+                };
+                db.Add(draft);
+                await db.SaveChangesAsync();
+                var note = new Ehr.Data.Patients.ClinicalNote
+                {
+                    Id = Guid.CreateVersion7(),
+                    DraftId = draft.Id,
+                    PatientId = patient,
+                    DraftVersion = 1,
+                    History = draft.History,
+                    Assessment = draft.Assessment,
+                    Plan = draft.Plan,
+                };
+                db.Add(note);
+                await db.SaveChangesAsync();
+                async Task<Guid> ReleaseAsync()
+                {
+                    var released = await summaries.ReleaseAsync(patient, note.Id, "We talked about how you have been.", "Everything we checked was as expected.\nYour weight is steady.",
+                        "Keep doing what you are doing, and come back in a year.", sensitive: i % 3 == 2, CancellationToken.None);
+                    return released.Summary ?? throw new InvalidOperationException("The benchmark's visit summary was refused: " + string.Join(" ", released.Errors));
+                }
+
+                var summary = await ReleaseAsync();
+                if (i == 0)
+                {
+                    if ((await summaries.WithdrawAsync(patient, summary, "Synthetic: written for the wrong visit.", CancellationToken.None)).Status != 200)
+                    {
+                        throw new InvalidOperationException("The benchmark's visit summary was not withdrawn.");
+                    }
+
+                    summary = await ReleaseAsync();
+                }
+
+                standing.Add((patient, note.Id, summary));
+            }
+        }
+
+        await transaction.CommitAsync();
+        return standing;
     }
 
     static async Task AcknowledgeResultsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Order)> resulted)
