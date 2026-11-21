@@ -1,10 +1,11 @@
 -- Visit summaries (the expansion plan's step 13a): what a clinician writes for the patient from a signed note and
 -- releases to the patient portal. What the database itself holds them to, whatever the app does. Who may write,
--- withdraw, mark and read one is row-level security's (30-rls.sql); the grants are in 10-grants.sql. Plain SQL, safe to
--- run again. Tahseen's decisions of 21 November 2026 shape the sensitivity and the withdrawal: a summary is sensitive
--- when its note or any of the note's addenda is (inherited), or when a clinician marks it; a withdrawn one leaves the
--- portal a dated placeholder; its releaser is told when someone else withdraws it; and the patient is told when it had
--- been viewed in the portal before it was withdrawn.
+-- withdraw, mark and read one is row-level security's (30-rls.sql), but for the portal, which is given them only
+-- through two functions below; the grants are in 10-grants.sql. Plain SQL, safe to run again. Tahseen's decisions of
+-- 21 November 2026 shape the sensitivity and the withdrawal: a summary is sensitive when its note or any of the note's
+-- addenda is (inherited), or when a clinician marks it; a withdrawn one leaves the portal a dated placeholder; its
+-- releaser is told when someone else withdraws it; and the patient is told when it had been viewed in the portal
+-- before it was withdrawn.
 
 -- What in a summary isn't fit for the patient: the one statement of the rule, which the trigger below enforces and the
 -- page asks to explain a refusal (VisitSummaryChecks in Ehr.Data). One row for each thing found: the part of the
@@ -258,12 +259,13 @@ CREATE OR REPLACE TRIGGER visit_summaries_immutable
 
 -- A note's summaries follow its sensitivity and its addenda's (Tahseen's decision of 21 November 2026), as an addendum
 -- follows its note's (50-clinical-notes.sql). When the note or one of its addenda becomes sensitive (marked, or an
--- addendum signed sensitive), each of its summaries not already sensitive is marked, recorded as inherited, with the
--- reason given; when one is unmarked and none of them is sensitive any more, the inherited marks are cleared, with
--- that reason, and only those: a summary marked on its own stays marked until it is unmarked itself. Withdrawn
--- summaries follow too: their placeholders in the portal depend on it. As the caller, through the summaries' own rule
--- above, which decides that a mark is inherited, and the panel policy (30-rls.sql); the person who changes a note or an
--- addendum is a clinician with the patient on their panel already.
+-- addendum signed sensitive), each of its summaries not already sensitive is marked, recorded as inherited; when one is
+-- unmarked and none of them is sensitive any more, the inherited marks are cleared, and only those: a summary marked on
+-- its own stays marked until it is unmarked itself. Each with a fixed reason of the database's, never the words given
+-- for the note's or the addendum's change, which stay on that row alone. Withdrawn summaries follow too: their
+-- placeholders in the portal depend on it. As the caller, through the summaries' own rule above, which decides that a
+-- mark is inherited, and the panel policy (30-rls.sql); the person who changes a note or an addendum is a clinician
+-- with the patient on their panel already.
 -- When it runs: AFTER triggers on clinical_notes and note_addenda, so at the end of the statement that changed the note
 -- or the addendum, under the note's lock, which ehr.change_note_sensitivity, ehr.change_addendum_sensitivity and
 -- ehr.sign_note_addendum take before the row changes and the summaries' rule takes too. It recomputes from the note and
@@ -280,7 +282,6 @@ CREATE OR REPLACE FUNCTION ehr.follow_summary_sources() RETURNS trigger
 AS $$
 DECLARE
     source_note uuid := CASE WHEN TG_TABLE_NAME = 'clinical_notes' THEN (to_jsonb(NEW) ->> 'id')::uuid ELSE (to_jsonb(NEW) ->> 'note_id')::uuid END;
-    why text := coalesce(NEW.sensitive_reason, 'An addendum to the note was signed as sensitive.');
     sources boolean;
 BEGIN
     IF current_setting('transaction_isolation') <> 'read committed' THEN
@@ -289,10 +290,10 @@ BEGIN
 
     sources := ehr.summary_sources_sensitive(source_note, NEW.patient_id);
     IF sources THEN
-        UPDATE ehr.visit_summaries s SET sensitive = true, sensitive_reason = why
+        UPDATE ehr.visit_summaries s SET sensitive = true, sensitive_reason = 'Its note or an addendum to the note is sensitive.'
         WHERE s.note_id = source_note AND s.patient_id = NEW.patient_id AND NOT s.sensitive;
     ELSE
-        UPDATE ehr.visit_summaries s SET sensitive = false, sensitive_reason = why
+        UPDATE ehr.visit_summaries s SET sensitive = false, sensitive_reason = 'Neither its note nor any addendum to the note is sensitive now.'
         WHERE s.note_id = source_note AND s.patient_id = NEW.patient_id AND s.sensitive AND s.sensitive_inherited;
     END IF;
     -- All of them, or the change doesn't happen: an update the policies hid from this caller would leave one behind.
@@ -342,13 +343,40 @@ CREATE OR REPLACE TRIGGER visit_summaries_deliver_withdrawn
     FOR EACH ROW WHEN (OLD.withdrawn_at IS NULL AND NEW.withdrawn_at IS NOT NULL)
     EXECUTE FUNCTION ehr.deliver_summary_withdrawn();
 
+-- The portal's visit summaries (step 13a), for the record the session is looking at: the standing ones, newest note
+-- first, up to max_rows, each with its ID, the date its note was signed, the name of who released it, its three parts
+-- and whether it is sensitive, and nothing else of it: not how it came to be sensitive, why or by whom, not its note,
+-- and nothing of withdrawals (ehr.withdrawn_visit_summaries, below, gives those). The patient's own, and a proxy's only
+-- while their access is in force; a sensitive one only where ehr.portal_sees_sensitive says so: always the patient's
+-- own, a proxy's only when the patient allowed sensitive items. Row-level security can't keep some of a row's columns
+-- from a session that may read the row, so no portal session reads the table (30-rls.sql): this is the portal's only
+-- way to a summary. Runs as its owner, reading the summaries through the owner's policy (30-rls.sql) and the staff
+-- accounts' names; its search_path is pinned, and only the runtime roles may call it. Anyone who isn't a portal session
+-- looking at a record gets nothing.
+CREATE OR REPLACE FUNCTION ehr.standing_visit_summaries(max_rows integer)
+    RETURNS TABLE (id uuid, note_signed_at timestamptz, released_by text, talked_about text, found text, next_steps text, sensitive boolean)
+    LANGUAGE sql
+    STABLE
+    SECURITY DEFINER
+    SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT s.id, s.note_signed_at, coalesce(u.display_name, '')::text, s.talked_about, s.found, s.next_steps, s.sensitive
+    FROM ehr.visit_summaries s
+    LEFT JOIN ehr.staff_users u ON u.id = s.released_by
+    WHERE s.patient_id = (SELECT ehr.current_patient_id()) AND s.withdrawn_at IS NULL
+      AND (NOT s.sensitive OR (SELECT ehr.portal_sees_sensitive()))
+    ORDER BY s.note_signed_at DESC, s.released_at DESC, s.id
+    LIMIT max_rows
+$$;
+REVOKE ALL ON FUNCTION ehr.standing_visit_summaries(integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ehr.standing_visit_summaries(integer) TO ehr_app, ehr_read;
+
 -- The portal's placeholders for withdrawn summaries (Tahseen's decision of 21 November 2026): for the record the
 -- session is looking at, the date of each withdrawn summary and whether it is sensitive, and nothing else of it, under
--- the rule a standing summary is read by (30-rls.sql, visit_summaries_own_select): the patient's own, and a proxy's only
--- while their access is in force, a sensitive one only when the patient allows them sensitive items. Row-level
--- security can't keep a row's text from a session that may read the row, so the portal is given no withdrawn row at all,
--- only this. Runs as its owner, reading the table through the owner's policy (30-rls.sql); its search_path is pinned,
--- and only the runtime roles may call it. Anyone who isn't a portal session looking at a record gets nothing.
+-- the rule ehr.standing_visit_summaries gives standing ones by: the patient's own, and a proxy's only while their
+-- access is in force, a sensitive one only when the patient allows them sensitive items. Runs as its owner, reading the
+-- table through the owner's policy (30-rls.sql); its search_path is pinned, and only the runtime roles may call it.
+-- Anyone who isn't a portal session looking at a record gets nothing.
 CREATE OR REPLACE FUNCTION ehr.withdrawn_visit_summaries()
     RETURNS TABLE (note_signed_at timestamptz, sensitive boolean)
     LANGUAGE sql

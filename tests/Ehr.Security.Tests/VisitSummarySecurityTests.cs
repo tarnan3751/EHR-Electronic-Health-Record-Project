@@ -313,22 +313,26 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.Equal(before, await AsSuperuserAsync("SELECT to_jsonb(s)::text FROM ehr.visit_summaries s WHERE id = @id", ("id", summary)));
     }
 
-    // Who reads which summaries, through both roles: clinicians every one; the portal the standing ones of the patient
-    // it is looking at, a sensitive one for the patient themselves and for a proxy the patient allowed sensitive items;
-    // nobody else any. Of a withdrawn one, the portal is given its date and whether it is sensitive, under the same
-    // rule, and never its row: not its text, not its reason.
+    // Who reads which summaries, through both roles: clinicians every one, from the table; no portal session any row of
+    // it, whoever it is acting for. The portal is given the standing ones of the patient it is looking at, a sensitive one
+    // for the patient themselves and for a proxy the patient allowed sensitive items, through ehr.standing_visit_summaries,
+    // and of a withdrawn one its date and whether it is sensitive, under the same rule, through
+    // ehr.withdrawn_visit_summaries: never a mark's reason, who made it, the note or the withdrawal. Nobody else any.
     [Fact]
-    public async Task Clinicians_read_every_summary_and_the_portal_only_the_standing_ones_and_the_dates_of_the_withdrawn_the_patients_rule_allows()
+    public async Task Clinicians_read_every_summary_and_the_portal_no_row_only_what_the_two_functions_give_under_the_patients_rule()
     {
         var (clinician, patient, plain) = await SignedAsync();
         var replaced = await NoteAsync(clinician, patient);
         var sensitive = await NoteAsync(clinician, patient, sensitive: true);
         var withdrawnSensitive = await NoteAsync(clinician, patient, sensitive: true);
+        var marked = await NoteAsync(clinician, patient);
         await ReleaseAsync(clinician, patient, plain, "plain");
         await WithdrawAsync(clinician, await ReleaseAsync(clinician, patient, replaced, "withdrawn"));
         await ReleaseAsync(clinician, patient, replaced, "replacement");
         await ReleaseAsync(clinician, patient, sensitive, "sensitive");
         await WithdrawAsync(clinician, await ReleaseAsync(clinician, patient, withdrawnSensitive, "withdrawn-sensitive"));
+        // Marked on its own after it was released, with a reason the portal must never be given.
+        await ChangeAsync(clinician, "visit_summaries", await ReleaseAsync(clinician, patient, marked, "marked"), sensitive: true, "Synthetic private reason.");
 
         var outsider = await Accounts.StaffAsync(database, StaffRoles.Clinician);
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
@@ -340,8 +344,15 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         var (revoked, revokedGrant) = await ProxyAsync(own, patient, includeSensitive: true);
         await Accounts.ExecuteAsync(App, own, "UPDATE ehr.proxy_grants SET revoked_at = now() WHERE id = @id", ("id", revokedGrant));
         var (proxyOnly, _) = await Accounts.ProxyOnlyAccountAsync(database);
-        const string Seen = "SELECT coalesce(string_agg(talked_about || coalesce(withdrawn_reason, ''), ' ' ORDER BY talked_about), '') FROM ehr.visit_summaries WHERE patient_id = @patient";
+        const string Seen = "SELECT coalesce(string_agg(talked_about || coalesce(withdrawn_reason, '') || coalesce(sensitive_reason, ''), ' ' ORDER BY talked_about), '') FROM ehr.visit_summaries WHERE patient_id = @patient";
+        // Every row of the table, any patient's.
+        const string Rows = "SELECT count(*)::text FROM ehr.visit_summaries";
+        const string Given = "SELECT coalesce(string_agg(talked_about || ' ' || found || ' ' || next_steps || ' ' || released_by || ' ' || sensitive, ' / ' ORDER BY talked_about), '') FROM ehr.standing_visit_summaries(100)";
         const string Placeholders = "SELECT count(*) || ' ' || count(*) FILTER (WHERE sensitive) FROM ehr.withdrawn_visit_summaries()";
+        var name = (await AsSuperuserAsync("SELECT display_name FROM ehr.staff_users WHERE id = @id", ("id", clinician))).Single();
+        string GivenOf(params string[] parts) => string.Join(" / ", parts.Select(part =>
+            $"{part} Your chest sounded clear. Rest, drink fluids, and call us if it gets worse. {name} {(part is "plain" or "replacement" ? "false" : "true")}"));
+        const string All = "markedSynthetic private reason. plain replacement sensitive withdrawnWritten for the wrong visit. withdrawn-sensitiveWritten for the wrong visit.";
 
         foreach (var connection in new[] { App, Read })
         {
@@ -353,34 +364,44 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
                 }
             }
 
-            foreach (var (user, grant, seen, placeholders) in new (Guid?, Guid?, string, string)[]
+            foreach (var (user, grant, seen, given, placeholders) in new (Guid?, Guid?, string, string, string)[]
             {
-                (clinician, null, "plain replacement sensitive withdrawnWritten for the wrong visit. withdrawn-sensitiveWritten for the wrong visit.", "0 0"),
-                (outsider, null, "plain replacement sensitive withdrawnWritten for the wrong visit. withdrawn-sensitiveWritten for the wrong visit.", "0 0"),
-                (admin, null, "", "0 0"),
-                (null, null, "", "0 0"),
-                (own, null, "plain replacement sensitive", "2 1"),
-                (allowed, allowedGrant, "plain replacement sensitive", "2 1"),
-                (without, withoutGrant, "plain replacement", "1 0"),
-                (revoked, revokedGrant, "", "0 0"),
+                (clinician, null, All, "", "0 0"),
+                (outsider, null, All, "", "0 0"),
+                (admin, null, "", "", "0 0"),
+                (null, null, "", "", "0 0"),
+                (own, null, "", GivenOf("marked", "plain", "replacement", "sensitive"), "2 1"),
+                (allowed, allowedGrant, "", GivenOf("marked", "plain", "replacement", "sensitive"), "2 1"),
+                (without, withoutGrant, "", GivenOf("plain", "replacement"), "1 0"),
+                (revoked, revokedGrant, "", "", "0 0"),
                 // A grant named by someone it isn't addressed to; another patient; a proxy-only account on its own.
-                (otherPatient, allowedGrant, "", "0 0"),
-                (otherPatient, null, "", "0 0"),
-                (proxyOnly, null, "", "0 0"),
+                (otherPatient, allowedGrant, "", "", "0 0"),
+                (otherPatient, null, "", "", "0 0"),
+                (proxyOnly, null, "", "", "0 0"),
             })
             {
                 Assert.Equal(seen, await AskAsync(Seen, user, grant));
+                Assert.Equal(given, await AskAsync(Given, user, grant));
                 Assert.Equal(placeholders, await AskAsync(Placeholders, user, grant));
+                if (user != clinician && user != outsider)
+                {
+                    Assert.Equal("0", await AskAsync(Rows, user, grant));
+                }
             }
         }
 
-        // The placeholders carry a date and a mark, and nothing else of the summary.
-        Assert.Equal(["note_signed_at timestamp with time zone", "sensitive boolean"], await AsSuperuserAsync(
-            """
+        // The portal's two functions return these columns and no other: nothing of a mark but whether there is one, and
+        // nothing of the note or a withdrawal.
+        const string Columns = """
             SELECT a.name || ' ' || format_type(a.type, NULL) FROM unnest(
-                (SELECT p.proallargtypes FROM pg_proc p WHERE p.oid = 'ehr.withdrawn_visit_summaries'::regproc),
-                (SELECT p.proargnames FROM pg_proc p WHERE p.oid = 'ehr.withdrawn_visit_summaries'::regproc)) AS a(type, name) ORDER BY a.name
-            """));
+                (SELECT p.proallargtypes FROM pg_proc p WHERE p.oid = @function::regproc),
+                (SELECT p.proargnames FROM pg_proc p WHERE p.oid = @function::regproc),
+                (SELECT p.proargmodes FROM pg_proc p WHERE p.oid = @function::regproc)) WITH ORDINALITY AS a(type, name, mode, position)
+            WHERE a.mode = 't' ORDER BY a.position
+            """;
+        Assert.Equal(["id uuid", "note_signed_at timestamp with time zone", "released_by text", "talked_about text", "found text", "next_steps text", "sensitive boolean"],
+            await AsSuperuserAsync(Columns, ("function", "ehr.standing_visit_summaries")));
+        Assert.Equal(["note_signed_at timestamp with time zone", "sensitive boolean"], await AsSuperuserAsync(Columns, ("function", "ehr.withdrawn_visit_summaries")));
     }
 
     // A proxy for the patient, with a portal account of their own, given access by the patient. The account and grant.
@@ -407,6 +428,11 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
     Task ChangeAsync(Guid user, string table, Guid id, bool sensitive, string reason = "Synthetic reason.") =>
         Accounts.ExecuteAsync(App, user, $"UPDATE ehr.{table} SET sensitive = @sensitive, sensitive_reason = @reason WHERE id = @id",
             ("id", id), ("sensitive", sensitive), ("reason", reason));
+
+    // The reasons the database gives an inherited mark and its clearing: never the words given for the note's or the
+    // addendum's change.
+    const string Inherited = "Its note or an addendum to the note is sensitive.";
+    const string Cleared = "Neither its note nor any addendum to the note is sensitive now.";
 
     // "sensitive inherited marked-by reason" of a summary.
     Task<List<string>> MarkOfAsync(Guid summary) => AsSuperuserAsync(
@@ -459,17 +485,17 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         {
             using (Accounts.ActingUnder(withoutGrant))
             {
-                return await Accounts.QueryAsync(App, without, "SELECT count(*)::text FROM ehr.visit_summaries");
+                return await Accounts.QueryAsync(App, without, "SELECT count(*)::text FROM ehr.standing_visit_summaries(100)");
             }
         }
 
         Assert.Equal(["1"], await ProxySeesAsync());
 
-        // 1. The note is marked: the summaries follow, inherited, with the note's reason, in the same statement, and the
-        //    proxy without sensitive items is given it no more.
+        // 1. The note is marked: the summaries follow, inherited, in the same statement, with the database's reason and
+        //    never the words given for the note, and the proxy without sensitive items is given it no more.
         await ChangeAsync(signer, "clinical_notes", note, sensitive: true, "Patient asked for it.");
-        Assert.Equal(["true true none Patient asked for it."], await MarkOfAsync(summary));
-        Assert.Equal(["true true none Patient asked for it."], await MarkOfAsync(withdrawn));
+        Assert.Equal([$"true true none {Inherited}"], await MarkOfAsync(summary));
+        Assert.Equal([$"true true none {Inherited}"], await MarkOfAsync(withdrawn));
         Assert.Equal(["0"], await ProxySeesAsync());
         // An inherited mark can't be taken off on its own, by anyone.
         foreach (var user in new[] { signer, colleague })
@@ -479,13 +505,13 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
 
         // 2. Unmarked: cleared, as nothing else of the note is sensitive.
         await ChangeAsync(signer, "clinical_notes", note, sensitive: false, "Marked the wrong note.");
-        Assert.Equal(["false false none Marked the wrong note."], await MarkOfAsync(summary));
-        Assert.Equal(["false false none Marked the wrong note."], await MarkOfAsync(withdrawn));
+        Assert.Equal([$"false false none {Cleared}"], await MarkOfAsync(summary));
+        Assert.Equal([$"false false none {Cleared}"], await MarkOfAsync(withdrawn));
         Assert.Equal(["1"], await ProxySeesAsync());
 
         // 3. An addendum marked on its own while the note isn't sensitive: the summary follows it.
         await ChangeAsync(colleague, "note_addenda", addendum, sensitive: true, "Names a relative.");
-        Assert.Equal(["true true none Names a relative."], await MarkOfAsync(summary));
+        Assert.Equal([$"true true none {Inherited}"], await MarkOfAsync(summary));
         Assert.Equal(["0"], await ProxySeesAsync());
         // The note marked and unmarked meanwhile: the addendum's own mark stands, so the summary's inherited one does.
         await ChangeAsync(signer, "clinical_notes", note, sensitive: true, "Patient asked for it.");
@@ -493,13 +519,13 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.StartsWith("true true ", (await MarkOfAsync(summary)).Single());
         // The addendum unmarked: the last source, so cleared.
         await ChangeAsync(colleague, "note_addenda", addendum, sensitive: false, "Not about a relative.");
-        Assert.Equal(["false false none Not about a relative."], await MarkOfAsync(summary));
+        Assert.Equal([$"false false none {Cleared}"], await MarkOfAsync(summary));
 
-        // 4. An addendum signed sensitive afterwards: the summary follows, with the database's reason.
+        // 4. An addendum signed sensitive afterwards: the summary follows.
         var later = await AddendumAsync(colleague, patient, note, sensitive: true);
-        Assert.Equal(["true true none An addendum to the note was signed as sensitive."], await MarkOfAsync(summary));
+        Assert.Equal([$"true true none {Inherited}"], await MarkOfAsync(summary));
         await ChangeAsync(colleague, "note_addenda", later, sensitive: false, "Signed so by mistake.");
-        Assert.Equal(["false false none Signed so by mistake."], await MarkOfAsync(summary));
+        Assert.Equal([$"false false none {Cleared}"], await MarkOfAsync(summary));
 
         // 5. Marked on its own by a clinician on the panel, with a reason; refused with none. Off the panel, an admin,
         //    the patient and nobody find no row to mark.
@@ -509,7 +535,7 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         }
 
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ChangeAsync(colleague, "visit_summaries", summary, sensitive: true, "   "));
-        Assert.Equal(["false false none Signed so by mistake."], await MarkOfAsync(summary));
+        Assert.Equal([$"false false none {Cleared}"], await MarkOfAsync(summary));
         await ChangeAsync(colleague, "visit_summaries", summary, sensitive: true, "Discussed something private.");
         Assert.Equal([$"true false {colleague} Discussed something private."], await MarkOfAsync(summary));
         Assert.Equal(["0"], await ProxySeesAsync());

@@ -3,6 +3,10 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Ehr.Data.Patients;
 
+// A standing visit summary as the portal is given it (ehr.standing_visit_summaries): its ID, the date of the note it was
+// written from, the name of who released it, its three parts and whether it is sensitive, and nothing else of it.
+public sealed record PortalVisitSummary(Guid Id, DateTimeOffset NoteSignedAt, string ReleasedBy, string TalkedAbout, string Found, string NextSteps, bool Sensitive);
+
 // A withdrawn visit summary as the portal is given it (ehr.withdrawn_visit_summaries): the date of the note it was
 // written from and whether it is sensitive, and nothing else of it.
 public sealed record WithdrawnVisitSummary(DateTimeOffset NoteSignedAt, bool Sensitive);
@@ -13,11 +17,34 @@ public sealed record VisitSummaryProblem(int Part, string Found, string Kind);
 
 // Asks the database about visit summaries (db/policies/52-visit-summaries.sql): its rule about the text, before one is
 // released, so the page can say what to change (the same rule refuses the row when it is inserted); once the caller
-// has withdrawn one, whether it had been viewed in the portal, so the patient can be told; and, for the portal, the
-// dates of the withdrawn ones the session may know of. Raw SQL, so it lives here (AGENTS.md); it runs in the caller's
-// transaction, where the user context is set.
+// has withdrawn one, whether it had been viewed in the portal, so the patient can be told; and, for the portal, which
+// reads no summary's row, the standing ones and the dates of the withdrawn ones the session may know of. Raw SQL, so it
+// lives here (AGENTS.md); it runs in the caller's transaction, where the user context is set.
 public static class VisitSummaryChecks
 {
+    // The standing summaries of the record the portal session is looking at, newest note first, up to the limit, under
+    // the patient's rule for sensitive items.
+    public static async Task<List<PortalVisitSummary>> StandingAsync(EhrDbContext db, int limit, CancellationToken cancellationToken)
+    {
+        var connection = db.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+        command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandText = "SELECT id, note_signed_at, released_by, talked_about, found, next_steps, sensitive FROM ehr.standing_visit_summaries(@limit)";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "limit";
+        parameter.Value = limit;
+        command.Parameters.Add(parameter);
+        var rows = new List<PortalVisitSummary>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new PortalVisitSummary(reader.GetGuid(0), reader.GetFieldValue<DateTimeOffset>(1), reader.GetString(2), reader.GetString(3),
+                reader.GetString(4), reader.GetString(5), reader.GetBoolean(6)));
+        }
+
+        return rows;
+    }
+
     // The withdrawn summaries of the record the portal session is looking at, newest first, under the rule a standing
     // one is read by: their dates and whether each is sensitive.
     public static async Task<List<WithdrawnVisitSummary>> WithdrawnAsync(EhrDbContext db, CancellationToken cancellationToken)

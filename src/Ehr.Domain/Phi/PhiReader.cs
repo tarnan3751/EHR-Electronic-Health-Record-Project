@@ -1044,13 +1044,13 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     public const string SummariesTable = "visit_summaries";
 
     // A patient's visit summaries for the portal (step 13a): the standing ones, newest note first, up to the limit, and
-    // the withdrawn ones as their dates alone. Row-level security returns the record the session is looking at and only
-    // what its rule allows: the patient's own sensitive ones, a proxy's only when the patient allowed sensitive items;
-    // a withdrawn summary's text never reaches the portal (ehr.withdrawn_visit_summaries gives its date). Sensitive ones
-    // are left out unless asked for, as everywhere: asking is recorded as a view of the patient's sensitive items, in
-    // place of the plain read. One recorded read of the patient, and a read of each summary shown, by which the database
-    // knows a withdrawn one had been viewed (Tahseen's decision of 21 November 2026). Null when the session may read no
-    // such patient.
+    // the withdrawn ones as their dates alone. The portal reads no summary's row: the database gives it, for the record
+    // the session is looking at, what of each a patient may see and only what the patient's rule allows: their own
+    // sensitive ones, a proxy's only when the patient allowed sensitive items (ehr.standing_visit_summaries and
+    // ehr.withdrawn_visit_summaries). Sensitive ones are left out unless asked for, as everywhere: asking is recorded as a
+    // view of the patient's sensitive items, in place of the plain read. One recorded read of the patient, and a read of
+    // each summary shown, by which the database knows a withdrawn one had been viewed (Tahseen's decision of 21 November
+    // 2026). Null when the session may read no such patient.
     public async Task<PatientVisitSummaries?> VisitSummariesAsync(Guid patientId, bool sensitive, int limit, CancellationToken cancellationToken)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
@@ -1059,11 +1059,10 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             return null;
         }
 
-        var standing = await SummaryEntries(db.VisitSummaries.Where(s => s.PatientId == patientId && s.WithdrawnAt == null)
-            .OrderByDescending(s => s.NoteSignedAt).ThenByDescending(s => s.ReleasedAt).ThenBy(s => s.Id).Take(limit)).ToListAsync(cancellationToken);
+        var standing = await VisitSummaryChecks.StandingAsync(db, limit, cancellationToken);
         var withdrawn = await VisitSummaryChecks.WithdrawnAsync(db, cancellationToken);
         var hidden = sensitive ? 0 : standing.Count(s => s.Sensitive) + withdrawn.Count(w => w.Sensitive);
-        List<VisitSummaryEntry> shown = sensitive ? standing : [.. standing.Where(s => !s.Sensitive)];
+        List<PortalVisitSummary> shown = sensitive ? standing : [.. standing.Where(s => !s.Sensitive)];
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
         if (shown.Count > 0)
         {

@@ -57,7 +57,7 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
             """
             SELECT ((SELECT count(*) FROM pg_trigger WHERE tgname IN ('clinical_notes_follow_summaries', 'note_addenda_follow_summaries', 'note_addenda_signed_follow_summaries'))
                 + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'ehr'::regnamespace AND proname IN ('follow_summary_sources', 'guard_visit_summary', 'reject_visit_summary_delete',
-                    'deliver_summary_withdrawn', 'withdrawn_visit_summaries', 'withdrawn_summary_was_viewed', 'visit_summary_problems', 'summary_sources_sensitive')))::text
+                    'deliver_summary_withdrawn', 'standing_visit_summaries', 'withdrawn_visit_summaries', 'withdrawn_summary_was_viewed', 'visit_summary_problems', 'summary_sources_sensitive')))::text
             """));
         // Nothing of step 10b is left behind for the older schema to carry.
         Assert.Equal(["0"], await AsSuperuserAsync(
