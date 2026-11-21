@@ -40,13 +40,14 @@ static partial class RecordViewTests
     public static string Shown(DateTimeOffset moment) => moment.UtcDateTime.ToString("MMM d, yyyy, HH:mm", CultureInfo.InvariantCulture) + " UTC";
 
     // A patient signed in to the portal, and a clinician who signed in before putting them on their panel, so that their
-    // signing in, which lists the panel, is no view of this patient: each test's lines are exactly the views it makes.
+    // signing in, which lists the panel, is no view of this patient: each test's lines are exactly the views it makes. On
+    // the panel by this machine's clock, as views are recorded, so a proxy without sensitive items is shown them.
     public static async Task<(StaffAccount Clinician, Session Session, ProxyTests.Person Patient)> ViewedPatientAsync(WebApps apps, string family)
     {
         var clinician = await apps.ClinicianAsync();
         var person = await ProxyTests.PersonAsync(apps, "Synthetic", family);
         var session = await SignInAsync(apps.OnPrem, clinician);
-        await apps.AssignAsync(clinician, person.Patient);
+        await AssignNowAsync(apps, clinician, person.Patient);
         return (clinician, session, person);
     }
 

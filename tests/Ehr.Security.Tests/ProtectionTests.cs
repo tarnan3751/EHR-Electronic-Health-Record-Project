@@ -9,7 +9,7 @@ namespace Ehr.Security.Tests;
 // like ExpectedPrivileges: changing one means changing both, and a reviewer sees both.
 public class ProtectionTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    enum Protection
+    internal enum Protection
     {
         // Row-level security enabled and forced, and every write recorded by trigger (db/policies/40-audit.sql).
         Phi,
@@ -21,7 +21,7 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         Internal,
     }
 
-    static readonly Dictionary<string, Protection> ExpectedProtection = new()
+    internal static readonly Dictionary<string, Protection> ExpectedProtection = new()
     {
         ["quick_texts"] = Protection.Internal,
         ["data_protection_keys"] = Protection.Internal,
