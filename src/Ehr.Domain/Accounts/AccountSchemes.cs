@@ -22,10 +22,14 @@ public static class AccountSchemes
     public const string Default = "Ehr";
 
     // Everything the patient portal serves lives under this path; the APIs under the other, where the default is the
-    // desktop app's token (dictation's policy names the staff cookie instead); and everything else is the clinic's.
+    // desktop app's token (dictation's policy names the staff cookie instead); and everything else is the clinic's,
+    // the FHIR API at FhirPath included, which takes the staff cookie like the clinic's pages.
     public const string PortalPath = "/portal";
 
     public const string ApiPath = "/api";
+
+    // The read-only FHIR API (Ehr.Web's Api/Fhir): refused, like the APIs, with a status rather than a redirect.
+    public const string FhirPath = "/fhir";
 
     public static string Select(HttpContext context) =>
         context.Request.Path.StartsWithSegments(PortalPath) ? Patient

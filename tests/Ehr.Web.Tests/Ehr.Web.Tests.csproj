@@ -12,6 +12,12 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Playwright" />
+    <!-- The FHIR API's answers checked against the R4 specification, offline (FhirConformance.cs). -->
+    <PackageReference Include="Hl7.Fhir.R4" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4" />
+    <PackageReference Include="Firely.Fhir.Validation.R4" />
+    <!-- UCUM, to check every unit the reference data and the seed record (UcumTests.cs). -->
+    <PackageReference Include="Fhir.Metrics" />
   </ItemGroup>
 
   <ItemGroup>

@@ -72,6 +72,10 @@ They flag synthetic values on a flowsheet. **They are not validated for clinical
 
 **Rights.** MedlinePlus is a US government work. The two *Pediatrics* articles are copyright American Academy of Pediatrics, StatPearls is CC BY-NC-ND 4.0, and the life-support text is the American Heart Association's. Nothing of theirs is copied here but the numbers, which are facts, each with its citation; no table is reproduced.
 
+### Units
+
+Every unit in `observation_codes` is UCUM's, and the synthetic seed records each result and vital sign in its code's own unit, so the FHIR API can send every seeded value with UCUM's system and code. `tests/Ehr.Web.Tests/UcumTests.cs` checks both with Fhir.Metrics, Firely's UCUM implementation. Until the plan's step 11 the seed wrote thyrotropin (3016-3) in "mIU/L", which isn't UCUM; it now writes "m[IU]/L", as the reference data always had (Tahseen's decision, 19 November 2026). A database seeded before that keeps "mIU/L" on those seeded results: nothing rewrites them, and the FHIR API sends that unit as text.
+
 ### How drug classes are joined to RxNorm
 
 The FDA's indexing files name a substance and its Established Pharmacologic Classes. DailyMed's two mapping files say which class files and which RxNorm products belong to each drug label. A label whose products have exactly one ingredient between them tells us that ingredient's classes; a class is kept when at least four in five of the ingredient's labels carry it. That gives classes for 1,413 ingredients. For an ingredient with no label of its own, such as one sold only in combinations, the class file's substance is matched through the FDA substance list's RxNorm column, which brings the total to 1,945 of RxNorm's 5,886 ingredients. The rest have no FDA class and get no class check. Classes are kept by name; the class files' own codes are MED-RT's and are not stored.
@@ -79,6 +83,21 @@ The FDA's indexing files name a substance and its Established Pharmacologic Clas
 ### Which classes cross-react
 
 Two rows, both from Khan DA, Banerji A, Blumenthal KG, et al. Drug allergy: a 2022 practice parameter update. *J Allergy Clin Immunol.* 2022;150(6):1333-1393: penicillins with cephalosporins, and penicillins with carbapenems. A class always cross-reacts with itself. Adding a row needs a published source.
+
+## Systems the FHIR API names
+
+The FHIR API (the plan's step 11, `docs/UC19.md`) sends each code with its system's canonical FHIR address:
+
+| Codes | System |
+| --- | --- |
+| RxNorm (medications, drug allergens) | `http://www.nlm.nih.gov/research/umls/rxnorm` |
+| FDA UNII (other allergens) | `http://fdasis.nlm.nih.gov` |
+| ICD-10-CM (diagnoses) | `http://hl7.org/fhir/sid/icd-10-cm` |
+| LOINC (results, vital signs) | `http://loinc.org` |
+| UCUM (units) | `http://unitsofmeasure.org` |
+| The clinic's medical record numbers | `http://swiftchart.example/fhir/sid/mrn`, the clinic's own (Tahseen's decision, 19 November 2026), with the identifier type MR from `http://terminology.hl7.org/CodeSystem/v2-0203` |
+
+"No known allergy" has the app's own marker for a code, which has no system, so it is sent as text alone.
 
 ## Licenses and attribution
 

@@ -9,6 +9,7 @@ using Ehr.Web;
 using Ehr.Web.Api.Audit;
 using Ehr.Web.Api.Desktop;
 using Ehr.Web.Api.Dictation;
+using Ehr.Web.Api.Fhir;
 using Ehr.Web.Api.Sync;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Email;
@@ -183,8 +184,10 @@ if (site == Site.Cloud)
     app.UseMiddleware<CloudForwardingMiddleware>();
 }
 
-// A page that fails says so, after forwarding, so forwarded responses pass by untouched (ErrorPages).
+// A page that fails says so, after forwarding, so forwarded responses pass by untouched (ErrorPages). The FHIR API's
+// refusals and failures are OperationOutcomes instead (Api/Fhir).
 app.UseErrorPages();
+app.UseFhirErrors();
 if (site == Site.Cloud)
 {
     // A request's audit events reach the disk before any of its response is sent; if they can't, the error pages
@@ -209,6 +212,11 @@ if (site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Leng
 {
     app.MapCloudAudit(CloudAuditKey.FromConfiguration(builder.Configuration));
 }
+
+// The read-only FHIR R4 API, for clinicians, with the staff cookie: the whole group takes the Clinician policy, and
+// each patient the chart's gate (Api/Fhir). Both apps map it; off-site it reads the cloud copy, and its reads are
+// recorded in the cloud app's audit queue, as the pages' are.
+app.MapFhirApi().RequireAuthorization(EhrPolicies.Clinician);
 
 // Dictation, for clinicians in the browser, with the staff cookie. Only the on-prem app maps it; the cloud app
 // forwards it there, as it does every POST and DELETE (Api/Dictation).
