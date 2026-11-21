@@ -1087,33 +1087,42 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // how many there are in all; none entered in error. A blood pressure is one entry, its reading (step 9c): the
     // systolic value, with the diastolic of the same reading beside it, paired here by the reading's ID, never by time;
     // so the limit and the total count a reading once. The database holds a reading to one standing systolic and one
-    // standing diastolic, taken at one time, or both in error (75-results.sql). Each value says whether its unit is its
-    // code's UCUM unit.
+    // standing diastolic, taken at one time, or both in error (75-results.sql). What makes a value a reading's is its
+    // reading ID, not its code: a laboratory row may carry a blood pressure code with no reading (ck_observations_reading
+    // ties the two codes to readings among vital signs only), and is an entry like any other. Each value says whether its
+    // unit is its code's UCUM unit.
     public async Task<PatientEntries<ObservationEntry>> ObservationsAsync(
         Guid patientId, Guid? only, string? category, int limit, CancellationToken cancellationToken)
     {
         var matching = (only is { } id ? ObservationById(id) : db.Observations).AsNoTracking()
             .Where(o => o.PatientId == patientId && (category == null || o.Category == category) && o.Status != ObservationStatus.EnteredInError);
         // A search reads the patient's rows alone, by their index, both values of a reading among them, and twice the
-        // limit of them, since an entry is at most two rows. A diastolic comes before its systolic (same time, and its
-        // code sorts first), so the rows read never hold a reading's systolic without its diastolic. Nothing is joined:
-        // a join to the diastolics, on a key no index answered, read all of them for each request (step 11's benchmark).
+        // limit of them, since an entry is one row, or two for a reading. A reading's diastolic comes before its systolic
+        // (same time, and its code sorts first), so the rows read never hold a reading's systolic without its diastolic,
+        // and only a diastolic of the last moment read can be there without its systolic. A moment has one standing
+        // reading (75-results.sql), so the diastolics read are at most one more than the systolics, and of 2 x limit rows
+        // at least the limit are entries. Nothing is joined: a join to the diastolics, on a key no index answered, read
+        // all of them for each request (step 11's benchmark).
         var rows = await (only is null ? matching.OrderByDescending(o => o.EffectiveAt).ThenBy(o => o.Code).ThenBy(o => o.Id).Take(2 * limit) : matching)
             .Select(o => new { Value = o, Ucum = db.ObservationCodes.Any(c => c.Code == o.Code && c.Unit == o.Unit) })
             .ToListAsync(cancellationToken);
         var diastolics = rows.Where(row => row.Value.ReadingId is not null && row.Value.Code == VitalSign.Diastolic)
             .ToDictionary(row => row.Value.ReadingId!.Value, row => new ObservationEntry(row.Value, row.Ucum));
-        var all = rows.Where(row => row.Value.Code != VitalSign.Diastolic).Select(row => new ObservationEntry(row.Value, row.Ucum)
-        {
-            // Only a diastolic standing as its systolic stands: the database keeps a reading whole, and this keeps the
-            // read from ever pairing a systolic with a diastolic in another state.
-            Diastolic = row.Value.ReadingId is { } reading && diastolics.TryGetValue(reading, out var diastolic)
-                && diastolic.Observation.Status == row.Value.Status ? diastolic : null,
-        }).ToList();
+        var all = rows.Where(row => row.Value.ReadingId is null || row.Value.Code != VitalSign.Diastolic)
+            .Select(row => new ObservationEntry(row.Value, row.Ucum)
+            {
+                // Only a diastolic standing as its systolic stands: the database keeps a reading whole, and this keeps
+                // the read from ever pairing a systolic with a diastolic in another state.
+                Diastolic = row.Value.ReadingId is { } reading && diastolics.TryGetValue(reading, out var diastolic)
+                    && diastolic.Observation.Status == row.Value.Status ? diastolic : null,
+            })
+            // A reading without both its values is left out here, so nothing is recorded as read that the API can't send.
+            .Where(entry => entry.Observation.ReadingId is null || entry.Diastolic is not null)
+            .ToList();
         // How many there are in all is asked for only when the limit may have cut the rows: never for one entry read by
         // its ID, which is all there can be. Each row but a reading's diastolic is an entry, so the count is of one table.
         var total = only is not null || rows.Count < 2 * limit ? all.Count
-            : await matching.CountAsync(o => o.Code == null || o.Code != VitalSign.Diastolic, cancellationToken);
+            : await matching.CountAsync(o => o.ReadingId == null || o.Code != VitalSign.Diastolic, cancellationToken);
         return await RecordAsync(patientId, only, new PatientEntries<ObservationEntry>([.. all.Take(limit)], total), sensitive: false, cancellationToken);
     }
 

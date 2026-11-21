@@ -1,3 +1,4 @@
+using System.Net;
 using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
@@ -14,7 +15,8 @@ using R4 = Hl7.Fhir.Model;
 namespace Ehr.Web.Tests;
 
 // The FHIR API's reads (the expansion plan's step 11) below what the test cases check: what one read by ID costs the
-// database, and the order each kind of entry comes in, which the capability statement states.
+// database, the order each kind of entry comes in, which the capability statement states, and what a blood pressure
+// code on a row that is no reading's value is.
 public class FhirReaderTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -116,5 +118,83 @@ public class FhirReaderTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["Synthetic: onset 2024", "Synthetic: onset 2020", "Synthetic: no onset"], conditionsFound.Select(c => c.Code!.Text));
         var (_, allergies, _) = Searched<R4.AllergyIntolerance>(await GetAsync(session.Client, $"/fhir/AllergyIntolerance?patient={patient}"));
         Assert.Equal(["Synthetic: recorded 2024", "Synthetic: recorded 2021"], allergies.Select(a => a.Code!.Text));
+    }
+
+    // A blood pressure code makes no reading. A laboratory row can carry one with no reading ID, as a lab interface may
+    // send it (ck_observations_reading ties the two codes to readings among vital signs only): it is an observation like
+    // any other, an entry of its own, counted, read by its own ID and sent as itself, laboratory, claiming no profile.
+    // Only a reading's diastolic is no entry, being part of its systolic's. The review's probe: two readings and a newer
+    // laboratory diastolic, searched with limits of 1 and 2, came back with no entry and a total of 2; and a laboratory
+    // systolic read by its ID was recorded as read and then not found.
+    [Fact]
+    public async Task A_blood_pressure_code_on_a_row_with_no_reading_is_an_observation_of_its_own()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Fhir Laboratory", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Synthetic", "Fhirlaboratory");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        foreach (var (minutesAgo, systolic, diastolic) in new[] { (90, "131", "85"), (60, "122", "79") })
+        {
+            using var recorded = await VitalTests.RecordAsync(session.Client, patient, minutesAgo, (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic));
+            Assert.Equal(VitalTests.Path(patient), PathOf(recorded));
+        }
+
+        // The newer reading first.
+        var readings = (await ProxyTests.QueryAsync(apps,
+            "SELECT reading_id::text FROM ehr.observations WHERE patient_id = @patient AND code = '8480-6' AND reading_id IS NOT NULL ORDER BY effective_at DESC", patient))
+            .Select(Guid.Parse).ToList();
+        var readingsDiastolic = Guid.Parse((await ProxyTests.QueryAsync(apps,
+            "SELECT id::text FROM ehr.observations WHERE patient_id = @patient AND code = '8462-4' AND reading_id IS NOT NULL ORDER BY effective_at DESC LIMIT 1", patient)).Single());
+        var now = DateTimeOffset.UtcNow;
+        var newest = now.AddMinutes(-10);
+        var oldest = now.AddHours(-3);
+        var laboratoryDiastolic = await apps.InsertResultAsync(patient, "Diastolic blood pressure", VitalSign.Diastolic, 78m, "mm[Hg]", 60m, 80m, newest, newest);
+        var laboratorySystolic = await apps.InsertResultAsync(patient, "Systolic blood pressure", VitalSign.Systolic, 119m, "mm[Hg]", 90m, 120m, oldest, oldest);
+        Guid[] expected = [laboratoryDiastolic, readings[0], readings[1], laboratorySystolic];
+
+        // In the reader, at each limit: each entry by the ID the API sends it under.
+        var user = new UserContext { UserId = clinician.Id };
+        var options = new DbContextOptionsBuilder<EhrDbContext>();
+        EhrDbContext.Configure(options, apps.Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+        options.AddInterceptors(new UserContextInterceptor(user));
+        await using (var db = new EhrDbContext(options.Options))
+        {
+            var reader = new PhiReader(db, new AuditRecorder(db, user, new AuditSource(AuditSources.OnPrem)), user);
+            await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+            foreach (var limit in new[] { 1, 2, 3, 4, 600 })
+            {
+                var read = await reader.ObservationsAsync(patient, only: null, category: null, limit, Cancel);
+                Assert.Equal(expected.Take(limit), read.Entries.Select(entry => entry.Observation.ReadingId ?? entry.Observation.Id));
+                Assert.Equal(4, read.Total);
+            }
+
+            foreach (var laboratory in new[] { laboratoryDiastolic, laboratorySystolic })
+            {
+                Assert.Equal(patient, await reader.EntryPatientAsync("observations", laboratory, sensitive: false, Cancel));
+                Assert.Equal(laboratory, Assert.Single((await reader.ObservationsAsync(patient, laboratory, category: null, 1, Cancel)).Entries).Observation.Id);
+            }
+
+            await transaction.RollbackAsync(Cancel);
+        }
+
+        // Through the API: the search sends all four, the laboratory rows as themselves; the laboratory systolic is read
+        // by its own ID; a reading's diastolic by its own ID is still not found, and is not recorded as read.
+        var before = await ReadsAsync(apps, clinician.Id, patient);
+        var (bundle, found, _) = Searched<R4.Observation>(await GetAsync(session.Client, $"/fhir/Observation?patient={patient}"));
+        Assert.Equal(4, bundle.Total);
+        Assert.Equal(expected.Select(id => id.ToString()), found.Select(observation => observation.Id));
+        var laboratorySystolicRead = FhirConformance.Valid<R4.Observation>(
+            Expect(await GetAsync(session.Client, $"/fhir/Observation/{laboratorySystolic}"), HttpStatusCode.OK).Json);
+        foreach (var laboratory in new[] { found[0], found[3], laboratorySystolicRead })
+        {
+            Assert.Equal("laboratory", laboratory.Category.Single().Coding.Single().Code);
+            Assert.Empty(laboratory.Meta?.Profile ?? []);
+            Assert.Empty(laboratory.Component);
+            Assert.IsType<R4.Quantity>(laboratory.Value);
+        }
+
+        Assert.Equal((laboratorySystolic.ToString(), VitalSign.Systolic), (laboratorySystolicRead.Id, laboratorySystolicRead.Code.Coding.Single().Code));
+        Refused(await GetAsync(session.Client, $"/fhir/Observation/{readingsDiastolic}"), HttpStatusCode.NotFound, "not-found");
+        Assert.Equal((before.Reads + 2, before.Sensitive), await ReadsAsync(apps, clinician.Id, patient));
     }
 }

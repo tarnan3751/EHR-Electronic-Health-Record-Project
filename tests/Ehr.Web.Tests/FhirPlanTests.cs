@@ -22,7 +22,8 @@ namespace Ehr.Web.Tests;
 // send is EXPLAINed as it is sent, as ehr_app with a clinician in context: first with the statistics cleared, as after
 // a bulk load nobody analyzed, then analyzed. None may read the whole of a table the seed filled. The plan is checked
 // rather than a time, so the test holds on any machine however busy, and that join showed as a sequential scan at any
-// size.
+// size. Its one limit: it looks for sequential scans and nothing else. A plan that reads a whole table some other way,
+// such as a full index scan or an index probed once for each of many rows, passes it; the benchmark times the reads.
 public class FhirPlanTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const int Patients = 10_000;

@@ -19,7 +19,8 @@ namespace Ehr.Web.Api.Fhir;
 // unit and reference range, as the other vital signs have theirs. Its ID is the reading's, which the database gives the
 // two values entered together; neither value is an Observation of its own, and a read by either value's ID finds
 // nothing. The PHI reader brings the two together by that ID, never by time (PhiReader.ObservationsAsync), and the
-// reading is a BloodPressure, as the pages have it.
+// reading is a BloodPressure, as the pages have it. A row with a blood pressure code and no reading, which only a
+// laboratory row can be, is an Observation like any other: under its own ID and category, claiming no profile.
 internal static class FhirObservations
 {
     // LOINC's blood pressure panel, the code R4's bp profile requires.
@@ -46,11 +47,11 @@ internal static class FhirObservations
     // The profiles vital signs claim, for the capability statement's supportedProfile.
     public static IEnumerable<string> Profiles => VitalSignProfiles.Values.Distinct();
 
-    // Each entry as an Observation, with its ID: a blood pressure's is its reading's. A blood pressure value without the
-    // other value of its reading is left out, never sent alone under its own ID: the database keeps readings whole, so
-    // this is a guard against what can't be stored, not a case that happens.
+    // Each entry as an Observation, with its ID: a blood pressure's is its reading's. A value of a reading without the
+    // other value is left out, never sent alone under its own ID: the database keeps readings whole, and the reader
+    // leaves such a reading out, so this is a guard against what can't be stored, not a case that happens.
     public static IReadOnlyList<(Guid Id, FhirObservation Resource)> Map(IEnumerable<ObservationEntry> entries) =>
-        [.. entries.Where(entry => entry.Diastolic is not null || !VitalSign.BloodPressure.Contains(entry.Observation.Code))
+        [.. entries.Where(entry => entry.Diastolic is not null || entry.Observation.ReadingId is null)
             .Select(entry => entry.Diastolic is { } diastolic
                 ? (entry.Observation.ReadingId!.Value, Reading(entry, diastolic))
                 : (entry.Observation.Id, Map(entry)))];
