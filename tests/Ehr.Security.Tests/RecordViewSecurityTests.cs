@@ -223,6 +223,8 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         await EventAsync(patient, clinician, "read", "note_addenda", 13);
         await EventAsync(patient, clinician, "read", "messages", 14);
         await EventAsync(patient, clinician, "read", "made_up_table", 15);
+        // A pre-visit form (step 13e), a sensitive item always.
+        await EventAsync(patient, clinician, "read", "questionnaire_responses", 16);
 
         const string Mine = "you|||record|false|false";
         string[] staff = ["staff|Dr. Alder|clinician|record|false|false"];
@@ -233,16 +235,17 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         string[] outside = ["staff|Dr. Birch|clinician|record|false|false", "staff|Dr. Cedar|clinician|record|true|false"];
         const string Addendum = "staff|Dr. Alder|clinician|note|false|false";
         const string Unnamed = "staff|Dr. Alder|clinician|record|false|false";
+        const string Form = "staff|Dr. Alder|clinician|form|false|false";
         foreach (var connection in new[] { App, Read })
         {
-            Assert.Equal([.. staff, .. sensitive, .. messages, .. markedAndDownloaded, .. lab, Mine, "you|||views|false|false", .. outside, Addendum, .. messages, Unnamed],
+            Assert.Equal([.. staff, .. sensitive, .. messages, .. markedAndDownloaded, .. lab, Mine, "you|||views|false|false", .. outside, Addendum, .. messages, Unnamed, Form],
                 await ViewsAsync(connection, full.Account, full.Grant));
             // No sensitive items: no line for a view of them, nor for a note or an addendum, nor for anything marked
             // sensitive, nor for a staff member who didn't have the patient on their panel then (emergency access
-            // included), nor for a part the rule doesn't name.
+            // included), nor for a part the rule doesn't name, nor for a pre-visit form.
             Assert.Equal([.. staff, .. messages, .. lab, Mine, .. messages], await ViewsAsync(connection, plain.Account, plain.Grant));
             // No messages: no line for a conversation or a message.
-            Assert.Equal([.. staff, .. sensitive, .. markedAndDownloaded, .. lab, Mine, .. outside, Addendum, Unnamed],
+            Assert.Equal([.. staff, .. sensitive, .. markedAndDownloaded, .. lab, Mine, .. outside, Addendum, Unnamed, Form],
                 await ViewsAsync(connection, recordOnly.Account, recordOnly.Grant));
             // Nothing at all for access that ended, a grant named by someone it isn't addressed to, another patient
             // acting under it, a proxy-only account on its own, a clinician (even with the patient on their panel), an
@@ -805,6 +808,8 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         Assert.True(unnamed.Count == 0, "Name these tables in ehr.record_view_part (db/policies/42-record-views.sql): " + string.Join(", ", unnamed));
         Assert.Equal(["none"], await AsSuperuserAsync("SELECT coalesce(ehr.record_view_part('read', 'made_up_table'), 'none')"));
         Assert.Equal(["note messages"], await AsSuperuserAsync("SELECT ehr.record_view_part('read', 'note_addenda') || ' ' || ehr.record_view_part('read', 'messages')"));
+        Assert.Equal(["form form"], await AsSuperuserAsync(
+            "SELECT ehr.record_view_part('read', 'questionnaire_requests') || ' ' || ehr.record_view_part('read', 'questionnaire_responses')"));
 
         // Only its owner runs it, inside ehr.record_views.
         Assert.Equal(["false false false"], await AsSuperuserAsync(

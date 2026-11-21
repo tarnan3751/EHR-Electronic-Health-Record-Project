@@ -19,6 +19,9 @@ AS $$
         WHEN table_name = 'visit_summaries' THEN 'summary'
         WHEN table_name IN ('message_threads', 'messages') THEN 'messages'
         WHEN table_name IN ('clinical_notes', 'note_addenda', 'clinical_drafts', 'ai_note_reviews', 'ai_field_proposals') THEN 'note'
+        -- Pre-visit forms (step 13e), sensitive items always: a part of their own, which a proxy without sensitive items
+        -- is never shown a view of.
+        WHEN table_name IN ('questionnaire_requests', 'questionnaire_responses') THEN 'form'
         -- The rest of the chart, and what the clinic keeps about the patient: the record, until step 13c2. A refill
         -- request (step 13d) has no read of its own: its pages record a read of the patient. Should one be recorded,
         -- step 13c2 names its part, hidden from a proxy whose access doesn't include messages, as asking is.

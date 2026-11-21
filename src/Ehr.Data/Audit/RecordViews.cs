@@ -45,6 +45,9 @@ public static class RecordViewParts
     public const string Download = "download";
     public const string DownloadSensitive = "download-sensitive";
     public const string Note = "note";
+
+    // A pre-visit form (step 13e).
+    public const string Form = "form";
     public const string Summary = "summary";
     public const string Messages = "messages";
     public const string LabOrder = "lab-order";

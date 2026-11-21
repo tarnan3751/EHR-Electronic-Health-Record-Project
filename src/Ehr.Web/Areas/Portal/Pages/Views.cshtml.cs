@@ -139,6 +139,7 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
         [RecordViewParts.DownloadSensitive] = ("Your record, downloaded with its sensitive items", "The record, downloaded with its sensitive items",
             "Your record, downloaded with its sensitive items {0} times", "The record, downloaded with its sensitive items {0} times"),
         [RecordViewParts.Note] = ("A visit note", "A visit note", "{0} visit notes", "{0} visit notes"),
+        [RecordViewParts.Form] = ("A pre-visit form", "A pre-visit form", "{0} pre-visit forms", "{0} pre-visit forms"),
         [RecordViewParts.Summary] = ("A visit summary", "A visit summary", "{0} visit summaries", "{0} visit summaries"),
         [RecordViewParts.Messages] = ("A conversation in your messages", "A conversation in the messages",
             "{0} conversations in your messages", "{0} conversations in the messages"),
