@@ -163,17 +163,22 @@ public sealed class SyntheticClinic
                 // Drawn only when taken, in this order, as before.
                 var diastolic = vitals ? systolic - random.Next(38, 56) : 0;
                 var heartRate = vitals ? random.Next(55, 101) : 0;
-                // A child's blood pressure is lower and heart rate faster (step 9b): what was drawn is shifted for the
-                // age band on the day of the visit, with nothing more drawn, so the rest of the chart comes out the same.
-                var (pressureDown, gapDown, rateUp) = AgeBand.Of(AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(start.UtcDateTime))) switch
+                // A child's values come from the same draws, with nothing more drawn, so the rest of the chart comes out
+                // the same, shaped for the child's ranges on the day of the visit (steps 9b and 9d): a heart rate inside
+                // Fleming's centiles for their age; from 1 year, a blood pressure below the AAP's screening value for
+                // their age and sex, which only the highest draws (about one in ten) and a child with high blood
+                // pressure reach; under 1 year, where no range applies, the blood pressure lowered as before.
+                var months = AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(start.UtcDateTime));
+                var band = AgeBand.Of(months);
+                if (vitals && band != AgeBand.Adult)
                 {
-                    AgeBand.Infant => (30, 12, 55),
-                    AgeBand.YoungChild => (18, 8, 35),
-                    AgeBand.OlderChild => (10, 4, 20),
-                    AgeBand.Adolescent => (4, 0, 5),
-                    _ => (0, 0, 0),
-                };
-                (systolic, diastolic, heartRate) = (systolic - pressureDown, diastolic - pressureDown + gapDown, heartRate + rateUp);
+                    var (rateLow, rateHigh, _) = VitalRanges.For(VitalSign.HeartRate, months, patient.Gender)!.Value;
+                    heartRate = (int)(rateLow!.Value + ((rateHigh!.Value - rateLow.Value) * (heartRate - 50) / 56));
+                    (systolic, diastolic) = band == AgeBand.Infant
+                        ? (systolic - 30, diastolic - 18)
+                        : ((int)VitalRanges.For(VitalSign.Systolic, months, patient.Gender)!.Value.High!.Value - 17 + ((systolic - 102) * 2 / 3),
+                            (int)VitalRanges.For(VitalSign.Diastolic, months, patient.Gender)!.Value.High!.Value - 12 + ((diastolic - 47) / 3));
+                }
                 return (Visit: visit, Vitals: vitals ? new[] { (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic), (VitalSign.HeartRate, heartRate) } : []);
             })
             .ToList();
@@ -185,21 +190,23 @@ public sealed class SyntheticClinic
             // The visit's blood pressure is one reading (step 9c): its ID from a generator seeded by the visit's other
             // half, so no other ID shifts.
             var reading = Uuid7(visit.Visit.PeriodStart, new SplitMix64(BitConverter.ToUInt64(visit.Visit.Id.ToByteArray(), 0)));
-            return visit.Vitals.Select(vital => new Observation
+            // The range for the patient's age on the day, and sex (steps 9b and 9d), as the database gives a recorded one.
+            var months = AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(visit.Visit.PeriodStart.UtcDateTime));
+            return visit.Vitals.Select(vital => (Vital: vital, Range: VitalRanges.For(vital.Item1, months, patient.Gender))).Select(vital => new Observation
             {
                 Id = Uuid7(visit.Visit.PeriodStart, ids),
                 PatientId = patientId,
                 EncounterId = visit.Visit.Id,
-                ReadingId = VitalSign.BloodPressure.Contains(vital.Item1) ? reading : null,
+                ReadingId = VitalSign.BloodPressure.Contains(vital.Vital.Item1) ? reading : null,
                 Category = ObservationCategory.VitalSigns,
-                Code = vital.Item1,
-                Display = VitalSigns[vital.Item1].Display,
+                Code = vital.Vital.Item1,
+                Display = VitalSigns[vital.Vital.Item1].Display,
                 Status = ObservationStatus.Final,
-                Value = vital.Item2,
-                Unit = VitalSigns[vital.Item1].Unit,
-                // The range for the patient's age on the day (step 9b), as the database gives a recorded one.
-                ReferenceLow = VitalRanges.For(vital.Item1, AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(visit.Visit.PeriodStart.UtcDateTime)))?.Low,
-                ReferenceHigh = VitalRanges.For(vital.Item1, AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(visit.Visit.PeriodStart.UtcDateTime)))?.High,
+                Value = vital.Vital.Item2,
+                Unit = VitalSigns[vital.Vital.Item1].Unit,
+                ReferenceLow = vital.Range?.Low,
+                ReferenceHigh = vital.Range?.High,
+                ReferenceKind = vital.Range?.Kind ?? ReferenceKind.Normal,
                 EffectiveAt = visit.Visit.PeriodStart,
                 IssuedAt = visit.Visit.PeriodStart,
             });

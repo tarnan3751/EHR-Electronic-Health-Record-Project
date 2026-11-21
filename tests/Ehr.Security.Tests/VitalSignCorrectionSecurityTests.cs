@@ -188,12 +188,15 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         Assert.Contains($"{BodyMassIndex} 24.4 final none none none", await StateAsync(patient));
     }
 
+    // Steps 9b and 9d: Fleming's centiles for heart rate, the AAP's Table 6 for a child's blood pressure (a screening
+    // value; none under 1 year), the adults' ranges from 18. The patient's sex is unknown, so a child's blood pressure
+    // is held to the lower of the boys' and girls' values.
     [Theory]
-    [InlineData(4, AgeBand.Infant, "91-186", "70-none", "none-none")]
-    [InlineData(40, AgeBand.YoungChild, "66-173", "72-103", "none-63")]
-    [InlineData(100, AgeBand.OlderChild, "56-155", "82-110", "none-73")]
-    [InlineData(180, AgeBand.Adolescent, "48-138", "90-119", "none-79")]
-    [InlineData(480, AgeBand.Adult, "60-100", "90-129", "60-79")]
+    [InlineData(4, AgeBand.Infant, "104-175 normal", "none-none normal", "none-none normal")]
+    [InlineData(40, AgeBand.YoungChild, "70-136 normal", "none-101 screening", "none-58 screening")]
+    [InlineData(100, AgeBand.OlderChild, "52-115 normal", "none-107 screening", "none-69 screening")]
+    [InlineData(180, AgeBand.Adolescent, "43-104 normal", "none-120 screening", "none-80 screening")]
+    [InlineData(480, AgeBand.Adult, "60-100 normal", "90-129 normal", "60-79 normal")]
     public async Task A_vital_sign_gets_the_reference_range_for_the_patients_age_on_the_day_it_was_taken(int months, string band, string heartRate, string systolic, string diastolic)
     {
         Assert.Equal(band, AgeBand.Of(months));
@@ -206,41 +209,43 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         // Temperature has one range at every age.
         await RecordAsync(clinician, patient, "8310-5", 37m);
 
-        Assert.Equal([$"8310-5 36.1-37.5", $"{Diastolic} {diastolic}", $"{Systolic} {systolic}", $"{HeartRate} {heartRate}"], await AsSuperuserAsync(
-            "SELECT code || ' ' || coalesce(trim_scale(reference_low)::text, 'none') || '-' || coalesce(trim_scale(reference_high)::text, 'none') FROM ehr.observations WHERE patient_id = @patient ORDER BY code",
-            ("patient", patient)));
+        Assert.Equal([$"8310-5 36.1-37.5 normal", $"{Diastolic} {diastolic}", $"{Systolic} {systolic}", $"{HeartRate} {heartRate}"], await AsSuperuserAsync(
+            """
+            SELECT code || ' ' || coalesce(trim_scale(reference_low)::text, 'none') || '-' || coalesce(trim_scale(reference_high)::text, 'none') || ' ' || reference_kind
+            FROM ehr.observations WHERE patient_id = @patient ORDER BY code
+            """, ("patient", patient)));
     }
 
     // The age is the one on the day the sign was taken, not today's: a reading from before a birthday keeps the
-    // younger band's range.
+    // younger age's range.
     [Fact]
-    public async Task The_age_band_is_the_one_on_the_day_the_sign_was_taken()
+    public async Task The_age_is_the_one_on_the_day_the_sign_was_taken()
     {
         var (clinician, patient) = await OnPanelAsync();
-        // Six years and a month old today: an older child now, a young child two months ago.
+        // Six years and a month old today, in Fleming's 6 to 8 years; two months ago in its 4 to 6 years.
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             "UPDATE ehr.patients SET birth_date = (now() - interval '6 years 1 month')::date WHERE id = @patient", ("patient", patient));
 
         await RecordAsync(clinician, patient, HeartRate, 90m, DateTime.UtcNow.AddDays(-62));
         await RecordAsync(clinician, patient, HeartRate, 90m);
 
-        Assert.Equal(["66-173", "56-155"], await AsSuperuserAsync(
+        Assert.Equal(["65-131", "59-123"], await AsSuperuserAsync(
             "SELECT trim_scale(reference_low) || '-' || trim_scale(reference_high) FROM ehr.observations WHERE patient_id = @patient ORDER BY effective_at", ("patient", patient)));
     }
 
     // db/reference/35-vital-ranges.sql and Ehr.Data.Reference.VitalRanges (which the seed uses) are the same rows.
+    // VitalRangeSecurityTests holds both to the published tables.
     [Fact]
     public async Task The_reference_file_and_the_ranges_in_code_are_the_same()
     {
-        var ages = AgeBand.Ages.ToDictionary(age => age.Band);
         var expected = VitalRanges.All
-            .Select(r => $"{r.Code} {r.Band} {ages[r.Band].FromMonths} {ages[r.Band].ToMonths?.ToString() ?? "none"} {r.Low?.ToString("0") ?? "none"} {r.High?.ToString("0") ?? "none"} {r.Source}")
+            .Select(r => $"{r.Code} {r.Sex} {r.FromMonths} {r.ToMonths?.ToString() ?? "none"} {r.Low?.ToString("0") ?? "none"} {r.High?.ToString("0") ?? "none"} {r.Kind} {r.Source}")
             .Order(StringComparer.Ordinal);
 
         Assert.Equal(expected, (await AsSuperuserAsync(
             """
-            SELECT code || ' ' || band || ' ' || from_months || ' ' || coalesce(to_months::text, 'none') || ' ' || coalesce(trim_scale(low)::text, 'none') || ' '
-                || coalesce(trim_scale(high)::text, 'none') || ' ' || source
+            SELECT code || ' ' || sex || ' ' || from_months || ' ' || coalesce(to_months::text, 'none') || ' ' || coalesce(trim_scale(low)::text, 'none') || ' '
+                || coalesce(trim_scale(high)::text, 'none') || ' ' || kind || ' ' || source
             FROM ehr.vital_reference_ranges
             """)).Order(StringComparer.Ordinal));
     }

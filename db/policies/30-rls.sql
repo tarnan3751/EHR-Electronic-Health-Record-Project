@@ -438,6 +438,13 @@ CREATE POLICY observations_panel_update ON ehr.observations FOR UPDATE
 DROP POLICY IF EXISTS observations_owner_select ON ehr.observations;
 CREATE POLICY observations_owner_select ON ehr.observations FOR SELECT TO ehr_owner USING (true);
 
+-- A check-in ties the vital signs already recorded to the visit it starts (step 9c's follow-up,
+-- ehr.attach_vital_signs in 75-results.sql), as the table's owner, which forced row-level security binds too: this
+-- lets it change them. The owner's alone, as above; the function changes only the visit, and the apps' roles can't
+-- call it or change a visit themselves.
+DROP POLICY IF EXISTS observations_owner_update ON ehr.observations;
+CREATE POLICY observations_owner_update ON ehr.observations FOR UPDATE TO ehr_owner USING (true) WITH CHECK (true);
+
 -- Acknowledgments of results (PHI). Clinicians read them, as they read the orders; a clinician with the patient on
 -- their active panel makes one, as themselves. Patients, admins and nobody see none. Never updated or deleted.
 ALTER TABLE ehr.result_acknowledgments ENABLE ROW LEVEL SECURITY;

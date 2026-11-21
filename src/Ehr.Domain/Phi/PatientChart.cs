@@ -105,6 +105,9 @@ public sealed record LatestVital(string Code, string Display, decimal Value, str
     // The reading before this one, when the chart's query held one (step 9b): for the up or down mark.
     public decimal? Previous { get; init; }
 
+    // What its range is (ReferenceKind): a child's blood pressure is a screening value (step 9d).
+    public string ReferenceKind { get; init; } = Data.Patients.ReferenceKind.Normal;
+
     // For a blood pressure, which is one reading (step 9c): this is its systolic, and this the diastolic of the same
     // reading, with the diastolic of the reading before.
     public LatestVital? Diastolic { get; init; }
@@ -130,9 +133,10 @@ public sealed record LatestVital(string Code, string Display, decimal Value, str
 
     public string PreviousShown => Diastolic is null ? $"{Previous:0.#}" : $"{Previous:0.#}/{Diastolic.Previous:0.#}";
 
-    public bool IsHigh => Value > ReferenceHigh || Diastolic?.Value > Diastolic?.ReferenceHigh;
+    // Its flags, each once, a blood pressure's systolic first: "High", "Low" or "Needs follow-up" (VitalFlag).
+    public IReadOnlyList<string> Flags => [.. new[] { Flag, Diastolic?.Flag }.OfType<string>().Distinct()];
 
-    public bool IsLow => Value < ReferenceLow || Diastolic?.Value < Diastolic?.ReferenceLow;
+    string? Flag => Results.VitalFlag.Of(Value, ReferenceLow, ReferenceHigh, ReferenceKind);
 
     // The newest blood pressure among these readings, newest first: its systolic, with the diastolic of the same
     // reading, each with the value of the reading before it.
@@ -146,7 +150,10 @@ public sealed record LatestVital(string Code, string Display, decimal Value, str
     }
 
     public static LatestVital Of(Observation value) =>
-        new(value.Code!, value.Display, value.Value!.Value, value.Unit, value.ReferenceLow, value.ReferenceHigh, value.EffectiveAt);
+        new(value.Code!, value.Display, value.Value!.Value, value.Unit, value.ReferenceLow, value.ReferenceHigh, value.EffectiveAt)
+        {
+            ReferenceKind = value.ReferenceKind,
+        };
 }
 
 // A patient's message threads, latest first, already recorded as one read of the patient.

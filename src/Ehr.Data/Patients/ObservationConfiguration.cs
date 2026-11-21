@@ -13,6 +13,7 @@ public sealed class ObservationConfiguration : IEntityTypeConfiguration<Observat
         {
             table.HasCheckConstraint("ck_observations_status", $"status IN ({Codes.List(ObservationStatus.All)})");
             table.HasCheckConstraint("ck_observations_reference_range", "reference_low <= reference_high");
+            table.HasCheckConstraint("ck_observations_reference_kind", $"reference_kind IN ({Codes.List(ReferenceKind.All)})");
             table.HasCheckConstraint("ck_observations_category", $"category IN ({Codes.List(ObservationCategory.All)})");
             // A reason, a person and a time belong to an entry in error, and to nothing else.
             table.HasCheckConstraint("ck_observations_entered_in_error",
@@ -47,6 +48,7 @@ public sealed class ObservationConfiguration : IEntityTypeConfiguration<Observat
         observation.Property(o => o.Unit).HasMaxLength(20);
         observation.Property(o => o.ReferenceLow).HasPrecision(12, 4);
         observation.Property(o => o.ReferenceHigh).HasPrecision(12, 4);
+        observation.Property(o => o.ReferenceKind).HasMaxLength(20).HasDefaultValue(ReferenceKind.Normal);
         observation.Property(o => o.Note).HasMaxLength(500);
         // Read by patient, newest first, for the portal's results page.
         observation.HasOne<Patient>().WithMany().HasForeignKey(o => o.PatientId).OnDelete(DeleteBehavior.Restrict);

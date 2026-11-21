@@ -984,6 +984,12 @@
         cursor: pointer;
     }
 
+    /* The trend's table sits in a narrow card: its value, with the words that say a value is outside its range or
+       needs follow-up, wraps instead of being cut off at the card's edge. */
+    .sc-trend__values td:last-child {
+        white-space: normal;
+    }
+
     /* A list inside a notice, such as an order's safety warnings: a long address in a citation wraps inside it. */
     .sc-notice .sc-list li {
         overflow-wrap: anywhere;

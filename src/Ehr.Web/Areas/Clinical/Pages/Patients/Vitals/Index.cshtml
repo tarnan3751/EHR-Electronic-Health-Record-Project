@@ -109,7 +109,8 @@ else
                 {
                     if (VitalSign.BloodPressure.Contains(code))
                     {
-                        @* A blood pressure is one reading (step 9c): its two numbers from one reading, flagged when either is outside its range. *@
+                        @* A blood pressure is one reading (step 9c): its two numbers from one reading, flagged when either is outside its range,
+                           or a child's at or above its screening value (step 9d). *@
                         <tr>
                             <th scope="row">Blood pressure <span class="sc-muted">(@Units.Shown(names[code].Unit))</span></th>
                             @foreach (var time in Model.Times)
@@ -118,13 +119,9 @@ else
                                     @if (Model.PressureAt(time) is { } pressure)
                                     {
                                         @pressure.Text
-                                        @if (pressure.IsHigh)
+                                        @foreach (var flag in pressure.Flags)
                                         {
-                                            <span class="sc-tag sc-tag--warning">High</span>
-                                        }
-                                        @if (pressure.IsLow)
-                                        {
-                                            <span class="sc-tag sc-tag--warning">Low</span>
+                                            <span class="sc-tag sc-tag--warning">@flag</span>
                                         }
                                     }
                                     @if (Model.ShowErrors)
@@ -148,9 +145,9 @@ else
                                 @if (sign is not null)
                                 {
                                     @sign.Value!.Value.ToString("0.#")
-                                    @if (IndexModel.IsOutside(sign))
+                                    @if (VitalFlag.Of(sign) is { } flag)
                                     {
-                                        <span class="sc-tag sc-tag--warning">@(sign.Value > sign.ReferenceHigh ? "High" : "Low")</span>
+                                        <span class="sc-tag sc-tag--warning">@flag</span>
                                     }
                                 }
                                 @if (Model.ShowErrors)

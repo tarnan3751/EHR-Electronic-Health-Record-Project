@@ -1513,6 +1513,7 @@ DECLARE
     indexes_again bigint;
     partners bigint;
     unpaired bigint;
+    unpartnered bigint;
     readings bigint;
     apart bigint;
 BEGIN
@@ -1520,6 +1521,29 @@ BEGIN
     IF cascading THEN
         ALTER TABLE ehr.observations DISABLE TRIGGER observations_mark_body_mass_index;
     END IF;
+
+    -- Each blood pressure value with what it was entered with, before 1 moves any visit: its insert's
+    -- audit event, the time of the transaction that wrote it and who; or, loaded with none, its
+    -- issued_at and the visit it was loaded for (two visits starting at one instant load two pairs with
+    -- one issued_at). That visit is the one it had before its visit was first moved, which every move
+    -- records, so a run after a rollback finds the same.
+    CREATE TEMPORARY TABLE pressure_values ON COMMIT DROP AS
+    SELECT o.id, o.patient_id, o.effective_at, o.code, o.status <> 'entered-in-error' AS standing, o.issued_at,
+        i.occurred_at IS NOT NULL AS logged, coalesce(i.occurred_at, o.issued_at) AS entered_at, i.actor_id AS entered_by,
+        CASE WHEN i.occurred_at IS NOT NULL THEN NULL WHEN m.moved THEN m.was ELSE o.encounter_id END AS loaded_for
+    FROM ehr.observations o
+    LEFT JOIN LATERAL (
+        SELECT e.occurred_at, e.actor_id FROM ehr.audit_events e
+        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'insert' AND e.row_id = o.id
+        ORDER BY e.occurred_at
+        LIMIT 1) i ON true
+    LEFT JOIN LATERAL (
+        SELECT true AS moved, (e.details -> 'encounter_id' ->> 'old')::uuid AS was FROM ehr.audit_events e
+        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'update' AND e.row_id = o.id
+          AND e.details ? 'encounter_id'
+        ORDER BY e.occurred_at, e.id
+        LIMIT 1) m ON true
+    WHERE o.category = 'vital-signs' AND o.code IN ('8480-6', '8462-4');
 
     WITH split AS (
         SELECT patient_id, effective_at FROM ehr.observations WHERE category = 'vital-signs' AND code IS NOT NULL
@@ -1543,7 +1567,8 @@ BEGIN
 
     WITH ranked AS (
         SELECT id, row_number() OVER (PARTITION BY patient_id, code, effective_at ORDER BY issued_at DESC NULLS LAST, id DESC) AS place
-        FROM ehr.observations WHERE category = 'vital-signs' AND code IS NOT NULL AND status <> 'entered-in-error'),
+        FROM ehr.observations
+        WHERE category = 'vital-signs' AND code IS NOT NULL AND code NOT IN ('8480-6', '8462-4') AND status <> 'entered-in-error'),
     marked AS (
         UPDATE ehr.observations o
         SET status = 'entered-in-error', entered_in_error_reason = 'duplicate resolved by migration 9c', entered_in_error_at = clock_timestamp()
@@ -1591,29 +1616,62 @@ BEGIN
     WHERE b.value >= 1 AND b.value <= 500;
     GET DIAGNOSTICS indexes_again = ROW_COUNT;
 
-    -- Each moment's blood pressure: which of its two values stand, and which are there at all.
+    -- The values of a moment entered together: a pair when one systolic and one diastolic.
+    CREATE TEMPORARY TABLE pressure_entries ON COMMIT DROP AS
+    SELECT patient_id, effective_at, logged, entered_at, entered_by, loaded_for,
+        count(*) FILTER (WHERE code = '8480-6') = 1 AND count(*) FILTER (WHERE code = '8462-4') = 1 AS pair,
+        bool_and(standing) AS standing, max(issued_at) AS latest, min(id::text) AS first_id
+    FROM pressure_values
+    GROUP BY patient_id, effective_at, logged, entered_at, entered_by, loaded_for;
+
+    -- Each moment's blood pressure: the most recent pair entered together whose two values stand. Two
+    -- loaded for two visits starting at one instant are equally recent: the one loaded for the visit 1
+    -- gave the moment (its first value's, whatever sign) stands, then the one with the smaller ID.
+    CREATE TEMPORARY TABLE pressure_kept ON COMMIT DROP AS
+    SELECT DISTINCT ON (e.patient_id, e.effective_at) e.patient_id, e.effective_at, e.logged, e.entered_at, e.entered_by, e.loaded_for
+    FROM pressure_entries e
+    LEFT JOIN LATERAL (
+        SELECT o.encounter_id FROM ehr.observations o
+        WHERE o.patient_id = e.patient_id AND o.effective_at = e.effective_at AND o.category = 'vital-signs' AND o.code IS NOT NULL
+        LIMIT 1) m ON true
+    WHERE e.pair AND e.standing
+    ORDER BY e.patient_id, e.effective_at, e.latest DESC, e.entered_at DESC, (e.loaded_for IS NOT DISTINCT FROM m.encounter_id) DESC, e.first_id;
+
+    WITH marks AS (
+        SELECT v.id,
+            CASE
+                WHEN n.pair AND n.standing THEN 'duplicate resolved by migration 9c'
+                WHEN k.patient_id IS NOT NULL THEN 'not entered together with a standing partner (migration 9c)'
+                WHEN n.pair THEN 'partner value was marked in error before readings existed (migration 9c)'
+                WHEN NOT EXISTS (SELECT 1 FROM pressure_values w WHERE w.patient_id = v.patient_id AND w.effective_at = v.effective_at AND w.code <> v.code)
+                    THEN 'blood pressure value without its partner (migration 9c)'
+                ELSE 'not entered together with a standing partner (migration 9c)'
+            END AS reason
+        FROM pressure_values v
+        JOIN pressure_entries n ON n.patient_id = v.patient_id AND n.effective_at = v.effective_at AND n.logged = v.logged
+            AND n.entered_at = v.entered_at AND n.entered_by IS NOT DISTINCT FROM v.entered_by AND n.loaded_for IS NOT DISTINCT FROM v.loaded_for
+        LEFT JOIN pressure_kept k ON k.patient_id = v.patient_id AND k.effective_at = v.effective_at
+        WHERE v.standing
+          AND NOT (k.patient_id IS NOT NULL AND k.logged = v.logged AND k.entered_at = v.entered_at AND k.entered_by IS NOT DISTINCT FROM v.entered_by
+                   AND k.loaded_for IS NOT DISTINCT FROM v.loaded_for)),
+    marked AS (
+        UPDATE ehr.observations o
+        SET status = 'entered-in-error', entered_in_error_reason = m.reason, entered_in_error_at = clock_timestamp()
+        FROM marks m WHERE o.id = m.id
+        RETURNING o.entered_in_error_reason AS reason)
+    SELECT duplicates + count(*) FILTER (WHERE reason = 'duplicate resolved by migration 9c'),
+        count(*) FILTER (WHERE reason = 'partner value was marked in error before readings existed (migration 9c)'),
+        count(*) FILTER (WHERE reason = 'blood pressure value without its partner (migration 9c)'),
+        count(*) FILTER (WHERE reason = 'not entered together with a standing partner (migration 9c)')
+    INTO duplicates, partners, unpaired, unpartnered
+    FROM marked;
+
+    -- Each moment's blood pressure now: whether a systolic and a diastolic stand.
     CREATE TEMPORARY TABLE pressure_moments ON COMMIT DROP AS
     SELECT patient_id, effective_at,
-        bool_or(code = '8480-6' AND status <> 'entered-in-error') AS systolic, bool_or(code = '8462-4' AND status <> 'entered-in-error') AS diastolic,
-        bool_or(code = '8480-6') AS any_systolic, bool_or(code = '8462-4') AS any_diastolic
+        bool_or(code = '8480-6' AND status <> 'entered-in-error') AS systolic, bool_or(code = '8462-4' AND status <> 'entered-in-error') AS diastolic
     FROM ehr.observations WHERE category = 'vital-signs' AND code IN ('8480-6', '8462-4')
     GROUP BY patient_id, effective_at;
-
-    UPDATE ehr.observations o
-    SET status = 'entered-in-error', entered_in_error_reason = 'partner value was marked in error before readings existed (migration 9c)',
-        entered_in_error_at = clock_timestamp()
-    FROM pressure_moments m
-    WHERE o.patient_id = m.patient_id AND o.effective_at = m.effective_at AND o.category = 'vital-signs' AND o.status <> 'entered-in-error'
-      AND (o.code = '8480-6' AND NOT m.diastolic AND m.any_diastolic OR o.code = '8462-4' AND NOT m.systolic AND m.any_systolic);
-    GET DIAGNOSTICS partners = ROW_COUNT;
-
-    UPDATE ehr.observations o
-    SET status = 'entered-in-error', entered_in_error_reason = 'blood pressure value without its partner (migration 9c)',
-        entered_in_error_at = clock_timestamp()
-    FROM pressure_moments m
-    WHERE o.patient_id = m.patient_id AND o.effective_at = m.effective_at AND o.category = 'vital-signs' AND o.status <> 'entered-in-error'
-      AND (o.code = '8480-6' AND NOT m.any_diastolic OR o.code = '8462-4' AND NOT m.any_systolic);
-    GET DIAGNOSTICS unpaired = ROW_COUNT;
 
     IF audited THEN
         ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
@@ -1661,6 +1719,7 @@ BEGIN
     RAISE NOTICE 'Migration 9c: % body mass index values worked out again from the weight and height kept (audited)', indexes_again;
     RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error because their partner was, "partner value was marked in error before readings existed (migration 9c)" (audited)', partners;
     RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that never had a partner, "blood pressure value without its partner (migration 9c)" (audited)', unpaired;
+    RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that were not entered together with a standing partner, "not entered together with a standing partner (migration 9c)" (audited)', unpartnered;
     RAISE NOTICE 'Migration 9c: % standing blood pressure values made into % readings; % values in error given readings', readings, readings / 2, apart;
 END
 $$;
@@ -1673,6 +1732,312 @@ ALTER TABLE ehr.observations ADD CONSTRAINT ck_observations_reading CHECK ((read
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
 VALUES ('20261120032936_VitalReadings', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE ehr.vital_reference_ranges DROP CONSTRAINT pk_vital_reference_ranges;
+
+ALTER TABLE ehr.vital_reference_ranges DROP CONSTRAINT ck_vital_reference_ranges_band;
+
+ALTER TABLE ehr.vital_reference_ranges DROP COLUMN band;
+
+ALTER TABLE ehr.vital_reference_ranges ADD sex character varying(10) NOT NULL DEFAULT 'any';
+
+ALTER TABLE ehr.vital_reference_ranges ADD kind character varying(20) NOT NULL DEFAULT 'normal';
+
+ALTER TABLE ehr.observations ADD reference_kind character varying(20) NOT NULL DEFAULT 'normal';
+
+ALTER TABLE ehr.vital_reference_ranges ADD CONSTRAINT pk_vital_reference_ranges PRIMARY KEY (code, sex, from_months);
+
+ALTER TABLE ehr.vital_reference_ranges ADD CONSTRAINT ck_vital_reference_ranges_kind CHECK (kind IN ('normal', 'screening'));
+
+ALTER TABLE ehr.vital_reference_ranges ADD CONSTRAINT ck_vital_reference_ranges_screening CHECK (kind <> 'screening' OR (low IS NULL AND high IS NOT NULL));
+
+ALTER TABLE ehr.vital_reference_ranges ADD CONSTRAINT ck_vital_reference_ranges_sex CHECK (sex IN ('male', 'female', 'any'));
+
+ALTER TABLE ehr.observations ADD CONSTRAINT ck_observations_reference_kind CHECK (reference_kind IN ('normal', 'screening'));
+
+DO $$
+DECLARE
+    forced boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
+    audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
+    sign record;
+    change record;
+    counted bigint;
+    detail text;
+    newly bigint;
+    cleared bigint;
+    switched bigint;
+BEGIN
+    CREATE TEMPORARY TABLE ranges_now (code text, sex text, from_months int, to_months int, low numeric, high numeric, kind text, source text) ON COMMIT DROP;
+    INSERT INTO ranges_now (code, sex, from_months, to_months, low, high, kind, source) VALUES
+    ('8867-4', 'any', 0, 3::int, 107::numeric, 181::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 3, 6::int, 104::numeric, 175::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 6, 9::int, 98::numeric, 168::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 9, 12::int, 93::numeric, 161::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 12, 18::int, 88::numeric, 156::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 18, 24::int, 82::numeric, 149::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 24, 36::int, 76::numeric, 142::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 36, 48::int, 70::numeric, 136::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 48, 72::int, 65::numeric, 131::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 72, 96::int, 59::numeric, 123::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 96, 144::int, 52::numeric, 115::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 144, 180::int, 47::numeric, 108::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 180, 216::int, 43::numeric, 104::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 5 (heart rate), 1st and 99th centiles, page 12'),
+    ('8867-4', 'any', 216, NULL::int, 60::numeric, 100::numeric, 'normal',
+     'MedlinePlus (NIH), Vital signs, reviewed 2025-01-01'),
+    ('9279-1', 'any', 0, 3::int, 25::numeric, 66::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 3, 6::int, 24::numeric, 64::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 6, 9::int, 23::numeric, 61::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 9, 12::int, 22::numeric, 58::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 12, 18::int, 21::numeric, 53::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 18, 24::int, 19::numeric, 46::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 24, 36::int, 18::numeric, 38::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 36, 48::int, 17::numeric, 33::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 48, 72::int, 17::numeric, 29::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 72, 96::int, 16::numeric, 27::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 96, 144::int, 14::numeric, 25::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 144, 180::int, 12::numeric, 23::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 180, 216::int, 11::numeric, 22::numeric, 'normal',
+     'Fleming S et al., Lancet 2011;377:1011-18, Web Appendix, Web Table 4 (respiratory rate), 1st and 99th centiles, page 12'),
+    ('9279-1', 'any', 216, NULL::int, 12::numeric, 20::numeric, 'normal',
+     'StatPearls, Vital Sign Assessment (NIH Bookshelf NBK553213)'),
+    ('8480-6', 'male', 12, 24::int, NULL::numeric, 98::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 24, 36::int, NULL::numeric, 100::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 36, 48::int, NULL::numeric, 101::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 48, 60::int, NULL::numeric, 102::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 60, 72::int, NULL::numeric, 103::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 72, 84::int, NULL::numeric, 105::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 84, 96::int, NULL::numeric, 106::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 96, 108::int, NULL::numeric, 107::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 108, 120::int, NULL::numeric, 107::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 120, 132::int, NULL::numeric, 108::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 132, 144::int, NULL::numeric, 110::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 144, 156::int, NULL::numeric, 113::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'male', 156, 216::int, NULL::numeric, 120::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8480-6', 'female', 12, 24::int, NULL::numeric, 98::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 24, 36::int, NULL::numeric, 101::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 36, 48::int, NULL::numeric, 102::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 48, 60::int, NULL::numeric, 103::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 60, 72::int, NULL::numeric, 104::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 72, 84::int, NULL::numeric, 105::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 84, 96::int, NULL::numeric, 106::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 96, 108::int, NULL::numeric, 107::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 108, 120::int, NULL::numeric, 108::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 120, 132::int, NULL::numeric, 109::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 132, 144::int, NULL::numeric, 111::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 144, 156::int, NULL::numeric, 114::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'female', 156, 216::int, NULL::numeric, 120::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8480-6', 'any', 216, NULL::int, 90::numeric, 129::numeric, 'normal',
+     'MedlinePlus (NIH), Vital signs (low); AHA/ACC adult categories, stage 1 from 130 or 80 (high)'),
+    ('8462-4', 'male', 12, 24::int, NULL::numeric, 52::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 24, 36::int, NULL::numeric, 55::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 36, 48::int, NULL::numeric, 58::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 48, 60::int, NULL::numeric, 60::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 60, 72::int, NULL::numeric, 63::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 72, 84::int, NULL::numeric, 66::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 84, 96::int, NULL::numeric, 68::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 96, 108::int, NULL::numeric, 69::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 108, 120::int, NULL::numeric, 70::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 120, 132::int, NULL::numeric, 72::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 132, 144::int, NULL::numeric, 74::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 144, 156::int, NULL::numeric, 75::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'male', 156, 216::int, NULL::numeric, 80::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, boys'),
+    ('8462-4', 'female', 12, 24::int, NULL::numeric, 54::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 24, 36::int, NULL::numeric, 58::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 36, 48::int, NULL::numeric, 60::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 48, 60::int, NULL::numeric, 62::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 60, 72::int, NULL::numeric, 64::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 72, 84::int, NULL::numeric, 67::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 84, 96::int, NULL::numeric, 68::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 96, 108::int, NULL::numeric, 69::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 108, 120::int, NULL::numeric, 71::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 120, 132::int, NULL::numeric, 72::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 132, 144::int, NULL::numeric, 74::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 144, 156::int, NULL::numeric, 75::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'female', 156, 216::int, NULL::numeric, 80::numeric, 'screening',
+     'Flynn JT et al., Pediatrics 2017;140(3):e20171904, Table 6 (Screening BP Values Requiring Further Evaluation), page 15, girls'),
+    ('8462-4', 'any', 216, NULL::int, 60::numeric, 79::numeric, 'normal',
+     'MedlinePlus (NIH), Vital signs (low); AHA/ACC adult categories, stage 1 from 130 or 80 (high)');
+
+    DELETE FROM ehr.vital_reference_ranges;
+    INSERT INTO ehr.vital_reference_ranges (code, sex, from_months, to_months, low, high, kind, source)
+    SELECT r.code, r.sex, r.from_months, r.to_months, r.low, r.high, r.kind, r.source FROM ranges_now r
+    WHERE EXISTS (SELECT 1 FROM ehr.observation_codes c WHERE c.code = r.code);
+
+    ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
+    IF audited THEN
+        ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
+    END IF;
+
+    -- Each value's range now, beside the one it had: for a sex other than male or female, the higher low
+    -- and the lower high of both sexes' rows; none for a blood pressure under 1 year.
+    CREATE TEMPORARY TABLE regraded ON COMMIT DROP AS
+    WITH aged AS (
+        SELECT o.id, o.code, o.value, o.status <> 'entered-in-error' AS standing, o.reading_id, o.reference_low, o.reference_high,
+            o.reference_kind, p.gender,
+            greatest(0, (extract(year FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                + extract(month FROM age((o.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int) AS months
+        FROM ehr.observations o JOIN ehr.patients p ON p.id = o.patient_id
+        WHERE o.category = 'vital-signs' AND o.code IN (SELECT code FROM ranges_now))
+    SELECT a.id, a.code, a.value, a.standing, a.reading_id, a.reference_low AS old_low, a.reference_high AS old_high, a.reference_kind AS old_kind,
+        n.low, n.high, n.kind
+    FROM aged a
+    CROSS JOIN LATERAL (
+        SELECT max(r.low) AS low, min(r.high) AS high, coalesce(max(r.kind), 'normal') AS kind
+        FROM ranges_now r
+        WHERE r.code = a.code AND a.months >= r.from_months AND (r.to_months IS NULL OR a.months < r.to_months)
+          AND (r.sex = 'any' OR r.sex = a.gender OR a.gender NOT IN ('male', 'female'))) n;
+
+    -- Each value's flag before and after, as the pages work them out (Ehr.Domain's VitalFlag), and whether
+    -- its range changes. Only standing values are flagged on a page, so only they are counted as flags;
+    -- values entered in error are given the new range too, and counted apart.
+    CREATE TEMPORARY TABLE flag_moves ON COMMIT DROP AS
+    SELECT code, standing, reading_id, (old_low, old_high, old_kind) IS DISTINCT FROM (low, high, kind) AS changed,
+        CASE WHEN old_kind = 'screening' THEN CASE WHEN value >= old_high THEN 'needs follow-up' END
+             WHEN value > old_high THEN 'High' WHEN value < old_low THEN 'Low' END AS before,
+        CASE WHEN kind = 'screening' THEN CASE WHEN value >= high THEN 'needs follow-up' END
+             WHEN value > high THEN 'High' WHEN value < low THEN 'Low' END AS after
+    FROM regraded;
+
+    UPDATE ehr.observations o SET reference_low = g.low, reference_high = g.high, reference_kind = g.kind
+    FROM regraded g
+    WHERE o.id = g.id AND (g.old_low, g.old_high, g.old_kind) IS DISTINCT FROM (g.low, g.high, g.kind);
+
+    IF audited THEN
+        ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
+    END IF;
+    IF forced THEN
+        ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
+    END IF;
+
+    FOR sign IN
+        SELECT * FROM (VALUES (1, '8867-4', 'heart rate'), (2, '9279-1', 'respiratory rate'), (3, '8480-6', 'systolic blood pressure'),
+            (4, '8462-4', 'diastolic blood pressure')) s(place, code, name) ORDER BY place
+    LOOP
+        SELECT count(*) INTO counted FROM flag_moves m WHERE m.code = sign.code AND m.standing AND m.changed;
+        RAISE NOTICE 'Migration 9d: % (%): % standing values re-ranged', sign.name, sign.code, counted;
+        FOR change IN
+            SELECT * FROM (VALUES (1, 'newly flagged'), (2, 'no longer flagged'), (3, 'changed from one flag to another')) c(place, name) ORDER BY place
+        LOOP
+            SELECT coalesce(sum(t.n), 0), coalesce(' (' || string_agg(t.n || ' ' || t.what, ', ' ORDER BY t.what) || ')', '') INTO counted, detail
+            FROM (
+                SELECT count(*) AS n,
+                    CASE change.place WHEN 1 THEN m.after WHEN 2 THEN m.before ELSE m.before || ' to ' || m.after END AS what
+                FROM flag_moves m
+                WHERE m.code = sign.code AND m.standing AND m.changed
+                  AND CASE change.place
+                      WHEN 1 THEN m.before IS NULL AND m.after IS NOT NULL
+                      WHEN 2 THEN m.before IS NOT NULL AND m.after IS NULL
+                      ELSE m.before IS NOT NULL AND m.after IS NOT NULL AND m.before <> m.after END
+                GROUP BY 2) t;
+            RAISE NOTICE 'Migration 9d: % (%): % %', sign.name, sign.code, counted, change.name || detail;
+        END LOOP;
+    END LOOP;
+    -- Blood pressure as the pages show it, one reading of two values with the flags of both: the standing
+    -- readings with a value re-ranged.
+    SELECT count(*), count(*) FILTER (WHERE r.before = '{}' AND r.after <> '{}'), count(*) FILTER (WHERE r.before <> '{}' AND r.after = '{}'),
+        count(*) FILTER (WHERE r.before <> '{}' AND r.after <> '{}' AND r.before <> r.after)
+    INTO counted, newly, cleared, switched
+    FROM (
+        SELECT coalesce(array_agg(DISTINCT m.before ORDER BY m.before) FILTER (WHERE m.before IS NOT NULL), '{}') AS before,
+            coalesce(array_agg(DISTINCT m.after ORDER BY m.after) FILTER (WHERE m.after IS NOT NULL), '{}') AS after
+        FROM flag_moves m
+        WHERE m.standing AND m.reading_id IS NOT NULL
+        GROUP BY m.reading_id
+        HAVING bool_or(m.changed)) r;
+    RAISE NOTICE 'Migration 9d: blood pressure: % standing readings re-ranged; % newly flagged, % no longer flagged, % changed from one flag to another',
+        counted, newly, cleared, switched;
+    SELECT count(*), count(*) FILTER (WHERE before IS NULL AND after IS NOT NULL), count(*) FILTER (WHERE before IS NOT NULL AND after IS NULL),
+        count(*) FILTER (WHERE before IS NOT NULL AND after IS NOT NULL AND before <> after)
+    INTO counted, newly, cleared, switched
+    FROM flag_moves WHERE standing AND changed;
+    RAISE NOTICE 'Migration 9d: in all, % standing values re-ranged; % newly flagged, % no longer flagged, % changed from one flag to another',
+        counted, newly, cleared, switched;
+    SELECT count(*) INTO counted FROM flag_moves WHERE NOT standing AND changed;
+    RAISE NOTICE 'Migration 9d: % values entered in error re-ranged too, which no page flags', counted;
+END
+$$;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261120071837_ChildrenRanges', '10.0.13');
 
 COMMIT;
 

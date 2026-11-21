@@ -192,10 +192,14 @@ public enum Recorded
 
 // One value of a test or a vital sign at a time.
 // With the reference range the value was recorded against: a vital sign's goes by the patient's age on the day it
-// was taken (step 9b), so one chart's points can have different ranges.
-public sealed record TrendPoint(DateTimeOffset At, decimal Value, decimal? Low = null, decimal? High = null)
+// was taken (step 9b), so one chart's points can have different ranges, and a child's blood pressure is a screening
+// value (step 9d).
+public sealed record TrendPoint(DateTimeOffset At, decimal Value, decimal? Low = null, decimal? High = null, string Kind = ReferenceKind.Normal)
 {
-    public bool IsOutside => (Low is not null && Value < Low) || (High is not null && Value > High);
+    // "High", "Low" or "Needs follow-up" (VitalFlag), or null.
+    public string? Flag => VitalFlag.Of(Value, Low, High, Kind);
+
+    public bool IsOutside => Flag is not null;
 }
 
 // The values of one test or vital sign over time, with where each sits on a small chart (step 9). The chart is drawn
@@ -210,9 +214,9 @@ public sealed class Trend
     // The most points a chart shows: the latest ones.
     public const int Most = 24;
 
-    public Trend(string code, string title, string? unit, decimal? low, decimal? high, IEnumerable<TrendPoint> points)
+    public Trend(string code, string title, string? unit, decimal? low, decimal? high, IEnumerable<TrendPoint> points, string kind = ReferenceKind.Normal)
     {
-        (Code, Title, Unit, Low, High) = (code, title, Units.Shown(unit), low, high);
+        (Code, Title, Unit, Low, High, Kind) = (code, title, Units.Shown(unit), low, high, kind);
         Points = [.. points.OrderBy(point => point.At).TakeLast(Most)];
         var values = Points.Select(point => point.Value).Concat(new[] { low, high }.Where(bound => bound is not null).Select(bound => bound!.Value)).ToList();
         (Floor, Ceiling) = (values.Min(), values.Max());
@@ -233,6 +237,12 @@ public sealed class Trend
 
     public decimal? High { get; }
 
+    // The latest point's kind of range (ReferenceKind): a screening value is shown as one, and needs follow-up at or
+    // above it.
+    public string Kind { get; }
+
+    public bool IsScreening => Kind == ReferenceKind.Screening;
+
     // Oldest first.
     public IReadOnlyList<TrendPoint> Points { get; }
 
@@ -246,8 +256,8 @@ public sealed class Trend
     // Each point against the range it was recorded with, not the latest one.
     public static bool IsOutside(TrendPoint point) => point.IsOutside;
 
-    // Whether the points were recorded against more than one range: a child who grew into another age band.
-    public bool RangesDiffer => Points.Select(point => (point.Low, point.High)).Distinct().Count() > 1;
+    // Whether the points were recorded against more than one range: a child who grew into another age group.
+    public bool RangesDiffer => Points.Select(point => (point.Low, point.High, point.Kind)).Distinct().Count() > 1;
 
     public decimal X(int index) => Points.Count == 1 ? Width / 2m : Left + (index * (Width - Left - Right) / (Points.Count - 1));
 
@@ -286,7 +296,7 @@ public sealed class Trend
         var change = last.Value == first.Value ? "the same as" : last.Value > first.Value ? "up from" : "down from";
         return $"{Title}: {Points.Count} values from {day(first.At)} to {day(last.At)}. "
             + $"Latest {last.Value:0.####}{(Unit is null ? "" : " " + Unit)}, {change} {first.Value:0.####}."
-            + (HasRange ? $" Reference range {RangeText}." : "")
+            + (HasRange ? IsScreening ? $" Needs follow-up at or above {High:0.####}{(Unit is null ? "" : " " + Unit)}." : $" Reference range {RangeText}." : "")
             + (RangesDiffer ? " That range is for the latest reading; earlier ones are marked against the range for the patient's age then." : "");
     }
 
@@ -307,7 +317,7 @@ public sealed class Trend
                 // Two values of one moment stay in the order they were released (the chart's own sort keeps it).
                 return new Trend(group.Key, latest.Display, latest.Unit, latest.ReferenceLow, latest.ReferenceHigh,
                     group.OrderBy(o => o.EffectiveAt).ThenBy(o => o.IssuedAt).ThenBy(o => o.Id)
-                        .Select(o => new TrendPoint(o.EffectiveAt, o.Value!.Value, o.ReferenceLow, o.ReferenceHigh)));
+                        .Select(o => new TrendPoint(o.EffectiveAt, o.Value!.Value, o.ReferenceLow, o.ReferenceHigh, o.ReferenceKind)), latest.ReferenceKind);
             });
         var places = order?.Select((code, place) => (code, place)).ToDictionary(item => item.code, item => item.place);
         return [.. places is null
