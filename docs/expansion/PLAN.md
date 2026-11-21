@@ -38,8 +38,9 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 11b | FHIR: a child's screening value | done | expansion/step-11b-fhir-screening-values | expansion-step-11b | [44848677796](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44848677796) | Mine: found when steps 9d and 11 met on the integration branch |
 | 12 | Simulated lab | done | expansion/step-12-simulated-lab | expansion-step-12, expansion-phase-3 | [44873790074](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44873790074) | New use case UC 20; proposed FR-54. Authorization change (a keyed service door) and db/policies; migration `LabKeys`. Last step of phase 3 |
 | 13a | Visit summaries | in progress | expansion/step-13a-visit-summaries | | | Extends UC 6 and UC 14. Touches db/policies; a new table |
-| 13b | Download my record | not started | | | | |
-| 13c | Who viewed my record | not started | | | | |
+| 13b | Download my record | in progress | | | | A parallel lane, with 13c, since 2026-11-21 |
+| 13c | Who viewed my record | in progress | | | | A parallel lane, with 13b. Most views read "Your record" until 13c2 |
+| 13c2 | Who viewed my record: which part | not started | | | | Mine: records which page was opened on each read, after 13a, 13b and 13c are merged, so that 13c meets "which part" before phase 4 is tagged |
 | 13d | Refill requests | not started | | | | |
 | 13e | Pre-visit forms | not started | | | | |
 | 14 | SOAP notes and templates | not started | | | | |
@@ -1129,6 +1130,10 @@ One entry per decision: date, step, the decision, and why.
   - *Deciding anything new:* patient safety and privacy first, then the course document, then the smallest reversible choice; each such decision recorded here under the heading **"Decided without Tahseen — to review"** with the alternatives rejected, and listed in the phase's pull request draft. A gate met by cutting the smallest piece that drops no requirement is recorded the same way; if only dropping a requirement would meet it, the lane pauses.
   - *What still stops a lane:* spending money or creating an account; a model, dataset or library outside the rules; a recording of a real person's voice; anything on main, a force-push, deleting a branch or tag, repo settings; CI failing after two honest attempts; a gate that can't be met without dropping a requirement.
   - *Effect on the plan:* the "asks first" notes are gone from steps 15, 16, 17, 20 and 21 in the status table, which now say what only he can do; "Stop and ask Tahseen before" points here.
+
+- **2026-11-21, Decided without Tahseen — to review: parallel lanes, and "which part" in two steps.**
+  - *Parallel lanes.* Tahseen asked whether independent tasks could be done by several agents in parallel; I read that as "do so". Within a phase, independent steps now run in separate developer lanes, each in a clone of its own from the same base, each reviewed and merged one at a time. About three at once: with two lanes running tests together this Mac's load passed 30 and test containers timed out. Later phases are not pulled forward, since a phase's branch should hold that phase's work only (his rule for phase 2.1). *Rejected:* one lane at a time (slower, nothing gained); every remaining step at once (false failures, and migrations from many lanes to reconcile).
+  - *Step 13c says "Your record" for most views, and step 13c2 follows.* His words for 13c are "staff name and role, when, and which part". The audit log records most reads as a read of the patient's row, whichever page was opened, so the page can tell notes, messages, visit summaries, downloads and the lab apart, and nothing else. Recording which page was opened means touching about thirty reads in `PhiReader`, the cloud queue's allow-list and the admin page: done at the same time as 13a's fixes and 13b it would put three lanes in the same lines. So 13c is built on what is recorded, and 13c2, in this phase and before its tag, records the part. *Rejected:* delivering phase 4 with "Your record" only (it drops part of what he asked for); holding 13c until the others merge (nothing gained, the page and its database door don't depend on the finer parts).
 
 ## Log
 
