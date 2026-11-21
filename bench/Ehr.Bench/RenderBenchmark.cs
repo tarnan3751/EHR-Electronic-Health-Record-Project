@@ -200,6 +200,11 @@ internal static partial class RenderBenchmark
                 // panels' table of a clinic's size, which a proxy's page reads.
                 await FillViewsAsync(database, clinicianId, portalPatient, panel[0]);
                 await FillPanelHistoryAsync(database, portalPatient, panel[0]);
+                // Refill requests (step 13d): the portal patient's own, and the record they are a proxy for, asked as the
+                // portal asks; the first of each declined. A request's page, and the order form that approves a waiting
+                // one. A generator of its own, so the rows after them pick as they did.
+                var refills = await AskRefillsAsync(app, clinicianId, patientUserId, [(portalPatient, null), (panel[0], proxyGrant)]);
+                results.AddRange(await MeasureRefillsAsync(client, times, "", refills));
                 // Kept to the end, off-site rows included: the off-site portal rows use the same session.
                 var portalSession = new CookieContainer();
                 // Download my record (step 13b) is measured for the seeded patient with the most entries too.
@@ -216,6 +221,7 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal access, the patient's own", typing: false, () => "/portal/access"));
                     results.Add(await MeasureAsync(portal, times, "Portal choose, a record shared", typing: false, () => "/portal/choose"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
+                    results.Add(await MeasureAsync(portal, times, "Portal refills, the patient's own", typing: false, () => "/portal/refills"));
                     // Download my record (step 13b): the page, the FHIR file and the printable page.
                     results.AddRange(await MeasureRecordAsync(portal, times, "", "the patient's own", page: true));
                     results.Add(await MeasureAsync(portal, times, "Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
@@ -232,6 +238,7 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal home, as a proxy", typing: false, () => "/portal"));
                     results.Add(await MeasureAsync(portal, times, "Portal results, as a proxy", typing: false, () => "/portal/results"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+                    results.Add(await MeasureAsync(portal, times, "Portal refills, as a proxy", typing: false, () => "/portal/refills"));
                     results.AddRange(await MeasureRecordAsync(portal, times, "", "as a proxy", page: false));
                     // And for the seeded patient whose record has the most entries, with a session of its own.
                     using (var largest = await PortalSignInAsync(app, largestSession, largestEmail, largestPassword))
@@ -248,7 +255,8 @@ internal static partial class RenderBenchmark
                     else
                     {
                         await SettleAsync(database);
-                        results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession));
+                        results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
+                            refills));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -440,7 +448,7 @@ internal static partial class RenderBenchmark
     static async Task<List<Result>> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
-        CookieContainer portalSession, CookieContainer largestSession)
+        CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -481,8 +489,10 @@ internal static partial class RenderBenchmark
                 var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
                 return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
             }));
+            results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, as a proxy", typing: false, () => "/portal/refills"));
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "as a proxy", page: false));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
             using (var mine = await PostFormAsync(portal, "/portal/acting?handler=Mine", await portal.GetStringAsync("/portal/summaries")))
@@ -494,6 +504,7 @@ internal static partial class RenderBenchmark
             }
 
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, the patient's own", typing: false, () => "/portal/refills"));
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "the patient's own", page: true));
             using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
             results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
@@ -1326,6 +1337,104 @@ internal static partial class RenderBenchmark
         var grant = await db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM ehr.proxy_grants WHERE patient_id = {patient} AND revoked_at IS NULL").SingleAsync();
         await transaction.CommitAsync();
         return grant;
+    }
+
+    // Refill requests (step 13d). For each record, the clinician adds two coded medications to its chart, so there is
+    // something to ask for and one left waiting; then, as the portal account (on its own record, or acting under the
+    // proxy grant), a request for every medication the refill page offers, through the app's own service and the
+    // database's rules; then the clinician declines the first of each, so the portal lists an answer too. With --stack
+    // they stay on the primary afterwards, as its orders do. Every request, by patient, and whether it still waits.
+    static async Task<List<(Guid Patient, Guid Request, bool Waiting)>> AskRefillsAsync(BenchApp app, Guid clinicianId, Guid account, (Guid Patient, Guid? Grant)[] records)
+    {
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+            var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            foreach (var (patient, _) in records)
+            {
+                foreach (var (code, display) in new[] { ("314076", "lisinopril 10 MG Oral Tablet"), ("197361", "amlodipine 5 MG Oral Tablet") })
+                {
+                    db.Add(new Ehr.Data.Patients.MedicationStatement
+                    {
+                        Id = Guid.CreateVersion7(),
+                        PatientId = patient,
+                        Code = code,
+                        Display = display,
+                        Dosage = "1 tablet by mouth daily",
+                        Status = Ehr.Data.Patients.MedicationStatementStatus.Active,
+                    });
+                }
+            }
+
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+
+        foreach (var (patient, grant) in records)
+        {
+            await using var scope = app.Services.CreateAsyncScope();
+            var user = scope.ServiceProvider.GetRequiredService<UserContext>();
+            (user.UserId, user.ActingGrant) = (account, grant);
+            var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+            var refills = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Refills.RefillRequests>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            var page = await scope.ServiceProvider.GetRequiredService<Ehr.Domain.Phi.PhiReader>().RefillsAsync(patient, sensitive: false, 50, CancellationToken.None)
+                ?? throw new InvalidOperationException("The benchmark's portal account can't read the record it asks for.");
+            foreach (var medication in page.Medications)
+            {
+                if (await refills.AskAsync(patient, medication.Id, "Synthetic: running low.", CancellationToken.None) != Ehr.Domain.Refills.RefillAsked.Sent)
+                {
+                    throw new InvalidOperationException("The benchmark's refill request was refused.");
+                }
+            }
+
+            await transaction.CommitAsync();
+        }
+
+        var requests = new List<(Guid, Guid, bool)>();
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+            var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+            var refills = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Refills.RefillRequests>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            foreach (var (patient, _) in records)
+            {
+                var asked = await db.RefillRequests.AsNoTracking().Where(r => r.PatientId == patient).OrderBy(r => r.RequestedAt).Select(r => r.Id).ToListAsync();
+                if (asked.Count < 2
+                    || await refills.DeclineAsync(patient, asked[0], "Synthetic: please book a visit first.", CancellationToken.None) != Ehr.Domain.Refills.RefillDeclined.Declined)
+                {
+                    throw new InvalidOperationException("The benchmark's refill requests weren't asked for, or the first wasn't declined.");
+                }
+
+                requests.AddRange(asked.Select((request, i) => (patient, request, i > 0)));
+            }
+
+            await transaction.CommitAsync();
+        }
+
+        return requests;
+    }
+
+    // A request's page, for any of the requests, and the order form that approves one, for the waiting ones.
+    static async Task<List<Result>> MeasureRefillsAsync(HttpClient client, DatabaseTimes times, string site, List<(Guid Patient, Guid Request, bool Waiting)> refills)
+    {
+        var random = new Random(20261126);
+        var waiting = refills.Where(r => r.Waiting).ToList();
+        return
+        [
+            await MeasureAsync(client, times, $"{site}Refill request, a patient on the panel", typing: false, () =>
+            {
+                var (patient, request, _) = refills[random.Next(refills.Count)];
+                return $"/patients/{patient}/refills/{request}";
+            }),
+            await MeasureAsync(client, times, $"{site}Order form approving a refill, a patient on the panel", typing: false, () =>
+            {
+                var (patient, request, _) = waiting[random.Next(waiting.Count)];
+                return $"/patients/{patient}/orders/new?type=medication&refill={request}";
+            }),
+        ];
     }
 
     // The portal patient's own conversation: the clinician puts them on the panel first, since only the care team writes.
