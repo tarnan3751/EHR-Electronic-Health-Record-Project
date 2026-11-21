@@ -70,6 +70,9 @@ public sealed class Appointments(EhrDbContext db)
         const string savepoint = "check_in";
         var transaction = db.Database.CurrentTransaction!;
         await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+        // The start sent is the app's clock; the database replaces it with its own, the moment the row is inserted
+        // (db/policies/75-results.sql, ehr.check_in_visit). Nothing here reads it back: the visit is detached below, and
+        // the pages read the visit from the database.
         var visit = new Encounter
         {
             Id = Guid.CreateVersion7(),
@@ -84,7 +87,12 @@ public sealed class Appointments(EhrDbContext db)
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.InsufficientPrivilege })
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+        {
+            // Refused by row-level security (the patient isn't on the panel), or by the database's rule for a visit
+            // the apps start, which the page's visit always meets.
+            SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation,
+        })
         {
             entry.State = EntityState.Detached;
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);

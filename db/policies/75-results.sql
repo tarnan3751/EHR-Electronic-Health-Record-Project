@@ -363,22 +363,23 @@ CREATE CONSTRAINT TRIGGER observations_reading_deleted
     EXECUTE FUNCTION ehr.check_vital_reading();
 COMMIT;
 
--- A visit the apps insert is a check-in (Appointments.CheckInAsync, the only one): in progress, starting now. Before
--- the insert, as the caller, for the apps' roles: any other status, or a start more than a minute from the
--- transaction's clock, is refused. The page sends the time it handles the request, inside the transaction, so the only
--- gap is between the app's clock and the database's; a minute is far more than that, and a start a minute out ties no
--- more than a check-in a minute earlier would. So a visit the apps add never starts in the past or the future, and a
--- vital sign's visit can't be changed by a visit dated to suit (step 9c's follow-up, after its review). The seed and
--- the migrations insert visits as the owner, and are not held to it.
+-- A visit the apps insert is a check-in (Appointments.CheckInAsync, the only one): it starts when it is inserted.
+-- Before the insert, as the caller, for the apps' roles: its start is the database's wall clock, whatever was sent, as
+-- an appointment's booked_at, a result's issued_at and an acknowledgment's time are (step 9c's follow-up, after its
+-- review). Not the transaction's start, which a session holding its transaction open could make as early as it liked.
+-- So a visit the apps add never starts in the past or the future, and no visit dated to suit can take a vital sign. Any
+-- status but in progress is refused: the check-in always sends in progress, so the pages never meet the refusal (the
+-- page turns it into its "Not saved" if one ever comes). The seed and the migrations insert visits as the owner, and
+-- are not held to it.
 CREATE OR REPLACE FUNCTION ehr.check_in_visit() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
-    IF NEW.status IS DISTINCT FROM 'in-progress' OR NEW.period_start IS NULL
-       OR NEW.period_start < now() - interval '1 minute' OR NEW.period_start > clock_timestamp() + interval '1 minute' THEN
-        RAISE EXCEPTION 'A visit is started by checking the patient in: in progress, from now' USING ERRCODE = '23514';
+    IF NEW.status IS DISTINCT FROM 'in-progress' THEN
+        RAISE EXCEPTION 'A visit is started by checking the patient in, in progress' USING ERRCODE = '23514';
     END IF;
+    NEW.period_start := clock_timestamp();
     RETURN NEW;
 END
 $$;
@@ -389,21 +390,21 @@ CREATE OR REPLACE TRIGGER encounters_check_in
     FOR EACH ROW WHEN (current_user IN ('ehr_app', 'ehr_read'))
     EXECUTE FUNCTION ehr.check_in_visit();
 
--- A check-in ties the vital signs already recorded to the visit it starts, when the rule ehr.file_result decides a
--- moment's visit by (above) now gives this one (Tahseen's answer on step 9c): a moment taken from fifteen minutes
--- before the visit's start until now (and the five minutes ahead ehr.file_result lets a time be typed), that has no
--- visit or the visit of one this one wins over: one that began earlier, or at the same instant with a greater ID, the
--- order ehr.file_result picks by. So a sign's visit depends on the time it was taken alone, whether it was typed before
--- the check-in or after it. A moment moves whole, every value of it, standing or entered in error, so a reading is never
--- split, and its reading check (ehr.check_vital_reading) runs at the commit as for any change of visit. Only the visit's
--- own patient's vital signs, and only their visit: nothing else changes. After the insert of a visit the apps make,
--- which is a check-in starting now (ehr.check_in_visit, above), by a clinician with the patient on their panel
--- (30-rls.sql); the window is held to the clock as well, not only to the visit's start. As the tables' owner, since the
--- apps may not change an observation's visit (10-grants.sql); the owner's own policy lets it (observations_owner_update,
--- 30-rls.sql). Each value moved is a change of its visit, audited as any write is, as the person checking the patient
--- in. It waits for any transaction recording a value for the patient, and they for it (the lock ehr.file_result takes),
--- so none is missed. After it, nothing the apps do moves the moment again but another check-in within fifteen minutes
--- after it was taken, which the rule gives the moment to.
+-- A check-in ties the vital signs already recorded to the visit it starts, exactly when the rule ehr.file_result decides
+-- a moment's visit by (above) now gives this one (Tahseen's answer on step 9c): a moment taken from fifteen minutes
+-- before the visit's start to twelve hours after it, the same window, that has no visit or the visit of one this one
+-- wins over: one that began earlier, or at the same instant with a greater ID, the order ehr.file_result picks by. The
+-- start is the wall clock at the insert (ehr.check_in_visit, above), so the window is the clock's. So a sign's visit
+-- depends on the time it was taken alone, whether it was typed before the check-in or after it. A moment moves whole,
+-- every value of it, standing or entered in error, so a reading is never split, and its reading check
+-- (ehr.check_vital_reading) runs at the commit as for any change of visit. Only the visit's own patient's vital signs,
+-- and only their visit: nothing else changes. After the insert of a visit the apps make, by a clinician with the patient
+-- on their panel (30-rls.sql). As the tables' owner, since the apps may not change an observation's visit
+-- (10-grants.sql); the owner's own policy lets it (observations_owner_update, 30-rls.sql). Each value moved is a change
+-- of its visit, audited as any write is, as the person checking the patient in. It waits for any transaction recording
+-- a value for the patient, and they for it (the lock ehr.file_result takes), so none is missed. After it, nothing the
+-- apps do moves the moment again but another check-in within fifteen minutes after it was taken, which the rule gives
+-- the moment to; never back to a visit that began earlier.
 CREATE OR REPLACE FUNCTION ehr.attach_vital_signs() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -418,7 +419,7 @@ BEGIN
 
     UPDATE ehr.observations o SET encounter_id = NEW.id
     WHERE o.patient_id = NEW.patient_id AND o.category = 'vital-signs'
-      AND o.effective_at >= NEW.period_start - interval '15 minutes' AND o.effective_at <= clock_timestamp() + interval '5 minutes'
+      AND o.effective_at >= NEW.period_start - interval '15 minutes' AND o.effective_at <= NEW.period_start + interval '12 hours'
       AND (o.encounter_id IS NULL
            OR EXISTS (SELECT 1 FROM ehr.encounters e
                       WHERE e.id = o.encounter_id
