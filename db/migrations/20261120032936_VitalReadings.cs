@@ -46,16 +46,16 @@ namespace Ehr.Migrations
             //      events having the same time (the transaction's start) and person; values with no insert event, which
             //      the seed and the VitalSigns migration loaded, were entered together when they have the same
             //      issued_at and the visit they were loaded for (both give a visit's values the visit's start, so two
-            //      visits starting at one instant load two pairs with one issued_at; of two such pairs, the one holding
-            //      the moment's first value, whose visit 1 gives the moment, stands). Every other standing blood
-            //      pressure value of the moment is marked entered in error: an older pair whose values both stand,
-            //      "duplicate resolved by migration 9c"; where a pair stands, any other value, "not entered together
-            //      with a standing partner (migration 9c)"; where none does, a value whose partner, entered with it,
-            //      was marked in error alone under step 9b, "partner value was marked in error before readings existed
-            //      (migration 9c)" (Tahseen's rule); a value that never had a partner, the moment holding no value of
-            //      the other sign (only an insert past the apps could leave one), "blood pressure value without its
-            //      partner (migration 9c)"; and any other, "not entered together with a standing partner (migration
-            //      9c)".
+            //      visits starting at one instant load two pairs with one issued_at; of two such pairs, the one loaded
+            //      for the visit 1 gives the moment, its first value's whatever sign that is, stands, then the one with
+            //      the smaller ID). Every other standing blood pressure value of the moment is marked entered in error:
+            //      an older pair whose values both stand, "duplicate resolved by migration 9c"; where a pair stands,
+            //      any other value, "not entered together with a standing partner (migration 9c)"; where none does, a
+            //      value whose partner, entered with it, was marked in error alone under step 9b, "partner value was
+            //      marked in error before readings existed (migration 9c)" (Tahseen's rule); a value that never had a
+            //      partner, the moment holding no value of the other sign (only an insert past the apps could leave
+            //      one), "blood pressure value without its partner (migration 9c)"; and any other, "not entered
+            //      together with a standing partner (migration 9c)".
             //   5. Each standing systolic and diastolic of a moment become one reading. Values in error get readings
             //      too: a moment's systolic and diastolic in error share one only when they were marked together (the
             //      same reason, by the same person, within a second of each other: one statement marks them
@@ -194,12 +194,17 @@ namespace Ehr.Migrations
                     GROUP BY patient_id, effective_at, logged, entered_at, entered_by, loaded_for;
 
                     -- Each moment's blood pressure: the most recent pair entered together whose two values stand. Two
-                    -- loaded for two visits starting at one instant are equally recent: the one holding the moment's
-                    -- first value, whose visit 1 gives the moment, stands.
+                    -- loaded for two visits starting at one instant are equally recent: the one loaded for the visit 1
+                    -- gave the moment (its first value's, whatever sign) stands, then the one with the smaller ID.
                     CREATE TEMPORARY TABLE pressure_kept ON COMMIT DROP AS
-                    SELECT DISTINCT ON (patient_id, effective_at) patient_id, effective_at, logged, entered_at, entered_by, loaded_for
-                    FROM pressure_entries WHERE pair AND standing
-                    ORDER BY patient_id, effective_at, latest DESC, entered_at DESC, first_id;
+                    SELECT DISTINCT ON (e.patient_id, e.effective_at) e.patient_id, e.effective_at, e.logged, e.entered_at, e.entered_by, e.loaded_for
+                    FROM pressure_entries e
+                    LEFT JOIN LATERAL (
+                        SELECT o.encounter_id FROM ehr.observations o
+                        WHERE o.patient_id = e.patient_id AND o.effective_at = e.effective_at AND o.category = 'vital-signs' AND o.code IS NOT NULL
+                        LIMIT 1) m ON true
+                    WHERE e.pair AND e.standing
+                    ORDER BY e.patient_id, e.effective_at, e.latest DESC, e.entered_at DESC, (e.loaded_for IS NOT DISTINCT FROM m.encounter_id) DESC, e.first_id;
 
                     WITH marks AS (
                         SELECT v.id,

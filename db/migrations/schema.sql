@@ -1625,12 +1625,17 @@ BEGIN
     GROUP BY patient_id, effective_at, logged, entered_at, entered_by, loaded_for;
 
     -- Each moment's blood pressure: the most recent pair entered together whose two values stand. Two
-    -- loaded for two visits starting at one instant are equally recent: the one holding the moment's
-    -- first value, whose visit 1 gives the moment, stands.
+    -- loaded for two visits starting at one instant are equally recent: the one loaded for the visit 1
+    -- gave the moment (its first value's, whatever sign) stands, then the one with the smaller ID.
     CREATE TEMPORARY TABLE pressure_kept ON COMMIT DROP AS
-    SELECT DISTINCT ON (patient_id, effective_at) patient_id, effective_at, logged, entered_at, entered_by, loaded_for
-    FROM pressure_entries WHERE pair AND standing
-    ORDER BY patient_id, effective_at, latest DESC, entered_at DESC, first_id;
+    SELECT DISTINCT ON (e.patient_id, e.effective_at) e.patient_id, e.effective_at, e.logged, e.entered_at, e.entered_by, e.loaded_for
+    FROM pressure_entries e
+    LEFT JOIN LATERAL (
+        SELECT o.encounter_id FROM ehr.observations o
+        WHERE o.patient_id = e.patient_id AND o.effective_at = e.effective_at AND o.category = 'vital-signs' AND o.code IS NOT NULL
+        LIMIT 1) m ON true
+    WHERE e.pair AND e.standing
+    ORDER BY e.patient_id, e.effective_at, e.latest DESC, e.entered_at DESC, (e.loaded_for IS NOT DISTINCT FROM m.encounter_id) DESC, e.first_id;
 
     WITH marks AS (
         SELECT v.id,
