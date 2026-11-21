@@ -471,13 +471,14 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         var removedGrant = await GiveAsync(removed);
         await Accounts.ExecuteAsync(App, own, "UPDATE ehr.proxy_grants SET revoked_at = now() WHERE id = @id", ("id", removedGrant));
 
-        // What each portal session is given, in either role: patients, signed notes, addenda and visit summaries.
+        // What each portal session is given, in either role: patients, signed notes, addenda, visit summaries as the
+        // portal is given them (ehr.standing_visit_summaries), and rows of the summaries' table, which is none.
         async Task<List<string>> AsPortalAsync(string connection, Guid account, Guid? acting)
         {
             using (acting is { } chosen ? Accounts.ActingUnder(chosen) : null)
             {
                 return await Accounts.QueryAsync(connection, account,
-                    "SELECT (SELECT count(*) FROM ehr.patients) || ' ' || (SELECT count(*) FROM ehr.clinical_notes) || ' ' || (SELECT count(*) FROM ehr.note_addenda) || ' ' || (SELECT count(*) FROM ehr.visit_summaries)");
+                    "SELECT (SELECT count(*) FROM ehr.patients) || ' ' || (SELECT count(*) FROM ehr.clinical_notes) || ' ' || (SELECT count(*) FROM ehr.note_addenda) || ' ' || (SELECT count(*) FROM ehr.standing_visit_summaries(100)) || ' ' || (SELECT count(*) FROM ehr.visit_summaries)");
             }
         }
 
@@ -493,7 +494,7 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         }
 
         // Before the mark: the record and the summary, never the note or its addendum.
-        await GivenAsync("1 0 0 1", "1 0 0 1", "1 0 0 1", "0 0 0 0");
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 1 0", "0 0 0 0 0");
 
         // The two proxies' views of the summaries page, recorded the way the portal records one: a read of the patient,
         // and a read of each summary it showed, under the proxy's own account, while acting for the patient.
@@ -541,15 +542,15 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         // patient and the proxy allowed sensitive items still see it; the proxy without them doesn't; nobody in the
         // portal sees the note or its addendum.
         Assert.Equal(["true true"], await AsSuperuserAsync("SELECT sensitive || ' ' || sensitive_inherited FROM ehr.visit_summaries WHERE id = @id", ("id", summary)));
-        await GivenAsync("1 0 0 1", "1 0 0 1", "1 0 0 0", "0 0 0 0");
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 0 0", "0 0 0 0 0");
         // Nor an addendum signed to the note now that it is sensitive, nor any after the note is unmarked again.
         await AddendumAsync(colleague, patient, note, "Synthetic addendum to a sensitive note.");
-        await GivenAsync("1 0 0 1", "1 0 0 1", "1 0 0 0", "0 0 0 0");
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 0 0", "0 0 0 0 0");
 
         // Unmarked: nothing of the note is sensitive any more, so the summary's inherited mark goes and it is shown to the
         // proxy without sensitive items again; the note and its addenda still to nobody in the portal.
         await ChangeAsync(colleague, "clinical_notes", note, sensitive: false, reason: "Marked the wrong note.");
-        await GivenAsync("1 0 0 1", "1 0 0 1", "1 0 0 1", "0 0 0 0");
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 1 0", "0 0 0 0 0");
 
         Assert.NotEqual(Guid.Empty, addendum);
     }

@@ -6,7 +6,7 @@ namespace Ehr.Web.Areas.Portal.Pages;
 
 // The portal's visit summaries (the expansion plan's step 13a): what the care team wrote for the patient after a visit,
 // from a signed note, newest first, and a placeholder where one was withdrawn. Never the note itself. Which patient
-// comes from the session, never from the request (AGENTS.md), and row-level security returns nothing else anyway; no
+// comes from the session, never from the request (AGENTS.md), and the database gives nothing else anyway; no
 // summary ID is taken either: the whole list is one page. Sensitive summaries are left out until asked for, the asking
 // recorded, as everywhere: for the patient, and for a proxy the patient allowed sensitive items. For a proxy without
 // them, sensitive summaries don't exist: no count, no notice, and asking changes nothing. The read goes through the

@@ -10,7 +10,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Purpose / scenario: The visit summaries page works on a phone and from the keyboard: at 360 pixels wide nothing
 //   scrolls sideways, before or after sensitive summaries are shown, and the patient reaches "Show sensitive summaries"
 //   with Tab, sees the focus ring on it, and opens it with Enter. The notice names its state in words and the link says
-//   what it does, for a screen reader.
+//   what it does, for a screen reader. In the light theme and the dark, a withdrawn summary's placeholder is a card
+//   padded as a summary's card is, on the same surface.
 // Type: Non-functional (usability)
 // Requirements: NFR-12, proposed FR-55
 // Use case: UC 6, View my results and appointments in the portal
@@ -22,10 +23,13 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Open Visit summaries.
 //   2. Press Tab until "Show sensitive summaries" has the focus, and press Enter.
+//   3. Open Visit summaries again, in the light theme and in the dark.
 // Expected result: Step 1: the page is no wider than the window; the notice reads "Sensitive items hidden:" and its
 //   link "Show sensitive summaries". Step 2: the focused link shows the focus ring; Enter opens
-//   /portal/summaries?sensitive=true, which shows the sensitive summary and is no wider than the window either. No
-//   script errors.
+//   /portal/summaries?sensitive=true, which shows the sensitive summary and is no wider than the window either. Step 3:
+//   in each theme the page is no wider than the window, the summary's card and the placeholder are both padded by the
+//   brand's space-4 on every side (the card's padding at this width), and the placeholder's background is the summary
+//   card's, which differs between the themes. No script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -84,6 +88,35 @@ public class TC_UC6_23_Nfr12_VisitSummariesSmallScreen(WebApps apps) : IClassFix
         await page.WaitForURLAsync(url => url.EndsWith("/portal/summaries?sensitive=true", StringComparison.Ordinal));
         Assert.Contains("We talked about something private.", await page.Locator("main").TextContentAsync());
         Assert.True(await page.EvaluateAsync<bool>(fits), "The page with sensitive summaries scrolls sideways at 360 pixels.");
+
+        // In both themes: the placeholder is padded as the summary's card is, by the card's padding at this width.
+        var surfaces = new List<string>();
+        foreach (var scheme in new[] { ColorScheme.Light, ColorScheme.Dark })
+        {
+            await using var themed = await browser.NewContextAsync(new() { IgnoreHTTPSErrors = true, ColorScheme = scheme, ViewportSize = new() { Width = 360, Height = 740 } });
+            await themed.AddCookiesAsync(patient.Jar.GetCookies(Base).Cast<System.Net.Cookie>().Select(c => new Microsoft.Playwright.Cookie
+            { Name = c.Name, Value = c.Value, Domain = "localhost", Path = c.Path, Secure = true, HttpOnly = c.HttpOnly, SameSite = SameSiteAttribute.Strict }));
+            var shown = await themed.NewPageAsync();
+            shown.PageError += (_, error) => errors.Add(error);
+            await shown.GotoAsync($"{server.Url}/portal/summaries");
+            Assert.True(await shown.EvaluateAsync<bool>(fits), $"The page scrolls sideways at 360 pixels in the {scheme} theme.");
+            var space = (await shown.EvaluateAsync<string>("getComputedStyle(document.documentElement).getPropertyValue('--space-4')")).Trim();
+            var padded = $"{space} {space} {space} {space}";
+            Assert.Equal([$"standing {padded}", $"withdrawn {padded}"], await shown.EvaluateAsync<string[]>(
+                """
+                [...document.querySelectorAll('[data-summary]')].map(card => {
+                    const style = getComputedStyle(card);
+                    return `${card.dataset.summary} ${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`;
+                })
+                """));
+            // On the card surface, as the summary's card is.
+            var (placeholder, summary) = (await shown.EvaluateAsync<string>("getComputedStyle(document.querySelector('[data-summary=withdrawn]')).backgroundColor"),
+                await shown.EvaluateAsync<string>("getComputedStyle(document.querySelector('[data-summary=standing]')).backgroundColor"));
+            Assert.Equal(summary, placeholder);
+            surfaces.Add(placeholder);
+        }
+
+        Assert.NotEqual(surfaces[0], surfaces[1]);
         Assert.Empty(errors);
     }
 }

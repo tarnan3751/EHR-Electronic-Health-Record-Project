@@ -15,8 +15,8 @@ else
     @* Standing summaries and the placeholders of withdrawn ones, in one list by date, newest first; a standing one before
        a placeholder of the same date. Dated, as the results page dates a result, the day the visit's notes were signed:
        nothing ties a note to a visit's own date. *@
-    var items = summaries.Summaries.Select(s => (Date: s.NoteSignedAt, Summary: (Ehr.Domain.Phi.VisitSummaryEntry?)s, Sensitive: s.Sensitive))
-        .Concat(summaries.Withdrawn.Select(w => (Date: w.NoteSignedAt, Summary: (Ehr.Domain.Phi.VisitSummaryEntry?)null, Sensitive: w.Sensitive)))
+    var items = summaries.Summaries.Select(s => (Date: s.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)s, Sensitive: s.Sensitive))
+        .Concat(summaries.Withdrawn.Select(w => (Date: w.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)null, Sensitive: w.Sensitive)))
         .OrderByDescending(item => item.Date.UtcDateTime.Date).ThenBy(item => item.Summary is null).ThenByDescending(item => item.Date).ToList();
     <p class="sc-muted">@(own ? "Written for you by your care team after a visit" : "Written by the care team after a visit"), newest first. Each is dated the day the visit's notes were signed.</p>
     @if (Model.MaySeeSensitive && summaries.SensitiveHidden > 0)
@@ -39,7 +39,7 @@ else
             {
                 @if (item.Summary is { } summary)
                 {
-                    <li class="sc-result" data-summary="standing">
+                    <li class="sc-result sc-result--plain" data-summary="standing">
                         <h2>@summary.NoteSignedAt.UtcDateTime.ToString("MMM d, yyyy") UTC</h2>
                         <p class="sc-muted">Written by @summary.ReleasedBy@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</p>
                         <h3>@parts[0]</h3>
@@ -53,7 +53,7 @@ else
                 else
                 {
                     @* Tahseen's decision of 21 November 2026: the date and nothing else, not the text, the reason or who. *@
-                    <li class="sc-result" data-summary="withdrawn">
+                    <li class="sc-result sc-result--plain" data-summary="withdrawn">
                         <p>A visit summary from @item.Date.UtcDateTime.ToString("MMM d, yyyy") UTC was withdrawn by your care team. Contact the clinic if you have questions.</p>
                     </li>
                 }

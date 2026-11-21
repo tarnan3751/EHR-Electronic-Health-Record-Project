@@ -96,10 +96,11 @@ public sealed record VisitSummaryEntry(
 }
 
 // A patient's visit summaries as the portal lists them (step 13a), already recorded as one read of the patient and a
-// read of each summary shown: the standing ones, newest note first, and the withdrawn ones, as their dates alone; how
-// many sensitive ones were left out, and whether sensitive ones were asked for.
+// read of each summary shown: the standing ones, newest note first, as the portal is given them (no marks, reasons or
+// withdrawals), and the withdrawn ones, as their dates alone; how many sensitive ones were left out, and whether
+// sensitive ones were asked for.
 public sealed record PatientVisitSummaries(
-    Patient Patient, IReadOnlyList<VisitSummaryEntry> Summaries, IReadOnlyList<Ehr.Data.Patients.WithdrawnVisitSummary> Withdrawn, int SensitiveHidden, bool SensitiveShown);
+    Patient Patient, IReadOnlyList<Ehr.Data.Patients.PortalVisitSummary> Summaries, IReadOnlyList<Ehr.Data.Patients.WithdrawnVisitSummary> Withdrawn, int SensitiveHidden, bool SensitiveShown);
 
 // A note's visit summaries as its page shows them: the standing one first, then those withdrawn; how many sensitive ones
 // were left out, and whether sensitive ones were shown.

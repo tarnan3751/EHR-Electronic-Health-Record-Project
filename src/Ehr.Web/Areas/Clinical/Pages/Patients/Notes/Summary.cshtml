@@ -43,15 +43,17 @@ else
     @if (Model.Errors.Count > 0)
     {
         <div class="sc-notice sc-notice--danger" role="alert" data-summary-errors>
-            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not released:</span> @error</p> }
+            @for (var e = 0; e < Model.Errors.Count; e++) { <p id="summary-error-@e"><span class="sc-notice__state">Not released:</span> @Model.Errors[e]</p> }
         </div>
     }
     @for (var i = 0; i < VisitSummaries.Parts.Length; i++)
     {
+        @* Only the parts an error is about are invalid, each described by its errors first, then the hint. *@
+        string[] about = [.. Enumerable.Range(0, Model.ErrorParts.Count).Where(e => Model.ErrorParts[e] == i).Select(e => $"summary-error-{e}")];
         <div class="sc-field">
             <label for="@fields[i]">@VisitSummaries.Parts[i] <span>(required)</span></label>
             <textarea id="@fields[i]" class="sc-field__input" name="@names[i]" rows="5" maxlength="@VisitSummaries.MaxLength" required autofocus="@(i == 0 ? "autofocus" : null)"
-                      aria-describedby="summary-hint" aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)">@values[i]</textarea>
+                      aria-describedby="@string.Join(' ', [.. about, "summary-hint"])" aria-invalid="@(about.Length > 0 ? "true" : null)">@values[i]</textarea>
         </div>
     }
     <p class="sc-field__hint" id="summary-hint">Up to @VisitSummaries.MaxLength.ToString("N0") characters each. Line breaks are kept.</p>

@@ -2008,6 +2008,20 @@
         margin-bottom: 0;
     }
 
+    /* A portal card with nothing to open (a visit summary, or the placeholder of a withdrawn one): the brand guide's
+       card padding on the card itself, where the results page puts it on a card's summary line and body. */
+    .sc-result--plain {
+        padding: var(--space-4) var(--space-6);
+    }
+
+    .sc-result--plain > :first-child {
+        margin-top: 0;
+    }
+
+    .sc-result--plain > :last-child {
+        margin-bottom: 0;
+    }
+
     @media (max-width: 40rem) {
         .sc-app--portal dl.record {
             grid-template-columns: 1fr;
@@ -2024,6 +2038,10 @@
 
         .sc-result__body {
             padding: 0 var(--space-4) var(--space-4);
+        }
+
+        .sc-result--plain {
+            padding: var(--space-4);
         }
 
         .sc-app--portal .sc-panel {
