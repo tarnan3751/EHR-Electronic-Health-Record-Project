@@ -10,10 +10,11 @@ namespace Ehr.Web.Areas.Portal.Pages.Record;
 // (Print). Which patient comes from the session, never from the request (AGENTS.md), and row-level security returns
 // nothing else anyway. The page itself reads nothing of the record: it says what the copy holds, and that once it is
 // downloaded or printed, where it goes is up to the person who has it. Both are plain GETs, so the cloud app answers
-// them itself from its copy. What holds against another site: the sign-in cookie is SameSite=Strict, so a link from
-// elsewhere arrives signed out and is sent to sign in; signing in goes on to this page without the link's query
-// (Links.LocalPage), so never to the file or to sensitive items; and no answer has a CORS header, so no other site can
-// read one. Sensitive items are left out unless asked for, for the patient and for a proxy the patient allowed them;
+// them itself from its copy. What holds against another site: the sign-in cookies are SameSite=Strict, so a link from
+// elsewhere arrives signed out and is sent to sign in; either sign-in, the portal's or the staff's, at every step that
+// ends one and when already signed in, goes on to the page without the link's query (Links.LocalPage; the staff's keeps
+// a patient search's criteria and nothing else), so never to the file or to sensitive items; and no answer has a CORS
+// header, so no other site can read one. Sensitive items are left out unless asked for, for the patient and for a proxy the patient allowed them;
 // for any other proxy there is nothing to ask for, and asking changes nothing.
 public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
 {
