@@ -15,11 +15,11 @@ public sealed record WithdrawnVisitSummary(DateTimeOffset NoteSignedAt, bool Sen
 // (1 What we talked about, 2 What we found, 3 What happens next), what was found, and its kind.
 public sealed record VisitSummaryProblem(int Part, string Found, string Kind);
 
-// Asks the database about visit summaries (db/policies/52-visit-summaries.sql): its rule about the text, before one is
-// released, so the page can say what to change (the same rule refuses the row when it is inserted); once the caller
-// has withdrawn one, whether it had been viewed in the portal, so the patient can be told; and, for the portal, which
-// reads no summary's row, the standing ones and the dates of the withdrawn ones the session may know of. Raw SQL, so it
-// lives here (AGENTS.md); it runs in the caller's transaction, where the user context is set.
+// Asks the database about visit summaries (db/policies/52-visit-summaries.sql): its rule about the text, once the rule
+// has refused a summary as it was inserted, so the page can say what to change; once the caller has withdrawn one,
+// whether it had been viewed in the portal, so the patient can be told; and, for the portal, which reads no summary's
+// row, the standing ones and the dates of the withdrawn ones the session may know of. Raw SQL, so it lives here
+// (AGENTS.md); it runs in the caller's transaction, where the user context is set.
 public static class VisitSummaryChecks
 {
     // The standing summaries of the record the portal session is looking at, newest note first, up to the limit, under

@@ -16,44 +16,56 @@
 --                   a category the reference data doesn't hold as a code ("E11", "N95") is not one
 --   medication-code an RxNorm code: 5 to 7 digits standing alone, not part of a grouped or decimal number. Shorter
 --                   ones aren't checked: 1998 is captopril's code and a year
---   lab-code        a LOINC code the clinic records or orders: digits, a hyphen and its check digit ("4548-4")
+--   lab-code        a LOINC code the clinic records or orders: digits, a hyphen and its check digit ("4548-4"), among
+--                   the observation codes or the order catalog's codes. The LOINC code a catalog item stands for (its
+--                   standard_code, which no index serves) is itself one of those codes, so it isn't looked up there:
+--                   VisitSummaryPlanTests in Ehr.Security.Tests checks this of the catalog
 --   substance-code  a UNII of the reference data: 10 letters and digits
 --   order-code      the clinic's own order codes ("SYN-LAB-001")
 --   note-section    the note's whole History, Assessment or Plan, when it is 40 characters or more, copied in
 --                   (compared with case and runs of white space ignored)
 -- A word counts as one when it stands alone: nothing but a letter or digit may touch it (and for a number, no
 -- separator joining it to more digits), and case doesn't matter. Each pattern must match a real code, so ordinary
--- words, doses and dates pass: "B12", "A1c", "500 mg", "50,000 units", "2026-11-21", "1-2 tablets". Runs as the
--- caller, who must be able to read the patient and the note: a clinician.
+-- words, doses and dates pass: "B12", "A1c", "500 mg", "50,000 units", "2026-11-21", "1-2 tablets". Every word of a
+-- code's shape is collected once, with the code it would be, and each is one probe of a code table's index, for that
+-- code alone, however long the summary is and however many such words it has: LIMIT 1 keeps the planner from joining
+-- the words to a whole table, and with sequential scans off it doesn't read the observation codes, a page or two, whole
+-- for each word either (VisitSummaryPlanTests in Ehr.Security.Tests checks the plans). Runs as the caller, who must be
+-- able to read the patient and the note: a clinician.
 CREATE OR REPLACE FUNCTION ehr.visit_summary_problems(summary_patient uuid, summary_note uuid, parts text[])
     RETURNS TABLE (part integer, found text, kind text)
     LANGUAGE sql
     STABLE
     SET search_path = pg_catalog, pg_temp
+    SET enable_seqscan = off
 AS $$
     WITH part_text AS (
         SELECT p.ordinality::integer AS part, coalesce(p.body, '') AS body
         FROM unnest(parts) WITH ORDINALITY AS p(body, ordinality)
     ),
     words AS (
-        SELECT t.part, m[1] AS word, 'identifier' AS shape
-        FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:]])([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})(?![[:alnum:]])', 'gi') AS m
-        UNION ALL
-        SELECT t.part, m[1], 'diagnosis'
-        FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:].])([a-z][0-9][0-9a-z](?:\.[0-9a-z]{1,4}|[0-9a-z]{1,4})?)(?![[:alnum:]]|\.[[:alnum:]])', 'gi') AS m
-        UNION ALL
-        SELECT t.part, m[1], 'medication'
-        FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:].,/-])([0-9]{5,7})(?![[:alnum:]]|[.,/-][0-9])', 'g') AS m
-        UNION ALL
-        SELECT t.part, m[1], 'lab'
-        FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:].,/-])([0-9]{1,7}-[0-9])(?![[:alnum:]]|[.,/-][0-9])', 'g') AS m
-        UNION ALL
-        SELECT t.part, m[1], 'substance'
-        FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:]])([0-9a-z]{10})(?![[:alnum:]])', 'gi') AS m
-        WHERE m[1] ~ '[0-9]'
-        UNION ALL
-        SELECT t.part, m[1], 'order'
-        FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:]-])(syn-[0-9a-z-]*[0-9a-z])(?![[:alnum:]-])', 'gi') AS m
+        SELECT DISTINCT w.part, w.word, w.shape, w.code
+        FROM (
+            SELECT t.part, m[1] AS word, 'identifier' AS shape, NULL::text AS code
+            FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:]])([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})(?![[:alnum:]])', 'gi') AS m
+            UNION ALL
+            SELECT t.part, m[1], 'diagnosis',
+                CASE WHEN m[1] LIKE '%.%' OR length(m[1]) = 3 THEN upper(m[1]) ELSE upper(left(m[1], 3) || '.' || substr(m[1], 4)) END
+            FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:].])([a-z][0-9][0-9a-z](?:\.[0-9a-z]{1,4}|[0-9a-z]{1,4})?)(?![[:alnum:]]|\.[[:alnum:]])', 'gi') AS m
+            UNION ALL
+            SELECT t.part, m[1], 'medication', m[1]
+            FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:].,/-])([0-9]{5,7})(?![[:alnum:]]|[.,/-][0-9])', 'g') AS m
+            UNION ALL
+            SELECT t.part, m[1], 'lab', m[1]
+            FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:].,/-])([0-9]{1,7}-[0-9])(?![[:alnum:]]|[.,/-][0-9])', 'g') AS m
+            UNION ALL
+            SELECT t.part, m[1], 'substance', upper(m[1])
+            FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:]])([0-9a-z]{10})(?![[:alnum:]])', 'gi') AS m
+            WHERE m[1] ~ '[0-9]'
+            UNION ALL
+            SELECT t.part, m[1], 'order', upper(m[1])
+            FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:]-])(syn-[0-9a-z-]*[0-9a-z])(?![[:alnum:]-])', 'gi') AS m
+        ) AS w
     ),
     note AS (
         SELECT n.history, n.assessment, n.plan FROM ehr.clinical_notes n WHERE n.id = summary_note AND n.patient_id = summary_patient
@@ -66,32 +78,36 @@ AS $$
     UNION
     SELECT w.part, w.word, 'diagnosis-code'
     FROM words w
-    WHERE w.shape = 'diagnosis' AND EXISTS (
-        SELECT 1 FROM ehr.clinical_codes c
-        WHERE c.kind = 'condition' AND c.system = 'icd-10-cm'
-          AND c.code = CASE WHEN w.word LIKE '%.%' OR length(w.word) = 3 THEN upper(w.word)
-                            ELSE upper(left(w.word, 3) || '.' || substr(w.word, 4)) END)
+    CROSS JOIN LATERAL (
+        SELECT 1 FROM ehr.clinical_codes c WHERE c.kind = 'condition' AND c.system = 'icd-10-cm' AND c.code = w.code LIMIT 1) AS hit
+    WHERE w.shape = 'diagnosis'
     UNION
     SELECT w.part, w.word, 'medication-code'
     FROM words w
-    WHERE w.shape = 'medication' AND EXISTS (
-        SELECT 1 FROM ehr.clinical_codes c WHERE c.kind IN ('medication', 'allergen') AND c.system = 'rxnorm' AND c.code = w.word)
+    CROSS JOIN LATERAL (
+        SELECT 1 FROM ehr.clinical_codes c WHERE c.kind IN ('medication', 'allergen') AND c.system = 'rxnorm' AND c.code = w.code LIMIT 1) AS hit
+    WHERE w.shape = 'medication'
     UNION
     SELECT w.part, w.word, 'lab-code'
     FROM words w
-    WHERE w.shape = 'lab' AND (
-        EXISTS (SELECT 1 FROM ehr.observation_codes c WHERE c.code = w.word)
-        OR EXISTS (SELECT 1 FROM ehr.order_catalog_items i WHERE i.code = w.word)
-        OR EXISTS (SELECT 1 FROM ehr.order_catalog_items i WHERE i.standard_system = 'loinc' AND i.standard_code = w.word))
+    CROSS JOIN LATERAL (SELECT 1 FROM ehr.observation_codes c WHERE c.code = w.code LIMIT 1) AS hit
+    WHERE w.shape = 'lab'
+    UNION
+    SELECT w.part, w.word, 'lab-code'
+    FROM words w
+    CROSS JOIN LATERAL (SELECT 1 FROM ehr.order_catalog_items i WHERE i.code = w.code LIMIT 1) AS hit
+    WHERE w.shape = 'lab'
     UNION
     SELECT w.part, w.word, 'substance-code'
     FROM words w
-    WHERE w.shape = 'substance' AND EXISTS (
-        SELECT 1 FROM ehr.clinical_codes c WHERE c.kind = 'allergen' AND c.system = 'unii' AND c.code = upper(w.word))
+    CROSS JOIN LATERAL (
+        SELECT 1 FROM ehr.clinical_codes c WHERE c.kind = 'allergen' AND c.system = 'unii' AND c.code = w.code LIMIT 1) AS hit
+    WHERE w.shape = 'substance'
     UNION
     SELECT w.part, w.word, 'order-code'
     FROM words w
-    WHERE w.shape = 'order' AND EXISTS (SELECT 1 FROM ehr.order_catalog_items i WHERE i.code = upper(w.word))
+    CROSS JOIN LATERAL (SELECT 1 FROM ehr.order_catalog_items i WHERE i.code = w.code LIMIT 1) AS hit
+    WHERE w.shape = 'order'
     UNION
     SELECT t.part, substring(t.body FROM '(?i)(?<![[:alnum:]])' || regexp_replace(m.mrn, '([^[:alnum:]])', '\\\1', 'g') || '(?![[:alnum:]])'), 'record-number'
     FROM part_text t, mrn m
@@ -122,13 +138,14 @@ REVOKE ALL ON FUNCTION ehr.summary_sources_sensitive(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION ehr.summary_sources_sensitive(uuid, uuid) TO ehr_app;
 
 -- Before a summary is inserted or updated, whoever makes the change, the tables' owner included. Runs as the caller.
---   Insert, as row-level security has already required a clinician with the patient on their panel, as themselves:
---     in a READ COMMITTED transaction (below); one at a time with the note's or an addendum's sensitivity changing and
---     an addendum being signed, under the note's lock (the one ehr.change_note_sensitivity, the addenda's sensitivity
---     and their signing take), so what is read next is the note as it will stand; the note must be this patient's and
---     readable by the caller; who released it and when are the database's, and so is the note's date; it starts
---     standing; nothing ehr.visit_summary_problems finds may be in it. Sensitive if the note or any of its addenda is
---     (inherited), or if it was sent as sensitive (its own mark, by the person releasing it), as an addendum is signed.
+--   Insert, as row-level security requires a clinician with the patient on their panel, as themselves: in a READ
+--     COMMITTED transaction (below); nothing ehr.visit_summary_problems finds may be in it, which is asked first,
+--     before the lock; then one at a time with the note's or an addendum's sensitivity changing and an addendum being
+--     signed, under the note's lock (the one ehr.change_note_sensitivity, the addenda's sensitivity and their signing
+--     take), so what is read next is the note as it will stand; the note must be this patient's and readable by the
+--     caller; who released it and when are the database's, and so is the note's date; it starts standing. Sensitive if
+--     the note or any of its addenda is (inherited), or if it was sent as sensitive (its own mark, by the person
+--     releasing it), as an addendum is signed.
 --   Update: one of two changes, and nothing else.
 --     Withdrawn, once, with a reason of up to 500 characters; who and when are the database's.
 --     Marked sensitive, or unmarked, with a reason of up to 500 characters, under the note's lock, as an addendum is
@@ -154,6 +171,13 @@ BEGIN
             RAISE EXCEPTION 'A visit summary is released in a READ COMMITTED transaction' USING ERRCODE = '0A000';
         END IF;
 
+        -- The rule first, before the lock: what it reads (the text, the note's sections, the MRN and the code tables)
+        -- no change of sensitivity touches, so nobody waits on the note while it runs.
+        IF EXISTS (SELECT 1 FROM ehr.visit_summary_problems(NEW.patient_id, NEW.note_id, ARRAY[NEW.talked_about, NEW.found, NEW.next_steps])) THEN
+            RAISE EXCEPTION 'A visit summary has no codes, record numbers or identifiers, and copies no whole section of its note'
+                USING ERRCODE = '23514', CONSTRAINT = 'visit_summaries_plain';
+        END IF;
+
         PERFORM pg_advisory_xact_lock(hashtextextended('ehr.clinical_notes:' || NEW.note_id::text, 0));
         SELECT n.signed_at INTO note_signed FROM ehr.clinical_notes n WHERE n.id = NEW.note_id AND n.patient_id = NEW.patient_id;
         IF NOT FOUND THEN
@@ -172,10 +196,6 @@ BEGIN
         NEW.withdrawn_at := NULL;
         NEW.withdrawn_by := NULL;
         NEW.withdrawn_reason := NULL;
-        IF EXISTS (SELECT 1 FROM ehr.visit_summary_problems(NEW.patient_id, NEW.note_id, ARRAY[NEW.talked_about, NEW.found, NEW.next_steps])) THEN
-            RAISE EXCEPTION 'A visit summary has no codes, record numbers or identifiers, and copies no whole section of its note'
-                USING ERRCODE = '23514', CONSTRAINT = 'visit_summaries_plain';
-        END IF;
         RETURN NEW;
     END IF;
 

@@ -13,8 +13,8 @@ namespace Ehr.Domain.Notes;
 // patient on their panel, as themselves), sets who released or withdrew one and when, takes the note's date, makes it
 // sensitive with the note and its addenda, keeps one standing summary a note, refuses internal codes and identifiers,
 // tells the releaser when someone else withdraws theirs, and refuses every other change (db/policies/30-rls.sql and
-// 52-visit-summaries.sql). The same rule is asked here first, so the page can say what to change. Nothing is copied
-// from the note: the clinician writes it. Marking one sensitive afterwards is ClinicalNotes.SetSensitivityAsync's, as
+// 52-visit-summaries.sql). When its rule about codes refuses one, the rule is asked again, so the page can say what to
+// change: a summary released is checked once. Nothing is copied from the note: the clinician writes it. Marking one sensitive afterwards is ClinicalNotes.SetSensitivityAsync's, as
 // for a note or an addendum.
 public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuthority authority, IEmailSender email)
 {
@@ -59,12 +59,6 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
             return new(403, ["Add this patient to your panel to write a summary for the patient."]);
         }
 
-        var problems = await VisitSummaryChecks.ProblemsAsync(db, patient, note, parts[0], parts[1], parts[2], cancel);
-        if (problems.Count > 0)
-        {
-            return new(422, [.. problems.Select(Explain)]);
-        }
-
         object summary = new VisitSummary
         {
             Id = Guid.CreateVersion7(),
@@ -92,11 +86,19 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
         } refusal)
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            if (refusal.SqlState == PostgresErrorCodes.CheckViolation && refusal.ConstraintName == "visit_summaries_plain")
+            {
+                // The rule refused it: asked again, only now, to say what it found and where.
+                var problems = await VisitSummaryChecks.ProblemsAsync(db, patient, note, parts[0], parts[1], parts[2], cancel);
+                return new(422, problems.Count > 0
+                    ? [.. problems.Select(Explain)]
+                    : ["It has a code, a record number or an identifier in it. Write it in plain words."]);
+            }
+
             return refusal.SqlState switch
             {
                 PostgresErrorCodes.InsufficientPrivilege => new(403, ["Add this patient to your panel to write a summary for the patient."]),
                 PostgresErrorCodes.UniqueViolation => new(409, ["A summary of this note has already been released. Withdraw it first to write another."]),
-                _ when refusal.ConstraintName == "visit_summaries_plain" => new(422, ["It has a code, a record number or an identifier in it. Write it in plain words."]),
                 _ => new(404, ["This note is unavailable."]),
             };
         }

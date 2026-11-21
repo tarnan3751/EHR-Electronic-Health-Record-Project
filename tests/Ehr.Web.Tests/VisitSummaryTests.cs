@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Text.RegularExpressions;
 using Ehr.Data;
 using Ehr.Data.Audit;
@@ -95,6 +97,38 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
     // The emails sent to an address, oldest first.
     public static List<(string To, string Subject, string Body)> EmailsTo(WebApps apps, string address) =>
         [.. apps.Emails.Sent.Where(message => string.Equals(message.To, address, StringComparison.OrdinalIgnoreCase))];
+
+    // The rule about codes looks each word of a code's shape up by index, once (db/policies/52-visit-summaries.sql), so
+    // ordinary words like "B12" cost next to nothing. Before it did, each such word cost a read of the code tables, under
+    // the note's lock: on an idle laptop a release with twenty of them took 0.6 s, against 9 ms for a plain one, so fifty
+    // would take about 1.5 s. Now fifty take about as long as none. The bound, a second for the fastest of three
+    // releases, leaves a busy machine a wide margin over that and is still under what the old rule took on an idle one;
+    // the fastest, because a busy machine can stall any one request, and the rule's cost is in every one.
+    [Fact]
+    public async Task A_summary_with_fifty_ordinary_words_shaped_like_codes_is_released_in_well_under_a_second()
+    {
+        var (_, patient, session) = await OrderTests.OnPanelAsync(apps);
+        // Dosing times, vitamins, a gene, spinal levels and the like, and made-up ones of the same shape: none is a code.
+        string[] words = ["A1c", "B12", "H2O", "Q2h", "Q3h", "Q4h", "Q6h", "Q8h", "Q12h", "Q24h", "G6PD", "H1N1", "L5S1", "C5a", "P2Y12",
+            .. Enumerable.Range(0, 35).Select(i => $"{(char)('A' + i % 26)}{i % 9 + 1}{(char)('t' + i / 26)}")];
+        Assert.Equal(50, words.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        var found = "Words that look like codes and aren't: " + string.Join(", ", words) + ".";
+        using var client = Client(apps.OnPrem, session.Jar, followRedirects: false);
+        var fastest = TimeSpan.MaxValue;
+        for (var i = 0; i < 3; i++)
+        {
+            var note = await SignedNoteAsync(session.Client, patient);
+            using var page = await session.Client.GetAsync(SummaryPath(patient, note), Cancel);
+            var watch = Stopwatch.StartNew();
+            using var released = await PostFormAsync(client, SummaryPath(patient, note), page,
+                ("TalkedAbout", TalkedAbout), ("Found", found), ("NextSteps", NextSteps), ("Sensitive", false));
+            watch.Stop();
+            Assert.Equal(HttpStatusCode.Redirect, released.StatusCode);
+            fastest = watch.Elapsed < fastest ? watch.Elapsed : fastest;
+        }
+
+        Assert.True(fastest < TimeSpan.FromSeconds(1), $"Released in {fastest.TotalMilliseconds:F0} ms at the fastest.");
+    }
 
     // The chart shows which signed notes have a summary in the portal from the notes statement it already makes: the
     // chart is the page nearest the render gate, so the tag costs no statement of its own (step 7a).
