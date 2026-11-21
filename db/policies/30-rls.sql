@@ -743,6 +743,62 @@ CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
         )
     );
 
+-- Visit summaries (PHI; step 13a): what a clinician writes for the patient from a signed note. Clinicians read them
+-- all, withdrawn ones too, as they read the notes. No portal session reads the table: row-level security can't keep
+-- some of a row's columns (how and why it was marked sensitive, and by whom; its note; its withdrawal) from a session
+-- that may read the row. The portal is given the standing ones of the patient it is looking at, a sensitive one only
+-- where ehr.portal_sees_sensitive says so, through ehr.standing_visit_summaries, and of a withdrawn one only its date,
+-- through ehr.withdrawn_visit_summaries (52-visit-summaries.sql). An earlier build had a policy for the portal's reads,
+-- visit_summaries_own_select: it is dropped. The note and its addenda stay out of the portal: those two functions are
+-- the portal's only way to anything written from a note. A clinician with the patient on their active panel releases
+-- one, as themselves, and withdraws one or changes its sensitivity, a withdrawn one's too. Who withdrew one and when
+-- are the trigger's, from the person signed in as the row changes; it holds every change and decides who may unmark
+-- (52-visit-summaries.sql). A statement that changes who is signed in part-way could record someone else as having
+-- withdrawn one: the known limit of a note's mark (step 10b) and a reading in error (step 9b), which needs arbitrary
+-- SQL as the app's role, and with that anyone can be signed in as anyone. Nothing deletes one (10-grants.sql). Admins
+-- and nobody see none.
+ALTER TABLE ehr.visit_summaries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.visit_summaries FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS visit_summaries_clinician_select ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_clinician_select ON ehr.visit_summaries FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS visit_summaries_own_select ON ehr.visit_summaries;
+DROP POLICY IF EXISTS visit_summaries_panel_insert ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_panel_insert ON ehr.visit_summaries FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND released_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    );
+DROP POLICY IF EXISTS visit_summaries_panel_update ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_panel_update ON ehr.visit_summaries FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    );
+-- The portal's summaries and placeholders (ehr.standing_visit_summaries, ehr.withdrawn_visit_summaries) and the check
+-- that a withdrawn summary had been viewed (ehr.withdrawn_summary_was_viewed) run as the tables' owner, which forced
+-- row-level security binds too: this lets them read the summaries, and nothing changes one. The owner's alone; no
+-- runtime role is or can become it.
+DROP POLICY IF EXISTS visit_summaries_owner_select ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_owner_select ON ehr.visit_summaries FOR SELECT TO ehr_owner USING (true);
+
 -- UC 1 (Tahseen Arnan). Orders (PHI) are read as signed notes are: by every clinician, on the chart's access model. A
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;
 -- the signing trigger also locks, checks for a duplicate and sets the time (60-orders.sql). The one update is

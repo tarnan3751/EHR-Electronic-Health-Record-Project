@@ -189,6 +189,10 @@ CREATE OR REPLACE TRIGGER note_addenda_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.note_addenda
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
+CREATE OR REPLACE TRIGGER visit_summaries_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.visit_summaries
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
 CREATE OR REPLACE TRIGGER ai_note_reviews_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.ai_note_reviews
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();

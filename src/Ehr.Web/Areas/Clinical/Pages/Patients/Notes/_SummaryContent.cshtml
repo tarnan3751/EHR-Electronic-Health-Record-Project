@@ -1,0 +1,21 @@
+@model Ehr.Domain.Phi.VisitSummaryEntry
+@* A visit summary's three parts, read-only, their text kept as it was typed (step 13a). A withdrawn one is struck
+   through: it is no longer what the patient reads. *@
+@{
+    string[] parts = [Model.TalkedAbout, Model.Found, Model.NextSteps];
+    var withdrawn = Model.WithdrawnAt is not null;
+}
+<section class="sc-note">
+    @for (var i = 0; i < parts.Length; i++)
+    {
+        <h3>@Ehr.Domain.Notes.VisitSummaries.Parts[i]</h3>
+        @if (withdrawn)
+        {
+            <p class="sc-note__text sc-muted"><s>@parts[i]</s></p>
+        }
+        else
+        {
+            <p class="sc-note__text">@parts[i]</p>
+        }
+    }
+</section>

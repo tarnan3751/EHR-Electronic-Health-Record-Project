@@ -53,7 +53,10 @@ public static class InboxItemKind
     // Someone else added an addendum to a note the recipient signed (step 10b).
     public const string Addendum = "addendum";
 
-    public static readonly string[] All = [Message, Result, RefillRequest, EmergencyAccessReview, Addendum];
+    // Someone else withdrew a visit summary the recipient released (step 13a).
+    public const string SummaryWithdrawn = "summary-withdrawn";
+
+    public static readonly string[] All = [Message, Result, RefillRequest, EmergencyAccessReview, Addendum, SummaryWithdrawn];
 
     // What the inbox calls each kind.
     public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
@@ -63,6 +66,7 @@ public static class InboxItemKind
         [RefillRequest] = "Refill request",
         [EmergencyAccessReview] = "Emergency access to review",
         [Addendum] = "Addendum to your note",
+        [SummaryWithdrawn] = "Visit summary withdrawn",
     };
 }
 

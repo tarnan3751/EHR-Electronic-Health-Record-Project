@@ -101,6 +101,9 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<NoteAddendum> NoteAddenda => Set<NoteAddendum>();
 
+    // What a clinician wrote for the patient from a signed note (step 13a): PHI, and the portal's way to a note.
+    public DbSet<VisitSummary> VisitSummaries => Set<VisitSummary>();
+
     // UC 1: the orders clinicians sign, PHI like the chart (read them only through the PHI reader), and the catalog of
     // what can be ordered, which isn't.
     public DbSet<Order> Orders => Set<Order>();

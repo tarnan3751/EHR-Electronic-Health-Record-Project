@@ -37,19 +37,21 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 11 | Read-only FHIR API | done | expansion/step-11-fhir-api | expansion-step-11 | [44844959277](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44844959277) | New use case UC 19; proposed FR-53. Authorization change: a new API group. Blood pressure waited for step 9c |
 | 11b | FHIR: a child's screening value | done | expansion/step-11b-fhir-screening-values | expansion-step-11b | [44848677796](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44848677796) | Mine: found when steps 9d and 11 met on the integration branch |
 | 12 | Simulated lab | done | expansion/step-12-simulated-lab | expansion-step-12, expansion-phase-3 | [44873790074](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44873790074) | New use case UC 20; proposed FR-54. Authorization change (a keyed service door) and db/policies; migration `LabKeys`. Last step of phase 3 |
-| 13a | Visit summaries | not started | | | | |
-| 13b | Download my record | not started | | | | |
-| 13c | Who viewed my record | not started | | | | |
+| 13a | Visit summaries | done | expansion/step-13a-visit-summaries | expansion-step-13a | [44931978491](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/actions/runs/44931978491) | Extends UC 6 (Simar), UC 14 (Satwik), UC 4 (Diego: a chart tag) and UC 15; proposed FR-55. Touches `db/policies`; migration `VisitSummaries`, a new table |
+| 13b | Download my record | in progress | | | | A parallel lane, with 13c, since 2026-11-21 |
+| 13c | Who viewed my record | in progress | | | | A parallel lane, with 13b. Most views read "Your record" until 13c2 |
+| 13c2 | Who viewed my record: which part | not started | | | | Mine: records which page was opened on each read, after 13a, 13b and 13c are merged, so that 13c meets "which part" before phase 4 is tagged |
 | 13d | Refill requests | not started | | | | |
 | 13e | Pre-visit forms | not started | | | | |
 | 14 | SOAP notes and templates | not started | | | | |
-| 15 | Dictation proposals beyond the note | not started | | | | asks first |
-| 16 | Ambient listening | not started | | | | asks first |
-| 17 | Languages beyond English | not started | | | | asks first |
+| 15 | Dictation proposals beyond the note | not started | | | | Approved as designed (Standing decisions, 2026-11-21) |
+| 16 | Ambient listening | not started | | | | Approved (Standing decisions). Only Tahseen can allow a recording of a real voice: tests use synthetic voices |
+| 17 | Languages beyond English | not started | | | | Spanish dictation only (Standing decisions). A gated model, or one outside MIT, Apache-2.0 or BSD, goes to Tahseen |
 | 18 | Session timeouts, emergency-access review | not started | | | | |
+| 18a | The admin audit view without clinical text | not started | | | | Added by Tahseen, 2026-11-21, with his answers on step 13a. After step 18 |
 | 19 | Passkeys | not started | | | | |
-| 20 | Desktop distribution | not started | | | | part asks first |
-| 21 | Real deployment and operations | not started | | | | asks first |
+| 20 | Desktop distribution | not started | | | | Ship unsigned, updater, remote wipe (Standing decisions). Tell Tahseen where the updater's private key is (`~/.swiftchart-secrets/`); publish nothing |
+| 21 | Real deployment and operations | not started | | | | Prepare only (Standing decisions): nothing hosted, no accounts, nothing spent; hosting itself is Tahseen's |
 
 Statuses: not started, in progress, done, blocked (with the reason in Notes).
 
@@ -178,6 +180,8 @@ Statuses: not started, in progress, done, blocked (with the reason in Notes).
 
 ## Stop and ask Tahseen before
 
+**Since 21 November 2026 the section "Standing decisions" below governs where it differs from this list:** its "What still stops" is the list of things that pause a lane, and everything else is decided and recorded.
+
 - spending money or creating any account: hosting, Apple Developer, code-signing certificates, domains, UMLS;
 - changing an existing requirement (an FR or NFR) or a documented use case's behavior beyond adding to it (steps 15 and 17 do both);
 - adding an AI model, a dataset, a code list, or a dependency whose license isn't clearly free and open (NFR-15, NFR-16), or downloading new model weights;
@@ -191,6 +195,63 @@ When you stop, and also whenever this session's context is running low:
 - push it;
 - update the status table and the log, saying exactly where to resume;
 - give Tahseen a short summary.
+
+## Standing decisions
+
+Tahseen, 21 November 2026, in his words: "Standing decisions, so you can work through the rest of the plan without stopping for me." Where a step still needs something only he can do, the step's notes in the status table say what.
+
+### Step decisions
+
+- Step 15 (dictation proposals beyond the note): approved as designed. Dictation may propose orders and allergy changes only as drafts, clearly labeled as proposed. A clinician reviews and signs each one through the normal order and allergy flows (steps 1, 2 and 8, including the safety checks). Nothing is ever placed or saved automatically, and the same grounding checks as for note fields apply. Propose new wording for FR-14 in "Requirements to propose", update the affected use cases' docs, and extend the dictation eval with synthetic cases.
+- Step 16 (ambient listening): approved.
+  - Capture starts only after the clinician confirms the patient's verbal consent, which is recorded in the audit log.
+  - Audio is kept no longer than dictation keeps it today (the service keeps nothing).
+  - English only at first. The note is drafted into the same review flow as dictation.
+  - Tests use synthetic voices generated locally with an open-licensed text-to-speech tool. Synthetic clips may be committed as test fixtures (under 1 MB each, 20 MB in total). Never record a real person; recordings of real voices still need my say-so.
+- Step 17 (languages): Spanish dictation only.
+  - Clinicians can dictate in Spanish, choosing the language per dictation.
+  - Proposed note fields come out in English. The Spanish transcript is kept and shown in the review, with source highlighting.
+  - MedASR is English-only, so add an open-licensed multilingual speech model under the model rule below.
+  - The clinician and portal screens stay English. Propose new wording for NFR-14 and add Spanish synthetic eval cases.
+- Step 20 (desktop distribution): ship unsigned. No OS code signing.
+  - Write install instructions covering the one-time warning (right-click → Open on macOS; More info → Run anyway on Windows).
+  - Build auto-update with Tauri's updater. Generate its key pair locally and keep the private key outside the repo, in ~/.swiftchart-secrets/ with permissions 600; tell me where it is. Test updates against a local update server in the stack. Don't publish anything: no GitHub releases.
+  - Build remote wipe as planned.
+- Step 21 (deployment): prepare only. Nothing is hosted, no accounts are created, and nothing is spent.
+  - Deliver deployment documentation for the clinic server and a single low-cost cloud server, plus deployment scripts (dotnet run or PowerShell, no bash) and Tailscale access rules as config.
+  - Add monitoring and alerting with open-source tools, as an optional profile in the local stack.
+  - Add an automated point-in-time restore drill that runs against the local stack.
+  - All of it tested locally.
+
+### Rules for what you may add without asking
+
+- AI models: models whose weights are under MIT, Apache-2.0 or BSD licenses may be downloaded without asking, up to 15 GB of new models in total. Record each one's source, commit and SHA-256 in the models manifest, as setup_models.py does, and never commit weights. A gated model (one that requires accepting terms on Hugging Face), or any other license, pauses that lane and goes in my next batch of questions.
+- Datasets and code lists: public domain, CC0 and CC BY are fine. Non-commercial or share-alike terms ask first (DDInter is already approved).
+- Libraries: MIT, Apache-2.0, BSD, ISC and MPL-2.0 are fine, recorded in the decision log. GPL, AGPL or anything unclear asks first.
+- Teammates' areas: go ahead. Record the heads-up in the step's notes and in the phase pull request draft; don't wait for them.
+
+### Deciding anything new
+
+When a decision comes up that this doesn't cover, decide it yourself by these principles, in order:
+1. Patient safety and privacy first: the more protective option wins.
+2. Match the course document, unless a step deliberately changes it.
+3. Prefer the smallest choice that's easy to reverse.
+
+Record each one in the decision log under "Decided without Tahseen — to review", with the alternatives you rejected, and keep going. List them in each phase's pull request draft so I review them there.
+
+If a performance or security gate can only be met by cutting scope, cut the smallest piece that doesn't drop a requirement, record it the same way, and continue. If the only way would drop a requirement, pause that lane.
+
+### What still stops
+
+Pause only the affected lane, and put the question in my next batch:
+- spending money or creating any account;
+- a model, dataset or library outside the rules above;
+- committing a recording of a real person's voice;
+- anything on main, a force-push, deleting a branch or tag, or changing repo settings;
+- CI failing for a reason two honest attempts haven't fixed;
+- a gate that can't be met without dropping a requirement.
+
+Everything else, decide and continue.
 
 ## Use-case owners
 
@@ -436,6 +497,11 @@ All of these use the portal's sizes, work for proxies (step 6) under the sensiti
 - It can run any time after step 3.
 - **In the repo:** cookie lifetimes are set in `src/Ehr.Domain/Accounts/AccountServiceCollectionExtensions.cs`; emergency access is `ehr.break_glass_accesses` and the flagged rows at `/admin/audit` (`Admin/Audit.cshtml`), with no reviewed state. Admins have no access to patient data: the review shows the patient by ID, as the audit page does.
 
+**Step 18a. The admin audit view without clinical text** (added by Tahseen, 2026-11-21; after step 18)
+- "The admin audit view shows who did what to which record, but no clinical text for any patient data, sensitive or not."
+- **In the repo:** `/admin/audit` (`Admin/Audit.cshtml`) shows an event's details through `ehr.shown_audit_details`, which today hides them only for sensitive events; the write-audit trigger (`ehr.record_write`, `db/policies/40-audit.sql`) stores the written values. Administrators therefore see the text of orders, results, non-sensitive notes and, since step 13a, non-sensitive visit summaries. Raised as an open point in steps 2b, 7 and 13a.
+- Note it in the phase 4 pull request draft (his instruction), since step 13a adds another kind of text administrators can read until this step is done.
+
 **Step 19. Passkeys**
 - Passkeys as a second factor, using the framework's built-in support if this .NET version has it. Recovery paths don't change.
 - **Touches:** authentication.
@@ -462,6 +528,7 @@ New FR IDs (FR-37 onward) and use cases (UC 15 onward), as each step defines the
 | --- | --- | --- |
 | FR-37 | 1 | The system shall let clinicians discontinue a signed order with a reason, and change one by signing a replacement, without ever editing or deleting the signed order; it shall keep who, when and why. (Extends UC 1; test cases TC-UC1-07 to TC-UC1-12.) |
 | FR-38 | 2 | The system shall let clinicians add and change a patient's allergies, medications and diagnoses, each picked from a standard code list, never deleting an entry and keeping the history of every change. (Extends UC 4; test cases TC-UC4-07 to TC-UC4-12.) |
+| UC 6 and UC 14, FR-55 | 13a | The system shall let a clinician with the patient on their panel write, from a signed note, a visit summary for the patient in three plain-language parts, refusing internal codes and identifiers, the patient's record number and a whole section of the note; release it to the patient portal for the patient and those they share their record with, under the rules for sensitive items (sensitive when the note or any of its addenda is, or when a clinician marks it); tell the patient by email with no health details; never edit a released summary, but withdraw it with a reason, leaving the portal a dated placeholder, telling its releaser when someone else withdrew it and the patient when it had been viewed; and never show the note itself in the portal. (Extends UC 6 and UC 14: test cases TC-UC6-15 to TC-UC6-23 and TC-UC14-18 to TC-UC14-25.) |
 | UC 20, FR-54 | 12 | Receive results from a lab. The system shall hand a lab that presents a key of its own, with nobody signed in, the lab orders waiting for results with only what a lab needs (the order, when it was signed, the tests still waiting with their units and the clinic's reference ranges, and the patient's current diagnoses that aren't sensitive), recording each order handed over; and shall file the lab's results through the rules a clinician's filing follows, all or none and once, telling the clinician who signed the order and recording the lab, not an account, as their source. (Test cases TC-UC20-01 to TC-UC20-06.) |
 | UC 19, FR-53 | 11 | Read a patient's record through the FHIR API. The system shall let a signed-in clinician read, through a read-only FHIR R4 API, the demographics, allergies, medications, diagnoses, results, vital signs and appointments of a patient on their panel or under emergency access in force, coded with the standard codes the record carries; shall record each read as the page that shows the same data records it; and shall leave sensitive items out unless asked for, recording the asking, and mark them restricted when included. (Test cases TC-UC19-01 to TC-UC19-06.) |
 | FR-52 | 10d | The system shall show and take times on clinician pages and in the desktop app in one configured clinic time zone, labeled with it, store them in UTC, and keep the audit log in labeled UTC. |
@@ -1019,6 +1086,55 @@ One entry per decision: date, step, the decision, and why.
   - **For Tahseen,** each built as the default shown: (1) when the clinician who signed an order can't be told (their account disabled) and nobody has the patient on their panel, a lab's result reaches no inbox; it is filed all the same (step 7's rule, unchanged). Should admins be told then? (2) A lab's results reach the portal at once, before anyone acknowledges them, as a clinician's filing does (step 7's open question, now for the lab too). (3) A lab's post that meets a different result entered by hand is refused whole, and the clinician's stands. (4) Lab orders signed before step 12 are never handed to the lab; they are resulted by hand.
   - **Open, for Tahseen:** set `idle_in_transaction_session_timeout` for the app roles, so a session left idle in a transaction can't hold back the lab's hand-over for long (not set: a session left open holds it back until it ends).
 
+- **2026-11-21, step 13a: visit summaries, as built** (proposed FR-55; extends UC 6, Simar's, and UC 14, Satwik's). From the coordinator's approved plan and eight adjustments, and Tahseen's answers to the plan's nine questions. A migration (`VisitSummaries`: the table and a new inbox kind; no data moves).
+  - *What it is.* A visit summary is its own table (`ehr.visit_summaries`), never the note: what a clinician writes for the patient from a signed note in three parts ("What we talked about", "What we found", "What happens next"), each required and up to 4,000 characters, typed from nothing with the note under the form for reference. One stands per note. It is released, never edited; a wrong one is withdrawn with a reason. The portal reads summaries and never notes or addenda. Any clinician with the patient on their panel releases and withdraws one; the note's page says who and when. The portal dates each by the day its note was signed, as the results page dates a result ("Nov 2, 2026 UTC"), since nothing ties a note to its visit's own date.
+  - *No internal codes.* One rule, held by the database (`ehr.visit_summary_problems`), which the page asks to say what it found when the rule refuses a summary (*after the review:* it asked first, so every release ran the rule twice): a UUID; the patient's own MRN; an ICD-10-CM, RxNorm (5 to 7 digits), LOINC or UNII code, or one of the clinic's own order codes, each only when it is a real code in the reference data, so doses, dates and words like "B12" or "N95" pass; and a whole section of the note of 40 characters or more. Its limit, in `docs/UC14.md`: a pasted fragment, a code typed another way, a category that isn't itself a code, and another patient's MRN get through. *After the review,* look-alikes are read as they look (characters that show nothing taken out, fullwidth and other compatibility forms folded, dashes read as hyphens); a letter of another alphabet that looks like a Latin one still gets through.
+  - **Tahseen's decisions of 21 November 2026,** on the plan's nine questions, in his words: "Keep 1, 2, 4, 5, 6 and 7 as approved.
+
+    3. Withdrawing: the portal keeps a placeholder where the summary was: 'A visit summary from <date> was withdrawn by your care team. Contact the clinic if you have questions.' No content, no reason. If the patient or a proxy had viewed the summary before it was withdrawn, send the patient the same generic email as a new summary. If the person withdrawing isn't the one who released it, the releaser gets an inbox item, as with another clinician's addendum. Add tests for the placeholder, the email only after a view, and the inbox item.
+
+    8. Keep as approved, and add a step to the plan (after step 18): the admin audit view shows who did what to which record, but no clinical text for any patient data, sensitive or not. Note it in the phase 4 pull request draft.
+
+    9. Change: a summary starts sensitive if its note or any of its addenda is sensitive at release, and the clinician can mark any summary sensitive. If the note or an addendum becomes sensitive after release, the summary becomes sensitive too, recorded as inherited, under the same inherit and unmark rules as notes and addenda. Add tests for both paths, including that a proxy without sensitive access loses the summary at once when the mark arrives."
+  - *The nine, as built,* each with the alternative not taken:
+    1. Sensitive summaries on the portal are left out until the patient, or a proxy allowed sensitive items, asks ("Show sensitive summaries", a link, so a read the cloud app answers too), and the asking is recorded as a view of sensitive items. Not built: showing them at once with a tag.
+    2. A sensitive summary's release emails the patient like any other; the email says nothing of it. Not built: no email for a sensitive one.
+    3. As he set out above (and below, "mine").
+    4. Any clinician with the patient on their panel releases and withdraws, labeled with who did. Not built: the note's signer only.
+    5. Only this patient's MRN is looked for. Not built: any patient's, which would tell a clinician whether a string is somebody's record number without a recorded read.
+    6. A whole section of the note of 40 characters or more is refused, with case and runs of white space ignored. Not built: no such rule, or a stricter one on fragments.
+    7. Each part up to 4,000 characters, all three required. Not built: a different limit, or optional parts.
+    8. An administrator sees the text of a summary that isn't sensitive in the audit log's details, as for notes today (step 2b's open point), until step 18a; a sensitive one's never.
+    9. As he set out above: sensitive at release when the note or any addendum is (inherited) or when the clinician ticks "Sensitive" (its own mark); afterwards inherited when the note or any addendum becomes sensitive (marked, or an addendum signed sensitive), cleared when none of them is; marked on its own with a reason, unmarked only by the person who marked it or the note's signer, and never while the note or an addendum is sensitive. Not built: sensitive with the note only.
+  - **Mine, for Tahseen** (each built; say if you want it otherwise):
+    - *"Viewed"* means the portal recorded a read of that summary by the patient's account or a proxy's. The portal page now records a read of each summary it shows, besides the one read of the patient (the plan had one event a view); a clinician's reading doesn't count. The database answers it (`ehr.withdrawn_summary_was_viewed`, owner-run) only to the clinician who has just withdrawn that summary, since clinicians can't read the audit log. *Corrected after the review:* "in the same transaction" was a check of the time and of who withdrew it, which a transaction of the same clinician's open since before another of theirs withdrew it also passed; it now checks that this transaction wrote the summary's row (its xmin is this transaction's, a savepoint's included). Its limits: a clinician can withdraw, ask and roll back, leaving no trace; and a view is inferred from audit rows that SQL run as the app's role, or the cloud app's shipper, can insert; either way the most it does is one generic email. A view made off-site counts once the cloud app ships it: within seconds while the link to the clinic is up, but while it is down the view waits until the link is back, so a summary withdrawn in between counts as not viewed and no email is sent (this entry said "every couple of seconds", which held only while the link was up). `docs/UC6.md` and `docs/UC14.md` say so.
+    - *The withdrawal email* is not held back by the one-a-day rule for releases, and a release the same day is held back by a withdrawn summary as by any other (the rule counts summaries released in the last day). It goes to the patient's own confirmed account only, whoever viewed it.
+    - *The placeholder* takes the withdrawn summary's place by its date; a replacement of the same visit stands beside it, before it. A withdrawn sensitive summary's placeholder is shown only to someone who could have seen the summary, once they ask, and counts in the "hidden" number; a proxy without sensitive items gets none and no hint. It carries no "Sensitive" tag. The portal gets the placeholders from `ehr.withdrawn_visit_summaries` (owner-run: the date and the sensitivity, under the standing summaries' rule), never the row, because row-level security can't hide a row's columns. *Corrected after the review:* the standing summaries came through a policy for the portal, which gave a portal session the whole row, a mark's reason and who made it included; now no portal session reads the table, and the portal gets each standing summary's ID, date, writer, three parts and mark from `ehr.standing_visit_summaries` (owner-run, under the same rule).
+    - *The inbox item* is a new kind, `summary-withdrawn` ("Visit summary withdrawn": "A visit summary you released was withdrawn"), with a link to the note and nothing of the summary or the reason, delivered by the database in the same statement (`ehr.deliver_summary_withdrawn`, owner-run); nobody is told when the releaser can no longer sign in, as for an addendum; the releaser marks it done.
+    - *An inherited mark's reason* is the database's: "Its note or an addendum to the note is sensitive.", and when cleared "Neither its note nor any addendum to the note is sensitive now." *Corrected after the review:* it was the source's own reason, which carried the words given for the note or the addendum onto the summary.
+    - *The release form doesn't offer the tick* when the note or an addendum is sensitive (the summary is sensitive anyway), as for an addendum to a sensitive note (step 10e's open point).
+    - *On the note's page,* a sensitive summary of a note that isn't sensitive is left out until asked for ("Show sensitive summaries"), and showing it is the one recorded view of sensitive items the page records for its addenda too.
+    - *Marking or unmarking a note or an addendum, and signing a sensitive addendum, now need READ COMMITTED,* as releasing a summary does, even for a note with no summary: under an older snapshot the summaries could miss a change. The apps use READ COMMITTED everywhere these happen.
+    - *The summaries' update policy has no "who may unmark" clause* (the notes' and addenda's do): any panel clinician must be able to withdraw a summary someone else marked, so the trigger alone decides who unmarks. *Corrected after the review:* its check also required a summary withdrawn since the transaction began to have been withdrawn by the person signed in. That refused a legitimate change, a colleague's withdrawal committed while the signer's transaction was open making the signer's mark of the note, of an addendum or of the summary fail, and didn't do what this entry said; it is gone. The trigger sets who withdrew one; a statement that changes who is signed in part-way could record someone else, the same known limit as steps 9b and 10b.
+    - *The clinician's chart* tags a note with a summary standing, "Summary released", from the notes query it already makes.
+    - *Not built:* a FHIR resource for summaries (UC 19 is unchanged); summaries in the desktop app's offline copy, which already has the signed notes; the portal's app bar has no "Visit summaries" link (the home page has it).
+  - *The owner's test* (`NoteSensitivitySecurityTests`, renamed `…_and_a_proxy_sees_no_note_or_addendum_and_its_summary_only_as_the_grant_allows`) keeps every assertion it made and adds the patient, a proxy without sensitive items and one whose access was removed, the summary in every count, and two proxies' real views of the summaries page that stay in the log after the mark.
+  - *UC owners:* UC 6 (Simar): a page, a link on the portal's home and a section of `docs/UC6.md`; its existing dates and test cases unchanged. UC 14 (Satwik): pages, the note's page, the note sensitivity page's wording, and a section of `docs/UC14.md`. UC 4 (Diego): the chart's tag. UC 18: two lines of `docs/UC18.md`.
+- **2026-11-21, Tahseen's standing decisions.** His words are the section "Standing decisions" above, whole; each is recorded here by name and date so the log shows when it was given.
+  - *Step 15,* dictation proposals beyond the note: approved as designed (drafts only, labeled as proposed, signed through the normal order and allergy flows with their safety checks, nothing placed or saved automatically, the same grounding checks; new wording for FR-14 to propose; eval extended with synthetic cases).
+  - *Step 16,* ambient listening: approved (capture only after the patient's verbal consent is confirmed and audited; audio kept no longer than dictation keeps it; English first; the same review flow; synthetic voices only, clips under 1 MB each and 20 MB in total; a real voice needs his say-so).
+  - *Step 17,* languages: Spanish dictation only (chosen per dictation; fields in English; the Spanish transcript kept and shown with source highlighting; an open-licensed multilingual speech model under the model rule; screens stay English; new wording for NFR-14 to propose; Spanish synthetic eval cases).
+  - *Step 20,* desktop distribution: ship unsigned, with install instructions for the one-time warning; Tauri's updater, its private key in `~/.swiftchart-secrets/` with permissions 600 and its place told to him; updates tested against a local update server in the stack; nothing published; remote wipe as planned.
+  - *Step 21,* deployment: prepare only (documentation, scripts in dotnet or PowerShell, Tailscale rules as config, optional open-source monitoring profile, an automated point-in-time restore drill; all tested locally; nothing hosted, no accounts, nothing spent).
+  - *What may be added without asking:* models under MIT, Apache-2.0 or BSD up to 15 GB in total, each in the manifest with source, commit and SHA-256, never committed, a gated model or other license pausing the lane; datasets and code lists that are public domain, CC0 or CC BY; libraries under MIT, Apache-2.0, BSD, ISC or MPL-2.0, recorded here; teammates' areas, with the heads-up in the step's notes and the phase pull request draft.
+  - *Deciding anything new:* patient safety and privacy first, then the course document, then the smallest reversible choice; each such decision recorded here under the heading **"Decided without Tahseen — to review"** with the alternatives rejected, and listed in the phase's pull request draft. A gate met by cutting the smallest piece that drops no requirement is recorded the same way; if only dropping a requirement would meet it, the lane pauses.
+  - *What still stops a lane:* spending money or creating an account; a model, dataset or library outside the rules; a recording of a real person's voice; anything on main, a force-push, deleting a branch or tag, repo settings; CI failing after two honest attempts; a gate that can't be met without dropping a requirement.
+  - *Effect on the plan:* the "asks first" notes are gone from steps 15, 16, 17, 20 and 21 in the status table, which now say what only he can do; "Stop and ask Tahseen before" points here.
+
+- **2026-11-21, Decided without Tahseen — to review: parallel lanes, and "which part" in two steps.**
+  - *Parallel lanes.* Tahseen asked whether independent tasks could be done by several agents in parallel; I read that as "do so". Within a phase, independent steps now run in separate developer lanes, each in a clone of its own from the same base, each reviewed and merged one at a time. About three at once: with two lanes running tests together this Mac's load passed 30 and test containers timed out. Later phases are not pulled forward, since a phase's branch should hold that phase's work only (his rule for phase 2.1). *Rejected:* one lane at a time (slower, nothing gained); every remaining step at once (false failures, and migrations from many lanes to reconcile).
+  - *Step 13c says "Your record" for most views, and step 13c2 follows.* His words for 13c are "staff name and role, when, and which part". The audit log records most reads as a read of the patient's row, whichever page was opened, so the page can tell notes, messages, visit summaries, downloads and the lab apart, and nothing else. Recording which page was opened means touching about thirty reads in `PhiReader`, the cloud queue's allow-list and the admin page: done at the same time as 13a's fixes and 13b it would put three lanes in the same lines. So 13c is built on what is recorded, and 13c2, in this phase and before its tag, records the part. *Rejected:* delivering phase 4 with "Your record" only (it drops part of what he asked for); holding 13c until the others merge (nothing gained, the page and its database door don't depend on the finer parts).
+
 ## Log
 
 One entry per session or step: date, step, what was done, measurements (p99, page JavaScript size, first contentful paint), follow-ups, and where to resume.
@@ -1241,3 +1357,14 @@ One entry per session or step: date, step, what was done, measurements (p99, pag
   - **For Tahseen:** the four defaults in the decision log's step 12 entry, and whether to set `idle_in_transaction_session_timeout` for the app roles. To see the lab on your stack, add an `EHR_LAB_KEY` line to `infra/compose/.env` (`.env.example` says how); the stack is running now with my throwaway key, and goes back to no lab the next time it is brought up from `.env` alone.
 - **2026-11-21, end of phase 3.** Tag `expansion-phase-3` and branch `expansion/phase-3`, at the merge of step 12. The pull request title and description are under "Phase merges"; Tahseen opens it, after phase 2's. Nothing was pushed to `main`, no pull request was opened, no history was rewritten and no branch or tag was deleted or moved.
   - *Resume at phase 4,* step 13a, visit summaries: rewrite the sensitive-note proxy test there (Tahseen's note under 13a).
+- **2026-11-21, step 13a. Visit summaries (extends UC 6 and UC 14; proposed FR-55).** Built by a developer agent from an approved plan, in a clone of its own, and applied here as patches; reviewed twice. Migration `VisitSummaries` (one new table, `ehr.visit_summaries`; no data moves). **Protected paths: `db/policies`** (`52-visit-summaries.sql`, new: the plain-words rule, the guard and no-delete triggers, the inherit-and-follow trigger, the withdrawal's inbox item, and three owner-run functions, `ehr.standing_visit_summaries`, `ehr.withdrawn_visit_summaries` and `ehr.withdrawn_summary_was_viewed`; `30-rls.sql`, the table's policies, with no policy for portal sessions; `10-grants.sql`; `40-audit.sql`). No authorization attribute or policy changed.
+  - *What it does:* from a signed note, its signer or another clinician with the patient on their panel writes a summary for the patient in three parts (what we talked about, what we found, what happens next), which the database refuses while it holds a diagnosis, medication, lab or order code, a record number or an ID, or a line copied from the note. Released, it can't be changed, only withdrawn with a reason; the portal then keeps Tahseen's placeholder sentence in its place, the patient gets the generic email only if the summary had been viewed, and a releaser who isn't the one withdrawing gets an inbox item. A summary starts sensitive when its note or an addendum is, can be marked on its own, and follows its sources afterwards under the note-and-addendum rules; a proxy without sensitive items loses it at once and is given no hint of it. The patient and proxies read summaries at `/portal/summaries`.
+  - *Tahseen's test:* the sensitive-note proxy test (`NoteSensitivitySecurityTests`) is rewritten as he asked, keeping every earlier assertion: a proxy is given no note, no addendum and, without sensitive items, no summary of a sensitive note, and no portal session reads a row of the table at all.
+  - *Reviews:* (1) failed, though no route to a note's text, a withdrawn summary or another patient's data worked: a portal session could read, from the database, the note's own sensitivity reason copied onto the summary, and that a summary had once been sensitive; the plain-words rule scanned the code tables for every code-shaped word, twice a release and under the note's lock (16 to 18 seconds at worst); one clause of the update policy refused marking a note after a colleague's withdrawal and did not do what its comment said. Fixed: portal sessions get summaries only through `ehr.standing_visit_summaries`, seven columns and no more, and an inherited mark carries a fixed reason; the rule looks each word up by index, once, before the lock (the same worst case now takes 2 to 12 ms; a release with twenty such words went from 605 ms to 10 ms); the clause is gone and the comment says what holds. Also fixed: characters that show nothing or look alike (zero-width, fullwidth, other dashes) are read as they look, with what is stored left as typed; the "was it viewed" check answers only for the transaction's own withdrawal; a note with no addenda has its own test; the portal page records its reads in one statement. (2) passed: each fix confirmed by the reviewer's own probes, 47 ordinary phrases ("A1c", "B12", "COVID-19", "10–20 mg") still accepted, no test weakened, every mutation but one harmless one caught.
+  - *Known limits, written down in `docs/UC14.md` and the decision log:* the rule can't catch a code typed with a space in it (a hair space is nearly invisible) or with another alphabet's look-alike letter; SQL as the app role can change the user mid-statement (the same limit as steps 9b and 10b); a clinician can withdraw, ask whether the summary was viewed and roll back; a view made off-site while the link is down reaches the audit log late, so a withdrawal in between sends no email.
+  - *Mine to own:* my first brief let the portal read the table through a policy; the review showed that hands a portal session every column. And the Mac's disk filled during this step (several lanes' clones, test databases and Docker's build cache), which stopped Docker for every lane for about an hour and a half: finished clones and the unused build cache were removed, and lanes now keep one clone, run the full gate once on a finished series, and leave the 50,000-patient benchmark to CI.
+  - *Checked on the local stack through the pages, before and after the fixes:* a summary written from a new signed note; "J06.9" refused with only its own part marked; released; read in the portal as the patient at 1280 and 360 px; withdrawn with a reason; the placeholder in its place, padded as the summary's card is. No ID or MRN in the portal's markup.
+  - *Gates:* format clean; Release build; 1,125 tests, 1,074 pass, 51 performance cases skipped without a results file; cargo fmt, clippy and tests pass (the desktop's copy of the stylesheet changed); CI green on the final head, its benchmark job passing (summary form 9.0 ms, withdraw form 8.0, portal summaries 4.9 as the patient and 5.3 as a proxy, at p99 excluding the commit). Screenshots, light and dark, looked at: the note with and without a summary, the form, a refusal, the withdraw form, the chart's tag, and the portal page at 1280 and 360.
+  - *Not done:* after a refusal the keyboard focus returns to the first part, not the part named (the message names it and the part is marked); the other portal cards (messages, appointments, the record chooser, access) have the same missing padding the summary cards had.
+  - *Heads-up for teammates:* Simar (UC 6: a new portal page, a home link, TC-UC6-15 to 23), Satwik (UC 14: the note's page gains the summary section and its sensitivity; TC-UC14-18 to 25), Diego (UC 4: a "summary" tag on the chart's note list), and UC 15 gains the inbox kind `summary-withdrawn`.
+  - *Resume:* merge steps 13b and 13c as their reviews pass, then 13c2, 13d and 13e.

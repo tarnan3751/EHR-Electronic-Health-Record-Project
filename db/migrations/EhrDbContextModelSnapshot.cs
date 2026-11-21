@@ -590,7 +590,7 @@ namespace Ehr.Migrations
 
                     b.ToTable("inbox_items", "ehr", t =>
                         {
-                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum')");
+                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn')");
 
                             t.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
                         });
@@ -2286,6 +2286,123 @@ namespace Ehr.Migrations
                     b.ToTable("patient_enrollments", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.VisitSummary", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Found")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("found");
+
+                    b.Property<string>("NextSteps")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("next_steps");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("note_id");
+
+                    b.Property<DateTimeOffset>("NoteSignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("note_signed_at");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<DateTimeOffset>("ReleasedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("ReleasedBy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("released_by")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
+                    b.Property<DateTimeOffset?>("SensitiveChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sensitive_changed_at");
+
+                    b.Property<bool>("SensitiveInherited")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive_inherited");
+
+                    b.Property<Guid?>("SensitiveMarkedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sensitive_marked_by");
+
+                    b.Property<string>("SensitiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("sensitive_reason");
+
+                    b.Property<string>("TalkedAbout")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("talked_about");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("withdrawn_by");
+
+                    b.Property<string>("WithdrawnReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("withdrawn_reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_visit_summaries");
+
+                    b.HasIndex("NoteId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_visit_summaries_note_id")
+                        .HasFilter("withdrawn_at IS NULL");
+
+                    b.HasIndex("ReleasedBy")
+                        .HasDatabaseName("ix_visit_summaries_released_by");
+
+                    b.HasIndex("SensitiveMarkedBy")
+                        .HasDatabaseName("ix_visit_summaries_sensitive_marked_by");
+
+                    b.HasIndex("WithdrawnBy")
+                        .HasDatabaseName("ix_visit_summaries_withdrawn_by");
+
+                    b.HasIndex("NoteId", "PatientId")
+                        .HasDatabaseName("ix_visit_summaries_note_id_patient_id");
+
+                    b.HasIndex("PatientId", "NoteSignedAt")
+                        .HasDatabaseName("ix_visit_summaries_patient_id_note_signed_at");
+
+                    b.ToTable("visit_summaries", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_visit_summaries_found", "found ~ '[^[:space:]]' AND char_length(found) <= 4000");
+
+                            t.HasCheckConstraint("ck_visit_summaries_inherited", "sensitive OR NOT sensitive_inherited");
+
+                            t.HasCheckConstraint("ck_visit_summaries_next_steps", "next_steps ~ '[^[:space:]]' AND char_length(next_steps) <= 4000");
+
+                            t.HasCheckConstraint("ck_visit_summaries_talked_about", "talked_about ~ '[^[:space:]]' AND char_length(talked_about) <= 4000");
+
+                            t.HasCheckConstraint("ck_visit_summaries_withdrawn", "(withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawn_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_reason ~ '[^[:space:]]')");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Proxies.ProxyGrant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3301,6 +3418,43 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_patient_enrollments_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.VisitSummary", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_summaries_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ReleasedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_summaries_staff_users_released_by");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("SensitiveMarkedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_visit_summaries_staff_users_sensitive_marked_by");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_visit_summaries_staff_users_withdrawn_by");
+
+                    b.HasOne("Ehr.Data.Patients.ClinicalNote", null)
+                        .WithMany()
+                        .HasForeignKey("NoteId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_summaries_clinical_notes_note_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Proxies.ProxyGrant", b =>

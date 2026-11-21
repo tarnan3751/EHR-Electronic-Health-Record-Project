@@ -42,11 +42,23 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
         var patient = await Accounts.PatientAsync(database, clinician);
         // An inbox item of the kind step 10b added: rolling back past that step has to take it away, since the older
         // schema's check refuses the kind.
-        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
-            "INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at) VALUES (gen_random_uuid(), @to, 'addendum', @patient, 'Synthetic', now())",
-            ("to", clinician), ("patient", patient));
+        // Step 13a's kind likewise.
+        foreach (var kind in new[] { "addendum", "summary-withdrawn" })
+        {
+            await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+                "INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at) VALUES (gen_random_uuid(), @to, @kind, @patient, 'Synthetic', now())",
+                ("to", clinician), ("kind", kind), ("patient", patient));
+        }
+
         await MigrateAsync(BeforeStep9);
-        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.inbox_items WHERE kind = 'addendum'"));
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.inbox_items WHERE kind IN ('addendum', 'summary-withdrawn')"));
+        // Nor of step 13a: the triggers it put on the notes and addenda, and its functions.
+        Assert.Equal(["0"], await AsSuperuserAsync(
+            """
+            SELECT ((SELECT count(*) FROM pg_trigger WHERE tgname IN ('clinical_notes_follow_summaries', 'note_addenda_follow_summaries', 'note_addenda_signed_follow_summaries'))
+                + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'ehr'::regnamespace AND proname IN ('follow_summary_sources', 'guard_visit_summary', 'reject_visit_summary_delete',
+                    'deliver_summary_withdrawn', 'standing_visit_summaries', 'withdrawn_visit_summaries', 'withdrawn_summary_was_viewed', 'visit_summary_problems', 'summary_sources_sensitive')))::text
+            """));
         // Nothing of step 10b is left behind for the older schema to carry.
         Assert.Equal(["0"], await AsSuperuserAsync(
             """
