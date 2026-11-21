@@ -11,9 +11,10 @@ namespace Ehr.Web.CloudAudit;
 public static class CloudAuditEvents
 {
     // Exactly what the cloud app records: PhiReader reads of patients, private drafts/reviews, signed notes, message
-    // threads or visit summaries (forced RLS decides visibility), a patient's record downloaded from the portal (step
-    // 13b), or a sign-out as StaffSignIn and PatientSignIn record it, with the patient for a patient's. All by an actor,
-    // none with a reason or details. The JSON the on-prem app reads can hold null where an event should be.
+    // threads or visit summaries (forced RLS decides visibility), or of the patient's part of the audit log, the portal's
+    // "Who viewed my record" (step 13c), which names no row; a patient's record downloaded from the portal (step 13b); or
+    // a sign-out as StaffSignIn and PatientSignIn record it, with the patient for a patient's. All by an actor, none with
+    // a reason or details. The JSON the on-prem app reads can hold null where an event should be.
     public static bool IsAllowed([NotNullWhen(true)] AuditEvent? e) =>
         e is not null
         && e.Id != Guid.Empty
@@ -26,7 +27,8 @@ public static class CloudAuditEvents
             AuditActions.Read => e.PatientId is { } patient && patient != Guid.Empty
                 && (e.TableName == PhiReader.PatientsTable && e.RowId == patient
                     || e.TableName is "clinical_notes" or "clinical_drafts" or "ai_note_reviews" or "ai_field_proposals" or PhiReader.ThreadsTable or PhiReader.SummariesTable
-                        && e.RowId is { } row && row != Guid.Empty),
+                        && e.RowId is { } row && row != Guid.Empty
+                    || e.TableName == PhiReader.AuditTable && e.RowId is null),
             // Asking the chart for a patient's sensitive items, off-site as on-site; and a portal download of the record,
             // with them or without.
             AuditActions.ReadSensitive or AuditActions.Download or AuditActions.DownloadSensitive =>

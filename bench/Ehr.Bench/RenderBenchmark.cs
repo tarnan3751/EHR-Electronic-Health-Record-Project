@@ -196,6 +196,10 @@ internal static partial class RenderBenchmark
                     var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
                     return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
                 }));
+                // Who viewed my record (step 13c): a year of views of each record in the audit log beyond the run's own, and a
+                // panels' table of a clinic's size, which a proxy's page reads.
+                await FillViewsAsync(database, clinicianId, portalPatient, panel[0]);
+                await FillPanelHistoryAsync(database, portalPatient, panel[0]);
                 // Kept to the end, off-site rows included: the off-site portal rows use the same session.
                 var portalSession = new CookieContainer();
                 // Download my record (step 13b) is measured for the seeded patient with the most entries too.
@@ -214,6 +218,7 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
                     // Download my record (step 13b): the page, the FHIR file and the printable page.
                     results.AddRange(await MeasureRecordAsync(portal, times, "", "the patient's own", page: true));
+                    results.Add(await MeasureAsync(portal, times, "Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
                     // The same session, now looking at the record it holds a proxy grant for: every page first checks
                     // the grant, and every policy resolves the subject through it.
                     using (var chosen = await PostFormAsync(portal, "/portal/acting", await portal.GetStringAsync("/portal/access"), ("grantId", proxyGrant.ToString())))
@@ -233,6 +238,7 @@ internal static partial class RenderBenchmark
                     {
                         results.AddRange(await MeasureRecordAsync(largest, times, "", "the largest seeded record", page: false));
                     }
+                    results.Add(await MeasureAsync(portal, times, "Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
 
                     if (database is null)
                     {
@@ -478,6 +484,7 @@ internal static partial class RenderBenchmark
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "as a proxy", page: false));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
             using (var mine = await PostFormAsync(portal, "/portal/acting?handler=Mine", await portal.GetStringAsync("/portal/summaries")))
             {
                 if (mine.RequestMessage?.RequestUri?.AbsolutePath != "/portal")
@@ -490,6 +497,7 @@ internal static partial class RenderBenchmark
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "the patient's own", page: true));
             using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
             results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
             return results;
         }
         finally
@@ -1400,6 +1408,85 @@ internal static partial class RenderBenchmark
             """, connection);
         command.Parameters.AddWithValue("recipient", clinicianId);
         command.Parameters.AddWithValue("patients", panel.Take(InboxSize).ToArray());
+        await command.ExecuteNonQueryAsync();
+    }
+
+    const int ViewsPerRecord = 20_000;
+
+    const int EndedAssignments = 5_000;
+
+    // Step 13c: the panels' table as a clinic's would be after a year or two, which a page of a proxy without sensitive
+    // items reads whole for the patient's history (42-record-views.sql): 5,000 ended assignments of seeded patients, with
+    // twenty colleagues of the benchmark's clinician (disabled accounts, so nobody signs in as them), three of them for
+    // each record given, by colleagues, ended two years ago: they change no line the pages show. Without these the table
+    // held the run's hundred, and a page that read it badly looked fast. As the database's superuser, in the benchmark's own
+    // database only: with --stack the table is the stack's.
+    static async Task FillPanelHistoryAsync(MigratedDatabase? database, params Guid[] records)
+    {
+        if (database is null)
+        {
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            WITH colleagues AS (
+                INSERT INTO ehr.staff_users (id, user_name, normalized_user_name, email, normalized_email, email_confirmed, phone_number_confirmed,
+                    two_factor_enabled, lockout_enabled, lockout_end, access_failed_count, display_name, roles, must_change_password)
+                SELECT gen_random_uuid(), x.email, upper(x.email), x.email, upper(x.email), true, false, false, true, now() + interval '100 years', 0,
+                       'Synthetic Colleague ' || n, ARRAY['Clinician'], false
+                FROM generate_series(1, 20) AS n, LATERAL (SELECT 'bench-colleague-' || n || '-' || gen_random_uuid() || '@example.test' AS email) x
+                RETURNING id
+            ),
+            numbered AS (SELECT id, row_number() OVER (ORDER BY id) - 1 AS k FROM colleagues),
+            seeded AS (SELECT p.id, row_number() OVER (ORDER BY p.id) AS n FROM ehr.patients p LIMIT @count)
+            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at)
+            SELECT gen_random_uuid(), p.id, c.id, now() - make_interval(days => 700 - (p.n % 300)::int), now() - make_interval(days => 400 - (p.n % 300)::int)
+            FROM seeded p JOIN numbered c ON c.k = p.n % 20
+            UNION ALL
+            SELECT gen_random_uuid(), r.patient, c.id, now() - interval '3 years', now() - interval '2 years'
+            FROM unnest(@records) AS r(patient) CROSS JOIN (SELECT id FROM numbered WHERE k < 3) c
+            """, connection);
+        command.Parameters.AddWithValue("count", EndedAssignments);
+        command.Parameters.AddWithValue("records", records);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    // Step 13c: a year of views of each record in the audit log, 26 minutes apart, beyond those the run's own pages make.
+    // One in twenty is the clinician's read of the record; the rest are views of sensitive items, of a note, of a
+    // summary marked sensitive, or by another portal account, and events that are no view at all (a sign-in, writes).
+    // The first record's patient is shown all the views. The proxy of the second, who has no sensitive items, is shown
+    // none of them, not even the clinician's, made before the run put the record on the clinician's panel: so a page of
+    // theirs reads past the whole year, the most a page can read. As the database's superuser,
+    // in the benchmark's own database only: with --stack the pages read the run's own views.
+    static async Task FillViewsAsync(MigratedDatabase? database, Guid clinicianId, params Guid[] records)
+    {
+        if (database is null)
+        {
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), now() - make_interval(mins => n * 26), v.actor, v.action, v.table_name, r.patient, r.patient, 'onprem', v.sensitive
+            FROM unnest(@records) AS r(patient)
+            CROSS JOIN generate_series(1, @count) AS n
+            CROSS JOIN LATERAL (SELECT
+                CASE WHEN n % 20 BETWEEN 11 AND 16 THEN @other ELSE @clinician END AS actor,
+                CASE n % 20 WHEN 1 THEN 'read_sensitive' WHEN 16 THEN 'sign_in' WHEN 17 THEN 'insert' WHEN 18 THEN 'update' ELSE 'read' END AS action,
+                CASE WHEN n % 20 BETWEEN 2 AND 9 OR n % 20 = 19 THEN 'clinical_notes' WHEN n % 20 = 10 THEN 'visit_summaries'
+                     WHEN n % 20 = 16 THEN NULL WHEN n % 20 = 17 THEN 'conditions' ELSE 'patients' END AS table_name,
+                n % 20 = 10 AS sensitive) AS v
+            """, connection);
+        command.Parameters.AddWithValue("clinician", clinicianId);
+        command.Parameters.AddWithValue("other", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("records", records);
+        command.Parameters.AddWithValue("count", ViewsPerRecord);
         await command.ExecuteNonQueryAsync();
     }
 

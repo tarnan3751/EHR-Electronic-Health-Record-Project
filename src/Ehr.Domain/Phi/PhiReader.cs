@@ -1080,6 +1080,26 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return db.VisitSummaries.CountAsync(s => s.PatientId == patientId && s.ReleasedAt > since, cancellationToken);
     }
 
+    public const string AuditTable = "audit_events";
+
+    // Who viewed the record a portal session is looking at (the expansion plan's step 13c): a page of its views in the
+    // audit log, newest first, older or newer than a moment, from ehr.record_views (db/policies/42-record-views.sql),
+    // which answers only for the session's own record and only with the lines its viewer may see. Looking is a read of
+    // the patient's part of the log, recorded once, after reading, so it is listed from the next look on. Null when the
+    // session may read no such patient.
+    public async Task<IReadOnlyList<RecordViewRow>?> RecordViewsAsync(Guid patientId, DateTimeOffset? olderThan, DateTimeOffset? newerThan, CancellationToken cancellationToken)
+    {
+        if (!await db.Patients.AsNoTracking().AnyAsync(p => p.Id == patientId, cancellationToken))
+        {
+            return null;
+        }
+
+        var views = await RecordViews.ReadAsync(db, olderThan, newerThan, cancellationToken);
+        audit.Record(AuditActions.Read, patientId, AuditTable);
+        await db.SaveChangesAsync(cancellationToken);
+        return views;
+    }
+
     // Summaries as the pages show them, with the names of who released and withdrew each. Staff accounts anyone signed
     // in may read.
     IQueryable<VisitSummaryEntry> SummaryEntries(IQueryable<VisitSummary> summaries) =>
