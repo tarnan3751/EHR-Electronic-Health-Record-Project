@@ -107,6 +107,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "clinical_notes")] = ["SELECT"],
         [("ehr_app", "note_addenda")] = ["SELECT", "INSERT"],
         [("ehr_read", "note_addenda")] = ["SELECT"],
+        // Step 13a: a visit summary is released, never edited or deleted. Withdrawing it is a column grant
+        // (ExpectedColumnPrivileges).
+        [("ehr_app", "visit_summaries")] = ["SELECT", "INSERT"],
+        [("ehr_read", "visit_summaries")] = ["SELECT"],
         [("ehr_app", "clinical_drafts")] = ["SELECT", "INSERT", "UPDATE"],
         // UC 14 adds replica draft reads under the same private-author/active-panel RLS as the primary.
         [("ehr_read", "clinical_drafts")] = ["SELECT"],
@@ -295,6 +299,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Step 10b: marking a signed note or addendum sensitive, or unmarking it.
         [("ehr_app", "clinical_notes", "UPDATE")] = ["sensitive", "sensitive_reason"],
         [("ehr_app", "note_addenda", "UPDATE")] = ["sensitive", "sensitive_reason"],
+        // Step 13a: withdrawing a visit summary, and marking it sensitive or unmarking it, each with a reason.
+        [("ehr_app", "visit_summaries", "UPDATE")] = ["sensitive", "sensitive_reason", "withdrawn_reason"],
         // Step 9b: marking a vital sign entered in error.
         [("ehr_app", "observations", "UPDATE")] = ["entered_in_error_reason", "status"],
         // Marking an inbox item done.

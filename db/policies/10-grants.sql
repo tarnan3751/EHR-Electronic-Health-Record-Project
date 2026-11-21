@@ -133,6 +133,15 @@ GRANT SELECT, INSERT ON ehr.note_addenda TO ehr_app;
 GRANT UPDATE (sensitive, sensitive_reason) ON ehr.note_addenda TO ehr_app;
 GRANT SELECT ON ehr.note_addenda TO ehr_read;
 
+-- Visit summaries (step 13a): what a clinician writes for the patient from a signed note. PHI: row-level security, the
+-- write-audit trigger and the trigger that holds every change follow (52-visit-summaries.sql). A clinician releases
+-- one (INSERT). The UPDATEs the apps make are withdrawing it, with a reason, and marking it sensitive or unmarking it,
+-- with a reason, as for an addendum, on those columns alone: who and when, and whether a mark is inherited, are the
+-- database's. Never DELETE. The portal reads them on either server.
+GRANT SELECT, INSERT ON ehr.visit_summaries TO ehr_app;
+GRANT UPDATE (withdrawn_reason, sensitive, sensitive_reason) ON ehr.visit_summaries TO ehr_app;
+GRANT SELECT ON ehr.visit_summaries TO ehr_read;
+
 -- UC 1 (Tahseen Arnan). The catalog of what can be ordered: not PHI, grants only, seeded by its migration and read by
 -- both apps. Nothing at runtime changes it.
 GRANT SELECT ON ehr.order_catalog_items TO ehr_app, ehr_read;

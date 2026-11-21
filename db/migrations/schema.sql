@@ -2053,3 +2053,56 @@ VALUES ('20261121021505_LabKeys', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.inbox_items DROP CONSTRAINT ck_inbox_items_kind;
+
+CREATE TABLE ehr.visit_summaries (
+    id uuid NOT NULL,
+    note_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    talked_about text NOT NULL,
+    found text NOT NULL,
+    next_steps text NOT NULL,
+    note_signed_at timestamp with time zone NOT NULL,
+    released_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    released_at timestamp with time zone NOT NULL DEFAULT (now()),
+    sensitive boolean NOT NULL,
+    sensitive_inherited boolean NOT NULL,
+    sensitive_marked_by uuid,
+    sensitive_reason character varying(500),
+    sensitive_changed_at timestamp with time zone,
+    withdrawn_at timestamp with time zone,
+    withdrawn_by uuid,
+    withdrawn_reason character varying(500),
+    CONSTRAINT pk_visit_summaries PRIMARY KEY (id),
+    CONSTRAINT ck_visit_summaries_found CHECK (found ~ '[^[:space:]]' AND char_length(found) <= 4000),
+    CONSTRAINT ck_visit_summaries_inherited CHECK (sensitive OR NOT sensitive_inherited),
+    CONSTRAINT ck_visit_summaries_next_steps CHECK (next_steps ~ '[^[:space:]]' AND char_length(next_steps) <= 4000),
+    CONSTRAINT ck_visit_summaries_talked_about CHECK (talked_about ~ '[^[:space:]]' AND char_length(talked_about) <= 4000),
+    CONSTRAINT ck_visit_summaries_withdrawn CHECK ((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawn_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_reason ~ '[^[:space:]]')),
+    CONSTRAINT fk_visit_summaries_clinical_notes_note_id_patient_id FOREIGN KEY (note_id, patient_id) REFERENCES ehr.clinical_notes (id, patient_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_staff_users_released_by FOREIGN KEY (released_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_staff_users_sensitive_marked_by FOREIGN KEY (sensitive_marked_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_staff_users_withdrawn_by FOREIGN KEY (withdrawn_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn'));
+
+CREATE UNIQUE INDEX ix_visit_summaries_note_id ON ehr.visit_summaries (note_id) WHERE withdrawn_at IS NULL;
+
+CREATE INDEX ix_visit_summaries_note_id_patient_id ON ehr.visit_summaries (note_id, patient_id);
+
+CREATE INDEX ix_visit_summaries_patient_id_note_signed_at ON ehr.visit_summaries (patient_id, note_signed_at);
+
+CREATE INDEX ix_visit_summaries_released_by ON ehr.visit_summaries (released_by);
+
+CREATE INDEX ix_visit_summaries_sensitive_marked_by ON ehr.visit_summaries (sensitive_marked_by);
+
+CREATE INDEX ix_visit_summaries_withdrawn_by ON ehr.visit_summaries (withdrawn_by);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261121072854_VisitSummaries', '10.0.13');
+
+COMMIT;
+

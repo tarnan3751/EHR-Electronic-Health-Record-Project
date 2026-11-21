@@ -743,6 +743,61 @@ CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
         )
     );
 
+-- Visit summaries (PHI; step 13a): what a clinician writes for the patient from a signed note. Clinicians read them all,
+-- withdrawn ones too, as they read the notes. The portal reads the standing ones of the patient it is looking at, a
+-- sensitive one only where ehr.portal_sees_sensitive says so: always the patient's own, a proxy's only when the patient
+-- allowed sensitive items. Of a withdrawn one it reads only its date, through ehr.withdrawn_visit_summaries
+-- (52-visit-summaries.sql): row-level security can't keep a row's text from a session that may read the row. The note
+-- and its addenda stay out of the portal: this is the portal's only way to anything written from a note. A clinician with
+-- the patient on their active panel releases one, as themselves, and withdraws one or changes its sensitivity: a summary
+-- withdrawn in this transaction is withdrawn as the person the statement began as (the trigger sets who first); one
+-- withdrawn before keeps whoever did it. The trigger holds every change and decides who may unmark
+-- (52-visit-summaries.sql). Nothing deletes one (10-grants.sql). Admins and nobody see none.
+ALTER TABLE ehr.visit_summaries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.visit_summaries FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS visit_summaries_clinician_select ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_clinician_select ON ehr.visit_summaries FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS visit_summaries_own_select ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_own_select ON ehr.visit_summaries FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND withdrawn_at IS NULL
+        AND (NOT sensitive OR (SELECT ehr.portal_sees_sensitive())));
+DROP POLICY IF EXISTS visit_summaries_panel_insert ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_panel_insert ON ehr.visit_summaries FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND released_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    );
+DROP POLICY IF EXISTS visit_summaries_panel_update ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_panel_update ON ehr.visit_summaries FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND (withdrawn_at IS NULL OR withdrawn_at < now() OR withdrawn_by = (SELECT ehr.current_user_id()))
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    );
+-- The portal's placeholders (ehr.withdrawn_visit_summaries) and the check that a withdrawn summary had been viewed
+-- (ehr.withdrawn_summary_was_viewed) run as the tables' owner, which forced row-level security binds too: this lets
+-- them read the summaries, and nothing changes one. The owner's alone; no runtime role is or can become it.
+DROP POLICY IF EXISTS visit_summaries_owner_select ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_owner_select ON ehr.visit_summaries FOR SELECT TO ehr_owner USING (true);
+
 -- UC 1 (Tahseen Arnan). Orders (PHI) are read as signed notes are: by every clinician, on the chart's access model. A
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;
 -- the signing trigger also locks, checks for a duplicate and sets the time (60-orders.sql). The one update is
