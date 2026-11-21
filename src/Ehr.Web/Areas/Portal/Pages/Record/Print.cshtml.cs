@@ -36,6 +36,9 @@ public class PrintModel(PortalSubject subject, PhiReader phi) : PageModel
         Record = await phi.PrintableRecordAsync(subject.PatientId, Sensitive && MaySeeSensitive, IndexModel.Limit, SummariesModel.Limit, HttpContext.RequestAborted);
     }
 
+    // HEAD would read the record, and record a view, for nothing shown: refused before anything is read.
+    public IActionResult OnHead() => IndexModel.GetOnly(Response);
+
     // A status as the record codes it ("on-hold"), as a person reads it ("On hold").
     public static string Said(string code) => code.Length == 0 ? code : char.ToUpperInvariant(code[0]) + code[1..].Replace('-', ' ');
 

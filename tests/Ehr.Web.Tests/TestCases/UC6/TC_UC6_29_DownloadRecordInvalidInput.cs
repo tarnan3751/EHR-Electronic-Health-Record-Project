@@ -9,7 +9,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test Case ID: TC-UC6-29
 // Purpose / scenario: The download takes no patient from the request. Whatever a request names, in its query, its path,
 //   a form or a header, the copy is of the record the session is looking at; a proxy grant that isn't the account's
-//   opens nothing. Someone signed out, and a clinician, are sent to the portal's sign-in.
+//   opens nothing. Someone signed out, and a clinician, are sent to the portal's sign-in. A HEAD of the file or the
+//   printable page, which would read the record for nothing sent, is refused before anything is read.
 // Type: Functional (invalid input)
 // Requirements: proposed FR-56, NFR-06
 // Use case: UC 6, View my results and appointments in the portal
@@ -18,14 +19,18 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Inputs and system conditions: GET /portal/record?handler=File and /portal/record/print with patientId, patient, id
 //   and subject set to B's ID; GET /portal/record/{B's ID} and /portal/record/print/{B's ID}; POST /portal/record with
 //   B's ID in the form; X-Patient-Id and X-Forwarded-For headers; the acting cookie set to the grant B gave the third
-//   person; the same GETs signed out, and as the clinician.
+//   person; the same GETs signed out, and as the clinician; HEAD of /portal/record?handler=File, /portal/record/print
+//   (each with and without sensitive items) and /portal/record, as A.
 // Test data: B's allergy "Synthetic: another patient's quince allergy".
 // Steps:
 //   1. As A, make each request.
 //   2. Signed out, and as the clinician, ask for the file and the page.
+//   3. As A, send each HEAD.
 // Expected result: Step 1: every file and page is A's (A's MRN in it) and has nothing of B's; the paths with an ID are
-//   404; the POST gets no file and nothing of anyone's record; with the cookie naming another account's grant, A is sent to their own record, told the
-//   access ended. Nothing is recorded against B. Step 2: sent to /portal/sign-in, nothing recorded.
+//   404; the POST gets no file and nothing of anyone's record; with the cookie naming another account's grant, A is
+//   sent to their own record, told the access ended. Nothing is recorded against B. Step 2: sent to /portal/sign-in,
+//   nothing recorded. Step 3: 405 with Allow: GET for the file and the printable page, 200 for the page that offers
+//   them; no download, read or view of sensitive items recorded.
 // Creator: Tahseen Arnan
 public class TC_UC6_29_DownloadRecordInvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
@@ -107,5 +112,25 @@ public class TC_UC6_29_DownloadRecordInvalidInput(WebApps apps) : IClassFixture<
 
         // A's own: one download for each file above that answered.
         Assert.Equal(7, await apps.AuditEventsAsync(AuditActions.Download, patient.Account, patient.Patient));
+
+        // HEAD: the file and the printable page are refused before anything is read, so nothing is recorded; the page
+        // that offers them reads nothing and answers as for GET.
+        var reads = await apps.AuditEventsAsync(AuditActions.Read, patient.Account, patient.Patient);
+        foreach (var path in new[] { FilePath, PrintPath, FilePath + "&sensitive=true", PrintPath + "?sensitive=true" })
+        {
+            using var head = await patient.Client.SendAsync(new HttpRequestMessage(HttpMethod.Head, path), Cancel);
+            Assert.Equal(HttpStatusCode.MethodNotAllowed, head.StatusCode);
+            Assert.Equal(["GET"], head.Content.Headers.Allow);
+        }
+
+        using (var head = await patient.Client.SendAsync(new HttpRequestMessage(HttpMethod.Head, PagePath), Cancel))
+        {
+            Assert.Equal(HttpStatusCode.OK, head.StatusCode);
+        }
+
+        Assert.Equal(7, await apps.AuditEventsAsync(AuditActions.Download, patient.Account, patient.Patient));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.DownloadSensitive, patient.Account, patient.Patient));
+        Assert.Equal(reads, await apps.AuditEventsAsync(AuditActions.Read, patient.Account, patient.Patient));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.ReadSensitive, patient.Account, patient.Patient));
     }
 }

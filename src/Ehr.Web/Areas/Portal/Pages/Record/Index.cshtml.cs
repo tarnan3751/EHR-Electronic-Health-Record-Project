@@ -47,4 +47,16 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
 
         return new FhirRecordFile(FhirRecord.Bundle(record, at), FhirRecord.FileName(at));
     }
+
+    // HEAD asks for what a GET would send, without its body: for the file, that would read the record and record a
+    // download with nothing sent. So it is refused before anything is read, as the FHIR API refuses every method but GET.
+    // The page itself reads nothing, and answers HEAD as it answers GET.
+    public IActionResult OnHeadFile() => GetOnly(Response);
+
+    // 405, with Allow: GET.
+    internal static IActionResult GetOnly(HttpResponse response)
+    {
+        response.Headers.Allow = HttpMethods.Get;
+        return new StatusCodeResult(StatusCodes.Status405MethodNotAllowed);
+    }
 }
