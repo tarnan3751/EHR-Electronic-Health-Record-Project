@@ -12,36 +12,39 @@ using static Ehr.Web.Tests.ResultTests;
 namespace Ehr.Web.Tests.TestCases.UC20;
 
 // Test Case ID: TC-UC20-04
-// Purpose / scenario: Whatever isn't the lab, by its key, on the clinic's server, gets nothing through the door: a
-//   request without the key or with a wrong one, a clinician's cookie or the desktop app's token with or without it,
-//   and any request through the cloud site, which has no door and doesn't pass a lab's key on. A server with no lab's
-//   key has no door: an address with nothing there is held to sign-in, as any is. A database with no key's hash (the
-//   migration job run without EHR_LAB_KEY) lets no lab in, and the results pages, which go by the database, say
-//   nothing of a lab.
+// Purpose / scenario: Whatever isn't the lab, by its key alone, on the clinic's network, gets nothing through the door:
+//   a request without the key or with a wrong one; the right key carried beside any of the app's sign-ins, a
+//   clinician's cookie, a patient's portal cookie or the desktop app's token; and any request through the cloud site,
+//   which has no door and forwards nothing under it. A server with no lab's key has no door: an address with nothing
+//   there is held to sign-in, as any is. A database with no key's hash (the migration job run without EHR_LAB_KEY) lets
+//   no lab in, and the results pages, which go by the database, say nothing of a lab. An order discontinued while the
+//   lab works on it takes no results.
 // Type: Functional (exceptional condition)
 // Requirements: proposed FR-54, with NFR-06
 // Use case: UC 20, Receive results from a lab
 // Preconditions: A clinician on the on-site app has the patient on their panel and has signed a complete blood count
-//   for them; they are signed in on both sites, and the desktop app has a session token.
+//   for them; they are signed in on both sites, the desktop app has a session token, and the patient has a portal
+//   account, signed in.
 // Inputs and system conditions: GET /api/lab/orders and POST /api/lab/orders/{id}/results on the on-site app with no
-//   key, a wrong key, the clinician's cookie, the desktop token alone and with the lab's key; the same with the lab's
-//   key on the cloud site, with its link to the on-site app up and cut off; on an on-site app with no Ehr:Lab:Key; and
-//   with the database holding no key's hash. GET /patients/{id}/orders/{order}/results in each case.
+//   key, a wrong key, and the lab's key beside the clinician's cookie, the portal cookie and the desktop token; the
+//   same with the lab's key on the cloud site, with its link to the on-site app up and cut off; on an on-site app with
+//   no Ehr:Lab:Key; and with the database holding no key's hash. GET /patients/{id}/orders/{order}/results in each
+//   case. The simulated lab's code, in process.
 // Test data: Hemoglobin (718-7) 9.1 g/dL; the wrong key "not-the-lab-key-but-long-enough-to-look-real".
 // Steps:
-//   1. Ask for orders and post results on the on-site app without a key, with a wrong key, with the clinician's cookie,
-//      with the desktop token, and with the token beside the lab's key.
+//   1. Ask for orders and post results on the on-site app without a key, with a wrong key, with the clinician's cookie
+//      and with the desktop token alone; then with the lab's key beside the clinician's cookie, beside the patient's
+//      portal cookie, and beside the desktop token.
 //   2. On the cloud site, with the lab's key: ask for orders; post results; post again with the link cut off.
 //   3. On an on-site app without Ehr:Lab:Key: ask and post.
 //   4. With the database holding no key's hash: ask, post, and open the results page; then with it back, open it again.
 //   5. Sign a TSH. Run a round of the simulated lab, which is handed it; discontinue the TSH; run a round once its
 //      results are due.
-// Expected result: Step 1: 401 unauthorized each. Step 2: the ask finds no door (401, with no lab's answer, as for
-//   any address before sign-in) and isn't forwarded; the post is forwarded without X-Lab-Key and refused 401
-//   unauthorized; cut off, 503 "Not saved". Step 3: no door, each.
-//   Step 4: 503 not-ready each, and the page has no "Lab connected"; with the hash back, it says "Lab connected:". Until
-//   then no result is filed and no order handed over. Step 5: the lab is handed the TSH, then told it was discontinued
-//   and drops it; nothing is filed.
+// Expected result: Step 1: 401 unauthorized each. Step 2: no door, each time (401, with no lab's answer, as for any
+//   address before sign-in), and nothing is forwarded to the clinic's server, link up or cut off. Step 3: no door,
+//   each. Step 4: 503 not-ready each, and the page has no "Lab connected"; with the hash back, it says "Lab connected:".
+//   Until then no result is filed and no order handed over. Step 5: the lab is handed the TSH, then told it was
+//   discontinued and drops it; nothing is filed.
 // Creator: Tahseen Arnan
 public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -86,26 +89,26 @@ public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var desktop = Client(apps.OnPrem, key: null);
         desktop.DefaultRequestHeaders.Authorization = new("Bearer", token);
         await RefusedAsync(desktop, HttpStatusCode.Unauthorized, "unauthorized");
+        // The right key, beside each way of being signed in to the app.
+        var (portal, _) = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, patient);
         var desktopWithKey = Client(apps.OnPrem);
         desktopWithKey.DefaultRequestHeaders.Authorization = new("Bearer", token);
-        await RefusedAsync(desktopWithKey, HttpStatusCode.Unauthorized, "unauthorized");
+        foreach (var signedIn in new[] { session.Client, portal, desktopWithKey })
+        {
+            if (!signedIn.DefaultRequestHeaders.Contains("X-Lab-Key"))
+            {
+                signedIn.DefaultRequestHeaders.Add("X-Lab-Key", MigratedDatabase.LabKey);
+            }
+
+            await RefusedAsync(signedIn, HttpStatusCode.Unauthorized, "unauthorized");
+        }
 
         // Step 2.
+        var forwarded = apps.Forwarded.Count;
         await NoDoorAsync(await Client(apps.Cloud).GetAsync(Orders, Cancel));
-
-        using (var posted = await PostAsync(Client(apps.Cloud), order, collected, (Hemoglobin, 9.1m, "g/dL")))
-        {
-            Assert.Equal(HttpStatusCode.Unauthorized, posted.StatusCode);
-            Assert.Equal("unauthorized", await RefusalAsync(posted));
-        }
-
-        Assert.Contains($"POST {ResultsPath(order)}", apps.Forwarded);
-        Assert.DoesNotContain(apps.Forwarded, request => request.StartsWith($"GET {Orders}", StringComparison.Ordinal));
-        using (var cutOff = await PostAsync(Client(apps.CloudCutOff), order, collected, (Hemoglobin, 9.1m, "g/dL")))
-        {
-            Assert.Equal(HttpStatusCode.ServiceUnavailable, cutOff.StatusCode);
-            Assert.Equal("Not saved: the on-prem server can't be reached.", await cutOff.Content.ReadAsStringAsync(Cancel));
-        }
+        await NoDoorAsync(await PostAsync(Client(apps.Cloud), order, collected, (Hemoglobin, 9.1m, "g/dL")));
+        await NoDoorAsync(await PostAsync(Client(apps.CloudCutOff), order, collected, (Hemoglobin, 9.1m, "g/dL")));
+        Assert.DoesNotContain(apps.Forwarded.Skip(forwarded), request => request.Contains(Orders, StringComparison.Ordinal));
 
         // Step 3.
         await using (var noLab = apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting(LabApiKey.Setting, "")))
@@ -137,6 +140,7 @@ public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         // Step 5: discontinued while the lab works on it.
         var since = await WatermarkAsync(apps);
         var thyroid = await SignedAsync(session.Client, patient, "lab", "Thyroid-stimulating hormone (TSH)", Cbc);
+        await SettledAsync(apps, patient);
         var log = new List<string>();
         var lab = new LabSimulator(Client(apps.OnPrem), LabSettings.Default, log.Add, since);
         Assert.Equal(new LabRound(1, 0, 0, 1), await lab.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(-1), Cancel));

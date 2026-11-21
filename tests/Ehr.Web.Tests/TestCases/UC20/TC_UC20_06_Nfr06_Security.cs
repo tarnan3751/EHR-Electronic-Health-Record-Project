@@ -35,12 +35,12 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 //   2. Ask and post with the wrong key.
 //   3. Read the log lines, the audit events about the patient, and the audit page for the patient.
 // Expected result: Step 1: 200 with exactly watermark, more and orders; the order with exactly id, signedAt, tests and
-//   conditions; each test with exactly code, unit, low, high and decimals; conditions ["E11.9"]; none of the patient's
-//   ID, MRN, family name, birth date or F32.A anywhere in the answer. Then 204, then 422 wrong-unit. Step 2: 401
-//   unauthorized each. Every answer is no-store. Step 3: a warning that a key was wrong, without either key; no log line
-//   holds the patient's ID, MRN, family name or birth date, or the order's ID; the audit log holds one sent_to_lab for
-//   the order and the result's, the order's and the inbox item's writes, all with no account and the lab as the source;
-//   the audit page shows sent_to_lab and "Lab" as who.
+//   conditions, signedAt in UTC with a Z; each test with exactly code, unit, low, high and decimals; conditions
+//   ["E11.9"]; none of the patient's ID, MRN, family name, birth date or F32.A anywhere in the answer. Then 204, then
+//   422 wrong-unit. Step 2: 401 unauthorized each. Every answer is no-store. Step 3: a warning that a key was wrong,
+//   without either key; no log line holds the patient's ID, MRN, family name or birth date, or the order's ID; the
+//   audit log holds one sent_to_lab for the order and the result's, the order's and the inbox item's writes, all with
+//   no account and the lab as the source; the audit page shows sent_to_lab and "Lab" as who.
 // Creator: Tahseen Arnan
 public class TC_UC20_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
 {
@@ -56,6 +56,7 @@ public class TC_UC20_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
         await apps.InsertConditionAsync(patient, "Depression, unspecified", code: "F32.A");
         var since = await WatermarkAsync(apps);
         var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
+        await SettledAsync(apps, patient);
         var logs = new LoggingTests.CapturedLogs();
         await using var app = apps.OnPrem.WithWebHostBuilder(builder => builder.ConfigureTestServices(services => services.AddSingleton<ILoggerProvider>(logs)));
         var lab = Client(app);
@@ -72,6 +73,7 @@ public class TC_UC20_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["conditions", "id", "signedAt", "tests"], Names(only));
         Assert.All(only.GetProperty("tests").EnumerateArray(), test => Assert.Equal(["code", "decimals", "high", "low", "unit"], Names(test)));
         Assert.Equal(["E11.9"], only.GetProperty("conditions").EnumerateArray().Select(c => c.GetString()));
+        Assert.EndsWith("Z", only.GetProperty("signedAt").GetString(), StringComparison.Ordinal);
         var text = body.GetRawText();
         foreach (var personal in new[] { patient.ToString(), WebApps.MrnOf(patient), "Orderable", "1980-01-01", "F32.A", "Depression" })
         {

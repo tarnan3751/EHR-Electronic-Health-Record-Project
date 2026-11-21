@@ -4,9 +4,12 @@ using System.Text;
 using System.Text.Json;
 using Ehr.Data;
 using Ehr.Data.Lab;
+using Ehr.Domain.Accounts;
 using Ehr.Domain.Phi;
 using Ehr.Domain.Results;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Ehr.Web.Api.Lab;
@@ -20,17 +23,21 @@ namespace Ehr.Web.Api.Lab;
 //   POST /api/lab/orders/{id}/results       one order's results, all or none; 204 when filed, or when the same was
 //                                           filed before
 //
-// Who: the lab, by the key in KeyHeader, compared in fixed time with Ehr:Lab:Key, before anything is read; and nobody
-// else's sign-in with it (a desktop token alongside the key is refused too). No account stands behind a lab, so the
-// database checks again: it is given the key's hash, finds it among what the migration job stored, and lets nobody
-// signed in through (db/policies/76-lab.sql). The cloud app maps none of this, and drops KeyHeader from every request it
-// forwards, so a lab's key is no use from the internet. The whole of /api/lab is rate-limited as one (AccountRateLimits).
+// Who: the lab, by the key in KeyHeader, hashed and compared in fixed time with the hash of Ehr:Lab:Key (LabApiKey)
+// before anything else, and carrying none of the app's credentials beside it: no Authorization header and none of the
+// staff, portal or sign-in-in-progress cookies. No account stands behind a lab, so the database checks again, by itself:
+// it is given the hash of the key the caller presented, finds it among what the migration job stored, and lets nobody
+// signed in through (db/policies/76-lab.sql). The cloud app maps none of this and forwards nothing under /api/lab
+// (CloudForwardingMiddleware), so the door is the clinic's network's alone. Requests that present the right key are
+// counted in the lab's own rate-limit window; every other request to the door, in a small window of its own, which can
+// only ever earn a 401 or a 429, so nobody without the key can make the lab's requests wait or fail (AccountRateLimits).
 //
 // What a lab gets is only what it needs, and every order handed over is recorded by the database as it is read, with
 // the lab as the source (PhiReader.LabOrdersAsync); what it files goes through the same rule a clinician's filing does,
-// and is audited the same way, as the lab's. Each request is one transaction. Every answer is no-store, and every
-// refusal is a fixed word and sentence, with nothing from the request or a patient's record; the log says what was
-// refused and never the key, an order or a patient.
+// and is audited the same way, as the lab's. Each request is one transaction. Every answer is no-store JSON, in every
+// environment: a refusal is a fixed word and sentence, with nothing from the request or a patient's record, and so is a
+// failure (Failures), which never reaches an error page. The log says what was refused or failed, and never the key,
+// an order or a patient.
 public static class LabApi
 {
     public const string Path = "/api/lab";
@@ -44,38 +51,58 @@ public static class LabApi
 
     public const int MaxResults = 50;
 
-    public static RouteGroupBuilder MapLabApi(this IEndpointRouteBuilder endpoints, LabApiKey key)
+    // The cookies of the app's sign-ins (AccountSchemes), any of which beside the key is refused.
+    static readonly string[] SignInSchemes = [AccountSchemes.Staff, AccountSchemes.Patient, AccountSchemes.StaffPending];
+
+    // Mapped only when the app has a key (Program.cs), which it then holds as a LabApiKey.
+    public static RouteGroupBuilder MapLabApi(this IEndpointRouteBuilder endpoints)
     {
-        var expected = SHA256.HashData(Encoding.UTF8.GetBytes(key.Value));
-        var keyHash = Convert.ToHexStringLower(expected);
         // No staff or patient account calls these: the key is the credential, checked here and by the database.
-        var group = endpoints.MapGroup(Path).AllowAnonymous();
+        var group = endpoints.MapGroup(Path).AllowAnonymous().AddEndpointFilter(Failures);
         group.MapGet("/orders", (HttpContext context, PhiReader reader, EhrDbContext db, CancellationToken cancellationToken) =>
-            Admitted(context, expected) is { } refused ? Task.FromResult(refused) : HandOverAsync(context, reader, db, keyHash, cancellationToken));
+            Admitted(context, out var presented) is { } refused ? Task.FromResult(refused) : HandOverAsync(context, reader, db, presented, cancellationToken));
         group.MapPost("/orders/{id:guid}/results", (Guid id, HttpContext context, LabResults results, EhrDbContext db, CancellationToken cancellationToken) =>
-                Admitted(context, expected) is { } refused ? Task.FromResult(refused) : FileAsync(id, context, results, db, keyHash, cancellationToken))
+                Admitted(context, out var presented) is { } refused ? Task.FromResult(refused) : FileAsync(id, context, results, db, presented, cancellationToken))
             .WithMetadata(new RequestSizeLimitAttribute(MaxBodySize));
         return group;
     }
 
-    // Null when the request comes from the lab: its key, and no account signed in. Every answer is no-store from here.
-    static IResult? Admitted(HttpContext context, byte[] expected)
+    // Null when the request comes from the lab: the right key, and none of the app's credentials beside it. Then
+    // `presented` is the hex SHA-256 of the key it presented, which the database checks again. Every answer is
+    // no-store from here.
+    static IResult? Admitted(HttpContext context, out string presented)
     {
         context.Response.Headers.CacheControl = "no-store";
-        var presented = context.Request.Headers[KeyHeader];
-        var signedIn = context.User.Identity?.IsAuthenticated == true;
-        if (!signedIn && CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(presented.ToString())), expected))
+        var hash = LabApiKey.Presented(context.Request);
+        presented = Convert.ToHexStringLower(hash);
+        var credentials = CarriesCredentials(context);
+        if (!credentials && context.RequestServices.GetRequiredService<LabApiKey>().Admits(hash))
         {
             return null;
         }
 
         Log(context).LogWarning(
             "A request to the lab's door from {Address} was refused: {Why}.", context.Connection.RemoteIpAddress,
-            presented.Count == 0 ? "it had no key" : signedIn ? "an account's sign-in came with it" : "its key is wrong");
-        return Refused(StatusCodes.Status401Unauthorized, "unauthorized", $"Send the lab's key in {KeyHeader}, and no account's sign-in.");
+            context.Request.Headers[KeyHeader].Count == 0 ? "it had no key" : credentials ? "it carried an account's credentials too" : "its key is wrong");
+        return Refused(StatusCodes.Status401Unauthorized, "unauthorized", $"Send the lab's key in {KeyHeader}, and none of the app's sign-ins.");
     }
 
-    static async Task<IResult> HandOverAsync(HttpContext context, PhiReader reader, EhrDbContext db, string keyHash, CancellationToken cancellationToken)
+    // Whether the request carries any way of being signed in to the app: an Authorization header (the desktop app's
+    // token, or anything else), or a cookie of one of the app's sign-ins, whole or in chunks. By their presence, not by
+    // whether they are still good: the lab has no reason to send any.
+    static bool CarriesCredentials(HttpContext context)
+    {
+        if (context.User.Identity?.IsAuthenticated == true || context.Request.Headers.ContainsKey("Authorization"))
+        {
+            return true;
+        }
+
+        var cookies = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
+        var names = SignInSchemes.Select(scheme => cookies.Get(scheme).Cookie.Name).OfType<string>().ToList();
+        return context.Request.Cookies.Keys.Any(cookie => names.Any(name => cookie.StartsWith(name, StringComparison.Ordinal)));
+    }
+
+    static async Task<IResult> HandOverAsync(HttpContext context, PhiReader reader, EhrDbContext db, string presented, CancellationToken cancellationToken)
     {
         if (!TrySince(context.Request.Query, out var since))
         {
@@ -87,10 +114,10 @@ public static class LabApi
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            handOver = await reader.LabOrdersAsync(keyHash, since, cancellationToken);
+            handOver = await reader.LabOrdersAsync(presented, since, cancellationToken);
             await transaction.CommitAsync(CancellationToken.None);
         }
-        catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.InsufficientPrivilege)
+        catch (PostgresException e) when (LabStore.IsKeyRefused(e))
         {
             return NotSetUp(context);
         }
@@ -100,7 +127,7 @@ public static class LabApi
         return Results.Json(new LabOrders(handOver.Watermark.ToString(CultureInfo.InvariantCulture), handOver.More, orders), LabJson.Options);
     }
 
-    static async Task<IResult> FileAsync(Guid order, HttpContext context, LabResults results, EhrDbContext db, string keyHash, CancellationToken cancellationToken)
+    static async Task<IResult> FileAsync(Guid order, HttpContext context, LabResults results, EhrDbContext db, string presented, CancellationToken cancellationToken)
     {
         if (!context.Request.HasJsonContentType())
         {
@@ -131,10 +158,10 @@ public static class LabApi
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            filing = await results.FileFromLabAsync(keyHash, order, post.CollectedAt, [.. post.Results.Select(r => (r.Code, r.Value, r.Unit))], cancellationToken);
+            filing = await results.FileFromLabAsync(presented, order, post.CollectedAt, [.. post.Results.Select(r => (r.Code, r.Value, r.Unit))], cancellationToken);
             await transaction.CommitAsync(CancellationToken.None);
         }
-        catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.InsufficientPrivilege)
+        catch (PostgresException e) when (LabStore.IsKeyRefused(e))
         {
             return NotSetUp(context);
         }
@@ -148,14 +175,14 @@ public static class LabApi
         return Refusal(filing);
     }
 
-    // What the database checks too, refused here before a transaction is started: 1 to MaxResults results, each test
-    // given once, with a value from 0 to under 10^8 of at most 4 decimals (what the column holds) and a unit.
+    // What the database checks too, refused here before a transaction is started: 1 to MaxResults results, none of them
+    // null, each test given once, with a value from 0 to under 10^8 of at most 4 decimals (what the column holds) and a
+    // unit. The contract's JSON refuses a missing or null field, but not a null in a list.
     static bool IsWellFormed(LabResultsPost post) =>
         post.CollectedAt != default
-        && post.Results.Count is >= 1 and <= MaxResults
-        && post.Results.Select(r => r.Code).Distinct(StringComparer.Ordinal).Count() == post.Results.Count
-        && post.Results.All(r => r.Code.Length is >= 1 and <= 20 && r.Unit.Length is >= 1 and <= 20
-            && r.Value is >= 0 and < 100_000_000 && decimal.Round(r.Value, 4) == r.Value);
+        && post.Results is { Count: >= 1 and <= MaxResults }
+        && post.Results.All(r => r is { Code.Length: >= 1 and <= 20, Unit.Length: >= 1 and <= 20, Value: >= 0 and < 100_000_000 } && decimal.Round(r.Value, 4) == r.Value)
+        && post.Results.Select(r => r.Code).Distinct(StringComparer.Ordinal).Count() == post.Results.Count;
 
     // Nothing but since, once, as the digits of a transaction ID; none means from the beginning.
     static bool TrySince(IQueryCollection query, out ulong since)
@@ -207,12 +234,32 @@ public static class LabApi
         return buffer.ToArray();
     }
 
-    // The app has a key, and the lab sent it, but the database holds another, or none: the migration job ran with a
-    // different EHR_LAB_KEY. The lab can't fix that, so it is told to try again later, and the log says what to do.
+    // The app took the key the lab sent, but the database refused it (ehr.require_lab): it holds another key's hash, or
+    // none, so the migration job ran with a different EHR_LAB_KEY from this app's Ehr:Lab:Key. The lab can't fix that, so
+    // it is told to try again later, and the log says what to do. Any other failure is Failures'.
     static IResult NotSetUp(HttpContext context)
     {
-        Log(context).LogError("The database doesn't hold the hash of this app's Ehr:Lab:Key: run the migration job with the same key as EHR_LAB_KEY.");
+        Log(context).LogError("The database refused the key this app took for the lab: run the migration job with this app's Ehr:Lab:Key as EHR_LAB_KEY.");
         return Refused(StatusCodes.Status503ServiceUnavailable, "not-ready", "The lab's door isn't ready on this server. Try again later.");
+    }
+
+    // Anything that fails behind the door answers in the door's shape, in every environment: never the developer
+    // exception page, which shows the request's headers, the key among them, nor an error page. The log names the kind
+    // of failure, and the database's code when it was the database's, and nothing from the request.
+    static async ValueTask<object?> Failures(EndpointFilterInvocationContext invocation, EndpointFilterDelegate next)
+    {
+        try
+        {
+            return await next(invocation);
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !invocation.HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            Log(invocation.HttpContext).LogError(
+                "A request to the lab's door failed: {Failure}{Code}.", e.GetType().Name, e is PostgresException database ? $", SQLSTATE {database.SqlState}" : "");
+            invocation.HttpContext.Response.Headers.CacheControl = "no-store";
+            return Refused(StatusCodes.Status500InternalServerError, "failed",
+                "The clinic's server failed to answer. Send it again later: results already filed are answered as filed.");
+        }
     }
 
     static IResult Refusal(LabFiling filing) => Refused(Words[filing].Status, Words[filing].Error, Words[filing].Message);
@@ -239,16 +286,26 @@ public static class LabApi
 }
 
 // The secret a lab's system calls the on-prem app with (Ehr:Lab:Key). The migration job is given the same as
-// EHR_LAB_KEY and stores its hash in the database. Optional: without it there is no lab and no door (Program.cs).
-public sealed record LabApiKey(string Value)
+// EHR_LAB_KEY and stores its hash in the database. Optional: without it there is no lab and no door (Program.cs), and
+// no LabApiKey. Admits is virtual only so a test can stand in for this check and show the database refuses a wrong key
+// by itself.
+public record LabApiKey(string Value)
 {
     public const string Setting = "Ehr:Lab:Key";
 
     public const int MinimumLength = 32;
+
+    readonly byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(Value));
 
     public static LabApiKey FromConfiguration(IConfiguration configuration) =>
         configuration[Setting] is { Length: >= MinimumLength } key
             ? new(key)
             : throw new InvalidOperationException(
                 $"Set {Setting} to a secret of at least {MinimumLength} characters, the one the migration job is given as EHR_LAB_KEY, or leave it empty for no lab.");
+
+    // The SHA-256 of the key a request presents in LabApi.KeyHeader, or of nothing.
+    public static byte[] Presented(HttpRequest request) => SHA256.HashData(Encoding.UTF8.GetBytes(request.Headers[LabApi.KeyHeader].ToString()));
+
+    // Whether the presented key's hash is this key's, compared in fixed time.
+    public virtual bool Admits(byte[] presented) => CryptographicOperations.FixedTimeEquals(presented, hash);
 }

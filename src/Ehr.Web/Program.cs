@@ -119,6 +119,12 @@ if (site == Site.OnPrem)
 
     // The dictation service runs beside the models, on-prem only (Api/Dictation).
     builder.Services.AddSingleton(DictationSidecar.FromConfiguration(builder.Configuration));
+
+    // A lab's key, when there is one (Api/Lab): the door, and its rate limit, check what a request presents against it.
+    if (builder.Configuration[LabApiKey.Setting] is { Length: > 0 })
+    {
+        builder.Services.AddSingleton(LabApiKey.FromConfiguration(builder.Configuration));
+    }
 }
 else
 {
@@ -216,10 +222,10 @@ if (site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Leng
 
 // A lab's system is handed the lab orders waiting for results and files their results here, with a key of its own
 // (Api/Lab, the expansion plan's step 12). Only the on-prem app, and only with a key: without one there is no lab and no
-// door. The cloud app forwards a lab's posts here without the key (CloudForwardingMiddleware), so they are refused.
+// door. The cloud app forwards nothing under /api/lab (CloudForwardingMiddleware): the door is the clinic's network's.
 if (site == Site.OnPrem && builder.Configuration[LabApiKey.Setting] is { Length: > 0 })
 {
-    app.MapLabApi(LabApiKey.FromConfiguration(builder.Configuration));
+    app.MapLabApi();
 }
 
 // The read-only FHIR R4 API, for clinicians, with the staff cookie: the whole group takes the Clinician policy, and

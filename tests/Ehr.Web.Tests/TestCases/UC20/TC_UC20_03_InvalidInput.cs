@@ -27,9 +27,12 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 //      the count a test it doesn't report, hemoglobin in g/L, and hemoglobin collected tomorrow.
 //   3. POST hemoglobin 9.1 to the count, then 9.2.
 //   4. GET the hand-over with since not a number, twice, and beside another parameter.
+//   5. POST each of the shapes JSON readers commonly let through: a null result, null fields, a number in a string, a
+//      field twice, a top-level array or null, an empty body, a time that isn't one, a number too large to read.
 // Expected result: Step 1: 415 unsupported for the text, 413 too-large for the large body, 400 malformed for the rest.
 //   Step 2: 404 unknown-order for the unknown order and the X-ray; 409 discontinued; 409 closed; 422 not-reported;
-//   422 wrong-unit; 422 in-the-future. Step 3: 204, then 409 different-result, and 9.1 stays. Step 4: 400 malformed.
+//   422 wrong-unit; 422 in-the-future. Step 3: 204, then 409 different-result, and 9.1 stays. Steps 4 and 5: 400
+//   malformed, each.
 //   Every refusal is JSON with exactly an error word and a message, holds neither the patient's name, MRN or ID nor the
 //   order's ID, and is no-store. Nothing but the one hemoglobin is filed, and nothing is handed over.
 // Creator: Tahseen Arnan
@@ -127,5 +130,36 @@ public class TC_UC20_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         }
 
         Assert.Equal(handedBefore, await apps.AuditEventsAsync("sent_to_lab", patientId: patient));
+    }
+
+    // Step 5, one shape at a time, against a fresh order: each is malformed, and files nothing.
+    public static TheoryData<string> Shapes =>
+    [
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[null]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":9.1,"unit":"g/dL"},null]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":null,"value":9.1,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":9.1,"unit":null}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":null,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":"9.1","unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":9.1,"value":9.2,"unit":"g/dL"}]}""",
+        """[{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}]""",
+        """null""",
+        "",
+        """{"collectedAt":null,"results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":null}""",
+        """{"collectedAt":"yesterday","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":1e400,"unit":"g/dL"}]}""",
+        """{"collectedAt":"2026-11-20T15:00:00Z","results":[{"code":"718-7","value":9.1,"unit":"g/dL"}],"results2":[]}""",
+    ];
+
+    [Theory]
+    [MemberData(nameof(Shapes))]
+    public async Task A_shape_the_contract_does_not_name_is_malformed(string body)
+    {
+        using var refused = await PostRawAsync(Client(apps.OnPrem), Guid.CreateVersion7(), body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal("malformed", await RefusalAsync(refused));
     }
 }

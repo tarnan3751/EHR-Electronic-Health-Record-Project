@@ -41,6 +41,27 @@ static class LabTests
         return (string)(await command.ExecuteScalarAsync(Cancel))!;
     }
 
+    // Until the lab's watermark has passed the transactions that signed the patient's lab orders. Any transaction still
+    // running from before them, such as autovacuum's analyze, holds it back for a moment, as it would a real lab's; a
+    // test that asks at once would be handed nothing yet.
+    public static async Task SettledAsync(WebApps apps, Guid patient)
+    {
+        for (var tries = 0; tries < 600; tries++)
+        {
+            var settled = await ProxyTests.QueryAsync(apps,
+                """
+                SELECT coalesce(pg_snapshot_xmin(pg_current_snapshot()) > (SELECT max(l.transaction_id) FROM ehr.change_log l
+                    JOIN ehr.orders o ON o.id = l.row_id WHERE l.table_name = 'orders' AND o.patient_id = @patient), true)::text
+                """, patient);
+            if (settled.Single() == "true")
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), Cancel);
+        }
+    }
+
     public static async Task<(HttpResponseMessage Response, JsonElement Body)> HandOverAsync(HttpClient client, string since)
     {
         var response = await client.GetAsync($"{Orders}?since={since}", Cancel);

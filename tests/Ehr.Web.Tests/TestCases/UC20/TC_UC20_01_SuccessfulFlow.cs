@@ -50,6 +50,7 @@ public class TC_UC20_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         // Step 1.
         var order = await SignedAsync(session.Client, patient, "lab", "Hemoglobin A1c", Cbc);
+        await SettledAsync(apps, patient);
         Assert.Contains("<span class=\"sc-notice__state\">Lab connected:</span>", await session.Client.GetStringAsync(Path(patient, order), Cancel));
         var signed = DateTimeOffset.Parse(
             (await ProxyTests.QueryAsync(apps, "SELECT to_char(signed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM ehr.orders WHERE patient_id = @patient", patient)).Single(),

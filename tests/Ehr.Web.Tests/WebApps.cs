@@ -482,7 +482,8 @@ public sealed class WebApps : IAsyncLifetime
                 // Every test client has the same address, so the limits are out of reach (RateLimitTests lowers them).
                 .UseSetting("RateLimits:PermitLimit", "1000000")
                 .UseSetting("RateLimits:EmailsPerAddressPerHour", "1000000")
-                .UseSetting("RateLimits:LabRequestsPerMinute", "1000000");
+                .UseSetting("RateLimits:LabRequestsPerMinute", "1000000")
+                .UseSetting("RateLimits:LabKeylessRequestsPerMinute", "1000000");
             // A lab is connected (step 12): the on-prem app has its key, and the database the key's hash
             // (MigratedDatabase). As in the stack, the cloud app isn't given it.
             if (site == Site.OnPrem)

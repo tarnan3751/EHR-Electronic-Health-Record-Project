@@ -48,6 +48,7 @@ public class TC_UC20_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         }
 
         var thyroid = await SignedAsync(session.Client, patient, "lab", "Thyroid-stimulating hormone (TSH)", Cbc);
+        await SettledAsync(apps, patient);
         var signed = DateTimeOffset.UtcNow;
 
         // Step 2.
@@ -72,6 +73,7 @@ public class TC_UC20_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 
         // Step 3.
         var vitaminD = await SignedAsync(session.Client, patient, "lab", "Vitamin D, 25-hydroxy", Cbc);
+        await SettledAsync(apps, patient);
         var thirdLog = new List<string>();
         var third = new LabSimulator(Client(apps.OnPrem), LabSettings.Default, thirdLog.Add);
         Assert.Equal(new LabRound(1, 0, 0, 1), await third.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(-1), Cancel));

@@ -9,7 +9,8 @@ namespace Ehr.Web.Forwarding;
 
 // The cloud app's write path. The replica can't take writes, so every request that could change data goes to the
 // on-prem app, which saves and renders the response; it comes back in one WAN round trip. Signing out, which saves
-// nothing, is handled here instead (HandledOffSiteAttribute). The on-prem app reports the save's WAL position, which
+// nothing, is handled here instead (HandledOffSiteAttribute), and the lab's door (Api/Lab) is never forwarded: it is the
+// clinic's network's alone. The on-prem app reports the save's WAL position, which
 // LastSaveCookie keeps. Until the replica has replayed that far, the same browser's page requests go to the on-prem
 // app too, so people see their own saves, unless the on-prem app can't save just then (OnPremStatus) and the
 // replica's copy is all there is. Other reads, PHI included, come from the replica; the PHI reader records them in the
@@ -30,7 +31,10 @@ public sealed class CloudForwardingMiddleware(
         var isPage = endpoint?.Metadata.GetMetadata<PageActionDescriptor>() is not null;
         if (!HttpMethods.IsGet(method) && !HttpMethods.IsHead(method))
         {
-            if (endpoint?.Metadata.GetMetadata<HandledOffSiteAttribute>() is not null)
+            // The lab's door is the clinic's network's alone (step 12): nothing under it is forwarded, so nobody on the
+            // internet can reach it, or use up its rate limit, through here. With no door on this app, such a request is
+            // answered here as any address with nothing there is.
+            if (endpoint?.Metadata.GetMetadata<HandledOffSiteAttribute>() is not null || context.Request.Path.StartsWithSegments(LabApi.Path))
             {
                 await next(context);
                 return;
@@ -191,8 +195,8 @@ public sealed class CloudForwardingMiddleware(
 
             // Only the shipper sends the key, straight to the on-prem app. From the internet the on-prem app is reached
             // only through here, so this closes that path: a leaked key can't be used from the internet, only from the
-            // cloud box or the clinic's network. The same for a lab's key (step 12): a lab calls the on-prem app on the
-            // clinic's network, and its posts sent here arrive without the key and are refused.
+            // cloud box or the clinic's network. The same for a lab's key (step 12), sent with any other request: the
+            // lab's own door isn't forwarded at all (above).
             proxyRequest.Headers.Remove(CloudAuditApi.KeyHeader);
             proxyRequest.Headers.Remove(LabApi.KeyHeader);
 

@@ -8,8 +8,9 @@ namespace Ehr.Web;
 
 // RateLimits: how many anonymous account POSTs (sign-in, register, forgot, resend, reset, confirm, the desktop app's
 // sign-in) one address may make per window, how many account emails one recipient may get per hour
-// (CappedEmailSender), and how many requests the lab's door takes a minute, all of them together (step 12). The
-// defaults are for production; the tests raise them, since all their clients share one address.
+// (CappedEmailSender), and how many requests the lab's door takes a minute: those with the lab's key, and, apart, all
+// the others (step 12). The defaults are for production; the tests raise them, since all their clients share one
+// address.
 public sealed class RateLimitOptions
 {
     public const string Section = "RateLimits";
@@ -20,13 +21,18 @@ public sealed class RateLimitOptions
 
     public int EmailsPerAddressPerHour { get; set; } = 3;
 
-    // A lab asks every few seconds and posts once an order: this is far above that, and bounds how fast anyone, with
-    // the key or without, can make the door work or write to the audit log (docs/UC20.md).
+    // A lab asks every few seconds and posts once an order: this is far above that, and bounds how fast the key's
+    // holder can make the door work or write to the audit log (docs/UC20.md). Only requests that present the right key
+    // count here.
     public int LabRequestsPerMinute { get; set; } = 120;
+
+    // Every other request to the lab's door, which can only earn a 401 or a 429: a window of its own, so a flood of them
+    // never touches the lab's.
+    public int LabKeylessRequestsPerMinute { get; set; } = 30;
 }
 
-// Limits the anonymous account POSTs per client address, a fixed window each, and the lab's door as one, and nothing
-// else. The address is the socket's (Connection.RemoteIpAddress), never X-Forwarded-For, which anyone can send. The cloud app limits before it
+// Limits the anonymous account POSTs per client address, a fixed window each, and the lab's door in two windows, one
+// for the requests that present the lab's key and one for all the others, and nothing else. The address is the socket's (Connection.RemoteIpAddress), never X-Forwarded-For, which anyone can send. The cloud app limits before it
 // forwards (Program.cs), so off-site clients are counted there by their own address, and the on-prem app doesn't count
 // what the cloud app forwards (ForwardedHeader). Over the limit: 429 with a page saying so, or JSON on /api.
 public static class AccountRateLimits
@@ -56,11 +62,16 @@ public static class AccountRateLimits
         });
 
     public static RateLimitPartition<string> Partition(HttpContext context, RateLimitOptions limits, string? forwardedProof = null) =>
-        // One window for every request to the lab's door, whoever sends it, checked before its key is: there is one lab.
+        // The lab's door: its key is checked first, here, which costs a hash. The lab's requests have a window of their
+        // own, which nobody without the key can touch; everyone else's share a small one, and can only earn a 401 there.
         context.Request.Path.StartsWithSegments(LabApi.Path)
-            ? RateLimitPartition.GetFixedWindowLimiter(
-                LabApi.Path,
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.LabRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })
+            ? context.RequestServices.GetService<LabApiKey>() is { } key && key.Admits(LabApiKey.Presented(context.Request))
+                ? RateLimitPartition.GetFixedWindowLimiter(
+                    LabApi.Path,
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.LabRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })
+                : RateLimitPartition.GetFixedWindowLimiter(
+                    LabApi.Path + " without the key",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.LabKeylessRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })
         : IsAccountPost(context.Request) && !IsForwarded(context.Request, forwardedProof)
             ? RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",

@@ -10,9 +10,16 @@ namespace Ehr.Data.Lab;
 // The apps' only way through the lab's door (the expansion plan's step 12): the functions in db/policies/76-lab.sql,
 // each given the hash of the lab's key. Raw SQL, so it lives in Ehr.Data (AGENTS.md); it runs on the context's
 // connection and in its transaction. Every argument is a parameter. A call without the right hash, or with someone
-// signed in, is refused by the database with insufficient_privilege.
+// signed in, is refused by the database with insufficient_privilege and the constraint name KeyRefused (IsKeyRefused).
 public static class LabStore
 {
+    // What the database names its refusal of a caller that isn't the lab (ehr.require_lab), so it is told apart from
+    // any other refusal.
+    public const string KeyRefused = "lab_key_refused";
+
+    public static bool IsKeyRefused(PostgresException e) =>
+        e.SqlState == PostgresErrorCodes.InsufficientPrivilege && e.ConstraintName == KeyRefused;
+
     // The lab orders signed by transactions from `since` up to the watermark, still waiting for results, as the JSON
     // the database writes; the database records each one handed over.
     public static async Task<LabHandOver> OrdersAsync(EhrDbContext db, string keyHash, ulong since, CancellationToken cancellationToken)
