@@ -43,14 +43,14 @@ Under each step, "In the repo" says what the step touches as the code stood when
 | 13d | Refill requests | not started | | | | |
 | 13e | Pre-visit forms | not started | | | | |
 | 14 | SOAP notes and templates | not started | | | | |
-| 15 | Dictation proposals beyond the note | not started | | | | asks first |
-| 16 | Ambient listening | not started | | | | asks first |
-| 17 | Languages beyond English | not started | | | | asks first |
+| 15 | Dictation proposals beyond the note | not started | | | | Approved as designed (Standing decisions, 2026-11-21) |
+| 16 | Ambient listening | not started | | | | Approved (Standing decisions). Only Tahseen can allow a recording of a real voice: tests use synthetic voices |
+| 17 | Languages beyond English | not started | | | | Spanish dictation only (Standing decisions). A gated model, or one outside MIT, Apache-2.0 or BSD, goes to Tahseen |
 | 18 | Session timeouts, emergency-access review | not started | | | | |
 | 18a | The admin audit view without clinical text | not started | | | | Added by Tahseen, 2026-11-21, with his answers on step 13a. After step 18 |
 | 19 | Passkeys | not started | | | | |
-| 20 | Desktop distribution | not started | | | | part asks first |
-| 21 | Real deployment and operations | not started | | | | asks first |
+| 20 | Desktop distribution | not started | | | | Ship unsigned, updater, remote wipe (Standing decisions). Tell Tahseen where the updater's private key is (`~/.swiftchart-secrets/`); publish nothing |
+| 21 | Real deployment and operations | not started | | | | Prepare only (Standing decisions): nothing hosted, no accounts, nothing spent; hosting itself is Tahseen's |
 
 Statuses: not started, in progress, done, blocked (with the reason in Notes).
 
@@ -179,6 +179,8 @@ Statuses: not started, in progress, done, blocked (with the reason in Notes).
 
 ## Stop and ask Tahseen before
 
+**Since 21 November 2026 the section "Standing decisions" below governs where it differs from this list:** its "What still stops" is the list of things that pause a lane, and everything else is decided and recorded.
+
 - spending money or creating any account: hosting, Apple Developer, code-signing certificates, domains, UMLS;
 - changing an existing requirement (an FR or NFR) or a documented use case's behavior beyond adding to it (steps 15 and 17 do both);
 - adding an AI model, a dataset, a code list, or a dependency whose license isn't clearly free and open (NFR-15, NFR-16), or downloading new model weights;
@@ -192,6 +194,63 @@ When you stop, and also whenever this session's context is running low:
 - push it;
 - update the status table and the log, saying exactly where to resume;
 - give Tahseen a short summary.
+
+## Standing decisions
+
+Tahseen, 21 November 2026, in his words: "Standing decisions, so you can work through the rest of the plan without stopping for me." Where a step still needs something only he can do, the step's notes in the status table say what.
+
+### Step decisions
+
+- Step 15 (dictation proposals beyond the note): approved as designed. Dictation may propose orders and allergy changes only as drafts, clearly labeled as proposed. A clinician reviews and signs each one through the normal order and allergy flows (steps 1, 2 and 8, including the safety checks). Nothing is ever placed or saved automatically, and the same grounding checks as for note fields apply. Propose new wording for FR-14 in "Requirements to propose", update the affected use cases' docs, and extend the dictation eval with synthetic cases.
+- Step 16 (ambient listening): approved.
+  - Capture starts only after the clinician confirms the patient's verbal consent, which is recorded in the audit log.
+  - Audio is kept no longer than dictation keeps it today (the service keeps nothing).
+  - English only at first. The note is drafted into the same review flow as dictation.
+  - Tests use synthetic voices generated locally with an open-licensed text-to-speech tool. Synthetic clips may be committed as test fixtures (under 1 MB each, 20 MB in total). Never record a real person; recordings of real voices still need my say-so.
+- Step 17 (languages): Spanish dictation only.
+  - Clinicians can dictate in Spanish, choosing the language per dictation.
+  - Proposed note fields come out in English. The Spanish transcript is kept and shown in the review, with source highlighting.
+  - MedASR is English-only, so add an open-licensed multilingual speech model under the model rule below.
+  - The clinician and portal screens stay English. Propose new wording for NFR-14 and add Spanish synthetic eval cases.
+- Step 20 (desktop distribution): ship unsigned. No OS code signing.
+  - Write install instructions covering the one-time warning (right-click → Open on macOS; More info → Run anyway on Windows).
+  - Build auto-update with Tauri's updater. Generate its key pair locally and keep the private key outside the repo, in ~/.swiftchart-secrets/ with permissions 600; tell me where it is. Test updates against a local update server in the stack. Don't publish anything: no GitHub releases.
+  - Build remote wipe as planned.
+- Step 21 (deployment): prepare only. Nothing is hosted, no accounts are created, and nothing is spent.
+  - Deliver deployment documentation for the clinic server and a single low-cost cloud server, plus deployment scripts (dotnet run or PowerShell, no bash) and Tailscale access rules as config.
+  - Add monitoring and alerting with open-source tools, as an optional profile in the local stack.
+  - Add an automated point-in-time restore drill that runs against the local stack.
+  - All of it tested locally.
+
+### Rules for what you may add without asking
+
+- AI models: models whose weights are under MIT, Apache-2.0 or BSD licenses may be downloaded without asking, up to 15 GB of new models in total. Record each one's source, commit and SHA-256 in the models manifest, as setup_models.py does, and never commit weights. A gated model (one that requires accepting terms on Hugging Face), or any other license, pauses that lane and goes in my next batch of questions.
+- Datasets and code lists: public domain, CC0 and CC BY are fine. Non-commercial or share-alike terms ask first (DDInter is already approved).
+- Libraries: MIT, Apache-2.0, BSD, ISC and MPL-2.0 are fine, recorded in the decision log. GPL, AGPL or anything unclear asks first.
+- Teammates' areas: go ahead. Record the heads-up in the step's notes and in the phase pull request draft; don't wait for them.
+
+### Deciding anything new
+
+When a decision comes up that this doesn't cover, decide it yourself by these principles, in order:
+1. Patient safety and privacy first: the more protective option wins.
+2. Match the course document, unless a step deliberately changes it.
+3. Prefer the smallest choice that's easy to reverse.
+
+Record each one in the decision log under "Decided without Tahseen — to review", with the alternatives you rejected, and keep going. List them in each phase's pull request draft so I review them there.
+
+If a performance or security gate can only be met by cutting scope, cut the smallest piece that doesn't drop a requirement, record it the same way, and continue. If the only way would drop a requirement, pause that lane.
+
+### What still stops
+
+Pause only the affected lane, and put the question in my next batch:
+- spending money or creating any account;
+- a model, dataset or library outside the rules above;
+- committing a recording of a real person's voice;
+- anything on main, a force-push, deleting a branch or tag, or changing repo settings;
+- CI failing for a reason two honest attempts haven't fixed;
+- a gate that can't be met without dropping a requirement.
+
+Everything else, decide and continue.
 
 ## Use-case owners
 
@@ -1024,6 +1083,17 @@ One entry per decision: date, step, the decision, and why.
   - *The results page* says "Lab connected:" for an order still waiting when the database holds a key; the by-hand form stays.
   - **For Tahseen,** each built as the default shown: (1) when the clinician who signed an order can't be told (their account disabled) and nobody has the patient on their panel, a lab's result reaches no inbox; it is filed all the same (step 7's rule, unchanged). Should admins be told then? (2) A lab's results reach the portal at once, before anyone acknowledges them, as a clinician's filing does (step 7's open question, now for the lab too). (3) A lab's post that meets a different result entered by hand is refused whole, and the clinician's stands. (4) Lab orders signed before step 12 are never handed to the lab; they are resulted by hand.
   - **Open, for Tahseen:** set `idle_in_transaction_session_timeout` for the app roles, so a session left idle in a transaction can't hold back the lab's hand-over for long (not set: a session left open holds it back until it ends).
+
+- **2026-11-21, Tahseen's standing decisions.** His words are the section "Standing decisions" above, whole; each is recorded here by name and date so the log shows when it was given.
+  - *Step 15,* dictation proposals beyond the note: approved as designed (drafts only, labeled as proposed, signed through the normal order and allergy flows with their safety checks, nothing placed or saved automatically, the same grounding checks; new wording for FR-14 to propose; eval extended with synthetic cases).
+  - *Step 16,* ambient listening: approved (capture only after the patient's verbal consent is confirmed and audited; audio kept no longer than dictation keeps it; English first; the same review flow; synthetic voices only, clips under 1 MB each and 20 MB in total; a real voice needs his say-so).
+  - *Step 17,* languages: Spanish dictation only (chosen per dictation; fields in English; the Spanish transcript kept and shown with source highlighting; an open-licensed multilingual speech model under the model rule; screens stay English; new wording for NFR-14 to propose; Spanish synthetic eval cases).
+  - *Step 20,* desktop distribution: ship unsigned, with install instructions for the one-time warning; Tauri's updater, its private key in `~/.swiftchart-secrets/` with permissions 600 and its place told to him; updates tested against a local update server in the stack; nothing published; remote wipe as planned.
+  - *Step 21,* deployment: prepare only (documentation, scripts in dotnet or PowerShell, Tailscale rules as config, optional open-source monitoring profile, an automated point-in-time restore drill; all tested locally; nothing hosted, no accounts, nothing spent).
+  - *What may be added without asking:* models under MIT, Apache-2.0 or BSD up to 15 GB in total, each in the manifest with source, commit and SHA-256, never committed, a gated model or other license pausing the lane; datasets and code lists that are public domain, CC0 or CC BY; libraries under MIT, Apache-2.0, BSD, ISC or MPL-2.0, recorded here; teammates' areas, with the heads-up in the step's notes and the phase pull request draft.
+  - *Deciding anything new:* patient safety and privacy first, then the course document, then the smallest reversible choice; each such decision recorded here under the heading **"Decided without Tahseen — to review"** with the alternatives rejected, and listed in the phase's pull request draft. A gate met by cutting the smallest piece that drops no requirement is recorded the same way; if only dropping a requirement would meet it, the lane pauses.
+  - *What still stops a lane:* spending money or creating an account; a model, dataset or library outside the rules; a recording of a real person's voice; anything on main, a force-push, deleting a branch or tag, repo settings; CI failing after two honest attempts; a gate that can't be met without dropping a requirement.
+  - *Effect on the plan:* the "asks first" notes are gone from steps 15, 16, 17, 20 and 21 in the status table, which now say what only he can do; "Stop and ask Tahseen before" points here.
 
 ## Log
 
