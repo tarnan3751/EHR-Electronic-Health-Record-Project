@@ -704,7 +704,13 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
         await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () =>
             Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = NULL WHERE id = @id", ("id", backdated)));
-        Assert.Equal(["3 3"], await AsSuperuserAsync(
+
+        // An end is never before its start: a start fifty seconds ahead and an end fifty seconds back are each within the
+        // minute, so each is kept as sent, and the end would fall before the start. It is made the start.
+        var early = await InsertAsync(App, patients[3], "50 seconds");
+        await EndAsync(early, "-50 seconds");
+        Assert.Equal(["true"], await AsSuperuserAsync("SELECT (ended_at = assigned_at)::text FROM ehr.patient_assignments WHERE id = @id", ("id", early)));
+        Assert.Equal(["4 4"], await AsSuperuserAsync(
             "SELECT count(*) FILTER (WHERE ended_at IS NOT NULL) || ' ' || count(*) FROM ehr.patient_assignments WHERE patient_id = ANY(@patients)",
             ("patients", patients.ToArray())));
     }

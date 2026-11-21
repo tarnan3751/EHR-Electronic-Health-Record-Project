@@ -206,8 +206,13 @@ BEGIN
     ELSIF (NEW.id, NEW.patient_id, NEW.clinician_id, NEW.assigned_at) IS DISTINCT FROM (OLD.id, OLD.patient_id, OLD.clinician_id, OLD.assigned_at)
           OR OLD.ended_at IS NOT NULL AND NEW.ended_at IS DISTINCT FROM OLD.ended_at THEN
         RAISE EXCEPTION 'A panel assignment only ends, once' USING ERRCODE = '23514';
-    ELSIF OLD.ended_at IS NULL AND NEW.ended_at IS NOT NULL AND abs(extract(epoch FROM NEW.ended_at - clock_timestamp())) > 60 THEN
-        NEW.ended_at := clock_timestamp();
+    ELSIF OLD.ended_at IS NULL AND NEW.ended_at IS NOT NULL THEN
+        IF abs(extract(epoch FROM NEW.ended_at - clock_timestamp())) > 60 THEN
+            NEW.ended_at := clock_timestamp();
+        END IF;
+
+        -- A start and an end each within the minute could still leave the end before the start: it is never before it.
+        NEW.ended_at := greatest(NEW.ended_at, OLD.assigned_at);
     END IF;
 
     RETURN NEW;
