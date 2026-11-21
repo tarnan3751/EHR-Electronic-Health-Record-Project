@@ -1,13 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
+using Ehr.Web.Api.Lab;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Ehr.Web;
 
 // RateLimits: how many anonymous account POSTs (sign-in, register, forgot, resend, reset, confirm, the desktop app's
-// sign-in) one address may make per window, and how many account emails one recipient may get per hour
-// (CappedEmailSender). The defaults are for production; the tests raise them, since all their clients share one address.
+// sign-in) one address may make per window, how many account emails one recipient may get per hour
+// (CappedEmailSender), and how many requests the lab's door takes a minute, all of them together (step 12). The
+// defaults are for production; the tests raise them, since all their clients share one address.
 public sealed class RateLimitOptions
 {
     public const string Section = "RateLimits";
@@ -17,10 +19,14 @@ public sealed class RateLimitOptions
     public int WindowMinutes { get; set; } = 5;
 
     public int EmailsPerAddressPerHour { get; set; } = 3;
+
+    // A lab asks every few seconds and posts once an order: this is far above that, and bounds how fast anyone, with
+    // the key or without, can make the door work or write to the audit log (docs/UC20.md).
+    public int LabRequestsPerMinute { get; set; } = 120;
 }
 
-// Limits the anonymous account POSTs per client address, a fixed window each, and nothing else. The address is the
-// socket's (Connection.RemoteIpAddress), never X-Forwarded-For, which anyone can send. The cloud app limits before it
+// Limits the anonymous account POSTs per client address, a fixed window each, and the lab's door as one, and nothing
+// else. The address is the socket's (Connection.RemoteIpAddress), never X-Forwarded-For, which anyone can send. The cloud app limits before it
 // forwards (Program.cs), so off-site clients are counted there by their own address, and the on-prem app doesn't count
 // what the cloud app forwards (ForwardedHeader). Over the limit: 429 with a page saying so, or JSON on /api.
 public static class AccountRateLimits
@@ -50,7 +56,12 @@ public static class AccountRateLimits
         });
 
     public static RateLimitPartition<string> Partition(HttpContext context, RateLimitOptions limits, string? forwardedProof = null) =>
-        IsAccountPost(context.Request) && !IsForwarded(context.Request, forwardedProof)
+        // One window for every request to the lab's door, whoever sends it, checked before its key is: there is one lab.
+        context.Request.Path.StartsWithSegments(LabApi.Path)
+            ? RateLimitPartition.GetFixedWindowLimiter(
+                LabApi.Path,
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.LabRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })
+        : IsAccountPost(context.Request) && !IsForwarded(context.Request, forwardedProof)
             ? RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions
@@ -70,6 +81,15 @@ public static class AccountRateLimits
 
     static Task WriteRejectedAsync(HttpContext context, CancellationToken cancellationToken)
     {
+        if (context.Request.Path.StartsWithSegments(LabApi.Path))
+        {
+            // The lab's door answers every refusal in its own shape (LabApiContract.cs), never cached.
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers.RetryAfter = "60";
+            return context.Response.WriteAsJsonAsync(
+                new { error = "too-many", message = "Too many requests to the lab's door. Wait a minute and try again." }, cancellationToken);
+        }
+
         if (context.Request.Path.StartsWithSegments("/api"))
         {
             // "problem" is what the desktop app shows the person when a sign-in is refused (api.rs, Refusal).

@@ -269,6 +269,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("a sign-out with details")]
     [InlineData("a sign-out with no actor")]
     [InlineData("a sign-out of an empty patient")]
+    [InlineData("a hand-over to the lab")]
     public async Task Only_reads_of_one_patient_by_a_signed_in_account_are_taken(string what)
     {
         var good = Event(Guid.CreateVersion7());
@@ -317,6 +318,12 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
                 break;
             case "a sign-out of an empty patient":
                 bad = SignOutEvent(Guid.Empty);
+                break;
+            // Only the database records one, on-prem, with the lab as the source (step 12): never the cloud app.
+            case "a hand-over to the lab":
+                bad.Action = AuditActions.SentToLab;
+                bad.TableName = "orders";
+                bad.RowId = Guid.CreateVersion7();
                 break;
         }
 

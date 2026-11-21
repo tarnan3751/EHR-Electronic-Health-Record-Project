@@ -10,6 +10,7 @@ using Ehr.Web.Api.Audit;
 using Ehr.Web.Api.Desktop;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.Api.Fhir;
+using Ehr.Web.Api.Lab;
 using Ehr.Web.Api.Sync;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Email;
@@ -211,6 +212,14 @@ app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop);
 if (site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 })
 {
     app.MapCloudAudit(CloudAuditKey.FromConfiguration(builder.Configuration));
+}
+
+// A lab's system is handed the lab orders waiting for results and files their results here, with a key of its own
+// (Api/Lab, the expansion plan's step 12). Only the on-prem app, and only with a key: without one there is no lab and no
+// door. The cloud app forwards a lab's posts here without the key (CloudForwardingMiddleware), so they are refused.
+if (site == Site.OnPrem && builder.Configuration[LabApiKey.Setting] is { Length: > 0 })
+{
+    app.MapLabApi(LabApiKey.FromConfiguration(builder.Configuration));
 }
 
 // The read-only FHIR R4 API, for clinicians, with the staff cookie: the whole group takes the Clinician policy, and

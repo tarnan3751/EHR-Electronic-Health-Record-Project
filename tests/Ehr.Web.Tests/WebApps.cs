@@ -28,8 +28,8 @@ namespace Ehr.Web.Tests;
 // The web app in memory, configured as each server, against one migrated database. The cloud app reads as ehr_read
 // like the real one, but from the primary: there's no replica in these tests. Its WAN link to the on-prem app is an
 // in-memory one, which records what crosses it. The on-prem app starts with the bootstrap admin settings, as the
-// stack does, and its dictation service is a stub in memory (DictationSidecarStub). Every app's emails are kept
-// rather than sent.
+// stack does, and its dictation service is a stub in memory (DictationSidecarStub). A lab is connected: the on-prem
+// app has its key (step 12). Every app's emails are kept rather than sent.
 public sealed class WebApps : IAsyncLifetime
 {
     public const string BootstrapAdminEmail = "admin@example.test";
@@ -481,7 +481,15 @@ public sealed class WebApps : IAsyncLifetime
                 .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")))
                 // Every test client has the same address, so the limits are out of reach (RateLimitTests lowers them).
                 .UseSetting("RateLimits:PermitLimit", "1000000")
-                .UseSetting("RateLimits:EmailsPerAddressPerHour", "1000000");
+                .UseSetting("RateLimits:EmailsPerAddressPerHour", "1000000")
+                .UseSetting("RateLimits:LabRequestsPerMinute", "1000000");
+            // A lab is connected (step 12): the on-prem app has its key, and the database the key's hash
+            // (MigratedDatabase). As in the stack, the cloud app isn't given it.
+            if (site == Site.OnPrem)
+            {
+                builder.UseSetting(Ehr.Web.Api.Lab.LabApiKey.Setting, MigratedDatabase.LabKey);
+            }
+
             if (bootstrapAdmin)
             {
                 builder

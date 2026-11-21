@@ -45,8 +45,9 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 - Note follow-ups (the plan's step 10b): an addendum written by someone other than the note's signer is labeled and reaches the signer's inbox; a signed note or addendum can be marked sensitive after signing, with a reason, and only the person who marked it or the note's signer can unmark it (`docs/UC14.md`). Marking a note marks its addenda as inherited from it, and unmarking the note clears only those marks (step 10e).
 - Off-site audit cost (the plan's step 10c): off-site, a request's audit events are written to the cloud app's queue together, with one flush to disk, before any of the page is sent; a page whose events can't be written is not sent (`docs/UC2.md`).
 - A read-only FHIR R4 API (the plan's step 11): a clinician's client reads a patient on their panel, their allergies, medications, diagnoses, results, vital signs (a blood pressure as one reading) and appointments, coded as the record is, with the clinical app's sign-in; each read is recorded as a page's is, and sensitive items are left out unless asked for. See [FHIR API](#fhir-api) and `docs/UC19.md`.
+- A lab's door (the plan's step 12): a lab's system, with a key of its own, is handed the lab orders waiting for results, with only what it needs, and files their results through the same database rule as a clinician's filing; each order handed over and each result filed is audited as the lab's. See [Simulated lab](#simulated-lab) and `docs/UC20.md`.
 
-**Not built yet:** editing visits, sending orders to a lab or pharmacy, and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
+**Not built yet:** editing visits, sending orders to a pharmacy, a real lab's interface (step 12's door is there for one), and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
 ## Layout
 
@@ -54,7 +55,7 @@ Folders describe their intended contents; most are still empty.
 
 ```
 src/
-  Ehr.Web/          ASP.NET Core Razor Pages host: Areas/Clinical, Areas/Portal, Api/Sync, Api/Dictation, Api/Fhir
+  Ehr.Web/          ASP.NET Core Razor Pages host: Areas/Clinical, Areas/Portal, Api/Sync, Api/Dictation, Api/Fhir, Api/Lab
   Ehr.Domain/       services, authorization policies, PHI reader, FHIR-shaped models
   Ehr.Data/         EF Core + Dapper on Npgsql: read and write contexts, RLS interceptor
   Ehr.Design/       Razor class library: the SwiftChart tokens, shared CSS, fonts and logos (wwwroot), shared partials, htmx, Alpine.js
@@ -163,6 +164,8 @@ The account is created at the next start if there are no staff accounts yet. The
 
 The local server stack sets them from `infra/compose/.env` (`EHR_ENROLLMENT_KEY`; the addresses are in `compose.yaml`).
 
+**Optional:** `Ehr:Lab:Key`, the key a lab's system calls the on-prem app with; without it there is no lab and its door isn't there (see [Simulated lab](#simulated-lab)). `RateLimits:LabRequestsPerMinute` (default 120) is how many requests that door takes a minute, all together.
+
 **In VS Code:** open the repository folder, then use Terminal → Run Task:
 
 | Task | What it does |
@@ -253,9 +256,25 @@ A read-only FHIR R4 API, on both servers, for clinicians (`src/Ehr.Web/Api/Fhir`
 - **Every answer** is `application/fhir+json`, `Cache-Control: no-store`, with no CORS headers. A GET whose `Accept` header doesn't take `application/fhir+json` (the most specific matching range decides, as RFC 9110 has it; `application/json` counts as asking for it) is refused with 406, and `_format=json` overrides it; a write is 405 whatever it accepts.
 - **Conformance** is checked in the tests with the Firely .NET SDK (BSD-3-Clause), offline: every answer is parsed strictly and validated against R4's definitions and the profiles it claims (`tests/Ehr.Web.Tests/FhirConformance.cs`). The app itself writes the JSON and has no FHIR package.
 
+## Simulated lab
+
+A lab's system is handed the lab orders waiting for results and files their results through a door of its own on the on-prem app (`src/Ehr.Web/Api/Lab`, UC 20 in `docs/UC20.md`). The database checks it too (`db/policies/76-lab.sql`).
+
+| Request | What it does |
+|---|---|
+| `GET /api/lab/orders?since={watermark}` | The lab orders signed since the lab last asked that still wait for results, and the watermark to ask from next time. `since` is a transaction ID; without it, every order still waiting. At most 100 signing transactions' orders at once, with `more` set when there are more |
+| `POST /api/lab/orders/{id}/results` | One order's results, `{"collectedAt": ..., "results": [{"code", "value", "unit"}]}`, all or none: 204 when filed, and again when the same is sent twice. Refused with a word and a sentence: `malformed` (400), `unknown-order` (404), `discontinued`, `closed` or `different-result` (409), `not-reported`, `wrong-unit` or `in-the-future` (422) |
+
+- **Who:** the key in the `X-Lab-Key` header, the on-prem app's `Ehr:Lab:Key`, and nobody signed in; anything else is 401. The database is given the key's hash and lets nothing through without it, whatever the app does. The cloud app has no lab endpoints, and removes `X-Lab-Key` from the posts it forwards, so a lab's key is no use from the internet.
+- **What a lab is handed:** each order's ID, when it was signed, the tests still waiting for a result (an order partly filed by hand gets the rest), each with its LOINC code, unit, the clinic's reference range and its decimals, and the codes of the patient's current diagnoses that aren't sensitive. Never the patient's name, MRN, birth date, sex or ID, the order's details, medications or allergies.
+- **Filing** goes through the same database rule as a clinician's filing: the clinic's name, unit and range, the order resulted, the clinician who signed it told in the inbox. A result can't change one already filed, by hand or by the lab.
+- **Recorded:** each order handed over is a `sent_to_lab` audit event, and every write a filing makes is audited, all with no account and the source `lab`; the admin audit page shows them as "Lab". With at most 100 orders an answer and 120 requests a minute, the door adds at most 12,000 hand-over events a minute, and only with the key.
+- **Key:** the migration job stores the SHA-256 of `EHR_LAB_KEY`, which must be the on-prem app's `Ehr:Lab:Key`; without it no hash is stored and nothing gets in. To change it, change both, run the migration job again and restart the on-prem app; calls in between are refused and a lab tries again.
+- **The results page** of an order still waiting says "Lab connected:" when a key is stored; entering results by hand stays, for when the lab can't send them.
+
 ## Database changes
 
-The schema comes from EF Core migrations in `db/migrations`; roles, grants, row-level security and triggers are hand-written SQL in `db/policies`. Reference data, the standard codes chart entries are picked from, is generated SQL in `db/reference` (`docs/expansion/reference-data.md`). The migration job (`infra/migrate`) applies all three to the primary, as `ehr_owner`, every time the server stack starts, and then stores the hash of the lab's key from `EHR_LAB_KEY`, or none when it isn't set (`db/policies/76-lab.sql`); the replica gets them by replication. CI's stack job runs the same job.
+The schema comes from EF Core migrations in `db/migrations`; roles, grants, row-level security and triggers are hand-written SQL in `db/policies`. Reference data, the standard codes chart entries are picked from, is generated SQL in `db/reference` (`docs/expansion/reference-data.md`). The migration job (`infra/migrate`) applies all three to the primary, as `ehr_owner`, every time the server stack starts, and then stores the hash of the lab's key from `EHR_LAB_KEY`, or none when it isn't set (see [Simulated lab](#simulated-lab)); the replica gets them by replication. CI's stack job runs the same job.
 
 Run `dotnet tool restore` for the pinned `dotnet-ef`: once, and again whenever `.config/dotnet-tools.json` changes. Then, from the repository folder:
 

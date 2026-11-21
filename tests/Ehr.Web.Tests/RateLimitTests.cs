@@ -8,7 +8,7 @@ using Xunit;
 namespace Ehr.Web.Tests;
 
 // Rate limits (issue #32): the anonymous account POSTs are limited per socket address, whatever X-Forwarded-For says,
-// and one address gets at most so many account emails an hour.
+// and one address gets at most so many account emails an hour; the lab's door is limited as one (step 12).
 public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -33,6 +33,28 @@ public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
         // Reading the page isn't limited.
         using var page = await client.GetAsync("/portal/sign-in", Cancel);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+    }
+
+    // Step 12: the lab's door takes so many requests a minute, all of them together, with the key or without, and past
+    // that says so in its own shape; it bounds how fast anyone can make the door write to the audit log (docs/UC20.md).
+    [Fact]
+    public async Task The_labs_door_takes_its_limit_a_minute_from_everyone_together()
+    {
+        await using var app = apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting("RateLimits:LabRequestsPerMinute", "3"));
+        using var lab = LabTests.Client(app);
+        using var stranger = LabTests.Client(app, key: null);
+
+        foreach (var client in new[] { lab, stranger, lab })
+        {
+            using var allowed = await client.GetAsync(LabTests.Orders, Cancel);
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, allowed.StatusCode);
+        }
+
+        using var refused = await lab.GetAsync(LabTests.Orders, Cancel);
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.Equal("too-many", await LabTests.RefusalAsync(refused));
+        Assert.Equal("no-store", refused.Headers.CacheControl?.ToString());
+        Assert.Equal("60", refused.Headers.RetryAfter?.ToString());
     }
 
     [Fact]

@@ -108,6 +108,11 @@ else
 @if (order.OpenToResults)
 {
     <h2>@(filed.Count == 0 ? "Enter results" : "Enter the remaining results")</h2>
+    @if (Model.LabConnected)
+    {
+        @* Step 12: a connected lab files these itself. The form stays, for when it can't. *@
+        <p class="sc-notice sc-notice--info" data-lab-connected><span class="sc-notice__state">Lab connected:</span> the lab files this order's results here when they're ready, and the clinician who signed it finds them in the inbox. Enter results below only if the lab can't send them.</p>
+    }
     @if (!Model.OnPanel)
     {
         <p class="sc-muted">Add this patient to your panel to enter results.</p>
