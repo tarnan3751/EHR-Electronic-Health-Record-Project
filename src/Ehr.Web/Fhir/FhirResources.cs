@@ -42,16 +42,18 @@ internal static class FhirResources
     // A sensitive diagnosis or medication, shown because it was asked for: restricted, in FHIR's confidentiality codes.
     static readonly Meta Restricted = new(Security: [new Coding(Confidentiality, "R")]);
 
-    public static FhirPatient Patient(Patient patient) => new(
-        patient.Id.ToString(),
+    // Each mapping writes its entry's id, and its references, as the ids say: the record's own for the clinician API, or a
+    // download's own (FhirIds).
+    public static FhirPatient Patient(Patient patient, FhirIds ids) => new(
+        ids.Id(patient.Id),
         [new Identifier("usual", new CodeableConcept([new Coding(IdentifierTypes, "MR")]), MrnSystem, patient.Mrn)],
         [new HumanName("official", patient.FamilyName, [patient.GivenName])],
         patient.Gender,
         Date(patient.BirthDate));
 
     // "No known allergies" is an entry like any other, with the app's own marker as its code: sent as text alone.
-    public static FhirAllergyIntolerance Allergy(AllergyIntolerance allergy) => new(
-        allergy.Id.ToString(),
+    public static FhirAllergyIntolerance Allergy(AllergyIntolerance allergy, FhirIds ids) => new(
+        ids.Id(allergy.Id),
         new CodeableConcept([new Coding("http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical", allergy.ClinicalStatus)]),
         allergy.Category is { } category ? [category] : null,
         allergy.Criticality,
@@ -61,35 +63,36 @@ internal static class FhirResources
             ClinicalCodeSystem.Unii => Unii,
             _ => null,
         }, allergy.Code, allergy.Display),
-        PatientReference(allergy.PatientId),
+        ids.Patient(allergy.PatientId),
         Instant(allergy.RecordedAt),
         // A reaction is what the patient has; its severity alone, with no reaction recorded, has nothing to belong to.
         allergy.Reaction is { Length: > 0 } reaction ? [new Reaction([new CodeableConcept(Text: reaction)], allergy.Severity)] : null);
 
-    public static FhirMedicationStatement Medication(MedicationStatement medication) => new(
-        medication.Id.ToString(),
+    public static FhirMedicationStatement Medication(MedicationStatement medication, FhirIds ids) => new(
+        ids.Id(medication.Id),
         medication.Sensitive ? Restricted : null,
         medication.Status,
         Concept(RxNorm, medication.Code, medication.Display),
-        PatientReference(medication.PatientId),
+        ids.Patient(medication.PatientId),
         medication.EffectiveStart is null && medication.EffectiveEnd is null ? null : new Period(Date(medication.EffectiveStart), Date(medication.EffectiveEnd)),
         medication.Dosage is { Length: > 0 } dosage ? [new Dosage(dosage)] : null);
 
     // The chart's diagnoses are the patient's problem list.
-    public static FhirCondition Condition(Condition condition) => new(
-        condition.Id.ToString(),
+    public static FhirCondition Condition(Condition condition, FhirIds ids) => new(
+        ids.Id(condition.Id),
         condition.Sensitive ? Restricted : null,
         new CodeableConcept([new Coding("http://terminology.hl7.org/CodeSystem/condition-clinical", condition.ClinicalStatus)]),
         [new CodeableConcept([new Coding("http://terminology.hl7.org/CodeSystem/condition-category", "problem-list-item")])],
         Concept(Icd10Cm, condition.Code, condition.Display),
-        PatientReference(condition.PatientId),
+        ids.Patient(condition.PatientId),
         Date(condition.OnsetDate));
 
-    // The patient and the clinician, each by reference with their name. There is no Practitioner endpoint: the name is
-    // what a reader has. FHIR requires each participant's status, which the record doesn't hold: the clinic booked the
-    // appointment for both, so both accepted (Tahseen's decision).
-    public static FhirAppointment Appointment(AppointmentEntry appointment) => new(
-        appointment.Id.ToString(),
+    // The patient and the clinician, each with their name, and by reference as the ids have it (a download's names the
+    // clinician only). There is no Practitioner endpoint: the name is what a reader has. FHIR requires each participant's
+    // status, which the record doesn't hold: the clinic booked the appointment for both, so both accepted (Tahseen's
+    // decision).
+    public static FhirAppointment Appointment(AppointmentEntry appointment, FhirIds ids) => new(
+        ids.Id(appointment.Id),
         appointment.Status,
         appointment.CancelReason is { Length: > 0 } cancelled ? new CodeableConcept(Text: cancelled) : null,
         [new CodeableConcept(Text: appointment.Reason)],
@@ -97,11 +100,9 @@ internal static class FhirResources
         Instant(appointment.StartsAt.AddMinutes(appointment.Minutes)),
         appointment.Minutes,
         [
-            new Participant(new ResourceReference($"Patient/{appointment.PatientId}", appointment.PatientName), "accepted"),
-            new Participant(new ResourceReference($"Practitioner/{appointment.ClinicianId}", appointment.Clinician), "accepted"),
+            new Participant(ids.Patient(appointment.PatientId, appointment.PatientName), "accepted"),
+            new Participant(ids.Practitioner(appointment.ClinicianId, appointment.Clinician), "accepted"),
         ]);
-
-    public static ResourceReference PatientReference(Guid patientId) => new($"Patient/{patientId}");
 
     // A code with its system when the record has both, and the record's own name as the text; the text alone otherwise.
     // No display: the name is the record's, which may not be the code system's own wording.
@@ -129,7 +130,8 @@ internal sealed record Coding(string System, string Code);
 
 internal sealed record CodeableConcept(IReadOnlyList<Coding>? Coding = null, string? Text = null);
 
-internal sealed record ResourceReference(string Reference, string? Display = null);
+// A reference by address, with a name, or by name alone.
+internal sealed record ResourceReference(string? Reference, string? Display = null);
 
 internal sealed record Identifier(string Use, CodeableConcept Type, string System, string Value);
 
@@ -174,6 +176,9 @@ internal sealed record BundleLink(string Relation, string Url);
 
 internal sealed record BundleSearch(string Mode);
 
-internal sealed record BundleEntry(string FullUrl, object Resource, BundleSearch Search);
+// A search's entries say whether each matched or is what the search had to say; other bundles' entries say neither.
+internal sealed record BundleEntry(string FullUrl, object Resource, BundleSearch? Search = null);
 
-internal sealed record FhirBundle(string Type, int Total, IReadOnlyList<BundleLink> Link, IReadOnlyList<BundleEntry>? Entry) : FhirResource("Bundle", null);
+// A search's bundle has its total and its self link; a collection, when it was put together.
+internal sealed record FhirBundle(string Type, string? Timestamp, int? Total, IReadOnlyList<BundleLink>? Link, IReadOnlyList<BundleEntry>? Entry)
+    : FhirResource("Bundle", null);

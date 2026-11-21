@@ -1144,7 +1144,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // The FHIR API (the expansion plan's step 11). Each read of entries below is one view of one patient, so one recorded
     // read of the patient, as the chart's is: `read`, or `read_sensitive` when sensitive items were asked for, which is
     // what the chart records too. Entries of every status, but for those entered in error. `only` reads one entry by its
-    // ID, and records nothing when it isn't there.
+    // ID, and records nothing when it isn't there. Each public read records; the Read...Async beneath it reads the same
+    // and records nothing, for a read that records one event for several kinds of entry.
 
     // Whose entry it is, for the API's gate, which comes before anything is read: the patient's ID and nothing else, or
     // null when the reader has no such entry. A sensitive diagnosis or medication is found only when sensitive items
@@ -1172,34 +1173,43 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         db.Patients.AsNoTracking().Where(p => p.Mrn == mrn).Select(p => (Guid?)p.Id).SingleOrDefaultAsync(cancellationToken);
 
     // A patient's allergies, every status, the latest recorded first. "No known allergies" is one of them.
-    public async Task<PatientEntries<AllergyIntolerance>> AllergiesAsync(Guid patientId, Guid? only, int limit, CancellationToken cancellationToken)
+    public async Task<PatientEntries<AllergyIntolerance>> AllergiesAsync(Guid patientId, Guid? only, int limit, CancellationToken cancellationToken) =>
+        await RecordAsync(patientId, only, await ReadAllergiesAsync(patientId, only, limit, cancellationToken), sensitive: false, cancellationToken);
+
+    async Task<PatientEntries<AllergyIntolerance>> ReadAllergiesAsync(Guid patientId, Guid? only, int limit, CancellationToken cancellationToken)
     {
         var all = await db.AllergyIntolerances.AsNoTracking().Where(a => a.PatientId == patientId && (only == null || a.Id == only))
             .OrderByDescending(a => a.RecordedAt).ThenBy(a => a.Id).ToListAsync(cancellationToken);
-        return await EntriesAsync(patientId, only, all, sensitiveShown: false, sensitiveLeftOut: 0, limit, cancellationToken);
+        return Entries(all, sensitiveLeftOut: 0, limit);
     }
 
     // A patient's medications, every status but entered in error, the latest started first, undated last. Sensitive ones
     // only when asked for; like the chart, they are read either way and left out here, so the API can say how many it
     // left out.
-    public async Task<PatientEntries<MedicationStatement>> MedicationsAsync(Guid patientId, Guid? only, bool sensitive, int limit, CancellationToken cancellationToken)
+    public async Task<PatientEntries<MedicationStatement>> MedicationsAsync(Guid patientId, Guid? only, bool sensitive, int limit, CancellationToken cancellationToken) =>
+        await RecordAsync(patientId, only, await ReadMedicationsAsync(patientId, only, sensitive, limit, cancellationToken), sensitive, cancellationToken);
+
+    async Task<PatientEntries<MedicationStatement>> ReadMedicationsAsync(Guid patientId, Guid? only, bool sensitive, int limit, CancellationToken cancellationToken)
     {
         var all = await db.MedicationStatements.AsNoTracking()
             .Where(m => m.PatientId == patientId && (only == null || m.Id == only) && m.Status != MedicationStatementStatus.EnteredInError)
             .OrderBy(m => m.EffectiveStart == null).ThenByDescending(m => m.EffectiveStart).ThenBy(m => m.Display).ThenBy(m => m.Id)
             .ToListAsync(cancellationToken);
         var left = sensitive ? 0 : all.RemoveAll(m => m.Sensitive);
-        return await EntriesAsync(patientId, only, all, sensitive, left, limit, cancellationToken);
+        return Entries(all, left, limit);
     }
 
     // A patient's diagnoses, every status, the latest onset first. Sensitive ones only when asked for, as above.
-    public async Task<PatientEntries<Condition>> ConditionsAsync(Guid patientId, Guid? only, bool sensitive, int limit, CancellationToken cancellationToken)
+    public async Task<PatientEntries<Condition>> ConditionsAsync(Guid patientId, Guid? only, bool sensitive, int limit, CancellationToken cancellationToken) =>
+        await RecordAsync(patientId, only, await ReadConditionsAsync(patientId, only, sensitive, limit, cancellationToken), sensitive, cancellationToken);
+
+    async Task<PatientEntries<Condition>> ReadConditionsAsync(Guid patientId, Guid? only, bool sensitive, int limit, CancellationToken cancellationToken)
     {
         var all = await db.Conditions.AsNoTracking().Where(c => c.PatientId == patientId && (only == null || c.Id == only))
             .OrderBy(c => c.OnsetDate == null).ThenByDescending(c => c.OnsetDate).ThenBy(c => c.Display).ThenBy(c => c.Id)
             .ToListAsync(cancellationToken);
         var left = sensitive ? 0 : all.RemoveAll(c => c.Sensitive);
-        return await EntriesAsync(patientId, only, all, sensitive, left, limit, cancellationToken);
+        return Entries(all, left, limit);
     }
 
     // A patient's test results and vital signs, or those of one category, the latest taken first, up to the limit, with
@@ -1211,6 +1221,10 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // ties the two codes to readings among vital signs only), and is an entry like any other. Each value says whether its
     // unit is its code's UCUM unit.
     public async Task<PatientEntries<ObservationEntry>> ObservationsAsync(
+        Guid patientId, Guid? only, string? category, int limit, CancellationToken cancellationToken) =>
+        await RecordAsync(patientId, only, await ReadObservationsAsync(patientId, only, category, limit, cancellationToken), sensitive: false, cancellationToken);
+
+    async Task<PatientEntries<ObservationEntry>> ReadObservationsAsync(
         Guid patientId, Guid? only, string? category, int limit, CancellationToken cancellationToken)
     {
         var matching = (only is { } id ? ObservationById(id) : db.Observations).AsNoTracking()
@@ -1242,7 +1256,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         // its ID, which is all there can be. Each row but a reading's diastolic is an entry, so the count is of one table.
         var total = only is not null || rows.Count < 2 * limit ? all.Count
             : await matching.CountAsync(o => o.ReadingId == null || o.Code != VitalSign.Diastolic, cancellationToken);
-        return await RecordAsync(patientId, only, new PatientEntries<ObservationEntry>([.. all.Take(limit)], total), sensitive: false, cancellationToken);
+        return new PatientEntries<ObservationEntry>([.. all.Take(limit)], total);
     }
 
     // An observation by its ID, or a blood pressure reading's two values by the reading's ID (step 9c); never a value of
@@ -1255,18 +1269,20 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .Concat(db.Observations.Where(o => o.ReadingId == id && o.Code == VitalSign.Diastolic));
 
     // A patient's appointments, every status, the latest first, up to the limit, with how many there are in all.
-    public async Task<PatientEntries<AppointmentEntry>> AllAppointmentsAsync(Guid patientId, Guid? only, int limit, CancellationToken cancellationToken)
+    public async Task<PatientEntries<AppointmentEntry>> AllAppointmentsAsync(Guid patientId, Guid? only, int limit, CancellationToken cancellationToken) =>
+        await RecordAsync(patientId, only, await ReadAppointmentsAsync(patientId, only, limit, cancellationToken), sensitive: false, cancellationToken);
+
+    async Task<PatientEntries<AppointmentEntry>> ReadAppointmentsAsync(Guid patientId, Guid? only, int limit, CancellationToken cancellationToken)
     {
         var matching = db.Appointments.Where(a => a.PatientId == patientId && (only == null || a.Id == only));
         var entries = await AppointmentEntriesAsync(matching.OrderByDescending(a => a.StartsAt).ThenBy(a => a.Id).Take(limit), latestFirst: true, cancellationToken);
         var total = only is not null || entries.Count < limit ? entries.Count : await matching.CountAsync(cancellationToken);
-        return await RecordAsync(patientId, only, new PatientEntries<AppointmentEntry>(entries, total), sensitive: false, cancellationToken);
+        return new PatientEntries<AppointmentEntry>(entries, total);
     }
 
-    // Entries read whole: the total before the limit, then the limit, and the read recorded.
-    Task<PatientEntries<T>> EntriesAsync<T>(
-        Guid patientId, Guid? only, List<T> all, bool sensitiveShown, int sensitiveLeftOut, int limit, CancellationToken cancellationToken) =>
-        RecordAsync(patientId, only, new PatientEntries<T>([.. all.Take(limit)], all.Count) { SensitiveLeftOut = sensitiveLeftOut }, sensitiveShown, cancellationToken);
+    // Entries read whole: the total before the limit, then the limit.
+    static PatientEntries<T> Entries<T>(List<T> all, int sensitiveLeftOut, int limit) =>
+        new([.. all.Take(limit)], all.Count) { SensitiveLeftOut = sensitiveLeftOut };
 
     // One view of one patient, one event; nothing for a read by ID that found nothing.
     async Task<PatientEntries<T>> RecordAsync<T>(Guid patientId, Guid? only, PatientEntries<T> read, bool sensitive, CancellationToken cancellationToken)
