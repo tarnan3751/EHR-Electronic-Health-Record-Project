@@ -144,7 +144,7 @@ public static class Seeder
             rows["observations"] = await CopyAsync(connection,
                 """
                 COPY ehr.observations (id, patient_id, code, display, status, value, unit, reference_low, reference_high, effective_at,
-                    issued_at, note, category, encounter_id, reading_id) FROM STDIN (FORMAT BINARY)
+                    issued_at, note, category, encounter_id, reading_id, reference_kind) FROM STDIN (FORMAT BINARY)
                 """,
                 // Laboratory results, and the vital signs taken at the visits (step 9).
                 clinic.Charts().SelectMany(chart => chart.Results.Concat(chart.Vitals)),
@@ -165,6 +165,7 @@ public static class Seeder
                     await row.WriteAsync(o.Category, NpgsqlDbType.Varchar, ct);
                     await WriteAsync(row, o.EncounterId, NpgsqlDbType.Uuid, ct);
                     await WriteAsync(row, o.ReadingId, NpgsqlDbType.Uuid, ct);
+                    await row.WriteAsync(o.ReferenceKind, NpgsqlDbType.Varchar, ct);
                 },
                 cancellationToken);
 

@@ -7,8 +7,8 @@ namespace Ehr.Security.Tests;
 
 // The expansion plan's step 9c: what the database holds vital signs to, whatever the app does, in SQL of its own
 // (db/policies/75-results.sql and 30-rls.sql, the indexes and check of the VitalReadings migration). A sign has one
-// standing value for a patient at a moment, whatever the visit; a moment's visit is decided once, by its first value,
-// from the time it was taken; a blood pressure is one reading of a systolic and a diastolic, which the database gives
+// standing value for a patient at a moment, whatever the visit; a moment's visit is decided by its first value, from
+// the time it was taken (VitalSignVisitSecurityTests has the check-in's side of it); a blood pressure is one reading of a systolic and a diastolic, which the database gives
 // its ID, which stands whole or not at all when a transaction commits, and which is marked entered in error whole, by
 // one person. Each rule for the app's role and, where it is the rule for everyone, for a superuser; and with two
 // connections where timing matters.
@@ -68,11 +68,12 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
             "UPDATE ehr.observations SET status = 'entered-in-error', entered_in_error_reason = @reason WHERE patient_id = @patient AND code = @code AND status = 'final'",
             ("patient", patient), ("code", code), ("reason", reason));
 
-    // A visit begun now, as checking the patient in starts one.
-    async Task<Guid> CheckInAsync(Guid patient)
+    // A visit begun now, as checking the patient in starts one: as the app, by the clinician (step 9c's follow-up ties
+    // the moments already recorded to it, ehr.attach_vital_signs).
+    async Task<Guid> CheckInAsync(Guid clinician, Guid patient)
     {
         var visit = Guid.CreateVersion7();
-        await Accounts.ExecuteAsync(Superuser, null,
+        await Accounts.ExecuteAsync(App, clinician,
             "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (@id, @patient, 'in-progress', 'AMB', now())",
             ("id", visit), ("patient", patient));
         return visit;
@@ -143,54 +144,55 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
     public async Task A_sign_has_one_standing_value_at_a_moment_whatever_the_visit_for_every_role()
     {
         var (clinician, patient) = await OnPanelAsync();
-        await RecordAsync(clinician, patient, HeartRate, 72m);
-        // The patient checked in since: a visit begun after the sign was taken.
-        var visit = await CheckInAsync(patient);
+        await RecordAsync(clinician, patient, HeartRate, 72m, at: Taken.AddMinutes(-10));
+        // The patient checked in since: a visit begun twenty minutes after the sign was taken, so not its visit.
+        var visit = await CheckInAsync(clinician, patient);
 
-        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => RecordAsync(clinician, patient, HeartRate, 80m));
-        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => RecordAsync(clinician, patient, HeartRate, 80m, visit: visit));
+        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => RecordAsync(clinician, patient, HeartRate, 80m, at: Taken.AddMinutes(-10)));
+        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => RecordAsync(clinician, patient, HeartRate, 80m, at: Taken.AddMinutes(-10), visit: visit));
         // Past every trigger the apps go through, as a superuser naming the visit: the index is for everyone.
-        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => Accounts.ExecuteAsync(Superuser, null, Insert, Values(patient, HeartRate, 80m, visit: visit)));
+        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => Accounts.ExecuteAsync(Superuser, null, Insert, Values(patient, HeartRate, 80m, Taken.AddMinutes(-10), visit: visit)));
         Assert.Equal(["8867-4 72 final none none"], await StateAsync(patient));
 
         // Once the value standing is marked entered in error, the right one is recorded for the same moment.
         await MarkAsync(clinician, patient, HeartRate);
-        await RecordAsync(clinician, patient, HeartRate, 80m);
+        await RecordAsync(clinician, patient, HeartRate, 80m, at: Taken.AddMinutes(-10));
         Assert.Equal(["8867-4 72 entered-in-error none none", "8867-4 80 final none none"], await StateAsync(patient));
     }
 
-    // Failure A of step 9c, in the database: 120/80 recorded with no visit, the patient checked in five minutes later,
-    // the diastolic marked in error and 120/78 typed for the same time. Before, the systolic stood with no visit and the
-    // new diastolic had the visit.
+    // Failure A of step 9c, in the database: 120/80 recorded with no visit, the patient checked in ten minutes later,
+    // the diastolic marked in error and 120/78 typed for the same time. Before step 9c, the systolic stood with no
+    // visit and the new diastolic had the visit; now the check-in ties the moment to its visit whole, since it was taken
+    // within fifteen minutes before it (step 9c's follow-up), and every later value of the moment takes the same.
     [Fact]
-    public async Task A_moments_visit_is_decided_once_from_the_time_taken_so_a_check_in_between_cannot_split_a_reading()
+    public async Task A_moments_visit_is_decided_from_the_time_taken_so_a_check_in_between_cannot_split_a_reading()
     {
         var (clinician, patient) = await OnPanelAsync();
         await RecordPressureAsync(clinician, patient, 120m, 80m);
-        var visit = await CheckInAsync(patient);
+        var visit = await CheckInAsync(clinician, patient);
 
         await RecordAsync(clinician, patient, HeartRate, 70m);
-        // Naming the visit doesn't take a value away from its moment's.
         await RecordAsync(clinician, patient, Temperature, 37m, visit: visit);
         await MarkAsync(clinician, patient, Diastolic);
         await RecordPressureAsync(clinician, patient, 120m, 78m);
 
         Assert.Equal(
-            ["8480-6 120 entered-in-error none R1", "8462-4 80 entered-in-error none R1", "8867-4 70 final none none", "8310-5 37 final none none",
-                "8480-6 120 final none R2", "8462-4 78 final none R2"],
+            ["8480-6 120 entered-in-error visit R1", "8462-4 80 entered-in-error visit R1", "8867-4 70 final visit none", "8310-5 37 final visit none",
+                "8480-6 120 final visit R2", "8462-4 78 final visit R2"],
             await StateAsync(patient, visit));
 
-        // From the time taken, not the moment recorded: a moment taken before the check-in and first recorded after it
-        // has no visit either, and naming the visit for it is refused. A moment taken after the check-in has the visit,
-        // and the rest of that moment follows its first value.
-        var before = Taken.AddMinutes(5);
+        // From the time taken alone: a moment taken twenty minutes before the check-in and first recorded after it has no
+        // visit, and naming the visit for it is refused; a later value of that moment naming the visit takes the
+        // moment's. A moment taken after the check-in has the visit, and the rest of that moment follows its first value.
+        var before = Taken.AddMinutes(-10);
         await RecordAsync(clinician, patient, HeartRate, 74m, at: before);
-        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, HeartRate, 75m, at: Taken.AddMinutes(6), visit: visit));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, HeartRate, 75m, at: before.AddMinutes(-1), visit: visit));
+        await RecordAsync(clinician, patient, Temperature, 36.8m, at: before, visit: visit);
         var after = new DateTime((DateTime.UtcNow.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond) + (2 * TimeSpan.TicksPerSecond), DateTimeKind.Utc);
         await RecordAsync(clinician, patient, HeartRate, 76m, at: after);
         await RecordPressureAsync(clinician, patient, 118m, 76m, at: after);
         const string visits = "SELECT coalesce(encounter_id::text, 'none') FROM ehr.observations WHERE patient_id = @patient AND effective_at = @at";
-        Assert.Equal(["none"], await AsSuperuserAsync(visits, ("patient", patient), ("at", before)));
+        Assert.Equal(["none", "none"], await AsSuperuserAsync(visits, ("patient", patient), ("at", before)));
         Assert.Equal([$"{visit}", $"{visit}", $"{visit}"], await AsSuperuserAsync(visits, ("patient", patient), ("at", after)));
     }
 
@@ -219,7 +221,7 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
     {
         var (clinician, patient) = await OnPanelAsync();
         var (_, someoneElse) = await OnPanelAsync();
-        var visit = await CheckInAsync(patient);
+        var visit = await CheckInAsync(clinician, patient);
 
         // A lone value, as the app: refused when the transaction commits.
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, Systolic, 120m));
@@ -383,27 +385,38 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.Equal(["8480-6 120 final none R1", "8462-4 80 final none R1"], await StateAsync(patient));
     }
 
-    // A check-in committed while one transaction holds a moment's first value: a second transaction's value for that
-    // moment waits, and then takes the first's visit, not the visit begun in between.
+    // A check-in while one transaction holds a moment's first value, and a second transaction records another value of
+    // that moment: the check-in and the second value both wait for the first; whichever goes next, the other waits for
+    // it in turn, and the moment ends whole, with the visit (taken within fifteen minutes before it, step 9c's
+    // follow-up), not split by the check-in between.
     [Fact]
     public async Task A_check_in_between_two_transactions_of_one_moment_cannot_split_it()
     {
         var (clinician, patient) = await OnPanelAsync();
+        var visit = Guid.CreateVersion7();
         var (first, firstTransaction) = await BeginAsync(clinician);
         var (second, secondTransaction) = await BeginAsync(clinician);
+        var (checkingIn, checkInTransaction) = await BeginAsync(clinician);
         await using (first)
         await using (second)
+        await using (checkingIn)
         {
             await ExecuteAsync(first, firstTransaction, Insert, Values(patient, HeartRate, 70m));
-            await CheckInAsync(patient);
+            var checkIn = ExecuteAsync(checkingIn, checkInTransaction,
+                "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (@id, @patient, 'in-progress', 'AMB', now())",
+                ("id", visit), ("patient", patient));
+            await WaitsAsync(checkIn);
             var waiting = ExecuteAsync(second, secondTransaction, Insert, Values(patient, Temperature, 37m));
             await WaitsAsync(waiting);
             await firstTransaction.CommitAsync(Cancel);
+            var next = await Task.WhenAny(checkIn, waiting);
+            await (next == checkIn ? checkInTransaction : secondTransaction).CommitAsync(Cancel);
+            Assert.Equal(1, await checkIn);
             Assert.Equal(1, await waiting);
-            await secondTransaction.CommitAsync(Cancel);
+            await (next == checkIn ? secondTransaction : checkInTransaction).CommitAsync(Cancel);
         }
 
-        Assert.Equal(["8867-4 70 final none none", "8310-5 37 final none none"], await StateAsync(patient));
+        Assert.Equal(["8867-4 70 final visit none", "8310-5 37 final visit none"], await StateAsync(patient, visit));
     }
 
     // Two clinicians marking one reading at once, one from each value: the second waits, then finds it marked and is

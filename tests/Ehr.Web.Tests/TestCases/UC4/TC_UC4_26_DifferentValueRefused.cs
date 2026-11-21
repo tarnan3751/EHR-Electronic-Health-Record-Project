@@ -24,8 +24,9 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   3. Record a heart rate of 70 taken ten minutes ago. Type 72 for the same time.
 // Expected result: Steps 1 and 2: each is answered 422 with "Not saved:", and the systolic field says "A blood pressure
 //   already stands for that time. Mark it entered in error first, then record the correct one."; what was typed is
-//   still in the form; nothing is saved: 120/80 is the one reading for that time, with no visit, and the heart rate
-//   wasn't saved either. Step 3: 422, and the heart rate field says "A value already stands for this sign at that
+//   still in the form; nothing is saved: 120/80 is the one reading for that time, and the heart rate wasn't saved
+//   either. Taken five minutes before the check-in, the reading is tied to the visit it started (Tahseen's answer on
+//   step 9c). Step 3: 422, and the heart rate field says "A value already stands for this sign at that
 //   time. Mark it entered in error first, then record the correct one."
 // Creator: Tahseen Arnan
 public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebApps>
@@ -65,7 +66,7 @@ public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebAp
         using var withRate = await RecordAtAsync(session.Client, patient, taken, (Systolic, "130"), (Diastolic, "80"), (HeartRate, "70"));
         await RefusedAsync(withRate, Systolic, Pressure, "130", "80", "70");
 
-        Assert.Equal(["8480-6 120 final none R1", "8462-4 80 final none R1"], await ReadingsAsync(apps, patient));
+        Assert.Equal(["8480-6 120 final visit R1", "8462-4 80 final visit R1"], await ReadingsAsync(apps, patient));
         Assert.Equal([$"{Diastolic} 80", $"{Systolic} 120"], await RecordedAsync(apps, patient));
 
         var earlier = DateTime.UtcNow.AddMinutes(-10).ToString("yyyy-MM-ddTHH:mm");

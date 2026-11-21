@@ -59,25 +59,36 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
         Assert.Equal(first.Vitals.Select(v => (v.Id, v.EncounterId, v.ReadingId, v.Code, v.Value)), again.Vitals.Select(v => (v.Id, v.EncounterId, v.ReadingId, v.Code, v.Value)));
         Assert.Equal("SYN0001235", first.Patient.Mrn);
 
-        // Step 9b: every seeded vital sign carries the range for the patient's age on the day of the visit, and the
-        // seeded clinic has children of every band among them. Children are not all flagged: most values are inside.
+        // Steps 9b and 9d: every seeded vital sign carries the range for the patient's age on the day of the visit and
+        // their sex, and the seeded clinic has children of every band among them. Healthy synthetic children are mostly
+        // unflagged: of each sign, at most one child's value in seven is flagged (a blood pressure at or above its
+        // screening value, as the pages flag it).
         var seen = new Dictionary<string, (int In, int Out)>();
+        var children = new Dictionary<string, (int All, int Flagged)>();
         foreach (var chart in Enumerable.Range(0, 3000).Select(SyntheticClinic.Chart))
         {
             foreach (var vital in chart.Vitals)
             {
                 var months = Ehr.Data.Reference.AgeBand.Months(chart.Patient.BirthDate, DateOnly.FromDateTime(vital.EffectiveAt.UtcDateTime));
-                var range = Ehr.Data.Reference.VitalRanges.For(vital.Code!, months);
-                Assert.Equal((range?.Low, range?.High), (vital.ReferenceLow, vital.ReferenceHigh));
+                var range = Ehr.Data.Reference.VitalRanges.For(vital.Code!, months, chart.Patient.Gender);
+                Assert.Equal((range?.Low, range?.High, range?.Kind ?? Ehr.Data.Patients.ReferenceKind.Normal), (vital.ReferenceLow, vital.ReferenceHigh, vital.ReferenceKind));
                 var band = Ehr.Data.Reference.AgeBand.Of(months);
-                var outside = vital.Value < vital.ReferenceLow || vital.Value > vital.ReferenceHigh;
+                var outside = vital.ReferenceKind == Ehr.Data.Patients.ReferenceKind.Screening
+                    ? vital.Value >= vital.ReferenceHigh
+                    : vital.Value < vital.ReferenceLow || vital.Value > vital.ReferenceHigh;
                 var (inside, flagged) = seen.GetValueOrDefault(band);
                 seen[band] = outside ? (inside, flagged + 1) : (inside + 1, flagged);
+                if (band != Ehr.Data.Reference.AgeBand.Adult)
+                {
+                    var (all, flaggedChildren) = children.GetValueOrDefault(vital.Code!);
+                    children[vital.Code!] = (all + 1, flaggedChildren + (outside ? 1 : 0));
+                }
             }
         }
 
         Assert.Equal(Ehr.Data.Reference.AgeBand.All.Order(), seen.Keys.Order());
         Assert.All(seen.Values, counts => Assert.True(counts.In > counts.Out, $"More seeded values outside the range than inside: {counts}"));
+        Assert.All(children, sign => Assert.True(sign.Value.Flagged * 7 <= sign.Value.All, $"Too many seeded children flagged for {sign.Key}: {sign.Value}"));
         Assert.Equal(7, first.Patient.Id.Version);
     }
 }

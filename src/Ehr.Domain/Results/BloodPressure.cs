@@ -5,7 +5,8 @@ namespace Ehr.Domain.Results;
 // A blood pressure reading (the expansion plan's step 9c): a systolic and a diastolic value that share a reading ID,
 // which the database gives them when they are entered together and holds standing together or entered in error
 // together (db/policies/75-results.sql). Every page that shows a blood pressure takes its two numbers from one reading,
-// never by matching times, and shows it as one value, "126/80", flagged when either number is outside its range.
+// never by matching times, and shows it as one value, "126/80", flagged when either number is outside its range, or for
+// a child at or above its screening value (step 9d; VitalFlag).
 public sealed record BloodPressure(Observation Systolic, Observation Diastolic)
 {
     public DateTimeOffset TakenAt => Systolic.EffectiveAt;
@@ -14,9 +15,8 @@ public sealed record BloodPressure(Observation Systolic, Observation Diastolic)
 
     public string Text => $"{Systolic.Value:0.#}/{Diastolic.Value:0.#}";
 
-    public bool IsHigh => Systolic.Value > Systolic.ReferenceHigh || Diastolic.Value > Diastolic.ReferenceHigh;
-
-    public bool IsLow => Systolic.Value < Systolic.ReferenceLow || Diastolic.Value < Diastolic.ReferenceLow;
+    // The flags of its two numbers, each once, the systolic's first: "High", "Low" or "Needs follow-up".
+    public IReadOnlyList<string> Flags => [.. new[] { VitalFlag.Of(Systolic), VitalFlag.Of(Diastolic) }.OfType<string>().Distinct()];
 
     // The readings among these values that have both of theirs here, the latest first.
     public static IReadOnlyList<BloodPressure> Readings(IEnumerable<Observation> values) =>

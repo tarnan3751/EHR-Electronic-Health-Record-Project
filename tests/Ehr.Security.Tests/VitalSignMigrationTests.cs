@@ -94,8 +94,10 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
                 """, ("patient", patient)));
         Assert.Equal(protection, await AsSuperuserAsync(Protection));
         Assert.Equal(audited, await AsSuperuserAsync("SELECT count(*)::text FROM ehr.audit_events"));
-        // The child's signs came out with a three-year-old's ranges (the VitalCorrections migration, step 9b).
-        Assert.Equal(["8462-4 60 none-63", "8480-6 98 72-103", "8867-4 120 66-173"], await AsSuperuserAsync(
+        // The child's signs came out with a three-year-old's ranges (the VitalCorrections migration, step 9b, and the
+        // ChildrenRanges migration, step 9d: Fleming's 3 to 4 years, and Table 6's age 3, the lower of the boys' and
+        // girls' values for a patient whose sex is unknown).
+        Assert.Equal(["8462-4 60 none-58", "8480-6 98 none-101", "8867-4 120 70-136"], await AsSuperuserAsync(
             """
             SELECT code || ' ' || trim_scale(value) || ' ' || coalesce(trim_scale(reference_low)::text, 'none') || '-' || coalesce(trim_scale(reference_high)::text, 'none')
             FROM ehr.observations WHERE patient_id = @patient ORDER BY code

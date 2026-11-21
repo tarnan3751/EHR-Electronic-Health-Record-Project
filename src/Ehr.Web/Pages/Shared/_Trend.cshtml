@@ -2,8 +2,10 @@
 @model Trend
 @* One test's or vital sign's values over time (step 9; docs/brand: sc-trend). Drawn here as SVG: no script, colored
    by the stylesheet's tokens, the reference range as a band behind the line, values outside it marked by shape as well
-   as color. The sentence under it says what it shows, and the table under that has every number: the chart is never
-   the only way to read them. The table has two narrow columns so it fits the card; the unit is in the title. *@
+   as color. For a child's blood pressure the band is what lies below its screening value, and a value at or above it
+   needs follow-up (step 9d; VitalFlag). The sentence under it says what it shows, and the table under that has every
+   number: the chart is never the only way to read them. The table has two narrow columns so it fits the card; the unit
+   is in the title. *@
 <figure class="sc-trend" data-trend="@Model.Code">
     <figcaption class="sc-trend__title">@Model.Title@(Model.Unit is null ? "" : $" ({Model.Unit})")</figcaption>
     <svg class="sc-trend__chart" viewBox="0 0 @Trend.Width @Trend.Height" role="img" aria-label="Chart of @Model.Title.ToLowerInvariant(), described under it" focusable="false">
@@ -17,7 +19,7 @@
             var (x, y) = (Model.X(i), Model.Y(Model.Points[i].Value));
             if (Model.Points[i].IsOutside)
             {
-                @* Outside the range: a diamond, not only another color. *@
+                @* Flagged (outside the range, or needing follow-up): a diamond, not only another color. *@
                 <rect class="sc-trend__point sc-trend__point--outside" x="@Trend.Number(x - 4)" y="@Trend.Number(y - 4)" width="8" height="8" transform="rotate(45 @Trend.Number(x) @Trend.Number(y))"></rect>
             }
             else
@@ -26,7 +28,7 @@
             }
         }
     </svg>
-    <p class="sc-trend__summary">@Model.Summary@(Model.HasRange ? " The shaded band is the reference range; values outside it are diamonds." : "")</p>
+    <p class="sc-trend__summary">@Model.Summary@(!Model.HasRange ? "" : Model.IsScreening ? " The shaded band is below the screening value; values at or above it need follow-up and are diamonds." : " The shaded band is the reference range; values outside it are diamonds.")</p>
     <details class="sc-trend__values">
         <summary>The values as a table</summary>
         <div class="sc-table-wrap">
@@ -37,7 +39,7 @@
                     {
                         <tr>
                             <td class="sc-table__mono">@point.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td class="sc-table__mono">@point.Value.ToString("0.####")@(point.IsOutside ? ", outside the range" : "")</td>
+                            <td class="sc-table__mono">@point.Value.ToString("0.####")@(point.Flag is null ? "" : point.Flag == VitalFlag.FollowUp ? ", needs follow-up" : ", outside the range")</td>
                         </tr>
                     }
                 </tbody>

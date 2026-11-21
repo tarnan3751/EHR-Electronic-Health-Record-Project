@@ -55,6 +55,10 @@ public class Observation
 
     public decimal? ReferenceHigh { get; set; }
 
+    // What the range is (one of ReferenceKind): a normal range, or for a child's blood pressure a screening value at
+    // or above which a reading needs follow-up (the expansion plan's step 9d). Copied from the range when filed.
+    public string ReferenceKind { get; set; } = Patients.ReferenceKind.Normal;
+
     // When the sample was taken.
     public DateTimeOffset EffectiveAt { get; set; }
 
@@ -93,6 +97,18 @@ public static class VitalSign
 
     // The two values of one blood pressure reading (step 9c).
     public static readonly string[] BloodPressure = [Systolic, Diastolic];
+}
+
+// What an observation's reference range is (the expansion plan's step 9d). A normal range flags a value below its low
+// or above its high. A screening value, which a child's blood pressure has (the AAP's Table 6), is a high only, and a
+// value at or above it needs follow-up: the table is for screening, so such a value is never called abnormal.
+public static class ReferenceKind
+{
+    public const string Normal = "normal";
+
+    public const string Screening = "screening";
+
+    public static readonly string[] All = [Normal, Screening];
 }
 
 // FHIR R4's Observation status codes, the values Observation.Status may hold.
