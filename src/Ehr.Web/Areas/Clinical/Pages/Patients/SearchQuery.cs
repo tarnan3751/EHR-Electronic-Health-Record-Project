@@ -7,6 +7,10 @@ public sealed record SearchQuery(string? Name, string? Birthdate, string? Mrn)
 {
     public static readonly SearchQuery None = new(null, null, null);
 
+    // The criteria's names in the query string: what the staff sign-in keeps of a link, and nothing else, so a search
+    // left when a session ended comes back after signing in (Links.LocalPage).
+    public static readonly IReadOnlyList<string> Parameters = ["name", "birthdate", "mrn"];
+
     public bool IsEmpty => string.IsNullOrWhiteSpace(Name) && string.IsNullOrWhiteSpace(Birthdate) && string.IsNullOrWhiteSpace(Mrn);
 
     // For a redirect to a patient's chart or to the reason it asks for: the patient's ID, and the criteria.

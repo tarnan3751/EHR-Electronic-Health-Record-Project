@@ -270,6 +270,10 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("a sign-out with no actor")]
     [InlineData("a sign-out of an empty patient")]
     [InlineData("a hand-over to the lab")]
+    [InlineData("a download of another row")]
+    [InlineData("a download from another table")]
+    [InlineData("a download of a signed note")]
+    [InlineData("a download of a visit summary")]
     [InlineData("a view of who viewed with a row")]
     [InlineData("a view of who viewed as sensitive")]
     public async Task Only_reads_of_one_patient_by_a_signed_in_account_are_taken(string what)
@@ -325,6 +329,26 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
             case "a hand-over to the lab":
                 bad.Action = AuditActions.SentToLab;
                 bad.TableName = "orders";
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            // A portal download (step 13b) is of one patient's record, as a read of the patient is, and nothing else.
+            case "a download of another row":
+                bad.Action = AuditActions.Download;
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            case "a download from another table":
+                bad.Action = AuditActions.DownloadSensitive;
+                bad.TableName = "observations";
+                break;
+            // Shapes a read may have and a download may not: a download is of the record, never of one row in it.
+            case "a download of a signed note":
+                bad.Action = AuditActions.Download;
+                bad.TableName = "clinical_notes";
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            case "a download of a visit summary":
+                bad.Action = AuditActions.DownloadSensitive;
+                bad.TableName = "visit_summaries";
                 bad.RowId = Guid.CreateVersion7();
                 break;
             // The portal's "Who viewed my record" (step 13c) is a read of the patient's part of the log, which names

@@ -39,6 +39,9 @@ public class SummaryModel(PhiReader phi, PatientAssignments assignments, BreakGl
 
     public IReadOnlyList<string> Errors { get; private set; } = [];
 
+    // The part each error is about, if any (SummaryResult.ErrorParts).
+    public IReadOnlyList<int?> ErrorParts { get; private set; } = [];
+
     [BindProperty]
     public string? TalkedAbout { get; set; }
 
@@ -81,6 +84,7 @@ public class SummaryModel(PhiReader phi, PatientAssignments assignments, BreakGl
         }
 
         Errors = result.Errors;
+        ErrorParts = result.ErrorParts;
         Response.StatusCode = result.Status;
         return Page();
     }

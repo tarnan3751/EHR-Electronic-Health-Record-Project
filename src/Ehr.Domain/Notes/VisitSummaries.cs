@@ -13,8 +13,8 @@ namespace Ehr.Domain.Notes;
 // patient on their panel, as themselves), sets who released or withdrew one and when, takes the note's date, makes it
 // sensitive with the note and its addenda, keeps one standing summary a note, refuses internal codes and identifiers,
 // tells the releaser when someone else withdraws theirs, and refuses every other change (db/policies/30-rls.sql and
-// 52-visit-summaries.sql). The same rule is asked here first, so the page can say what to change. Nothing is copied
-// from the note: the clinician writes it. Marking one sensitive afterwards is ClinicalNotes.SetSensitivityAsync's, as
+// 52-visit-summaries.sql). When its rule about codes refuses one, the rule is asked again, so the page can say what to
+// change: a summary released is checked once. Nothing is copied from the note: the clinician writes it. Marking one sensitive afterwards is ClinicalNotes.SetSensitivityAsync's, as
 // for a note or an addendum.
 public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuthority authority, IEmailSender email)
 {
@@ -37,32 +37,29 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
 
         string[] parts = [.. new[] { talkedAbout, found, nextSteps }.Select(part => part?.ReplaceLineEndings("\n").Trim() ?? "")];
         var errors = new List<string>();
+        var errorParts = new List<int?>();
         for (var i = 0; i < parts.Length; i++)
         {
             if (parts[i].Length == 0)
             {
                 errors.Add($"Write “{Parts[i]}”.");
+                errorParts.Add(i);
             }
             else if (parts[i].Length > MaxLength)
             {
                 errors.Add($"“{Parts[i]}” can be up to {MaxLength:N0} characters. It has {parts[i].Length:N0}.");
+                errorParts.Add(i);
             }
         }
 
         if (errors.Count > 0)
         {
-            return new(422, errors);
+            return new(422, errors) { ErrorParts = errorParts };
         }
 
         if (!await phi.IsAssignedAsync(patient, cancel))
         {
             return new(403, ["Add this patient to your panel to write a summary for the patient."]);
-        }
-
-        var problems = await VisitSummaryChecks.ProblemsAsync(db, patient, note, parts[0], parts[1], parts[2], cancel);
-        if (problems.Count > 0)
-        {
-            return new(422, [.. problems.Select(Explain)]);
         }
 
         object summary = new VisitSummary
@@ -92,11 +89,19 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
         } refusal)
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            if (refusal.SqlState == PostgresErrorCodes.CheckViolation && refusal.ConstraintName == "visit_summaries_plain")
+            {
+                // The rule refused it: asked again, only now, to say what it found and where.
+                var problems = await VisitSummaryChecks.ProblemsAsync(db, patient, note, parts[0], parts[1], parts[2], cancel);
+                return problems.Count > 0
+                    ? new(422, [.. problems.Select(Explain)]) { ErrorParts = [.. problems.Select(problem => (int?)(problem.Part - 1))] }
+                    : new(422, ["It has a code, a record number or an identifier in it. Write it in plain words."]);
+            }
+
             return refusal.SqlState switch
             {
                 PostgresErrorCodes.InsufficientPrivilege => new(403, ["Add this patient to your panel to write a summary for the patient."]),
                 PostgresErrorCodes.UniqueViolation => new(409, ["A summary of this note has already been released. Withdraw it first to write another."]),
-                _ when refusal.ConstraintName == "visit_summaries_plain" => new(422, ["It has a code, a record number or an identifier in it. Write it in plain words."]),
                 _ => new(404, ["This note is unavailable."]),
             };
         }
@@ -207,4 +212,8 @@ public sealed record SummaryResult(int Status, IReadOnlyList<string> Errors, Gui
 {
     // Withdrawn after the patient or a proxy had viewed it in the portal.
     public bool Viewed { get; init; }
+
+    // For each error, the part of the summary it is about (0 What we talked about, 1 What we found, 2 What happens next),
+    // or null for one about none of them: the form marks those parts alone, each tied to its messages.
+    public IReadOnlyList<int?> ErrorParts { get; init; } = [];
 }

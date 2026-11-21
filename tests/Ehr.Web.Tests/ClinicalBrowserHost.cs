@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Ehr.Web.Tests;
 
-// Exposes the real in-memory app to Chromium over loopback HTTPS. No alternate endpoints or production auth bypass.
+// Exposes the real in-memory app (the on-site one, or the off-site one a test names) to Chromium over loopback HTTPS. No
+// alternate endpoints or production auth bypass.
 // The normal test fixture's synthetic accounts and owner-checked deterministic model stub are used unchanged.
 sealed class ClinicalBrowserHost : IAsyncDisposable
 {
@@ -21,7 +22,7 @@ sealed class ClinicalBrowserHost : IAsyncDisposable
     readonly RSA key;
     public string Url { get; private set; } = "";
 
-    ClinicalBrowserHost(WebApps apps)
+    ClinicalBrowserHost(WebApps apps, WebApplicationFactory<Program>? app)
     {
         key = RSA.Create(2048);
         using var created = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)
@@ -33,14 +34,14 @@ sealed class ClinicalBrowserHost : IAsyncDisposable
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(options => options.Listen(System.Net.IPAddress.Loopback, 0, listen => listen.UseHttps(certificate)));
         host = builder.Build();
-        client = apps.OnPrem.CreateClient(new WebApplicationFactoryClientOptions
+        client = (app ?? apps.OnPrem).CreateClient(new WebApplicationFactoryClientOptions
         { BaseAddress = Browser.Base, AllowAutoRedirect = false, HandleCookies = false });
         host.Run(ForwardAsync);
     }
 
-    public static async Task<ClinicalBrowserHost> StartAsync(WebApps apps)
+    public static async Task<ClinicalBrowserHost> StartAsync(WebApps apps, WebApplicationFactory<Program>? app = null)
     {
-        var server = new ClinicalBrowserHost(apps);
+        var server = new ClinicalBrowserHost(apps, app);
         await server.host.StartAsync();
         var address = server.host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
         server.Url = address.Replace("127.0.0.1", "localhost", StringComparison.Ordinal);

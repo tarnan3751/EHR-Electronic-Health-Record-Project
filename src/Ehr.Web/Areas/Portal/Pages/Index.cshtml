@@ -24,6 +24,8 @@
     <p><a asp-page="/Results" class="sc-btn sc-btn--primary">@(own ? "See your test results" : "See test results")</a></p>
     @* Step 13a: what the care team wrote for the patient after a visit. *@
     <p><a asp-page="/Summaries" class="sc-btn">@(own ? "See your visit summaries" : "See visit summaries")</a></p>
+    @* Step 13b: a copy of the record, as a file or a page to print. *@
+    <p><a asp-page="/Record/Index" class="sc-btn">@(own ? "Download my record" : "Download this record")</a></p>
     @* Step 13c: who has looked at the record, from the audit log. *@
     <p><a asp-page="/Views" class="sc-btn">@(own ? "Who viewed my record" : "Who viewed this record")</a></p>
     <section class="sc-panel" aria-labelledby="home-appointments">

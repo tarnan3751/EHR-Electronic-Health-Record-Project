@@ -151,6 +151,7 @@ namespace Ehr.Migrations
                 DROP FUNCTION IF EXISTS ehr.guard_visit_summary();
                 DROP FUNCTION IF EXISTS ehr.reject_visit_summary_delete();
                 DROP FUNCTION IF EXISTS ehr.deliver_summary_withdrawn();
+                DROP FUNCTION IF EXISTS ehr.standing_visit_summaries(integer);
                 DROP FUNCTION IF EXISTS ehr.withdrawn_visit_summaries();
                 DROP FUNCTION IF EXISTS ehr.withdrawn_summary_was_viewed(uuid);
                 DROP FUNCTION IF EXISTS ehr.visit_summary_problems(uuid, uuid, text[]);

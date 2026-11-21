@@ -1,6 +1,6 @@
 using Ehr.Data.Patients;
 using Ehr.Domain.Phi;
-using Ehr.Web.Api.Fhir;
+using Ehr.Web.Fhir;
 using Xunit;
 
 namespace Ehr.Web.Tests;
@@ -49,7 +49,7 @@ public class FhirObservationsTests
             Value(VitalSign.Diastolic, 85, half),
             heartRate,
             laboratory,
-        ]);
+        ], FhirIds.Record);
 
         Assert.Equal([whole, heartRate.Observation.Id, laboratory.Observation.Id], mapped.Select(observation => observation.Id));
         var reading = mapped[0].Resource;
@@ -82,7 +82,7 @@ public class FhirObservationsTests
         [
             Ranged(VitalSign.Systolic, 98, child, null, 98, ReferenceKind.Screening) with { Diastolic = Ranged(VitalSign.Diastolic, 50, child, null, 54, ReferenceKind.Screening) },
             Ranged(VitalSign.Systolic, 118, adult, 90, 129, ReferenceKind.Normal) with { Diastolic = Ranged(VitalSign.Diastolic, 76, adult, 60, 79, ReferenceKind.Normal) },
-        ]);
+        ], FhirIds.Record);
 
         var screened = mapped[0].Resource.Component!.Select(component => Assert.Single(component.ReferenceRange!)).ToList();
         Assert.All(screened, range => Assert.Null(range.Low));
