@@ -64,6 +64,58 @@ public sealed partial class PhiReader
         return new FormAnswers(patient, entry);
     }
 
+    // The portal's pre-visit forms, for the record the session is looking at: every form row-level security gives it,
+    // newest appointment first. A session that may not see sensitive items is given none, exactly as for a record with no
+    // forms. One recorded read of the patient: a view of sensitive items when the session may see them, which opening
+    // this page is the asking for, and a plain read when it may not. Null when the session may read no such patient.
+    public async Task<PortalForms?> PortalFormsAsync(Guid patientId, bool maySeeSensitive, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var forms = await FormEntriesAsync(patientId, request: null, cancellationToken);
+        audit.Record(maySeeSensitive ? AuditActions.ReadSensitive : AuditActions.Read, patientId, PatientsTable, patientId);
+        await db.SaveChangesAsync(cancellationToken);
+        return new PortalForms(patient, forms);
+    }
+
+    // One pre-visit form of the record the session is looking at, to fill in or to read its answers: a view of sensitive
+    // items. Null, with nothing read or recorded but this one statement, when the session can't see it: a form that
+    // doesn't exist, another patient's, and one a proxy without sensitive items may not see are all the same nothing.
+    public async Task<FormEntry?> PortalFormAsync(Guid patientId, Guid requestId, CancellationToken cancellationToken)
+    {
+        if ((await FormEntriesAsync(patientId, requestId, cancellationToken)).SingleOrDefault() is not { } form)
+        {
+            return null;
+        }
+
+        audit.Record(AuditActions.ReadSensitive, patientId, PatientsTable, patientId);
+        await db.SaveChangesAsync(cancellationToken);
+        return form;
+    }
+
+    // How many of the record's forms can be filled in now, for the portal's home: asked for, not answered, before an
+    // appointment that is booked or checked in, from 7 days before it until its scheduled end (the database's rule, which
+    // decides when answers are sent). A number about the session's own record, part of the home page's one recorded read;
+    // none for a session that may not see sensitive items.
+    public async Task<int> OpenFormsAsync(Guid patientId, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var latest = now.AddDays(PreVisitForms.OpenDays);
+        var earliest = now.AddMinutes(-AppointmentConfiguration.LongestMinutes);
+        var open = await (
+            from asked in db.QuestionnaireRequests.AsNoTracking()
+            where asked.PatientId == patientId && !db.QuestionnaireResponses.Any(r => r.RequestId == asked.Id)
+            join appointment in db.Appointments on asked.AppointmentId equals appointment.Id
+            where (appointment.Status == AppointmentStatus.Booked || appointment.Status == AppointmentStatus.Fulfilled)
+                && appointment.StartsAt <= latest && appointment.StartsAt > earliest
+            select new { appointment.StartsAt, appointment.Minutes }).ToListAsync(cancellationToken);
+        return open.Count(a => a.StartsAt.AddMinutes(a.Minutes) > now);
+    }
+
     // The forms of a patient, or the one asked for, with what the pages show of each: the questionnaire's title, the
     // appointment, who asked, the copy of the definition, and the answers with their score and who sent them. Read in one
     // statement; a proxy is named by the name their account gave, never by reading another record.
@@ -137,6 +189,9 @@ public sealed record FormEntry(
 
     // Whether the appointment still allows answers at all: booked, or checked in.
     public bool AppointmentHeld => AppointmentStatus is Ehr.Data.Scheduling.AppointmentStatus.Booked or Ehr.Data.Scheduling.AppointmentStatus.Fulfilled;
+
+    // Whether answers can be sent at `now`, on the pages' reckoning; the database's clock decides when they are.
+    public bool OpenAt(DateTimeOffset now) => Response is null && AppointmentHeld && now >= OpensAt && now < ClosesAt;
 }
 
 // A form's answers: the score, band, follow-up and alert the database worked out, when they were sent, and, when a proxy
@@ -145,3 +200,6 @@ public sealed record FormResponse(
     Guid Id, int? Score, string? Band, bool FollowUp, bool Alert, DateTimeOffset AnsweredAt, string? Proxy, IReadOnlyDictionary<string, string> Answers);
 
 public sealed record FormAnswers(Patient Patient, FormEntry Form);
+
+// The record's pre-visit forms as the portal lists them.
+public sealed record PortalForms(Patient Patient, IReadOnlyList<FormEntry> Forms);

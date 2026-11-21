@@ -1,0 +1,64 @@
+@page "/portal/forms"
+@model Ehr.Web.Areas.Portal.Pages.Forms.IndexModel
+@{
+    // A page title names no form: it is a sensitive item (docs/brand: sensitive items).
+    ViewData["Title"] = "Pre-visit forms";
+    var own = Model.ActingFor is null;
+    var now = DateTimeOffset.UtcNow;
+    // Those that can be filled in now or later, soonest first; then those sent, newest first. One that closed unanswered
+    // is no longer anything to do, and isn't listed.
+    var toFill = (Model.Forms?.Forms ?? []).Where(form => form.Response is null && form.AppointmentHeld && form.ClosesAt > now)
+        .OrderBy(form => form.AppointmentStartsAt).ToList();
+    var sent = (Model.Forms?.Forms ?? []).Where(form => form.Response is not null).OrderByDescending(form => form.Response!.AnsweredAt).ToList();
+    static string When(DateTimeOffset moment) => $"{moment.UtcDateTime:MMM d, yyyy, HH:mm} UTC";
+}
+<h1>Pre-visit forms</h1>
+@if (Model.Forms is null)
+{
+    <p class="sc-notice sc-notice--danger">@(own ? "Your forms are" : "Forms are") not available right now. Contact the clinic if this continues.</p>
+}
+else
+{
+    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">@FormNotices.NotMonitoredState</span> @FormNotices.NotMonitored</p>
+    <h2>To fill in</h2>
+    @if (toFill.Count == 0)
+    {
+        <p>@(own ? "You have no forms to fill in." : "There are no forms to fill in.")</p>
+    }
+    else
+    {
+        <ul class="sc-results">
+            @foreach (var form in toFill)
+            {
+                <li class="sc-result" data-form="open">
+                    <h3>@form.Title</h3>
+                    <p>Before @(own ? "your" : "the") appointment on @When(form.AppointmentStartsAt) with @form.AppointmentClinician.</p>
+                    @if (form.OpenAt(now))
+                    {
+                        <p>Fill it in by @When(form.ClosesAt).</p>
+                        <p><a asp-page="Form" asp-route-requestId="@form.Id" class="sc-btn sc-btn--primary">Fill in the form</a></p>
+                    }
+                    else
+                    {
+                        <p>You can fill it in from @When(form.OpensAt) until @When(form.ClosesAt).</p>
+                    }
+                </li>
+            }
+        </ul>
+    }
+    @if (sent.Count > 0)
+    {
+        <h2>Sent</h2>
+        <ul class="sc-results">
+            @foreach (var form in sent)
+            {
+                <li class="sc-result" data-form="sent">
+                    <h3>@form.Title</h3>
+                    <p>Sent @When(form.Response!.AnsweredAt), before the appointment on @When(form.AppointmentStartsAt).</p>
+                    <p><a asp-page="Form" asp-route-requestId="@form.Id">@(own ? "See your answers" : "See the answers")</a></p>
+                </li>
+            }
+        </ul>
+    }
+}
+<p><a asp-page="/Index">@(own ? "Back to my record" : "Back to the record")</a></p>

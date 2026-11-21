@@ -1,0 +1,95 @@
+@page "/portal/forms/{requestId:guid}"
+@model Ehr.Web.Areas.Portal.Pages.Forms.FormModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // A page title names no form: it is a sensitive item (docs/brand: sensitive items).
+    ViewData["Title"] = "Pre-visit form";
+    var own = Model.ActingFor is null;
+    var form = Model.Form;
+    var definition = form.Definition;
+    var answered = form.Response;
+    var now = DateTimeOffset.UtcNow;
+    static string When(DateTimeOffset moment) => $"{moment.UtcDateTime:MMM d, yyyy, HH:mm} UTC";
+}
+<h1>Pre-visit form</h1>
+@if (answered is { Alert: true })
+{
+    @* The PHQ-9's question 9 answered other than "Not at all": what to do now, first, never the answer (FormNotices). *@
+    <p class="sc-notice sc-notice--warning" role="alert" data-form-help>@FormNotices.AfterAnswerToReview(Model.ActingFor)</p>
+}
+@if (Model.Sent && answered is not null)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Answers sent:</span> your care team will go over them with you at your visit.</p>
+}
+<p class="sc-notice sc-notice--info" data-form-not-monitored><span class="sc-notice__state">@FormNotices.NotMonitoredState</span> @FormNotices.NotMonitored</p>
+<h2>@form.Title</h2>
+<p class="sc-muted">Before @(own ? "your" : "the") appointment on @When(form.AppointmentStartsAt) with @form.AppointmentClinician.</p>
+@if (answered is not null)
+{
+    <p>Sent @When(answered.AnsweredAt) by @(answered.Proxy ?? (own ? "you" : "the patient")).</p>
+    <p>@definition.Prompt</p>
+    <dl class="record" data-form-answers>
+        @foreach (var item in definition.Items)
+        {
+            var chosen = answered.Answers.TryGetValue(item.Code, out var code) ? definition.AnswersTo(item).FirstOrDefault(answer => answer.Code == code) : null;
+            <dt>@item.Text</dt>
+            <dd>@(chosen?.Text ?? "Not answered")</dd>
+        }
+    </dl>
+}
+else if (!form.AppointmentHeld || form.ClosesAt <= now)
+{
+    <p>This form can no longer be filled in.</p>
+}
+else if (now < form.OpensAt)
+{
+    <p>You can fill it in from @When(form.OpensAt) until @When(form.ClosesAt).</p>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Not sent:</span> forms can't be sent until the clinic's server is back.</p>
+}
+else
+{
+    @if (!own)
+    {
+        <p>You are answering for @Model.ActingFor. The questions ask how they have been.</p>
+    }
+    <form method="post" asp-route-requestId="@form.Id" class="sc-stack">
+        @if (Model.Missing.Count > 0)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> answer every question to send the form. The ones without an answer say so.</p>
+        }
+        <p>@definition.Prompt Fill it in by @When(form.ClosesAt), in one go: nothing is kept until you send it.</p>
+        @* The cursor goes to the first question left without an answer, when the form comes back; never on opening it, so
+           the notices above stay in view. *@
+        @{ var firstMissing = definition.Items.FirstOrDefault(item => Model.Missing.Contains(item.Code))?.Code; }
+        @foreach (var item in definition.Items)
+        {
+            var missing = Model.Missing.Contains(item.Code);
+            var given = Model.Answers.GetValueOrDefault(item.Code);
+            var id = $"question-{item.Code}";
+            <fieldset class="sc-choice" aria-describedby="@(missing ? id + "-error" : null)" data-question="@item.Code">
+                <legend>@item.Text@(item.Optional ? " (you can leave this one)" : "")</legend>
+                @if (missing)
+                {
+                    <p class="sc-field__error" id="@(id)-error">Choose an answer.</p>
+                }
+                @foreach (var (answer, place) in definition.AnswersTo(item).Select((answer, place) => (answer, place)))
+                {
+                    <label class="sc-choice__option" for="@(id)-@place">
+                        <input type="radio" id="@(id)-@place" name="Answers[@item.Code]" value="@answer.Code" checked="@(answer.Code == given)"
+                               required="@(!item.Optional)" autofocus="@(place == 0 && item.Code == firstMissing)">
+                        @answer.Text
+                    </label>
+                }
+            </fieldset>
+        }
+        <div class="sc-actions"><button class="sc-btn sc-btn--primary">@(own ? "Send to my care team" : "Send to the care team")</button></div>
+    </form>
+}
+@if (definition.Attribution is { } attribution)
+{
+    <p class="sc-muted">@attribution</p>
+}
+<p><a asp-page="Index">Back to pre-visit forms</a></p>

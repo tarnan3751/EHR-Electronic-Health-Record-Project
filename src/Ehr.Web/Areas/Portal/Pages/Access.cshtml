@@ -75,7 +75,7 @@ else
                         @ProxyAccess.ScopeLabel(grant.Scope). Until @grant.ExpiresAt.UtcDateTime.ToString("MMM d, yyyy").
                         @(grant.ByClinic ? "Recorded by your clinic." : "Given by you.")
                     </p>
-                    <p>@(grant.IncludeSensitive ? "They can also see items your care team marked sensitive." : "They can't see items your care team marked sensitive.")</p>
+                    <p>@(grant.IncludeSensitive ? "They can also see items your care team marked sensitive. They can also see and fill in your pre-visit forms." : "They can't see items your care team marked sensitive. They can't see your pre-visit forms.")</p>
                     @if (OnPrem.IsReachable)
                     {
                         <div class="sc-actions">
@@ -131,7 +131,9 @@ else
                 }
             </div>
             <div class="sc-field">
-                <label class="sc-check" for="access-sensitive"><input type="checkbox" id="access-sensitive" name="IncludeSensitive" value="true" checked="@Model.IncludeSensitive"> Also show them items my care team marked sensitive</label>
+                <label class="sc-check" for="access-sensitive"><input type="checkbox" id="access-sensitive" name="IncludeSensitive" value="true" checked="@Model.IncludeSensitive" aria-describedby="access-sensitive-hint"> Also show them items my care team marked sensitive</label>
+                @* Step 13e: pre-visit forms are sensitive items, and a proxy allowed them can answer them too. *@
+                <p class="sc-field__hint" id="access-sensitive-hint">These include your pre-visit forms: with this, they can also see and fill in your forms.</p>
             </div>
             <div class="sc-field">
                 <label for="access-days">For how long</label>

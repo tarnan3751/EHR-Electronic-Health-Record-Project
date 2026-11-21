@@ -25,6 +25,9 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public bool MayMessage => subject.MayMessage;
 
+    // Pre-visit forms that can be filled in now (step 13e): none for a proxy without sensitive items, who is shown no link.
+    public int OpenForms { get; private set; }
+
     public async Task OnGetAsync()
     {
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
@@ -33,5 +36,9 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
         var appointments = await phi.AppointmentsAsync(patientId, past: 0, HttpContext.RequestAborted);
         Patient = appointments?.Patient;
         Upcoming = [.. (appointments?.Upcoming ?? []).Take(3)];
+        if (Patient is not null && (subject.Acting is null || subject.Acting.IncludeSensitive))
+        {
+            OpenForms = await phi.OpenFormsAsync(patientId, HttpContext.RequestAborted);
+        }
     }
 }

@@ -226,6 +226,8 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal choose, a record shared", typing: false, () => "/portal/choose"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
                     results.Add(await MeasureAsync(portal, times, "Portal refills, the patient's own", typing: false, () => "/portal/refills"));
+                    // Pre-visit forms (step 13e): the list, and the GAD-7 still open.
+                    results.AddRange(await MeasurePortalFormsAsync(portal, times, "", forms));
                     // Download my record (step 13b): the page, the FHIR file and the printable page.
                     results.AddRange(await MeasureRecordAsync(portal, times, "", "the patient's own", page: true));
                     results.Add(await MeasureAsync(portal, times, "Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
@@ -243,6 +245,8 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal results, as a proxy", typing: false, () => "/portal/results"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
                     results.Add(await MeasureAsync(portal, times, "Portal refills, as a proxy", typing: false, () => "/portal/refills"));
+                    // A proxy without sensitive items: the record has no forms for them, as the database decides.
+                    results.Add(await MeasureAsync(portal, times, "Portal pre-visit forms, as a proxy", typing: false, () => "/portal/forms"));
                     results.AddRange(await MeasureRecordAsync(portal, times, "", "as a proxy", page: false));
                     // And for the seeded patient whose record has the most entries, with a session of its own.
                     using (var largest = await PortalSignInAsync(app, largestSession, largestEmail, largestPassword))
@@ -499,6 +503,7 @@ internal static partial class RenderBenchmark
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, as a proxy", typing: false, () => "/portal/refills"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal pre-visit forms, as a proxy", typing: false, () => "/portal/forms"));
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "as a proxy", page: false));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
             using (var mine = await PostFormAsync(portal, "/portal/acting?handler=Mine", await portal.GetStringAsync("/portal/summaries")))
@@ -511,6 +516,7 @@ internal static partial class RenderBenchmark
 
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, the patient's own", typing: false, () => "/portal/refills"));
+            results.AddRange(await MeasurePortalFormsAsync(portal, times, "Off-site, ", forms));
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "the patient's own", page: true));
             using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
             results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
@@ -1487,7 +1493,7 @@ internal static partial class RenderBenchmark
     }
 
     // Step 13e: what the forms' rows open. The patient, one answered form (a PHQ-9 with an answer to review) and one
-    // still open (a GAD-7).
+    // still open (a GAD-7), which the portal's rows open.
     sealed record FormRows(Guid Patient, Guid Response, Guid Open);
 
     // For the patient, three appointments in the days ahead, each with a PHQ-9 and a GAD-7 asked for by the clinician,
@@ -1578,6 +1584,13 @@ internal static partial class RenderBenchmark
             () => $"/patients/{forms.Patient}/forms?sensitive=true"),
         await MeasureAsync(client, times, prefix + "Pre-visit form answers, a patient on the panel", typing: false,
             () => $"/patients/{forms.Patient}/forms/{forms.Response}"),
+    ];
+
+    // The portal's pre-visit forms pages, as the patient: the list, and the form still open.
+    static async Task<List<Result>> MeasurePortalFormsAsync(HttpClient portal, DatabaseTimes times, string prefix, FormRows forms) =>
+    [
+        await MeasureAsync(portal, times, prefix + "Portal pre-visit forms, the patient's own", typing: false, () => "/portal/forms"),
+        await MeasureAsync(portal, times, prefix + "Portal pre-visit form, the patient's own", typing: false, () => $"/portal/forms/{forms.Open}"),
     ];
 
     // The schedule's pages: a clinician's day, each patient named a recorded read; the form that books an appointment;

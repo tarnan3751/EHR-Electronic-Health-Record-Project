@@ -91,6 +91,21 @@ static class PreVisitFormTests
         return id;
     }
 
+    public static string FormPath(Guid request) => $"/portal/forms/{request}";
+
+    // The patient's own portal session, signed in on the on-site app.
+    public static async Task<(HttpClient Client, System.Net.CookieContainer Jar)> PortalAsync(WebApps apps, Visit visit)
+    {
+        var (client, jar, path, _) = await ProxyTests.SignInAsync(apps, visit.Email);
+        Assert.Equal("/portal", path);
+        return (client, jar);
+    }
+
+    // "Send to my care team", as the form posts it: each question's answer, by its code. The token comes from the
+    // Access page, which every portal session has, so a form the session can't see is posted to just the same.
+    public static Task<HttpResponseMessage> SendAsync(HttpClient client, Guid request, Dictionary<string, string> answers, params (string Name, object Value)[] more) =>
+        PostFormAsync(client, FormPath(request), "/portal/access", [.. answers.Select(answer => ($"Answers[{answer.Key}]", (object)answer.Value)), .. more]);
+
     // A page's words with each run of white space made one space, so a table's row reads as one line.
     public static string Text(string html) => System.Text.RegularExpressions.Regex.Replace(Words(html), "\\s+", " ");
 

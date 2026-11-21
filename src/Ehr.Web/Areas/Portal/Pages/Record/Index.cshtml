@@ -15,7 +15,7 @@
         <li><strong>As a file (FHIR):</strong> the standard format other clinics and health apps can read. It doesn't hold visit summaries yet.</li>
         <li><strong>As a printable page:</strong> the same, with the @SummariesModel.Limit newest visit summaries at most, laid out to print or to save as a PDF.</li>
     </ul>
-    <p class="sc-muted">Neither holds the care team's notes, messages, or who has looked at the record.</p>
+    <p class="sc-muted">Neither holds the care team's notes, messages, pre-visit forms, or who has looked at the record.</p>
 </div>
 @* Said before anything is downloaded: the copy is the person's to look after once it leaves the portal. *@
 <p class="sc-notice sc-notice--warning" data-download-warning><span class="sc-notice__state">Health information:</span> the file and the printable page hold @(own ? "your" : "this person's") health information. Once you download or print them, where they go is your responsibility: anyone who has the file or the paper can read it, and the clinic can't take it back. On a computer you share, delete the file when you're done.</p>
