@@ -1,6 +1,7 @@
 -- Results of an order, and their acknowledgment (the expansion plan's step 7): what the database itself holds them
 -- to, whatever the app does. Who may file and acknowledge is row-level security's (30-rls.sql): a clinician with the
--- patient on their active panel. Plain SQL, safe to run again.
+-- patient on their active panel, or, for filing, a lab through its door (step 12, 76-lab.sql), whose rows are held
+-- to the same rules here. Plain SQL, safe to run again.
 
 -- Before a result or a vital sign is inserted. Runs as the caller.
 --   1. It answers a lab order of the same patient that is still open to results: active, or completed and not yet
@@ -203,13 +204,16 @@ REVOKE ALL ON FUNCTION ehr.file_result() FROM PUBLIC;
 CREATE OR REPLACE TRIGGER observations_file
     BEFORE INSERT ON ehr.observations
     -- For every insert the apps make, by the role they connect as: never by who the statement says is signed in,
-    -- which a statement can change between its own rows. Rows loaded by the schema's owner (the seed) or a superuser
-    -- (a test standing in for a lab interface) don't pass through here.
-    FOR EACH ROW WHEN (current_user IN ('ehr_app', 'ehr_read'))
+    -- which a statement can change between its own rows. That is the role the session logged in as (session_user)
+    -- as well as the one a statement runs as (current_user), so an insert an app session makes through a function
+    -- that runs as its owner, as the lab's door does (76-lab.sql), passes through here too. Rows loaded by the
+    -- schema's owner logged in as itself (the seed, the migrations) or by a superuser (a test's setup) don't.
+    FOR EACH ROW WHEN (current_user IN ('ehr_app', 'ehr_read') OR session_user IN ('ehr_app', 'ehr_read'))
     EXECUTE FUNCTION ehr.file_result();
 
 -- After a result is inserted: its order, if still active, becomes completed. As the caller, who may update the orders
--- of a patient on their panel; the orders' own trigger allows exactly this change (60-orders.sql).
+-- of a patient on their panel, or the lab's door, as the tables' owner, whose policy lets it complete a lab order
+-- (orders_owner_update, 30-rls.sql); the orders' own trigger allows exactly this change (60-orders.sql).
 CREATE OR REPLACE FUNCTION ehr.complete_resulted_order() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp

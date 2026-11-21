@@ -255,7 +255,7 @@ A read-only FHIR R4 API, on both servers, for clinicians (`src/Ehr.Web/Api/Fhir`
 
 ## Database changes
 
-The schema comes from EF Core migrations in `db/migrations`; roles, grants, row-level security and triggers are hand-written SQL in `db/policies`. Reference data, the standard codes chart entries are picked from, is generated SQL in `db/reference` (`docs/expansion/reference-data.md`). The migration job (`infra/migrate`) applies all three to the primary, as `ehr_owner`, every time the server stack starts; the replica gets them by replication. CI's stack job runs the same job.
+The schema comes from EF Core migrations in `db/migrations`; roles, grants, row-level security and triggers are hand-written SQL in `db/policies`. Reference data, the standard codes chart entries are picked from, is generated SQL in `db/reference` (`docs/expansion/reference-data.md`). The migration job (`infra/migrate`) applies all three to the primary, as `ehr_owner`, every time the server stack starts, and then stores the hash of the lab's key from `EHR_LAB_KEY`, or none when it isn't set (`db/policies/76-lab.sql`); the replica gets them by replication. CI's stack job runs the same job.
 
 Run `dotnet tool restore` for the pinned `dotnet-ef`: once, and again whenever `.config/dotnet-tools.json` changes. Then, from the repository folder:
 

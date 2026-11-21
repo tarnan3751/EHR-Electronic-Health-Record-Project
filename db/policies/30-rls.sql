@@ -786,6 +786,28 @@ CREATE POLICY orders_panel_update ON ehr.orders FOR UPDATE
         )
     );
 
+-- The lab's door (step 12, ehr.lab_orders and ehr.file_lab_results in 76-lab.sql) runs as the tables' owner, which
+-- forced row-level security binds too. These let it do what the door does, and only the owner: no runtime role is or
+-- can become it, and the apps reach the owner only through those two functions, which demand the lab's key. Without
+-- them the door would see nothing, and the acknowledgment check in ehr.file_result would pass for want of finding one.
+--   orders: read and lock lab orders, and complete one when its first result is filed (60-orders.sql holds that
+--     update to the status alone); no other kind of order is seen.
+--   observations: insert a result of an order, nothing else (ehr.file_result holds such a row to a laboratory result
+--     of one of the order's tests); reading them is the owner's already (above). Written on the order alone: a policy
+--     on a column a rolled-back migration drops would stop the rollback.
+--   result_acknowledgments: whether an order's results were acknowledged.
+--   conditions: the codes of a patient's diagnoses for the hand-over, never a sensitive one.
+DROP POLICY IF EXISTS orders_owner_select ON ehr.orders;
+CREATE POLICY orders_owner_select ON ehr.orders FOR SELECT TO ehr_owner USING (type = 'lab');
+DROP POLICY IF EXISTS orders_owner_update ON ehr.orders;
+CREATE POLICY orders_owner_update ON ehr.orders FOR UPDATE TO ehr_owner USING (type = 'lab') WITH CHECK (type = 'lab');
+DROP POLICY IF EXISTS observations_owner_insert ON ehr.observations;
+CREATE POLICY observations_owner_insert ON ehr.observations FOR INSERT TO ehr_owner WITH CHECK (order_id IS NOT NULL);
+DROP POLICY IF EXISTS result_acknowledgments_owner_select ON ehr.result_acknowledgments;
+CREATE POLICY result_acknowledgments_owner_select ON ehr.result_acknowledgments FOR SELECT TO ehr_owner USING (true);
+DROP POLICY IF EXISTS conditions_owner_select ON ehr.conditions;
+CREATE POLICY conditions_owner_select ON ehr.conditions FOR SELECT TO ehr_owner USING (NOT sensitive);
+
 -- UC 13 review results are private to the clinician and the same active-panel draft as UC 14.
 ALTER TABLE ehr.ai_note_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.ai_note_reviews FORCE ROW LEVEL SECURITY;
