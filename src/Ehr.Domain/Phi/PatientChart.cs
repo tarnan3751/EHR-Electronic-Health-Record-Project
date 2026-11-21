@@ -40,6 +40,12 @@ public sealed record PatientChart(
     // Signed notes marked sensitive that the chart's list leaves out (step 10); zero when sensitive items are shown.
     public int SensitiveNotesHidden { get; init; }
 
+    // The patient's pre-visit forms (step 13e), every one a sensitive item: how many there are, for the link to their
+    // page, which the chart never lists; and whether the reader has one in their inbox with an answer still to review.
+    public int Forms { get; init; }
+
+    public bool FormToReview { get; init; }
+
     // For the desktop app's offline copy only: the latest signed notes that aren't sensitive, with their addenda.
     public IReadOnlyList<OfflineNote> OfflineNotes { get; init; } = [];
 

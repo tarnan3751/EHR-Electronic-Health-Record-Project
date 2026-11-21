@@ -22,7 +22,7 @@ namespace Ehr.Domain.Phi;
 // which rows exist for the current user: a clinician sees every patient, a patient only themselves, anyone else
 // nothing. Ehr.Architecture.Tests fails if anything outside this namespace touches the patient entity or the rest of
 // the chart.
-public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext user)
+public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext user)
 {
     public const string PatientsTable = "patients";
 
@@ -62,6 +62,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
                 // the chart's list unless asked for, like sensitive diagnoses and medications.
                 SensitiveNotes = db.ClinicalNotes.Count(n => n.PatientId == id && n.Sensitive),
                 Drafts = db.ClinicalDrafts.Any(d => d.PatientId == id),
+                // Pre-visit forms (step 13e): how many, and whether the reader has an answer to review (their own
+                // inbox's item, by the index of what still needs action).
+                Forms = db.QuestionnaireRequests.Count(r => r.PatientId == id),
+                FormToReview = db.InboxItems.Any(i => i.RecipientId == user.UserId && i.DoneAt == null && i.PatientId == id
+                    && i.Kind == Ehr.Data.Inbox.InboxItemKind.FormAlert),
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (found is null)
@@ -164,6 +169,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             SensitiveHidden = hidden,
             SensitiveNotesHidden = sensitive ? 0 : found.SensitiveNotes,
             SensitiveShown = sensitive,
+            Forms = found.Forms,
+            FormToReview = found.FormToReview,
         };
     }
 
@@ -800,11 +807,13 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             }
         }
 
+        // A pre-visit form's answer to review comes before everything else (step 13e).
         var ordered = done
             ? mine.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id)
             : abnormal.Count > 0
-                ? mine.OrderByDescending(i => i.SourceId != null && abnormal.Contains(i.SourceId.Value)).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id)
-                : mine.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id);
+                ? mine.OrderByDescending(i => i.Kind == Ehr.Data.Inbox.InboxItemKind.FormAlert)
+                    .ThenByDescending(i => i.SourceId != null && abnormal.Contains(i.SourceId.Value)).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id)
+                : mine.OrderByDescending(i => i.Kind == Ehr.Data.Inbox.InboxItemKind.FormAlert).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id);
         var rows = await (
             from item in ordered.Take(limit + 1)
             join patient in db.Patients on item.PatientId equals patient.Id into patients
@@ -815,7 +824,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         var items = rows.Select(i => i with { Abnormal = i.SourceId is { } source && abnormal.Contains(source) }).ToList();
         items = [.. done
             ? items.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id)
-            : items.OrderByDescending(i => i.Abnormal).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id)];
+            : items.OrderByDescending(i => i.Kind == Ehr.Data.Inbox.InboxItemKind.FormAlert).ThenByDescending(i => i.Abnormal).ThenBy(i => i.CreatedAt).ThenBy(i => i.Id)];
         var more = items.Count > limit;
         items = [.. items.Take(limit)];
 

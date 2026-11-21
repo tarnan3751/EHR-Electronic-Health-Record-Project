@@ -24,6 +24,8 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
     <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@Clinic.Day(appointment.StartsAt)">That day's schedule</a></p>
+    @* Step 13e: the forms asked for before this visit, and asking for one, on the patient's pre-visit forms page. *@
+    <p><a asp-page="/Patients/Forms/Index" asp-route-patientId="@patient.Id" asp-fragment="appointment-@appointment.Id" data-forms>Pre-visit forms</a></p>
 </div>
 <h1>Appointment: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Gone)

@@ -1,0 +1,58 @@
+@page "/patients/{patientId:guid}/forms/{responseId:guid}"
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Forms.ResponseModel
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Answers.Patient;
+    var form = Model.Answers.Form;
+    var answered = form.Response!;
+    var definition = form.Definition;
+    // A page title names no form: it is a sensitive item (docs/brand: sensitive items).
+    ViewData["Title"] = $"Pre-visit form: {patient.FamilyName}, {patient.GivenName}";
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true" asp-fragment="appointment-@form.AppointmentId">Back to pre-visit forms</a></p>
+</div>
+<h1>Pre-visit form: @patient.FamilyName, @patient.GivenName</h1>
+<p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded.</p>
+@if (answered.Alert)
+{
+    <p class="sc-notice sc-notice--danger" data-form-alert><span class="sc-notice__state">Needs review:</span> question 9 was answered other than "Not at all". A final decision about the risk of self-harm needs a clinical interview.</p>
+}
+<section class="sc-panel" aria-label="The form">
+    <dl class="record">
+        <dt>Questionnaire</dt><dd>@form.Title <span class="sc-tag sc-tag--warning">Sensitive</span></dd>
+        <dt>Before</dt><dd>@Clinic.Format(form.AppointmentStartsAt) with @form.AppointmentClinician</dd>
+        <dt>Answered</dt><dd>@Clinic.Format(answered.AnsweredAt) by @(answered.Proxy is { } proxy ? $"{proxy}, not the patient" : "the patient")</dd>
+        @if (answered.Score is { } score)
+        {
+            <dt>Score</dt>
+            <dd data-form-score>@score@(definition.Max is { } max ? $" of {max}" : "")@(answered.Band is { } band ? $" · {band}" : "")@if (answered.FollowUp) {<text> </text><span class="sc-tag sc-tag--warning" data-form-follow-up>Needs follow-up</span>}</dd>
+        }
+    </dl>
+</section>
+<h2>Answers</h2>
+<p>@definition.Prompt</p>
+<div class="sc-table-wrap">
+    <table class="sc-table" data-form-answers>
+        <thead><tr><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Score</th></tr></thead>
+        <tbody>
+            @foreach (var item in definition.Items)
+            {
+                var chosen = answered.Answers.TryGetValue(item.Code, out var code) ? definition.AnswersTo(item).FirstOrDefault(answer => answer.Code == code) : null;
+                <tr>
+                    <td>@item.Text</td>
+                    <td>@(chosen?.Text ?? "Not answered")</td>
+                    <td class="sc-table__mono">@(item.Scored && chosen?.Score is { } points ? points.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+@if (definition.Attribution is { } attribution)
+{
+    <p class="sc-muted">@attribution</p>
+}

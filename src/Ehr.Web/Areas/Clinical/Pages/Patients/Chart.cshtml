@@ -42,6 +42,11 @@
 {
     <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Emergency access:</span> this patient is not on your panel. Your access and the reason you gave are recorded for review. It lasts until @Clinic.Format(until).</p>
 }
+@if (Model.Chart.FormToReview)
+{
+    @* Step 13e: a pre-visit form in this clinician's inbox has an answer to review. No questionnaire, answer or score. *@
+    <p class="sc-notice sc-notice--danger" data-form-review><span class="sc-notice__state">Needs review:</span> a pre-visit form has an answer for you to review. <a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" asp-route-sensitive="true">Open pre-visit forms</a></p>
+}
 @if (Model.Chart.ConfirmsDiscontinued)
 {
     <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Order discontinued:</span> it is listed under this chart's discontinued orders.</p>
@@ -331,6 +336,8 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             <p class="sc-muted">No appointments booked.</p>
         }
+        @* Step 13e: the forms asked for before visits, each a sensitive item, on their own page; only how many here. *@
+        <p><a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" data-forms>Pre-visit forms@(Model.Chart.Forms > 0 ? $" ({Model.Chart.Forms})" : "")</a></p>
     </section>
 
     @* Allergies, medications and diagnoses: added and changed for a patient on the clinician's panel while the clinic's

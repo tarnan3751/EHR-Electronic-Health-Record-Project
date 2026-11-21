@@ -54,6 +54,15 @@ else
                                 @* A value outside its reference range: these come first (step 7). *@
                                 <span class="sc-tag sc-tag--warning" data-inbox-abnormal>Abnormal</span>
                             }
+                            @if (item.Kind == InboxItemKind.FormAlert)
+                            {
+                                @* Step 13e: a pre-visit form has an answer to review; these come before everything else. *@
+                                <span class="sc-tag sc-tag--danger" data-inbox-review>Needs review</span>
+                                @if (clinician && item.SourceTable == "questionnaire_responses" && item.PatientId is not null)
+                                {
+                                    <a asp-page="/Patients/Forms/Response" asp-route-patientId="@item.PatientId" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
+                                }
+                            }
                             @if (clinician && item.Kind == InboxItemKind.Result && item.SourceTable == "orders" && item.PatientId is not null)
                             {
                                 @* Where it gets acknowledged, which is what marks it done. *@

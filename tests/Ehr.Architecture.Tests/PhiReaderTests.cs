@@ -33,6 +33,8 @@ public class PhiReaderTests
         ["ChartHistory"] = typeof(ChartHistoryEntry),
         ["InboxItems"] = typeof(Ehr.Data.Inbox.InboxItem),
         ["Appointments"] = typeof(Ehr.Data.Scheduling.Appointment),
+        ["QuestionnaireRequests"] = typeof(Ehr.Data.Forms.QuestionnaireRequest),
+        ["QuestionnaireResponses"] = typeof(Ehr.Data.Forms.QuestionnaireResponse),
         ["ProxyGrants"] = typeof(Ehr.Data.Proxies.ProxyGrant),
         ["ResultAcknowledgments"] = typeof(Ehr.Data.Orders.ResultAcknowledgment),
         ["MessageThreads"] = typeof(Ehr.Data.Messaging.MessageThread),
