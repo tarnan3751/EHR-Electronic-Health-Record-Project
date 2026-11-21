@@ -44,6 +44,10 @@ Added in the expansion plan's step 8 (Tahseen Arnan).
 - **What doesn't.** A moderate or minor interaction, and a drug that only shares an FDA class with an allergy (those classes group drugs by how they act, which is not how most allergies run), are shown under **Be aware** and kept on the order, without asking for a reason. The first **Sign order** brings the notes up with the cursor on the button; pressing it again signs.
 - **What it is not.** The form says so on every medication order: decision support for this demonstration system, not a complete clinical reference. Only coded allergies and medications are checked, and no warning doesn't mean a combination is safe. `docs/expansion/reference-data.md` says what the interaction data covers and what it doesn't.
 
+### Approving a refill request
+
+Added in the expansion plan's step 13d (Tahseen Arnan; `docs/UC21.md`). A patient's refill request is approved on this form: **Approve: write the order**, on the request's page, opens it as `/patients/{id}/orders/new?type=medication&refill={request}`, with the clinic's item for the medication asked for, no other type, and a notice of what the order approves. Every check above applies, the duplicate's and the override's reasons included. **Sign order** signs the order and approves the request with it, in one transaction: an order of another strength or form of the same medication, never another drug, which the form refuses and the database refuses again. If someone answered the request first, or its medication was stopped, nothing is saved, the order included. The order is like any other: on the chart, in the write audit, discontinued or changed as any order is. The `refill` in the address doesn't survive a sign-in, which drops a link's query: the clinician approves again from the request's page. Test case TC-UC1-22 (`TC_UC1_22_OrderFromRefill.cs`).
+
 ## Decisions
 
 - **Who.** Clinicians only, and only for a patient on their panel, as for "New note" and dictation. Under emergency access the chart says to add the patient to the panel first, and the order page sends anyone off the panel back to the chart before anything is read.
@@ -97,6 +101,7 @@ The Assignment 4 test cases are one file each, in `tests/Ehr.Web.Tests/TestCases
 | TC-UC1-20, NFR-12 (safety) | In a real browser, a stopped order is answered and signed with the keyboard only | `TC_UC1_20_Nfr12_SafetyKeyboardFirst.cs` |
 
 | TC-UC1-21, successful flow (trends) | An order's results page charts each test that has earlier values, with the reference range and a table of the numbers (the plan's step 9) | `TC_UC1_21_ResultTrends.cs` |
+| TC-UC1-22, alternative flow (a refill request) | The form approves a refill request with an ordinary order for the same medication, at any strength, and refuses another drug (the plan's step 13d) | `TC_UC1_22_OrderFromRefill.cs` |
 
 `tests/Ehr.Security.Tests/OrderSafetySecurityTests.cs` asks the database directly: an order for a drug the patient is allergic to needs a reason, kept with what the database found (not what the client claimed); same-class and cross-reactive classes; interactions from each source, with only serious ones needing a reason; and only a clinician is told anything.
 

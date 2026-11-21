@@ -70,6 +70,41 @@ static partial class RefillRequestTests
     public static async Task<Guid> RequestIdAsync(WebApps apps, Guid patient) =>
         Guid.Parse((await ProxyTests.QueryAsync(apps, "SELECT id::text FROM ehr.refill_requests WHERE patient_id = @patient ORDER BY requested_at DESC LIMIT 1", patient)).Single());
 
+    // The clinician's page for a request.
+    public static string ReviewPath(Guid patient, Guid request) => $"/patients/{patient}/refills/{request}";
+
+    // The order form opened to approve a request.
+    public static string ApprovePath(Guid patient, Guid request) => $"/patients/{patient}/orders/new?type=medication&refill={request}";
+
+    // "Decline request", as the request's page posts it: the page it ends on.
+    public static Task<HttpResponseMessage> DeclineAsync(HttpClient client, Guid patient, Guid request, string message = "Synthetic: please book a visit first.") =>
+        PostFormAsync(client, ReviewPath(patient, request) + "?handler=Decline", ReviewPath(patient, request), ("Message", message));
+
+    // "Sign order" on the order form opened to approve a request, as the form posts it without JavaScript, with the item
+    // and details given (the form's own item when none is), and any reasons the form asks for: the page it ends on.
+    public static async Task<HttpResponseMessage> ApproveAsync(HttpClient client, Guid patient, Guid request, string? item = null, string? safetyReason = null,
+        string? duplicateReason = null)
+    {
+        var path = ApprovePath(patient, request);
+        var html = await client.GetStringAsync(path, Cancel);
+        item ??= WebUtility.HtmlDecode(Regex.Match(html, "name=\"Item\" value=\"([^\"]*)\"").Groups[1].Value);
+        (string, object)[] reasons =
+        [
+            .. safetyReason is null ? [] : new[] { ("SafetyReason", (object)safetyReason) },
+            .. duplicateReason is null ? [] : new[] { ("DuplicateReason", (object)duplicateReason) },
+        ];
+        return await client.PostAsync(path, Form([("__RequestVerificationToken", Token(html)), ("Item", item), ("SafetySeen", "true"),
+            .. SafetyTests.Details.Select(d => ($"Details[{d.Name}]", (object)d.Value)), .. reasons]), Cancel);
+    }
+
+    // The open inbox items a request put in, by recipient: "recipient done?".
+    public static Task<List<string>> ItemsAsync(WebApps apps, Guid patient, Guid request) => ProxyTests.QueryAsync(apps,
+        $"SELECT recipient_id || ' ' || (done_at IS NOT NULL) FROM ehr.inbox_items WHERE patient_id = @patient AND source_table = 'refill_requests' AND source_id = '{request}' ORDER BY recipient_id::text COLLATE \"C\"",
+        patient);
+
+    // What a page says, with every run of white space one space: for sentences that cross elements.
+    public static string Said(string html) => Regex.Replace(Words(html), "\\s+", " ");
+
     // Whether markup carries an ID of the clinic's: a UUID in either of its forms.
     public static bool HasAnId(string html) => Uuid().IsMatch(html);
 

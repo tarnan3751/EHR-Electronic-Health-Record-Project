@@ -1,5 +1,6 @@
 using Ehr.Data;
 using Ehr.Data.Orders;
+using Ehr.Data.Patients;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -97,9 +98,15 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
     // A change (`replaces`) signs the new order and discontinues the one it replaces, for `changeReason`, in one
     // savepoint: both happen or neither does, and the database checks that again when the transaction commits. Gone
     // when the order to replace is no longer active, because someone discontinued or changed it first; nothing is saved.
+    //
+    // Approving a refill request (`refill`, step 13d) signs the order and answers the request with it, in the same
+    // savepoint: the database holds the answer to an order signed now, by this clinician, for the same medication, while
+    // the request waits and the medication is active (77-refill-requests.sql). Answered when someone answered the request
+    // first, NotRenewable when its medication is no longer active or the order isn't one that renews it; nothing is
+    // saved then, not the order either.
     public async Task<(Order? Order, SignRefusal? Refusal)> SignAsync(
         Guid patient, OrderCatalogItem item, string details, string? duplicateReason, CancellationToken cancellationToken,
-        Guid? replaces = null, string? changeReason = null, string? safetyReason = null)
+        Guid? replaces = null, string? changeReason = null, string? safetyReason = null, Guid? refill = null)
     {
         var order = new Order
         {
@@ -124,6 +131,11 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
             if (replaces is { } replaced && !await UpdateAsync(replaced, patient, item.Type, changeReason ?? ReplacedReason, order.Id, cancellationToken))
             {
                 refusal = SignRefusal.Gone;
+            }
+
+            if (refusal is null && refill is { } request)
+            {
+                refusal = await AnswerRefillAsync(request, patient, order.Id, cancellationToken);
             }
         }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
@@ -151,6 +163,35 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
 
         await transaction.ReleaseSavepointAsync(Savepoint, cancellationToken);
         return (order, null);
+    }
+
+    // Answers a refill request with the order just signed for it: the one column the apps may write for an approval.
+    // Null when it was answered; why not otherwise.
+    async Task<SignRefusal?> AnswerRefillAsync(Guid request, Guid patient, Guid order, CancellationToken cancellationToken)
+    {
+        // A stand-in for the row, with its key: only order_id is sent.
+        var row = new RefillRequest { Id = request, PatientId = patient, Status = RefillRequestStatus.Requested };
+        var entry = db.Attach((object)row);
+        row.OrderId = order;
+        entry.Property(nameof(RefillRequest.OrderId)).IsModified = true;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return null;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // No row this clinician may answer.
+            return SignRefusal.NotRenewable;
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.CheckViolation or PostgresErrorCodes.UniqueViolation } refusal)
+        {
+            return refusal.ConstraintName == "refill_requests_answered" ? SignRefusal.Answered : SignRefusal.NotRenewable;
+        }
+        finally
+        {
+            entry.State = EntityState.Detached;
+        }
     }
 
     // What a replaced order's reason says when the clinician gave none.
@@ -222,4 +263,10 @@ public enum SignRefusal
 
     // The database found a safety warning against the order, and no reason to sign it all the same was given.
     Unsafe,
+
+    // The refill request the order approves was answered by someone else first (step 13d).
+    Answered,
+
+    // The refill request's medication is no longer active, or the order doesn't renew it (step 13d).
+    NotRenewable,
 }

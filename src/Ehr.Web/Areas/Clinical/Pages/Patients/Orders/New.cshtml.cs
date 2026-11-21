@@ -1,10 +1,14 @@
 using Ehr.Data.Orders;
+using Ehr.Domain.Accounts;
 using Ehr.Domain.Orders;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
+using Ehr.Domain.Refills;
+using Ehr.Web.Accounts;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 
 namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 
@@ -20,13 +24,21 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 // replaced, in one transaction. The order being replaced isn't a duplicate of its replacement. If someone discontinued
 // or changed it first, nothing is saved and the form says so.
 //
+// Approving a refill request (step 13d) is this form too (?type=medication&refill=<request>), from the request's page: it
+// opens with the clinic's item for the medication, the request beside it, and every check of an order. "Sign order" signs
+// it and answers the request with it, in one transaction, and the database holds the order to the same medication, at
+// any strength. If someone answered the request first, or its medication was stopped, nothing is saved and the form says
+// so. The request's ID is a query a link carries, which a sign-in drops: after one, the clinician is on a new order
+// with no request, and approves it from the request's page again. The patient is then told by email, as on a decline.
+//
 // The same rule as the chart's "New note": only for a patient on the clinician's panel. Anyone else, a clinician under
 // emergency access included, is sent back to the chart before anything about the patient is read. Off-site, the cloud
 // app forwards the post to the on-prem app; js/orders.js posts it with fetch, so when that fails the form stays filled.
 // Without JavaScript, the cloud app's "Not saved" page shows the order's fields again to copy (UC 2, ShownIfNotSaved).
 [ShownIfNotSaved(nameof(Item), "Details[indication]", "Details[dose]", "Details[route]", "Details[frequency]", "Details[duration]",
     "Details[reason]", "Details[notes]", nameof(DuplicateReason), nameof(ChangeReason), nameof(SafetyReason))]
-public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrders orders) : PageModel
+public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrders orders, RefillRequests refills, IOptions<SiteAddresses> addresses)
+    : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public SearchQuery Search { get; set; } = SearchQuery.None;
@@ -66,6 +78,13 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
     // Set when the order to replace was discontinued or changed by someone else first.
     public bool Gone { get; private set; }
 
+    // Step 13d: the refill request the order approves, from the query string.
+    [BindProperty(SupportsGet = true)]
+    public Guid? Refill { get; set; }
+
+    // Set when the request was answered first, or can no longer be approved: why, to say so.
+    public SignRefusal? RefillRefused { get; private set; }
+
     public OrderForm Form { get; private set; } = null!;
 
     public IReadOnlyList<OrderCatalogItem> Catalog { get; private set; } = [];
@@ -99,6 +118,8 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             Details = OrderForms.Values(replaced.Details);
         }
 
+        // The clinic's item for the medication asked for, when it has one: the clinician may choose another strength.
+        Item ??= Form.Refill?.CatalogItem;
         return Page();
     }
 
@@ -143,6 +164,11 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             errors["ChangeReason"] = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
         }
 
+        if (Form.Refill is not null && item is not null && !Form.RenewsRefill)
+        {
+            errors["Item"] = "A refill renews the same medication, at any strength. To order something else, decline the request and order it from the chart.";
+        }
+
         if (errors.Count > 0)
         {
             return Refused(errors);
@@ -155,10 +181,15 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         }
 
         var (order, refusal) = await orders.SignAsync(id, item!, OrderForms.Details(type, Details), Form.Duplicates.Count > 0 ? reason : null,
-            HttpContext.RequestAborted, Replaces, changeReason, Form.Warnings.Any(OrderSafetyText.NeedsReason) ? safetyReason : null);
+            HttpContext.RequestAborted, Replaces, changeReason, Form.Warnings.Any(OrderSafetyText.NeedsReason) ? safetyReason : null, Refill);
         if (refusal == SignRefusal.Gone)
         {
             return NoLongerActive();
+        }
+
+        if (refusal is SignRefusal.Answered or SignRefusal.NotRenewable)
+        {
+            return RefillNotApproved(refusal.Value);
         }
 
         if (refusal == SignRefusal.Unsafe)
@@ -184,9 +215,20 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             return Refused(new Dictionary<string, string> { ["DuplicateReason"] = "Give a reason to order this again, or cancel." });
         }
 
-        var chart = Search.ChartRouteValues(id);
-        chart["ordered"] = order.Id;
-        var url = Url.Page("/Patients/Chart", chart)!;
+        string url;
+        if (Refill is { } approved)
+        {
+            // The link is the configured portal's home, never built from this request (step 6c), and names nothing.
+            await refills.NotifyAnsweredAsync(id, Links.Build(addresses.Value.PortalBaseUrl, "/portal"), HttpContext.RequestAborted);
+            url = Url.Page("/Patients/Refills/Review", new { patientId = id, requestId = approved, answered = "approved" })!;
+        }
+        else
+        {
+            var chart = Search.ChartRouteValues(id);
+            chart["ordered"] = order.Id;
+            url = Url.Page("/Patients/Chart", chart)!;
+        }
+
         return Request.Headers.ContainsKey("HX-Request") ? new JsonResult(new { url }) : Redirect(url);
     }
 
@@ -195,6 +237,14 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
     {
         Errors = errors;
         Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+        return Page();
+    }
+
+    // Nothing saved, the order included: the refill request was answered first, or can't be approved any more.
+    PageResult RefillNotApproved(SignRefusal why)
+    {
+        RefillRefused = why;
+        Response.StatusCode = StatusCodes.Status409Conflict;
         return Page();
     }
 
@@ -214,12 +264,35 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             return RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
         }
 
-        if (await phi.OrderFormAsync(id, catalogCode, Replaces, HttpContext.RequestAborted) is not { } form)
+        // A refill is approved by a medication order, which replaces none.
+        if (Refill is not null && (Replaces is not null || (Type ?? OrderType.Medication) != OrderType.Medication))
+        {
+            return BadRequest();
+        }
+
+        if (await phi.OrderFormAsync(id, catalogCode, Replaces, HttpContext.RequestAborted, Refill) is not { } form)
         {
             return NotFound();
         }
 
         Form = form;
+        if (Refill is { } refill)
+        {
+            Type = OrderType.Medication;
+            if (form.Refill is null)
+            {
+                // Not a request of this patient's: nothing to approve.
+                return HttpMethods.IsPost(Request.Method) ? NotFound() : RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
+            }
+
+            if (!form.Refill.Renewable)
+            {
+                // Answered already, or its medication no longer active: a post says so; a link goes back to the request.
+                return HttpMethods.IsPost(Request.Method)
+                    ? RefillNotApproved(form.Refill.Waiting ? SignRefusal.NotRenewable : SignRefusal.Answered)
+                    : RedirectToPage("/Patients/Refills/Review", new { patientId = id, requestId = refill });
+            }
+        }
         if (Replaces is not null && form.Replaced is null)
         {
             // Not an active order of this patient: nothing to change. A post says so; a link goes back to the chart.
