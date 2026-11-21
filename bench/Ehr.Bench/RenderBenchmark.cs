@@ -196,6 +196,8 @@ internal static partial class RenderBenchmark
                     var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
                     return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
                 }));
+                // Who viewed my record (step 13c): a year of views of each record in the audit log beyond the run's own.
+                await FillViewsAsync(database, clinicianId, portalPatient, panel[0]);
                 // Kept to the end, off-site rows included: the off-site portal rows use the same session.
                 var portalSession = new CookieContainer();
                 try
@@ -209,6 +211,7 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal access, the patient's own", typing: false, () => "/portal/access"));
                     results.Add(await MeasureAsync(portal, times, "Portal choose, a record shared", typing: false, () => "/portal/choose"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
+                    results.Add(await MeasureAsync(portal, times, "Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
                     // The same session, now looking at the record it holds a proxy grant for: every page first checks
                     // the grant, and every policy resolves the subject through it.
                     using (var chosen = await PostFormAsync(portal, "/portal/acting", await portal.GetStringAsync("/portal/access"), ("grantId", proxyGrant.ToString())))
@@ -222,6 +225,7 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal home, as a proxy", typing: false, () => "/portal"));
                     results.Add(await MeasureAsync(portal, times, "Portal results, as a proxy", typing: false, () => "/portal/results"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+                    results.Add(await MeasureAsync(portal, times, "Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
 
                     if (database is null)
                     {
@@ -465,6 +469,7 @@ internal static partial class RenderBenchmark
             }));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
             using (var mine = await PostFormAsync(portal, "/portal/acting?handler=Mine", await portal.GetStringAsync("/portal/summaries")))
             {
                 if (mine.RequestMessage?.RequestUri?.AbsolutePath != "/portal")
@@ -474,6 +479,7 @@ internal static partial class RenderBenchmark
             }
 
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
             return results;
         }
         finally
@@ -1359,6 +1365,43 @@ internal static partial class RenderBenchmark
             """, connection);
         command.Parameters.AddWithValue("recipient", clinicianId);
         command.Parameters.AddWithValue("patients", panel.Take(InboxSize).ToArray());
+        await command.ExecuteNonQueryAsync();
+    }
+
+    const int ViewsPerRecord = 20_000;
+
+    // Step 13c: a year of views of each record in the audit log, 26 minutes apart, beyond those the run's own pages make.
+    // One in twenty is the clinician's read of the record, which anyone looking at the record is shown; the rest are
+    // views the proxy of the second record, who has no sensitive items, is not shown and a page of theirs reads past
+    // (of sensitive items, of a note, of a summary marked sensitive, by another portal account), and events that are no
+    // view at all (a sign-in, writes). The first record's patient is shown all but those. As the database's superuser,
+    // in the benchmark's own database only: with --stack the pages read the run's own views.
+    static async Task FillViewsAsync(MigratedDatabase? database, Guid clinicianId, params Guid[] records)
+    {
+        if (database is null)
+        {
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), now() - make_interval(mins => n * 26), v.actor, v.action, v.table_name, r.patient, r.patient, 'onprem', v.sensitive
+            FROM unnest(@records) AS r(patient)
+            CROSS JOIN generate_series(1, @count) AS n
+            CROSS JOIN LATERAL (SELECT
+                CASE WHEN n % 20 BETWEEN 11 AND 16 THEN @other ELSE @clinician END AS actor,
+                CASE n % 20 WHEN 1 THEN 'read_sensitive' WHEN 16 THEN 'sign_in' WHEN 17 THEN 'insert' WHEN 18 THEN 'update' ELSE 'read' END AS action,
+                CASE WHEN n % 20 BETWEEN 2 AND 9 OR n % 20 = 19 THEN 'clinical_notes' WHEN n % 20 = 10 THEN 'visit_summaries'
+                     WHEN n % 20 = 16 THEN NULL WHEN n % 20 = 17 THEN 'conditions' ELSE 'patients' END AS table_name,
+                n % 20 = 10 AS sensitive) AS v
+            """, connection);
+        command.Parameters.AddWithValue("clinician", clinicianId);
+        command.Parameters.AddWithValue("other", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("records", records);
+        command.Parameters.AddWithValue("count", ViewsPerRecord);
         await command.ExecuteNonQueryAsync();
     }
 
