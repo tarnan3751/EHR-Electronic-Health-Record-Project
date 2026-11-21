@@ -24,6 +24,12 @@
 --   order-code      the clinic's own order codes ("SYN-LAB-001")
 --   note-section    the note's whole History, Assessment or Plan, when it is 40 characters or more, copied in
 --                   (compared with case and runs of white space ignored)
+-- The rule reads the summary, and the note's sections, as they would look: with the characters that show nothing taken
+-- out (Unicode's default ignorable code points: zero-width spaces and joiners, the soft hyphen, direction marks,
+-- variation selectors), compatibility forms folded to their plain ones (NFKC: fullwidth letters and digits, ligatures,
+-- superscripts) and every common hyphen and dash (U+2010 to U+2015, the minus sign) read as "-". What is found is
+-- quoted as it reads; what is stored is what the clinician typed. A letter of another alphabet that looks like a Latin
+-- one (Cyrillic "Е" for "E") is not folded: the known limit (docs/UC14.md).
 -- A word counts as one when it stands alone: nothing but a letter or digit may touch it (and for a number, no
 -- separator joining it to more digits), and case doesn't matter. Each pattern must match a real code, so ordinary
 -- words, doses and dates pass: "B12", "A1c", "500 mg", "50,000 units", "2026-11-21", "1-2 tablets". Every word of a
@@ -39,9 +45,23 @@ CREATE OR REPLACE FUNCTION ehr.visit_summary_problems(summary_patient uuid, summ
     SET search_path = pg_catalog, pg_temp
     SET enable_seqscan = off
 AS $$
-    WITH part_text AS (
-        SELECT p.ordinality::integer AS part, coalesce(p.body, '') AS body
-        FROM unnest(parts) WITH ORDINALITY AS p(body, ordinality)
+    WITH texts AS (
+        SELECT t.part, t.section,
+            translate(normalize(regexp_replace(t.body,
+                '[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFF8\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0000-\U000E0FFF]',
+                '', 'g'), NFKC), U&'\2010\2011\2012\2013\2014\2015\2212', '-------') AS body
+        FROM (
+            SELECT p.ordinality::integer AS part, NULL::text AS section, coalesce(p.body, '') AS body
+            FROM unnest(parts) WITH ORDINALITY AS p(body, ordinality)
+            UNION ALL
+            SELECT NULL, s.name, coalesce(s.body, '')
+            FROM ehr.clinical_notes n,
+                LATERAL (VALUES ('History', n.history), ('Assessment', n.assessment), ('Plan', n.plan)) AS s(name, body)
+            WHERE n.id = summary_note AND n.patient_id = summary_patient
+        ) AS t
+    ),
+    part_text AS (
+        SELECT t.part, t.body FROM texts t WHERE t.part IS NOT NULL
     ),
     words AS (
         SELECT DISTINCT w.part, w.word, w.shape, w.code
@@ -66,9 +86,6 @@ AS $$
             SELECT t.part, m[1], 'order', upper(m[1])
             FROM part_text t, regexp_matches(t.body, '(?<![[:alnum:]-])(syn-[0-9a-z-]*[0-9a-z])(?![[:alnum:]-])', 'gi') AS m
         ) AS w
-    ),
-    note AS (
-        SELECT n.history, n.assessment, n.plan FROM ehr.clinical_notes n WHERE n.id = summary_note AND n.patient_id = summary_patient
     ),
     mrn AS (
         SELECT p.mrn::text AS mrn FROM ehr.patients p WHERE p.id = summary_patient
@@ -113,12 +130,11 @@ AS $$
     FROM part_text t, mrn m
     WHERE length(m.mrn) > 0 AND t.body ~* ('(?<![[:alnum:]])' || regexp_replace(m.mrn, '([^[:alnum:]])', '\\\1', 'g') || '(?![[:alnum:]])')
     UNION
-    SELECT t.part, s.name, 'note-section'
-    FROM part_text t, note n,
-        LATERAL (VALUES ('History', n.history), ('Assessment', n.assessment), ('Plan', n.plan)) AS s(name, body),
+    SELECT t.part, s.section, 'note-section'
+    FROM part_text t, texts s,
         LATERAL (SELECT lower(regexp_replace(btrim(s.body), '[[:space:]]+', ' ', 'g')) AS section,
                         lower(regexp_replace(btrim(t.body), '[[:space:]]+', ' ', 'g')) AS summary) AS plain
-    WHERE length(plain.section) >= 40 AND position(plain.section IN plain.summary) > 0
+    WHERE s.section IS NOT NULL AND length(plain.section) >= 40 AND position(plain.section IN plain.summary) > 0
     ORDER BY 1, 3, 2
 $$;
 REVOKE ALL ON FUNCTION ehr.visit_summary_problems(uuid, uuid, text[]) FROM PUBLIC;

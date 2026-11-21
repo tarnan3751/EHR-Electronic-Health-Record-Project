@@ -162,6 +162,20 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         { "We ordered SYN-LAB-001 for you.", "SYN-LAB-001", "order-code" },
         { "Reference 0193a5c2-7e4b-7c1d-9f2e-3b4a5c6d7e8f.", "0193a5c2-7e4b-7c1d-9f2e-3b4a5c6d7e8f", "identifier" },
         { "Reference 0193A5C27E4B7C1D9F2E3B4A5C6D7E8F.", "0193A5C27E4B7C1D9F2E3B4A5C6D7E8F", "identifier" },
+        // Look-alikes, read as they look: found as read, with what shows nothing taken out (a zero-width space, a soft
+        // hyphen, a word joiner), compatibility forms folded (fullwidth letters, digits and stop) and dashes read as "-".
+        { "Your test showed E1\u200B1.9 again.", "E11.9", "diagnosis-code" },
+        { "Your test showed \uFF25\uFF11\uFF11\uFF0E\uFF19 again.", "E11.9", "diagnosis-code" },
+        { "Keep taking 860\u00AD975 every morning.", "860975", "medication-code" },
+        { "Keep taking \uFF18\uFF16\uFF10\uFF19\uFF17\uFF15 every morning.", "860975", "medication-code" },
+        { "We will repeat 4548\u20134 in three months.", "4548-4", "lab-code" },
+        { "We will repeat 4548\u20114 in three months.", "4548-4", "lab-code" },
+        { "We will repeat 4548\u20144 in three months.", "4548-4", "lab-code" },
+        { "We will repeat 4548\u22124 in three months.", "4548-4", "lab-code" },
+        { "We will repeat 4548-\u20604 in three months.", "4548-4", "lab-code" },
+        { "Avoid QE1Q\u200DX6B99R.", "QE1QX6B99R", "substance-code" },
+        { "We ordered SYN\u2010LAB\u2010001 for you.", "SYN-LAB-001", "order-code" },
+        { "Reference 0193a5c2-7e4b-\u200B7c1d-9f2e-3b4a5c6d7e8f.", "0193a5c2-7e4b-7c1d-9f2e-3b4a5c6d7e8f", "identifier" },
     };
 
     [Theory]
@@ -216,6 +230,27 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ReleaseAsync(clinician, patient, note, found: Assessment));
         Assert.Empty(await ProblemsAsync(clinician, patient, note, Plan, "a viral chest infection, no pneumonia found", "Next."));
         Assert.Empty(await SummariesAsync(patient));
+    }
+
+    // The patient's MRN and a section of the note are looked for as they look too, and what is stored is what was typed:
+    // a summary with dashes, fullwidth letters and characters that show nothing, and no code, is released as it was
+    // sent.
+    [Fact]
+    public async Task Look_alikes_are_read_as_what_they_look_like_and_stored_as_typed()
+    {
+        var (clinician, patient, note) = await SignedAsync();
+        var mrn = (await AsSuperuserAsync("SELECT mrn FROM ehr.patients WHERE id = @id", ("id", patient))).Single();
+        var fullwidth = string.Concat(mrn.Select(c => (char)(c + 0xFEE0)));
+
+        Assert.Equal([$"1 {mrn} record-number"], await ProblemsAsync(clinician, patient, note, $"Your number is {fullwidth}.", "Found.", "Next."));
+        Assert.Equal([$"1 {mrn} record-number"], await ProblemsAsync(clinician, patient, note, $"Your number is {mrn[..6]}\u200B{mrn[6..]}.", "Found.", "Next."));
+        Assert.Equal(["2 Assessment note-section"], await ProblemsAsync(clinician, patient, note, "Talked.",
+            Assessment.Replace(" ", " \u200B", StringComparison.Ordinal).Replace("no pneumonia", "no \uFF50neumonia", StringComparison.Ordinal), "Next."));
+
+        const string typed = "Rest \u2014 and drink fluids.\u200D Your \uFF22\uFF30 is fine: check it 1\u20132 times a day.";
+        Assert.Empty(await ProblemsAsync(clinician, patient, note, typed, typed, typed));
+        var id = await ReleaseAsync(clinician, patient, note, typed, typed, typed);
+        Assert.Equal([$"{typed}|{typed}|{typed}"], await AsSuperuserAsync("SELECT talked_about || '|' || found || '|' || next_steps FROM ehr.visit_summaries WHERE id = @id", ("id", id)));
     }
 
     async Task<List<string>> ProblemsAsync(Guid clinician, Guid patient, Guid note, string talked, string found, string next) =>
