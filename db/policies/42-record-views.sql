@@ -77,17 +77,21 @@ CREATE OR REPLACE FUNCTION ehr.record_views(older_than timestamptz, newer_than t
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
 AS $$
+    -- Who is looking, read once. For a proxy without sensitive items, with the patient's panel history: who had the
+    -- patient on their panel, from when and until when, a few rows. It is read for every such proxy's page, whatever the
+    -- page holds, before anything else, so the page's time doesn't depend on whether there are views it leaves out (a
+    -- review found that reading it only when a staff member's view needed it told a proxy, by the page's time, that one
+    -- such view existed). By a scan of the panels' table, since no index finds one patient's ended assignments.
     WITH viewer AS MATERIALIZED (
-        SELECT ehr.current_patient_id() AS subject, ehr.current_user_id() AS account, ehr.acting_grant_id() IS NULL AS own,
-               ehr.portal_sees_sensitive() AS sees_sensitive, ehr.portal_may_message() AS sees_messages,
-               now() - interval '12 months' AS since
-    ),
-    -- The patient's panel history, for a proxy without sensitive items only: who had the patient on their panel, and when.
-    -- A few rows, read once, by a scan of the panels' table, since no index finds one patient's ended assignments.
-    panel AS MATERIALIZED (
-        SELECT a.clinician_id, a.assigned_at, a.ended_at
-        FROM ehr.patient_assignments a
-        WHERE NOT (SELECT v.sees_sensitive FROM viewer v) AND a.patient_id = (SELECT v.subject FROM viewer v)
+        SELECT c.*, h.panel_clinicians, h.panel_from, h.panel_until
+        FROM (SELECT ehr.current_patient_id() AS subject, ehr.current_user_id() AS account, ehr.acting_grant_id() IS NULL AS own,
+                     ehr.portal_sees_sensitive() AS sees_sensitive, ehr.portal_may_message() AS sees_messages,
+                     now() - interval '12 months' AS since) c
+        CROSS JOIN LATERAL (
+            SELECT array_agg(a.clinician_id) AS panel_clinicians, array_agg(a.assigned_at) AS panel_from,
+                   array_agg(coalesce(a.ended_at, 'infinity')) AS panel_until
+            FROM ehr.patient_assignments a
+            WHERE NOT c.sees_sensitive AND a.patient_id = c.subject) h
     ),
     -- The events of the record this viewer is shown, before paging. Written once; each use below reads it through the
     -- index in its own order.
@@ -107,9 +111,8 @@ AS $$
                OR NOT e.sensitive AND e.action NOT IN ('read_sensitive', 'download_sensitive')
                   AND ehr.record_view_part(e.action, e.table_name) IN ('record', 'download', 'summary', 'messages', 'views', 'lab-order')
                   AND (e.actor_id IS NULL OR e.actor_id = (SELECT v.account FROM viewer v)
-                       OR EXISTS (SELECT 1 FROM panel p
-                                  WHERE p.clinician_id = e.actor_id
-                                    AND p.assigned_at <= e.occurred_at AND (p.ended_at IS NULL OR p.ended_at > e.occurred_at))))
+                       OR EXISTS (SELECT 1 FROM viewer v, unnest(v.panel_clinicians, v.panel_from, v.panel_until) AS p(clinician, from_at, until_at)
+                                  WHERE p.clinician = e.actor_id AND p.from_at <= e.occurred_at AND e.occurred_at < p.until_at)))
     ),
     -- The first 51 in the direction asked: the 51st only says whether there is more.
     page AS (
@@ -154,7 +157,7 @@ AS $$
                AND EXISTS (SELECT 1 FROM ehr.break_glass_accesses b
                            WHERE b.clinician_id = k.actor_id AND b.patient_id = (SELECT v.subject FROM viewer v)
                              AND b.granted_at <= k.occurred_at AND k.occurred_at < b.expires_at)
-               -- On the panel at that moment: the same test as the panel's above, against the table, since the panel's
+               -- On the panel at that moment: the same test as the panel history's above, against the table, since that
                -- history is read above only for a proxy without sensitive items.
                AND NOT EXISTS (SELECT 1 FROM ehr.patient_assignments a
                                WHERE a.clinician_id = k.actor_id AND a.patient_id = (SELECT v.subject FROM viewer v)

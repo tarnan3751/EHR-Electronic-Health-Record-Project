@@ -496,6 +496,146 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         Assert.Equal(3, before.Count);
     }
 
+    // The same for a proxy with sensitive items, who is shown every staff member's view, emergency access marked: what
+    // they are not shown is the patient's own views and other proxies'. Only the who-can-see filter, before the cut,
+    // keeps those from shaping their pages (the test above proves the filters for a proxy without sensitive items).
+    [Fact]
+    public async Task A_proxy_with_sensitive_items_pages_the_same_whether_or_not_the_patient_and_others_viewed()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        var allowed = await ProxyAsync(own, patient, includeSensitive: true);
+        var second = await ProxyAsync(own, patient, includeSensitive: false);
+        var outside = await StaffAsync("Dr. Kapok", StaffRoles.Clinician);
+        await WindowAsync(outside, patient, fromMinutesAgo: 60 * 24, untilMinutesAgo: -60);
+        // What they are shown: the care team's, a view through emergency access, sensitive ones and notes, and their own.
+        for (var minute = 1; minute <= 110; minute++)
+        {
+            var (actor, action, table) = (minute % 10) switch
+            {
+                0 => (allowed.Account, "read", "patients"),
+                1 => (outside, "read", "patients"),
+                2 => (clinician, "read_sensitive", "patients"),
+                3 => (clinician, "read", "clinical_notes"),
+                _ => (clinician, "read", "patients"),
+            };
+            await EventAsync(patient, actor, action, table, minute);
+        }
+
+        var before = await PagesAsync(allowed.Account, newest: true, allowed.Grant);
+        var beforeNewer = await PagesAsync(allowed.Account, newest: false, allowed.Grant);
+        Assert.Contains(before.SelectMany(page => page), line => line.Contains("|staff|", StringComparison.Ordinal));
+
+        // The patient's own views and another proxy's, around and between theirs, and at each moment they are shown one.
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), now() - make_interval(secs => n * 13), k.actor, k.action, 'patients', @patient, @patient, 'onprem', false
+            FROM generate_series(1, 700) AS n
+            CROSS JOIN (VALUES (@own, 'read'), (@own, 'read_sensitive'), (@second, 'read'), (@own, 'download')) AS k(actor, action)
+            """, ("patient", patient), ("own", own), ("second", second.Account));
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
+            SELECT uuidv7(), e.occurred_at, k.actor, 'read', 'patients', @patient, @patient, 'onprem', false
+            FROM ehr.audit_events e CROSS JOIN (VALUES (@own), (@second)) AS k(actor)
+            WHERE e.patient_id = @patient AND e.actor_id IN (@clinician, @outside, @allowed)
+            """, ("patient", patient), ("own", own), ("second", second.Account), ("clinician", clinician), ("outside", outside), ("allowed", allowed.Account));
+
+        Assert.Equal(before, await PagesAsync(allowed.Account, newest: true, allowed.Grant));
+        Assert.Equal(beforeNewer, await PagesAsync(allowed.Account, newest: false, allowed.Grant));
+        Assert.Equal(3, before.Count);
+    }
+
+    // A proxy without sensitive items is shown a staff member's view from the moment the patient was put on their panel,
+    // to the moment, not included, it ended: by the microsecond, for each of the staff member's assignments, which may be
+    // ended and begun again, or overlap.
+    [Fact]
+    public async Task A_proxy_without_sensitive_items_is_shown_views_while_the_patient_was_on_the_panel_to_the_microsecond()
+    {
+        var (_, patient, own) = await PatientAsync();
+        var proxy = await ProxyAsync(own, patient, includeSensitive: false);
+        var clinician = await StaffAsync("Dr. Larch", StaffRoles.Clinician);
+        var start = DateTimeOffset.UtcNow.AddHours(-10);
+        start = start.AddTicks(-(start.UtcTicks % 10));
+        var micro = TimeSpan.FromTicks(10);
+        // On the panel from start to start + 1 hour; again from start + 2 hours to start + 4, overlapped by another
+        // assignment from start + 3 hours, still open.
+        foreach (var (from, until) in new (DateTimeOffset, DateTimeOffset?)[]
+        {
+            (start, start.AddHours(1)), (start.AddHours(2), start.AddHours(4)), (start.AddHours(3), null),
+        })
+        {
+            await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+                "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at) VALUES (gen_random_uuid(), @patient, @clinician, @from, @until)",
+                ("patient", patient), ("clinician", clinician), ("from", from), ("until", (object?)until ?? DBNull.Value));
+        }
+
+        var shown = new[]
+        {
+            start, start + micro, start.AddHours(1) - micro,
+            start.AddHours(2), start.AddHours(3.5), start.AddHours(4), start.AddHours(5),
+        };
+        var hidden = new[] { start - micro, start.AddHours(1), start.AddHours(1) + micro, start.AddHours(2) - micro };
+        foreach (var at in shown.Concat(hidden))
+        {
+            await EventAtAsync(patient, clinician, at);
+        }
+
+        static string Stamp(DateTimeOffset at) => at.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", CultureInfo.InvariantCulture);
+        var times = (await ViewsAsync(App, proxy.Account, proxy.Grant, sql: Timed)).Select(line => line.Split('|')[0]).ToList();
+        Assert.Equal(shown.OrderDescending().Select(Stamp), times);
+        // The patient is shown all of them.
+        Assert.Equal(shown.Length + hidden.Length, (await ViewsAsync(App, own, null)).Count);
+    }
+
+    // The panel history is read for every page of a proxy without sensitive items, whatever the page holds: so a page's
+    // time doesn't tell such a proxy whether there are staff views they aren't shown. It isn't read for the patient's.
+    [Fact]
+    public async Task A_proxy_without_sensitive_items_reads_the_panel_history_whatever_the_page_holds()
+    {
+        var (_, empty, emptyOwn) = await PatientAsync();
+        var emptyProxy = await ProxyAsync(emptyOwn, empty, includeSensitive: false);
+        var (_, busy, busyOwn) = await PatientAsync();
+        var busyProxy = await ProxyAsync(busyOwn, busy, includeSensitive: false);
+        var outside = await StaffAsync("Dr. Maple", StaffRoles.Clinician);
+        await WindowAsync(outside, busy, fromMinutesAgo: 60 * 24, untilMinutesAgo: -60);
+        var offPanel = await StaffAsync("Dr. Nutmeg", StaffRoles.Clinician);
+        for (var minute = 1; minute <= 40; minute++)
+        {
+            await EventAsync(busy, minute % 2 == 0 ? outside : offPanel, "read", "patients", minute);
+        }
+
+        foreach (var connection in new[] { App, Read })
+        {
+            // No staff view at all, or forty they aren't shown: the history is read once, either way.
+            Assert.Equal("0 1", await PanelScansAsync(connection, emptyProxy.Account, emptyProxy.Grant));
+            Assert.Equal("0 1", await PanelScansAsync(connection, busyProxy.Account, busyProxy.Grant));
+            Assert.Equal("0 0", await PanelScansAsync(connection, emptyOwn, null));
+        }
+    }
+
+    // A page's lines, and how many times the panels' table was scanned to make it: the scans the session's transaction
+    // counts after the page, less those it counted before (a pooled session's counts carry over from earlier work).
+    async Task<string> PanelScansAsync(string connectionString, Guid user, Guid? grant)
+    {
+        await using var connection = new Npgsql.NpgsqlConnection(connectionString);
+        await connection.OpenAsync(Cancel);
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        async Task<long> ScalarAsync(string sql)
+        {
+            await using var command = new Npgsql.NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("user", user.ToString());
+            command.Parameters.AddWithValue("grant", grant?.ToString() ?? "");
+            return Convert.ToInt64(await command.ExecuteScalarAsync(Cancel), CultureInfo.InvariantCulture);
+        }
+
+        await ScalarAsync("SELECT length(set_config('app.user_id', @user, true) || set_config('app.acting_grant', @grant, true))");
+        const string Scans = "SELECT pg_stat_get_xact_numscans('ehr.patient_assignments'::regclass)";
+        var before = await ScalarAsync(Scans);
+        var lines = await ScalarAsync("SELECT count(*) FROM ehr.record_views(NULL, NULL)");
+        return $"{lines} {await ScalarAsync(Scans) - before}";
+    }
+
     // Every table of patient data, and the log itself, is named by the part rule, so a new one is a decision: which part,
     // and whether a proxy without sensitive items may see a view of it. A table the rule doesn't name is the record to the
     // patient and hidden from such a proxy (the proxy test above). The list is the one ProtectionTests keeps.
