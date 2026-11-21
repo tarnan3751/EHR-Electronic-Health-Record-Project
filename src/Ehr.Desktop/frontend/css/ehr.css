@@ -1780,8 +1780,9 @@
 }
 
 @layer pages {
-    /* On paper (docs/brand: Print). Any page prints as its content alone: no app bar, bands, buttons or anything marked
-       sc-screen-only. Its ink is the brand navy on no ground, whatever the theme on screen: the color tokens are set
+    /* On paper (docs/brand: Printed pages). Any page prints as its content: no app bar, button or anything marked
+       sc-screen-only. The bands under the app bar stay, without their buttons, since the paper must say what they say:
+       whose record it is when a proxy prints it, and that the copy may be behind the clinic's server off-site. Its ink is the brand navy on no ground, whatever the theme on screen: the color tokens are set
        again for the page, to the brand's own colors, which no theme changes, or to nothing, so a dark screen doesn't print
        light text. Tables aren't clipped or scrolled, a row or an entry isn't split across pages, and a heading stays with
        what follows it. Nothing here applies on screen. */
@@ -1818,7 +1819,6 @@
 
         .sc-appbar,
         .sc-skip,
-        .sc-notice--band,
         .sc-screen-only,
         .sc-btn,
         button {

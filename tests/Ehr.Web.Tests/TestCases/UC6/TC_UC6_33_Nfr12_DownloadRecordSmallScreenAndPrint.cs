@@ -1,3 +1,5 @@
+using Ehr.Web.CloudAudit;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
@@ -9,30 +11,41 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Purpose / scenario: "Download my record" works on a phone and from the keyboard, and its printable page prints as the
 //   record alone. At 360 pixels wide neither page scrolls sideways; the patient ticks "Include sensitive items", downloads
 //   the file and opens the printable page with Tab, Space and Enter, the focus ring showing on each control. Printed, in
-//   the light theme or the dark, a page has no app bar, band, button or anything meant for the screen; its text is the
-//   brand navy on no ground; a table row isn't split; and nothing is wider than the paper. On screen, the print rules
-//   change nothing. A clinician's page prints sanely too: no app bar, and its tables not clipped.
+//   the light theme or the dark, a page has no app bar, button or anything meant for the screen, and never says that
+//   sensitive items were left out; its text is the brand navy on no ground; a table row isn't split; and nothing is
+//   wider than the paper. On screen, the print rules change nothing. The bands under the app bar print: a proxy's
+//   printout says whose record it is, and an off-site page that it is read-only. A clinician's page prints sanely too:
+//   no app bar, and its tables not clipped.
 // Type: Non-functional (usability)
 // Requirements: NFR-12, proposed FR-56
 // Use case: UC 6, View my results and appointments in the portal
-// Preconditions: As TC-UC6-24, the patient signed in; Dr. Keyboard Print, with the patient on their panel, signed in.
+// Preconditions: As TC-UC6-24, the patient signed in; Dr. Keyboard Print, with the patient on their panel, signed in;
+//   later, someone the patient gives access to, signed in and looking at the record. The off-site app can't reach the
+//   clinic's server.
 //   Chromium, driven by Playwright: 360 by 740 pixels for the phone; 794 pixels wide, A4's width, for paper.
 // Inputs and system conditions: GET /portal/record and /portal/record/print?sensitive=true; key presses only: Tab, Space
-//   and Enter; the print media type emulated, with the light and the dark color scheme; GET /patients/{id}/vitals as the
-//   clinician, printed.
+//   and Enter; the print media type emulated, with the light and the dark color scheme; /portal/record/print without
+//   sensitive items, printed; /portal/results, /portal/appointments, /portal/summaries and /portal/record/print as the
+//   proxy, printed; GET /patients/{id}/vitals as the clinician, printed, and /patients/{id} off-site, printed.
 // Test data: FhirRequests.ChartAsync's record.
 // Steps:
 //   1. Open Download my record at 360 pixels.
 //   2. Tab to "Include sensitive items" and press Space; Tab to "Download as a file (FHIR)" and press Enter.
 //   3. Tab to "Open a printable page" and press Enter.
-//   4. At 794 pixels, emulate print, light then dark; then screen, light then dark.
-//   5. As the clinician, open the patient's vital signs and emulate print.
+//   4. At 794 pixels, emulate print, light then dark; then screen, light then dark; then the printable page without
+//      sensitive items, on screen and printed.
+//   5. As the proxy, open each portal page and emulate print.
+//   6. As the clinician, open the patient's vital signs and emulate print; then the chart off-site, printed.
 // Expected result: Step 1: no sideways scroll. Step 2: the focus ring on each; a download named health-record-<date>.json
 //   whose file holds sertraline. Step 3: /portal/record/print?sensitive=true, with "Sensitive items shown:", no sideways
 //   scroll. Step 4: printed, the app bar, the sign-out button and "use your browser's Print command" aren't displayed;
 //   the body's text is rgb(14, 27, 44) on a transparent ground, in the light scheme, in both themes; a table row avoids a break; nothing
 //   overflows. On screen, the light theme's text is rgb(14, 27, 44) on white and the dark theme's rgb(232, 238, 243).
-//   Step 5: no app bar, the patient banner not stuck, the flowsheet's wrapper not clipping it. No script errors.
+//   Without sensitive items, "Sensitive items hidden:" is displayed on screen and not printed, and the paper says
+//   nothing of sensitive items. Step 5: each printout keeps the band "Viewing as a proxy: this is Synthetic Fhirchart's
+//   record, not your own.", without its button. Step 6: no app bar, the patient banner not stuck, the flowsheet's
+//   wrapper not clipping it; off-site, the band "Read-only: the clinic's server can't be reached." prints. No script
+//   errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -103,7 +116,29 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         Assert.NotEqual("none", await DisplayAsync(page, ".sc-appbar"));
         await page.EmulateMediaAsync(new() { Media = Media.Screen, ColorScheme = ColorScheme.Dark });
         Assert.Equal("rgb(232, 238, 243)", await page.EvaluateAsync<string>("getComputedStyle(document.body).color"));
+
+        // Without sensitive items: on screen the page says it left some out; paper never does.
+        await page.GotoAsync($"{server.Url}{PrintPath}");
+        Assert.NotEqual("none", await DisplayAsync(page, "[data-sensitive=hidden]"));
+        await page.EmulateMediaAsync(new() { Media = Media.Print, ColorScheme = ColorScheme.Light });
+        Assert.Equal("none", await DisplayAsync(page, "[data-sensitive=hidden]"));
+        Assert.DoesNotContain("Sensitive items", await page.EvaluateAsync<string>("document.body.innerText"));
         Assert.Empty(errors);
+
+        // A proxy's printout of a portal page says whose record it is: the band prints, without its button.
+        var (proxy, _) = await VisitSummaryTests.ProxyForAsync(apps, patient, "Printproxy", sensitive: false);
+        await using var proxyContext = await browser.NewContextAsync(new() { IgnoreHTTPSErrors = true, ViewportSize = new() { Width = 794, Height = 1123 } });
+        await proxyContext.AddCookiesAsync(proxy.Jar.GetCookies(Base).Cast<System.Net.Cookie>().Select(c => new Microsoft.Playwright.Cookie
+        { Name = c.Name, Value = c.Value, Domain = "localhost", Path = c.Path, Secure = true, HttpOnly = c.HttpOnly, SameSite = SameSiteAttribute.Strict }));
+        var proxyPage = await proxyContext.NewPageAsync();
+        foreach (var path in new[] { "/portal/results", "/portal/appointments", "/portal/summaries", PrintPath })
+        {
+            await proxyPage.GotoAsync($"{server.Url}{path}");
+            await proxyPage.EmulateMediaAsync(new() { Media = Media.Print });
+            Assert.NotEqual("none", await DisplayAsync(proxyPage, "[data-acting]"));
+            Assert.Contains("Viewing as a proxy: this is Synthetic Fhirchart's record, not your own.", await proxyPage.Locator("[data-acting]").InnerTextAsync());
+            Assert.Equal("none", await DisplayAsync(proxyPage, "[data-acting] button"));
+        }
 
         // A clinician's page, printed: the vital signs flowsheet, the widest table the app has. No app bar, the banner
         // in its place rather than stuck to the top of each sheet, and the table's wrapper clipping nothing.
@@ -115,6 +150,17 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         Assert.Equal("none", await DisplayAsync(vitals, ".sc-appbar"));
         Assert.Equal("static", await vitals.EvaluateAsync<string>("getComputedStyle(document.querySelector('.sc-banner')).position"));
         Assert.Equal("visible", await vitals.EvaluateAsync<string>("getComputedStyle(document.querySelector('.sc-table-wrap')).overflowX"));
+
+        // Off-site, with the clinic's server out of reach, a printed page keeps its read-only band: the copy may be behind.
+        Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(TestContext.Current.CancellationToken));
+        await using var offSite = await ClinicalBrowserHost.StartAsync(apps, apps.CloudCutOff);
+        var chartOffSite = await staff.NewPageAsync();
+        await chartOffSite.SetViewportSizeAsync(794, 1123);
+        await chartOffSite.GotoAsync($"{offSite.Url}/patients/{chart.Patient}");
+        await chartOffSite.EmulateMediaAsync(new() { Media = Media.Print });
+        Assert.Equal("none", await DisplayAsync(chartOffSite, ".sc-appbar"));
+        Assert.NotEqual("none", await DisplayAsync(chartOffSite, "p.sc-notice--band"));
+        Assert.StartsWith("Read-only: the clinic's server can't be reached.", await chartOffSite.Locator("p.sc-notice--band").InnerTextAsync());
     }
 
     static Task<string> DisplayAsync(IPage page, string selector) =>
