@@ -2106,3 +2106,46 @@ VALUES ('20261121072854_VisitSummaries', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.refill_requests (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    medication_statement_id uuid NOT NULL,
+    medication_display character varying(300) NOT NULL,
+    note character varying(500),
+    requested_by uuid NOT NULL,
+    requested_at timestamp with time zone NOT NULL,
+    status character varying(20) NOT NULL,
+    order_id uuid,
+    ordered_display character varying(200),
+    decline_message character varying(1000),
+    decided_by uuid,
+    decided_at timestamp with time zone,
+    sensitive boolean NOT NULL,
+    CONSTRAINT pk_refill_requests PRIMARY KEY (id),
+    CONSTRAINT ck_refill_requests_answer CHECK ((status = 'requested') = (decided_at IS NULL) AND (decided_at IS NULL) = (decided_by IS NULL) AND (status = 'completed') = (order_id IS NOT NULL) AND (order_id IS NULL) = (ordered_display IS NULL) AND (status = 'rejected') = (decline_message IS NOT NULL)),
+    CONSTRAINT ck_refill_requests_status CHECK (status IN ('requested', 'completed', 'rejected')),
+    CONSTRAINT fk_refill_requests_medication_statements_medication_statement_ FOREIGN KEY (medication_statement_id) REFERENCES ehr.medication_statements (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_orders_order_id FOREIGN KEY (order_id) REFERENCES ehr.orders (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_patient_users_requested_by FOREIGN KEY (requested_by) REFERENCES ehr.patient_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_staff_users_decided_by FOREIGN KEY (decided_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_refill_requests_decided_by ON ehr.refill_requests (decided_by);
+
+CREATE INDEX ix_refill_requests_medication_statement_id ON ehr.refill_requests (medication_statement_id);
+
+CREATE UNIQUE INDEX ix_refill_requests_order_id ON ehr.refill_requests (order_id);
+
+CREATE INDEX ix_refill_requests_patient_id_requested_at ON ehr.refill_requests (patient_id, requested_at);
+
+CREATE INDEX ix_refill_requests_requested_by ON ehr.refill_requests (requested_by);
+
+CREATE UNIQUE INDEX ux_refill_requests_open ON ehr.refill_requests (medication_statement_id) WHERE status = 'requested';
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261121181613_RefillRequests', '10.0.13');
+
+COMMIT;
+

@@ -21,6 +21,13 @@ BEGIN
         RAISE EXCEPTION 'Results are acknowledged on their own page, not marked done' USING ERRCODE = '23514';
     END IF;
 
+    -- A refill request is done by answering it (step 13d, 77-refill-requests.sql), which marks every care-team
+    -- member's item done as the tables' owner: an item ticked off without an answer would leave the patient waiting
+    -- with nobody told.
+    IF OLD.kind = 'refill-request' AND OLD.source_table = 'refill_requests' AND current_user IN ('ehr_app', 'ehr_read') THEN
+        RAISE EXCEPTION 'A refill request is done by answering it, not marked done' USING ERRCODE = '23514';
+    END IF;
+
     IF (to_jsonb(NEW) - 'done_at') IS DISTINCT FROM (to_jsonb(OLD) - 'done_at') THEN
         RAISE EXCEPTION 'An inbox item is never edited' USING ERRCODE = '42501';
     END IF;

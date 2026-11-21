@@ -149,7 +149,7 @@ public class ProxyAccessSecurityTests(MigratedDatabase database) : IClassFixture
         {
             "patients", "observations", "conditions", "medication_statements", "allergy_intolerances", "encounters", "appointments", "message_threads",
             "messages", "orders", "clinical_notes", "clinical_drafts", "patient_assignments", "break_glass_accesses", "inbox_items", "audit_events",
-            "chart_history", "result_acknowledgments", "proxy_grants",
+            "chart_history", "result_acknowledgments", "proxy_grants", "refill_requests",
         };
         var everything = string.Join(" + ", tables.Select(table => $"(SELECT count(*) FROM ehr.{table})"));
 

@@ -26,6 +26,7 @@ public class PolicyPlanTests(MigratedDatabase database) : IClassFixture<Migrated
     [InlineData("clinical_notes")]
     [InlineData("note_addenda")]
     [InlineData("visit_summaries")]
+    [InlineData("refill_requests")]
     [InlineData("orders")]
     public async Task Policies_ask_who_the_user_is_once_per_statement(string table)
     {
