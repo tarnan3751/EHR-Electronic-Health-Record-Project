@@ -37,21 +37,24 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
 
         string[] parts = [.. new[] { talkedAbout, found, nextSteps }.Select(part => part?.ReplaceLineEndings("\n").Trim() ?? "")];
         var errors = new List<string>();
+        var errorParts = new List<int?>();
         for (var i = 0; i < parts.Length; i++)
         {
             if (parts[i].Length == 0)
             {
                 errors.Add($"Write “{Parts[i]}”.");
+                errorParts.Add(i);
             }
             else if (parts[i].Length > MaxLength)
             {
                 errors.Add($"“{Parts[i]}” can be up to {MaxLength:N0} characters. It has {parts[i].Length:N0}.");
+                errorParts.Add(i);
             }
         }
 
         if (errors.Count > 0)
         {
-            return new(422, errors);
+            return new(422, errors) { ErrorParts = errorParts };
         }
 
         if (!await phi.IsAssignedAsync(patient, cancel))
@@ -90,9 +93,9 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
             {
                 // The rule refused it: asked again, only now, to say what it found and where.
                 var problems = await VisitSummaryChecks.ProblemsAsync(db, patient, note, parts[0], parts[1], parts[2], cancel);
-                return new(422, problems.Count > 0
-                    ? [.. problems.Select(Explain)]
-                    : ["It has a code, a record number or an identifier in it. Write it in plain words."]);
+                return problems.Count > 0
+                    ? new(422, [.. problems.Select(Explain)]) { ErrorParts = [.. problems.Select(problem => (int?)(problem.Part - 1))] }
+                    : new(422, ["It has a code, a record number or an identifier in it. Write it in plain words."]);
             }
 
             return refusal.SqlState switch
@@ -209,4 +212,8 @@ public sealed record SummaryResult(int Status, IReadOnlyList<string> Errors, Gui
 {
     // Withdrawn after the patient or a proxy had viewed it in the portal.
     public bool Viewed { get; init; }
+
+    // For each error, the part of the summary it is about (0 What we talked about, 1 What we found, 2 What happens next),
+    // or null for one about none of them: the form marks those parts alone, each tied to its messages.
+    public IReadOnlyList<int?> ErrorParts { get; init; } = [];
 }

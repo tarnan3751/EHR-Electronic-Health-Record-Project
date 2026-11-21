@@ -130,6 +130,45 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
         Assert.True(fastest < TimeSpan.FromSeconds(1), $"Released in {fastest.TotalMilliseconds:F0} ms at the fastest.");
     }
 
+    // A refusal marks only the parts it names as invalid, and ties each of its messages to that part, the hint after them
+    // (aria-describedby); the other parts keep the hint alone.
+    [Fact]
+    public async Task A_refusal_marks_only_the_parts_it_names_each_tied_to_its_messages()
+    {
+        var (_, patient, session) = await OrderTests.OnPanelAsync(apps);
+        var note = await SignedNoteAsync(session.Client, patient);
+
+        using (var coded = await ReleaseAsync(session.Client, patient, note, found: "We checked E11.9 and 4548-4."))
+        {
+            var page = await coded.Content.ReadAsStringAsync(Cancel);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, coded.StatusCode);
+            Assert.Equal(
+                [("summary-talked-about", "summary-hint", ""), ("summary-found", "summary-error-0 summary-error-1 summary-hint", "true"), ("summary-next-steps", "summary-hint", "")],
+                Fields(page));
+            Assert.StartsWith("Not released: “E11.9” in What we found", Message(page, 0));
+            Assert.StartsWith("Not released: “4548-4” in What we found", Message(page, 1));
+        }
+
+        using (var empty = await ReleaseAsync(session.Client, patient, note, talkedAbout: " ", nextSteps: ""))
+        {
+            var page = await empty.Content.ReadAsStringAsync(Cancel);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
+            Assert.Equal(
+                [("summary-talked-about", "summary-error-0 summary-hint", "true"), ("summary-found", "summary-hint", ""), ("summary-next-steps", "summary-error-1 summary-hint", "true")],
+                Fields(page));
+            Assert.Equal("Not released: Write “What we talked about”.", Message(page, 0));
+            Assert.Equal("Not released: Write “What happens next”.", Message(page, 1));
+        }
+
+        // Each part's ID, what describes it and whether it is invalid, in the page's order.
+        static List<(string, string, string)> Fields(string page) =>
+            [.. Regex.Matches(page, "<textarea id=\"([^\"]+)\"[^>]*aria-describedby=\"([^\"]*)\"(?: aria-invalid=\"([^\"]*)\")?")
+                .Select(field => (field.Groups[1].Value, field.Groups[2].Value, field.Groups[3].Value))];
+
+        static string Message(string page, int index) =>
+            Words(Regex.Match(page, $"<p id=\"summary-error-{index}\">(.*?)</p>").Groups[1].Value);
+    }
+
     // The chart shows which signed notes have a summary in the portal from the notes statement it already makes: the
     // chart is the page nearest the render gate, so the tag costs no statement of its own (step 7a).
     [Fact]
