@@ -2,9 +2,10 @@ using Ehr.Data.Patients;
 using Ehr.Domain.Phi;
 using Ehr.Domain.Results;
 
-namespace Ehr.Web.Api.Fhir;
+namespace Ehr.Web.Fhir;
 
-// Test results and vital signs as the FHIR API sends them (the expansion plan's step 11).
+// Test results and vital signs as the app sends them in FHIR: the clinician API (the expansion plan's step 11) and the
+// portal's download (step 13b).
 //
 // Each carries its category (laboratory or vital-signs), its LOINC code and, when its unit is its code's UCUM unit
 // (ehr.observation_codes), that unit with UCUM's system and code; otherwise the unit as text. Vital signs claim FHIR R4's
@@ -50,13 +51,14 @@ internal static class FhirObservations
     // Each entry as an Observation, with its ID: a blood pressure's is its reading's. A value of a reading without the
     // other value is left out, never sent alone under its own ID: the database keeps readings whole, and the reader
     // leaves such a reading out, so this is a guard against what can't be stored, not a case that happens.
-    public static IReadOnlyList<(Guid Id, FhirObservation Resource)> Map(IEnumerable<ObservationEntry> entries) =>
+    // Written with the given ids (FhirIds); the ID returned beside each is the record's.
+    public static IReadOnlyList<(Guid Id, FhirObservation Resource)> Map(IEnumerable<ObservationEntry> entries, FhirIds ids) =>
         [.. entries.Where(entry => entry.Diastolic is not null || entry.Observation.ReadingId is null)
             .Select(entry => entry.Diastolic is { } diastolic
-                ? (entry.Observation.ReadingId!.Value, Reading(entry, diastolic))
-                : (entry.Observation.Id, Map(entry)))];
+                ? (entry.Observation.ReadingId!.Value, Reading(entry, diastolic, ids))
+                : (entry.Observation.Id, Map(entry, ids)))];
 
-    static FhirObservation Map(ObservationEntry entry)
+    static FhirObservation Map(ObservationEntry entry, FhirIds ids)
     {
         var observation = entry.Observation;
         var profile = observation.Category == ObservationCategory.VitalSigns && entry.UcumUnit && observation.Value is not null
@@ -64,12 +66,12 @@ internal static class FhirObservations
                 ? claimed
                 : null;
         return new FhirObservation(
-            observation.Id.ToString(),
+            ids.Id(observation.Id),
             profile is null ? null : new Meta(Profile: [profile]),
             observation.Status,
             [new CodeableConcept([new Coding("http://terminology.hl7.org/CodeSystem/observation-category", observation.Category)])],
             FhirResources.Concept(FhirResources.Loinc, observation.Code, observation.Display),
-            FhirResources.PatientReference(observation.PatientId),
+            ids.Patient(observation.PatientId),
             FhirResources.Instant(observation.EffectiveAt),
             observation.IssuedAt is { } issued ? FhirResources.Instant(issued) : null,
             Measured(entry, observation.Value),
@@ -80,17 +82,17 @@ internal static class FhirObservations
 
     // One blood pressure reading. Its two values were entered together and stand together: the time taken is theirs,
     // the status is theirs, and issued is the later of their two, when the reading was whole.
-    static FhirObservation Reading(ObservationEntry systolic, ObservationEntry diastolic)
+    static FhirObservation Reading(ObservationEntry systolic, ObservationEntry diastolic, FhirIds ids)
     {
         var reading = new BloodPressure(systolic.Observation, diastolic.Observation);
         var issued = new[] { reading.Systolic.IssuedAt, reading.Diastolic.IssuedAt }.Max();
         return new FhirObservation(
-            reading.Systolic.ReadingId!.Value.ToString(),
+            ids.Id(reading.Systolic.ReadingId!.Value),
             systolic.UcumUnit && diastolic.UcumUnit ? new Meta(Profile: [VitalSignProfiles[BloodPressurePanel]]) : null,
             reading.Systolic.Status,
             VitalSignsCategory,
             FhirResources.Concept(FhirResources.Loinc, BloodPressurePanel, "Blood pressure"),
-            FhirResources.PatientReference(reading.Systolic.PatientId),
+            ids.Patient(reading.Systolic.PatientId),
             FhirResources.Instant(reading.TakenAt),
             issued is { } at ? FhirResources.Instant(at) : null,
             ValueQuantity: null,

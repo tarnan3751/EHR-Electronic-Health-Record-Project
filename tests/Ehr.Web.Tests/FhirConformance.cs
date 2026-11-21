@@ -8,7 +8,7 @@ using Xunit;
 namespace Ehr.Web.Tests;
 
 // Checks what the FHIR API sends against the FHIR R4 specification (the expansion plan's step 11), offline, with the
-// Firely .NET SDK, which only the tests use: the app writes its JSON itself (src/Ehr.Web/Api/Fhir). First a strict
+// Firely .NET SDK, which only the tests use: the app writes its JSON itself (src/Ehr.Web/Fhir). First a strict
 // parse, which refuses an element R4 doesn't have, a missing required one, a list or value that is empty, and a status
 // code outside its list. Then Firely's validator, over R4's own definitions (the specification's package, in the test's
 // output): the core profiles and their rules, required bindings to the codes R4 defines, and any profile the resource

@@ -293,9 +293,13 @@ ALTER TABLE ehr.medication_statements FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS medication_statements_clinician_select ON ehr.medication_statements;
 CREATE POLICY medication_statements_clinician_select ON ehr.medication_statements FOR SELECT USING ((SELECT ehr.is_clinician()));
 
+-- The portal's: never a medication entered in error (the expansion plan's step 13b, whose download hands the patient
+-- their medications), as observations_own_released_select never gives a result entered in error. Clinicians still see
+-- it, through their own policy above.
 DROP POLICY IF EXISTS medication_statements_own_select ON ehr.medication_statements;
 CREATE POLICY medication_statements_own_select ON ehr.medication_statements FOR SELECT
-    USING (patient_id = (SELECT ehr.current_patient_id()) AND (NOT sensitive OR (SELECT ehr.portal_sees_sensitive())));
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND status <> 'entered-in-error'
+        AND (NOT sensitive OR (SELECT ehr.portal_sees_sensitive())));
 
 DROP POLICY IF EXISTS medication_statements_panel_insert ON ehr.medication_statements;
 CREATE POLICY medication_statements_panel_insert ON ehr.medication_statements FOR INSERT

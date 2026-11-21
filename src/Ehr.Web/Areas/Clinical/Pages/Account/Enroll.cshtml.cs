@@ -25,7 +25,9 @@ public class EnrollModel(StaffSignIn signIn) : PageModel
 
     public IReadOnlyList<string>? RecoveryCodes { get; private set; }
 
-    public string Continue => Links.Local(Url, ReturnUrl, "/");
+    // After the recovery codes: the page the sign-in started from, without its query but for a search's criteria
+    // (Links.LocalPage).
+    public string Continue => Links.LocalPage(Url, ReturnUrl, "/", Patients.SearchQuery.Parameters);
 
     public async Task<IActionResult> OnGetAsync()
     {

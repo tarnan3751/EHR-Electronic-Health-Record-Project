@@ -41,6 +41,8 @@ public class CodeModel(StaffSignIn signIn) : PageModel
         }
 
         await signIn.CompleteAsync(HttpContext, user, HttpContext.RequestAborted);
-        return LocalRedirect(Links.Local(Url, ReturnUrl, "/"));
+        // On to the page the sign-in started from, without its query but for a search's criteria
+        // (Links.LocalPage).
+        return LocalRedirect(Links.LocalPage(Url, ReturnUrl, "/", Patients.SearchQuery.Parameters));
     }
 }

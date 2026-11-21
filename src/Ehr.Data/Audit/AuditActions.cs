@@ -10,6 +10,13 @@ public static class AuditActions
     // leaves out until asked: recorded by the PHI reader in place of the plain read, so one view is one event.
     public const string ReadSensitive = "read_sensitive";
 
+    // A patient's record downloaded from the portal as a file (the expansion plan's step 13b), by the patient or a proxy:
+    // recorded by the PHI reader in place of a read, apart from a view, since the file leaves the portal. With the
+    // patient's sensitive items in it, the second.
+    public const string Download = "download";
+
+    public const string DownloadSensitive = "download_sensitive";
+
     // Writes to a PHI table, recorded by its trigger.
     public const string Insert = "insert";
 
@@ -83,7 +90,7 @@ public static class AuditActions
     // Every action, for the audit page's filter.
     public static readonly string[] All =
     [
-        Read, ReadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
+        Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
         RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
         RegistrationReplaced, ProxyAccountCreated, SentToLab,
