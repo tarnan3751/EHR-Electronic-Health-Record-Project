@@ -47,7 +47,28 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
     {
         var order = Guid.CreateVersion7();
         await Accounts.ExecuteAsync(App, clinician, Order, ("id", order), ("patient", patient), ("type", type), ("code", code));
+        await SettledAsync(patient);
         return order;
+    }
+
+    // Until the lab's watermark has passed the transactions that signed the patient's lab orders. Any transaction still
+    // running from before them, such as autovacuum's analyze, holds it back for a moment, as it would a lab's; a test
+    // that asks at once would be handed nothing yet.
+    async Task SettledAsync(Guid patient)
+    {
+        for (var tries = 0; tries < 600; tries++)
+        {
+            if ((await AsSuperuserAsync(
+                    """
+                    SELECT coalesce(pg_snapshot_xmin(pg_current_snapshot()) > (SELECT max(l.transaction_id) FROM ehr.change_log l
+                        JOIN ehr.orders o ON o.id = l.row_id WHERE l.table_name = 'orders' AND o.patient_id = @patient), true)::text
+                    """, ("patient", patient))).Single() == "true")
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), Cancel);
+        }
     }
 
     // Where the lab would start asking now: every transaction before it has finished.
@@ -63,12 +84,20 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
             ("patient", patient), ("code", code), ("status", status));
 
     // The hand-over, as the on-prem app's role, committed: the watermark, whether there is more, and the orders.
-    async Task<(string Watermark, bool More, JsonElement Orders)> HandOverAsync(string? key, string since, Guid? user = null, string? connectionString = null)
+    async Task<(string Watermark, bool More, JsonElement Orders)> HandOverAsync(
+        string? key, string since, Guid? user = null, string? connectionString = null, string? timeZone = null)
     {
         await using var connection = new NpgsqlConnection(connectionString ?? App);
         await connection.OpenAsync(Cancel);
         await using var transaction = await connection.BeginTransactionAsync(Cancel);
         await SetUserAsync(connection, transaction, user);
+        if (timeZone is not null)
+        {
+            await using var zone = new NpgsqlCommand("SELECT set_config('TimeZone', @zone, true)", connection, transaction);
+            zone.Parameters.AddWithValue("zone", timeZone);
+            await zone.ExecuteNonQueryAsync(Cancel);
+        }
+
         await using var command = new NpgsqlCommand("SELECT watermark::text, more, orders::text FROM ehr.lab_orders(@key, @since::xid8)", connection, transaction);
         command.Parameters.Add(new NpgsqlParameter("key", NpgsqlDbType.Text) { Value = (object?)key ?? DBNull.Value });
         command.Parameters.AddWithValue("since", since);
@@ -121,8 +150,39 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         await set.ExecuteNonQueryAsync(Cancel);
     }
 
+    // A query, with nobody signed in, after app.lab_door is set to 'open' by hand in the same transaction.
+    static async Task<List<string>> WithDoorOpenAsync(string connectionString, string sql, Guid patient)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(Cancel);
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        await SetUserAsync(connection, transaction, null);
+        await using (var open = new NpgsqlCommand("SELECT set_config('app.lab_door', 'open', true)", connection, transaction))
+        {
+            await open.ExecuteNonQueryAsync(Cancel);
+        }
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("patient", patient);
+        var rows = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(Cancel);
+        while (await reader.ReadAsync(Cancel))
+        {
+            rows.Add(reader.GetValue(0).ToString()!);
+        }
+
+        return rows;
+    }
+
     static async Task RefusedAsync(string state, Func<Task> attempt) =>
         Assert.Equal(state, (await Assert.ThrowsAsync<PostgresException>(attempt)).SqlState);
+
+    // The door's own refusal of a caller: insufficient_privilege, named so the app tells it from any other.
+    static async Task KeyRefusedAsync(Func<Task> attempt)
+    {
+        var refused = await Assert.ThrowsAsync<PostgresException>(attempt);
+        Assert.Equal((PostgresErrorCodes.InsufficientPrivilege, "lab_key_refused"), (refused.SqlState, refused.ConstraintName));
+    }
 
     static readonly (string, decimal, string)[] Hemoglobin = [("718-7", 9.1m, "g/dL")];
 
@@ -144,15 +204,15 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         // No hash, an empty one, a wrong one, the key itself rather than its hash, and the hash in capitals.
         foreach (var key in new[] { null, "", new string('0', 64), MigratedDatabase.LabKey, Key.ToUpperInvariant() })
         {
-            await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => HandOverAsync(key, since));
-            await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => FileAsync(key, order, Hemoglobin));
+            await KeyRefusedAsync(() => HandOverAsync(key, since));
+            await KeyRefusedAsync(() => FileAsync(key, order, Hemoglobin));
         }
 
         // The right hash, but an account signed in: a clinician on the panel, a patient's portal account.
         foreach (var user in new[] { clinician, account })
         {
-            await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => HandOverAsync(Key, since, user));
-            await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege, () => FileAsync(Key, order, Hemoglobin, user: user));
+            await KeyRefusedAsync(() => HandOverAsync(Key, since, user));
+            await KeyRefusedAsync(() => FileAsync(Key, order, Hemoglobin, user: user));
         }
 
         // The read-only role may not call the door at all, even with the hash.
@@ -486,5 +546,169 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         Assert.Equal("filed", await FileAsync(Key, order, Hemoglobin));
         Assert.Equal(["completed 0"], await AsSuperuserAsync(
             "SELECT (SELECT status FROM ehr.orders WHERE id = @order) || ' ' || (SELECT count(*) FROM ehr.inbox_items WHERE source_id = @order)", ("order", order)));
+    }
+
+    [Fact]
+    public async Task Times_in_the_hand_over_are_utc_with_a_z_whatever_the_sessions_time_zone()
+    {
+        var (clinician, patient) = await PanelAsync();
+        var since = await NowAsync();
+        var order = await SignAsync(clinician, patient);
+
+        var (_, _, orders) = await HandOverAsync(Key, since, timeZone: "America/Chicago");
+
+        var signedAt = Assert.Single(orders.EnumerateArray()).GetProperty("signedAt").GetString()!;
+        Assert.Matches(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$", signedAt);
+        Assert.Equal(["True"], await AsSuperuserAsync("SELECT signed_at = @at::timestamptz FROM ehr.orders WHERE id = @order", ("at", signedAt), ("order", order)));
+    }
+
+    // An answer holds whole signing transactions, as many as come to 100 lab orders, or one alone that signed more: no
+    // order is split from its transaction, skipped or handed over twice.
+    [Fact]
+    public async Task An_answer_is_cut_at_a_hundred_orders_between_transactions_and_a_bigger_transaction_comes_whole()
+    {
+        var (clinician, patient) = await PanelAsync();
+        const string Many = """
+            INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status, duplicate_reason)
+            SELECT uuidv7(), @patient, 'lab', 'SYN-LAB-001', '{}', 'active', 'Synthetic repeat' FROM generate_series(1, @count)
+            """;
+
+        var since = await NowAsync();
+        foreach (var count in new[] { 60, 60, 150, 1 })
+        {
+            await Accounts.ExecuteAsync(App, clinician, Many, ("patient", patient), ("count", count));
+        }
+
+        await SettledAsync(patient);
+
+        var sizes = new List<int>();
+        var handed = new List<Guid>();
+        var from = since;
+        bool more;
+        do
+        {
+            (from, more, var page) = await HandOverAsync(Key, from);
+            sizes.Add(page.GetArrayLength());
+            handed.AddRange(page.EnumerateArray().Select(o => o.GetProperty("id").GetGuid()));
+        }
+        while (more);
+
+        Assert.Equal([60, 60, 150, 1], sizes);
+        Assert.Equal(271, handed.Distinct().Count());
+        Assert.Equal(handed.Order(), (await AsSuperuserAsync("SELECT id::text FROM ehr.orders WHERE patient_id = @patient", ("patient", patient))).Select(Guid.Parse).Order());
+    }
+
+    // The owner's policies for the door hold only while the lab's own two functions run (30-rls.sql). An app session that
+    // sets app.lab_door itself sees nothing more with its own statements; another function that runs as the owner sees
+    // nothing through them; and while a lab files, ehr.file_result still finds an order's acknowledgment.
+    [Fact]
+    public async Task The_doors_owner_policies_hold_only_inside_the_labs_own_functions()
+    {
+        var (clinician, patient) = await PanelAsync();
+        await ConditionAsync(patient, "E11.9");
+        var open = await SignAsync(clinician, patient);
+        var acknowledged = await SignAsync(clinician, patient);
+        await Accounts.ExecuteAsync(App, clinician, ByHand, ("patient", patient), ("order", acknowledged), ("code", "718-7"), ("value", 13.1m));
+        await Accounts.ExecuteAsync(App, clinician, Acknowledge, ("order", acknowledged), ("patient", patient), ("by", clinician));
+        const string Counts = """
+            SELECT (SELECT count(*) FROM ehr.orders WHERE patient_id = @patient) || ' ' || (SELECT count(*) FROM ehr.result_acknowledgments WHERE patient_id = @patient)
+                   || ' ' || (SELECT count(*) FROM ehr.conditions WHERE patient_id = @patient)
+            """;
+
+        // The app's own statements, with nobody signed in, the setting open by hand: nothing.
+        Assert.Equal(["0 0 0"], await WithDoorOpenAsync(App, Counts, patient));
+
+        // Functions that run as the owner, made here for the test: one that only counts, one that inserts a result for
+        // the acknowledged order as the lab's door would, and the same with the door open.
+        await MigratedDatabase.ExecuteAsync(database.OwnerConnectionString, $"""
+            CREATE FUNCTION ehr.test_probe_counts(patient uuid) RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+            AS $$ {Counts.Replace("@patient", "patient")} $$;
+            CREATE FUNCTION ehr.test_probe_file(patient uuid, lab_order uuid) RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+            AS $$ INSERT INTO ehr.observations (id, patient_id, order_id, category, code, display, status, value, effective_at)
+                  VALUES (uuidv7(), patient, lab_order, 'laboratory', '777-3', 'x', 'final', 250, now()) $$;
+            CREATE FUNCTION ehr.test_probe_file_open(patient uuid, lab_order uuid) RETURNS void LANGUAGE sql SECURITY DEFINER
+                SET search_path = pg_catalog, pg_temp
+            AS $$ SELECT set_config('app.lab_door', 'open', true);
+                  INSERT INTO ehr.observations (id, patient_id, order_id, category, code, display, status, value, effective_at)
+                  VALUES (uuidv7(), patient, lab_order, 'laboratory', '777-3', 'x', 'final', 250, now()) $$;
+            GRANT EXECUTE ON FUNCTION ehr.test_probe_counts(uuid), ehr.test_probe_file(uuid, uuid), ehr.test_probe_file_open(uuid, uuid) TO ehr_app;
+            """);
+        try
+        {
+            Assert.Equal(["0 0 0"], await Accounts.QueryAsync(App, null, "SELECT ehr.test_probe_counts(@patient)", ("patient", patient)));
+            // Without it the owner can't see the order, and the filing rule refuses before the insert's policy is asked.
+            var unseen = await Assert.ThrowsAsync<PostgresException>(() =>
+                Accounts.ExecuteAsync(App, null, "SELECT ehr.test_probe_file(@patient, @order)", ("patient", patient), ("order", open)));
+            Assert.Equal((PostgresErrorCodes.CheckViolation, "Results are filed against an active lab order of the same patient"), (unseen.SqlState, unseen.MessageText));
+            // With the door open the insert reaches ehr.file_result, which finds the acknowledgment and refuses.
+            var refused = await Assert.ThrowsAsync<PostgresException>(() =>
+                Accounts.ExecuteAsync(App, null, "SELECT ehr.test_probe_file_open(@patient, @order)", ("patient", patient), ("order", acknowledged)));
+            Assert.Equal(PostgresErrorCodes.CheckViolation, refused.SqlState);
+            Assert.Contains("acknowledged", refused.MessageText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await MigratedDatabase.ExecuteAsync(database.OwnerConnectionString,
+                "DROP FUNCTION ehr.test_probe_counts(uuid); DROP FUNCTION ehr.test_probe_file(uuid, uuid); DROP FUNCTION ehr.test_probe_file_open(uuid, uuid)");
+        }
+
+        // The lab's own function still sees what it must, and files.
+        Assert.Equal("filed", await FileAsync(Key, open, Hemoglobin));
+        Assert.Equal("closed", await FileAsync(Key, acknowledged, [("777-3", 250m, "10*3/uL")]));
+
+        // No function that runs as its owner reads the door's tables but the lab's two: a new one is a decision to make
+        // about app.lab_door (30-rls.sql).
+        Assert.Equal(["file_lab_results", "lab_orders"], await AsSuperuserAsync(
+            """
+            SELECT p.proname FROM pg_proc p
+            WHERE p.pronamespace = 'ehr'::regnamespace AND p.prosecdef
+              AND p.prosrc ~ '(ehr\.orders|ehr\.conditions|ehr\.result_acknowledgments|INSERT INTO ehr\.observations)'
+            ORDER BY p.proname
+            """));
+    }
+
+    // Each layer that withholds a sensitive diagnosis from the lab, on its own (step 12): the owner's policy on
+    // conditions, as the door's functions see the table; and the hand-over's own filter, with the policy out of the
+    // picture, as a superuser can arrange inside a transaction that is rolled back.
+    [Fact]
+    public async Task Each_layer_withholds_a_sensitive_diagnosis_on_its_own()
+    {
+        var (clinician, patient) = await PanelAsync();
+        await ConditionAsync(patient, "E11.9");
+        await ConditionAsync(patient, "F32.A");
+        var since = await NowAsync();
+        var order = await SignAsync(clinician, patient);
+
+        // The policy: as the owner, with the door open as the functions open it.
+        Assert.Contains("NOT sensitive", (await AsSuperuserAsync(
+            "SELECT pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polname = 'conditions_owner_select'")).Single(), StringComparison.Ordinal);
+        Assert.Equal(["E11.9"], await WithDoorOpenAsync(database.OwnerConnectionString, "SELECT code FROM ehr.conditions WHERE patient_id = @patient ORDER BY code", patient));
+        Assert.Equal(["0"], await Accounts.QueryAsync(database.OwnerConnectionString, null, "SELECT count(*)::text FROM ehr.conditions WHERE patient_id = @patient", ("patient", patient)));
+
+        // The function: forced row-level security lifted on conditions, so the owner reads every row, and only the
+        // hand-over's own filter is left.
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync(Cancel);
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        async Task<string> OneAsync(string sql)
+        {
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("patient", patient);
+            command.Parameters.AddWithValue("key", Key);
+            command.Parameters.AddWithValue("since", since);
+            return (await command.ExecuteScalarAsync(Cancel))?.ToString() ?? "";
+        }
+
+        await OneAsync("ALTER TABLE ehr.conditions NO FORCE ROW LEVEL SECURITY");
+        await OneAsync("SET LOCAL ROLE ehr_owner");
+        Assert.Equal("E11.9 F32.A", await OneAsync("SELECT string_agg(code, ' ' ORDER BY code) FROM ehr.conditions WHERE patient_id = @patient"));
+        await OneAsync("RESET ROLE");
+        await OneAsync("SELECT set_config('app.user_id', '', true)");
+        var orders = JsonDocument.Parse(await OneAsync("SELECT orders::text FROM ehr.lab_orders(@key, @since::xid8)")).RootElement;
+        var handed = Assert.Single(orders.EnumerateArray(), o => o.GetProperty("id").GetGuid() == order);
+        Assert.Equal(["E11.9"], handed.GetProperty("conditions").EnumerateArray().Select(c => c.GetString()));
+        await transaction.RollbackAsync(Cancel);
+
+        Assert.Equal(["True"], await AsSuperuserAsync("SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.conditions'::regclass"));
     }
 }
