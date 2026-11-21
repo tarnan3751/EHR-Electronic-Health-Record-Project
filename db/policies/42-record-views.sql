@@ -183,22 +183,31 @@ GRANT EXECUTE ON FUNCTION ehr.record_views(timestamptz, timestamptz) TO ehr_app,
 -- now, once. The app stamps both times from its own clock a moment before saving (Ehr.Domain's PatientAssignments: the
 -- chart's "Add to my patients" and "Remove", and the benchmark's setup), on the on-prem app beside this database; off
 -- site, the cloud app forwards the write there. Nothing else writes the table at runtime: neither the desktop app nor
--- the sync API holds or replays assignments. So "now" is this server's clock within a minute either way, for the two
--- machines' clocks to differ by. Rows the schema's owner writes (the migrations, the seed) or a superuser (a test's
--- setup) aren't held to it. Each write is audited as before (40-audit.sql).
+-- the sync API holds or replays assignments. A time within a minute of this server's clock is kept, so it stays on the
+-- clock the app stamps its views with; one further off, as from a machine whose clock slipped while it slept, is made
+-- this server's clock, as a proxy grant's is (95-proxy-access.sql), rather than refused, so no one is kept from their
+-- own panel by a clock: either way an assignment can't be backdated or dated ahead by more than the minute. A row
+-- inserted already ended, a change to its ID, patient, clinician or start, a second end or a reopening are refused.
+-- Rows the schema's owner writes (the migrations, the seed) or a superuser (a test's setup) aren't held to it. Each
+-- write is audited as before (40-audit.sql).
 CREATE OR REPLACE FUNCTION ehr.guard_patient_assignment() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        IF NEW.ended_at IS NOT NULL OR abs(extract(epoch FROM NEW.assigned_at - clock_timestamp())) > 60 THEN
-            RAISE EXCEPTION 'A panel assignment starts now, and open' USING ERRCODE = '23514';
+        IF NEW.ended_at IS NOT NULL THEN
+            RAISE EXCEPTION 'A panel assignment starts open' USING ERRCODE = '23514';
+        END IF;
+
+        IF abs(extract(epoch FROM NEW.assigned_at - clock_timestamp())) > 60 THEN
+            NEW.assigned_at := clock_timestamp();
         END IF;
     ELSIF (NEW.id, NEW.patient_id, NEW.clinician_id, NEW.assigned_at) IS DISTINCT FROM (OLD.id, OLD.patient_id, OLD.clinician_id, OLD.assigned_at)
-          OR OLD.ended_at IS NOT NULL AND NEW.ended_at IS DISTINCT FROM OLD.ended_at
-          OR OLD.ended_at IS NULL AND NEW.ended_at IS NOT NULL AND abs(extract(epoch FROM NEW.ended_at - clock_timestamp())) > 60 THEN
-        RAISE EXCEPTION 'A panel assignment only ends, now, and once' USING ERRCODE = '23514';
+          OR OLD.ended_at IS NOT NULL AND NEW.ended_at IS DISTINCT FROM OLD.ended_at THEN
+        RAISE EXCEPTION 'A panel assignment only ends, once' USING ERRCODE = '23514';
+    ELSIF OLD.ended_at IS NULL AND NEW.ended_at IS NOT NULL AND abs(extract(epoch FROM NEW.ended_at - clock_timestamp())) > 60 THEN
+        NEW.ended_at := clock_timestamp();
     END IF;
 
     RETURN NEW;

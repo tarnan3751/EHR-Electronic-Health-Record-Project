@@ -636,52 +636,77 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         return $"{lines} {await ScalarAsync(Scans) - before}";
     }
 
-    // The panel's history decides what a proxy without sensitive items is shown, so the apps can't rewrite it: an
-    // assignment starts now and open, and only ends, now, once (42-record-views.sql), through either runtime role.
+    // The panel's history decides what a proxy without sensitive items is shown, so the apps can't rewrite it: through
+    // either runtime role, an assignment starts now and open, and only ends, now, once (42-record-views.sql). A time
+    // within a minute of the database's clock is kept; one further off is made the database's clock, not refused.
     [Fact]
     public async Task A_panel_assignment_starts_now_and_only_ends_now_once()
     {
         var clinician = await StaffAsync("Dr. Oakes", StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        var other = await Accounts.PatientAsync(database, clinician);
-        const string Insert = "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at) VALUES (@id, @patient, @clinician, now() + @shift::interval, @ended::timestamptz)";
+        var patients = new List<Guid>();
+        for (var i = 0; i < 5; i++)
+        {
+            patients.Add(await Accounts.PatientAsync(database, clinician));
+        }
 
-        Task InsertAsync(string connection, Guid id, string shift, object? ended = null) =>
-            Accounts.ExecuteAsync(connection, clinician, Insert, ("id", id), ("patient", patient), ("clinician", clinician), ("shift", shift), ("ended", ended ?? DBNull.Value));
+        const string Insert = "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at) VALUES (@id, @patient, @clinician, now() + @shift::interval, @ended::timestamptz)";
+        async Task<Guid> InsertAsync(string connection, Guid patient, string shift, object? ended = null)
+        {
+            var id = Guid.CreateVersion7();
+            await Accounts.ExecuteAsync(connection, clinician, Insert, ("id", id), ("patient", patient), ("clinician", clinician), ("shift", shift), ("ended", ended ?? DBNull.Value));
+            return id;
+        }
+
+        Task EndAsync(Guid assignment, string shift) =>
+            Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() + @shift::interval WHERE id = @id", ("id", assignment), ("shift", shift));
+
+        // How far behind the database's clock a time stored for the assignment is, in whole seconds.
+        async Task<string> BehindAsync(Guid assignment, string column) => (await AsSuperuserAsync(
+            $"SELECT round(extract(epoch FROM clock_timestamp() - {column}))::text FROM ehr.patient_assignments WHERE id = @id", ("id", assignment))).Single();
 
         async Task RefusedAsync(string state, Func<Task> attempt) =>
             Assert.Equal(state, (await Assert.ThrowsAsync<Npgsql.PostgresException>(attempt)).SqlState);
 
-        // Backdated, ahead, or already ended: refused. The read role writes no assignment at all.
-        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => InsertAsync(App, Guid.CreateVersion7(), "-1 hour"));
-        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => InsertAsync(App, Guid.CreateVersion7(), "2 minutes"));
-        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => InsertAsync(App, Guid.CreateVersion7(), "0 seconds", DateTimeOffset.UtcNow));
-        await RefusedAsync(Npgsql.PostgresErrorCodes.InsufficientPrivilege, () => InsertAsync(Read, Guid.CreateVersion7(), "0 seconds"));
-        var assignment = Guid.CreateVersion7();
-        await InsertAsync(App, assignment, "0 seconds");
+        // An hour back or two minutes ahead is stored as now; thirty seconds back is kept. Already ended: refused. The
+        // read role writes no assignment at all.
+        var backdated = await InsertAsync(App, patients[0], "-1 hour");
+        var ahead = await InsertAsync(App, patients[1], "2 minutes");
+        var near = await InsertAsync(App, patients[2], "-30 seconds");
+        Assert.InRange(int.Parse(await BehindAsync(backdated, "assigned_at"), CultureInfo.InvariantCulture), 0, 5);
+        Assert.InRange(int.Parse(await BehindAsync(ahead, "assigned_at"), CultureInfo.InvariantCulture), 0, 5);
+        Assert.InRange(int.Parse(await BehindAsync(near, "assigned_at"), CultureInfo.InvariantCulture), 29, 35);
+        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => InsertAsync(App, patients[3], "0 seconds", DateTimeOffset.UtcNow));
+        await RefusedAsync(Npgsql.PostgresErrorCodes.InsufficientPrivilege, () => InsertAsync(Read, patients[4], "0 seconds"));
 
-        // While open: its start, patient and ID never change, and it ends only now.
-        foreach (var change in new[]
-        {
-            "SET assigned_at = assigned_at - interval '1 hour'", "SET patient_id = @other", "SET ended_at = now() - interval '1 hour'",
-            "SET ended_at = now() + interval '2 minutes'",
-        })
+        // While open: its start, patient and ID never change.
+        foreach (var change in new[] { "SET assigned_at = assigned_at - interval '1 hour'", "SET patient_id = @other", "SET id = gen_random_uuid()" })
         {
             await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () =>
-                Accounts.ExecuteAsync(App, clinician, $"UPDATE ehr.patient_assignments {change} WHERE id = @id", ("id", assignment), ("other", other)));
+                Accounts.ExecuteAsync(App, clinician, $"UPDATE ehr.patient_assignments {change} WHERE id = @id", ("id", backdated), ("other", patients[4])));
         }
 
         await RefusedAsync(Npgsql.PostgresErrorCodes.InsufficientPrivilege, () =>
-            Accounts.ExecuteAsync(Read, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id", ("id", assignment)));
-        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id", ("id", assignment));
+            Accounts.ExecuteAsync(Read, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id", ("id", backdated)));
 
-        // Once ended, never again.
+        // It ends now: an end an hour back or two minutes ahead is stored as now, thirty seconds back is kept.
+        await EndAsync(backdated, "-1 hour");
+        await EndAsync(ahead, "2 minutes");
+        await EndAsync(near, "-30 seconds");
+        Assert.InRange(int.Parse(await BehindAsync(backdated, "ended_at"), CultureInfo.InvariantCulture), 0, 5);
+        Assert.InRange(int.Parse(await BehindAsync(ahead, "ended_at"), CultureInfo.InvariantCulture), 0, 5);
+        Assert.InRange(int.Parse(await BehindAsync(near, "ended_at"), CultureInfo.InvariantCulture), 29, 35);
+
+        // Once ended, never again: no second end, no moving it, no reopening.
+        foreach (var shift in new[] { "0 seconds", "-30 seconds" })
+        {
+            await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => EndAsync(backdated, shift));
+        }
+
         await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () =>
-            Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id", ("id", assignment)));
-        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () =>
-            Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = NULL WHERE id = @id", ("id", assignment)));
-        Assert.Equal(["1 1"], await AsSuperuserAsync(
-            "SELECT count(*) FILTER (WHERE ended_at IS NOT NULL) || ' ' || count(*) FROM ehr.patient_assignments WHERE patient_id = @patient", ("patient", patient)));
+            Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = NULL WHERE id = @id", ("id", backdated)));
+        Assert.Equal(["3 3"], await AsSuperuserAsync(
+            "SELECT count(*) FILTER (WHERE ended_at IS NOT NULL) || ' ' || count(*) FROM ehr.patient_assignments WHERE patient_id = ANY(@patients)",
+            ("patients", patients.ToArray())));
     }
 
     // The panel history is read with the patient's ID worked out once: the session's context functions never run for each
