@@ -158,7 +158,9 @@ services:
     environment:
       EHR_LAB_KEY: ${EHR_LAB_KEY:-}
     volumes:
-      - ./certs:/certs:ro
+      # The public certificate it pins, alone: it stands for a third party, so not the folder, which holds the
+      # certificate's private key, the one the apps also protect their Data Protection keys with.
+      - ./certs/example.com.pem:/certs/example.com.pem:ro
     read_only: true
     tmpfs: [/tmp]
     networks: [onprem]
