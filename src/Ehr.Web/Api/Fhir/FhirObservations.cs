@@ -109,17 +109,26 @@ internal static class FhirObservations
             entry.UcumUnit ? entry.Observation.Unit : null)
         : null;
 
+    // A child's blood pressure is held to a screening value, not a normal range (step 9d): a reading at or above it
+    // needs follow-up. In FHIR a range's high is the top of what a value may be, so sending the screening value there
+    // would say a reading equal to it is within range. It is said in words instead, which R4 allows: a range needs a
+    // low, a high or text.
     static IReadOnlyList<ReferenceRange>? Range(ObservationEntry entry) =>
         entry.Observation.ReferenceLow is null && entry.Observation.ReferenceHigh is null
             ? null
-            : [new ReferenceRange(Measured(entry, entry.Observation.ReferenceLow), Measured(entry, entry.Observation.ReferenceHigh))];
+            : entry.Observation.ReferenceKind == ReferenceKind.Screening
+                ? entry.Observation.ReferenceHigh is { } screening
+                    ? [new ReferenceRange(null, null, FormattableString.Invariant(
+                        $"Screening value: needs follow-up at or above {screening:0.####}{(entry.Observation.Unit is { Length: > 0 } unit ? " " + unit : "")}."))]
+                    : null
+                : [new ReferenceRange(Measured(entry, entry.Observation.ReferenceLow), Measured(entry, entry.Observation.ReferenceHigh))];
 }
 
 internal sealed record Quantity(decimal Value, string? Unit, string? System, string? Code);
 
 internal sealed record Annotation(string Text);
 
-internal sealed record ReferenceRange(Quantity? Low, Quantity? High);
+internal sealed record ReferenceRange(Quantity? Low, Quantity? High, string? Text = null);
 
 internal sealed record ObservationComponent(CodeableConcept Code, Quantity? ValueQuantity, IReadOnlyList<ReferenceRange>? ReferenceRange);
 
