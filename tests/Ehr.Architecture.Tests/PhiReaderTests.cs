@@ -24,6 +24,7 @@ public class PhiReaderTests
         ["ClinicalDrafts"] = typeof(ClinicalDraft),
         ["ClinicalNotes"] = typeof(ClinicalNote),
         ["NoteAddenda"] = typeof(NoteAddendum),
+        ["VisitSummaries"] = typeof(VisitSummary),
         ["Patients"] = typeof(Patient),
         ["AllergyIntolerances"] = typeof(AllergyIntolerance),
         ["MedicationStatements"] = typeof(MedicationStatement),

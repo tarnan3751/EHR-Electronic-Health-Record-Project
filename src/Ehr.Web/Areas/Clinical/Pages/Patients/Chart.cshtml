@@ -112,7 +112,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             <ul class="sc-list">
                 @foreach (var note in Model.Notes)
                 {
-                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @Clinic.Format(note.SignedAt)</a>@if (note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</li>
+                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @Clinic.Format(note.SignedAt)</a>@if (note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }@if (note.SummaryReleased) { <text> </text><span class="sc-tag" data-summary-released>Summary released</span> }</li>
                 }
             </ul>
         }

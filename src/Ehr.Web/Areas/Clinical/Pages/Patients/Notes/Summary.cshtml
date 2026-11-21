@@ -1,0 +1,73 @@
+@page "/patients/{patientId:guid}/notes/{noteId:guid}/summary"
+@using Ehr.Domain.Notes
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.SummaryModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    ViewData["Title"] = "Write a summary for the patient";
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    string[] fields = ["summary-talked-about", "summary-found", "summary-next-steps"];
+    string?[] values = [Model.TalkedAbout, Model.Found, Model.NextSteps];
+    string[] names = [nameof(Model.TalkedAbout), nameof(Model.Found), nameof(Model.NextSteps)];
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to the signed note</a></p>
+</div>
+<h1>Write a summary for the patient</h1>
+<p class="sc-prose">From the note signed @Clinic.Format(Model.Note.SignedAt). Write what the patient should know, in plain words. They read it in the portal as you write it, and so does anyone they share their record with. Leave out codes, record numbers and anything only the care team needs. Once released it can't be changed: a wrong summary is withdrawn and a new one written.</p>
+@if (Model.SourcesSensitive)
+{
+    <p class="sc-notice sc-notice--info" data-summary-sensitive><span class="sc-notice__state">Sensitive note:</span> the note or an addendum to it is sensitive, so the summary is too. A proxy sees it only if the patient allows sensitive items.</p>
+}
+@if (!OnPrem.IsReachable)
+{
+    @* UC 2: reached by Back or a tab opened before the outage. Nothing to release until the server is back. *@
+    <p class="sc-muted">A summary can't be released until the clinic's server is back.</p>
+}
+else if (Model.Standing is not null)
+{
+    @if (Model.Errors.Count > 0)
+    {
+        <div class="sc-notice sc-notice--danger" role="alert" data-summary-errors>
+            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not released:</span> @error</p> }
+        </div>
+    }
+    <p class="sc-notice sc-notice--info" data-summary-standing><span class="sc-notice__state">Not offered:</span> a summary of this note was released by @Model.Standing.ReleasedBy, @Clinic.Format(Model.Standing.ReleasedAt). Withdraw it from the note's page to write another.</p>
+}
+else
+{
+<form method="post" class="sc-form sc-form--wide" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">
+    @if (Model.Errors.Count > 0)
+    {
+        <div class="sc-notice sc-notice--danger" role="alert" data-summary-errors>
+            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not released:</span> @error</p> }
+        </div>
+    }
+    @for (var i = 0; i < VisitSummaries.Parts.Length; i++)
+    {
+        <div class="sc-field">
+            <label for="@fields[i]">@VisitSummaries.Parts[i] <span>(required)</span></label>
+            <textarea id="@fields[i]" class="sc-field__input" name="@names[i]" rows="5" maxlength="@VisitSummaries.MaxLength" required autofocus="@(i == 0 ? "autofocus" : null)"
+                      aria-describedby="summary-hint" aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)">@values[i]</textarea>
+        </div>
+    }
+    <p class="sc-field__hint" id="summary-hint">Up to @VisitSummaries.MaxLength.ToString("N0") characters each. Line breaks are kept.</p>
+    @if (!Model.SourcesSensitive)
+    {
+        <label class="sc-check" for="summary-sensitive"><input type="checkbox" id="summary-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="summary-sensitive-hint"> Sensitive</label>
+        <p class="sc-field__hint" id="summary-sensitive-hint">A sensitive summary is shown in the portal to the patient, and to someone they share their record with only if the patient allows sensitive items. It is left out of the note's page until someone asks for it, and each view is recorded.</p>
+    }
+    <div class="sc-actions">
+        <button type="submit" class="sc-btn sc-btn--primary" data-release-summary>Release to the patient</button>
+        <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Cancel</a>
+    </div>
+</form>
+}
+
+@* For reference only: nothing of it is copied into the summary, which the clinician writes for the patient. *@
+<h2>The signed note, for reference</h2>
+<p class="sc-muted">Not copied into the summary.</p>
+<partial name="_NoteContent" model="new NoteContent(Model.Note.History, Model.Note.Assessment, Model.Note.Plan)" />

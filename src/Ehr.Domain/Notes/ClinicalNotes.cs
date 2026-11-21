@@ -177,11 +177,13 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         return new(200, [], Note: note);
     }
 
-    // Marks a signed note, or one of its addenda, sensitive after signing, or unmarks it, with a reason (step 10b). The
-    // text never changes. The database decides who may (a clinician with the patient on their panel marks; only the
-    // person who made it sensitive, or the note's signer, unmarks), sets who and when, and marks a note's addenda with
-    // it (db/policies/30-rls.sql and 50-clinical-notes.sql). The caller has read the note as this patient's.
-    public async Task<SensitivityResult> SetSensitivityAsync(Guid patient, Guid note, Guid? addendum, bool sensitive, string? reason, CancellationToken cancel)
+    // Marks a signed note, or one of its addenda, sensitive after signing, or unmarks it, with a reason (step 10b); or one
+    // of its visit summaries (step 13a), under the addenda's rules. The text never changes. The database decides who may
+    // (a clinician with the patient on their panel marks; only the person who made it sensitive, or the note's signer,
+    // unmarks), sets who and when, and marks a note's addenda and summaries with it (db/policies/30-rls.sql,
+    // 50-clinical-notes.sql and 52-visit-summaries.sql). The caller has read the note as this patient's, and the
+    // addendum or summary as the note's.
+    public async Task<SensitivityResult> SetSensitivityAsync(Guid patient, Guid note, Guid? addendum, bool sensitive, string? reason, CancellationToken cancel, Guid? summary = null)
     {
         if (!authority.IsPrimaryHost)
         {
@@ -205,9 +207,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         }
 
         // Only the two columns the apps may update; the row is found by its ID, under row-level security.
-        object row = addendum is { } id
-            ? new NoteAddendum { Id = id, NoteId = note, PatientId = patient, Text = "", Sensitive = sensitive, SensitiveReason = reason }
-            : new ClinicalNote { Id = note, PatientId = patient, History = "", Assessment = "", Plan = "", Sensitive = sensitive, SensitiveReason = reason };
+        object row = (addendum, summary) switch
+        {
+            ({ } id, _) => new NoteAddendum { Id = id, NoteId = note, PatientId = patient, Text = "", Sensitive = sensitive, SensitiveReason = reason },
+            (_, { } id) => new VisitSummary { Id = id, NoteId = note, PatientId = patient, TalkedAbout = "", Found = "", NextSteps = "", Sensitive = sensitive, SensitiveReason = reason },
+            _ => new ClinicalNote { Id = note, PatientId = patient, History = "", Assessment = "", Plan = "", Sensitive = sensitive, SensitiveReason = reason },
+        };
         const string savepoint = "note_sensitivity";
         var transaction = db.Database.CurrentTransaction!;
         await transaction.CreateSavepointAsync(savepoint, cancel);
@@ -234,9 +239,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
             return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
                 ? new(403, ["Only the person who marked it sensitive, or the note's signer, can unmark it."])
-                : new(409, [addendum is not null && !sensitive
-                    ? "This can't be unmarked: an addendum to a sensitive note is sensitive, or it has already been unmarked."
-                    : "This has already been changed. Open the note again."]);
+                : new(409, [(addendum, summary, sensitive) switch
+                {
+                    (not null, _, false) => "This can't be unmarked: an addendum to a sensitive note is sensitive, or it has already been unmarked.",
+                    (_, not null, false) => "This can't be unmarked: a summary of a sensitive note or addendum is sensitive, or it has already been unmarked.",
+                    _ => "This has already been changed. Open the note again.",
+                }]);
         }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected })
         {

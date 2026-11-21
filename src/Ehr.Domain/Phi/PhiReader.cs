@@ -114,12 +114,17 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         // The chart's list of signed notes (step 10c): when and whether sensitive, not their text, read here so their
         // reads are recorded with the chart's in one insert. It was a read and an insert of its own, which put a
         // chart with notes over the gate on a slow CI runner. Sensitive ones only when asked for (step 10). Not for
-        // the offline copy, which reads the notes it keeps, text and all, itself (`notes: false`).
+        // the offline copy, which reads the notes it keeps, text and all, itself (`notes: false`). Whether each has a
+        // standing visit summary (step 13a) is asked in the same statement, by the index on the standing summaries.
         IReadOnlyList<SignedNoteEntry> signed = !notes || !found.Notes
             ? []
             : await db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == id && (sensitive || !n.Sensitive))
                 .OrderByDescending(n => n.SignedAt).ThenBy(n => n.Id)
-                .Select(n => new SignedNoteEntry(n.Id, n.SignedAt, n.Sensitive)).ToListAsync(cancellationToken);
+                .Select(n => new SignedNoteEntry(n.Id, n.SignedAt, n.Sensitive)
+                {
+                    SummaryReleased = db.VisitSummaries.Any(s => s.NoteId == n.Id && s.PatientId == id && s.WithdrawnAt == null),
+                })
+                .ToListAsync(cancellationToken);
         // One event for one view: a read, or a read that showed sensitive items. Then each note listed, as before.
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
         if (signed.Count > 0)
@@ -903,10 +908,29 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return note;
     }
 
-    // A signed note with its addenda (step 10), for the page that shows them: one recorded read of the note, which
-    // covers its addenda. Null when the note isn't this patient's or isn't the reader's to see.
-    public async Task<(ClinicalNote Note, NoteAddenda Addenda)?> NoteWithAddendaAsync(Guid id, Guid patient, bool sensitive, CancellationToken cancel) =>
-        await NoteAsync(id, patient, cancel) is { } note ? (note, await AddendaAsync(note, sensitive, cancel)) : null;
+    // A signed note with its addenda (step 10) and its visit summaries (step 13a), for the page that shows them: one
+    // recorded read of the note, which covers them. Sensitive addenda and summaries of a note that isn't sensitive are
+    // left out unless asked for, and showing any of them is one recorded view of the patient's sensitive items. Null
+    // when the note isn't this patient's or isn't the reader's to see.
+    public async Task<(ClinicalNote Note, NoteAddenda Addenda, NoteSummaries Summaries)?> NoteWithAddendaAsync(Guid id, Guid patient, bool sensitive, CancellationToken cancel)
+    {
+        if (await NoteAsync(id, patient, cancel) is not { } note)
+        {
+            return null;
+        }
+
+        var addenda = await AddendaAsync(note, sensitive, cancel, record: false);
+        var summaries = await NoteSummariesAsync(note, cancel);
+        var show = sensitive || note.Sensitive;
+        IReadOnlyList<VisitSummaryEntry> shown = show ? summaries : [.. summaries.Where(s => !s.Sensitive)];
+        if (show && !note.Sensitive && (addenda.All.Any(a => a.Sensitive) || summaries.Any(s => s.Sensitive)))
+        {
+            audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return (note, addenda, new NoteSummaries(shown, summaries.Count - shown.Count, show) { HasStanding = summaries.Any(s => s.WithdrawnAt is null) });
+    }
 
     // One addendum of a note, for the page that marks it sensitive or unmarks it (step 10b): who wrote it and when,
     // whether it is sensitive and who made it so. Its text is read with it and not shown there. The page has just
@@ -928,7 +952,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // The addenda to a note just read, in the order they were signed, each with its author's name. Sensitive addenda
     // to a note that isn't sensitive are left out unless asked for, and showing them is recorded as a view of the
     // patient's sensitive items; a sensitive note's addenda are all sensitive, and its read has already recorded that.
-    async Task<NoteAddenda> AddendaAsync(ClinicalNote note, bool sensitive, CancellationToken cancel, Guid? only = null)
+    async Task<NoteAddenda> AddendaAsync(ClinicalNote note, bool sensitive, CancellationToken cancel, Guid? only = null, bool record = true)
     {
         var all = await db.NoteAddenda.AsNoTracking().Where(a => a.NoteId == note.Id && a.PatientId == note.PatientId && (only == null || a.Id == only))
             .OrderBy(a => a.SignedAt).ThenBy(a => a.Id)
@@ -944,7 +968,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .ToListAsync(cancel);
         var show = sensitive || note.Sensitive;
         var shown = show ? all : all.Where(a => !a.Sensitive).ToList();
-        if (show && !note.Sensitive && all.Any(a => a.Sensitive))
+        if (record && show && !note.Sensitive && all.Any(a => a.Sensitive))
         {
             audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
             await db.SaveChangesAsync(cancel);
@@ -987,6 +1011,60 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             SensitiveAddendaNotKept = withheld.GetValueOrDefault(n.Note.Id),
         })];
     }
+
+    // The visit summaries written from a note just read (step 13a): the standing one first, then those withdrawn,
+    // latest first, each with who released it and who withdrew it. For a page that says whether one stands and who
+    // released it, and shows none of their text: the page has read the note, which is the recorded read. The note's
+    // own page has them through NoteWithAddendaAsync, which leaves sensitive ones out unless asked for.
+    public async Task<IReadOnlyList<VisitSummaryEntry>> NoteSummariesAsync(ClinicalNote note, CancellationToken cancel) =>
+        await SummaryEntries(db.VisitSummaries.Where(s => s.NoteId == note.Id && s.PatientId == note.PatientId)
+            .OrderBy(s => s.WithdrawnAt != null).ThenByDescending(s => s.ReleasedAt).ThenBy(s => s.Id)).ToListAsync(cancel);
+
+    // One summary of a note just read, for the page that withdraws it. That page shows the summary and not the note, so
+    // a sensitive one is recorded as a view of the patient's sensitive items, as an addendum's page records one. Null
+    // when it isn't a summary of that note.
+    public async Task<VisitSummaryEntry?> NoteSummaryAsync(ClinicalNote note, Guid summary, CancellationToken cancel)
+    {
+        var entry = await SummaryEntries(db.VisitSummaries.Where(s => s.Id == summary && s.NoteId == note.Id && s.PatientId == note.PatientId))
+            .SingleOrDefaultAsync(cancel);
+        if (entry is { Sensitive: true })
+        {
+            audit.Record(AuditActions.ReadSensitive, note.PatientId, PatientsTable, note.PatientId);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return entry;
+    }
+
+    // Whether a note just read, or any of its addenda, is sensitive: then a summary of it is sensitive too, inherited
+    // (step 13a). A yes or no about the note, not a recorded read.
+    public async Task<bool> NoteSourcesSensitiveAsync(ClinicalNote note, CancellationToken cancel) =>
+        note.Sensitive || await db.NoteAddenda.AnyAsync(a => a.NoteId == note.Id && a.PatientId == note.PatientId && a.Sensitive, cancel);
+
+    // How many visit summaries were released for a patient in the last day, the one just released included: whether the
+    // patient has already been told today that there is something new. A number, about no summary in particular: not a
+    // recorded read.
+    public Task<int> SummariesReleasedTodayAsync(Guid patientId, CancellationToken cancellationToken)
+    {
+        var since = DateTimeOffset.UtcNow.AddDays(-1);
+        return db.VisitSummaries.CountAsync(s => s.PatientId == patientId && s.ReleasedAt > since, cancellationToken);
+    }
+
+    // Summaries as the pages show them, with the names of who released and withdrew each. Staff accounts anyone signed
+    // in may read.
+    IQueryable<VisitSummaryEntry> SummaryEntries(IQueryable<VisitSummary> summaries) =>
+        summaries.AsNoTracking().Select(s => new VisitSummaryEntry(s.Id, s.TalkedAbout, s.Found, s.NextSteps, s.NoteSignedAt,
+            db.StaffUsers.Where(u => u.Id == s.ReleasedBy).Select(u => u.DisplayName).FirstOrDefault() ?? "", s.ReleasedAt, s.Sensitive)
+        {
+            ReleasedById = s.ReleasedBy,
+            SensitiveInherited = s.SensitiveInherited,
+            SensitiveMarkedBy = s.SensitiveMarkedBy,
+            SensitiveReason = s.SensitiveReason,
+            SensitiveChangedAt = s.SensitiveChangedAt,
+            WithdrawnAt = s.WithdrawnAt,
+            WithdrawnBy = db.StaffUsers.Where(u => u.Id == s.WithdrawnBy).Select(u => u.DisplayName).FirstOrDefault(),
+            WithdrawnReason = s.WithdrawnReason,
+        });
 
     public async Task<ClinicalDraft?> LockDraftAsync(Guid id, Guid patient, CancellationToken cancel) =>
         await ClinicalDraftLock.AcquireAsync(db, id, patient, cancel) ? await ReadDraftAsync(id, patient, cancel) : null;
