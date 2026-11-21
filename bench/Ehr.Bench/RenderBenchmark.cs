@@ -196,8 +196,10 @@ internal static partial class RenderBenchmark
                     var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
                     return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
                 }));
-                // Who viewed my record (step 13c): a year of views of each record in the audit log beyond the run's own.
+                // Who viewed my record (step 13c): a year of views of each record in the audit log beyond the run's own, and a
+                // panels' table of a clinic's size, which a proxy's page reads.
                 await FillViewsAsync(database, clinicianId, portalPatient, panel[0]);
+                await FillPanelHistoryAsync(database, portalPatient, panel[0]);
                 // Kept to the end, off-site rows included: the off-site portal rows use the same session.
                 var portalSession = new CookieContainer();
                 try
@@ -1369,6 +1371,47 @@ internal static partial class RenderBenchmark
     }
 
     const int ViewsPerRecord = 20_000;
+
+    const int EndedAssignments = 5_000;
+
+    // Step 13c: the panels' table as a clinic's would be after a year or two, which a page of a proxy without sensitive
+    // items reads whole for the patient's history (42-record-views.sql): 5,000 ended assignments of seeded patients, with
+    // twenty colleagues of the benchmark's clinician (disabled accounts, so nobody signs in as them), three of them for
+    // each record given, by colleagues, ended two years ago: they change no line the pages show. Without these the table
+    // held the run's hundred, and a page that read it badly looked fast. As the database's superuser, in the benchmark's own
+    // database only: with --stack the table is the stack's.
+    static async Task FillPanelHistoryAsync(MigratedDatabase? database, params Guid[] records)
+    {
+        if (database is null)
+        {
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            WITH colleagues AS (
+                INSERT INTO ehr.staff_users (id, user_name, normalized_user_name, email, normalized_email, email_confirmed, phone_number_confirmed,
+                    two_factor_enabled, lockout_enabled, lockout_end, access_failed_count, display_name, roles, must_change_password)
+                SELECT gen_random_uuid(), x.email, upper(x.email), x.email, upper(x.email), true, false, false, true, now() + interval '100 years', 0,
+                       'Synthetic Colleague ' || n, ARRAY['Clinician'], false
+                FROM generate_series(1, 20) AS n, LATERAL (SELECT 'bench-colleague-' || n || '-' || gen_random_uuid() || '@example.test' AS email) x
+                RETURNING id
+            ),
+            numbered AS (SELECT id, row_number() OVER (ORDER BY id) - 1 AS k FROM colleagues),
+            seeded AS (SELECT p.id, row_number() OVER (ORDER BY p.id) AS n FROM ehr.patients p LIMIT @count)
+            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at)
+            SELECT gen_random_uuid(), p.id, c.id, now() - make_interval(days => 700 - (p.n % 300)::int), now() - make_interval(days => 400 - (p.n % 300)::int)
+            FROM seeded p JOIN numbered c ON c.k = p.n % 20
+            UNION ALL
+            SELECT gen_random_uuid(), r.patient, c.id, now() - interval '3 years', now() - interval '2 years'
+            FROM unnest(@records) AS r(patient) CROSS JOIN (SELECT id FROM numbered WHERE k < 3) c
+            """, connection);
+        command.Parameters.AddWithValue("count", EndedAssignments);
+        command.Parameters.AddWithValue("records", records);
+        await command.ExecuteNonQueryAsync();
+    }
 
     // Step 13c: a year of views of each record in the audit log, 26 minutes apart, beyond those the run's own pages make.
     // One in twenty is the clinician's read of the record; the rest are views of sensitive items, of a note, of a

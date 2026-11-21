@@ -14,7 +14,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   off-site one with its link to the on-site server down; a portal account for a seeded patient, who is also a proxy,
 //   without sensitive items, for another; each record has 20,000 views over the last 12 months beyond those the run's
 //   own pages make; the proxy, who has no sensitive items, is shown none of the second record's, all of them views of
-//   sensitive items or notes, another account's, or a clinician's from before the patient was on their panel.
+//   sensitive items or notes, another account's, or a clinician's from before the patient was on their panel; and the
+//   panels' table holds 5,000 ended assignments besides the run's own, which each of the proxy's pages reads whole.
 // Inputs and system conditions: GET /portal/views as the patient and as the proxy, each 100 times to warm up and then
 //   1,000 times, on-site and off-site.
 // Test data: The synthetic clinic (bench/Ehr.Seed) and the benchmark's own views.
