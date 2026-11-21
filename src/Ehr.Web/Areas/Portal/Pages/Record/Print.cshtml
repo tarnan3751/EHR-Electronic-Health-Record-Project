@@ -249,6 +249,11 @@ else
         .OrderByDescending(item => item.Date.UtcDateTime.Date).ThenBy(item => item.Index < 0).ThenByDescending(item => item.Date).ToList();
     <section class="sc-panel" aria-labelledby="record-summaries" data-record="summaries">
         <h2 class="sc-panel__title" id="record-summaries">Visit summaries</h2>
+        @if (summaries.Summaries.Count >= SummariesModel.Limit)
+        {
+            @* The reader gives the newest of them, as Visit summaries has them, and doesn't say how many more there are. *@
+            <p class="sc-muted" data-summaries-cut>Only the newest @SummariesModel.Limit visit summaries are shown.</p>
+        }
         @if (items.Count == 0)
         {
             <p class="sc-muted">No visit summaries yet.</p>
