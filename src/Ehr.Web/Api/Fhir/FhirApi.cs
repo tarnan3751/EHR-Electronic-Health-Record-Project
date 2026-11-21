@@ -1,18 +1,18 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Ehr.Data;
 using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
+using Ehr.Web.Fhir;
 using Microsoft.Extensions.Options;
 
 namespace Ehr.Web.Api.Fhir;
 
 // A read-only FHIR R4 API for clinicians (the expansion plan's step 11, UC 19), at /fhir on both servers: a patient's
 // demographics, allergies, medications, diagnoses, test results and vital signs, and appointments, read by ID or
-// searched by patient, as FHIR JSON (FhirResources.cs, FhirObservations.cs), and the capability statement that says so
-// at /fhir/metadata.
+// searched by patient, as FHIR JSON (the shared mapping, Fhir/FhirResources.cs and FhirObservations.cs), and the
+// capability statement that says so at /fhir/metadata (FhirCapabilities.cs).
 //
 // Who: the Clinician policy on the whole group (Program.cs), with the clinical app's own sign-in. The staff cookie is
 // the one /fhir reads (AccountSchemes), so UserContextMiddleware hands the clinician to the database as it does for a
@@ -37,8 +37,6 @@ namespace Ehr.Web.Api.Fhir;
 // (off-site, the cloud app forwards it to the clinic's server, as every write, and its answer comes back).
 public static class FhirApi
 {
-    public const string ContentType = "application/fhir+json; charset=utf-8";
-
     // The most entries a search returns: the most values the vital signs page and the portal's results read (PhiReader).
     public const int SearchLimit = 600;
 
@@ -64,14 +62,12 @@ public static class FhirApi
             ["Appointment"] = ("appointments", ["patient"], []),
         };
 
-    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
-
     public static RouteGroupBuilder MapFhirApi(this IEndpointRouteBuilder endpoints)
     {
         var fhir = endpoints.MapGroup(AccountSchemes.FhirPath);
         fhir.AddEndpointFilter(JsonAcceptedAsync);
         fhir.MapGet("/metadata", (HttpContext context, IOptions<SiteAddresses> addresses) =>
-            Unsupported(context.Request.Query, []) ?? Answer(StatusCodes.Status200OK, FhirResources.Capabilities(BaseUrl(addresses))));
+            Unsupported(context.Request.Query, []) ?? Answer(StatusCodes.Status200OK, FhirCapabilities.Statement(BaseUrl(addresses))));
         fhir.MapGet("/{type}", SearchAsync).AddEndpointFilter(InTransactionAsync);
         fhir.MapGet("/{type}/{id}", ReadAsync).AddEndpointFilter(InTransactionAsync);
         // Everything else under /fhir: any method but GET is 405, so every write is refused, and any other GET is 404.
@@ -388,14 +384,14 @@ public static class FhirApi
     static async Task WriteAsync(HttpContext context, int status, object resource)
     {
         context.Response.StatusCode = status;
-        context.Response.ContentType = ContentType;
+        context.Response.ContentType = FhirResources.ContentType;
         context.Response.Headers.CacheControl = "no-store";
         if (status == StatusCodes.Status405MethodNotAllowed)
         {
             context.Response.Headers.Allow = "GET";
         }
 
-        await JsonSerializer.SerializeAsync(context.Response.Body, resource, resource.GetType(), Json, CancellationToken.None);
+        await JsonSerializer.SerializeAsync(context.Response.Body, resource, resource.GetType(), FhirResources.Json, CancellationToken.None);
     }
 
     sealed class FhirAnswer(int status, object resource) : IResult

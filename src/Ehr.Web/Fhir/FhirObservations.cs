@@ -2,7 +2,7 @@ using Ehr.Data.Patients;
 using Ehr.Domain.Phi;
 using Ehr.Domain.Results;
 
-namespace Ehr.Web.Api.Fhir;
+namespace Ehr.Web.Fhir;
 
 // Test results and vital signs as the FHIR API sends them (the expansion plan's step 11).
 //

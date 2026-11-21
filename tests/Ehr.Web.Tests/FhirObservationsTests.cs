@@ -1,6 +1,6 @@
 using Ehr.Data.Patients;
 using Ehr.Domain.Phi;
-using Ehr.Web.Api.Fhir;
+using Ehr.Web.Fhir;
 using Xunit;
 
 namespace Ehr.Web.Tests;
