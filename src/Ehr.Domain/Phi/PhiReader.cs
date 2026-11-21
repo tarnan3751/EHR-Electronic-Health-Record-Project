@@ -1,5 +1,6 @@
 using Ehr.Data;
 using Ehr.Data.Audit;
+using Ehr.Data.Lab;
 using Ehr.Data.Messaging;
 using Ehr.Data.Orders;
 using Ehr.Data.Patients;
@@ -847,6 +848,13 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
         return drafts;
     }
+
+    // What a lab is handed (the expansion plan's step 12): the lab orders signed since `since` that still wait for
+    // results, as the database writes them. No account reads here, so this records nothing itself: the database
+    // records each order it hands over, in the statement that reads it, with the lab as the source, so nothing leaves
+    // it without its record (db/policies/76-lab.sql). The hash of the lab's key decides whether there is anything at all.
+    public Task<LabHandOver> LabOrdersAsync(string keyHash, ulong since, CancellationToken cancellationToken) =>
+        LabStore.OrdersAsync(db, keyHash, since, cancellationToken);
 
     public async Task<IReadOnlyList<ClinicalDraft>> NoteDraftsAsync(Guid patient, CancellationToken cancel)
     {

@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using Ehr.Data;
 using Ehr.Web.Api.Audit;
+using Ehr.Web.Api.Lab;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Yarp.ReverseProxy.Forwarder;
 
@@ -8,7 +9,8 @@ namespace Ehr.Web.Forwarding;
 
 // The cloud app's write path. The replica can't take writes, so every request that could change data goes to the
 // on-prem app, which saves and renders the response; it comes back in one WAN round trip. Signing out, which saves
-// nothing, is handled here instead (HandledOffSiteAttribute). The on-prem app reports the save's WAL position, which
+// nothing, is handled here instead (HandledOffSiteAttribute), and the lab's door (Api/Lab) is never forwarded: it is the
+// clinic's network's alone. The on-prem app reports the save's WAL position, which
 // LastSaveCookie keeps. Until the replica has replayed that far, the same browser's page requests go to the on-prem
 // app too, so people see their own saves, unless the on-prem app can't save just then (OnPremStatus) and the
 // replica's copy is all there is. Other reads, PHI included, come from the replica; the PHI reader records them in the
@@ -29,7 +31,10 @@ public sealed class CloudForwardingMiddleware(
         var isPage = endpoint?.Metadata.GetMetadata<PageActionDescriptor>() is not null;
         if (!HttpMethods.IsGet(method) && !HttpMethods.IsHead(method))
         {
-            if (endpoint?.Metadata.GetMetadata<HandledOffSiteAttribute>() is not null)
+            // The lab's door is the clinic's network's alone (step 12): nothing under it is forwarded, so nobody on the
+            // internet can reach it, or use up its rate limit, through here. With no door on this app, such a request is
+            // answered here as any address with nothing there is.
+            if (endpoint?.Metadata.GetMetadata<HandledOffSiteAttribute>() is not null || context.Request.Path.StartsWithSegments(LabApi.Path))
             {
                 await next(context);
                 return;
@@ -179,8 +184,8 @@ public sealed class CloudForwardingMiddleware(
             """;
     }
 
-    // Keeps the cloud audit key off what is forwarded, and moves the on-prem app's WAL position from the response into
-    // the browser's LastSaveCookie.
+    // Keeps the cloud audit key and a lab's key off what is forwarded, and moves the on-prem app's WAL position from the
+    // response into the browser's LastSaveCookie.
     sealed class OnPremTransformer(LastSaveCookie lastSave) : HttpTransformer
     {
         public override async ValueTask TransformRequestAsync(
@@ -190,8 +195,10 @@ public sealed class CloudForwardingMiddleware(
 
             // Only the shipper sends the key, straight to the on-prem app. From the internet the on-prem app is reached
             // only through here, so this closes that path: a leaked key can't be used from the internet, only from the
-            // cloud box or the clinic's network.
+            // cloud box or the clinic's network. The same for a lab's key (step 12), sent with any other request: the
+            // lab's own door isn't forwarded at all (above).
             proxyRequest.Headers.Remove(CloudAuditApi.KeyHeader);
+            proxyRequest.Headers.Remove(LabApi.KeyHeader);
 
             // Whatever a client sent under this name goes; the cloud app's own proof replaces it, so the on-prem app
             // doesn't limit forwarded requests as one client (AccountRateLimits).

@@ -108,6 +108,25 @@ jobs:
           check portal.example.com:9443 /portal/sign-in 200
           check ehr.example.com:8443 "/api/sync/quick-texts?since=0" 401
 
+      # The lab's door (step 12). The .env copied from .env.example has a lab key, so the on-prem app opens the door,
+      # the migration job stores the key's hash, and the lab service runs. With the key, the on-prem site hands over
+      # the orders waiting (none: an empty list); the cloud site has no door, key or not.
+      - name: The lab's door
+        run: |
+          key=$(sed -n 's/^EHR_LAB_KEY=//p' .env)
+          [ -n "$key" ]
+          ask() {
+            code=$(curl --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
+              --cacert certs/example.com.pem --resolve "$1:127.0.0.1" --header "X-Lab-Key: $key" \
+              --output /dev/null --write-out "%{http_code}" "https://$1/api/lab/orders")
+            echo "https://$1/api/lab/orders with the lab's key: $code (expected $2)"
+            [ "$code" = "$2" ]
+          }
+          ask ehr.example.com:8443 200
+          ask ehr-remote.example.com:9443 401
+          [ "$(docker compose ps --status running --services | grep -cx lab)" = 1 ]
+          echo "The lab service is running"
+
       - name: Databases accept connections
         run: |
           docker compose exec -T -u postgres onprem-db pg_isready

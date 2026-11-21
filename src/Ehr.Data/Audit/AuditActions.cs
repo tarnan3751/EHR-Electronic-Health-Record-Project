@@ -72,6 +72,10 @@ public static class AuditActions
     // no record of its own. The actor is the new account.
     public const string ProxyAccountCreated = "proxy_account_created";
 
+    // A lab order handed to the lab (step 12): a disclosure of what the order needs, recorded by the database for each
+    // order it hands over, with the lab as the source and no actor (db/policies/76-lab.sql).
+    public const string SentToLab = "sent_to_lab";
+
     // A patient whose account was never confirmed (a mistyped address, say) registered again with a new code: the
     // account's address and password were replaced.
     public const string RegistrationReplaced = "registration_replaced";
@@ -82,6 +86,6 @@ public static class AuditActions
         Read, ReadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
         RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
-        RegistrationReplaced, ProxyAccountCreated,
+        RegistrationReplaced, ProxyAccountCreated, SentToLab,
     ];
 }

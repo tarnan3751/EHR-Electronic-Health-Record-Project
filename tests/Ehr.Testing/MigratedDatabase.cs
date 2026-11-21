@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using DotNet.Testcontainers.Configurations;
 using Ehr.Data;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +10,8 @@ using Xunit;
 namespace Ehr.Testing;
 
 // A real PostgreSQL 18, set up the way infra/migrate sets up the primary: the initdb bootstrap (ehr_owner and the
-// ehr schema), then, as ehr_owner, db/policies/00-roles.sql, the EF Core migrations, and the rest of db/policies.
+// ehr schema), then, as ehr_owner, db/policies/00-roles.sql, the EF Core migrations, the rest of db/policies, the
+// reference data, and the hash of the lab's key (LabKey: a lab is connected in every test database).
 //
 // For the tests it runs as Testcontainers starts PostgreSQL, with fsync, synchronous_commit and full_page_writes off:
 // a commit returns before its changes reach the disk. That makes the suites fast and changes nothing they check:
@@ -18,6 +21,13 @@ public sealed class MigratedDatabase : IAsyncLifetime
 {
     public const string AppPassword = "test-app";
     public const string ReadPassword = "test-read";
+
+    // The lab's key (the expansion plan's step 12), as infra/migrate takes it from EHR_LAB_KEY; the database holds its
+    // hash. Synthetic, for tests only.
+    public const string LabKey = "a-lab-key-for-the-tests-only-not-a-secret";
+
+    // The hash the lab's door is given and finds (db/policies/76-lab.sql): hex SHA-256 of the key.
+    public static string LabKeyHash => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(LabKey)));
     const string OwnerPassword = "test-owner";
 
     readonly PostgreSqlContainer container;
@@ -93,6 +103,9 @@ public sealed class MigratedDatabase : IAsyncLifetime
         {
             await ReferenceData.ApplyAsync(owner, file);
         }
+
+        // The lab's key, last, as infra/migrate stores it: only its hash.
+        await ExecuteAsync(owner, $"SELECT ehr.set_lab_key('{LabKeyHash}')");
     }
 
     public static async Task ExecuteAsync(string connectionString, string sql)

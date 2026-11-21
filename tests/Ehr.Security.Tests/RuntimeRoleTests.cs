@@ -57,6 +57,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "patient_enrollments")] = [],
         [("ehr_app", "proxy_invitations")] = [],
         [("ehr_read", "proxy_invitations")] = [],
+        // Step 12: no privilege at all. The lab's key is found only by the functions of its door, from its hash
+        // (db/policies/76-lab.sql, LabSecurityTests).
+        [("ehr_app", "lab_keys")] = [],
+        [("ehr_read", "lab_keys")] = [],
         [("ehr_app", "proxy_grants")] = ["SELECT", "INSERT"],
         [("ehr_read", "proxy_grants")] = ["SELECT"],
         [("ehr_app", "message_threads")] = ["SELECT", "INSERT"],
@@ -232,6 +236,14 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT details FROM ehr.audit_events")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.audit_events SET sensitive = true")]
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.audit_events (id, occurred_at, action, source) VALUES (uuidv7(), now(), 'read', 'cloud')")]
+    // Step 12: the lab's key is nobody's to read or set but the owner's, and only the on-prem app's role uses the door.
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "SELECT * FROM ehr.lab_keys")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "INSERT INTO ehr.lab_keys (key_hash) VALUES (repeat('a', 64))")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "SELECT ehr.set_lab_key(repeat('a', 64))")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "SELECT ehr.require_lab(repeat('a', 64))")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT * FROM ehr.lab_keys")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT * FROM ehr.lab_orders(repeat('a', 64), '0')")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT ehr.file_lab_results(repeat('a', 64), gen_random_uuid(), now(), ARRAY['718-7'], ARRAY[1.0], ARRAY['g/dL'])")]
     public async Task Runtime_roles_are_refused_outside_their_grants(string role, string password, string sql)
     {
         var error = await Assert.ThrowsAsync<PostgresException>(

@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -211,11 +212,14 @@ internal static partial class RenderBenchmark
                 if (database is null)
                 {
                     Console.WriteLine("Off-site: not measured with --stack, which has no ehr_read login for the replica.");
+                    Console.WriteLine("The lab's door: not measured with --stack, whose lab key is in the stack's .env alone.");
                 }
                 else
                 {
                     await SettleAsync(database);
                     results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted));
+                    // The lab's door (step 12), last, so every row before it makes the requests it always did.
+                    results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -434,6 +438,98 @@ internal static partial class RenderBenchmark
                 Directory.Delete(queue, recursive: true);
             }
         }
+    }
+
+    // The lab's door (step 12, Api/Lab), on-prem, with the lab's key, as a lab's system calls it. A lab asking for what
+    // was signed since it last asked: ten lab orders signed together for ten of the panel, each ask handing all ten over,
+    // with an audit event for each. Then a lab filing one order's results, a complete blood count's four, through the
+    // same rules as a clinician's filing (the order resulted, its signer told), each request for another of 1,100
+    // orders signed for the panel beforehand. Each answer must be the door's success: 200, then 204.
+    static async Task<List<Result>> MeasureLabAsync(BenchApp app, MigratedDatabase database, DatabaseTimes times, Guid clinicianId, List<Guid> panel)
+    {
+        using var lab = app.CreateDefaultClient(Base);
+        lab.DefaultRequestHeaders.Add("X-Lab-Key", MigratedDatabase.LabKey);
+        string since;
+        await using (var connection = new NpgsqlConnection(database.SuperuserConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var watermark = new NpgsqlCommand("SELECT pg_snapshot_xmin(pg_current_snapshot())::text", connection);
+            since = (string)(await watermark.ExecuteScalarAsync())!;
+        }
+
+        await SignLabOrdersAsync(app, clinicianId, panel.Take(10));
+        var asked = await MeasureLabRequestsAsync(lab, times, "Lab orders, ten waiting since the last ask", HttpStatusCode.OK,
+            _ => new HttpRequestMessage(HttpMethod.Get, $"/api/lab/orders?since={since}"));
+
+        var orders = await SignLabOrdersAsync(app, clinicianId, Enumerable.Range(0, WarmUp + Measured).Select(i => panel[i % panel.Count]));
+        var collected = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var results = new[] { ("718-7", 13.5m, "g/dL"), ("4544-3", 41m, "%"), ("6690-2", 6.2m, "10*3/uL"), ("777-3", 250m, "10*3/uL") }
+            .Select(result => new { code = result.Item1, value = result.Item2, unit = result.Item3 }).ToArray();
+        var filed = await MeasureLabRequestsAsync(lab, times, "Lab results, one order filed", HttpStatusCode.NoContent,
+            i => new HttpRequestMessage(HttpMethod.Post, $"/api/lab/orders/{orders[i]}/results") { Content = JsonContent.Create(new { collectedAt = collected, results }) });
+        return [asked, filed];
+    }
+
+    // Complete blood counts the clinician signs, one for each patient given, in one transaction, with a reason to order
+    // one again for a patient who has one active: their IDs, in that order.
+    static async Task<List<Guid>> SignLabOrdersAsync(BenchApp app, Guid clinicianId, IEnumerable<Guid> patients)
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var orders = patients.Select(patient => new Order
+        {
+            Id = Guid.CreateVersion7(),
+            PatientId = patient,
+            Type = OrderType.Lab,
+            CatalogCode = "SYN-LAB-001",
+            Details = "{}",
+            Status = OrderStatus.Active,
+            DuplicateReason = "Synthetic: benchmark repeat",
+        }).ToList();
+        db.AddRange(orders);
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return [.. orders.Select(order => order.Id)];
+    }
+
+    // As MeasureAsync, for the lab's door: each request made by `next` from its number, each answer the status expected.
+    static async Task<Result> MeasureLabRequestsAsync(HttpClient client, DatabaseTimes times, string name, HttpStatusCode expected, Func<int, HttpRequestMessage> next)
+    {
+        var total = new double[Measured];
+        var audit = new double[Measured];
+        var commit = new double[Measured];
+        var row = Stopwatch.StartNew();
+        for (var i = 0; i < WarmUp + Measured; i++)
+        {
+            if (row.Elapsed > RowLimit)
+            {
+                throw new InvalidOperationException(
+                    $"{name}: stopped after {i:N0} of {WarmUp + Measured:N0} requests, which took over {RowLimit.TotalSeconds:0} seconds; at {BudgetMilliseconds} ms each, all of them take {(WarmUp + Measured) * BudgetMilliseconds / 1000:0} seconds.");
+            }
+
+            using var request = next(i);
+            times.Reset();
+            var started = Stopwatch.GetTimestamp();
+            using var response = await client.SendAsync(request);
+            await response.Content.ReadAsByteArrayAsync();
+            var elapsed = Stopwatch.GetElapsedTime(started);
+            if (response.StatusCode != expected)
+            {
+                throw new InvalidOperationException($"{name}: {request.Method} {request.RequestUri} answered {(int)response.StatusCode}.");
+            }
+
+            if (i >= WarmUp)
+            {
+                total[i - WarmUp] = elapsed.TotalMilliseconds;
+                audit[i - WarmUp] = times.AuditMilliseconds;
+                commit[i - WarmUp] = times.CommitMilliseconds;
+            }
+        }
+
+        Console.WriteLine($"  {name}: done");
+        return new Result(name, total, audit, commit);
     }
 
     // Times one kind of request, after warming it up, and its audit events' insert and its commit within it. Every
@@ -1238,7 +1334,10 @@ internal static partial class RenderBenchmark
                 // Required outside Development (step 6c). The benchmark sends no email and issues no enrollment code.
                 builder.UseSetting("Ehr:Links:ClinicalBaseUrl", "https://localhost").UseSetting("Ehr:Links:PortalBaseUrl", "https://localhost")
                     .UseSetting("Ehr:Clinic:TimeZone", "America/Chicago").UseSetting("Ehr:Clinic:TimeZoneAbbreviations", "CST,CDT")
-                    .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+                    .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
+                    // A lab is connected, as in the tests' databases (step 12), and may ask as fast as the rows do.
+                    .UseSetting("Ehr:Lab:Key", MigratedDatabase.LabKey)
+                    .UseSetting("RateLimits:LabRequestsPerMinute", "1000000");
             }
         }
     }

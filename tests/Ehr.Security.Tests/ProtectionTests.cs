@@ -74,6 +74,8 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         // Registration looks a code up before anyone is signed in, so this is grants-only; it holds hashes, not codes.
         ["patient_enrollments"] = Protection.Internal,
         ["proxy_invitations"] = Protection.Internal,
+        // The lab's key, as its hash, read only by the functions of the lab's door.
+        ["lab_keys"] = Protection.Internal,
         ["audit_events"] = Protection.Restricted,
     };
 

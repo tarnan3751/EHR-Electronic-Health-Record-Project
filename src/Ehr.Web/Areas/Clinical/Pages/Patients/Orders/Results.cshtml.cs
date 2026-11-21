@@ -9,8 +9,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 
 // The results of one order (the expansion plan's step 7): the tests it reports with their values, flagged when outside
-// the reference range and listed first; entering the values the lab reported, for a lab order still open to them; and
-// acknowledging the results, which records who and when and clears the inbox item. Open to whoever the chart is open
+// the reference range and listed first; entering the values the lab reported, for a lab order still open to them,
+// which says so when a lab is connected and files them itself (step 12); and acknowledging the results, which records
+// who and when and clears the inbox item. Open to whoever the chart is open
 // to; only a clinician with the patient on their panel files or acknowledges (MessagePage's gate). The database holds
 // all of it (db/policies/75-results.sql): this page only asks. Off-site it is read from the cloud copy and its posts
 // are forwarded to the clinic's server.
@@ -39,6 +40,9 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
 
     // Set when a post asked for something the order no longer takes: someone else got there first.
     public bool Stale { get; private set; }
+
+    // A lab is connected, and files this order's results itself (step 12): asked only while the order is open to them.
+    public bool LabConnected { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid orderId)
     {
@@ -120,6 +124,7 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
         }
 
         Order = order;
+        LabConnected = order.OpenToResults && await results.LabConnectedAsync(HttpContext.RequestAborted);
         return null;
     }
 }

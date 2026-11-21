@@ -7,13 +7,14 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | Service | Stands in for | Notes |
 |---|---|---|
 | `onprem-db` | On-prem PostgreSQL 18 primary | Owns every write |
-| `migrate` | A deploy's database step | One-shot job that applies `db/policies` and the EF Core migrations to the primary as `ehr_owner` each time the stack starts; "Exited (0)" means the database is up to date. Both apps start only after it. |
+| `migrate` | A deploy's database step | One-shot job that applies `db/policies` and the EF Core migrations to the primary as `ehr_owner` each time the stack starts, and stores the hash of `EHR_LAB_KEY` or none; "Exited (0)" means the database is up to date. Both apps start only after it. |
 | `onprem-app` | On-prem app | On-site clinicians reach it directly |
 | `cloud-db` | Cloud hot standby | Clones the primary over the WAN on first start, then streams from it |
 | `cloud-app` | Cloud app | Reached only through the simulated internet |
 | `barman` | Isolated backup host | Streams WAL and takes base backups; listens on nothing |
 | `wan` | Tailscale and the internet | [Toxiproxy](https://github.com/Shopify/toxiproxy): the only path between sites, with latency on every link |
 | `wan-latency` | | One-shot job that sets the latency each time the stack starts; "Exited (0)" means it worked. `cloud-app` starts only after it. |
+| `lab` | A lab's system on the clinic's network | The simulated lab (`src/Ehr.Lab.Simulator`): asks the on-prem app for the lab orders waiting for results and files synthetic results for them, a few seconds after each is signed. Only with `EHR_LAB_KEY` in `.env`; without it, its log says it isn't running, and it waits doing nothing. No port; read-only apart from a tmpfs; given the public certificate it pins and nothing else from `certs/` |
 | `mail` | The clinic's mail relay | [Mailpit](https://mailpit.axllent.org/): catches every email the on-prem app sends and shows them at http://127.0.0.1:8025; delivers nothing |
 | `llama` | K2 Horizon 7B in llama.cpp's `llama-server`, on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
 | `dictation` | The dictation sidecar on the on-prem server: MedASR, then K2 Horizon through `llama`, then the checks on what it proposes (`src/Ehr.Dictation/sidecar`) | Opt-in `ai` profile, on the same network as `llama`; only the on-prem app reaches it, with a key. Keeps nothing: its file system is read-only apart from a tmpfs |
@@ -23,12 +24,14 @@ Both apps run the same image; `Ehr__Site` and the connection string decide how e
 
 Dictation is on-prem only: the cloud app forwards its requests to the on-prem app, which calls the `dictation` sidecar, which calls `llama`.
 
+The lab is on-prem only too: `lab` calls the on-prem app at https://ehr.example.com:8443, its name on the `onprem` network, with the key from `EHR_LAB_KEY`, which the on-prem app is given as `Ehr__Lab__Key` and the migration job stores as a hash. The cloud app has no lab door. With the key set, a lab order signed on either site gets its results within half a minute; `docker compose stop lab` stops it, and results are then entered by hand on the order's results page. If orders are signed and the lab is handed none, a session left open in a transaction on the primary is holding the hand-over back until it ends: `docker compose exec -u postgres onprem-db psql -c "select pid, usename, application_name, state, xact_start from pg_stat_activity where backend_xid is not null order by age(backend_xid) desc"` shows it first. See "Simulated lab" in the root README.
+
 **Signing in.** On its first start the on-prem app creates one admin account from `EHR_BOOTSTRAP_ADMIN_EMAIL` and `EHR_BOOTSTRAP_ADMIN_PASSWORD` in `.env`. Sign in with it at https://ehr.example.com:8443: it asks for a new password, then for an authenticator app (any TOTP app; the page shows the key), then shows recovery codes once. From **Staff** it creates the other accounts, each with a one-time setup link. Patients register at https://portal.example.com:9443/portal/register with the enrollment code a clinician issues from the chart; the confirmation email lands in Mailpit.
 
 ## One-time setup
 
 1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty. For the `ai` profile, give Docker at least 10 GB. On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
-2. **Settings file.** Copy `.env.example` to `.env`. The defaults work; `.env` is gitignored. If you already have a `.env`, copy over any lines it's missing from `.env.example`; Compose names the missing setting if you don't.
+2. **Settings file.** Copy `.env.example` to `.env`. The defaults work; `.env` is gitignored. If you already have a `.env`, copy over any lines it's missing from `.env.example`; Compose names the missing setting if you don't. `EHR_LAB_KEY` is optional, so Compose doesn't ask for it: without it there is no lab, and the stack runs as before.
 3. **Certificates.** Install [mkcert](https://github.com/FiloSottile/mkcert) (macOS: `brew install mkcert`; Windows: `winget install FiloSottile.mkcert`), then:
    ```
    mkcert -install
