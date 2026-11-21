@@ -636,6 +636,54 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         return $"{lines} {await ScalarAsync(Scans) - before}";
     }
 
+    // The panel's history decides what a proxy without sensitive items is shown, so the apps can't rewrite it: an
+    // assignment starts now and open, and only ends, now, once (42-record-views.sql), through either runtime role.
+    [Fact]
+    public async Task A_panel_assignment_starts_now_and_only_ends_now_once()
+    {
+        var clinician = await StaffAsync("Dr. Oakes", StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        var other = await Accounts.PatientAsync(database, clinician);
+        const string Insert = "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at) VALUES (@id, @patient, @clinician, now() + @shift::interval, @ended::timestamptz)";
+
+        Task InsertAsync(string connection, Guid id, string shift, object? ended = null) =>
+            Accounts.ExecuteAsync(connection, clinician, Insert, ("id", id), ("patient", patient), ("clinician", clinician), ("shift", shift), ("ended", ended ?? DBNull.Value));
+
+        async Task RefusedAsync(string state, Func<Task> attempt) =>
+            Assert.Equal(state, (await Assert.ThrowsAsync<Npgsql.PostgresException>(attempt)).SqlState);
+
+        // Backdated, ahead, or already ended: refused. The read role writes no assignment at all.
+        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => InsertAsync(App, Guid.CreateVersion7(), "-1 hour"));
+        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => InsertAsync(App, Guid.CreateVersion7(), "2 minutes"));
+        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () => InsertAsync(App, Guid.CreateVersion7(), "0 seconds", DateTimeOffset.UtcNow));
+        await RefusedAsync(Npgsql.PostgresErrorCodes.InsufficientPrivilege, () => InsertAsync(Read, Guid.CreateVersion7(), "0 seconds"));
+        var assignment = Guid.CreateVersion7();
+        await InsertAsync(App, assignment, "0 seconds");
+
+        // While open: its start, patient and ID never change, and it ends only now.
+        foreach (var change in new[]
+        {
+            "SET assigned_at = assigned_at - interval '1 hour'", "SET patient_id = @other", "SET ended_at = now() - interval '1 hour'",
+            "SET ended_at = now() + interval '2 minutes'",
+        })
+        {
+            await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () =>
+                Accounts.ExecuteAsync(App, clinician, $"UPDATE ehr.patient_assignments {change} WHERE id = @id", ("id", assignment), ("other", other)));
+        }
+
+        await RefusedAsync(Npgsql.PostgresErrorCodes.InsufficientPrivilege, () =>
+            Accounts.ExecuteAsync(Read, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id", ("id", assignment)));
+        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id", ("id", assignment));
+
+        // Once ended, never again.
+        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () =>
+            Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE id = @id", ("id", assignment)));
+        await RefusedAsync(Npgsql.PostgresErrorCodes.CheckViolation, () =>
+            Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.patient_assignments SET ended_at = NULL WHERE id = @id", ("id", assignment)));
+        Assert.Equal(["1 1"], await AsSuperuserAsync(
+            "SELECT count(*) FILTER (WHERE ended_at IS NOT NULL) || ' ' || count(*) FROM ehr.patient_assignments WHERE patient_id = @patient", ("patient", patient)));
+    }
+
     // Every table of patient data, and the log itself, is named by the part rule, so a new one is a decision: which part,
     // and whether a proxy without sensitive items may see a view of it. A table the rule doesn't name is the record to the
     // patient and hidden from such a proxy (the proxy test above). The list is the one ProtectionTests keeps.

@@ -1,5 +1,6 @@
 -- Who viewed a patient's record (the expansion plan's step 13c, proposed FR-57): what the portal's "Who viewed my
--- record" page lists. Applied as ehr_owner after migrations, on every run of infra/migrate; safe to run again.
+-- record" page lists, and, at the end, the guard on the panel history it relies on. Applied as ehr_owner after
+-- migrations, on every run of infra/migrate; safe to run again.
 
 -- The part of the record a view was of, from the action and the table the log records, or NULL for a table it doesn't
 -- name. Every table of patient data is named here (RecordViewSecurityTests holds it to the list ProtectionTests keeps),
@@ -170,3 +171,36 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION ehr.record_views(timestamptz, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION ehr.record_views(timestamptz, timestamptz) TO ehr_app, ehr_read;
+
+-- The panel's history decides which staff members' views a proxy without sensitive items is shown (above), so the apps
+-- can't rewrite it: an assignment the runtime roles insert starts now and open, and the one change it takes is ending,
+-- now, once. The app stamps both times from its own clock a moment before saving (Ehr.Domain's PatientAssignments: the
+-- chart's "Add to my patients" and "Remove", and the benchmark's setup), on the on-prem app beside this database; off
+-- site, the cloud app forwards the write there. Nothing else writes the table at runtime: neither the desktop app nor
+-- the sync API holds or replays assignments. So "now" is this server's clock within a minute either way, for the two
+-- machines' clocks to differ by. Rows the schema's owner writes (the migrations, the seed) or a superuser (a test's
+-- setup) aren't held to it. Each write is audited as before (40-audit.sql).
+CREATE OR REPLACE FUNCTION ehr.guard_patient_assignment() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.ended_at IS NOT NULL OR abs(extract(epoch FROM NEW.assigned_at - clock_timestamp())) > 60 THEN
+            RAISE EXCEPTION 'A panel assignment starts now, and open' USING ERRCODE = '23514';
+        END IF;
+    ELSIF (NEW.id, NEW.patient_id, NEW.clinician_id, NEW.assigned_at) IS DISTINCT FROM (OLD.id, OLD.patient_id, OLD.clinician_id, OLD.assigned_at)
+          OR OLD.ended_at IS NOT NULL AND NEW.ended_at IS DISTINCT FROM OLD.ended_at
+          OR OLD.ended_at IS NULL AND NEW.ended_at IS NOT NULL AND abs(extract(epoch FROM NEW.ended_at - clock_timestamp())) > 60 THEN
+        RAISE EXCEPTION 'A panel assignment only ends, now, and once' USING ERRCODE = '23514';
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.guard_patient_assignment() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER patient_assignments_guard
+    BEFORE INSERT OR UPDATE ON ehr.patient_assignments
+    -- By the role the session logged in as, or the one a statement runs as, as for filing a result (75-results.sql).
+    FOR EACH ROW WHEN (current_user IN ('ehr_app', 'ehr_read') OR session_user IN ('ehr_app', 'ehr_read'))
+    EXECUTE FUNCTION ehr.guard_patient_assignment();
