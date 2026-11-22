@@ -5,14 +5,17 @@ writes it in digits, quotes its gold word for word, lists what it names, and the
 from __future__ import annotations
 
 import re
+import tomllib
 from collections import Counter
 
 import pytest
 
+from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import FIELDS, HOLDOUT_DIR, load_scripts, runs
 from ehr_dictation import prompt, spanish, translation, validation
 from ehr_dictation.textnorm import tokens
 from ehr_eval import scoring_es
+from ehr_eval.scripts import EVAL_DIR
 
 SCRIPTS = load_scripts()
 HOLDOUT = load_scripts(HOLDOUT_DIR)
@@ -146,6 +149,18 @@ def test_drugs_the_english_gold_names_are_ones_the_script_lists():
         named = {name.lower() for name in script.drugs_en}
         for gold in script.gold.values():
             assert {t.text for t in tokens(gold.value) if translation.is_drug(t.text)} <= named, script.id
+
+
+def test_the_spanish_sets_voices_and_recordings_are_the_ones_voices_toml_lists():
+    voices = tomllib.loads((EVAL_DIR / "voices.toml").read_text(encoding="utf-8"))
+    assert {name: voice["accent"] for name, voice in voices["voices_es"].items()} == VOICES
+    variants = voices["variants_es"]
+    assert {name[:3] for name in variants["unusable"]} == {"e01", "e08"}
+    assert set(variants["unusable"]) <= {s.id for s in SCRIPTS if s.noise}
+    # The two in the wrong language each hold an instruction to keep out of the note (FR-14), and fit in 2 minutes.
+    english = next(s for s in load_english() if s.id == variants["english_as_spanish"])
+    spanish = next(s for s in SCRIPTS if s.id == variants["spanish_as_english"])
+    assert english.forbidden and english.words <= MAX_LENGTH_WORDS[1] and spanish.forbidden
 
 
 def test_five_scripts_are_held_out_and_run_only_when_asked():

@@ -153,19 +153,20 @@ def display_text(text: str) -> str:
     return _render(text, display=True)
 
 
-def runs(text: str, *, display: bool = False) -> list[tuple[str, str]]:
-    """The text in runs of one language, ("es", ...) and ("en", ...), as said (or as written), for the audio
-    generator to read each with its own pronunciation, and for the text-only eval to mark the English ones."""
+def runs(text: str, *, display: bool = False, pauses: bool = False) -> list[tuple[str, str]]:
+    """The text in runs of one language, ("es", ...) and ("en", ...), as said (with the pauses spoken punctuation
+    leaves, for the audio generator) or as written, for the audio generator to read each with its own pronunciation,
+    and for the text-only eval to mark the English ones."""
     flat = " ".join(text.split())
     found: list[tuple[str, str]] = []
     at = 0
     for match in ENGLISH.finditer(flat):
         if flat[at : match.start()].strip():
-            found.append(("es", _render(flat[at : match.start()], display=display)))
-        found.append(("en", _render(match.group(1), display=display)))
+            found.append(("es", _render(flat[at : match.start()], display=display, pauses=pauses)))
+        found.append(("en", _render(match.group(1), display=display, pauses=pauses)))
         at = match.end()
     if flat[at:].strip():
-        found.append(("es", _render(flat[at:], display=display)))
+        found.append(("es", _render(flat[at:], display=display, pauses=pauses)))
     return found
 
 

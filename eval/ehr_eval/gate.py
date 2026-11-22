@@ -27,6 +27,18 @@ someone committed instead:
    fields_clinical, is reported beside it and not gated), date and drug-name accuracy, and the share of offered words
    the transcript doesn't support.
 
+The Spanish test set (the expansion plan's step 17) is checked the same way, from eval/results/latest-es.json
+(check_spanish()): made by this commit's Spanish prompt, schema and parameters, by the pipeline and scoring code the
+two sets share, from the Spanish set's recordings and against its gold; covering every Spanish script's recordings and
+display text and the two recordings dictated in the wrong language; every recording and text sorted; no instruction to
+order something or change the allergy list in any offered value, the wrong-language recordings included (FR-14); every
+mistranslation shown without a warning (a number, unit, drug, side, medication change, negation, certainty, history or
+relative that differs from the Spanish it cites) accepted by the owner in known-limitations.toml
+([[accepted_mistranslation]]: variant, field, kind and what was shown, as the results list it), and each accepted one
+still shown; and, once the owner has recorded eval/results/baseline-es.json on the server machine, from that machine
+and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and date accuracy. The English
+checks above are unchanged.
+
 Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
     uv run --project eval python -m ehr_eval.gate
@@ -46,7 +58,8 @@ from ehr_dictation.transcript import Segment, assemble
 
 from . import scoring
 from .scoring import WARNING_CODES
-from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256
+from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
+                      recordings_sha256, scoring_sha256)
 
 RESULTS_DIR = EVAL_DIR / "results"
 KNOWN_LIMITATIONS = "known-limitations.toml"
@@ -242,8 +255,121 @@ def _get(metrics: dict, path: tuple[str, ...]) -> float | None:
     return value if isinstance(value, (int, float)) else None
 
 
+RUN_IT_ES = (
+    "Run the Spanish eval on the server machine (eval/README.md: generate_audio.py --set es, then "
+    "uv run --project eval python -m ehr_eval.run --set es ...) and commit the eval/results/latest-es.json it writes."
+)
+RESCORE_ES = (
+    "Score the stored answers again: uv run --project eval python -m ehr_eval.run --set es --rescore "
+    "eval/results/latest-es.json --out eval/results/latest-es.json"
+)
+GATED_ES = [
+    (("wer", "overall"), False, "Spanish word error rate"),
+    (("fields", "content", "f1"), True, "English note-field F1 from Spanish"),
+    (("drugs", "accuracy"), True, "Spanish drug-name accuracy"),
+    (("dates", "accuracy"), True, "Spanish date accuracy"),
+]
+
+
+def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[str]:
+    """The Spanish results' checks (the module's header)."""
+    latest_path = results_dir / "latest-es.json"
+    if not latest_path.is_file():
+        return [f"There are no Spanish eval results ({latest_path.relative_to(eval_dir.parent)}). {RUN_IT_ES}"]
+    latest = json.loads(latest_path.read_text(encoding="utf-8"))
+    problems: list[str] = []
+    recorded, dataset = latest.get("provenance", {}), latest.get("dataset", {})
+    if recorded.get("structuring") != prompt.load(language="es").structuring_sha256:
+        problems.append(f"The Spanish prompt, note schema or generation parameters changed since the Spanish eval run. {RUN_IT_ES}")
+    if recorded.get("pipeline") != pipeline_sha256(eval_dir):
+        problems.append(f"What makes the transcripts and the model's answers changed since the Spanish eval run. {RUN_IT_ES}")
+    elif recorded.get("scoring") != scoring_sha256(eval_dir):
+        problems.append(f"The checks or the scoring changed since the Spanish results were scored. {RESCORE_ES}")
+    if dataset.get("recordings_sha256") != recordings_es_sha256(eval_dir):
+        problems.append("What the Spanish test set's recordings say (a script's text, voice or noise, voices.toml or "
+                        f"generate_audio.py) changed since the Spanish eval run. Generate the audio again, then: {RUN_IT_ES}")
+    elif dataset.get("gold_sha256") != gold_es_sha256(eval_dir):
+        problems.append(f"The Spanish test set's gold, tags or lists changed since these results were scored. {RESCORE_ES}")
+
+    scripts = {path.stem for path in (eval_dir / "scripts-es").glob("*.toml")}
+    items = latest.get("items", [])
+    texts = {item["script"] for item in items if item.get("variant", "").endswith("--text")}
+    recordings = [item for item in items if not item.get("variant", "").endswith("--text")]
+    spoken = {item["script"] for item in recordings if not item.get("run_as")}
+    wrong = {item.get("run_as") for item in recordings if item.get("run_as")}
+    if not dataset.get("complete") or not scripts or spoken != scripts or texts != scripts or wrong != {"en", "es"}:
+        problems.append(
+            f"The Spanish results cover {len(spoken & scripts)} of the {len(scripts)} scripts' recordings, "
+            f"{len(texts & scripts)} of their texts and {len(wrong)} of the 2 recordings in the wrong language. "
+            f"Generate the audio for all of them, then: {RUN_IT_ES}"
+        )
+    if dataset.get("recordings") != len(recordings):
+        problems.append(f"The Spanish results' recording count doesn't match their items. {RUN_IT_ES}")
+    metrics = latest.get("metrics", {})
+    if metrics.get("sorted_every_item") is not True:
+        problems.append(
+            f"K2 Horizon didn't sort every Spanish recording and text ({metrics.get('sorting', {}).get('unavailable')}, "
+            f"texts {metrics.get('text', {}).get('sorting', {}).get('unavailable')}), so the fields weren't measured. "
+            f"Make llama-server reachable and fast enough, then: {RUN_IT_ES}"
+        )
+    if metrics.get("instructions_shown") != 0:
+        problems.append(
+            f"{metrics.get('instructions_shown')} offered value(s) from Spanish, or from a recording in the wrong "
+            "language, hold an instruction to order something or change the allergy list; there must be none (FR-14). "
+            f"Tighten the Spanish prompt or the checks (translation.py), then: {RUN_IT_ES}"
+        )
+    if latest.get("baseline"):
+        problems.append("latest-es.json says it is a baseline. Keep the accepted baseline in baseline-es.json only.")
+    listed = metrics.get("mistranslations", {}).get("listed")
+    in_text = metrics.get("text", {}).get("mistranslations", {}).get("listed")
+    if listed is None or in_text is None:
+        problems.append(f"The Spanish results don't say what was mistranslated. {RUN_IT_ES}")
+    else:
+        problems += _unaccepted_mistranslations([e for e in listed + in_text if not e["flagged"]],
+                                                eval_dir / KNOWN_LIMITATIONS)
+
+    baseline_path = results_dir / "baseline-es.json"
+    if baseline_path.is_file():
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        theirs = baseline.get("run", {}).get("machine", {}).get("label")
+        ours = latest.get("run", {}).get("machine", {}).get("label")
+        if theirs != ours:
+            problems.append(f"The Spanish baseline was recorded on {theirs!r} and these results on {ours!r}. Run the "
+                            "Spanish eval on the baseline's machine and commit its latest-es.json.")
+        for path, higher_is_better, name in GATED_ES:
+            now, before = _get(metrics, path), _get(baseline.get("metrics", {}), path)
+            if before is None:
+                continue
+            if now is None:
+                problems.append(f"The Spanish baseline has a {name}, and these results don't. {RUN_IT_ES}")
+            elif (now < before) if higher_is_better else (now > before):
+                problems.append(f"The {name} is {now}, worse than the accepted baseline's {before}. Find what made it "
+                                f"worse and fix it, then: {RUN_IT_ES} (Only the owner accepts a new baseline.)")
+    return problems
+
+
+def _unaccepted_mistranslations(unflagged: list[dict], known: Path) -> list[str]:
+    """Each mistranslation shown without a warning that known-limitations.toml doesn't accept, and each accepted there
+    that the results no longer show."""
+    accepted = tomllib.loads(known.read_text(encoding="utf-8")).get("accepted_mistranslation", []) if known.is_file() else []
+    key = lambda entry: (entry["variant"], entry["field"], entry["kind"], entry["shown"])  # noqa: E731
+    found, listed = {key(entry) for entry in unflagged}, {key(entry) for entry in accepted}
+    problems = [
+        f"{variant} shows {shown!r} in {field}, a {kind} that differs from the Spanish it cites, without a warning; "
+        "there must be none that the owner hasn't accepted in eval/known-limitations.toml ([[accepted_mistranslation]]). "
+        f"Tighten the Spanish prompt or the checks (translation.py), then: {RUN_IT_ES}"
+        for variant, field, kind, shown in sorted(found - listed)
+    ]
+    problems += [
+        f"eval/known-limitations.toml accepts {shown!r} ({kind}) in {field} of {variant}, which the Spanish results no "
+        f"longer show. Remove it from the list, then: {RESCORE_ES}"
+        for variant, field, kind, shown in sorted(listed - found)
+    ]
+    return problems
+
+
 def main() -> int:
-    problems = check()
+    problems = check() + check_spanish()
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:
@@ -259,6 +385,16 @@ def main() -> int:
         f"{metrics['proposals']['shown']} proposals ({metrics['proposals']['right']} right, every false or misheard one "
         f"accepted). "
         f"Run on {latest['run']['machine']['label']}."
+    )
+    spanish = json.loads((RESULTS_DIR / "latest-es.json").read_text(encoding="utf-8"))
+    metrics = spanish["metrics"]
+    baseline = "against the accepted baseline" if (RESULTS_DIR / "baseline-es.json").is_file() else "(no accepted baseline yet)"
+    print(
+        f"Spanish eval results match this commit {baseline}: WER {metrics['wer']['overall']} "
+        f"({metrics['wer']['no_accents']} without accents), English field F1 {metrics['fields']['content']['f1']} "
+        f"({metrics['text']['fields']['content']['f1']} from the text alone), every recording and text sorted, no "
+        f"instruction shown, every mistranslation without a warning accepted. "
+        f"Run on {spanish['run']['machine']['label']}."
     )
     return 0
 

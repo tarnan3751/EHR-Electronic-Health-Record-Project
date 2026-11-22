@@ -23,6 +23,20 @@ runs to come.
 - sorting and timing: how often the fields couldn't be sorted and why (a timeout, an answer cut off at the token
   limit, or the wrong shape), the time to sort and the tokens read and written, and whether the model wrote each
   statement's keys in the schema's order: its Spanish, then its field, then its English.
+
+The audio run (run_es.py, score_audio()) adds, over the recordings dictated in Spanish:
+
+- wer: the word error rate of Whisper's transcript against the display text, both in lower case without punctuation,
+  numbers as digits whether said or written ("treinta y siete coma ocho" and "37,8" are both 37.8, "1.000" a thousand,
+  "142/88" 142 sobre 88, "%" por ciento), accents kept; and beside it the same with the accents taken off (wer_no_accents),
+  overall and by tag;
+- drugs and dates: the share of the drugs each script names that the transcript has word for word, accents aside (and
+  within two letters), and of its dates said with their day and month;
+- unclear: the passages marked, by why (other_language among them);
+- live: the time to answer each one-second chunk of a dictation in Spanish (the sidecar's 15-second budget, NFR-14);
+- wrong_language: the two recordings dictated in the wrong language, for what was marked and for no instruction
+  carried into a field (FR-14), never for the fields' content;
+- text: the measures above that don't need speech recognition, on each script's display text alone (run A's).
 """
 
 from __future__ import annotations
@@ -32,13 +46,15 @@ import statistics
 from collections import Counter
 from dataclasses import dataclass, field
 
+import jiwer
+
 from dictation_scripts_es import Script
 from ehr_dictation import spanish, translation, validation
 from ehr_dictation.prompt import FIELDS
 from ehr_dictation.textnorm import tokens
 from ehr_dictation.transcript import Transcript
 
-from .scoring import FieldOutcome, _fields, _ratio, _validation
+from .scoring import FieldOutcome, _edits, _fields, _ratio, _stats, _validation
 
 STRUCTURING_SECONDS = 90.0  # the sidecar's limit (settings.py): an answer slower than this isn't offered
 CHANGED = ("number", "unit", "drug", "side", "action", "negation", "certainty", "history", "experiencer", "relative",
@@ -74,6 +90,13 @@ class SpanishItem:
     statements_in_order: int = 0  # statements whose keys came "spanish", "field", "english"
     statements_written: int = 0
     answer: str | None = None  # the model's answer as written, only when kept for a diagnostic run (run_a.py)
+    # A recording's (run_es.py): its length, the speech model's passages as heard (raw text, flags, samples), so the
+    # transcript can be rebuilt and checked again offline, the live chunks' times, and the language it was run as when
+    # it is dictated in the wrong one ("es" for an English script, "en" for a Spanish one).
+    seconds: float = 0.0
+    segments: list[dict] = field(default_factory=list)
+    chunk_seconds: list[float] = field(default_factory=list)
+    run_as: str | None = None
 
 
 def score(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
@@ -311,3 +334,131 @@ def thresholds(metrics: dict) -> list[tuple[str, bool, str]]:
          f"{sorting['cut_off_at_the_token_limit']}"),
     ]
 
+
+# ---- The audio run (run_es.py) ------------------------------------------------------------------------------------
+
+
+def score_audio(items: list[SpanishItem], scripts: dict[str, Script], english: dict) -> dict:
+    """The audio run's measures: the recordings dictated in Spanish, the two in the wrong language, and the display
+    texts alone (items whose variant ends --text). `english` holds the English scripts a wrong-language item reads."""
+    text = [item for item in items if item.variant.endswith("--text")]
+    wrong = [item for item in items if item.run_as]
+    spoken = [item for item in items if item not in text and item not in wrong]
+    shown_wrong = _wrong_language(wrong, scripts | english)
+    instructions = _instructions(spoken, scripts)
+    text_instructions = _instructions(text, scripts)
+    return {
+        "wer": _wer(spoken, scripts),
+        "drugs": _drugs(spoken, scripts),
+        "dates": _dates(spoken, scripts),
+        **score(spoken, scripts),
+        "unclear": dict(sorted(Counter(s["unclear"] for item in spoken for s in item.segments if s["unclear"]).items())),
+        "live": _live(spoken),
+        "wrong_language": shown_wrong,
+        "text": score(text, scripts),
+        # Every instruction carried into a field, in any item: FR-14 allows none.
+        "instructions_shown": instructions["shown"] + text_instructions["shown"] + shown_wrong["instructions_shown"],
+        "sorted_every_item": not any(item.sorting != "done" for item in spoken + text),
+    }
+
+
+NUMBER_LIKE = re.compile(r"(\d)\s*/\s*(\d)")
+
+
+def spanish_words(text: str, *, accents: bool = True) -> list[str]:
+    """The words for the word error rate: lower case, no punctuation, numbers as digits however said or written (the
+    sidecar's own Spanish reading, spanish.numbers()), "142/88" as 142 sobre 88 and "%" as por ciento; with their
+    accents or without."""
+    text = NUMBER_LIKE.sub(r"\1 sobre \2", text).replace("%", " por ciento ")
+    toks = spanish.tokens(text)
+    starts = {number.first: number for number in spanish.numbers(toks)}
+    out: list[str] = []
+    i = 0
+    while i < len(toks):
+        if (number := starts.get(i)) is not None:
+            out.append(max(number.readings, key=float))
+            i = number.last + 1
+            continue
+        out.append(toks[i].text if accents else toks[i].key)
+        i += 1
+    return out
+
+
+def _wer(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
+    def wer_of(group: list[SpanishItem], accents: bool) -> float | None:
+        references = [" ".join(spanish_words(scripts[i.script].display, accents=accents)) for i in group]
+        if not any(references):
+            return None
+        hypotheses = [" ".join(spanish_words(i.hypothesis, accents=accents)) for i in group]
+        return round(jiwer.wer(references, hypotheses), 4)
+
+    tags = sorted({tag for item in items for tag in item.tags})
+    return {
+        "overall": wer_of(items, True),
+        "no_accents": wer_of(items, False),
+        "by_tag": {tag: wer_of([i for i in items if tag in i.tags], True) for tag in tags},
+        "items": len(items),
+    }
+
+
+def _drugs(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
+    exact = near = said = 0
+    for item in items:
+        heard = [t.key for t in spanish.tokens(item.hypothesis)]
+        for drug in scripts[item.script].drugs:
+            said += 1
+            wanted = [t.key for t in spanish.tokens(drug)]
+            spans = [" ".join(heard[i : i + len(wanted)]) for i in range(len(heard) - len(wanted) + 1)]
+            target = " ".join(wanted)
+            exact += target in spans
+            near += any(_edits(target, span) <= 2 for span in spans)
+    return {"said": said, "exact": exact, "accuracy": _ratio(exact, said), "within_2_letters": near}
+
+
+def date_said(iso: str, text: str) -> bool:
+    """Whether the text says the date's day and month ("3 de marzo", "tres de marzo"); the year isn't asked for."""
+    month, day = list(spanish.MONTHS)[int(iso[5:7]) - 1], str(int(iso[8:10]))
+    toks = spanish.tokens(text)
+    for i, token in enumerate(toks):
+        if token.key == month and i >= 2 and toks[i - 1].key == "de":
+            before = toks[max(0, i - 6) : i - 1]
+            found = [n for n in spanish.numbers(before) if n.last == len(before) - 1]
+            if any(day in n.readings for n in found):
+                return True
+    return False
+
+
+def _dates(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
+    results = [date_said(iso, item.hypothesis) for item in items for iso in scripts[item.script].dates]
+    return {"said": len(results), "right": sum(results), "accuracy": _ratio(sum(results), len(results))}
+
+
+def _live(items: list[SpanishItem]) -> dict:
+    chunks = sorted(seconds for item in items for seconds in item.chunk_seconds)
+    out: dict = {"chunks": len(chunks)}
+    if chunks:
+        out |= {"p50": round(statistics.median(chunks), 3), "p95": round(chunks[int(0.95 * (len(chunks) - 1))], 3),
+                "max": round(chunks[-1], 3)}
+    stages = {stage: [i.timings[stage] for i in items if stage in i.timings] for stage in ("decode", "transcribe")}
+    return out | {stage: _stats(values) for stage, values in stages.items() if values}
+
+
+def _wrong_language(items: list[SpanishItem], scripts: dict) -> dict:
+    """Each recording dictated in the wrong language: the share of its passages marked unclear, and why; whether any
+    of its script's instructions reached a field (FR-14, from the English or the Spanish script's forbidden_en); and
+    what was offered. Never its fields' content."""
+    listed = []
+    for item in items:
+        script = scripts[item.script]
+        marked = Counter(s["unclear"] for s in item.segments if s["unclear"])
+        # A Spanish script's instructions in English (forbidden_en), an English script's as said (forbidden).
+        phrases = script.forbidden_en if isinstance(script, Script) else script.forbidden
+        shown = [phrase for outcome in item.fields.values() for phrase in phrases
+                 if outcome.shown and _contains(outcome.shown, phrase)]
+        listed.append({
+            "variant": item.variant, "run_as": item.run_as, "passages": len(item.segments),
+            "marked": dict(sorted(marked.items())), "marked_share": _ratio(sum(marked.values()), len(item.segments)),
+            "sorting": item.sorting, "offered": sorted(name for name, outcome in item.fields.items() if outcome.shown),
+            "instructions_shown": shown,
+        })
+    return {"items": listed, "instructions_shown": sum(len(entry["instructions_shown"]) for entry in listed)}

@@ -81,7 +81,7 @@ class ScriptedRecognizer:
         return Recognition(self.text, 0.9)
 
 
-def fake_structurer(content: dict) -> Structurer:
+def fake_structurer(content: dict, language: str = "en") -> Structurer:
     async def handle(request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/props":
             return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
@@ -92,4 +92,4 @@ def fake_structurer(content: dict) -> Structurer:
                                                        "message": {"content": json.dumps(content)}}]})
 
     server = LlamaServer("http://llama.test", "key", transport=httpx2.MockTransport(handle))
-    return Structurer(server, prompt.load(), "K2.gguf", timeout=5)
+    return Structurer(server, prompt.load(language=language), "K2.gguf", timeout=5)

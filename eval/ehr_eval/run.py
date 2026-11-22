@@ -8,6 +8,8 @@ recording goes through the sidecar's own code (answers.py): ffmpeg decoding, Med
 Horizon, timed stage by stage, and then the checks. The two-minute recordings are also fed in one-second chunks, as a
 live dictation is, to time the transcript's update after each chunk. Nothing reaches the network but llama-server.
 
+--set es runs the Spanish test set instead (the expansion plan's step 17; run_es.py), into eval/results/latest-es.json.
+
 It runs K2 Horizon as the sidecar ships it, reasoning off. --reasoning low256 runs the comparison the owner asked for
 instead, reasoning on at "low" capped at 256 tokens (and enable_thinking set, since a llama-server started with
 --reasoning off would otherwise keep it off): its results go to eval/results/compare-low256.json, which the gate
@@ -111,6 +113,12 @@ async def main_async(args: argparse.Namespace) -> int:
     if not api_key:
         print("Set LLAMA_API_KEY to llama-server's key.", file=sys.stderr)
         return 2
+    if args.set == "es":
+        from . import run_es
+
+        args.audio, args.out = args.audio or run_es.AUDIO, args.out or run_es.OUT
+        return await run_es.main_async(args, api_key)
+    args.audio = args.audio or EVAL_DIR / "audio"
     manifest_path = args.audio / "manifest.json"
     if not manifest_path.is_file():
         print(f"No {manifest_path}: generate the audio first (eval/README.md).", file=sys.stderr)
@@ -173,17 +181,32 @@ async def main_async(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--llama-url", required=True, help="llama-server's address, such as http://127.0.0.1:8080")
+    parser.add_argument("--set", choices=["en", "es"], default="en", help="the English test set (default) or the Spanish")
+    parser.add_argument("--rescore", type=Path, help="with --set es: a results file whose stored answers to score again")
+    parser.add_argument("--llama-url", help="llama-server's address, such as http://127.0.0.1:8080 (required to run)")
     parser.add_argument("--models-dir", type=Path, default=REPO_ROOT / "infra" / "compose" / "models")
-    parser.add_argument("--audio", type=Path, default=EVAL_DIR / "audio", help="the recordings and their manifest.json")
-    parser.add_argument("--device", default="cpu", help="where MedASR runs: cpu, mps (Apple Silicon) or cuda")
+    parser.add_argument("--audio", type=Path, help="the recordings and their manifest.json (default: eval/audio, or "
+                        "eval/audio-es with --set es)")
+    parser.add_argument("--device", default="cpu", help="where MedASR and Whisper run: cpu, mps (Apple Silicon) or cuda")
     parser.add_argument("--machine", help="a name for this machine in the results (default: its CPU, memory and OS)")
     parser.add_argument("--reasoning", choices=sorted(REASONING), default="off",
                         help="off, as shipped (default), or low256, the comparison")
-    parser.add_argument("--out", type=Path, help="default: eval/results/latest.json, or compare-low256.json")
+    parser.add_argument("--out", type=Path, help="default: eval/results/latest.json, compare-low256.json, or with --set "
+                        "es latest-es.json")
     parser.add_argument("--only", nargs="*", help="script IDs to run, for a quick look; the gate wants all of them")
     parser.add_argument("--no-live", action="store_true", help="skip the one-second-chunk timing")
-    return asyncio.run(main_async(parser.parse_args(argv)))
+    args = parser.parse_args(argv)
+    if args.set == "es" and args.reasoning != "off":
+        parser.error("the Spanish set runs K2 Horizon as it ships, reasoning off")
+    if args.rescore:
+        if args.set != "es":
+            parser.error("--rescore is for --set es; for the English set, use ehr_eval.rescore")
+        from . import run_es
+
+        return run_es.main_rescore(args.rescore, args.out or args.rescore)
+    if not args.llama_url:
+        parser.error("--llama-url is required")
+    return asyncio.run(main_async(args))
 
 
 if __name__ == "__main__":

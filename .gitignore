@@ -43,8 +43,9 @@ infra/compose/test-accounts.json*
 *.mp3
 *.flac
 
-# Dictation test set audio, regenerated from the synthetic scripts by eval/generate_audio.py
+# Dictation test set audio, regenerated from the synthetic scripts by eval/generate_audio.py (--set es: the Spanish set's)
 eval/audio/
+eval/audio-es/
 
 # Local databases (the desktop cache is SQLCipher)
 *.db

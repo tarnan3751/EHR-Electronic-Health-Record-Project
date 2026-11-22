@@ -13,6 +13,9 @@ The test set that dictation accuracy is measured on: about fifty synthetic clini
 | `tests/test_gold.py` | Checks the gold against the sidecar's own checks (`validation.py`) |
 | `known-limitations.toml` | Retracted values the pipeline shows without a warning (`[[accepted]]`), and false or misheard proposals (`[[accepted_proposal]]`), that the owner has accepted, each with its reason; the eval's gate fails on any other |
 | `clinical-gold.md` | The clinical gold values those checks would discard, and why. `ehr_eval/goldreport.py` writes it |
+| `scripts-es/eNN-<slug>.toml`, `dictation_scripts_es.py` | The Spanish test set (the expansion plan's step 17), and its reader: see [The Spanish test set](#the-spanish-test-set) |
+| `scripts-es-holdout/hNN-<slug>.toml` | Five Spanish scripts held out, never used to tune the checks, run only when asked |
+| `audio-es/` | The Spanish set's generated audio and its `manifest.json`. Gitignored |
 
 ## Scripts
 
@@ -178,6 +181,24 @@ No item may be longer than three minutes, the dictation session limit; the gener
 **Reproducibility.** Seeds and the number of CPU threads are fixed, so the same machine with the same package versions makes the same files, byte for byte. Another machine, or another build of torch or ffmpeg, makes audio that sounds the same but differs in its last bits, so the SHA-256 values differ. Only kokoro and misaki are pinned exactly; the manifest records the versions of the rest.
 
 **Licences.** Kokoro-82M's weights and voices are Apache-2.0, as are the kokoro and misaki packages; spaCy and its `en_core_web_sm` model are MIT. Words outside misaki's dictionary, which here are mostly the newer drug names, are pronounced by espeak-ng (GPL-3.0), which the espeakng-loader package bundles (the loader itself is MIT), through phonemizer-fork (GPL-3.0). They run only inside the generator, on the machine making the audio, and are never shipped with anything. The French voice, `ff_siwis`, was trained partly on the SIWIS corpus (CC BY 4.0). Where each was checked is in `voices.toml`.
+
+## The Spanish test set
+
+The expansion plan's step 17 measures dictation in Spanish on a set of its own: sixteen synthetic Spanish dictations in `scripts-es/` (e01 to e16), each with gold English statements, every one citing the Spanish it translates word for word and passing the sidecar's Spanish checks (`translation.py`; `tests/test_gold_es.py`), and five more held out in `scripts-es-holdout/` (h01 to h05), sealed before they could be used to tune anything. `dictation_scripts_es.py` says the format. A Spanish dictation is up to 2 minutes (the decision log's step 17, decision 20): the max-length script, e15, is 270 to 300 spoken words, the long ones 200 to 240, and every other under 240 (`tests/test_scripts_es.py`). Like everything here, they need a Spanish-speaking clinician's reading before any real use.
+
+**Run A, the text alone.** `uv run --project eval python -m ehr_eval.run_a --llama-url http://127.0.0.1:8080 --models-dir <models folder>` sorts each script's display text with the Spanish prompt and checks, no speech recognition, and prints the plan's stop thresholds; `--holdout` runs only the held-out five, and `--rescore <results> --out <results>` scores stored answers again without the model. The gate doesn't check its results.
+
+**Audio.** `uv run eval/generate_audio.py --set es` makes the Spanish set's audio into `eval/audio-es/`, as the English set's (the same options apply): each script read in Spanish by its voice, Kokoro's three Spanish voices (`es`) and two of its English voices reading Spanish (`en-voice`, synthetic stand-ins for a clinician whose first language is English, not a real accent), with any passage the script marks as said in English read in English; e01, e03, e06, e08, e12 and e13 with their noise at 20, 10 and 5 dB, and e01 and e08 at 0 dB too; no item over 2 minutes. Two more are dictated in the wrong language: an English script (d43) read in English and run as Spanish, and e01's clean item run as English. Kokoro's Spanish uses espeak-ng's Spanish pronunciation for every word (GPL-3.0, on the machine making the audio only). `voices.toml` lists the voices (`[voices_es]`) and the variants (`[variants_es]`).
+
+**The run.** With Whisper installed (`setup_models.py --only whisper`), llama-server running and `LLAMA_API_KEY` set:
+
+```
+uv run --project eval python -m ehr_eval.run --set es --llama-url http://127.0.0.1:8080 --device mps
+```
+
+Each recording dictated in Spanish goes through the sidecar's code as a Spanish dictation does (`ehr_eval/answers_es.py`): Whisper's transcript, K2 Horizon with the Spanish prompt and schema, and the Spanish checks; the one run as English goes the English way. Each script's display text is also sorted alone, as in run A. It writes `eval/results/latest-es.json`: the Spanish word error rate (lower case, no punctuation, numbers as digits however said, a decimal comma as a point; accents kept, and beside it without them), drug-name and date accuracy, the English note fields' content and detection F1 against the gold, what the checks passed and discarded and why, each statement's English compared with the Spanish it cites (a number, unit, drug, side, medication change, negation, certainty, history or relative that differs, with and without a warning; and, reported apart and never a stop, what it files in a field whose gold lacks it), the instructions carried into a field (there must be none) and those reported as not carried over, the passages marked unclear and why (`other_language` among them), the time per stage and per one-second live chunk, the two wrong-language recordings scored for what they mark and for no instruction carried over (never for their fields), and the same measures on the text alone. `--rescore eval/results/latest-es.json --out eval/results/latest-es.json` scores the stored answers again without the models.
+
+**The gate** (`ehr_eval/gate.py`) checks it beside `latest.json`: made by this commit's Spanish prompt, schema and parameters, by the pipeline and scoring code both sets share, from the Spanish set's recordings and against its gold; every script's recordings and text and both wrong-language recordings there, every recording and text sorted, no instruction in an offered value; every mistranslation shown without a warning accepted by the owner in `known-limitations.toml` as an `[[accepted_mistranslation]]` (`variant`, `field`, `kind`, `shown`, as the results list it, and `why`), and each accepted one still shown; and, once the owner records `eval/results/baseline-es.json` on the server machine, from that machine and no worse on the Spanish word error rate, the English field F1, and drug and date accuracy. The English checks are unchanged; since the two sets share the pipeline and scoring hashes, a change to either set's code means running, or scoring, both again.
 
 ## Recording the scripts yourself
 
