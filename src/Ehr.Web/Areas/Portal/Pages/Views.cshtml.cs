@@ -184,10 +184,13 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
         [AuditParts.Views] = Counted("Who viewed your record", "Who viewed the record"),
         [AuditParts.Refills] = Counted("Your refill requests", "The refill requests",
             Counted("Your refill requests, with the sensitive ones", "The refill requests, with the sensitive ones")),
-        // A pre-visit form (step 13e), always a sensitive item: the same words whether the part was recorded with the read
-        // or named from the forms' tables (RecordViewParts.Form, the same key).
-        [AuditParts.Forms] = new("A pre-visit form", "A pre-visit form", "{0} pre-visit forms", "{0} pre-visit forms",
-            new("A pre-visit form", "A pre-visit form", "{0} pre-visit forms", "{0} pre-visit forms")),
+        // Pre-visit forms (step 13e), always sensitive items. A view that showed them is a view of sensitive items; a
+        // plain read is a forms page that showed none of them (the clinician's with them hidden, which shows how many,
+        // or the portal's for a session that may not see them, which shows none), worded as that page. Counted as views,
+        // never as forms. A read of a form's own rows (RecordViewParts.Form, the same key) shows the form, so it is a view
+        // of sensitive items, worded as the forms.
+        [AuditParts.Forms] = Counted("Your pre-visit forms page, with the forms hidden", "The pre-visit forms page, with the forms hidden",
+            Counted("Your pre-visit forms", "The pre-visit forms")),
         [RecordViewParts.Record] = new("Your record", "The record", "Your record, {0} times", "The record, {0} times"),
         [RecordViewParts.RecordSensitive] = new("Your record, with its sensitive items", "The record, with its sensitive items",
             "Your record, with its sensitive items, {0} times", "The record, with its sensitive items, {0} times"),

@@ -212,11 +212,71 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
-    // A clinician who holds a pre-visit form's alert (step 13e) without the patient on their panel reads its answers from
-    // the inbox, not through emergency access: the patient is shown the view as a pre-visit form's, unmarked; so is a
-    // proxy with sensitive items; a proxy without them is shown nothing of it.
+    // A forms page that showed no form is worded as that page, never as a form: someone the record is shared with, without
+    // sensitive items, opens the portal's Pre-visit forms, which shows them none though the patient has one. The patient
+    // reads their view as the page with the forms hidden; they themselves are shown nothing of it, as before.
     [Fact]
-    public async Task An_alert_holder_off_the_panel_reading_a_forms_answers_is_shown_as_a_form_view_and_not_as_emergency_access()
+    public async Task A_proxy_without_sensitive_items_opening_the_forms_page_is_shown_to_the_patient_as_the_page_with_the_forms_hidden()
+    {
+        var visit = await PreVisitFormTests.VisitAsync(apps, "Dr. Forms Shown None");
+        using (var asked = await PreVisitFormTests.AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, PreVisitFormTests.Phq9))
+        {
+            Assert.True(asked.IsSuccessStatusCode, asked.StatusCode.ToString());
+        }
+
+        var (portal, jar) = await PreVisitFormTests.PortalAsync(apps, visit);
+        var (without, _) = await VisitSummaryTests.ProxyForAsync(apps, new ProxyTests.Person(visit.Patient, visit.Account, visit.Email, portal, jar), "Formsnone", sensitive: false);
+        var since = DateTimeOffset.UtcNow;
+        using (var page = await without.Client.GetAsync("/portal/forms", Cancel))
+        {
+            Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+            Assert.DoesNotContain(PreVisitFormTests.FormPath(await PreVisitFormTests.RequestAsync(apps, visit.Appointment, PreVisitFormTests.Phq9)),
+                await page.Content.ReadAsStringAsync(Cancel));
+        }
+
+        Assert.Equal(["patients forms"], await ReadsAsync(visit.Patient, without.Account, since));
+        var mine = RecordViewTests.Lines(await RecordViewTests.PageAsync(portal))
+            .Where(line => line.StartsWith($"proxy | {without.Email} | ", StringComparison.Ordinal)).Select(line => string.Join(" | ", line.Split(" | ").Take(3)));
+        Assert.Equal([$"proxy | {without.Email} | Your pre-visit forms page, with the forms hidden", $"proxy | {without.Email} | Your portal home page, with your appointments"], mine);
+        Assert.DoesNotContain(RecordViewTests.Lines(await RecordViewTests.PageAsync(without.Client)), line => line.Contains("forms", StringComparison.Ordinal));
+    }
+
+    // A clinician opens the forms page twice with the forms hidden, as it opens: the patient reads it as that page, with
+    // how many times in a minute, as any part counted by views; never as forms.
+    [Fact]
+    public async Task A_clinicians_forms_page_opened_twice_with_the_forms_hidden_is_counted_as_views_of_that_page()
+    {
+        var visit = await PreVisitFormTests.VisitAsync(apps, "Dr. Forms Asker");
+        using (var asked = await PreVisitFormTests.AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, PreVisitFormTests.Phq9))
+        {
+            Assert.True(asked.IsSuccessStatusCode, asked.StatusCode.ToString());
+        }
+
+        // Signed in before joining the panel, so their home's list of patients is no view of this one.
+        var twice = await apps.CreateStaffAsync("Dr. Forms Twice", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPrem, twice);
+        await apps.AssignAsync(twice, visit.Patient);
+        for (var time = 0; time < 2; time++)
+        {
+            using var page = await session.Client.GetAsync(PreVisitFormTests.FormsPath(visit.Patient), Cancel);
+            Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        }
+
+        // One line when both fell in one minute, as they nearly always do; two, each once, when a minute began between.
+        var minutes = (await PreVisitFormTests.QueryAsync(apps,
+            "SELECT to_char(date_trunc('minute', occurred_at), 'HH24:MI') FROM ehr.audit_events WHERE actor_id = @twice AND patient_id = @patient ORDER BY occurred_at",
+            ("twice", twice.Id), ("patient", visit.Patient))).Distinct().Count();
+        const string Page = "staff | Dr. Forms Twice, clinician | Your pre-visit forms page, with the forms hidden";
+        var lines = RecordViewTests.Lines(await RecordViewTests.PageAsync((await PreVisitFormTests.PortalAsync(apps, visit)).Client))
+            .Where(line => line.Contains("Dr. Forms Twice", StringComparison.Ordinal)).Select(line => string.Join(" | ", line.Split(" | ").Take(3)));
+        Assert.Equal(minutes == 1 ? [Page + ", 2 times"] : [Page, Page], lines);
+    }
+
+    // A clinician who holds a pre-visit form's alert (step 13e) without the patient on their panel reads its answers from
+    // the inbox, not through emergency access: the patient is shown the view as one of the pre-visit forms, unmarked; so
+    // is a proxy with sensitive items; a proxy without them is shown nothing of it.
+    [Fact]
+    public async Task An_alert_holder_off_the_panel_reading_a_forms_answers_is_shown_as_a_forms_view_and_not_as_emergency_access()
     {
         var visit = await PreVisitFormTests.VisitAsync(apps, "Dr. Forms Owner");
         using (var asked = await PreVisitFormTests.AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, PreVisitFormTests.Phq9))
@@ -252,8 +312,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, covering.Id));
         string[] Holder(string html) => [.. RecordViewTests.Lines(html).Where(line => line.Contains("Dr. Forms Holder", StringComparison.Ordinal))
             .Select(line => string.Join(" | ", line.Split(" | ").Take(3)))];
-        Assert.Equal(["staff | Dr. Forms Holder, clinician | A pre-visit form"], Holder(await RecordViewTests.PageAsync(portal)));
-        Assert.Equal(["staff | Dr. Forms Holder, clinician | A pre-visit form"], Holder(await RecordViewTests.PageAsync(allowed.Client)));
+        Assert.Equal(["staff | Dr. Forms Holder, clinician | Your pre-visit forms"], Holder(await RecordViewTests.PageAsync(portal)));
+        Assert.Equal(["staff | Dr. Forms Holder, clinician | The pre-visit forms"], Holder(await RecordViewTests.PageAsync(allowed.Client)));
         Assert.Empty(Holder(await RecordViewTests.PageAsync(without.Client)));
     }
 
@@ -293,6 +353,19 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(all.Union(RecordViewParts.All).Order(StringComparer.Ordinal), ViewsModel.Parts.Keys.Order(StringComparer.Ordinal));
         Assert.All(CloudAuditEvents.Parts.Where(shape => shape.Key.Action is AuditActions.ReadSensitive or AuditActions.DownloadSensitive).SelectMany(shape => shape.Value),
             part => Assert.NotNull(ViewsModel.Parts[part].Sensitive));
+
+        // Pre-visit forms, always sensitive items: a plain read is a forms page that showed none, a view of sensitive
+        // items is the forms; counted as views, never as forms.
+        Assert.Equal(
+            [
+                "Your pre-visit forms page, with the forms hidden", "The pre-visit forms page, with the forms hidden",
+                "Your pre-visit forms page, with the forms hidden, 2 times", "Your pre-visit forms", "The pre-visit forms", "The pre-visit forms, 3 times",
+            ],
+            [
+                ViewsModel.PartWords(AuditParts.Forms, own: true, count: 1, sensitive: false), ViewsModel.PartWords(AuditParts.Forms, own: false, count: 1, sensitive: false),
+                ViewsModel.PartWords(AuditParts.Forms, own: true, count: 2, sensitive: false), ViewsModel.PartWords(AuditParts.Forms, own: true, count: 1, sensitive: true),
+                ViewsModel.PartWords(AuditParts.Forms, own: false, count: 1, sensitive: true), ViewsModel.PartWords(AuditParts.Forms, own: false, count: 3, sensitive: true),
+            ]);
     }
 
     // A part the page has no words for, as from a database newer than the app during a deploy, is never shown as it is:
