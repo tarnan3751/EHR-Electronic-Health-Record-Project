@@ -46,8 +46,9 @@ namespace Ehr.Web.Api.Dictation;
 // The transcript: {text, final, segments: [{start, end, startMs, endMs, final, unclear}]}. start and end are half-open
 // UTF-16 offsets into text; unclear is null, "too_quiet", "too_noisy" or "low_confidence".
 //
-// The result: {transcript, sorting, reason?, message?, fields, notCarriedOver, provenance}, with sorting "pending",
-// "done" or "unavailable". fields is null, or {subjective, objective, assessment, plan}, each either {status: "pending", value, sources:
+// The result: {transcript, sorting, reason?, message?, fields, notCarriedOver, proposals?, provenance}, with sorting
+// "pending", "done" or "unavailable". fields is null, or {subjective, objective, assessment, plan}, each either
+// {status: "pending", value, sources:
 // [{start, end}], warnings: [{code, start, end}]}, a proposal for the clinician to approve, or {status: "empty",
 // reasons: [code, ...]}: nothing dictated, or discarded by validation, with the reasons' codes and never the discarded
 // text. A warning is "possible_correction", pointing at a later number, date or drug in the transcript that may be a
@@ -59,8 +60,11 @@ namespace Ehr.Web.Api.Dictation;
 // or all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is
 // kept as plain text." notCarriedOver: [{reason: "order" or "allergy_change", start, end}], each instruction in the
 // transcript to order something or change the allergy list, which no field carries (FR-14): the screen says it still
-// has to be placed, and can highlight the clinician's own words at start and end. provenance: {speech: {repository,
-// commit, sha256}, language: {repository, commit, file, sha256}, llamaServer, prompt, schema, structuring, code};
+// has to be placed, and can highlight the clinician's own words at start and end. proposals (the expansion plan's step
+// 15): [{kind: "order" or "allergy_addition", start, end, warnings: [{code, start, end}]}], those listed instructions the
+// dictation proposes, each at one's place and of its kind, from a final transcript, at most twenty; staged with the
+// review (TrustedResult), never carried into a field. Absent from a service older than step 15. provenance: {speech:
+// {repository, commit, sha256}, language: {repository, commit, file, sha256}, llamaServer, prompt, schema, structuring, code};
 // language and llamaServer are null while unknown. The JSON is
 // in DictationApiContract.cs, and every answer the service gives is pinned in src/Ehr.Dictation/contract, which the
 // service's tests write and DictationApiTests reads through this API.

@@ -475,6 +475,29 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Allergy));
     }
 
+    // As intended (D8, D17): a result whose fields couldn't be sorted still proposes what the rules found in its final
+    // transcript, since proposals don't come from the model. It is staged with them, and its review offers each, to open
+    // or dismiss, beside the transcript kept as plain text.
+    [Fact]
+    public async Task A_result_with_proposals_and_no_fields_is_staged_and_its_review_offers_them()
+    {
+        apps.Dictation.Reset();
+        apps.Dictation.Sorting = StubSorting.Unavailable;
+        var dictated = await DictateAsync(apps, reset: false);
+
+        var html = await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel);
+
+        Assert.Equal(["0 0 completed"], await QueryAsync(apps,
+            """
+            SELECT (SELECT count(*) FROM ehr.ai_field_proposals WHERE review_id = @id) || ' '
+                || (SELECT count(*) FROM ehr.ai_chart_proposals WHERE review_id = @id AND state <> 'pending') || ' ' || state
+            FROM ehr.ai_note_reviews WHERE id = @id
+            """, dictated.Review));
+        Assert.NotEmpty(LinkTo(html.Replace("&amp;", "&", StringComparison.Ordinal), OrderFormPath(dictated.Patient, dictated.Order)));
+        Assert.NotEmpty(LinkTo(html, AllergyFormPath(dictated.Patient, dictated.Allergy)));
+        Assert.Equal(2, CountOf(html, "Dismiss proposal"));
+    }
+
     // Off-site with the clinic's server cut off, the note being written is shown as last saved, without the proposals still
     // waiting, which can't be decided then: so they aren't read, and no read of them is queued for the clinic's audit log.
     // The review and the signed note, which show them, record theirs (TC-UC13-13, AuditPartTests).
