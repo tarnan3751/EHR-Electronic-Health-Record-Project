@@ -307,3 +307,44 @@ def test_drugs_fail_closed_both_ways(text, english, expected):
 def test_what_the_drug_checks_still_miss():
     # A name no list knows, with no dose just after it, for one no list knows either (translation.py's header).
     assert reasons("Continuar plixor.", ["Continuar plixor."], "Continue vortanex.") == []
+
+
+# ---- A passage cited once -------------------------------------------------------------------------------------------
+
+
+def test_a_passage_cited_again_in_another_field_discards_that_field_and_keeps_the_first():
+    text = "Mujer de 40 años con migraña. Control en 2 semanas."
+    statement = {"spanish": ["Mujer de 40 años con migraña."], "english": "40-year-old woman with migraine."}
+    checks = translation.check({"subjective": [statement], "assessment": [statement]}, [], transcript(text))
+    assert checks.fields["subjective"].pending
+    assert checks.fields["assessment"].reasons == ["source_repeated"]
+
+
+def test_the_answers_order_decides_which_citation_is_the_repeat():
+    # The flat answer said Assessment first: Subjective, later in the answer, is the one discarded.
+    text = "Mujer de 40 años con migraña. Control en 2 semanas."
+    quote = ["Mujer de 40 años con migraña."]
+    checks = translation.check({
+        "subjective": [{"spanish": quote, "english": "40-year-old woman with migraine.", "order": 1}],
+        "assessment": [{"spanish": quote, "english": "40-year-old woman with migraine.", "order": 0}],
+    }, [], transcript(text))
+    assert checks.fields["assessment"].pending and checks.fields["subjective"].reasons == ["source_repeated"]
+
+
+def test_a_statement_citing_part_of_an_earlier_ones_passage_is_a_repeat_in_one_field_too():
+    text = "Cefalea desde hace 3 días, sin fiebre."
+    checks = translation.check({"subjective": [
+        {"spanish": ["Cefalea desde hace 3 días, sin fiebre."], "english": "Headache for 3 days, no fever."},
+        {"spanish": ["sin fiebre"], "english": "No fever."},
+    ]}, [], transcript(text))
+    assert checks.fields["subjective"].reasons == ["source_repeated"]
+
+
+def test_the_same_words_said_twice_may_each_be_cited_once():
+    text = "Paracetamol 1 g cada 8 horas. Ibuprofeno 400 mg cada 8 horas."
+    checks = translation.check({"subjective": [
+        {"spanish": ["Paracetamol 1 g", "cada 8 horas"], "english": "Acetaminophen 1 g every 8 hours."},
+    ], "plan": [
+        {"spanish": ["Ibuprofeno 400 mg", "cada 8 horas"], "english": "Ibuprofen 400 mg every 8 hours."},
+    ]}, [], transcript(text))
+    assert checks.fields["subjective"].pending and checks.fields["plan"].pending

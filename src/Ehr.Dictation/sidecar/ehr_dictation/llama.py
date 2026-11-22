@@ -185,8 +185,8 @@ def parse_answer(content: object) -> tuple[dict[str, dict], list[str]]:
 def parse_statements(content: object) -> tuple[dict[str, list[dict]], list[str]]:
     """A Spanish dictation's answer (note-fields-es.schema.json), one list of statements, each its Spanish passages,
     its field and its English, checked against the schema's shape and sorted into the four fields' lists of statements,
-    each statement its Spanish passages and its English, as translation.check() takes them; and the names of any other
-    keys."""
+    each statement its Spanish passages, its English and its place in the answer ("order"), as translation.check()
+    takes them; and the names of any other keys."""
     try:
         data = json.loads(content) if isinstance(content, str) else None
     except json.JSONDecodeError:
@@ -202,6 +202,6 @@ def parse_statements(content: object) -> tuple[dict[str, list[dict]], list[str]]
     ):
         raise ModelOutputInvalid("The answer doesn't match the Spanish note schema.")
     fields: dict[str, list[dict]] = {name: [] for name in FIELDS}
-    for s in statements:
-        fields[s["field"]].append({"spanish": list(s["spanish"]), "english": s["english"]})
+    for order, s in enumerate(statements):
+        fields[s["field"]].append({"spanish": list(s["spanish"]), "english": s["english"], "order": order})
     return fields, [key for key in data if key != "statements"]

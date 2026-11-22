@@ -129,9 +129,13 @@ def test_llama_py_accepts_exactly_what_the_spanish_schema_does_and_sorts_it_into
                            ("plan", ["Control en 2 semanas."], "Follow-up in 2 weeks."))
     jsonschema.validate(json.loads(valid), SPANISH)
     fields, unknown = parse_statements(valid)
-    assert fields == {"subjective": [{"spanish": ["Niega fiebre."], "english": "Denies fever."}], "objective": [],
-                      "assessment": [], "plan": [{"spanish": ["Suspender metformina."], "english": "Stop metformin."},
-                                                 {"spanish": ["Control en 2 semanas."], "english": "Follow-up in 2 weeks."}]}
+    assert fields == {
+        "subjective": [{"spanish": ["Niega fiebre."], "english": "Denies fever.", "order": 1}],
+        "objective": [],
+        "assessment": [],
+        "plan": [{"spanish": ["Suspender metformina."], "english": "Stop metformin.", "order": 0},
+                 {"spanish": ["Control en 2 semanas."], "english": "Follow-up in 2 weeks.", "order": 2}],
+    }
     assert unknown == []
 
     for wrong in (

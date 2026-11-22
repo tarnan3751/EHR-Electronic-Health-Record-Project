@@ -133,7 +133,7 @@ def test_a_spanish_dictation_is_sent_the_spanish_prompt_and_its_statements_come_
 
     sent = json.loads(llama.requests[-1].content)
     assert sent["messages"][0]["content"].startswith("You sort a clinician's dictated transcript, spoken in Spanish")
-    assert proposal.fields["subjective"] == [{"spanish": ["Niega fiebre."], "english": "Denies fever."}]
+    assert proposal.fields["subjective"] == [{"spanish": ["Niega fiebre."], "english": "Denies fever.", "order": 0}]
     assert proposal.fields["plan"] == [] and proposal.unknown == ["orders"] and proposal.content == content
 
 

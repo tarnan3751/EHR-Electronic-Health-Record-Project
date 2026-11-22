@@ -14,7 +14,9 @@ statement:
    statement that was only an instruction is dropped.
 2. Each Spanish passage must be in the transcript, word for word, ignoring case, punctuation and accents
    (source_not_in_transcript), not in a passage marked unclear, and two words or more unless it holds a number. Every
-   check below reads the transcript's own words where the passage was found, never the model's copy.
+   check below reads the transcript's own words where the passage was found, never the model's copy. No word may be
+   cited by two statements of the answer: one citing a word an earlier statement (in the answer's order) cites outside
+   an instruction fails (source_repeated), so no passage is shown twice, in one field or two.
 3. Only the words outside a Spanish instruction to order something or change the allergy list count (spanish.py,
    FR-14). A statement whose passages are all inside one is that instruction translated: it is dropped, and the field
    is empty (order_or_allergy_change) when nothing is left of it. The Spanish is read as corrected: without a
@@ -90,6 +92,7 @@ REASONS = (
     "source_too_short",
     "source_not_in_transcript",
     "source_in_unclear_passage",
+    "source_repeated",
     "source_superseded",
     "number_not_in_sources",
     "unit_not_in_sources",
@@ -596,9 +599,11 @@ def said_numbers(said: list[spanish.Token], terms: list[_Term]) -> set[str]:
     return found | {"1"} if any(t.key in spanish.ARTICLE_NUMBERS for t in said) else found
 
 
-def _locate(quote: list[spanish.Token], ctx: _Context, earlier: list[tuple[int, int]]) -> tuple[int, int] | str:
+def _locate(quote: list[spanish.Token], ctx: _Context, earlier: list[tuple[int, int]],
+            cited: list[tuple[int, int]]) -> tuple[int, int] | str:
     """The quote's place in the transcript, word for word on keys, outside unclear passages, the first after the
-    statement's previous source that no earlier source took (as validation._locate())."""
+    statement's previous source that no earlier source took (as validation._locate()), and one no earlier statement of
+    the answer cites if there is one."""
     size, wanted = len(quote), [t.key for t in quote]
     keys = [t.key for t in ctx.toks]
     found = [(ctx.toks[i].start, ctx.toks[i + size - 1].end) for i in range(len(keys) - size + 1) if keys[i : i + size] == wanted]
@@ -608,6 +613,7 @@ def _locate(quote: list[spanish.Token], ctx: _Context, earlier: list[tuple[int, 
     if not clear:
         return "source_in_unclear_passage"
     unused = [span for span in clear if span not in earlier]
+    unused = [span for span in unused if not any(validation._overlaps(span, other) for other in cited)] or unused
     after = earlier[-1][1] if earlier else 0
     return next((span for span in unused if span[0] >= after), unused[0] if unused else clear[0])
 
@@ -629,7 +635,7 @@ def _outside_instructions(span: tuple[int, int], ctx: _Context) -> list[tuple[in
     return pieces
 
 
-def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]]) -> _Statement:
+def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]], cited: list[tuple[int, int]]) -> _Statement:
     raw = str(proposed.get("english", "")).strip()
     english = validation.clean(raw)
     result = _Statement(english)
@@ -661,7 +667,7 @@ def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]]) ->
         if len(quote_words) < 2 and not any(t.key[0].isdigit() for t in quote_words):
             result.reasons.add("source_too_short")
             continue
-        found = _locate(quote_words, ctx, earlier + located)
+        found = _locate(quote_words, ctx, earlier + located, cited)
         if isinstance(found, str):
             result.reasons.add(found)
             continue
@@ -672,6 +678,8 @@ def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]]) ->
         return result
     if result.reasons & LOCATING or not result.spans:
         return result
+    if any(validation._overlaps(span, other) for span in result.spans for other in cited):
+        result.reasons.add("source_repeated")
     _compare(result, ctx)
     return result
 
@@ -800,15 +808,9 @@ def _near_unclear(spans: list[tuple[int, int]], ctx: _Context) -> list[tuple[str
 # ---- A field --------------------------------------------------------------------------------------------------------
 
 
-def _field(name: str, proposed: list[dict], ctx: _Context) -> Translated:
+def _field(name: str, proposed: list[dict], results: list[_Statement], ctx: _Context) -> Translated:
     if not proposed:
         return Translated(name, "", ["not_dictated"])
-    results: list[_Statement] = []
-    earlier: list[tuple[int, int]] = []
-    for statement in proposed:
-        result = _statement(statement, ctx, earlier)
-        earlier += result.spans
-        results.append(result)
     kept = [r for r in results if not r.dropped]
     reasons = {reason for r in results for reason in r.reasons if not r.dropped or reason == "bad_format"}
     if len(proposed) > MAX_STATEMENTS:
@@ -831,9 +833,21 @@ def _field(name: str, proposed: list[dict], ctx: _Context) -> Translated:
 
 
 def check(fields: dict[str, list[dict]], unknown: list[str], transcript: Transcript) -> Translations:
-    """Each field's statements checked against the Spanish transcript (see the module's header)."""
+    """Each field's statements checked against the Spanish transcript (see the module's header), in the answer's order:
+    each statement's "order" (llama.parse_statements()), or else field by field."""
     ctx = _context(transcript)
-    checked = {name: _field(name, fields.get(name, []), ctx) for name in FIELDS}
+    proposed = {name: list(fields.get(name, [])) for name in FIELDS}
+    listed = [(name, k, statement) for name in FIELDS for k, statement in enumerate(proposed[name])]
+    results: dict[str, dict[int, _Statement]] = {name: {} for name in FIELDS}
+    earlier: dict[str, list[tuple[int, int]]] = {name: [] for name in FIELDS}
+    cited: list[tuple[int, int]] = []  # what every statement before this one in the answer quotes, outside instructions
+    for _, (name, k, statement) in sorted(enumerate(listed), key=lambda item: (item[1][2].get("order", item[0]), item[0])):
+        result = _statement(statement, ctx, earlier[name], cited)
+        earlier[name] += result.spans
+        cited += result.spans
+        results[name][k] = result
+    checked = {name: _field(name, proposed[name], [results[name][k] for k in range(len(proposed[name]))], ctx)
+               for name in FIELDS}
     offered = [f for f in checked.values() if f.pending]
     if len(offered) == 1 and ctx.toks:
         only = offered[0]
