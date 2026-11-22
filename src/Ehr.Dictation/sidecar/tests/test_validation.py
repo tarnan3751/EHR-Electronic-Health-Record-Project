@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from ehr_dictation.prompt import FIELDS
 from ehr_dictation.transcript import Segment, assemble
 from ehr_dictation.validation import FREE_WORDS, REASONS, check, directive_spans, directives, not_carried_over
 
@@ -704,11 +705,13 @@ def test_an_instruction_not_to_must_keep_its_negation():
     assert own(said, "An MRI.", "don't order an MRI").reasons == ["negation_dropped"]
 
 
-def test_an_order_sentence_is_cut_and_the_rest_of_the_plan_kept():
+# In whichever of the four fields the model put it (FR-14).
+@pytest.mark.parametrize("name", FIELDS)
+def test_an_order_sentence_is_cut_and_the_rest_of_the_field_kept(name):
     text = transcript("Start metformin 500 mg daily. I'm ordering an A1c.")
 
     checked = field("Start metformin 500 mg daily. I'm ordering an A1c.", "Start metformin 500 mg daily",
-                    "I'm ordering an A1c", name="plan", text=text)
+                    "I'm ordering an A1c", name=name, text=text)
 
     assert checked.pending and checked.value == "Start metformin 500 mg daily."
     assert [text.text[s:e] for s, e in checked.spans] == ["Start metformin 500 mg daily"]

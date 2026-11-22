@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from conftest import write_script
 
+from ehr_dictation.prompt import FIELDS
 from ehr_eval.scoring import FieldOutcome, Item, score
 from ehr_eval.scripts import load_all
 
@@ -98,8 +99,10 @@ def test_unsupported_content_in_proposed_and_offered_values(scripts):
     assert unsupported["proposed"] == round(1 / 4, 4)
 
 
-def test_an_order_slipped_into_an_offered_value_is_counted(scripts):
-    items = [item("d02", "x", plan=pending("Chest X-ray today."))]
+# In whichever of the four fields it is offered (FR-14).
+@pytest.mark.parametrize("name", FIELDS)
+def test_an_order_slipped_into_an_offered_value_is_counted(scripts, name):
+    items = [item("d02", "x", **{name: pending("Chest X-ray today.")})]
 
     assert score(items, scripts)["order_allergy"]["shown"] == 1
 
