@@ -9,10 +9,13 @@
 // - no microphone, or one the browser blocks: says how to fix it, and the page stays usable;
 // - a dropped connection: recording carries on, the chunks wait here in order, and they are sent again with backoff,
 //   from the one the API expects next (409 out_of_order), so the transcript resumes where it paused;
-// - a passage too quiet, too noisy or too uncertain to trust: marked in the transcript, to say again;
+// - a passage too quiet, too noisy or too uncertain to trust, or in Spanish not heard as Spanish: marked in the
+//   transcript, to say again;
 // - the model unavailable or too slow: the transcript stays as plain text, with the API's message;
 // - an order or allergy change dictated: listed as not carried over, never filled into a field (FR-14);
 // - Cancel: the session is deleted, so its audio and transcript are discarded, and the screen is cleared.
+// The language is chosen for each dictation, English first (the expansion plan's step 17): sent with the start as
+// spokenLanguage, never remembered, and fixed while a dictation is under way; a Spanish transcript is marked lang="es".
 // Finished results are staged through the server-owned review binding; no AI text is approved here (FR-13). The audio goes up in whatever format the browser records (AGENTS.md: never
 // hard-code one), and every piece of text is set with textContent, never parsed as HTML. Wired here rather than in
 // attributes, so a strict CSP can be added later.
@@ -28,6 +31,8 @@
     const api = root.dataset.dictationApi;
     const token = root.querySelector("input[name=__RequestVerificationToken]")?.value ?? "";
     const startButton = part("start");
+    const languageChoice = part("language");
+    const languageHint = part("language-hint");
     const stopButton = part("stop");
     const cancelButton = part("cancel");
     const statusArea = part("status");
@@ -88,11 +93,28 @@
         statusArea.classList.toggle("sc-status--error", isError);
     }
 
+    // The language can be changed only while a dictation can be started, never in the middle of one.
+    function startable(enabled) {
+        startButton.disabled = !enabled;
+        languageChoice.disabled = !enabled;
+    }
+
+    // The hint, read with the choice, says what a dictation in Spanish is.
+    function showLanguage() {
+        const spanish = languageChoice.value === "es";
+        languageHint.hidden = !spanish;
+        if (spanish) {
+            languageChoice.setAttribute("aria-describedby", languageHint.id);
+        } else {
+            languageChoice.removeAttribute("aria-describedby");
+        }
+    }
+
     // While recording, the status line carries a dot and the transcript's head says "Recording": a word beside each.
     function buttons(recording) {
         statusArea.dataset.state = recording ? "recording" : "idle";
         recordingMark.hidden = !recording;
-        startButton.disabled = recording;
+        startable(!recording);
         stopButton.disabled = !recording;
         cancelButton.disabled = !recording && state.session === null;
     }
@@ -141,8 +163,13 @@
         const requestId = state.requestId || crypto.randomUUID();
         state = fresh();
         state.requestId = requestId;
-        startButton.disabled = true;
+        const spokenLanguage = languageChoice.value === "es" ? "es" : "en";
+        startable(false);
         resetScreen();
+        if (spokenLanguage === "es") {
+            transcriptArea.lang = "es";
+        }
+
         cancelAs("Cancel");
         try {
             state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -156,7 +183,7 @@
         try {
             response = await call("POST", "/for-note", JSON.stringify({
                 reviewId: state.requestId, patientId: root.dataset.patientId,
-                draftId: root.dataset.draftId || null, version: Number(root.dataset.draftVersion) || null,
+                draftId: root.dataset.draftId || null, version: Number(root.dataset.draftVersion) || null, spokenLanguage,
             }), "application/json");
         } catch {
             endRecording();
@@ -345,7 +372,7 @@
             buttons(false);
             cancelButton.disabled = false;
             cancelAs("Discard");
-            startButton.disabled = true;
+            startable(false);
             say(result.sorting === "done"
                 ? "Done. Review each proposed field; nothing is in the note until you approve it."
                 : "Done, but the fields couldn't be sorted. The transcript is kept as plain text.");
@@ -413,7 +440,7 @@
         endRecording();
         state.ended = true;
         buttons(false);
-        startButton.disabled = state.session !== null;
+        startable(state.session === null);
         cancelButton.disabled = state.session === null;
         say(message, true);
     }
@@ -436,7 +463,7 @@
                 state.cancelled = false;
                 state.ended = true;
                 buttons(false);
-                startButton.disabled = true;
+                startable(false);
                 cancelButton.disabled = false;
                 say(`${error.message} Your transcript is still displayed; saved proposals must be reviewed individually.`, true);
                 return;
@@ -474,6 +501,7 @@
     function resetScreen() {
         state.transcript = null;
         reviewButton.hidden = true;
+        transcriptArea.removeAttribute("lang");
         transcriptArea.replaceChildren(element("p", "Your words appear here as you speak.", "sc-transcript__placeholder"));
         unclearNotice.hidden = true;
         sortMessage.textContent = "The fields are proposed once you stop.";
@@ -497,6 +525,16 @@
         return node;
     }
 
+    languageChoice.value = "en";
+    showLanguage();
+    languageChoice.addEventListener("change", showLanguage);
+    // A page the browser kept and shows again (Back) starts in English too, if no dictation is under way.
+    window.addEventListener("pageshow", (event) => {
+        if (event.persisted && !languageChoice.disabled) {
+            languageChoice.value = "en";
+            showLanguage();
+        }
+    });
     reviewButton.addEventListener("click", stageReview);
     startButton.addEventListener("click", start);
     stopButton.addEventListener("click", stop);

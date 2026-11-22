@@ -13,7 +13,9 @@ namespace Ehr.Web.Api.Dictation;
 
 public static partial class DictationApi
 {
-    public sealed record NoteDictationRequest(Guid ReviewId, Guid PatientId, Guid? DraftId, long? Version);
+    // SpokenLanguage (the expansion plan's step 17): "en" or "es" exactly, English when absent; any other is a 400.
+    public sealed record NoteDictationRequest(Guid ReviewId, Guid PatientId, Guid? DraftId, long? Version,
+        SpokenLanguage SpokenLanguage = SpokenLanguage.English);
     public sealed record StageReviewRequest(long Version);
 
     static void MapNoteReview(RouteGroupBuilder sessions)
@@ -57,7 +59,7 @@ public static partial class DictationApi
         }
 
         // Only a newly created sidecar session may be bound. A posted session ID/result is never accepted.
-        return await CallAsync(context, sidecar, "start-review", HttpMethod.Post, "v1/sessions", null,
+        return await CallAsync(context, sidecar, "start-review", HttpMethod.Post, "v1/sessions", Start(input.SpokenLanguage),
             async (body, token) =>
             {
                 var session = await body.ReadFromJsonAsync<DictationSession>(ServiceJson, token) ?? throw new JsonException();

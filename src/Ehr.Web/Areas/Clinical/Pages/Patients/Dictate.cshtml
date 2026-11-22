@@ -38,8 +38,20 @@ else
 {
     <section data-dictation data-dictation-api="@Ehr.Web.Api.Dictation.DictationApi.Path" data-patient-id="@Model.Patient.Id" data-draft-id="@Model.DraftId" data-draft-version="@Model.DraftVersion">
         @Html.AntiForgeryToken()
-        <p class="sc-notice sc-notice--info">Dictation supports English only and needs a microphone. Nothing is saved as approved note content without your review. Finished proposals and their source transcript are saved privately for review; orders and allergy changes are never filled in from dictation.</p>
+        <p class="sc-notice sc-notice--info">Dictation supports English and Spanish and needs a microphone. Nothing is saved as approved note content without your review. Finished proposals and their source transcript are saved privately for review; orders and allergy changes are never filled in from dictation.</p>
         <noscript><p class="sc-notice sc-notice--danger">Dictation needs JavaScript. You can still type the note.</p></noscript>
+
+        @* The language of this dictation (the expansion plan's step 17): chosen for each, English first, and never
+           remembered, by this page or the browser. js/dictation.js shows the hint when Spanish is chosen, and disables
+           the choice while a dictation is under way. *@
+        <div class="sc-field">
+            <label for="dictation-language">Language of this dictation</label>
+            <select id="dictation-language" class="sc-field__input" autocomplete="off" data-dictation-language>
+                <option value="en" selected>English</option>
+                <option value="es">Spanish (proposals in English)</option>
+            </select>
+            <p class="sc-field__hint" id="dictation-language-hint" data-dictation-language-hint hidden>Spanish: speak Spanish. The transcript stays in Spanish and the proposed note is in English for you to check. You don't need to say punctuation. Up to 2 minutes in Spanish.</p>
+        </div>
 
         @* "Dictate" is the page's one primary button; its shortcut is printed on it (js/dictation.js binds it). *@
         <div class="sc-actions">
@@ -62,7 +74,7 @@ else
                 <span class="sc-transcript__rec" data-dictation-recording hidden>Recording</span>
             </div>
             <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder">Your words appear here as you speak.</p></div>
-            <p class="sc-transcript__note" data-dictation-unclear hidden>Highlighted passages may be wrong: they were too quiet, too noisy, or the speech model wasn't sure. Say them again, or type them during review.</p>
+            <p class="sc-transcript__note" data-dictation-unclear hidden>Highlighted passages may be wrong: they were too quiet, too noisy, not heard as Spanish in a Spanish dictation, or the speech model wasn't sure. Say them again, or type them during review.</p>
         </section>
 
         <h2>Proposed fields</h2>

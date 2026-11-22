@@ -11,6 +11,10 @@ namespace Ehr.Web.Api.Dictation;
 // What the service allows a session: up to MaxSeconds of audio, in chunks of up to MaxChunkBytes each.
 public sealed record DictationSession(string SessionId, int MaxSeconds, int MaxChunkBytes);
 
+// What starting a session asks the service for: the language the clinician dictates in (the expansion plan's step 17),
+// always sent, English unless a note's dictation was started in Spanish.
+public sealed record SessionStart(SpokenLanguage SpokenLanguage);
+
 // The chunk just taken, how many seconds of audio the dictation now holds (of the session's MaxSeconds, so a screen can
 // warn before the cut-off), and the transcript so far.
 public sealed record AudioReceived(long ReceivedSeq, double AudioSeconds, Transcript Transcript);

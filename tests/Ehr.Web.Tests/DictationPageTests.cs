@@ -41,7 +41,7 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"data-dictation-api=\"{DictationApi.Path}\"", html);
         // The script, under its fingerprinted name (dictation.<hash>.js).
         Assert.Contains("/_content/Ehr.Design/js/dictation.", html);
-        Assert.Contains("Dictation supports English only", html);
+        Assert.Contains("Dictation supports English and Spanish", html);
         Assert.Contains("Nothing is saved", html);
         Assert.Contains("orders and allergy changes are never filled in from dictation", html);
         foreach (var field in new[] { "subjective", "objective", "assessment", "plan" })

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -29,12 +30,14 @@ namespace Ehr.Web.Api.Dictation;
 //
 // POST /api/dictation/sessions: 201 {sessionId, maxSeconds, maxChunkBytes}. The session takes up to maxSeconds of
 // audio, in chunks of up to maxChunkBytes (never over MaxChunkBytes, 2 MB). A session ID is 16 to 64 letters, digits,
-// _ or -; any other is 404 here, without asking the service.
+// _ or -; any other is 404 here, without asking the service. It is always a dictation in English, as is the desktop
+// app's offline one; a note's dictation (POST .../for-note, DictationReviewApi.cs) may be in Spanish.
 //
 // POST /api/dictation/sessions/{id}/audio?seq=N, the body one chunk of the recording, numbered from 0, in the audio/*
 // type the browser records (passed on as it came; WebKit and Chromium record different ones): 200 {receivedSeq,
-// audioSeconds, transcript}, audioSeconds being how much of maxSeconds (3 minutes) the dictation holds, so the screen
-// can warn before the cut-off; the transcript may lag a chunk when the service is busy. 409 out_of_order carries
+// audioSeconds, transcript}, audioSeconds being how much of maxSeconds (3 minutes, 2 in Spanish) the dictation holds,
+// so the screen can warn before the cut-off; the transcript may lag a chunk when the service is busy (a Spanish one
+// shows finished passages only). 409 out_of_order carries
 // expectedSeq, the chunk to send next: after a dropped connection, the client sends again from there and the transcript
 // carries on.
 //
@@ -44,7 +47,8 @@ namespace Ehr.Web.Api.Dictation;
 // dictation is cancelled, its audio and transcript discarded.
 //
 // The transcript: {text, final, segments: [{start, end, startMs, endMs, final, unclear}]}. start and end are half-open
-// UTF-16 offsets into text; unclear is null, "too_quiet", "too_noisy" or "low_confidence".
+// UTF-16 offsets into text; unclear is null, "too_quiet", "too_noisy" or "low_confidence", or in a dictation in
+// Spanish "other_language", a passage not heard as Spanish.
 //
 // The result: {transcript, sorting, reason?, message?, fields, notCarriedOver, proposals?, provenance}, with sorting
 // "pending", "done" or "unavailable". fields is null, or {subjective, objective, assessment, plan}, each either
@@ -73,7 +77,7 @@ namespace Ehr.Web.Api.Dictation;
 //   400 bad_form_token, or bad_seq; or bad_language: the service refused the language a dictation was started in
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop), or not_stopped (a result before stop)
-//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes)
+//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds
 //   415 unsupported_type: the body isn't audio/*
 //   422 not_audio: "The audio couldn't be decoded."
 //   429 busy: the service is busy
@@ -172,8 +176,9 @@ public static partial class DictationApi
         return await next(context);
     }
 
+    // English, always: the plain route and the desktop app's offline one (the expansion plan's step 17).
     static Task<IResult> StartAsync(HttpContext context, DictationSidecar sidecar) =>
-        CallAsync<DictationSession>(context, sidecar, "start", HttpMethod.Post, "v1/sessions", null,
+        CallAsync<DictationSession>(context, sidecar, "start", HttpMethod.Post, "v1/sessions", Start(SpokenLanguage.English),
             session => Results.Json(
                 session with { MaxChunkBytes = Math.Min(session.MaxChunkBytes, MaxChunkBytes) }, statusCode: StatusCodes.Status201Created));
 
@@ -223,6 +228,8 @@ public static partial class DictationApi
         SessionId().IsMatch(id)
             ? CallAsync(context, sidecar, "cancel", HttpMethod.Delete, $"v1/sessions/{id}", null, (_, _) => Task.FromResult(Results.NoContent()))
             : Task.FromResult(NotFound());
+
+    static JsonContent Start(SpokenLanguage language) => JsonContent.Create(new SessionStart(language), options: ServiceJson);
 
     // Calls the service, and writes its answer out again from the contract's types.
     static Task<IResult> CallAsync<T>(
@@ -306,7 +313,7 @@ public static partial class DictationApi
             case HttpStatusCode.RequestEntityTooLarge:
                 // Too long means stop and start another; too large, a smaller chunk.
                 return await ErrorBodyAsync(response, cancellationToken) is { Error: "too_long" }
-                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its 3-minute limit. Stop it and start another.")
+                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its time limit. Stop it and start another.")
                     : Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This chunk of audio, or the dictation as a whole, is too large.");
             case HttpStatusCode.UnprocessableEntity:
                 return Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded.");

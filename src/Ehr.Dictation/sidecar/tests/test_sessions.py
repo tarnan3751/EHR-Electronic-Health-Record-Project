@@ -657,7 +657,7 @@ def test_spanish_without_whisper_installed_is_refused(settings):
     assert sessions.count == 0
 
 
-# TC-UC10-13 and 14 (FR-14, proposed FR-61): a dictation in Spanish is transcribed by Whisper, sorted with the Spanish
+# TC-UC10-13, 14 and 17 (FR-14, NFR-15, proposed FR-61): a dictation in Spanish is transcribed by Whisper, sorted with the Spanish
 # prompt and schema, checked against its Spanish, lists its Spanish instructions and proposes nothing, and says so; one
 # in English beside it goes as before.
 def test_a_dictation_in_spanish_goes_through_whisper_the_spanish_checks_and_proposes_nothing(settings):
@@ -690,6 +690,26 @@ def test_a_dictation_in_spanish_goes_through_whisper_the_spanish_checks_and_prop
     assert "spokenLanguage" not in english and english["provenance"]["speech"] == MODELS.speech
     assert english["provenance"]["structuring"] == f"sha256:{prompt.load().structuring_sha256}"
     assert english["proposals"]
+
+
+# TC-UC10-16 (FR-11, FR-13, proposed FR-61): with the language model down, slow or answering nonsense, a dictation in
+# Spanish keeps its Spanish transcript as plain text and says why, as one in English does; it proposes nothing.
+@pytest.mark.parametrize(("llama", "reason"), [
+    (FakeLlama(status=503), "model_unavailable"),
+    (FakeLlama(TRADUCIDO, delay=3), "model_timeout"),
+    (FakeLlama("not json"), "model_output_invalid"),
+])
+def test_when_the_model_fails_a_spanish_transcript_stays_and_says_why(settings, llama, reason):
+    async def run():
+        sessions = make_spanish(settings, llama=llama, structuring_seconds=0.2)
+        session_id = await dictate_in(sessions, "es")
+        return await sessions.stop(session_id, ALICE)
+
+    result = asyncio.run(run())
+
+    assert (result["sorting"], result["reason"], result["fields"]) == ("unavailable", reason, None)
+    assert result["spokenLanguage"] == "es" and result["transcript"]["text"].startswith("Tos seca")
+    assert result["proposals"] == [] and result["notCarriedOver"]
 
 
 # Decision 20: a dictation in Spanish holds 2 minutes of audio, one in English 3.

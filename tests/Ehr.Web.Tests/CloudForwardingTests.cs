@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
@@ -226,6 +227,35 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 
     [GeneratedRegex("(?:href|src)=\"(/_content/[^\"]+)\"")]
     private static partial Regex PageAssets();
+
+    // The expansion plan's step 17: a note's dictation started off-site in Spanish reaches the on-prem app with its body
+    // as sent, so the dictation service is asked for one in Spanish, for the review the browser named.
+    [Fact]
+    public async Task A_dictation_started_off_site_in_spanish_is_forwarded_with_its_body_as_sent()
+    {
+        var service = apps.Dictation.Reset();
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Synthetic", "Dictado remoto");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.Cloud, clinician);
+        var token = Token(await session.Client.GetStringAsync($"/patients/{patient}/dictate", Cancel));
+        var review = Guid.NewGuid();
+        var forwarded = apps.Forwarded.Count;
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/dictation/sessions/for-note")
+        {
+            Content = JsonContent.Create(new { reviewId = review, patientId = patient, draftId = (Guid?)null, version = (long?)null, spokenLanguage = "es" }),
+        };
+        request.Headers.Add("RequestVerificationToken", token);
+
+        using var started = await session.Client.SendAsync(request, Cancel);
+
+        Assert.Equal(HttpStatusCode.Created, started.StatusCode);
+        Assert.Equal(["POST /api/dictation/sessions/for-note"], apps.Forwarded.Skip(forwarded));
+        var bound = await started.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Cancel);
+        Assert.Equal((review, 120), (bound.GetProperty("reviewId").GetGuid(), bound.GetProperty("maxSeconds").GetInt32()));
+        var start = Assert.Single(service.Received, received => received.PathAndQuery == "/v1/sessions");
+        Assert.Equal("""{"spokenLanguage":"es"}""", System.Text.Encoding.UTF8.GetString(start.Body));
+    }
 
     static bool RemovesLastSaveCookie(HttpResponseMessage response) =>
         response.Headers.TryGetValues("Set-Cookie", out var cookies)
