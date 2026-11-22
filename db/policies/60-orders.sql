@@ -23,8 +23,10 @@
 --      item's standard_code where its standard_system is 'rxnorm', which for RxNorm's own items is their code. The
 --      clinic's common item and RxNorm's (SYN-MED-001 "Lisinopril 10 mg tablet" and 314076 "lisinopril 10 MG Oral
 --      Tablet") are one drug at one strength, which a clinician may pick either way and a refill's approval (step
---      13d, 77-refill-requests.sql) always picks as RxNorm's; another strength is another product. The lookup is a
---      primary-key probe of the catalog for the new item and for each of the patient's active orders. The order a
+--      13d, 77-refill-requests.sql) always picks as RxNorm's; another strength is another product. The lookup
+--      probes the catalog by its primary key for the new item, and for a patient's few active orders for each of
+--      theirs; with hundreds of active orders PostgreSQL reads the catalog once instead (about 6 ms for 13,500 items:
+--      standard_code has no index), at signing only. The order a
 --      replacement replaces doesn't count: it is discontinued in the same transaction. Two submissions at once can't
 --      both get through: the second waited at the lock. The error is unique_violation (23505), which
 --      Ehr.Domain.Orders.ClinicalOrders turns into the order form's warning; PhiReader's order form finds the same

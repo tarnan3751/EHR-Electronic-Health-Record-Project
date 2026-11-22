@@ -41,7 +41,9 @@
 -- or leaving the panel, alone (ehr.follow_refill_care_team). So of two at once, one waits for the other and then sees
 -- what it wrote. Nothing that holds it waits for a medication's lock or a request's row, so it closes no circle with an
 -- approval or a marking. One lock for each patient whose panel a transaction joins: a panel of a hundred at once (the
--- benchmark's) is a hundred, well within the lock table.
+-- benchmark's) is a hundred, well within the lock table. The lock is held until the transaction ends, so two
+-- transactions that each join or leave several patients' panels must take them in the same order (by patient ID), or
+-- they can deadlock; the app joins and leaves one patient's panel in a request.
 CREATE OR REPLACE FUNCTION ehr.guard_refill_request() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
