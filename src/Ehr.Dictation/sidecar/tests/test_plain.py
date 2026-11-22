@@ -281,6 +281,10 @@ HELD_BACK = [
     "Order a CBC and a BMP. Not those.",
     "Order a CBC. Not that one.",
     "Order a CBC. Labs go with that.",
+    # Having it refilled, or sorting it out, is listed but isn't the plain form.
+    "Have her lisinopril refilled.",
+    "Please get her metformin 500 mg refilled for 90 days.",
+    "Sort out the refill.",
 ]
 
 # Plain, as the review's own controls: proposed, these words.

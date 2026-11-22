@@ -41,8 +41,9 @@ sentence accounted for:
   but "before" or "after" a meal or bedtime), "or", "either", "nor", "instead", "as needed", "prn", a negation, a
   subject or a word of telling (I, we, you, she, he, they; said, asked, told, insisted, suggested, wants, requested,
   mentioned, thinks), a reflexive, "any", "something", "whatever", "that" (but "call that in"), a note or a request,
-  words to the software, or another step of the plan (start, continue, stop, remove, update, take...); only a reason
-  after "because" may have its own subject ("because he has felt run down");
+  words to the software, another step of the plan (start, continue, stop, remove, update, take...), or "refilled"
+  (having it refilled: "have her lisinopril refilled"); only a reason after "because" may have its own subject
+  ("because he has felt run down"); and the verb isn't "sort out" ("sort out the refill");
 - an allergy to add names a substance of one to five words, not a note, a reaction or "that", on her, his, their or
   the list ("your" list, said to the software, is no patient's);
 - it doesn't come right after a sentence of four words or fewer that is a bare negation or doubt ("No.", "Not
@@ -78,11 +79,12 @@ and every check reads the cleaned text. The checks, each with the reason code re
   (a look-alike from another alphabet), markup, a link, code or JSON.
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
   its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one
-  is being placed now ("I'm ordering"), to write, send, refill or renew a prescription, to call in anything ("call in
-  something for her nausea", not "call in sick"), to send something to the pharmacy (anywhere on in the sentence: "send
-  amoxicillin 500 mg by mouth three times a day for 7 days to her pharmacy"), to make an orders section, or to change
-  the allergy list (add, remove, record, clear, update), whoever's list it is called ("her", "his", "their", "my",
-  "your": "I'll add penicillin to your allergies", as said to the patient); hyphens are ignored ("re-fill"). A word
+  is being placed now ("I'm ordering"), to write, send, refill, renew or sort out a prescription, to have or get one
+  refilled ("have her lisinopril refilled", not "it was refilled"), to call in anything ("call in something for her
+  nausea", not "call in sick"), to send something to the pharmacy (anywhere on in the sentence: "send amoxicillin 500
+  mg by mouth three times a day for 7 days to her pharmacy"), to make an orders section, or to change the allergy list
+  (add, remove, record, clear, update), whoever's list it is called ("her", "his", "their", "my", "your": "I'll add
+  penicillin to your allergies", as said to the patient); hyphens are ignored ("re-fill"). A word
   before the verb makes it a noun only right before it ("no order", "the lab order"): after a comma or a full stop the
   verb starts an instruction ("No, order a chest X-ray", "Check the lab. Order a CBC"). A plan stays a plan:
   "start", "continue", "increase" or "stop" a drug, orders in the past or by someone else ("her cardiologist ordered an
@@ -680,11 +682,14 @@ _NOUN_BEFORE = frozenset(
 )
 _ORDERS = [
     re.compile(
-        rf"\b(?:place|put in|putting in|enter|send in|send over|send|call in|phone in|fax|write|writing|give|giving)\s+"
-        rf"(?:(?:{_DET}|him|them|me|us)\s+)?(?:{_DET}\s+)?(?:\w+\s+)?(?:order|prescription|script|rx|refill)s?\b",
+        rf"\b(?:place|put in|putting in|enter|send in|send over|send|call in|phone in|fax|write|writing|give|giving|"
+        rf"sort out|sorting out)\s+(?:(?:{_DET}|him|them|me|us|you)\s+)?(?:{_DET}\s+)?(?:\w+\s+)?"
+        rf"(?:order|prescription|script|rx|refill)s?\b",
         re.IGNORECASE,
     ),
     re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
+    # Having it refilled, not that it was: "have her lisinopril refilled", "get that refilled".
+    re.compile(rf"\b(?:have|get|getting)\s+(?:(?:{_DET}|him|them|it)\s+)?(?:\w+\s+){{0,3}}?refilled\b", re.IGNORECASE),
     # "In to" as speech recognition often writes it: "call that into his usual pharmacy".
     re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in(?:to)?\b", re.IGNORECASE),
     re.compile(rf"\b(?:send|sending)\b(?:{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b|{_TO_THE_PHARMACY})", re.IGNORECASE),
@@ -1463,13 +1468,13 @@ _SOFTWARE = frozenset("ignore disregard forget instructions instruction rules ru
                       "assistant ai model system computer scribe software chatbot".split())
 # Never in a plain instruction's words, from its verb to the end of its sentence: someone else, a patient by name or
 # place, a hedge, a condition, an alternative or "as needed", a negation, a subject or word of telling, a reflexive, a
-# vague or reported object, the software, or another step of the plan.
+# vague or reported object, the software, another step of the plan, or a refill had done ("have it refilled").
 _NOT_PLAIN_AFTER = (
     _PEOPLE | {"patient", "patients"} | _HEDGES | _CONDITIONS | _TELLING | _SOFTWARE
     | frozenset(
         """or either nor instead needed prn no not nothing none never nobody neither i we you she he they yourself
         himself herself themselves myself ourselves itself any that which whatever something anything everything note
-        notes comment comments""".split()
+        notes comment comments refilled""".split()
     )
 )
 _PLAN_VERBS = frozenset(
@@ -1490,6 +1495,9 @@ _NOT_PLAIN_BEFORE = (
 _OPENING_CONDITIONS = _CONDITIONS - {"event", "case", "otherwise"}
 # Words that point back at what was just said.
 _POINTS_BACK = frozenset("that it this these those them".split())
+# Having it refilled or sorting it out, rather than saying it: listed as instructions (FR-14) but not the plain form
+# ("have her lisinopril refilled", "get that refilled", "sort out the refill").
+_NOT_PLAIN_VERBS = frozenset("sort sorting".split())
 # A step of the plan said with its verb, which an instruction may follow after a comma alone; and what may come before
 # that verb.
 _PLAN_STEPS = frozenset(
@@ -1564,6 +1572,8 @@ def _plain(text: str, sentence: int, sentence_end: int, start: int, at: int, kin
     # has felt run down").
     said = _CALLED_IN.sub("call in", after)
     verb = re.match(r"\S+", said)
+    if verb and _plainly(verb.group()) in _NOT_PLAIN_VERBS:
+        return False
     words = tokens(_DOSE_TIME.sub(" ", said[verb.end() if verb else 0 :]))
     reason = next((i for i, token in enumerate(words) if token.text == "because"), len(words))
     for i, token in enumerate(words):

@@ -949,6 +949,44 @@ def test_the_whole_of_a_long_instruction_is_listed_and_none_of_it_grounds_a_valu
     assert after.pending
 
 
+# Having a prescription refilled, sorting one out, and "you" as who it is for are instructions; a refill that was had, or
+# a refill sorted out by someone, is not.
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Have her lisinopril refilled.",
+        "Please get her metformin 500 mg refilled for 90 days.",
+        "Get that refilled.",
+        "Sort out the refill.",
+        "Sorting out her lisinopril refill today.",
+        "Write you a prescription for amoxicillin.",
+        "I'll give you a prescription for amoxicillin.",
+    ],
+)
+def test_having_a_prescription_refilled_or_sorting_one_out_is_an_order(said):
+    text = transcript(f"Continue lisinopril. {said}")
+
+    (listed,) = not_carried_over(text)
+
+    assert listed["reason"] == "order"
+    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".")
+    assert own(text.text, "Continue lisinopril. " + said).value == "Continue lisinopril."
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Her lisinopril was refilled last month.",
+        "She had her lisinopril refilled last week.",
+        "She has had it refilled twice.",
+        "The refill was sorted out by the nurse.",
+    ],
+)
+def test_a_refill_had_or_sorted_out_already_is_not_an_instruction(said):
+    assert not_carried_over(transcript(said)) == []
+    assert own(said, said).pending
+
+
 # Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
 @pytest.mark.parametrize(
     ("said", "reason"),
