@@ -248,7 +248,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
     // TC-UC23-06 in the browser: three voices told apart under a consent for the patient and the clinician. The third can
     // only be "I can't tell", as the page says, and from the keyboard: typing a choice's first letter, Tab between. Its
-    // words are shown as "Unsure" in the review.
+    // words are shown as "Unsure" in the review, and the order it said is listed as said where who spoke couldn't be told.
     [Fact]
     public async Task TC_UC23_06_a_voice_the_clinician_cant_tell_is_named_from_the_keyboard_and_shown_as_unsure()
     {
@@ -282,6 +282,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForURLAsync("**/review/*");
         await page.WaitForSelectorAsync(".sc-transcript__speaker");
         Assert.Contains("Unsure", await page.Locator(".sc-transcript__speaker").AllTextContentsAsync());
+        // The order that voice said, listed as not carried over, with why it is no one's.
+        Assert.Equal($"Order: “{DictationSidecarStub.FragmentSaid}” Said in a passage whose speaker couldn't be told.",
+            await page.Locator("[data-dictation-not-carried-list] li").TextContentAsync());
     }
 
     // TC-UC23-04 in the browser: fetching the draft after Stop. An answer this app couldn't use (502) isn't asked for

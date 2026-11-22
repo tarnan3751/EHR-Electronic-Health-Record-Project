@@ -200,11 +200,16 @@ public static partial class DictationApi
                     && i.Reason == (p.Kind == ProposalKind.Order ? Instruction.Order : Instruction.AllergyChange))
                 || p.Warnings.Any(w => w.Code == WarningCode.OneFieldHoldsDictation || !Range(w.Start, w.End)))) return null;
         var spoken = result.Transcript.Segments.Any(s => s.Speaker is not null || s.SpeakerGroup is not null) || result.Speakers is not null
+            || result.NotCarriedOver.Any(i => i.Speaker is not null)
             || result.Fields is { } said && new[] { said.Subjective, said.Objective, said.Assessment, said.Plan }
                 .OfType<PendingField>().Any(f => f.Sources.Any(s => s.Speaker is not null));
         // A visit's says who said every passage, whether or not its fields could be sorted: its review shows it a turn at a
-        // time, and a passage with no one's name would read as the turn before's.
-        if (ambient ? proposals.Count > 0 || result.Transcript.Segments.Any(s => s.Speaker is null) : spoken) return null;
+        // time, and a passage with no one's name would read as the turn before's. Each instruction it lists was said by the
+        // clinician, or in a passage whose speaker couldn't be told: never the patient's or someone else's.
+        if (ambient
+            ? proposals.Count > 0 || result.Transcript.Segments.Any(s => s.Speaker is null)
+                || result.NotCarriedOver.Any(i => i.Speaker is not (Speaker.Clinician or Speaker.Unsure))
+            : spoken) return null;
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
         if (result.Fields?.History is not null) return null;

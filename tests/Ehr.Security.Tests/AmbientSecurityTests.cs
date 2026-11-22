@@ -264,6 +264,12 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
                 "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":9,"text":"{{Said}}"}],
                 """),
             Put("\"sorting\":\"done\",", $$"""
+                "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":9,"speaker":"{{Said}}"}],
+                """),
+            Put("\"sorting\":\"done\",", """
+                "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":9,"speaker":"patient"}],
+                """),
+            Put("\"sorting\":\"done\",", $$"""
                 "sorting":"done","transcriptText":"{{Said}}",
                 """),
             Put("\"fields\":{", $$"""
@@ -298,7 +304,7 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
                 "fields":{"objective":{"status":"empty","reasons":["not_dictated"]},
                 """, StringComparison.Ordinal)
             .Replace("\"sorting\":\"done\",", """
-                "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":9}],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null},
+                "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":9,"speaker":"unsure"}],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null},
                 """, StringComparison.Ordinal);
         await Accounts.ExecuteAsync(App, visit.Actor, staged, [.. Parameters(visit), ("variant", stored)]);
         Assert.Equal(["pending"], await Query(visit, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));

@@ -146,6 +146,10 @@ window.SwiftChartDictationView = class {
                 const kind = proposed.get(`${item.start}:${item.end}`);
                 const li = element("li");
                 li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), document.createTextNode(`“${text}”`));
+                // A recorded visit's (step 16): an instruction said where who spoke couldn't be told.
+                if (item.speaker === "unsure") {
+                    li.append(document.createTextNode(" Said in a passage whose speaker couldn't be told."));
+                }
                 highlightOnFocus(li, [item]);
                 return li;
             }));

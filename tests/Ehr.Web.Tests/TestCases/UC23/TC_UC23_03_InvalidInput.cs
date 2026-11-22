@@ -19,8 +19,9 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   staging, with the service's answer replaced.
 // Test data: Consents without the agreement, with 4 speakers, agreed by a "neighbour", or in Spanish; a visit of three
 //   voices named with one missing, two clinicians, an unknown role, two others, a voice numbered past a gap, or a voice
-//   left out; a visit of two people, by its consent, and three voices, the third named as a person; drafts whose passage has no speaker, as the fields couldn't be sorted, or whose Subjective
-//   lacks the patient's-own-words warning.
+//   left out; a visit of two people, by its consent, and three voices, the third named as a person; drafts whose
+//   passage has no speaker, as the fields couldn't be sorted, whose Subjective lacks the patient's-own-words warning, or
+//   that list the patient's request as an instruction not carried over.
 // Steps:
 //   1. Start listening with each consent that isn't one.
 //   2. Start listening properly, and send a chunk of its audio through the dictation's route.
@@ -132,7 +133,8 @@ public class TC_UC23_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
     }
 
     // A visit's draft as the service sends one, but for what it gets wrong: a passage with no one's name, and the fields
-    // not sorted; or a Subjective value from the patient that doesn't say it is their own words.
+    // not sorted; a Subjective value from the patient that doesn't say it is their own words; or an instruction listed as
+    // the patient's, where only the clinician's, or one said where who spoke couldn't be told, is listed.
     const string Provenance = """
         "provenance":{"speech":{"repository":"google/medasr","commit":"1111111","sha256":"aaaa"},"language":null,"llamaServer":null,
         "prompt":"conversation-prompt-1","schema":"note-schema-1","structuring":"conversation-structuring-1","code":"sha256:cccc"}
@@ -147,6 +149,12 @@ public class TC_UC23_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         {"transcript":{"text":"I have had a cough for three days.","final":true,"segments":[{"start":0,"end":34,"startMs":0,"endMs":3000,"final":true,"speakerGroup":2,"speaker":"patient"}]},
          "sorting":"done","notCarriedOver":[],
          "fields":{"subjective":{"status":"pending","value":"I have had a cough for three days.","sources":[{"start":0,"end":34,"speaker":"patient"}],"warnings":[]},
+                   "objective":{"status":"empty","reasons":["not_dictated"]},"assessment":{"status":"empty","reasons":["not_dictated"]},"plan":{"status":"empty","reasons":["not_dictated"]}},
+        """)]
+    [InlineData("""
+        {"transcript":{"text":"I have had a cough for three days.","final":true,"segments":[{"start":0,"end":34,"startMs":0,"endMs":3000,"final":true,"speakerGroup":2,"speaker":"patient"}]},
+         "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":34,"speaker":"patient"}],
+         "fields":{"subjective":{"status":"pending","value":"I have had a cough for three days.","sources":[{"start":0,"end":34,"speaker":"patient"}],"warnings":[{"code":"patients_own_words","start":0,"end":34}]},
                    "objective":{"status":"empty","reasons":["not_dictated"]},"assessment":{"status":"empty","reasons":["not_dictated"]},"plan":{"status":"empty","reasons":["not_dictated"]}},
         """)]
     public async Task A_draft_that_doesnt_say_who_said_what_isnt_staged(string draft)

@@ -130,7 +130,10 @@ public enum SortingFailure
 
 // An instruction the clinician dictated that the note doesn't carry: its kind, and where they said it in the transcript
 // (offsets as in TranscriptSegment). The clinician's own words, already in the transcript; never anything the model wrote.
-public sealed record NotCarriedOver(Instruction Reason, int Start, int End);
+// A recorded visit's (step 16) says who said it: the clinician, or "unsure", a passage whose speaker couldn't be told; a
+// patient's request is never listed. A dictation's has no Speaker.
+public sealed record NotCarriedOver(Instruction Reason, int Start, int End,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Speaker? Speaker = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<Instruction>))]
 public enum Instruction

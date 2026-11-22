@@ -10,21 +10,25 @@ namespace Ehr.Web.Tests;
 // The stub's sessions that listen to a visit (the expansion plan's step 16), answered as the service answers them: started
 // with ?mode=ambient&speakers=N and called with DictationSidecar.ModeHeader every time (a call of the other kind finds no
 // session); audio taken in order with no transcript until stop, and how long nobody has spoken (QuietSeconds); at stop, a
-// made-up conversation of two or three voices (or one more, ExtraVoice), awaiting the clinician's word on who each is; a
-// mapping that leaves a voice out, doesn't name one clinician and one patient, or names more people, all but "unsure",
-// than the consent did, refused with 422 speakers_incomplete; and then the note's
-// fields drafted from it by who said what: Subjective from the patient's words, with the warning that they are the
-// patient's own, and Objective, Assessment and Plan from the clinician's, each source with its speaker. Once the voices
-// are named, every segment says who said it, whether or not the fields could be sorted: the app stages nothing else
-// (DictationApi.TrustedResult), and the service must send the same.
+// made-up conversation of two or three voices (or one more, ExtraVoice, saying an order), awaiting the clinician's word
+// on who each is; a mapping that leaves a voice out, doesn't name one clinician and one patient, or names more people,
+// all but "unsure", than the consent did, refused with 422 speakers_incomplete; and then the note's fields drafted from
+// it by who said what: Subjective from the patient's words, with the warning that they are the patient's own, and
+// Objective, Assessment and Plan from the clinician's, each source with its speaker, and the order said by a voice
+// named unsure listed as not carried over, with its speaker. Once the voices are named, every segment says who said it,
+// whether or not the fields could be sorted: the app stages nothing else (DictationApi.TrustedResult), and the service
+// must send the same.
 public sealed partial class DictationSidecarStub
 {
     // How long nobody has spoken, as the service measures it, in every audio answer.
     public double QuietSeconds { get; set; }
 
     // One voice more than the consent said would speak, as telling voices apart can hand over a fragment of someone's: the
-    // clinician can only name it "unsure" ("I can't tell") under a consent for two. Read as a session starts.
+    // clinician can only name it "unsure" ("I can't tell") under a consent for two. What it says is FragmentSaid, an order
+    // the draft lists as not carried over, said in a passage whose speaker couldn't be told. Read as a session starts.
     public bool ExtraVoice { get; set; }
+
+    public const string FragmentSaid = "Get a chest X-ray as well.";
 
     // The conversation, a turn at a time: who spoke (the voice the service told apart) and what they said.
     static readonly (int Group, string Text)[] Turns =
@@ -35,7 +39,6 @@ public sealed partial class DictationSidecarStub
         (1, "Your chest is clear."),
         (1, "Likely a viral cough."),
         (1, "Fluids and rest."),
-        (4, "Mm-hm."),
     ];
 
     HttpResponseMessage StartAmbient(string owner, string query)
@@ -112,7 +115,8 @@ public sealed partial class DictationSidecarStub
     {
         var text = new StringBuilder();
         var segments = new List<(int, int, int, string?)>();
-        foreach (var (group, words) in Turns.Where(turn => turn.Group <= session.Voices))
+        foreach (var (group, words) in Turns.Where(turn => turn.Group <= session.Speakers)
+            .Concat(session.Voices > session.Speakers ? [(session.Voices, FragmentSaid)] : []))
         {
             if (text.Length > 0)
             {
@@ -195,7 +199,9 @@ public sealed partial class DictationSidecarStub
                 assessment = clinician.Count > 1 ? Field(clinician[1]) : Empty(),
                 plan = clinician.Count > 2 ? Field(clinician[2]) : Empty(),
             },
-            notCarriedOver = Array.Empty<object>(),
+            // Each instruction with who said it: here the fragment's, named unsure.
+            notCarriedOver = spoken.Where(segment => segment.Group > session.Speakers && segment.Role == "unsure")
+                .Select(segment => new { reason = "order", start = segment.Start, end = segment.End, speaker = "unsure" }),
             provenance,
         };
     }

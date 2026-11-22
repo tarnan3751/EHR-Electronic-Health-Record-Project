@@ -24,8 +24,9 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 // Expected result: Step 1: the review cancelled; each later call refused with 409 not_listening and nothing more sent to
 //   the service; the service told to discard the session, as a visit's. Step 2: every proposal rejected, the review
 //   completed, no transcript kept, and the draft's four sections still empty. Step 3: the mapping sent to the service as
-//   named; the review's transcript gives the third voice's words as "unsure". (The browser does the same from the
-//   keyboard, switching the microphone off first, and names a voice "I can't tell": AmbientBrowserTests.)
+//   named; the review's transcript gives the third voice's words as "unsure", and lists the order it said as not
+//   carried over, said by no one who could be told. (The browser does the same from the keyboard, switching the
+//   microphone off first, and names a voice "I can't tell": AmbientBrowserTests.)
 // Creator: Tahseen Arnan
 public class TC_UC23_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -92,8 +93,10 @@ public class TC_UC23_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         using var staged = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version });
         Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
         var html = await l.Session.Client.GetStringAsync((await Json(staged)).GetProperty("url").GetString(), Cancel);
-        Assert.Contains("She has been coughing at night.", html);
+        Assert.Contains(DictationSidecarStub.FragmentSaid, html);
         Assert.Contains("\"speakerGroup\":3,\"speaker\":\"unsure\"", html);
+        // The order said in that passage is listed, with who said it: no one who could be told.
+        Assert.Matches("\"notCarriedOver\":\\[\\{\"reason\":\"order\",\"start\":\\d+,\"end\":\\d+,\"speaker\":\"unsure\"\\}\\]", html);
     }
 
     [Fact]

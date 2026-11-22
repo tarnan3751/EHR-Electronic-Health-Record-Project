@@ -60,7 +60,8 @@ namespace Ehr.Web.Api.Dictation;
 // or all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is
 // kept as plain text." notCarriedOver: [{reason: "order" or "allergy_change", start, end}], each instruction in the
 // transcript to order something or change the allergy list, which no field carries (FR-14): the screen says it still
-// has to be placed, and can highlight the clinician's own words at start and end. proposals (the expansion plan's step
+// has to be placed, and can highlight the clinician's own words at start and end. A visit's (AmbientApi) also has
+// speaker, "clinician" or "unsure" (said in a passage whose speaker couldn't be told). proposals (the expansion plan's step
 // 15): [{kind: "order" or "allergy_addition", start, end, warnings: [{code, start, end}]}], those listed instructions the
 // dictation proposes, each at one's place and of its kind, from a final transcript, at most twenty; staged with the
 // review (TrustedResult), never carried into a field. Absent from a service older than step 15. provenance: {speech:

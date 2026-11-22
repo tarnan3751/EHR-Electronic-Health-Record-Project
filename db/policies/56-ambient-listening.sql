@@ -46,7 +46,8 @@ CREATE OR REPLACE TRIGGER ambient_consents_guard
 --   sorting (55-ai-review.sql holds it) and reason, a code;
 --   fields: null, or the note's fields (and an earlier review's history), each {status: "pending", value, sources: [{start,
 --     end, speaker}], warnings: [{code, start, end}]} or {status: "empty", reasons: [codes]};
---   notCarriedOver: [{reason, start, end}]; proposals: none (a list that is empty, at most);
+--   notCarriedOver: [{reason, start, end, speaker: "clinician" or "unsure"}]; proposals: none (a list that is empty, at
+--     most);
 --   provenance and message.
 -- Every place is numbers and every code one of the contract's (DictationApiContract.cs: Speaker, Unclear, WarningCode,
 -- Instruction, SortingFailure; an empty field's reasons are the service's, held to the form of a code), so a word of the
@@ -107,7 +108,8 @@ BEGIN
             OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(result -> 'notCarriedOver') = 'array' THEN result -> 'notCarriedOver' ELSE '[]' END) x
                        WHERE jsonb_typeof(x) <> 'object' OR EXISTS (SELECT 1 FROM jsonb_each(x) e WHERE NOT (
                            e.key IN ('start', 'end') AND jsonb_typeof(e.value) = 'number'
-                           OR e.key = 'reason' AND e.value IN ('"order"', '"allergy_change"'))))
+                           OR e.key = 'reason' AND e.value IN ('"order"', '"allergy_change"')
+                           OR e.key = 'speaker' AND e.value IN ('"clinician"', '"unsure"'))))
             OR result -> 'proposals' NOT IN ('null', '[]')
             OR jsonb_typeof(result -> 'provenance') NOT IN ('object', 'null')
             OR jsonb_typeof(result -> 'message') NOT IN ('string', 'null')) THEN
