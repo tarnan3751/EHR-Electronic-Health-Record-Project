@@ -105,6 +105,10 @@ class Structurer:
     def structuring(self) -> Structuring:
         return self._structuring
 
+    def using(self, structuring: Structuring) -> Structurer:
+        """The same llama-server, model file and time limit with another prompt: a conversation's (step 16)."""
+        return Structurer(self._llama, structuring, self._model_file, timeout=self._timeout)
+
     async def propose(self, transcript: str) -> Proposal:
         try:
             async with asyncio.timeout(self._timeout):
