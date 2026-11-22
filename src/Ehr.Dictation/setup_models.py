@@ -8,7 +8,8 @@
   model llama.cpp calls IFM/K2-Horizon-7B-GGUF:Q4_K_M), into infra/compose/models/ for llama-server.
 - MedASR, speech to text: google/medasr, into infra/compose/models/medasr/ for the sidecar.
 - Whisper large-v3-turbo, speech to text for dictation in Spanish (the expansion plan's step 17), only when asked:
-  openai/whisper-large-v3-turbo at the commit WHISPER_REVISION pins, into infra/compose/models/whisper/. MIT, not gated.
+  openai/whisper-large-v3-turbo at the commit WHISPER_REVISION pins, into infra/compose/models/whisper/. MIT, not gated:
+  set up only while Hugging Face says so (gated is False; neither "auto", "manual" nor unknown).
   Without it the sidecar still starts, and refuses Spanish.
 
     uv run src/Ehr.Dictation/setup_models.py                          # K2 Horizon and MedASR
@@ -84,6 +85,7 @@ class Repository:
     name: str
     commit: str
     files: list[RemoteFile]
+    gated: bool | str | None = None  # what Hugging Face says: False, "auto" or "manual", or None when it doesn't say
 
 
 def read_repository(api: HfApi, name: str, revision: str) -> Repository:
@@ -113,7 +115,7 @@ def read_repository(api: HfApi, name: str, revision: str) -> Repository:
         raise SetupError(f"Hugging Face didn't say which commit {name} at {revision} is.")
     if re.fullmatch(r"[0-9a-f]{40}", revision) and info.sha != revision:
         raise SetupError(f"Hugging Face answered {name} at {revision} with another commit, {info.sha}.")
-    return Repository(name, info.sha, files)
+    return Repository(name, info.sha, files, getattr(info, "gated", None))
 
 
 def gated_message(name: str) -> str:
@@ -327,6 +329,9 @@ def setup_whisper(api: HfApi, args: argparse.Namespace, models_dir: Path) -> dic
     """Every file of the pinned commit but the dot files, into the whisper folder, as MedASR's are; its card, which
     says it is MIT-licensed, comes with them."""
     repository = read_repository(api, args.whisper_repo, args.whisper_revision)
+    # Set up without a sign-in only while Hugging Face says it isn't gated: an answer that doesn't say is no answer.
+    if repository.gated is not False:
+        raise SetupError(gated_message(repository.name))
     files = [f for f in repository.files if not f.name.startswith(".")]
     list_files(f"Whisper: {repository.name} at commit {repository.commit[:12]}", files)
     if args.dry_run:

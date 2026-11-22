@@ -92,7 +92,7 @@ class FakeHub:
             )
             for filename, (data, lfs) in repo["files"].items()
         ]
-        return SimpleNamespace(sha=repo["sha"], siblings=siblings)
+        return SimpleNamespace(sha=repo["sha"], siblings=siblings, gated=repo.get("gated", name in self.gated))
 
     def download(self, repo_id, filename, revision=None, local_dir=None):
         assert revision == self.repos[repo_id]["sha"], "downloads use the resolved commit"
@@ -278,6 +278,7 @@ def test_a_folder_git_would_track_is_refused(hub, tmp_path, monkeypatch, capsys)
 
 # Step 17: Whisper, for dictation in Spanish, only when asked; at the pinned commit, with no sign-in, recorded as
 # MedASR is, beside the others, and re-checked by --verify.
+# Hugging Face says gated is False (the fake hub's default for a repository it isn't told is gated): accepted.
 def test_whisper_is_set_up_only_when_asked_at_the_pinned_commit_without_a_sign_in(hub, models):
     assert run(models) == 0
     assert "whisper" not in manifest(models)
@@ -292,6 +293,14 @@ def test_whisper_is_set_up_only_when_asked_at_the_pinned_commit_without_a_sign_i
     assert weights["sha256"] == hashlib.sha256(WHISPER["files"]["model.safetensors"][0]).hexdigest()
     assert (models / "whisper" / "model.safetensors").is_file()
     assert run(models, "--verify") == 0
+
+
+@pytest.mark.parametrize("gated", [None, "auto", "manual"])
+def test_whisper_is_refused_unless_hugging_face_says_it_isnt_gated(hub, models, capsys, gated):
+    hub.repos["openai/whisper-large-v3-turbo"] = WHISPER | {"gated": gated}
+    assert run(models, "--only", "whisper") == 1
+    assert "is gated" in capsys.readouterr().err
+    assert not (models / "whisper").exists() and not (models / "models-manifest.json").exists()
 
 
 def test_whisper_at_another_commit_than_the_one_asked_is_refused(hub, models, capsys):
