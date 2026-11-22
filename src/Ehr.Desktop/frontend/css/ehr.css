@@ -578,6 +578,16 @@
         padding: 0 var(--space-3);
     }
 
+    /* A button whose words can be longer than a phone is wide wraps them, instead of running past the window's edge: a
+       recorded visit's "Reject every proposal and delete the conversation" (step 16). */
+    .sc-btn--wraps {
+        height: auto;
+        min-height: var(--control-height);
+        padding-block: var(--space-1);
+        white-space: normal;
+        text-align: center;
+    }
+
     .sc-btn--portal,
     .sc-app--portal .sc-btn {
         height: var(--control-height-portal);

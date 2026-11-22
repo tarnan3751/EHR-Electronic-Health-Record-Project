@@ -245,4 +245,40 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForTimeoutAsync(2000);
         Assert.StartsWith("Nobody has spoken for 4 minutes", await page.TextContentAsync("[data-ambient-status]"));
     }
+
+    // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
+    // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
+    [Fact]
+    public async Task TC_UC23_06_a_visits_review_fits_every_width_in_both_themes()
+    {
+        apps.Dictation.Reset();
+        var d = await AmbientFlows.DraftAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
+        const string Layout = """
+            () => {
+                const width = window.innerWidth;
+                const wide = [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > width + 1).map(e => e.tagName + '.' + e.className);
+                const button = document.querySelector('[data-ambient-reject-all] button').getBoundingClientRect();
+                return { scrolls: document.documentElement.scrollWidth > width, wide, inside: button.right <= width };
+            }
+            """;
+        foreach (var scheme in new[] { ColorScheme.Light, ColorScheme.Dark })
+        {
+            foreach (var width in new[] { 1280, 360 })
+            {
+                await using var context = await browser.NewContextAsync(new() { IgnoreHTTPSErrors = true, ColorScheme = scheme, ViewportSize = new() { Width = width, Height = 800 } });
+                await context.AddCookiesAsync(d.Listening.Session.Jar.GetCookies(Base).Cast<System.Net.Cookie>().Select(c => new Microsoft.Playwright.Cookie
+                { Name = c.Name, Value = c.Value, Domain = "localhost", Path = c.Path, Secure = true, HttpOnly = c.HttpOnly, SameSite = SameSiteAttribute.Strict }));
+                var page = await context.NewPageAsync();
+                await page.GotoAsync($"{server.Url}{d.ReviewUrl}");
+                var layout = await page.EvaluateAsync<System.Text.Json.JsonElement>(Layout);
+                var where = $"at {width} pixels in the {scheme} theme";
+                Assert.False(layout.GetProperty("scrolls").GetBoolean(), $"The review scrolls sideways {where}.");
+                Assert.True(layout.GetProperty("wide").GetArrayLength() == 0, $"Wider than the window {where}: {layout.GetProperty("wide")}");
+                Assert.True(layout.GetProperty("inside").GetBoolean(), $"Reject every proposal runs past the window {where}.");
+            }
+        }
+    }
 }

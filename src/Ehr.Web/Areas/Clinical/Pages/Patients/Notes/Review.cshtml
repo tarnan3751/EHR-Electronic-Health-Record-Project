@@ -201,7 +201,7 @@
         @* For a patient who withdraws their consent after the visit: nothing goes into the note, and the transcript goes. *@
         <form method="post" asp-page-handler="RejectAll" class="sc-form sc-form--wide" data-ambient-reject-all>
             <input type="hidden" name="Version" value="@Model.Draft.Version" />
-            <button class="sc-btn sc-btn--danger">Reject every proposal and delete the conversation</button>
+            <button class="sc-btn sc-btn--danger sc-btn--wraps">Reject every proposal and delete the conversation</button>
         </form>
     }
     @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed && !Model.DecideAtTheClinic)
