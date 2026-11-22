@@ -30,6 +30,9 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
     public Guid? ActiveReviewId { get; private set; }
     public IReadOnlyList<AiNoteReview> CompletedReviews { get; private set; } = [];
 
+    // The orders and allergies to add its dictations propose that still wait for a decision (the expansion plan's step 15).
+    public IReadOnlyList<AiChartProposal> WaitingProposals { get; private set; } = [];
+
     // Where the text in the sections came from (step 14): an earlier draft's History, or the desktop app's plain text,
     // is put in Subjective for its author to sort, and the page says so. The draft itself changes only when saved.
     public NoteOrigin Origin { get; private set; } = NoteOrigin.Sections;
@@ -61,6 +64,7 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         var reviews = await Phi.AiReviewsAsync(draftId, AuditParts.NoteDraft, HttpContext.RequestAborted);
         ActiveReviewId = reviews.FirstOrDefault(r => r.State is AiReviewStates.Pending or AiReviewStates.Recording)?.Id;
         CompletedReviews = reviews.Where(r => r.State == AiReviewStates.Completed).ToList();
+        WaitingProposals = await Phi.WaitingChartProposalsAsync([.. reviews.Select(r => r.Id)], AuditParts.NoteDraft, HttpContext.RequestAborted);
         var content = NoteContent.From(draft);
         (Subjective, Objective, Assessment, Plan, Version) = (content.Subjective, content.Objective, content.Assessment, content.Plan, draft.Version);
         (Origin, Saved) = (NoteContent.OriginOf(draft), NoteSections.AsSaved(draft));

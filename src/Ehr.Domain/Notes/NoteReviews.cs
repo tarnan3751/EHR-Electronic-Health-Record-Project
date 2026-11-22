@@ -3,6 +3,7 @@ using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Phi;
+using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Domain.Notes;
 
@@ -175,6 +176,31 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         return new(200, [], review, draft.Version);
     }
 
+    // Dismisses one of the orders or allergies to add the dictation proposes (the expansion plan's step 15): decided once,
+    // by the review's clinician, with nothing written to the chart. It needs no draft lock and no unsigned draft: a
+    // proposal waits for its decision whatever becomes of the note. Dismissing one already dismissed changes nothing.
+    public async Task<ReviewResult> DismissAsync(Guid id, Guid proposalId, CancellationToken cancel)
+    {
+        if (!authority.IsPrimaryHost) return ReviewResult.Offline;
+        if (await phi.AiReviewAsync(id, cancel) is not { } review) return ReviewResult.Missing;
+        var proposal = (await phi.ChartProposalsAsync(id, AuditParts.NoteDraft, cancel, tracking: true)).SingleOrDefault(p => p.Id == proposalId);
+        if (proposal is null) return ReviewResult.Missing;
+        if (proposal.State != AiChartProposalStates.Pending)
+            return proposal.State == AiChartProposalStates.Dismissed ? new(200, [], review) : ReviewResult.Decided;
+        proposal.State = AiChartProposalStates.Dismissed;
+        try
+        {
+            await db.SaveChangesAsync(cancel);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Decided in another tab since it was read. Not tracked any more, so the page's reads after this save nothing.
+            db.Entry(proposal).State = EntityState.Detached;
+            return ReviewResult.Decided;
+        }
+        return new(200, [], review);
+    }
+
     async Task<(AiNoteReview? Review, ClinicalDraft? Draft)> LockAsync(Guid id, CancellationToken cancel)
     {
         var snapshot = await phi.AiReviewAsync(id, cancel);
@@ -224,6 +250,7 @@ public sealed record ReviewResult(int Status, IReadOnlyList<string> Errors, AiNo
     public static ReviewResult Missing => new(404, ["This review is unavailable. Check your patient panel and draft ownership."]);
     public static ReviewResult Offline => new(503, ["The clinic server must be available to save review decisions. Your displayed work is still here."]);
     public static ReviewResult Signed => new(409, ["This note has been signed and cannot receive AI proposals."]);
+    public static ReviewResult Decided => new(409, ["Not saved: this proposal was already decided, in another tab or window. Nothing was changed."]);
     public static ReviewResult Invalid(string error) => new(422, [error]);
     public static ReviewResult Conflict(long version) => new(409,
         ["The draft or review changed elsewhere. Your displayed work is still here. Compare the current draft and reload the saved review before retrying."], Version: version);

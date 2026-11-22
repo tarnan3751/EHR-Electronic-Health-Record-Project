@@ -252,9 +252,9 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         string url;
         if (Proposed is { } proposed)
         {
-            // Back to the review.
+            // Back to the review, with the cursor on the next proposal waiting there.
             url = Url.Page("/Patients/Notes/Review",
-                new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId })!;
+                new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId, decided = proposed.Row.Id })!;
         }
         else if (Refill is { } approved)
         {

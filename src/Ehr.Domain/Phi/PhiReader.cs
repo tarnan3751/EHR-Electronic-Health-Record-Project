@@ -1231,6 +1231,42 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         return proposals;
     }
 
+    // The orders and allergies to add a dictation proposes (the expansion plan's step 15), in its result's order: the
+    // review's own clinician's alone, as row-level security has it. Each a recorded read, with the part of the page.
+    public async Task<IReadOnlyList<AiChartProposal>> ChartProposalsAsync(Guid review, string part, CancellationToken cancel, bool tracking = false)
+    {
+        var query = tracking ? db.AiChartProposals.AsQueryable() : db.AiChartProposals.AsNoTracking();
+        var proposals = await query.Where(p => p.ReviewId == review).OrderBy(p => p.Ordinal).ToListAsync(cancel);
+        if (proposals.Count > 0)
+        {
+            await audit.RecordReadsAsync("ai_chart_proposals", part, proposals.Select(p => (p.PatientId, p.Id)), cancel);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return proposals;
+    }
+
+    // Of those reviews' proposals, the ones still waiting for their clinician's decision, for the note to say so: recorded
+    // as read, with the part of the page. No statement when there are no reviews, as for a note written by hand.
+    public async Task<IReadOnlyList<AiChartProposal>> WaitingChartProposalsAsync(IReadOnlyCollection<Guid> reviews, string part, CancellationToken cancel)
+    {
+        if (reviews.Count == 0)
+        {
+            return [];
+        }
+
+        var waiting = await db.AiChartProposals.AsNoTracking()
+            .Where(p => reviews.Contains(p.ReviewId) && p.State == AiChartProposalStates.Pending)
+            .OrderBy(p => p.ReviewId).ThenBy(p => p.Ordinal).ToListAsync(cancel);
+        if (waiting.Count > 0)
+        {
+            await audit.RecordReadsAsync("ai_chart_proposals", part, waiting.Select(p => (p.PatientId, p.Id)), cancel);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return waiting;
+    }
+
     // One proposal of the patient's of the given kind, for the form opened from it (the expansion plan's step 15), with
     // its review, whose stored result holds its words: both recorded as read, a note being written. Null when it isn't
     // this patient's, of that kind, or the reader's own.

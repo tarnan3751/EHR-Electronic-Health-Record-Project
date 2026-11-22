@@ -240,7 +240,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
             return added switch
             {
                 ProposedAllergy.Saved => Redirect(Url.Page("/Patients/Notes/Review",
-                    new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId })!),
+                    new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId, decided = proposed.Row.Id })!),
                 ProposedAllergy.Decided => ProposalNotDecided(),
                 _ => RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id)),
             };

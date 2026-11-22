@@ -60,8 +60,9 @@ public static class CloudAuditEvents
         [(AuditActions.Read, "clinical_drafts")] = [AuditParts.Chart, AuditParts.NoteDraft],
         [(AuditActions.Read, "ai_note_reviews")] = [AuditParts.VisitNote, AuditParts.NoteDraft],
         [(AuditActions.Read, "ai_field_proposals")] = [AuditParts.NoteDraft],
-        // A dictation's proposed orders and allergies (step 15): on the forms opened from them, a note being written.
-        [(AuditActions.Read, "ai_chart_proposals")] = [AuditParts.NoteDraft],
+        // A dictation's proposed orders and allergies (step 15): on its review and the forms opened from them, the note being
+        // written, and the signed note.
+        [(AuditActions.Read, "ai_chart_proposals")] = [AuditParts.VisitNote, AuditParts.NoteDraft],
         [(AuditActions.Read, PhiReader.ThreadsTable)] = [AuditParts.Conversations],
         [(AuditActions.Read, PhiReader.SummariesTable)] = [AuditParts.Summaries, AuditParts.Printable],
         [(AuditActions.Read, PhiReader.AuditTable)] = [AuditParts.Views],

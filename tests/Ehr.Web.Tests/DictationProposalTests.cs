@@ -10,11 +10,11 @@ using static Ehr.Web.Tests.Browser;
 namespace Ehr.Web.Tests;
 
 // The expansion plan's step 15 (FR-14 as reworded): the orders and allergies to add a dictation proposes, through the web
-// app as each site. The service's proposals reach the review only as its listed instructions, staged once; each is opened
-// in the order form or the allergy form, which fill in nothing from it, and decided there once; nothing is ordered or
-// added on the chart by any of it otherwise. The stub proposes both kinds, so each test follows an order and an allergy
-// (step 14's lesson: a stub that proposes nothing keeps regressions green). The forms themselves are UC 1's and UC 4's
-// test cases (TestCases/UC1, TestCases/UC4).
+// app as each site. The service's proposals reach the review only as its listed instructions, staged once; the review
+// shows each in the clinician's own words, marked in the sentence they said it in, to open in the order form or the
+// allergy form or to dismiss; nothing is ordered, added or changed on the chart by any of it. The stub proposes both
+// kinds, so each test follows an order and an allergy (step 14's lesson: a stub that proposes nothing keeps regressions
+// green). The forms opened from a proposal are UC 1's and UC 4's test cases (TestCases/UC1, TestCases/UC4).
 public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 {
     readonly DictationSidecarStub sidecar = apps.Dictation.Reset();
@@ -137,6 +137,40 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
     internal static string AllergyFormPath(Guid patient, Guid proposal) => $"/patients/{patient}/allergies?proposal={proposal}";
 
+    // The note signed as UC 13 and UC 14 sign a dictated one: each field accepted on the review, the review completed, the
+    // draft saved and signed. The signed note's page.
+    internal static async Task<string> SignNoteAsync(WebApps apps, Dictated dictated)
+    {
+        async Task<long> VersionAsync() => long.Parse((await QueryAsync(apps, "SELECT version FROM ehr.clinical_drafts WHERE id = @id", dictated.Draft)).Single(),
+            System.Globalization.CultureInfo.InvariantCulture);
+        async Task<JsonElement> PostAsync(string path, params (string Name, object Value)[] fields)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = Form([("__RequestVerificationToken", dictated.Token), .. fields]) };
+            request.Headers.Add("HX-Request", "true");
+            using var response = await dictated.Session.Client.SendAsync(request, Cancel);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return JsonDocument.Parse(await response.Content.ReadAsStringAsync(Cancel)).RootElement.Clone();
+        }
+
+        foreach (var field in await QueryAsync(apps, "SELECT id FROM ehr.ai_field_proposals WHERE review_id = @id ORDER BY field", dictated.Review))
+        {
+            await PostAsync(dictated.ReviewPath + "?handler=Decide", ("ProposalId", field), ("Version", await VersionAsync()), ("DecisionKey", Guid.NewGuid()),
+                ("Decision", "accepted"), ("EditedValue", ""));
+        }
+
+        await PostAsync(dictated.ReviewPath + "?handler=Complete", ("Version", await VersionAsync()));
+        var editor = $"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}";
+        (string, object)[] sections = [("Subjective", "Synthetic subjective"), ("Objective", "Synthetic objective"), ("Assessment", "Synthetic assessment"),
+            ("Plan", "Synthetic plan")];
+        await PostAsync(editor + "?handler=Review", [("Version", await VersionAsync()), .. sections]);
+        var signed = await PostAsync(editor + "/confirm", [("Version", await VersionAsync()), ("Confirmed", true), .. sections]);
+        return signed.GetProperty("url").GetString()!.Split('?')[0];
+    }
+
+    // Dismiss on the review, as the page posts it.
+    internal static Task<HttpResponseMessage> DismissAsync(Dictated dictated, Guid proposal, HttpClient? client = null) =>
+        PostFormAsync(client ?? dictated.Session.Client, dictated.ReviewPath + "?handler=DismissProposal", dictated.ReviewPath, ("ChartProposalId", proposal));
+
     // TC-UC10-09, through the web app: what the service proposes comes back with the result as it sent it, at its listed
     // instructions' places, in no field; staging keeps each as a waiting proposal of its review, in its order, and puts
     // nothing on the chart.
@@ -234,6 +268,159 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             """, stopped.Review));
     }
 
+    // TC-UC13-10: the review lists each proposal under "Proposed orders and allergies": its kind, awaiting review, the
+    // clinician's words marked in the sentence they said them in and the one before, its warnings with the words they point
+    // at, and the way into its form; the order's into the order form, the allergy's into the allergy form. Only the
+    // dictating clinician sees them: not a colleague with the patient on their panel (TC-UC1-24 opens the order form
+    // with one as the colleague).
+    [Fact]
+    public async Task TC_UC13_10_the_review_lists_each_proposal_in_its_sentence_with_the_way_into_its_form()
+    {
+        var dictated = await DictateAsync(apps);
+        var html = await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel);
+        var said = RefillRequestTests.Said(html);
+        Assert.Contains("Proposed orders and allergies", said);
+        Assert.Contains("Dictation proposes these from what you said and places or saves none of them.", said);
+        Assert.Contains($"Order Awaiting review Chest is clear. {DictationSidecarStub.OrderSaid}.", said);
+        Assert.Contains($"Allergy to add Awaiting review {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
+        Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
+        Assert.Contains("Check: you may have corrected this just after it: “penicillin”", said);
+        Assert.Contains($"href=\"{OrderFormPath(dictated.Patient, dictated.Order)}\"", html.Replace("&amp;", "&", StringComparison.Ordinal));
+        Assert.Contains($"href=\"/patients/{dictated.Patient}/allergies?proposal={dictated.Allergy}\"", html);
+        Assert.Contains("Open in the order form", said);
+        Assert.Contains("Open in the allergy form", said);
+        Assert.Equal(2, CountOf(html, "Dismiss proposal"));
+
+        // Nor the colleague with the patient on their panel: not its review.
+        var colleague = await apps.CreateStaffAsync("Dr. Colleague", Ehr.Data.Accounts.StaffRoles.Clinician);
+        await apps.AssignAsync(colleague, dictated.Patient);
+        var theirs = await SignInAsync(apps.OnPrem, colleague);
+        using var review = await theirs.Client.GetAsync(dictated.ReviewPath, Cancel);
+        Assert.Equal(HttpStatusCode.NotFound, review.StatusCode);
+    }
+
+    // A sign-in drops a link's query (step 13b), `proposal` with the rest: through a link to the order form opened from a
+    // proposal, the clinician signs in to an ordinary order form, and the note being written leads back to the review,
+    // where the proposal waits with the way into its form.
+    [Fact]
+    public async Task A_sign_in_drops_the_proposal_and_the_note_leads_back_to_its_review()
+    {
+        var dictated = await DictateAsync(apps);
+        var clinician = await apps.ClinicianAsync();
+        var link = OrderFormPath(dictated.Patient, dictated.Order);
+        var client = Client(apps.OnPrem, new CookieContainer());
+        string signIn;
+        using (var challenged = await client.GetAsync(link, Cancel))
+        {
+            Assert.Equal("/sign-in", PathOf(challenged));
+            signIn = challenged.RequestMessage!.RequestUri!.PathAndQuery;
+        }
+
+        using var codePage = await PostFormAsync(client, signIn, signIn, ("Input.Email", clinician.Email), ("Input.Password", clinician.Password),
+            ("ReturnUrl", link));
+        Assert.Equal("/sign-in/code", PathOf(codePage));
+        using var landed = await PostFormAsync(client, codePage.RequestMessage!.RequestUri!.PathAndQuery, codePage,
+            ("Code", Ehr.Testing.Totp.Code(clinician.AuthenticatorKey)), ("ReturnUrl", link));
+        Assert.Equal($"/patients/{dictated.Patient}/orders/new", PathOf(landed));
+        Assert.Equal("", landed.RequestMessage!.RequestUri!.Query);
+        var form = await ReadAsync(landed);
+        Assert.DoesNotContain("Proposed from dictation", form);
+        Assert.DoesNotContain(DictationSidecarStub.OrderSaid, form);
+
+        var editor = await client.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel);
+        Assert.NotEmpty(LinkTo(editor, dictated.ReviewPath));
+        Assert.Contains("Awaiting review: 2 orders or allergies proposed from dictation. Review them.", RefillRequestTests.Said(editor));
+        var review = await client.GetStringAsync(dictated.ReviewPath, Cancel);
+        Assert.NotEmpty(LinkTo(review.Replace("&amp;", "&", StringComparison.Ordinal), link));
+        Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Order));
+    }
+
+    // The link to a path, as the page writes it, its attributes in whatever order.
+    internal static string LinkTo(string html, string path) =>
+        System.Text.RegularExpressions.Regex.Match(html, $"<a [^>]*href=\"{System.Text.RegularExpressions.Regex.Escape(path)}\"[^>]*>").Value;
+
+    static int CountOf(string text, string part) => (text.Length - text.Replace(part, "", StringComparison.Ordinal).Length) / part.Length;
+
+    // TC-UC13-11: Dismiss decides a proposal once, with nothing written to the chart: the review shows it dismissed, with
+    // when, and the cursor goes to the next one waiting; dismissing it again changes nothing; a form opened before it was
+    // dismissed saves nothing; one decided otherwise can't be dismissed.
+    [Fact]
+    public async Task TC_UC13_11_dismissing_decides_a_proposal_once_and_puts_nothing_on_the_chart()
+    {
+        var dictated = await DictateAsync(apps);
+        using (var dismissed = await DismissAsync(dictated, dictated.Order))
+        {
+            Assert.Equal(HttpStatusCode.OK, dismissed.StatusCode);
+            Assert.Equal(dictated.ReviewPath, PathOf(dismissed));
+            Assert.Contains($"decided={dictated.Order}", dismissed.RequestMessage!.RequestUri!.Query, StringComparison.Ordinal);
+            var html = await ReadAsync(dismissed);
+            Assert.Contains("autofocus", LinkTo(html, AllergyFormPath(dictated.Patient, dictated.Allergy)));
+            Assert.Contains("Order Dismissed", RefillRequestTests.Said(html));
+            Assert.Equal(1, CountOf(html, "Dismiss proposal"));
+        }
+
+        Assert.StartsWith("dismissed|-|-", await StateAsync(apps, dictated.Order), StringComparison.Ordinal);
+        using (var again = await DismissAsync(dictated, dictated.Order))
+        {
+            Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        }
+
+        // A proposal of another review of the clinician's, named on this one's page: not this review's to dismiss.
+        var other = await DictateAsync(apps, dictated.Session, dictated.Patient);
+        using (var elsewhere = await DismissAsync(dictated, other.Order))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, elsewhere.StatusCode);
+        }
+
+        Assert.Equal("pending|-|-", await StateAsync(apps, other.Order));
+
+        using (var last = await DismissAsync(dictated, dictated.Allergy))
+        {
+            // Nothing waits: the cursor goes to the section's heading.
+            Assert.Contains("id=\"chart-proposals\" tabindex=\"-1\" autofocus", await ReadAsync(last));
+        }
+
+        Assert.Equal("0 orders, 0 allergies", await ChartAsync(apps, dictated.Patient));
+
+        // A form opened before its proposal was dismissed saves nothing, its order or allergy included.
+        var opened = await DictateAsync(apps, dictated.Session, dictated.Patient);
+        var orderForm = OrderFormPath(opened.Patient, opened.Order, "lab");
+        var allergyForm = AllergyFormPath(opened.Patient, opened.Allergy);
+        var (orderToken, allergyToken) = (Token(await opened.Session.Client.GetStringAsync(orderForm, Cancel)),
+            Token(await opened.Session.Client.GetStringAsync(allergyForm, Cancel)));
+        foreach (var proposal in new[] { opened.Order, opened.Allergy })
+        {
+            using var dismissed = await DismissAsync(opened, proposal);
+            Assert.Equal(HttpStatusCode.OK, dismissed.StatusCode);
+        }
+
+        using (var orderRefused = await opened.Session.Client.PostAsync(orderForm, Form([("__RequestVerificationToken", orderToken), ("Item", "Lipid panel"),
+            ("Details[indication]", "Synthetic fatigue"), ("SafetySeen", "true")]), Cancel))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, orderRefused.StatusCode);
+        }
+
+        using (var allergyRefused = await opened.Session.Client.PostAsync(allergyForm, Form([("__RequestVerificationToken", allergyToken), ("Name", "Penicillin G"),
+            ("Status", "active")]), Cancel))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, allergyRefused.StatusCode);
+        }
+
+        Assert.Equal("0 orders, 0 allergies", await ChartAsync(apps, dictated.Patient));
+
+        // An order's proposal ordered in its form can't be dismissed after.
+        var second = await DictateAsync(apps, dictated.Session, dictated.Patient);
+        using (var signed = await UC1OrderAsync(second, "Lipid panel"))
+        {
+            Assert.Equal(second.ReviewPath, PathOf(signed));
+        }
+
+        using var refused = await DismissAsync(second, second.Order);
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Contains("Not saved: this proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.StartsWith("ordered|", await StateAsync(apps, second.Order), StringComparison.Ordinal);
+    }
+
     // "Sign order" for a lab test on the order form opened from the dictation's order proposal, as the form posts it
     // without JavaScript, with any reasons it asks for: the page it ends on.
     internal static async Task<HttpResponseMessage> UC1OrderAsync(Dictated dictated, string item, string type = "lab",
@@ -249,6 +436,41 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         ];
         return await client.PostAsync(path, Form([("__RequestVerificationToken", token), ("Item", item), ("SafetySeen", "true"),
             .. (details ?? OrderTests.Cbc).Select(d => ($"Details[{d.Name}]", (object)d.Value)), .. reasons]), Cancel);
+    }
+
+    // TC-UC13-13: off-site, the review is read from the cloud copy with its proposals and their reads accepted for the
+    // clinic's audit log; with the clinic's server reachable, Dismiss is forwarded to it, and with it cut off the
+    // proposals are still shown, their ways into a form and Dismiss hidden, with the reason, and a Dismiss sent anyway
+    // changes nothing.
+    [Fact]
+    public async Task TC_UC13_13_off_site_the_review_shows_its_proposals_and_their_actions_only_while_the_clinics_server_is_reachable()
+    {
+        var dictated = await DictateAsync(apps);
+        var cloud = Client(apps.Cloud, dictated.Session.Jar);
+        var reachable = await cloud.GetStringAsync(dictated.ReviewPath, Cancel);
+        Assert.Contains("Open in the order form", reachable);
+        using (var dismissed = await DismissAsync(dictated, dictated.Order, cloud))
+        {
+            Assert.Equal(HttpStatusCode.OK, dismissed.StatusCode);
+        }
+
+        Assert.StartsWith("dismissed|", await StateAsync(apps, dictated.Order), StringComparison.Ordinal);
+
+        var cutOff = Client(apps.CloudCutOff, dictated.Session.Jar);
+        using var page = await cutOff.GetAsync(dictated.ReviewPath, Cancel);
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        var said = RefillRequestTests.Said(await ReadAsync(page));
+        Assert.Contains("Opening or dismissing a proposal needs the clinic's server. The review remains readable.", said);
+        Assert.Contains($"Allergy to add Awaiting review {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
+        Assert.DoesNotContain("Open in the allergy form", said);
+        Assert.DoesNotContain("Dismiss proposal", said);
+        using (var refused = await cutOff.PostAsync(dictated.ReviewPath + "?handler=DismissProposal",
+            Form([("__RequestVerificationToken", Token(await ReadAsync(page))), ("ChartProposalId", dictated.Allergy)]), Cancel))
+        {
+            Assert.NotEqual(HttpStatusCode.OK, refused.StatusCode);
+        }
+
+        Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Allergy));
     }
 
     // Two tabs signing, or saving, one proposal at once, each having read it waiting: the database holds the second behind
@@ -302,6 +524,52 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var written = await QueryAsync(apps, $"SELECT id FROM ehr.{table} WHERE patient_id = @id", dictated.Patient);
         Assert.Single(written);
         Assert.Equal(kind == "order" ? $"ordered|{written[0]}|-" : $"recorded|-|{written[0]}", await StateAsync(apps, proposal));
+        foreach (var response in responses)
+        {
+            response.Dispose();
+        }
+    }
+
+    // Two tabs dismissing one proposal at once, each having read it waiting: the second finds it dismissed when its turn
+    // comes and says so, and it is dismissed once. The test holds the proposal's row until both wait on it.
+    [Fact]
+    public async Task Two_tabs_dismissing_one_proposal_at_once_dismiss_it_once()
+    {
+        var dictated = await DictateAsync(apps);
+        var tokens = new[] { Token(await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel)),
+            Token(await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel)) };
+        await using var holding = await apps.OpenDatabaseAsync();
+        await using var held = await holding.BeginTransactionAsync(Cancel);
+        await using (var hold = new NpgsqlCommand("SELECT 1 FROM ehr.ai_chart_proposals WHERE id = @id FOR UPDATE", holding, held))
+        {
+            hold.Parameters.AddWithValue("id", dictated.Order);
+            await hold.ExecuteNonQueryAsync(Cancel);
+        }
+
+        var sent = tokens.Select(token => dictated.Session.Client.PostAsync(dictated.ReviewPath + "?handler=DismissProposal",
+            Form([("__RequestVerificationToken", token), ("ChartProposalId", dictated.Order)]), Cancel)).ToArray();
+        await using var watching = await apps.OpenDatabaseAsync();
+        for (var tries = 0; ; tries++)
+        {
+            await using var count = new NpgsqlCommand(
+                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'UPDATE ehr.ai_chart_proposals%'", watching);
+            if ((long)(await count.ExecuteScalarAsync(Cancel))! >= 2)
+            {
+                break;
+            }
+
+            Assert.True(tries < 200, "The two tabs never both waited for the proposal's row.");
+            await Task.Delay(50, Cancel);
+        }
+
+        await held.CommitAsync(Cancel);
+        var responses = await Task.WhenAll(sent);
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], responses.Select(r => r.StatusCode).Order());
+        var refused = responses.Single(r => r.StatusCode == HttpStatusCode.Conflict);
+        Assert.Contains("Not saved: this proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.StartsWith("dismissed|-|-", await StateAsync(apps, dictated.Order), StringComparison.Ordinal);
+        Assert.Equal(["1"], await QueryAsync(apps,
+            "SELECT count(*) FROM ehr.audit_events WHERE table_name = 'ai_chart_proposals' AND row_id = @id AND action = 'update'", dictated.Order));
         foreach (var response in responses)
         {
             response.Dispose();

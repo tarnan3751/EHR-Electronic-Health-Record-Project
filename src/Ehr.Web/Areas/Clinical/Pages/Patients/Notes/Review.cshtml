@@ -2,6 +2,7 @@
 @using Ehr.Domain.Notes
 @using Ehr.Data.Patients
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ReviewModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = "Review AI-proposed fields";
 }
@@ -65,7 +66,7 @@
             <p class="sc-status" data-dictation-sort-message></p>
             <section class="sc-notice sc-notice--warning" data-dictation-not-carried hidden>
                 <h3>Not carried over</h3>
-                <p>Place any indicated orders or allergy updates through their normal clinical workflow.</p>
+                <p>Dictation doesn't propose these. Place any that still apply through their normal clinical workflow.</p>
                 <ul data-dictation-not-carried-list></ul>
             </section>
         </section>
@@ -106,6 +107,55 @@
                     </div>
                 }
             </dl>
+            @* The expansion plan's step 15: what the dictation proposes beyond the note, each opened in its form, where it is
+               signed or saved through every check of that form, or dismissed here. None holds up this review or signing. *@
+            @if (Model.ChartProposals.Count > 0)
+            {
+                <section data-chart-proposals aria-labelledby="chart-proposals">
+                    <h2 id="chart-proposals" tabindex="-1" autofocus="@(Model.Decided is not null && Model.NextProposal is null)">Proposed orders and allergies</h2>
+                    <p class="sc-prose">Dictation proposes these from what you said and places or saves none of them. Open each in its form to check every field and sign or save it there, or dismiss it. They don't hold up this review or signing the note.</p>
+                    @if (!OnPrem.IsReachable)
+                    {
+                        <p class="sc-muted" data-chart-proposals-offline>Opening or dismissing a proposal needs the clinic's server. The review remains readable.</p>
+                    }
+                    <ol class="sc-proposals">
+                        @foreach (var proposed in Model.ChartProposals)
+                        {
+                            var row = proposed.Row;
+                            <li class="sc-proposal" data-chart-proposal="@row.Id" data-review-state="@row.State" data-chart-proposal-start="@proposed.Start" data-chart-proposal-end="@proposed.End">
+                                <p class="sc-proposal__head"><span class="sc-proposal__field">@proposed.KindWords</span> <span class="@(proposed.Waiting ? "sc-tag sc-tag--warning" : row.State == AiChartProposalStates.Dismissed ? "sc-tag" : "sc-tag sc-tag--success")" data-chart-proposal-state>@proposed.StateWords</span></p>
+                                <p class="sc-proposal__value" data-chart-proposal-words>@proposed.Before<mark class="sc-transcript__source">@proposed.Words</mark>@proposed.After</p>
+                                @foreach (var warning in proposed.Warnings)
+                                {
+                                    <p class="sc-proposal__warning">Check: @ProposedFromDictation.WarningWords(warning.Code) “@warning.Said”</p>
+                                }
+                                @if (row.DecidedAt is { } decidedAt)
+                                {
+                                    <p class="sc-proposal__message">@proposed.StateWords @Clinic.Format(decidedAt).</p>
+                                }
+                                else if (OnPrem.IsReachable)
+                                {
+                                    var first = Model.NextProposal == row.Id;
+                                    <div class="sc-actions">
+                                        @if (proposed.IsOrder)
+                                        {
+                                            <a class="sc-btn" asp-page="/Patients/Orders/New" asp-route-id="@Model.Patient.Id" asp-route-proposal="@row.Id" autofocus="@first" data-open-proposal>Open in the order form</a>
+                                        }
+                                        else
+                                        {
+                                            <a class="sc-btn" asp-page="/Patients/Lists/Entry" asp-route-id="@Model.Patient.Id" asp-route-list="allergies" asp-route-proposal="@row.Id" autofocus="@first" data-open-proposal>Open in the allergy form</a>
+                                        }
+                                        <form method="post" asp-page-handler="DismissProposal">
+                                            <input type="hidden" name="ChartProposalId" value="@row.Id" />
+                                            <button class="sc-btn sc-btn--quiet">Dismiss proposal</button>
+                                        </form>
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ol>
+                </section>
+            }
         </section>
     </div>
     <details>

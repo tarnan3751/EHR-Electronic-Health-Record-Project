@@ -47,11 +47,14 @@ public sealed class DictationSidecarStub : HttpMessageHandler
     // kinds, so a test that follows a proposal to a signed order or a saved allergy has one of each to follow.
     public bool Proposals { get; set; }
 
+    // Said before the order, in its sentence, when set: a long one, for a page to wrap.
+    public string? ProposalLead { get; set; }
+
     public const string OrderSaid = "Go ahead and order a lipid panel";
 
     public const string AllergySaid = "Add penicillin to her allergy list";
 
-    const string ProposalsSaid = OrderSaid + ". " + AllergySaid + ".";
+    string ProposalsSaid => (ProposalLead is null ? "" : ProposalLead + " ") + OrderSaid + ". " + AllergySaid + ".";
 
     public StubSorting Sorting { get; set; }
 
@@ -77,6 +80,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         LiveHistory = false;
         WholeDictation = false;
         Proposals = false;
+        ProposalLead = null;
         Unreachable = false;
         Slow = false;
         Undecodable = false;
@@ -228,7 +232,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         object? proposals = null;
         if (Proposals && session.Stopped)
         {
-            var at = Text(session).Length + 1;
+            var at = Text(session).Length + 1 + (ProposalLead is null ? 0 : ProposalLead.Length + 1);
             var (order, allergy) = ((Start: at, End: at + OrderSaid.Length), (Start: at + OrderSaid.Length + 2, End: at + OrderSaid.Length + 2 + AllergySaid.Length));
             notCarriedOver = [new { reason = "order", start = order.Start, end = order.End }, new { reason = "allergy_change", start = allergy.Start, end = allergy.End }];
             proposals = new object[]

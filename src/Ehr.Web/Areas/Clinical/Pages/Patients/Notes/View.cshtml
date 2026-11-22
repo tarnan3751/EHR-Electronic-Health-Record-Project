@@ -167,4 +167,5 @@ else if (!Model.Summaries.HasStanding)
     <p><a class="sc-btn" asp-page="Summary" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-write-summary>Write a summary for the patient</a></p>
 }
 
+<partial name="_WaitingProposals" model="(Model.Note.DraftId, Model.WaitingProposals)" />
 <partial name="_ReviewHistory" model="Model.CompletedReviews" />

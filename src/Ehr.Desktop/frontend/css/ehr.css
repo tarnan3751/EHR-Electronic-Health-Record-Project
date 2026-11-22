@@ -1654,6 +1654,16 @@
         max-width: var(--width-reading);
     }
 
+    /* The orders and allergies a dictation proposes, as a list of the same rows: no numbers, and no gap between them. */
+    ol.sc-proposals {
+        list-style: none;
+        padding: 0;
+    }
+
+    ol.sc-proposals > li + li {
+        margin-top: 0;
+    }
+
     .sc-proposal dd {
         margin: 0;
     }
