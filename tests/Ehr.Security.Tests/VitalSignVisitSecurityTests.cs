@@ -25,8 +25,12 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
 
     string Superuser => database.SuperuserConnectionString;
 
-    // Now, to the second.
-    static DateTime Now() => new(DateTime.UtcNow.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+    // Now by the database's clock, which its rules hold a time to, to the second.
+    async Task<DateTime> NowAsync()
+    {
+        var now = await database.NowAsync();
+        return new(now.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+    }
 
     const string Insert = """
         INSERT INTO ehr.observations (id, patient_id, encounter_id, category, code, display, status, value, effective_at)
@@ -94,7 +98,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     public async Task A_sign_taken_up_to_fifteen_minutes_before_the_check_in_belongs_to_the_visit_whether_typed_before_or_after_it(bool typedBefore)
     {
         var (clinician, patient) = await OnPanelAsync();
-        var now = Now();
+        var now = await NowAsync();
         (decimal Value, DateTime At)[] signs =
         [
             (60m, now.AddMinutes(-20)), (61m, now.AddMinutes(-15).AddSeconds(-1)), (62m, now.AddMinutes(-15)), (63m, now.AddMinutes(-15).AddSeconds(1)),
@@ -135,7 +139,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     {
         var (clinician, patient) = await OnPanelAsync();
         var (otherClinician, other) = await OnPanelAsync();
-        var now = Now();
+        var now = await NowAsync();
         var taken = now.AddMinutes(-5);
         await RecordPressureAsync(clinician, patient, 150m, 95m, taken);
         await RecordAsync(clinician, patient, HeartRate, 70m, taken);
@@ -192,7 +196,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     public async Task A_check_in_takes_a_moment_from_an_earlier_visit_and_never_from_a_later_one()
     {
         var (clinician, patient) = await OnPanelAsync();
-        var now = Now();
+        var now = await NowAsync();
         // A visit begun two hours ago, as one checked in then would be: loaded past the apps, which start visits only now.
         var earlier = Guid.CreateVersion7();
         await Accounts.ExecuteAsync(Superuser, null, Visit, VisitValues(earlier, patient, now.AddHours(-2)));
@@ -209,9 +213,9 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
         var (otherClinician, other) = await OnPanelAsync();
         var later = Guid.CreateVersion7();
         await Accounts.ExecuteAsync(Superuser, null, Visit, VisitValues(later, other, now.AddMinutes(10)));
-        await RecordAsync(otherClinician, other, HeartRate, 72m, Now());
+        await RecordAsync(otherClinician, other, HeartRate, 72m, await NowAsync());
         Assert.Equal(["8867-4 72 earlier"], await VisitsAsync(other, earlier: later));
-        await CheckInAsync(otherClinician, other, Now());
+        await CheckInAsync(otherClinician, other, await NowAsync());
         Assert.Equal(["8867-4 72 earlier"], await VisitsAsync(other, earlier: later));
     }
 
@@ -227,7 +231,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     public async Task Two_visits_starting_at_one_instant_give_a_set_the_same_visit_whatever_the_order(bool smallerFirst, bool typedBefore)
     {
         var (clinician, patient) = await OnPanelAsync();
-        var start = Now();
+        var start = await NowAsync();
         var ids = new[] { Guid.CreateVersion7(), Guid.CreateVersion7() }.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray();
         await Accounts.ExecuteAsync(Superuser, null, "ALTER TABLE ehr.encounters DISABLE TRIGGER encounters_check_in");
         try
@@ -262,7 +266,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     public async Task Only_a_check_in_by_a_clinician_with_the_patient_on_their_panel_ties_vital_signs_to_a_visit()
     {
         var (clinician, patient) = await OnPanelAsync();
-        var now = Now();
+        var now = await NowAsync();
         await RecordAsync(clinician, patient, HeartRate, 70m, now.AddMinutes(-5));
         var outsider = await Accounts.StaffAsync(database, StaffRoles.Clinician);
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
@@ -297,7 +301,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     public async Task A_visit_dated_to_suit_starts_now_and_takes_no_old_vital_sign()
     {
         var (clinician, patient) = await OnPanelAsync();
-        var now = Now();
+        var now = await NowAsync();
         var old = now.AddYears(-2);
         await RecordPressureAsync(clinician, patient, 120m, 80m, old);
         await RecordAsync(clinician, patient, HeartRate, 72m, old);
@@ -308,7 +312,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
         foreach (var visit in new[] { backdated, ahead })
         {
             var start = await StartAsync(visit);
-            Assert.InRange(start, now.AddSeconds(-5), Now().AddSeconds(5));
+            Assert.InRange(start, now.AddSeconds(-5), (await NowAsync()).AddSeconds(5));
         }
 
         Assert.Equal(["8462-4 80 none", "8480-6 120 none", "8867-4 72 none"], await VisitsAsync(patient));
@@ -356,7 +360,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     public async Task A_check_in_in_a_transaction_held_open_starts_when_it_is_inserted()
     {
         var (clinician, patient) = await OnPanelAsync();
-        var now = Now();
+        var now = await NowAsync();
         await RecordAsync(clinician, patient, HeartRate, 70m, now.AddMinutes(-15).AddSeconds(1));
         var visit = Guid.CreateVersion7();
         var (connection, transaction) = await BeginAsync(clinician);
@@ -382,7 +386,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     {
         var (clinician, patient) = await OnPanelAsync();
         var visit = Guid.CreateVersion7();
-        var start = Now();
+        var start = await NowAsync();
         var (recording, recordingTransaction) = await BeginAsync(clinician);
         var (checkingIn, checkingInTransaction) = await BeginAsync(clinician);
         await using (recording)

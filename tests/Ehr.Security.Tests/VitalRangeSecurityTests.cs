@@ -159,9 +159,10 @@ public class VitalRangeSecurityTests(MigratedDatabase database) : IClassFixture<
     [InlineData("unknown", "98/52 100/55")]
     public async Task A_childs_blood_pressure_goes_by_sex_and_other_or_unknown_get_the_lower_value(string sex, string expected)
     {
-        var (clinician, patient) = await ChildAsync(DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-30), sex);
-        await RecordAsync(clinician, patient, "8480-6", DateTime.UtcNow.AddMonths(-12));
-        await RecordAsync(clinician, patient, "8480-6", DateTime.UtcNow.AddMinutes(-10));
+        var now = await database.NowAsync();
+        var (clinician, patient) = await ChildAsync(DateOnly.FromDateTime(now).AddMonths(-30), sex);
+        await RecordAsync(clinician, patient, "8480-6", now.AddMonths(-12));
+        await RecordAsync(clinician, patient, "8480-6", now.AddMinutes(-10));
 
         Assert.Equal([expected], await AsSuperuserAsync(
             """
@@ -176,8 +177,9 @@ public class VitalRangeSecurityTests(MigratedDatabase database) : IClassFixture<
     {
         // A child's blood pressure sent with a normal range of the client's own; an adult's heart rate sent as a
         // screening value; a result of an order sent as a screening value.
-        var (clinician, child) = await ChildAsync(DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-5), "female");
-        await RecordAsync(clinician, child, "8480-6", DateTime.UtcNow.AddMinutes(-10));
+        var now = await database.NowAsync();
+        var (clinician, child) = await ChildAsync(DateOnly.FromDateTime(now).AddYears(-5), "female");
+        await RecordAsync(clinician, child, "8480-6", now.AddMinutes(-10));
         var adult = await Accounts.PatientAsync(database, clinician);
         await Accounts.AssignAsync(database, clinician, adult);
         await Accounts.ExecuteAsync(App, clinician,

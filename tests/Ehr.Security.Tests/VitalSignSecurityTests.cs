@@ -10,7 +10,7 @@ namespace Ehr.Security.Tests;
 // a clinician with the patient on their panel records one, only of the vital-sign codes, with the database's own
 // name, unit and reference range, final and released at once; a body mass index is the database's arithmetic, never
 // the client's number; a result of an order is still filed only against its order; nothing is edited or deleted.
-public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
+public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>, IAsyncLifetime
 {
     const string HeartRate = "8867-4";
     const string Weight = "29463-7";
@@ -27,7 +27,14 @@ public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<M
         VALUES (@id, @patient, @visit, @category, @code, 'Forged name', 'preliminary', @value, 'forged', 0, 1000, @at, '2000-01-01', 'Forged note')
         """;
 
-    static readonly DateTime Taken = DateTime.UtcNow.AddMinutes(-10);
+    // When the test started, by the database's clock, which its rules hold a time to; and ten minutes before.
+    DateTime Started { get; set; }
+
+    DateTime Taken => Started.AddMinutes(-10);
+
+    public async ValueTask InitializeAsync() => Started = await database.NowAsync();
+
+    public ValueTask DisposeAsync() => default;
 
     async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
     {
@@ -114,7 +121,7 @@ public class VitalSignSecurityTests(MigratedDatabase database) : IClassFixture<M
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, code: "0000-0"));
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, value: 0m));
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, value: -5m));
-        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, at: DateTime.UtcNow.AddHours(2)));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, at: Started.AddHours(2)));
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, visit: theirVisit));
 
         Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.observations WHERE patient_id = @patient", ("patient", patient)));
