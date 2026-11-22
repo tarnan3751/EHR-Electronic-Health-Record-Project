@@ -382,7 +382,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/review/*");
         var reopened = page.Url;
-        Assert.Contains("This review evidence is read-only.", await page.Locator("main").TextContentAsync());
+        Assert.Contains("The review of its fields is read-only.", await page.Locator("main").TextContentAsync());
         await TabToAsync(page, "[data-dictation-field=plan] .sc-translation__pair");
         Assert.Equal(plan.Spanish, await HighlightedAsync(page));
         await TabToAsync(page, "[data-dictation-field=subjective] .sc-translation__pair:nth-child(2)");

@@ -660,7 +660,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Matches($"(?s)Saved AI reviews.*{f.Review}\">Dictation in Spanish and review saved ", signed);
 
         var reopened = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
-        Assert.Contains("This review evidence is read-only.", reopened);
+        Assert.Contains("The review of its fields is read-only.", reopened);
         Assert.Contains("Translated from Spanish:", reopened);
         foreach (var (english, spanish) in DictationSidecarStub.SpanishFields.SelectMany(field => field.Statements))
         {
