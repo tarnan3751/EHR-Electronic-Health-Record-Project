@@ -531,6 +531,36 @@ def test_a_new_subject_still_ends_a_cue_that_does_not_name_it(said, value):
     assert own(said, value, value.rstrip(".")).pending
 
 
+# Doubt without a subject, before the finding or closing its clause after a comma, where it reaches back over all of
+# the clause: a value that keeps the finding without it is refused, and one that keeps both goes out.
+@pytest.mark.parametrize(("said", "value"), [
+    ("Maybe pneumonia.", "Pneumonia."),
+    ("Perhaps viral.", "Viral."),
+    ("Possibly a stress fracture.", "A stress fracture."),
+    ("Probably not pneumonia.", "Not pneumonia."),
+    ("She has gout, I think.", "She has gout."),
+    ("Viral pharyngitis with cervical lymphadenopathy, I believe.", "Viral pharyngitis with cervical lymphadenopathy."),
+    ("She has gout, I suspect.", "She has gout."),
+    ("She has gout, we think.", "She has gout."),
+    ("Pneumonia, probably.", "Pneumonia."),
+    ("Pneumonia, probably not.", "Pneumonia."),
+    ("She has gout, possibly.", "She has gout."),
+    ("She has gout, maybe.", "She has gout."),
+])
+def test_doubt_without_a_subject_or_after_the_finding_must_be_kept(said, value):
+    assert own(said, value).reasons == ["certainty_dropped"]
+    assert own(said, said).pending
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("Knee pain improved, she is walking daily, I think.", "Knee pain improved."),
+    ("Fever resolved. She has gout, I think.", "Fever resolved."),
+    ("She has gout, I think the knee is better.", "She has gout."),
+])
+def test_doubt_after_a_comma_reaches_back_over_its_own_clause_only(said, value):
+    assert own(said, value, value.rstrip(".")).pending
+
+
 def test_the_cues_that_name_a_subject_are_made_for_any_subject():
     negation, certainty = subject_cues("you")
 

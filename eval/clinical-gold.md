@@ -9,6 +9,7 @@ Written by `uv run --project eval python -m ehr_eval.goldreport` (`ehr_eval/gold
 | `words_out_of_order` | 37 |
 | `unsupported_content` | 26 |
 | `negation_dropped` | 4 |
+| `certainty_dropped` | 1 |
 | `drug_not_in_sources` | 1 |
 | `experiencer_dropped` | 1 |
 
@@ -112,7 +113,7 @@ Reasons: `words_out_of_order`
 
 ## d09-mash-resmetirom: subjective
 
-Reasons: `unsupported_content`
+Reasons: `certainty_dropped`, `unsupported_content`
 
 - Clinical gold: 58-year-old man referred with metabolic dysfunction associated steatohepatitis. Type 2 diabetes, high blood pressure and obesity. Drinks alcohol rarely, about one beer a month. No jaundice, no confusion, no swelling of the abdomen, no bleeding. Medications: metformin, semaglutide 1 mg weekly, lisinopril, rosuvastatin 40 mg. Lost 7 kg since starting semaglutide. No gallbladder problems.
 - Rule-following gold: This is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis. He has type 2 diabetes, high blood pressure and obesity. He drinks alcohol rarely, maybe one beer a month. No jaundice, no confusion, no swelling of the abdomen and no bleeding. His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg. He has lost 7 kg since starting semaglutide. No gallbladder problems.

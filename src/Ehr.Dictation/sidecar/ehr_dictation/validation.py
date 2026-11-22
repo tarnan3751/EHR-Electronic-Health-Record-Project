@@ -113,7 +113,9 @@ and every check reads the cleaned text. The checks, each with the reason code re
   doubt she has strep", "unlikely that the patient has appendicitis"; uncertainty in "I think she has gout", "maybe
   it's viral", "possibly he is anemic", "she might have gout", "I wonder if she has gout", "I'm not sure she has gout",
   "it could be that she has gout". The subject is she, he, it, they or the patient, and its verb a form of "have" or
-  "be" (or "might", "may" or "could" with "have" or "be").
+  "be" (or "might", "may" or "could" with "have" or "be"). Doubt said after a comma closing a clause ("she has gout, I
+  think", "..., I believe", "..., I suspect", "..., probably", "..., probably not", "..., possibly", "..., maybe")
+  reaches back over all of the clause before the comma.
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -1151,15 +1153,23 @@ EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
 )
-# Not certain: "possible community acquired pneumonia", "rule out appendicitis", "pneumonia suspected".
+# Not certain: "possible community acquired pneumonia", "maybe pneumonia", "rule out appendicitis", "pneumonia
+# suspected".
 CERTAINTY = re.compile(
     rf"\b(?:{SUBJECT_CERTAINTY}|"
-    r"possible|possibly|probable|probably|suspected|suspect|suspicious for|suspicion of|likely|unlikely|"
+    r"maybe|perhaps|possible|possibly|probable|probably|suspected|suspect|suspicious for|suspicion of|likely|unlikely|"
     r"rule out|r/o|risk of|risk for|concern for|concerning for|questionable|presumed)\b",
     re.IGNORECASE,
 )
 POST_CERTAINTY = re.compile(
     r"\b(?:suspected|likely|possible|probable|unlikely|questionable|presumed)\b(?=\s*(?:[.,;:!?\n]|$))", re.IGNORECASE
+)
+# Doubt said after a comma at the end of a clause, which reaches back over the whole clause before the comma: "she has
+# gout, I think", "pneumonia, probably not".
+CLOSING_HEDGE = re.compile(
+    r",\s*(?:(?:i|we)\s+(?:think|believe|suspect)|probably(?:\s+not)?|possibly|maybe|perhaps|(?:un)?likely)"
+    r"(?=\s*(?:[.,;:!?\n]|$))",
+    re.IGNORECASE,
 )
 # In the past: "a history of MI in 2019", "status post appendectomy".
 # Not the heading "history of present illness", said without its colon.
@@ -1210,10 +1220,11 @@ def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern 
                 break
             reached.add(i)
             edge = words[i].end
-    for cue in after.finditer(text) if after else ():
+    closing = [(cue, len(words)) for cue in CLOSING_HEDGE.finditer(text)] if before is CERTAINTY else []
+    for cue, scope in [(cue, POST_SCOPE) for cue in (after.finditer(text) if after else ())] + closing:
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
         edge = cue.start()
-        for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()][-POST_SCOPE:]):
+        for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()][-scope:]):
             if stops(text[words[i].end : edge], words[i].text):
                 break
             reached.add(i)
