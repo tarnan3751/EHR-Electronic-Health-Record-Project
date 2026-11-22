@@ -32,6 +32,8 @@ def results(eval_dir, **overrides) -> dict:
                     "order_allergy": {"shown": 0, "retracted_shown": 2, "retracted_shown_unflagged": 0,
                                       "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0,
                                       "unflagged": []},
+                    "proposals": {"shown": 2, "said": 2, "found": 2, "right": 2, "false": 0, "misheard": 0,
+                                  "listed": []},
                     "warnings": {"shown": 3, "possible_correction": {"flagged": 1}, "near_unclear_passage": {"flagged": 0},
                                  "one_field_holds_dictation": {"flagged": 0}, "any": {"flagged": 1}},
                     "sorting": {"done": 2, "unavailable": {}}},
@@ -236,3 +238,66 @@ def test_results_from_another_machine_than_the_baselines_fail(eval_dir):
 
     (problem,) = check(eval_dir / "results", eval_dir)
     assert "baseline's machine" in problem
+
+
+# TC-UC10-12 (NFR-05; FR-14 as reworded, the expansion plan's step 15): the results say what the dictation proposed,
+# and every false or misheard proposal must be accepted by the owner, a warning or not; each accepted one must still be
+# listed. The gates on orders and allergy changes in the fields stand beside these, unchanged.
+MISHEARD = {"variant": "d02--hvac-5db", "kind": "order", "shown": "refill her atageban", "why": "misheard"}
+ACCEPTED_PROPOSAL = """
+[[accepted_proposal]]
+variant = "d02--hvac-5db"
+kind = "order"
+shown = "refill her atageban"
+reason = "misheard drug name"
+accepted = "2026-11-22"
+by = "the owner"
+"""
+
+
+@pytest.mark.parametrize("missing", ["shown", "said", "found", "false", "misheard", "listed"])
+def test_results_that_dont_say_what_was_proposed_fail(eval_dir, missing):
+    silent = results(eval_dir)
+    del silent["metrics"]["proposals"][missing]
+    save(eval_dir, "latest.json", silent)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "don't say what the dictation proposed" in problem
+
+
+@pytest.mark.parametrize("why", ["false", "misheard"])
+def test_a_false_or_misheard_proposal_fails_unless_accepted(eval_dir, why):
+    listed = results(eval_dir)
+    listed["metrics"]["proposals"]["listed"] = [MISHEARD | {"why": why}]
+    save(eval_dir, "latest.json", listed)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert f"a {why} proposal" in problem and "d02--hvac-5db" in problem and "warning doesn't excuse" in problem
+
+    (eval_dir / "known-limitations.toml").write_text(ACCEPTED_PROPOSAL, encoding="utf-8")
+    listed["provenance"]["scoring"] = scoring_sha256(eval_dir)
+    save(eval_dir, "latest.json", listed)
+
+    assert check(eval_dir / "results", eval_dir) == []
+
+
+def test_an_accepted_proposal_the_results_no_longer_list_is_stale(eval_dir):
+    (eval_dir / "known-limitations.toml").write_text(ACCEPTED_PROPOSAL, encoding="utf-8")
+    fresh = results(eval_dir)
+    fresh["provenance"]["scoring"] = scoring_sha256(eval_dir)
+    save(eval_dir, "latest.json", fresh)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "no longer list" in problem and "refill her atageban" in problem
+
+
+def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
+    (eval_dir / "known-limitations.toml").write_text(ACCEPTED, encoding="utf-8")
+    both = results(eval_dir)
+    both["metrics"]["order_allergy"]["unflagged"] = [UNFLAGGED]
+    both["metrics"]["proposals"]["listed"] = [MISHEARD]
+    both["provenance"]["scoring"] = scoring_sha256(eval_dir)
+    save(eval_dir, "latest.json", both)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "a misheard proposal" in problem

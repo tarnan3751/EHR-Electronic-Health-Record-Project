@@ -37,6 +37,7 @@
     "reason": "model_output_invalid",
     "fields": null,
     "notCarriedOver": [],
+    "proposals": [],
     "provenance": {
       "speech": {
         "repository": "google/medasr",

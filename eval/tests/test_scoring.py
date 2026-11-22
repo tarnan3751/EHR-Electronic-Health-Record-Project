@@ -6,7 +6,8 @@ import pytest
 from conftest import write_script
 
 from ehr_dictation.prompt import FIELDS
-from ehr_eval.scoring import FieldOutcome, Item, score
+from ehr_eval import goldreport
+from ehr_eval.scoring import FieldOutcome, Item, score, weigh_proposals
 from ehr_eval.scripts import load_all
 
 
@@ -276,3 +277,33 @@ def test_a_drug_named_but_in_no_gold_value_must_not_be_offered(scripts):
     assert score(items, stopping)["order_allergy"]["drug_not_in_gold_shown"] == 1
     assert score([item("d02", "x", subjective=pending("Takes aprocitentan daily."))], scripts)["order_allergy"][
         "drug_not_in_gold_shown"] == 0
+
+
+# The expansion plan's step 15: what the dictation proposed, against a script's gold proposals.
+def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_counted(eval_dir):
+    write_script(eval_dir / "scripts", "d03", "Plan {colon} go ahead and order a lipid panel {period} Rest {period}",
+                 tags=["order-attempt", "proposal"], forbidden=["order a lipid panel"], plan="Rest.", plan_sources=["Rest."],
+                 rules='\n[[proposals]]\nkind = "order"\nwords = "order a lipid panel"\nitem = "lipid panel"\n')
+    scripts = load_all(eval_dir / "scripts")
+
+    def heard(text: str) -> Item:
+        said = item("d03", text)
+        weigh_proposals(said, goldreport.transcript(text))
+        return said
+
+    right = heard("Plan: go ahead and order a lipid panel. Rest.")
+    misheard = heard("Plan: go ahead and order a lipid panol. Rest.")
+    false = heard("Plan: go ahead and order a chest X-ray. Rest.")
+    held = heard("Plan: consider ordering a lipid panel. Rest.")
+    warned = heard("Plan: go ahead and order a lipid panel no weight. Rest.")
+
+    proposals = score([right, misheard, false, held, warned], scripts)["proposals"]
+
+    assert {key: proposals[key] for key in ("shown", "said", "found", "right", "false", "misheard", "with_warnings")} == {
+        "shown": 4, "said": 5, "found": 3, "right": 2, "false": 1, "misheard": 1, "with_warnings": 1}
+    assert proposals["held_back"] == {"hedged": 1}
+    assert (proposals["recall"], proposals["precision"]) == (0.6, 0.5)
+    assert proposals["listed"] == [
+        {"variant": "d03-x", "kind": "order", "shown": "go ahead and order a lipid panol", "why": "misheard"},
+        {"variant": "d03-x", "kind": "order", "shown": "go ahead and order a chest x ray", "why": "false"},
+    ]

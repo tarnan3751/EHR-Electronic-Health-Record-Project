@@ -18,6 +18,28 @@ only for its words outside it. Separately, not_carried_over() lists every such i
 kind and where the clinician said it, so the review screen can say what still has to be placed in Orders or the
 allergy list.
 
+Some of those the dictation proposes (the expansion plan's step 15; FR-14 as reworded): an instruction to place an
+order, or to add an allergy, said plainly, which the clinician may open in the order form or the allergy form, which
+fill in nothing from it. proposals() is the one place they are made; a session that must propose none doesn't ask
+(sessions.py). weigh() tries each listed instruction against these rules in order, and the first that applies holds it
+back (HELD_BACK), still listed as not carried over: not_final (the transcript isn't final yet); to_the_software (its
+sentence tells the software to ignore its rules or instructions, or is a note to the assistant, the AI or the
+system); mixed_kinds (an order and an allergy change run together); not_an_addition (an orders section, or an allergy
+change other than adding one: removing, taking off, clearing, updating, changing, marking); negated (a negation before
+it in its clause: "I don't think we need to order"); hedged (if, unless, when, once, consider, maybe, perhaps,
+probably, might, could, would, discuss, think, whether, or "may" that isn't a date, before it in its clause; a sentence
+opening with a condition; or if, unless, in case, once, when or depending on after it); for_later (its sentence says
+next visit, week, month, year or season, at the follow-up, later, eventually, in the future, down the line, or in so
+many days, weeks, months or years); taken_back (a correction cue, or hold off, never mind, forget that, cancel that,
+on second thought, let's not or not yet, from its start to the end of the next sentence, within TAKEN_BACK_REACH words
+after it); in_the_past (a word of the past in its clause, as for the pharmacy: already, last week, ago); unclear (it
+overlaps a passage marked unclear); question (its sentence ends in a question mark); quoted (the clause before it ends
+in a word of telling: "she asked, can you order an MRI"); not_imperative (anything but an opener, from the start of
+its clause or the last "and" or word starting a clause, up to its lead-in or subject: "capillary refill under 2
+seconds"); too_many (past MAX_PROPOSALS). A proposal is its kind (order or allergy_addition), the place of its listed
+instruction, and its warnings, never words: possible_correction, pointing from a correction-like word said after the
+instruction, in its words or within WARNING_REACH words after them; and near_unclear_passage, as for a value.
+
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
 
@@ -336,7 +358,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
     if ordered:
         return Checked(name, value, quotes, ordered)
     warnings = [(POSSIBLE_CORRECTION, start, end) for start, end in _possible_corrections(value, spans, transcript)]
-    warnings += [(NEAR_UNCLEAR_PASSAGE, start, end) for start, end in _near_unclear(spans, transcript)]
+    warnings += [(NEAR_UNCLEAR_PASSAGE, start, end) for start, end in _near_unclear(spans, transcript.unclear, transcript.words)]
     return Checked(name, value, quotes, ordered, spans, warnings)
 
 
@@ -551,11 +573,11 @@ def _possible_corrections(value: str, spans: list[tuple[int, int]], transcript: 
     return sorted(found)
 
 
-def _near_unclear(spans: list[tuple[int, int]], transcript: _Transcript) -> list[tuple[int, int]]:
-    """Each unclear passage within NEAR_UNCLEAR words of one of the value's sources (see the module's header)."""
-    words = transcript.words
+def _near_unclear(spans: list[tuple[int, int]], unclear: list[tuple[int, int]], words: list[Token]) -> list[tuple[int, int]]:
+    """Each unclear passage within NEAR_UNCLEAR words of one of the spans, a value's sources or a proposal's words (see
+    the module's header)."""
     found = []
-    for start, end in transcript.unclear:
+    for start, end in unclear:
         unclear = [i for i, word in enumerate(words) if start <= word.start < end]
         for span in spans:
             source = [i for i, word in enumerate(words) if span[0] <= word.start and word.end <= span[1]]
@@ -598,6 +620,11 @@ def _sentence_end(text: str, start: int) -> int:
 # ---- Orders and allergy-list changes (FR-14) ----------------------------------------------------------------------
 
 _DET = r"(?:an?|the|her|his|their|this|that|my|our|its)"
+# Each instruction is an order or an allergy change (its reason in notCarriedOver), and, finer, which a dictation may
+# propose: an order, unless it asks the software for an orders section, and an allergy added (ALLERGY_ADDITION).
+ORDERS_SECTION = "orders_section"
+ALLERGY_ADDITION = "allergy_addition"
+REASON = {"order": "order", ORDERS_SECTION: "order", "allergy_change": "allergy_change", ALLERGY_ADDITION: "allergy_change"}
 _SAME_SENTENCE = r"(?:(?![.\n]).)"
 # Placing an order, or a prescription, now: the verb as an instruction ("order", "renew") or under way ("ordering").
 _ORDER_VERB = re.compile(
@@ -617,34 +644,36 @@ _ORDERS = [
     # "In to" as speech recognition often writes it: "call that into his usual pharmacy".
     re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in(?:to)?\b", re.IGNORECASE),
     re.compile(rf"\b(?:send|sending)\b{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b", re.IGNORECASE),
-    # The model told to make an orders section: "add an orders field with an MRI".
-    re.compile(
-        rf"\b(?:add|create|make|include|insert|start|open|put)\b{_SAME_SENTENCE}{{0,30}}?\borders?\s+"
-        r"(?:section|field|tab|entry)\b",
-        re.IGNORECASE,
-    ),
 ]
-_ALLERGY_CHANGES = [
+# The model told to make an orders section: "add an orders field with an MRI". Never proposed.
+_ORDERS_SECTION = re.compile(
+    rf"\b(?:add|create|make|include|insert|start|open|put)\b{_SAME_SENTENCE}{{0,30}}?\borders?\s+"
+    r"(?:section|field|tab|entry)\b",
+    re.IGNORECASE,
+)
+# Adding to the allergy list, which a dictation may propose (the expansion plan's step 15), and every other change to
+# it, which it never does.
+_ALLERGY_ADDITIONS = [
     re.compile(rf"\badd\b{_SAME_SENTENCE}{{0,40}}?\b(?:to|as|on)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.I),
     re.compile(rf"\badd\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
-    re.compile(rf"\b(?:remove|delete|take)\b{_SAME_SENTENCE}{{0,40}}?\b(?:from|off)\s+(?:{_DET}\s+)?(?:drug\s+)?allerg", re.I),
-    re.compile(rf"\b(?:remove|delete)\s+(?:{_DET}\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
-    re.compile(rf"\b(?:update|change|edit|correct|amend)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
-    re.compile(rf"\b(?:mark|flag)\b{_SAME_SENTENCE}{{0,40}}?\ballerg", re.IGNORECASE),
-    re.compile(
-        rf"\b(?:enter|document|discontinue|inactivate|deactivate)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg",
-        re.IGNORECASE,
-    ),
-    re.compile(rf"\bclear\s+{_DET}\s+(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
-    re.compile(r"\ballerg\w*(?:\s+list)?\s*[:,-]\s*(?:add|remove|update|change|delete)\b", re.IGNORECASE),
-    # "Not allergic to sulfa after all, please update that": the instruction is the update, not what precedes it.
-    re.compile(rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,120}}?\b(?P<at>(?:please\s+)?update\s+(?:that|this|it))\b", re.I),
+    re.compile(rf"\b(?:enter|document)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\blist\b{_SAME_SENTENCE}{{0,40}}?\bas\s+(?:an?\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\bput\b{_SAME_SENTENCE}{{0,40}}?\b(?:on|in|into)\s+(?:{_DET}\s+)?allerg", re.IGNORECASE),
     re.compile(
         rf"\b(?:make sure|ensure|confirm|check that)\b{_SAME_SENTENCE}{{0,40}}?\bon\s+(?:{_DET}\s+)?(?:drug\s+)?allerg\w*\s+list",
         re.IGNORECASE,
     ),
+]
+_ALLERGY_CHANGES = [
+    re.compile(rf"\b(?:remove|delete|take)\b{_SAME_SENTENCE}{{0,40}}?\b(?:from|off)\s+(?:{_DET}\s+)?(?:drug\s+)?allerg", re.I),
+    re.compile(rf"\b(?:remove|delete)\s+(?:{_DET}\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
+    re.compile(rf"\b(?:update|change|edit|correct|amend)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
+    re.compile(rf"\b(?:mark|flag)\b{_SAME_SENTENCE}{{0,40}}?\ballerg", re.IGNORECASE),
+    re.compile(rf"\b(?:discontinue|inactivate|deactivate)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
+    re.compile(rf"\bclear\s+{_DET}\s+(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
+    re.compile(r"\ballerg\w*(?:\s+list)?\s*[:,-]\s*(?:add|remove|update|change|delete)\b", re.IGNORECASE),
+    # "Not allergic to sulfa after all, please update that": the instruction is the update, not what precedes it.
+    re.compile(rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,120}}?\b(?P<at>(?:please\s+)?update\s+(?:that|this|it))\b", re.I),
     re.compile(rf"\ballerg\w*\s+list\b{_SAME_SENTENCE}{{0,30}}?\b(?:add|remove|update|change|delete)\b", re.IGNORECASE),
 ]
 # Instructions only in some places, each with the test of its place:
@@ -697,13 +726,16 @@ def _not_in_the_past(text: str, match: re.Match, clause: int) -> bool:
 
 _PLACED = [
     ("order", _CALL_IN, _calls_in_an_order),
-    ("allergy_change", _NOTE_ALLERGY, _at_clause_start),
+    (ALLERGY_ADDITION, _NOTE_ALLERGY, _at_clause_start),
 ]
 # Instructions whose subject comes first ("penicillin should be added to her allergies"): their span starts with it.
 _PASSIVE = [
+    (ALLERGY_ADDITION, re.compile(
+        rf"\b(?:added|listed|put)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg",
+        re.IGNORECASE,
+    )),
     ("allergy_change", re.compile(
-        rf"\b(?:added|removed|deleted|listed|taken|put)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?"
-        r"(?:drug\s+|medication\s+)?allerg",
+        rf"\b(?:removed|deleted|taken)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg",
         re.IGNORECASE,
     )),
     ("allergy_change", re.compile(
@@ -727,22 +759,29 @@ def directives(text: str) -> list[tuple[int, int, str]]:
     """Each instruction to place an order ("order") or change the allergy list ("allergy_change"), from its lead-in, or
     its subject when that comes first, to the end of its clause (see _directive_end()). Overlapping ones are merged, an
     allergy change winning. Hyphens are ignored ("re-fill")."""
+    return [(start, end, reason) for start, end, reason, _, _ in _instructions(text)]
+
+
+def _instructions(text: str) -> list[tuple[int, int, str, frozenset[str], int]]:
+    """directives(), each with the finer kinds of the instructions merged into it (REASON's keys) and where the first
+    of them was matched, which is after its lead-in or subject."""
     found = _directives(text)
     letters = [i for i, character in enumerate(text) if character != "-"]
     if len(letters) < len(text):
         plain = "".join(text[i] for i in letters)
-        found += [(letters[start], letters[end - 1] + 1, kind) for start, end, kind in _directives(plain)]
-    merged: list[tuple[int, int, str]] = []
-    for start, end, kind in sorted(found):
+        found += [(letters[start], letters[end - 1] + 1, kind, letters[at]) for start, end, kind, at in _directives(plain)]
+    merged: list[tuple[int, int, str, frozenset[str], int]] = []
+    for start, end, kind, at in sorted(found):
         if merged and start < merged[-1][1]:
-            last = merged[-1]
-            merged[-1] = (last[0], max(last[1], end), "allergy_change" if "allergy_change" in (kind, last[2]) else kind)
+            first, last, reason, kinds, matched = merged[-1]
+            reason = "allergy_change" if "allergy_change" in (REASON[kind], reason) else reason
+            merged[-1] = (first, max(last, end), reason, kinds | {kind}, min(matched, at))
         else:
-            merged.append((start, end, kind))
+            merged.append((start, end, REASON[kind], frozenset({kind}), at))
     return merged
 
 
-def _directives(text: str) -> list[tuple[int, int, str]]:
+def _directives(text: str) -> list[tuple[int, int, str, int]]:
     words = tokens(text)
     matches: list[tuple[int, int, str]] = []
     for match in _ORDER_VERB.finditer(text):
@@ -751,7 +790,8 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
         if (before and before[0] in _NOUN_BEFORE) or after.startswith(" of"):
             continue
         matches.append((match.start(), match.end(), "order"))
-    for kind, patterns in (("order", _ORDERS), ("allergy_change", _ALLERGY_CHANGES)):
+    for kind, patterns in (("order", _ORDERS), (ORDERS_SECTION, [_ORDERS_SECTION]), (ALLERGY_ADDITION, _ALLERGY_ADDITIONS),
+                           ("allergy_change", _ALLERGY_CHANGES)):
         for pattern in patterns:
             matches += [(match.start("at" if "at" in pattern.groupindex else 0), match.end(), kind)
                         for match in pattern.finditer(text)]
@@ -782,7 +822,7 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
             if token.start < clause or (token.text in CLAUSE_STARTS | {"and"} if subject else token.text not in LEAD_IN):
                 break
             span_start = token.start
-        spans.append((span_start, _directive_end(text, words, end), kind))
+        spans.append((span_start, _directive_end(text, words, end), kind, start))
     return spans
 
 
@@ -1155,3 +1195,158 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
 def _is_content(word: str) -> bool:
     """A word a qualifier can apply to: not a number or a function word, but "MI" or "PE" is one."""
     return word.isalpha() and len(word) >= 2 and word not in STOPWORDS
+
+
+# ---- Proposals (the expansion plan's step 15; FR-14 as reworded) --------------------------------------------------
+
+MAX_PROPOSALS = 20  # at most, in one dictation, as the on-prem app stages them
+TAKEN_BACK_REACH = 25  # at most, words after an instruction in which taking it back holds it back
+# Why a listed instruction isn't proposed, in the order the rules are tried: the first that applies is the one given.
+HELD_BACK = (
+    "not_final", "to_the_software", "mixed_kinds", "not_an_addition", "negated", "hedged", "for_later", "taken_back",
+    "in_the_past", "unclear", "question", "quoted", "not_imperative", "too_many",
+)  # fmt: skip
+# What may come between the start of an instruction's clause and the instruction: its lead-in (LEAD_IN) and the words
+# a clinician starts a step of the plan with.
+OPENERS = LEAD_IN | frozenset("okay ok alright so plan next finally lastly first second third going to now".split())
+HEDGE = re.compile(
+    r"\b(?:if|unless|when|whenever|once|consider|considering|maybe|perhaps|possibly|probably|might|could|would|"
+    r"discuss|discussed|discussing|think|thinking|wonder|wondering|whether)\b",
+    re.IGNORECASE,
+)
+CONDITIONS = frozenset("if unless when whenever once".split())
+CONDITION_AFTER = re.compile(r"\b(?:if|unless|in case|once|when|whenever|depending on)\b", re.IGNORECASE)
+_UNITS = "|".join(sorted(UNITS, key=len, reverse=True))
+_COUNT = rf"\d+|a|a few|a couple of|several|(?:{'|'.join(TENS)})(?:[\s-](?:{_UNITS}))?|{_UNITS}"
+FOR_LATER = re.compile(
+    r"\bnext\s+(?:visit|time|appointment|week|month|year|spring|summer|fall|autumn|winter)\b"
+    r"|\bat\s+(?:the\s+|her\s+|his\s+|their\s+)?(?:next\s+)?(?:follow[\s-]?up|visit|review|appointment)\b"
+    r"|\b(?:later|eventually|in the future|down the line)\b"
+    rf"|\bin\s+(?:{_COUNT})\s+(?:days?|weeks?|months?|years?)\b",
+    re.IGNORECASE,
+)
+TAKEN_BACK = re.compile(
+    CORRECTION.pattern + r"|\b(?:hold off|never ?mind|forget (?:that|it|about it)|cancel that|on second thought|"
+    r"let's not|let us not|not yet)\b",
+    re.IGNORECASE,
+)
+TO_THE_SOFTWARE = re.compile(
+    rf"\bignore\b{_SAME_SENTENCE}{{0,60}}?\b(?:rules|instructions|prompt|guidelines)\b"
+    r"|\b(?:note|instruction|message|request)s?\s+(?:to|for)\s+(?:the\s+)?(?:\w+\s+)?"
+    r"(?:assistant|ai|model|system|software|scribe|computer)\b",
+    re.IGNORECASE,
+)
+QUOTING = REPORTING | frozenset("wondered wonders wondering asking saying".split())
+
+
+@dataclass(frozen=True)
+class Weighed:
+    """One listed instruction (not_carried_over()) weighed as a proposal: what it would propose (order or
+    allergy_addition), or the listed reason when it is neither; the rule that holds it back (HELD_BACK), None when it is
+    proposed; and its warnings, as for a value. Code points in the transcript."""
+
+    start: int
+    end: int
+    kind: str
+    held_back: str | None
+    warnings: tuple[tuple[str, int, int], ...] = ()
+
+
+def proposals(transcript: Transcript) -> list[dict]:
+    """What the dictation proposes (see the module's header): each order or allergy to add the clinician dictated
+    plainly, as its kind, the place of its listed instruction and its warnings, in UTF-16 offsets. Never words."""
+    text = transcript.text
+    return [
+        {
+            "kind": weighed.kind,
+            "start": utf16_offset(text, weighed.start),
+            "end": utf16_offset(text, weighed.end),
+            "warnings": [
+                {"code": code, "start": utf16_offset(text, start), "end": utf16_offset(text, end)}
+                for code, start, end in weighed.warnings
+            ],
+        }
+        for weighed in weigh(transcript)
+        if weighed.held_back is None
+    ]
+
+
+def weigh(transcript: Transcript) -> list[Weighed]:
+    """Every listed instruction, in order, as proposed or held back (see the module's header)."""
+    text = transcript.text
+    words = tokens(text)
+    unclear = transcript.unclear_ranges()
+    weighed: list[Weighed] = []
+    for start, end, reason, kinds, at in _instructions(text):
+        kind = "order" if kinds == {"order"} else ALLERGY_ADDITION if kinds == {ALLERGY_ADDITION} else reason
+        held_back = "not_final" if not transcript.final else _held_back(text, words, unclear, start, end, kinds, at)
+        if held_back is None and sum(1 for w in weighed if w.held_back is None) == MAX_PROPOSALS:
+            held_back = "too_many"
+        warnings = () if held_back else _proposal_warnings(text, words, unclear, start, end, at)
+        weighed.append(Weighed(start, end, kind, held_back, warnings))
+    return weighed
+
+
+def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], start: int, end: int,
+               kinds: frozenset[str], at: int) -> str | None:
+    """The first rule that holds an instruction back from being proposed (HELD_BACK), or None. `at` is where it was
+    matched: what comes before it in its clause is its lead-in or subject."""
+    clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
+    clause_end = next((mark.start() for mark in CLAUSE_MARK.finditer(text, at)), len(text))
+    sentence = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, start)), default=0)
+    sentence_end = _sentence_end(text, at)
+    lead = [token for token in words if clause <= token.start and token.end <= at]
+    if TO_THE_SOFTWARE.search(text, sentence, sentence_end):
+        return "to_the_software"
+    if kinds & {"order", ORDERS_SECTION} and kinds & {"allergy_change", ALLERGY_ADDITION}:
+        return "mixed_kinds"
+    if kinds not in ({"order"}, {ALLERGY_ADDITION}):
+        return "not_an_addition"
+    if NEGATION.search(text, clause, at):
+        return "negated"
+    sentence_words = [token.text for token in words if sentence <= token.start < sentence_end]
+    dates = set(_date_words([token.text for token in lead]))
+    if (
+        HEDGE.search(text, clause, at)
+        or any(token.text == "may" and i not in dates for i, token in enumerate(lead))
+        or (sentence_words and sentence_words[0] in CONDITIONS)
+        or text[sentence:sentence_end].lstrip().lower().startswith("in case")
+        or CONDITION_AFTER.search(text, at, sentence_end)
+    ):
+        return "hedged"
+    if FOR_LATER.search(text, sentence, sentence_end):
+        return "for_later"
+    after = [token for token in words if token.start >= end][:TAKEN_BACK_REACH]
+    next_sentence_end = _sentence_end(text, sentence_end + 1) if sentence_end < len(text) else len(text)
+    reach = min(next_sentence_end, after[-1].end if len(after) == TAKEN_BACK_REACH else len(text))
+    if TAKEN_BACK.search(text, start, max(reach, end)):
+        return "taken_back"
+    if PAST.search(text, clause, clause_end):
+        return "in_the_past"
+    if any(_overlaps((start, end), passage) for passage in unclear):
+        return "unclear"
+    if sentence_end < len(text) and text[sentence_end] == "?":
+        return "question"
+    previous = [token.text for token in words if token.end <= clause]
+    if clause and previous and previous[-1] in QUOTING:
+        return "quoted"
+    # Said as an instruction: from the start of its clause, or the last "and" or word starting a clause before it,
+    # nothing but openers up to its lead-in or subject (not "capillary refill under 2 seconds").
+    joins = [i for i, token in enumerate(lead) if token.text in CLAUSE_STARTS or token.text == "and"]
+    if any(token.text not in OPENERS for token in lead[joins[-1] + 1 if joins else 0 :] if token.start < start):
+        return "not_imperative"
+    return None
+
+
+def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, int]], start: int, end: int,
+                       at: int) -> tuple[tuple[str, int, int], ...]:
+    """A proposal's warnings: possible_correction, pointing from a correction-like word (WARNING_GAP_WORDS) said after
+    the instruction, in its words or within WARNING_REACH words after them, to the end of those or of its sentence; and
+    near_unclear_passage, as for a value."""
+    warnings: list[tuple[str, int, int]] = []
+    reach = [token for token in words if at < token.start < end] + [token for token in words if token.start >= end][:WARNING_REACH]
+    cue = next((token for token in reach if token.text in (WARNING_GAP_WORDS or ())), None)
+    if cue is not None:
+        warnings.append((POSSIBLE_CORRECTION, cue.start, max(cue.end, min(reach[-1].end, _sentence_end(text, cue.start)))))
+    warnings += [(NEAR_UNCLEAR_PASSAGE, first, last) for first, last in _near_unclear([(start, end)], unclear, words)]
+    return tuple(warnings)

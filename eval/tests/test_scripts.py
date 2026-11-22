@@ -24,7 +24,7 @@ VOICES = tomllib.loads((EVAL_DIR / "voices.toml").read_text(encoding="utf-8"))
 CONTENT_TAGS = {
     "dates", "numbers", "vitals", "drug-new", "drug-uncommon", "negation", "self-correction", "order-attempt",
     "allergy-change", "mixed-plan", "recombination", "injection", "missing-field", "spoken-punctuation", "long",
-    "short", "max-length", "experiencer",
+    "short", "max-length", "experiencer", "proposal", "proposal-trap",
 }  # fmt: skip
 ACCENTS = {"us", "gb", "hi-voice", "es-voice", "fr-voice"}
 
@@ -51,7 +51,7 @@ UNCOMMON_DRUGS = {
 MINIMUMS = {
     "dates": 6, "vitals": 6, "negation": 6, "self-correction": 6, "drug-new": 6, "drug-uncommon": 6,
     "order-attempt": 5, "allergy-change": 5, "mixed-plan": 5, "recombination": 5, "injection": 3, "missing-field": 4,
-    "long": 6, "max-length": 2, "experiencer": 5,
+    "long": 6, "max-length": 2, "experiencer": 5, "proposal": 12, "proposal-trap": 10,
 }  # fmt: skip
 
 # How a dictation corrects itself; a retracted value comes just before one of these.
@@ -256,6 +256,8 @@ def test_tags_match_the_content(script):
     assert ("experiencer" in tags) == bool(SOMEONE_ELSE.search(display))
     assert ("drug-new" in tags) == bool(drugs & NEW_DRUGS)
     assert ("drug-uncommon" in tags) == bool(drugs & UNCOMMON_DRUGS)
+    assert ("proposal" in tags) == bool(script.proposals)
+    assert ("proposal-trap" in tags) == bool(script.not_proposed)
     if "self-correction" in tags:
         assert CORRECTION.search(display)
     if "negation" in tags:
@@ -291,7 +293,20 @@ def test_voices_and_noise_are_described():
     assert re.fullmatch(r"[0-9a-f]{40}", model["revision"]) and re.fullmatch(r"[0-9a-f]{64}", model["sha256"])
 
 
-def test_variants_add_up_to_about_eighty_items():
+@pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
+def test_what_should_and_shouldnt_be_proposed_is_in_the_display_text_and_never_in_gold(script):
+    """Each gold proposal is one of the forbidden passages, with the item it names in it; what mustn't be proposed is in
+    the display text; and no gold value has a proposal's words (the step 15 gold: the gate's listed proposals)."""
+    display = script.display.lower()
+    for proposal in script.proposals:
+        assert proposal.words.lower() in display and proposal.item.lower() in proposal.words.lower()
+        for field, gold in golds(script):
+            assert proposal.words.lower() not in gold.value.lower(), f"{field} value has a proposal's words"
+    for row in script.not_proposed:
+        assert row.words.lower() in display, f"{row.words!r} isn't in the display text"
+
+
+def test_variants_add_up_to_about_a_hundred_items():
     variants = VOICES["variants"]
     by_id = {script.id: script for script in SCRIPTS}
     assert len(variants["unusable"]) == 4
@@ -299,7 +314,7 @@ def test_variants_add_up_to_about_eighty_items():
         assert by_id[script_id].noise, f"{script_id} is in unusable but lists no noise"
     noisy = sum(len(script.noise) * len(variants["snr_db"]) for script in SCRIPTS)
     total = len(SCRIPTS) + noisy + len(variants["unusable"])
-    assert 75 <= total <= 90, total
+    assert 90 <= total <= 105, total
 
 
 # ---- Rendering -----------------------------------------------------------------------------------------------------

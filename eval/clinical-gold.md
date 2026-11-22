@@ -2,7 +2,7 @@
 
 Written by `uv run --project eval python -m ehr_eval.goldreport` (`ehr_eval/goldreport.py`); don't edit it. Each script's display text is read as its transcript, and its clinical gold (`[gold.*]`), what a careful clinician would accept, is checked by the dictation service's own checks (`validation.py` in the sidecar). These are the values they would discard, with why, and the rule-following gold (`[gold_rules.*]`) that the eval measures the pipeline against instead. See README.md, Two gold sets.
 
-63 of 161 clinical gold values would be discarded. By reason (a value can have more than one):
+63 of 188 clinical gold values would be discarded. By reason (a value can have more than one):
 
 | Reason | Values |
 |---|---|

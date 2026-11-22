@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Ehr.Testing;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.CloudAudit;
 using Microsoft.Extensions.DependencyInjection;
@@ -200,6 +201,29 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["order allergy_addition"], await QueryAsync(apps,
             "SELECT string_agg(p ->> 'kind', ' ') FROM ehr.ai_note_reviews r, jsonb_array_elements(r.result_json -> 'proposals') p WHERE r.id = @id", stopped.Review));
         Assert.Equal("0 orders, 0 allergies", await ChartAsync(apps, stopped.Patient));
+    }
+
+    // TC-UC10-09, from the service's own answer: the pinned result with proposals (src/Ehr.Dictation/contract, written
+    // by the sidecar's tests from its real code) is staged with each proposal it sends, in its order, and none that it
+    // holds back; the unclear passage's two instructions stay listed only.
+    [Fact]
+    public async Task TC_UC10_09_the_services_pinned_answer_with_proposals_is_staged_as_it_proposes()
+    {
+        var contract = JsonNode.Parse(await File.ReadAllTextAsync(
+            RepositoryRoot.Combine("src/Ehr.Dictation/contract/result-200-done-not_carried_over.json"), Cancel))!;
+        var body = contract["body"]!;
+        Assert.Equal(6, body["notCarriedOver"]!.AsArray().Count);
+        var stopped = await StopAsync(apps);
+        sidecar.Answer = (HttpStatusCode.OK, body.ToJsonString());
+
+        using (var staged = await StageAsync(stopped))
+        {
+            Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
+        }
+
+        Assert.Equal(["0 order pending", "1 allergy_addition pending", "2 order pending", "3 allergy_addition pending"],
+            await QueryAsync(apps, "SELECT ordinal || ' ' || kind || ' ' || state FROM ehr.ai_chart_proposals WHERE review_id = @id ORDER BY ordinal",
+                stopped.Review));
     }
 
     // TC-UC10-11: a result that proposes anything but its listed instructions, each of its kind, once, from a final

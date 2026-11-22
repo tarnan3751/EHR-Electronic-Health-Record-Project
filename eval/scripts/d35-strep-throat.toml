@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): pediatric strep throat, with an allergy change to leave out, no spoken punctuation. Format: eval/README.md.
 id = "d35-strep-throat"
 voice = "ff_siwis"
-tags = ["vitals", "numbers", "negation", "allergy-change"]
+tags = ["vitals", "numbers", "negation", "allergy-change", "proposal-trap"]
 dates = []
 drugs = ["amoxicillin", "ibuprofen", "acetaminophen"]
 forbidden = ["take amoxicillin off her allergy list"]
@@ -61,3 +61,7 @@ sources = [
     "tonsils red and swollen with white exudate tender lymph nodes at the front of the neck",
     "rapid strep test positive",
 ]
+
+[[not_proposed]]
+words = "take amoxicillin off her allergy list"
+why = "not_an_addition"

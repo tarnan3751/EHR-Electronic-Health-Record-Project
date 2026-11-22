@@ -12,7 +12,13 @@ someone committed instead:
    contains a retracted value or a drug a script names but no gold value carries, unless the owner has accepted it in
    eval/known-limitations.toml; and each accepted there still occurs, so the list stays true. The results say which
    offered values carry each warning.
-4. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
+4. The results say what the dictation proposed (the expansion plan's step 15), and every proposal that is false (it
+   matches no order or allergy to add a script dictates plainly) or misheard (it matches one, but not the item heard
+   word for word) has been accepted by the owner in eval/known-limitations.toml, as an [[accepted_proposal]] entry
+   naming its recording (variant), its kind and the words shown, as the results list them (shown); a warning doesn't
+   excuse one. Each accepted there still occurs, so the list stays true. The two gates above on orders and allergy
+   changes in the note's fields are unchanged beside it.
+5. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
    rate, note-field F1 against the rule-following gold (fields.content.f1; the F1 against the clinical gold,
    fields_clinical, is reported beside it and not gated), date and drug-name accuracy, and the share of offered words
@@ -43,6 +49,9 @@ RUN_IT = (
     "Run the eval on the server machine (eval/README.md: uv run --project eval python -m ehr_eval.run ...) and commit "
     "the eval/results/latest.json it writes."
 )
+
+# What the results must say about proposals.
+PROPOSAL_METRICS = ("shown", "said", "found", "false", "misheard", "listed")
 
 # metric path, higher is better
 GATED = [
@@ -118,6 +127,11 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                 f"none. Tighten the prompt (src/Ehr.Dictation/schema) or the checks (validation.py), then: {RUN_IT}"
             )
         problems += _unaccepted(order_allergy["unflagged"], eval_dir / KNOWN_LIMITATIONS)
+    proposals = latest.get("metrics", {}).get("proposals", {})
+    if any(key not in proposals for key in PROPOSAL_METRICS):
+        problems.append(f"The results don't say what the dictation proposed. {RUN_IT}")
+    else:
+        problems += _unaccepted_proposals(proposals["listed"], eval_dir / KNOWN_LIMITATIONS)
     warnings = latest.get("metrics", {}).get("warnings", {})
     if "shown" not in warnings or any("flagged" not in warnings.get(key, {}) for key in (*WARNING_CODES, "any")):
         problems.append(f"The results don't say which offered values carry a warning. {RUN_IT}")
@@ -168,6 +182,30 @@ def _unaccepted(unflagged: list[dict], known: Path) -> list[str]:
     return problems
 
 
+def _unaccepted_proposals(listed: list[dict], known: Path) -> list[str]:
+    """Each false or misheard proposal not accepted in known-limitations.toml, and each accepted there that the results
+    no longer list."""
+    accepted = tomllib.loads(known.read_text(encoding="utf-8")).get("accepted_proposal", []) if known.is_file() else []
+    key = lambda entry: (entry["variant"], entry["kind"], entry["shown"])  # noqa: E731
+    why = {key(entry): entry.get("why", "false") for entry in listed}
+    found, accepted_keys = set(why), {key(entry) for entry in accepted}
+    kinds = {"order": "an order", "allergy_addition": "an allergy to add"}
+    problems = [
+        f"{variant} proposes {shown!r} as {kinds.get(kind, kind)}, a {why[(variant, kind, shown)]} proposal: "
+        + ("nothing the script dictates plainly" if why[(variant, kind, shown)] == "false"
+           else "the item the script names wasn't heard word for word")
+        + "; there must be none that the owner hasn't accepted in eval/known-limitations.toml ([[accepted_proposal]]), "
+        f"and a warning doesn't excuse one. Tighten the proposal rules (validation.py), then score again or: {RUN_IT}"
+        for variant, kind, shown in sorted(found - accepted_keys)
+    ]
+    problems += [
+        f"eval/known-limitations.toml accepts the proposal {shown!r} ({kind}) of {variant}, which these results no longer "
+        "list. Remove it from the list, then score the stored answers again (ehr_eval/rescore.py)."
+        for variant, kind, shown in sorted(accepted_keys - found)
+    ]
+    return problems
+
+
 def _get(metrics: dict, path: tuple[str, ...]) -> float | None:
     value = metrics
     for key in path:
@@ -190,7 +228,9 @@ def main() -> int:
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
         f"field F1 {metrics['fields']['content']['f1']} (clinical gold {metrics['fields_clinical']['content']['f1']}), "
         f"every recording sorted, no order or allergy change shown and no retracted value without a warning, "
-        f"{metrics['warnings']['any']['flagged']} of {metrics['warnings']['shown']} offered values carry a warning. "
+        f"{metrics['warnings']['any']['flagged']} of {metrics['warnings']['shown']} offered values carry a warning, "
+        f"{metrics['proposals']['shown']} proposals ({metrics['proposals']['right']} right, every false or misheard one "
+        f"accepted). "
         f"Run on {latest['run']['machine']['label']}."
     )
     return 0

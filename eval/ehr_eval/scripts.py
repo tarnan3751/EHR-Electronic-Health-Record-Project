@@ -19,7 +19,14 @@ import json
 import tomllib
 from pathlib import Path
 
-from dictation_scripts import SCRIPTS_DIR, Gold, Script, load_scripts  # noqa: F401 (re-exported for the eval)
+from dictation_scripts import (  # noqa: F401 (re-exported for the eval)
+    SCRIPTS_DIR,
+    Gold,
+    NotProposed,
+    Proposal,
+    Script,
+    load_scripts,
+)
 from ehr_dictation.provenance import CHECKS_CODE_SHA256, PIPELINE_CODE_SHA256
 from dictation_scripts import display_text as render_display  # noqa: F401
 from dictation_scripts import spoken_text as render_spoken  # noqa: F401
@@ -58,8 +65,9 @@ def recordings_sha256(eval_dir: Path = EVAL_DIR) -> str:
 
 
 def gold_sha256(eval_dir: Path = EVAL_DIR) -> str:
-    """One hash over the rest of every script, what it is scored against: both gold sets, tags, dates, drugs, forbidden
-    and retracted. A change means scoring the stored answers again (rescore.py)."""
+    """One hash over the rest of every script, what it is scored against: both gold sets, tags, dates, drugs, forbidden,
+    retracted, and what should and shouldn't be proposed. A change means scoring the stored answers again
+    (rescore.py)."""
     digest = hashlib.sha256()
     for path in sorted((eval_dir / "scripts").glob("*.toml")):
         data = tomllib.loads(path.read_text(encoding="utf-8"))

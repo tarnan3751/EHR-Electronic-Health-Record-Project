@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): emergency department cellulitis, with an allergy record change to leave out. Format: eval/README.md.
 id = "d22-cellulitis-ed"
 voice = "hm_omega"
-tags = ["vitals", "numbers", "negation", "self-correction", "allergy-change", "spoken-punctuation"]
+tags = ["vitals", "numbers", "negation", "self-correction", "allergy-change", "spoken-punctuation", "proposal-trap"]
 noise = ["babble"]
 dates = []
 drugs = ["metoprolol", "metformin", "penicillin", "cephalexin", "paracetamol"]
@@ -79,3 +79,7 @@ sources = [
     "I have marked the edge with a pen.",
     "Glucose 11.2.",
 ]
+
+[[not_proposed]]
+words = "update his allergy record"
+why = "not_an_addition"

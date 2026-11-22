@@ -37,6 +37,7 @@
     "reason": "model_unavailable",
     "fields": null,
     "notCarriedOver": [],
+    "proposals": [],
     "provenance": {
       "speech": {
         "repository": "google/medasr",

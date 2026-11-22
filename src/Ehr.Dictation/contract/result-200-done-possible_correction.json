@@ -78,6 +78,7 @@
       }
     },
     "notCarriedOver": [],
+    "proposals": [],
     "provenance": {
       "speech": {
         "repository": "google/medasr",

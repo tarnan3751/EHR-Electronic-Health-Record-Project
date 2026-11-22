@@ -98,6 +98,44 @@
         "end": 223
       }
     ],
+    "proposals": [
+      {
+        "kind": "order",
+        "start": 17,
+        "end": 42,
+        "warnings": []
+      },
+      {
+        "kind": "allergy_addition",
+        "start": 44,
+        "end": 73,
+        "warnings": [
+          {
+            "code": "near_unclear_passage",
+            "start": 75,
+            "end": 149
+          }
+        ]
+      },
+      {
+        "kind": "order",
+        "start": 167,
+        "end": 192,
+        "warnings": [
+          {
+            "code": "near_unclear_passage",
+            "start": 75,
+            "end": 149
+          }
+        ]
+      },
+      {
+        "kind": "allergy_addition",
+        "start": 194,
+        "end": 223,
+        "warnings": []
+      }
+    ],
     "provenance": {
       "speech": {
         "repository": "google/medasr",

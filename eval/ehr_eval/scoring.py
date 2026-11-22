@@ -19,6 +19,12 @@
   carried over, so the screen can say they still need placing (recall against the scripts' forbidden items); and what
   the order-and-allergy rule threw away that the gold says was legitimate (false discards), so the owner can judge where
   that rule draws its line.
+- proposals (the expansion plan's step 15): what the dictation proposed, each an order or an allergy to add at the
+  place of a listed instruction, against each script's gold proposals: found where its gold words are, as said or as
+  heard (_as_heard()), and of the same kind; right when the item it names was heard word for word, misheard when not;
+  false when it matches no gold proposal. Each false or misheard one is listed (listed: the recording, the kind and the
+  words shown, normalized), for the gate to require the owner's acceptance of; recall, precision, how many carry a
+  warning, and why the others were held back (the rule, validation.HELD_BACK) are reported beside them.
 - warnings: for each warning code and for any warning, how many offered values carry it, how many of those holding a
   retracted value it caught, and of the right ones (matching the gold, holding nothing retracted), the share flagged
   anyway: its false-alarm rate, overall, on clean recordings and per tag, against each gold set.
@@ -36,8 +42,10 @@ from dataclasses import dataclass, field
 
 import jiwer
 
+from ehr_dictation import validation
 from ehr_dictation.prompt import FIELDS
 from ehr_dictation.textnorm import STOPWORDS, numbers
+from ehr_dictation.transcript import Transcript
 
 from .dates import said_right
 from .normalize import normalize, words
@@ -85,6 +93,17 @@ class Item:
     # checked again offline (rescore.py) without running the models.
     segments: list[dict] = field(default_factory=list)
     chunk_seconds: list[float] = field(default_factory=list)
+    # What the dictation proposed, each [kind, start, end, warnings] (warnings as a field's), and each listed
+    # instruction it held back, [reason, start, end, rule]: code points in the hypothesis (weigh_proposals()).
+    proposals: list[list] = field(default_factory=list)
+    held_back: list[list] = field(default_factory=list)
+
+
+def weigh_proposals(item: Item, transcript: Transcript) -> None:
+    """What the dictation proposes from the item's transcript, and what it holds back and why (validation.weigh())."""
+    weighed = validation.weigh(transcript)
+    item.proposals = [[w.kind, w.start, w.end, [list(x) for x in w.warnings]] for w in weighed if w.held_back is None]
+    item.held_back = [[w.kind, w.start, w.end, w.held_back] for w in weighed if w.held_back is not None]
 
 
 def score(items: list[Item], scripts: dict[str, Script]) -> dict:
@@ -97,6 +116,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "validation": _validation(items),
         "unsupported_content": _unsupported(items),
         "order_allergy": _order_allergy(items, scripts),
+        "proposals": _proposals(items, scripts),
         "warnings": _warnings(items, scripts),
         "sorting": _sorting(items),
         "timing": _timing(items),
@@ -321,6 +341,46 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
         "legitimate_fields_lost": lost,
         "lost_where_nothing_was_attempted": lost_without_attempt,
         "false_discard_rate": _ratio(lost, legitimate),
+    }
+
+
+def _proposals(items: list[Item], scripts: dict[str, Script]) -> dict:
+    shown = said = found = right = with_warnings = 0
+    listed: list[dict] = []
+    held_back: Counter[str] = Counter()
+    for item in items:
+        script = scripts[item.script]
+        golds = list(script.proposals)
+        heard = _as_heard(item, script, [normalize(gold.words) for gold in golds])
+        said += len(golds)
+        matched: set[int] = set()
+        for kind, start, end, warnings in item.proposals:
+            shown += 1
+            with_warnings += bool(warnings)
+            text = normalize(item.hypothesis[start:end])
+            match = next((k for k, gold in enumerate(golds) if k not in matched and gold.kind == kind
+                          and any(_contains(text, words) for words in heard[k])), None)
+            if match is not None:
+                matched.add(match)
+                if _contains(text, normalize(golds[match].item)) or not golds[match].item.strip():
+                    right += 1
+                    continue
+            listed.append({"variant": item.variant, "kind": kind, "shown": text,
+                           "why": "false" if match is None else "misheard"})
+        found += len(matched)
+        held_back.update(rule for *_, rule in item.held_back)
+    return {
+        "shown": shown,
+        "said": said,
+        "found": found,
+        "right": right,
+        "false": sum(1 for entry in listed if entry["why"] == "false"),
+        "misheard": sum(1 for entry in listed if entry["why"] == "misheard"),
+        "recall": _ratio(found, said),
+        "precision": _ratio(right, shown),
+        "with_warnings": with_warnings,
+        "held_back": dict(sorted(held_back.items())),
+        "listed": listed,
     }
 
 

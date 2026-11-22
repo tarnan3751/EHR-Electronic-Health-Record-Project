@@ -37,6 +37,7 @@
     "reason": "transcription_failed",
     "fields": null,
     "notCarriedOver": [],
+    "proposals": [],
     "provenance": {
       "speech": {
         "repository": "google/medasr",

@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): infant with bronchiolitis who had nirsevimab, on a ward. Format: eval/README.md.
 id = "d04-bronchiolitis-infant"
 voice = "bm_george"
-tags = ["vitals", "numbers", "drug-new", "negation", "spoken-punctuation"]
+tags = ["vitals", "numbers", "drug-new", "negation", "spoken-punctuation", "proposal-trap"]
 noise = ["monitor"]
 dates = []
 drugs = ["nirsevimab", "paracetamol"]
@@ -65,3 +65,7 @@ sources = [
     "Paracetamol for the fever if he is uncomfortable.",
     "Explained the expected course to mum.",
 ]
+
+[[not_proposed]]
+words = "refill under 2 seconds"
+why = "not_imperative"
