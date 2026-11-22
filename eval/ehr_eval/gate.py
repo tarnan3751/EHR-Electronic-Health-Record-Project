@@ -89,7 +89,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
         )
     elif recorded.get("scoring") != scoring_sha256(eval_dir):
         problems.append(
-            "The checks or the scoring (validation.py, textnorm.py or the eval's own code) changed since these results "
+            "The checks or the scoring (validation.py, textnorm.py, catalog.py or the eval's own code) changed since these results "
             "were scored. Score the stored answers again with the code that ships: "
             "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
         )
