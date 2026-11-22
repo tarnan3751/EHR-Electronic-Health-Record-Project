@@ -7,8 +7,12 @@
 - K2 Horizon 7B, which turns a transcript into note fields: the Q4_K_M GGUF from IFM/K2-Horizon-7B-GGUF (the
   model llama.cpp calls IFM/K2-Horizon-7B-GGUF:Q4_K_M), into infra/compose/models/ for llama-server.
 - MedASR, speech to text: google/medasr, into infra/compose/models/medasr/ for the sidecar.
+- Whisper large-v3-turbo, speech to text for dictation in Spanish (the expansion plan's step 17), only when asked:
+  openai/whisper-large-v3-turbo at the commit WHISPER_REVISION pins, into infra/compose/models/whisper/. MIT, not gated.
+  Without it the sidecar still starts, and refuses Spanish.
 
-    uv run src/Ehr.Dictation/setup_models.py                          # both models
+    uv run src/Ehr.Dictation/setup_models.py                          # K2 Horizon and MedASR
+    uv run src/Ehr.Dictation/setup_models.py --only whisper           # Whisper, for Spanish
     uv run src/Ehr.Dictation/setup_models.py --dry-run                # what it would download, and how big
     uv run src/Ehr.Dictation/setup_models.py --from-file <path.gguf>  # reuse a K2 Horizon file you already have
     uv run src/Ehr.Dictation/setup_models.py --verify                 # re-check the files on disk, offline
@@ -54,6 +58,10 @@ LLM_REPO = "IFM/K2-Horizon-7B-GGUF"
 LLM_QUANT = "Q4_K_M"
 MEDASR_REPO = "google/medasr"
 MEDASR_DIR = "medasr"
+WHISPER_REPO = "openai/whisper-large-v3-turbo"
+# Pinned, so every machine transcribes Spanish with the same weights the Spanish eval measured (step 17).
+WHISPER_REVISION = "41f01f3fe87f28c78e2fbf8b568835947dd65ed9"
+WHISPER_DIR = "whisper"
 
 
 class SetupError(Exception):
@@ -79,7 +87,8 @@ class Repository:
 
 
 def read_repository(api: HfApi, name: str, revision: str) -> Repository:
-    """Lists the files at `revision`, resolved to a commit so every download comes from the same one."""
+    """Lists the files at `revision`, resolved to a commit so every download comes from the same one. A revision given
+    as a full commit must be that commit."""
     try:
         info = api.model_info(name, revision=revision, files_metadata=True)
     except GatedRepoError as error:
@@ -102,6 +111,8 @@ def read_repository(api: HfApi, name: str, revision: str) -> Repository:
     ]
     if not info.sha:
         raise SetupError(f"Hugging Face didn't say which commit {name} at {revision} is.")
+    if re.fullmatch(r"[0-9a-f]{40}", revision) and info.sha != revision:
+        raise SetupError(f"Hugging Face answered {name} at {revision} with another commit, {info.sha}.")
     return Repository(name, info.sha, files)
 
 
@@ -309,6 +320,32 @@ def setup_medasr(api: HfApi, args: argparse.Namespace, models_dir: Path) -> dict
     }
 
 
+# ---- Whisper (step 17) ----------------------------------------------------------------------------------------------
+
+
+def setup_whisper(api: HfApi, args: argparse.Namespace, models_dir: Path) -> dict | None:
+    """Every file of the pinned commit but the dot files, into the whisper folder, as MedASR's are; its card, which
+    says it is MIT-licensed, comes with them."""
+    repository = read_repository(api, args.whisper_repo, args.whisper_revision)
+    files = [f for f in repository.files if not f.name.startswith(".")]
+    list_files(f"Whisper: {repository.name} at commit {repository.commit[:12]}", files)
+    if args.dry_run:
+        return None
+
+    local_dir = models_dir / WHISPER_DIR
+    local_dir.mkdir(parents=True, exist_ok=True)
+    ensure_space(local_dir, missing_bytes(local_dir, files))
+    for remote in files:
+        fetch(repository, remote, local_dir)
+
+    return {
+        "repository": repository.name,
+        "commit": repository.commit,
+        "directory": WHISPER_DIR,
+        "files": [{"path": f.name, "size": f.size, "sha256": f.sha256 or sha256_of(local_dir / f.name)} for f in files],
+    }
+
+
 # ---- Manifest and checks --------------------------------------------------------------------------------------------
 
 
@@ -336,7 +373,7 @@ def verify(models_dir: Path) -> int:
         raise SetupError(f"No {MANIFEST_NAME} in {models_dir}: nothing installed yet.")
 
     problems = 0
-    for key, base in (("llm", models_dir), ("medasr", models_dir / MEDASR_DIR)):
+    for key, base in (("llm", models_dir), ("medasr", models_dir / MEDASR_DIR), ("whisper", models_dir / WHISPER_DIR)):
         entry = manifest.get(key)
         if not entry:
             continue
@@ -379,7 +416,8 @@ def ensure_not_committable(models_dir: Path) -> None:
 
 def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--only", choices=["llm", "medasr"], help="set up one model, not both")
+    parser.add_argument("--only", choices=["llm", "medasr", "whisper"],
+                        help="set up one model; without it, K2 Horizon and MedASR (Whisper only when asked)")
     parser.add_argument(
         "--models-dir", type=Path, default=DEFAULT_MODELS_DIR, help="default: infra/compose/models (gitignored)"
     )
@@ -405,6 +443,10 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
         metavar="PATTERN",
         help="skip repository files matching this pattern (repeatable), e.g. an optional language model",
     )
+
+    whisper = parser.add_argument_group("Whisper (Spanish, step 17)")
+    whisper.add_argument("--whisper-repo", default=WHISPER_REPO)
+    whisper.add_argument("--whisper-revision", default=WHISPER_REVISION, help="commit (default: the pinned one)")
     return parser.parse_args(argv)
 
 
@@ -417,19 +459,20 @@ def main(argv: list[str] | None = None) -> int:
         ensure_not_committable(models_dir)
         if args.from_file and args.only == "medasr":
             raise SetupError("--from-file is for the K2 Horizon file; it can't be used with --only medasr.")
-        if args.only != "llm" and not args.dry_run and not get_token():
+        if args.only in (None, "medasr") and not args.dry_run and not get_token():
             raise SetupError(gated_message(args.medasr_repo))
 
         api = HfApi()
         manifest = load_manifest(models_dir)
-        llm = setup_llm(api, args, models_dir) if args.only != "medasr" else None
-        medasr = setup_medasr(api, args, models_dir) if args.only != "llm" else None
+        llm = setup_llm(api, args, models_dir) if args.only in (None, "llm") else None
+        medasr = setup_medasr(api, args, models_dir) if args.only in (None, "medasr") else None
+        whisper = setup_whisper(api, args, models_dir) if args.only == "whisper" else None
         if args.dry_run:
             print("Dry run: nothing was downloaded.")
             return 0
 
         installed_at = datetime.now(UTC).isoformat(timespec="seconds")
-        for key, entry in (("llm", llm), ("medasr", medasr)):
+        for key, entry in (("llm", llm), ("medasr", medasr), ("whisper", whisper)):
             if entry:
                 manifest[key] = entry | {"installed_at": installed_at}
         save_manifest(models_dir, manifest)
@@ -445,6 +488,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"In infra/compose/.env, set: LLAMA_MODEL_FILE={llm['file']}")
     if medasr:
         print(f"MedASR is in {models_dir / MEDASR_DIR}. Load it with HF_HUB_OFFLINE=1, so nothing is fetched.")
+    if whisper:
+        print(f"Whisper is in {models_dir / WHISPER_DIR}, for dictation in Spanish.")
     return 0
 
 

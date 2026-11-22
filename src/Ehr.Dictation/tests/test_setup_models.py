@@ -59,6 +59,18 @@ MEDASR = {
 }
 
 
+WHISPER = {
+    "sha": setup_models.WHISPER_REVISION,
+    "files": {
+        ".gitattributes": (b"*.safetensors filter=lfs", False),
+        "config.json": (b'{"model_type": "whisper"}', False),
+        "model.safetensors": (b"whisper weights" * 300, True),
+        "tokenizer.json": (b'{"vocab": {}}', False),
+        "README.md": (b"license: mit", False),
+    },
+}
+
+
 class FakeHub:
     def __init__(self, repos, token="hf_test", gated=()):
         self.repos = repos
@@ -99,7 +111,8 @@ class FakeHub:
 
 @pytest.fixture
 def hub(monkeypatch):
-    fake = FakeHub({"IFM/K2-Horizon-7B-GGUF": gguf_repo(), "google/medasr": MEDASR})
+    fake = FakeHub({"IFM/K2-Horizon-7B-GGUF": gguf_repo(), "google/medasr": MEDASR,
+                    "openai/whisper-large-v3-turbo": WHISPER})
     monkeypatch.setattr(setup_models, "HfApi", lambda: fake)
     monkeypatch.setattr(setup_models, "hf_hub_download", fake.download)
     monkeypatch.setattr(setup_models, "get_token", lambda: fake.token)
@@ -261,3 +274,28 @@ def test_a_folder_git_would_track_is_refused(hub, tmp_path, monkeypatch, capsys)
     assert run(repo / "infra" / "compose" / "models", "--only", "llm") == 0
     assert run(repo / "weights", "--only", "llm") == 1
     assert "isn't gitignored" in capsys.readouterr().err
+
+
+# Step 17: Whisper, for dictation in Spanish, only when asked; at the pinned commit, with no sign-in, recorded as
+# MedASR is, beside the others, and re-checked by --verify.
+def test_whisper_is_set_up_only_when_asked_at_the_pinned_commit_without_a_sign_in(hub, models):
+    assert run(models) == 0
+    assert "whisper" not in manifest(models)
+    hub.token = None
+    assert run(models, "--only", "whisper") == 0
+    recorded = manifest(models)
+    assert {"llm", "medasr", "whisper"} <= set(recorded)
+    assert recorded["whisper"]["commit"] == setup_models.WHISPER_REVISION
+    assert recorded["whisper"]["directory"] == "whisper"
+    assert {f["path"] for f in recorded["whisper"]["files"]} == {"config.json", "model.safetensors", "tokenizer.json", "README.md"}
+    weights = next(f for f in recorded["whisper"]["files"] if f["path"] == "model.safetensors")
+    assert weights["sha256"] == hashlib.sha256(WHISPER["files"]["model.safetensors"][0]).hexdigest()
+    assert (models / "whisper" / "model.safetensors").is_file()
+    assert run(models, "--verify") == 0
+
+
+def test_whisper_at_another_commit_than_the_one_asked_is_refused(hub, models, capsys):
+    hub.repos["openai/whisper-large-v3-turbo"] = WHISPER | {"sha": "d" * 40}
+    assert run(models, "--only", "whisper") == 1
+    assert "another commit" in capsys.readouterr().err
+    assert not (models / "whisper").exists()
