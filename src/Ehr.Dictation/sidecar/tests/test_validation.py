@@ -20,7 +20,6 @@ from ehr_dictation.validation import (
     directives,
     not_carried_over,
     proposals,
-    subject_cues,
     weigh,
 )
 
@@ -498,13 +497,13 @@ def test_a_qualifier_stops_at_a_new_subject():
     assert own("No fever she is eating well.", "Fever.", "No fever").reasons == ["negation_dropped"]
 
 
-# A cue that names the subject and its verb reaches past them: a value that keeps the finding without the cue is
-# refused, and one that keeps both goes out.
+# A negation or a doubt passes over a subject and its verb (TO_THE_FINDING): a value that keeps the finding without
+# the cue is refused, and one that keeps both goes out.
 @pytest.mark.parametrize(("said", "value", "reason"), [
     ("I don't think she has pneumonia.", "She has pneumonia.", "negation_dropped"),
     ("I do not believe that he has a fracture.", "He has a fracture.", "negation_dropped"),
     ("I doubt she has strep.", "She has strep.", "negation_dropped"),
-    ("It is unlikely that the patient has appendicitis.", "The patient has appendicitis.", "negation_dropped"),
+    ("It is unlikely that the patient has appendicitis.", "The patient has appendicitis.", "certainty_dropped"),
     ("I think she has gout.", "She has gout.", "certainty_dropped"),
     ("Maybe she has gout.", "She has gout.", "certainty_dropped"),
     ("Perhaps he is anemic.", "He is anemic.", "certainty_dropped"),
@@ -526,7 +525,7 @@ def test_a_qualifier_stops_at_a_new_subject():
     ("I think she isn't septic.", "She isn't septic.", "certainty_dropped"),
 ])
 def test_a_cue_that_names_the_subject_reaches_past_it(said, value, reason):
-    assert own(said, value).reasons == [reason]
+    assert reason in own(said, value).reasons  # a negation said as a doubt is both
     assert own(said, said).pending
 
 
@@ -576,12 +575,117 @@ def test_may_have_is_read_as_doubt_even_when_it_gives_leave():
         "certainty_dropped"]
 
 
-def test_the_cues_that_name_a_subject_are_made_for_any_subject():
-    negation, certainty = subject_cues("you")
+def test_a_cue_passes_over_any_subject_and_its_verb_you_included():
+    assert own("I don't think you have pneumonia.", "You have pneumonia.").reasons == ["negation_dropped",
+                                                                                     "certainty_dropped"]
+    assert own("I don't think you have pneumonia.", "I don't think you have pneumonia.").pending
 
-    assert re.fullmatch(negation, "I don't think you have", re.IGNORECASE)
-    assert re.fullmatch(certainty, "you might have", re.IGNORECASE)
-    assert not re.search(negation, "I don't think she has", re.IGNORECASE)
+
+# The review's cue list (TC-UC10-03): a negation or a doubt is read wherever it is said, before the finding (past a
+# subject and its verb, a "that" or a clause between commas), after it (closing its sentence, with a comma or not), as an
+# alternative offered, or as a question; a value that drops it is refused, and what it doesn't reach goes out.
+CUES_REFUSED = [
+    ("I don't think she has pneumonia, but she does have bronchitis.", 'She has pneumonia.', 'she has pneumonia'),
+    ("I don't think she doesn't have asthma.", "She doesn't have asthma.", "she doesn't have asthma"),
+    ("I don't think, given her normal oxygen and clear chest today, that she has pneumonia.", 'She has pneumonia.', 'she has pneumonia'),
+    ('We do not, after reviewing the x-ray, believe she has pneumonia.', 'She has pneumonia.', 'she has pneumonia'),
+    ('Maybe, given the timeline, she has Lyme disease.', 'She has Lyme disease.', 'she has Lyme disease'),
+    ('I wonder, since she was camping, if she has Lyme disease.', 'She has Lyme disease.', 'she has Lyme disease'),
+    ("I'm not sure, honestly, that she has strep.", 'She has strep.', 'she has strep'),
+    ('Gout, pseudogout, septic arthritis, possibly.', 'Gout.', 'Gout'),
+    ('Gout, pseudogout or septic arthritis, possibly.', 'Gout.', 'Gout'),
+    ('Her temperature was maybe 38.', 'Temperature was 38.', 'temperature was maybe 38'),
+    ('Symptoms started maybe two weeks ago.', 'Symptoms started two weeks ago.', 'Symptoms started maybe two weeks ago'),
+    ('Does she have pneumonia?', 'Pneumonia.', 'does she have pneumonia'),
+    ('Is this pneumonia?', 'Pneumonia.', 'is this pneumonia'),
+    ('It is unlikely he has a fracture.', 'He has a fracture.', 'he has a fracture'),
+    ('Doubt she has strep.', 'She has strep.', 'she has strep'),
+    ('Doubtful she has strep.', 'She has strep.', 'she has strep'),
+    ('Probably she has the flu.', 'She has the flu.', 'she has the flu'),
+    ('Likely she has a urinary tract infection.', 'She has a urinary tract infection.', 'she has a urinary tract infection'),
+    ('I suspect she has gout.', 'She has gout.', 'she has gout'),
+    ('We suspect he has a kidney stone.', 'He has a kidney stone.', 'he has a kidney stone'),
+    ('I believe she has gout.', 'She has gout.', 'she has gout'),
+    ('Concern that she has sepsis.', 'She has sepsis.', 'she has sepsis'),
+    ('Worried she has sepsis.', 'She has sepsis.', 'she has sepsis'),
+    ("Can't rule out that she has a PE.", 'She has a PE.', 'she has a PE'),
+    ('Cannot exclude that she has a pulmonary embolism.', 'She has a pulmonary embolism.', 'she has a pulmonary embolism'),
+    ("It's possible she has a pulmonary embolism.", 'She has a pulmonary embolism.', 'she has a pulmonary embolism'),
+    ('There is a chance she has a pulmonary embolism.', 'She has a pulmonary embolism.', 'she has a pulmonary embolism'),
+    ('Not convinced she has a pulmonary embolism.', 'She has a pulmonary embolism.', 'she has a pulmonary embolism'),
+    ('I am not certain she has a pulmonary embolism.', 'She has a pulmonary embolism.', 'she has a pulmonary embolism'),
+    ('Presumably she has a viral illness.', 'She has a viral illness.', 'she has a viral illness'),
+    ('She has had a fever maybe.', 'She has had a fever.', 'She has had a fever'),
+    ('Pneumonia maybe.', 'Pneumonia.', 'Pneumonia'),
+    ('Pneumonia probably.', 'Pneumonia.', 'Pneumonia'),
+    ('She has pneumonia I think.', 'She has pneumonia.', 'She has pneumonia'),
+    ('She has pneumonia, I would say.', 'She has pneumonia.', 'She has pneumonia'),
+    ('She has pneumonia, I guess.', 'She has pneumonia.', 'She has pneumonia'),
+    ('She has pneumonia, most likely.', 'She has pneumonia.', 'She has pneumonia'),
+    ('She has pneumonia, or maybe bronchitis.', 'She has pneumonia.', 'She has pneumonia'),
+    ('Either pneumonia or bronchitis.', 'Pneumonia.', 'pneumonia'),
+    ("I think it's pneumonia.", 'Pneumonia.', 'pneumonia'),
+    ('I think it is a viral infection.', 'A viral infection.', 'a viral infection'),
+    ('I think the patient has a viral infection.', 'The patient has a viral infection.', 'the patient has a viral infection'),
+    ('I think this is a viral infection.', 'This is a viral infection.', 'this is a viral infection'),
+    ('I think her knee pain is from arthritis.', 'Knee pain is from arthritis.', 'knee pain is from arthritis'),
+    ("We don't think the patient has pneumonia.", 'The patient has pneumonia.', 'the patient has pneumonia'),
+    ("I don't think her cough is pneumonia.", 'Her cough is pneumonia.', 'her cough is pneumonia'),
+    ("I don't believe this is cellulitis.", 'This is cellulitis.', 'this is cellulitis'),
+    ("It doesn't look like she has cellulitis.", 'She has cellulitis.', 'she has cellulitis'),
+    ('No signs that she has cellulitis.', 'She has cellulitis.', 'she has cellulitis'),
+    ('No evidence she has a fracture.', 'She has a fracture.', 'she has a fracture'),
+    ('She has no pneumonia, I think.', 'She has no pneumonia.', 'She has no pneumonia'),
+    ('She probably has pneumonia.', 'She has pneumonia.', 'she probably has pneumonia'),
+    ('She likely has pneumonia.', 'She has pneumonia.', 'she likely has pneumonia'),
+    ('She possibly has pneumonia.', 'She has pneumonia.', 'she possibly has pneumonia'),
+    ('She does not have pneumonia.', 'She does have pneumonia.', 'she does not have pneumonia'),
+    ('She maybe has pneumonia.', 'She has pneumonia.', 'she maybe has pneumonia'),
+]
+CUES_PASSING = [
+    ("I don't think she has pneumonia, but she does have bronchitis.", 'She does have bronchitis.', 'she does have bronchitis'),
+    ("I don't think she has pneumonia but she does have bronchitis.", 'She does have bronchitis.', 'she does have bronchitis'),
+    ("I don't think she has pneumonia, but she has bronchitis.", 'She has bronchitis.', 'she has bronchitis'),
+    ('I think she has a viral upper respiratory infection. Assessment: viral upper respiratory infection.', 'Viral upper respiratory infection.', 'viral upper respiratory infection'),
+    ('I think she has a viral infection. She has a viral infection with clear lungs.', 'She has a viral infection with clear lungs.', 'She has a viral infection with clear lungs'),
+    ('She could walk unaided across the room.', 'She could walk unaided across the room.', 'She could walk unaided across the room'),
+    ('She could walk unaided across the room.', 'Walk unaided across the room.', 'walk unaided across the room'),
+    ('She may return to school tomorrow.', 'Return to school tomorrow.', 'return to school tomorrow'),
+    ('I think she is doing well, her cough has resolved.', 'Her cough has resolved.', 'her cough has resolved'),
+    ('She has gout, I think, and hypertension.', 'Hypertension.', 'and hypertension'),
+    ('We think she is improving. Her rash is gone.', 'Her rash is gone.', 'Her rash is gone'),
+    ('Perhaps unsurprisingly, her A1c is 9.2.', 'Her A1c is 9.2.', 'her A1c is 9.2'),
+]
+# Known false refusals, kept on the safe side: "may" giving leave is read as doubt, and an approximation ("maybe once a
+# week") must keep its "maybe".
+CUES_REFUSED_THOUGH_PLAIN = [
+    ('She may have ibuprofen as needed.', 'Ibuprofen as needed.', 'ibuprofen as needed'),
+    ('He may have a regular diet.', 'Regular diet.', 'a regular diet'),
+    ('She may be discharged home today.', 'Discharge home today.', 'discharged home today'),
+    ('Maybe once a week she gets a headache.', 'Headache once a week.', 'once a week she gets a headache'),
+]
+
+
+@pytest.mark.parametrize(("said", "value", "source"), CUES_REFUSED + CUES_REFUSED_THOUGH_PLAIN)
+def test_a_value_that_drops_a_negation_or_a_doubt_is_refused(said, value, source):
+    assert not field(value, source, name="plan", text=transcript(said)).pending
+
+
+@pytest.mark.parametrize(("said", "value", "source"), CUES_PASSING)
+def test_what_a_negation_or_a_doubt_does_not_reach_goes_out(said, value, source):
+    assert field(value, source, name="plan", text=transcript(said)).pending
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("Gout, pseudogout, septic arthritis, possibly.", "Gout, pseudogout, septic arthritis."),
+    ("Community acquired pneumonia maybe.", "Community acquired pneumonia."),
+    ("Either community acquired pneumonia or bronchitis.", "Community acquired pneumonia."),
+    ("Is this community acquired pneumonia.", "Community acquired pneumonia."),
+    ("Any chest pain or shortness of breath?", "Chest pain or shortness of breath."),
+    ("Her temperature was maybe 38.", "Her temperature was 38."),
+])
+def test_a_doubt_after_the_finding_or_a_question_is_refused_as_doubt_itself(said, value):
+    assert "certainty_dropped" in field(value, said, name="plan", text=transcript(said)).reasons
 
 
 def test_without_punctuation_a_qualifier_stops_at_the_next_step_or_heading():

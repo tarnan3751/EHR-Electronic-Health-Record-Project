@@ -113,16 +113,22 @@ and every check reads the cleaned text. The checks, each with the reason code re
   (four back, for one that follows what it qualifies, such as "denied"), and stops at its clause: punctuation, a
   contrast ("but"), a new subject ("she", "patient"), a step of the plan or a heading after its first word ("no further
   pancreatitis continue monthly olezarsen"), and for someone else, a word of telling ("mom says the rash started
-  Monday" is the patient's rash). A cue that names the subject itself, with its verb, reaches what follows them
-  (subject_cues()): a negation in "I don't think she has pneumonia", "we do not believe that he has a fracture", "I
-  doubt she has strep", "unlikely that the patient has appendicitis"; uncertainty in "I think she has gout", "we think
-  she doesn't have gout", "maybe it's viral", "possibly he is anemic", "she might have gout", "I wonder if she has
-  gout", "we're not sure she has gout", "it could be that she has gout". The one in doubt is I or we; the subject is
-  she, he, it, they or the patient, and its verb a form of "have" or "be", negated or not, or "does", "did" or "do"
-  with "have" (or "might", "may" or "could" with "have" or "be": "she may have ibuprofen as needed" is read as doubt
-  too, a known false refusal). Doubt said after a comma closing a clause ("she has gout, I think", "..., I believe",
-  "..., I suspect", "..., probably", "..., probably not", "..., possibly", "..., maybe") reaches back over all of the
-  clause before the comma.
+  Monday" is the patient's rash). A negation or a doubt passes over a subject and its verb instead of stopping there
+  (TO_THE_FINDING), and over a "that", "if" or "whether", "think" or "believe", and a clause between commas: "I don't
+  think, given her normal oxygen, that she has pneumonia", "no evidence she has a fracture", "I think her knee pain is
+  from arthritis", "it doesn't look like she has cellulitis". The subject is a pronoun (you included), "this", "there",
+  "the patient" or a possessive and up to three words; the verb a form of "have" or "be", negated or not, or "does",
+  "did" or "do" with "have". "I don't think", "doubt" and "unlikely" are doubt as well as negation, so "She doesn't
+  have asthma." from "I don't think she doesn't have asthma" is refused. Uncertainty is also: "maybe", "perhaps",
+  "presumably", "think", "believe", "suspect", "wonder", "not sure", "not certain", "not convinced", "either", "a
+  chance", "concern that", "worried", "can't exclude" or "rule out"; she, he, it, they, you, this or the patient with
+  "might", "may" or "could" and "have" or "be" ("she may have ibuprofen as needed" is read as doubt too, a known false
+  refusal); doubt said after the finding, closing its clause with a comma or without ("she has gout, I think",
+  "pneumonia probably", "..., most likely", "..., I guess"), or an alternative offered ("she has pneumonia, or maybe
+  bronchitis"), which reaches back over all of its sentence to a word that ends a reach; and a question, a sentence
+  that ends with a question mark or opens with a verb and its subject ("does she have", "is this") or "any". A number a
+  doubt reaches counts ("her temperature was maybe 38"). A source said both hedged and plainly is read where it was
+  said plainly ("I think she has a viral infection. Assessment: viral infection.").
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -151,6 +157,7 @@ import re
 import string
 import unicodedata
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 from .prompt import FIELDS
 from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, STOPWORDS, TENS, UNITS, Token, numbers, stem, tokens
@@ -415,7 +422,8 @@ UNCLEAR_QUOTE = re.compile(r"\[\s*unclear\s*\]", re.IGNORECASE)
 def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int, int]]) -> tuple[int, int] | str:
     """The quote's place in the transcript, word for word, outside unclear passages. A passage said more than once
     goes to the first occurrence after the field's previous source that no earlier source took, so each is highlighted
-    where it was said (FR-08)."""
+    where it was said (FR-08); but to one no qualifier reaches before one a qualifier does, so a plain restatement is
+    read as said plainly ("I think she has a viral infection. Assessment: viral infection.")."""
     size, words = len(quote), transcript.words
     wanted = [token.text for token in quote]
     found = [
@@ -430,7 +438,13 @@ def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int
         return "source_in_unclear_passage"
     unused = [span for span in clear if span not in earlier]
     after = earlier[-1][1] if earlier else 0
-    return next((span for span in unused if span[0] >= after), unused[0] if unused else clear[0])
+    ordered = [span for span in unused if span[0] >= after] + [span for span in unused if span[0] < after] or clear
+    qualified = {i for reached in transcript.qualified.values() for i in reached}
+    plain = [
+        span for span in ordered
+        if not any(span[0] <= words[i].start and words[i].end <= span[1] for i in qualified)
+    ]
+    return (plain or ordered)[0]
 
 
 def _outside_instructions(span: tuple[int, int], transcript: _Transcript) -> list[tuple[int, int]]:
@@ -1177,36 +1191,27 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
 
 # ---- Negation, who has it, and how sure ----------------------------------------------------------------------------
 
-
-def subject_cues(*subjects: str) -> tuple[str, str]:
-    """Cues that name who has what follows, for NEGATION and CERTAINTY, as patterns: a new subject ends a cue's reach
-    ("no fever she is eating well"), so these take the subject and its verb into the cue, and reach what follows them
-    ("I don't think she has pneumonia", "we think she doesn't have gout", "she might have gout"). The one in doubt is
-    the clinician ("I" or "we"); each subject is one or more words ("the patient")."""
-    who = "|".join(r"\s+".join(subject.split()) for subject in subjects)
-    has = (
-        rf"(?:{who})(?:['’](?:s|re|ve)|\s+(?:(?:has|have|had|is|are|was|were)(?:n['’]t|\s+not)?"
-        rf"|(?:does|did|do)(?:n['’]t|\s+not)?\s+have))"
-    )
-    negation = (
-        rf"(?:i|we)\s+(?:don['’]t|do\s+not)\s+(?:think|believe)(?:\s+that)?\s+{has}"
-        rf"|(?:i|we)\s+doubt(?:\s+that)?\s+{has}|unlikely\s+that\s+{has}"
-    )
-    certainty = (
-        rf"it\s+could\s+be\s+that\s+{has}|(?:i|we)\s+think(?:\s+that)?\s+{has}|(?:maybe|possibly|perhaps)\s+{has}"
-        rf"|(?:{who})\s+(?:might|may|could)\s+(?:have|be)|(?:i|we)\s+wonder\s+(?:if|whether)\s+{has}"
-        rf"|(?:i['’]m|i\s+am|we['’]re|we\s+are)\s+not\s+sure(?:\s+(?:if|that|whether))?\s+{has}"
-    )
-    return negation, certainty
-
-
-# The patient, said of in the third person.
-SUBJECT_NEGATION, SUBJECT_CERTAINTY = subject_cues("she", "he", "it", "they", "the patient")
+# A subject with its verb (have, be or do, negated or not), which a negation or a doubt passes over rather than stop at
+# it: "she has", "she's", "the patient has", "this is", "her knee pain is", "she doesn't have".
+SUBJECT = r"(?:she|he|it|they|you|this|that|there|the\s+patient|(?:her|his|their|the|this|your)(?:\s+[a-z][\w'’-]*){1,3}?)"
+_SUBJECT_AND_VERB = (
+    rf"\b{SUBJECT}(?:['’](?:s|re|ve)\b|\s+(?:(?:has|have|had|is|are|was|were)(?:n['’]t|\s+not)?|"
+    r"(?:does|did|do)(?:n['’]t|\s+not)?\s+have)\b)"
+)
+# What a negation or a doubt passes over, in this order, before the words it qualifies: "think" or "believe"; "that",
+# "if" or "whether"; a clause between commas; "think" or "believe" again; "that", "if" or "whether"; a subject and its
+# verb. "I don't think, given her normal oxygen, that she has pneumonia", "we do not, after reviewing the x-ray, believe
+# she has pneumonia", "I wonder, since she was camping, if she has Lyme disease", "no evidence she has a fracture".
+TO_THE_FINDING = re.compile(
+    r"(?:\s*\b(?:think|believe)\b)?(?:\s*\b(?:that|if|whether)\b)?(?:\s*,[^,.;:!?\n]{1,80},)?(?:\s*\b(?:think|believe)\b)?"
+    rf"(?:\s*\b(?:that|if|whether)\b)?(?:\s*{_SUBJECT_AND_VERB})?",
+    re.IGNORECASE,
+)
 NEGATION = re.compile(
-    rf"\b(?:{SUBJECT_NEGATION}|"
+    r"\b(?:no\s+(?:evidence|signs?)(?:\s+of)?|doubt|doubtful|doesn't\s+look\s+like|does\s+not\s+look\s+like|"
     r"no(?![\s,]+(?:sorry|wait|correction)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
     r"free of|ruled out|rules out|doesn't|does not|didn't|did not|isn't|is not|wasn't|was not|hasn't|has not|haven't|"
-    r"have not|don't|do not|won't|will not|shouldn't|should not|non)\b",
+    r"have not|don't|do not|won't|will not|shouldn't|should not|can't|cannot|non)\b",
     re.IGNORECASE,
 )
 # Cues that negate what comes before them: "chest pain denied", "fracture ruled out".
@@ -1225,21 +1230,29 @@ POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
 )
 # Not certain: "possible community acquired pneumonia", "maybe pneumonia", "rule out appendicitis", "pneumonia
-# suspected".
+# suspected", "I think she has gout", "she might have gout", "cannot exclude a PE", "either pneumonia or bronchitis"; and
+# a question, whose sentence opens with a verb and its subject ("does she have", "is this") or with "any".
+QUESTION_OPENING = r"(?:^|(?<=[.!?\n]))\s*(?:(?:does|do|did|is|are|was|were|has|have|had|can|could|will|would|should)\s+" \
+    r"(?:she|he|it|they|there|this|that|you|the\s+patient)|any)\b"
 CERTAINTY = re.compile(
-    rf"\b(?:{SUBJECT_CERTAINTY}|"
-    r"maybe|perhaps|possible|possibly|probable|probably|suspected|suspect|suspicious for|suspicion of|likely|unlikely|"
-    r"rule out|r/o|risk of|risk for|concern for|concerning for|questionable|presumed)\b",
+    rf"{QUESTION_OPENING}|\b(?:(?:she|he|it|they|you|this|the\s+patient)\s+(?:might|may|could)\s+(?:have|be)|"
+    r"maybe|perhaps|possible|possibly|probable|probably|presumably|suspected|suspects?|suspicious for|suspicion of|likely|"
+    r"unlikely|think|thinks|believe|believes|wonder|wondering|doubt|doubtful|not\s+sure|not\s+certain|not\s+convinced|"
+    r"either|(?:a|some)\s+chance|concern(?:ed)?\s+that|worried|worry|doesn't\s+look\s+like|does\s+not\s+look\s+like|"
+    r"(?:can't|cannot)\s+(?:exclude|rule\s+out)|rule out|r/o|risk of|risk for|concern for|concerning for|questionable|"
+    r"presumed)\b",
     re.IGNORECASE,
 )
 POST_CERTAINTY = re.compile(
     r"\b(?:suspected|likely|possible|probable|unlikely|questionable|presumed)\b(?=\s*(?:[.,;:!?\n]|$))", re.IGNORECASE
 )
-# Doubt said after a comma at the end of a clause, which reaches back over the whole clause before the comma: "she has
-# gout, I think", "pneumonia, probably not".
+# Doubt said after what it qualifies, which reaches back over all of the sentence before it (commas included, to a
+# word that ends a cue's reach): closing a clause, after a comma or not ("she has gout, I think", "pneumonia
+# probably", "..., most likely", "gout, pseudogout, septic arthritis, possibly"); an alternative offered ("she has
+# pneumonia, or maybe bronchitis"); or a question mark.
 CLOSING_HEDGE = re.compile(
-    r",\s*(?:(?:i|we)\s+(?:think|believe|suspect)|probably(?:\s+not)?|possibly|maybe|perhaps|(?:un)?likely)"
-    r"(?=\s*(?:[.,;:!?\n]|$))",
+    r"(?:,\s*|\s+)(?:(?:i|we)\s+(?:think|believe|suspect|guess|would\s+say)|probably(?:\s+not)?|possibly|maybe|perhaps|"
+    r"presumably|(?:most\s+)?(?:un)?likely)(?=\s*(?:[.,;:!?\n]|$))|,?\s+or\s+(?:maybe|possibly|perhaps|probably)\b|\?",
     re.IGNORECASE,
 )
 # In the past: "a history of MI in 2019", "status post appendectomy".
@@ -1259,44 +1272,62 @@ REPORTING = frozenset(
 # monthly olezarsen", "no other injury on exam swelling"). Not right after the cue or "to", where the word is what it
 # negates ("not take aspirin", "not able to take aspirin").
 NEXT_CLAUSE = (NEW_CLAUSE - {"patient"}) | frozenset("exam examination assessment impression plan vitals".split())
-# Each kind of qualifier, with its reason code: cues before the words they qualify, cues after them, cues closing a
-# clause after a comma, which reach back over all of it, and what ends their reach.
+class Qualifier(NamedTuple):
+    """One kind of qualifier: its reason code; its cues before the words they qualify, cues after them, and cues closing
+    a sentence that reach back over all of it; whether a cue before passes over a subject and its verb
+    (TO_THE_FINDING); and the words that end its reach."""
+
+    reason: str
+    before: re.Pattern
+    after: re.Pattern | None
+    closing: re.Pattern | None
+    past_the_subject: bool
+    ends: frozenset[str]
+
+
 QUALIFIERS = (
-    ("negation_dropped", NEGATION, POST_NEGATION, None, TERMINATORS),
-    ("experiencer_dropped", EXPERIENCER, POST_EXPERIENCER, None, TERMINATORS | REPORTING),
-    ("certainty_dropped", CERTAINTY, POST_CERTAINTY, CLOSING_HEDGE, TERMINATORS),
-    ("history_dropped", HISTORY, None, None, TERMINATORS),
+    Qualifier("negation_dropped", NEGATION, POST_NEGATION, None, True, TERMINATORS),
+    Qualifier("experiencer_dropped", EXPERIENCER, POST_EXPERIENCER, None, False, TERMINATORS | REPORTING),
+    Qualifier("certainty_dropped", CERTAINTY, POST_CERTAINTY, CLOSING_HEDGE, True, TERMINATORS),
+    Qualifier("history_dropped", HISTORY, None, None, False, TERMINATORS),
 )
 
 
-def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern | None, closing: re.Pattern | None,
-           ends: frozenset[str]) -> tuple[set[int], set[int]]:
+def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int], set[int]]:
     """The words the text's cues of one kind reach, and the cues' own words (which are neither reached nor plain:
-    "mother" in "mother had a stroke" is who had it)."""
+    "mother" in "mother had a stroke" is who had it; "she has" in "I think she has gout")."""
+    before, after, closing, ends = qualifier.before, qualifier.after, qualifier.closing, qualifier.ends
     reached: set[int] = set()
     cue_words: set[int] = set()
 
-    def stops(between: str, word: str) -> bool:
-        return word in ends or any(mark in between for mark in ".,;:?!\n")
+    def stops(between: str, word: str, marks: str = ".,;:?!\n") -> bool:
+        return word in ends or any(mark in between for mark in marks)
 
     for cue in before.finditer(text):
         relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
         if before is EXPERIENCER and not relative and _object_of_a_preposition(text, cue.start()):
             continue
-        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
-        edge = relative.end() if relative else cue.end()
+        edge = relative.end() if relative else TO_THE_FINDING.match(text, cue.end()).end() if qualifier.past_the_subject else cue.end()
+        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < edge}
         for k, i in enumerate([i for i, token in enumerate(words) if token.start >= edge][:NEGATION_SCOPE]):
             next_clause = k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"
             if stops(text[edge : words[i].start], words[i].text) or next_clause:
                 break
             reached.add(i)
             edge = words[i].end
-    closings = [(cue, len(words)) for cue in closing.finditer(text)] if closing else []
-    for cue, scope in [(cue, POST_SCOPE) for cue in (after.finditer(text) if after else ())] + closings:
+    for cue in after.finditer(text) if after else ():
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
         edge = cue.start()
-        for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()][-scope:]):
+        for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()][-POST_SCOPE:]):
             if stops(text[words[i].end : edge], words[i].text):
+                break
+            reached.add(i)
+            edge = words[i].start
+    for cue in closing.finditer(text) if closing else ():
+        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
+        edge = cue.start()
+        for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()]):
+            if stops(text[words[i].end : edge], words[i].text, ".;:?!\n"):
                 break
             reached.add(i)
             edge = words[i].start
@@ -1313,7 +1344,7 @@ def _object_of_a_preposition(text: str, start: int) -> bool:
 
 def _qualifiers(text: str, words: list[Token]) -> dict[str, set[int]]:
     """For each kind of qualifier, by its reason code, the words its cues reach in the text."""
-    return {reason: _reach(text, words, *row)[0] for reason, *row in QUALIFIERS}
+    return {qualifier.reason: _reach(text, words, qualifier)[0] for qualifier in QUALIFIERS}
 
 
 def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) -> set[str]:
@@ -1322,14 +1353,16 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
     in the transcript, so a source can't leave its qualifier out ("chest pain" quoted from "no chest pain")."""
     words = tokens(value)
     found = set()
-    for reason, before, after, closing, ends in QUALIFIERS:
-        reached, cues = _reach(value, words, before, after, closing, ends)
-        plain = {stem(word.text) for i, word in enumerate(words) if _is_content(word.text) and i not in reached | cues}
-        plain -= {stem(words[i].text) for i in reached if _is_content(words[i].text)}
+    for qualifier in QUALIFIERS:
+        reason = qualifier.reason
+        reached, cues = _reach(value, words, qualifier)
+        content = lambda word: _is_content(word, numbers=reason == "certainty_dropped")  # noqa: E731
+        plain = {stem(word.text) for i, word in enumerate(words) if content(word.text) and i not in reached | cues}
+        plain -= {stem(words[i].text) for i in reached if content(words[i].text)}
         qualified = {
             stem(transcript.words[i].text)
             for i in transcript.qualified[reason]
-            if _is_content(transcript.words[i].text)
+            if content(transcript.words[i].text)
             and any(start <= transcript.words[i].start and transcript.words[i].end <= end for start, end in spans)
         }
         if qualified & plain:
@@ -1337,9 +1370,10 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
     return found
 
 
-def _is_content(word: str) -> bool:
-    """A word a qualifier can apply to: not a number or a function word, but "MI" or "PE" is one."""
-    return word.isalpha() and len(word) >= 2 and word not in STOPWORDS
+def _is_content(word: str, numbers: bool = False) -> bool:
+    """A word a qualifier can apply to: not a function word, but "MI" or "PE" is one; a number only for a doubt ("her
+    temperature was maybe 38")."""
+    return (word.isalpha() and len(word) >= 2 and word not in STOPWORDS) or (numbers and word[0].isdigit())
 
 
 # ---- Proposals (the expansion plan's step 15; FR-14 as reworded) --------------------------------------------------
