@@ -317,8 +317,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Marking an inbox item done.
         [("ehr_app", "inbox_items", "UPDATE")] = ["done_at"],
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.
-        [("ehr_app", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
-        [("ehr_read", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
+        [("ehr_app", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
+        [("ehr_read", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
     };
 
     async Task AssertExactPrivilegesAsync()

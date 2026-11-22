@@ -112,7 +112,7 @@ GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 GRANT INSERT ON ehr.audit_events TO ehr_app;
 -- Every column but details, which holds the values a write changed: admins get those through
 -- ehr.shown_audit_details (40-audit.sql), which never gives a sensitive item's.
-GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, sensitive) ON ehr.audit_events TO ehr_app, ehr_read;
+GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, sensitive, part) ON ehr.audit_events TO ehr_app, ehr_read;
 
 GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;
 

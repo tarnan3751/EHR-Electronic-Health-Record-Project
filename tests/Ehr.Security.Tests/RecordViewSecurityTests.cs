@@ -592,7 +592,9 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
     }
 
     // The panel history is read for every page of a proxy without sensitive items, whatever the page holds: so a page's
-    // time doesn't tell such a proxy whether there are staff views they aren't shown. It isn't read for the patient's.
+    // time doesn't tell such a proxy whether there are staff views they aren't shown. It isn't read for the patient's. It
+    // is read by its index on the patient and clinician (step 13c2), never by a scan of the whole table, on a table of some
+    // thousands of rows, as a clinic's is.
     [Fact]
     public async Task A_proxy_without_sensitive_items_reads_the_panel_history_whatever_the_page_holds()
     {
@@ -600,6 +602,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         var emptyProxy = await ProxyAsync(emptyOwn, empty, includeSensitive: false);
         var (_, busy, busyOwn) = await PatientAsync();
         var busyProxy = await ProxyAsync(busyOwn, busy, includeSensitive: false);
+        await PanelHistoryAsync();
         var outside = await StaffAsync("Dr. Maple", StaffRoles.Clinician);
         await WindowAsync(outside, busy, fromMinutesAgo: 60 * 24, untilMinutesAgo: -60);
         var offPanel = await StaffAsync("Dr. Nutmeg", StaffRoles.Clinician);
@@ -610,15 +613,37 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
         foreach (var connection in new[] { App, Read })
         {
-            // No staff view at all, or forty they aren't shown: the history is read once, either way.
-            Assert.Equal("0 1", await PanelScansAsync(connection, emptyProxy.Account, emptyProxy.Grant));
-            Assert.Equal("0 1", await PanelScansAsync(connection, busyProxy.Account, busyProxy.Grant));
-            Assert.Equal("0 0", await PanelScansAsync(connection, emptyOwn, null));
+            // No staff view at all, or forty they aren't shown: the history is read once, by its index, either way.
+            Assert.Equal("0 0 1", await PanelScansAsync(connection, emptyProxy.Account, emptyProxy.Grant));
+            Assert.Equal("0 0 1", await PanelScansAsync(connection, busyProxy.Account, busyProxy.Grant));
+            Assert.Equal("0 0 0", await PanelScansAsync(connection, emptyOwn, null));
         }
     }
 
-    // A page's lines, and how many times the panels' table was scanned to make it: the scans the session's transaction
-    // counts after the page, less those it counted before (a pooled session's counts carry over from earlier work).
+    // A panels' table as a clinic's: a thousand other patients, and three thousand ended assignments of theirs to one
+    // colleague, a table no page of these tests may read whole, nor all of the colleague's. Counted for the planner.
+    async Task<Guid> PanelHistoryAsync()
+    {
+        var colleague = await StaffAsync("Dr. Olive", StaffRoles.Clinician);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            WITH others AS (
+                INSERT INTO ehr.patients (id, mrn, given_name, family_name, birth_date, gender, version, updated_at)
+                SELECT gen_random_uuid(), substr(md5(random()::text), 1, 12), 'Test', 'Patient', '1980-01-01', 'unknown', 1, now()
+                FROM generate_series(1, 1000)
+                RETURNING id
+            )
+            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at)
+            SELECT gen_random_uuid(), o.id, @clinician, now() - make_interval(days => 400 + n), now() - make_interval(days => 399 + n)
+            FROM others o CROSS JOIN generate_series(1, 3) AS n
+            """, ("clinician", colleague));
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "ANALYZE ehr.patient_assignments");
+        return colleague;
+    }
+
+    // A page's lines, how many times the panels' table was scanned whole to make it, and how many times its history index
+    // was: the scans the session's transaction counts after the page, less those it counted before (a pooled session's
+    // counts carry over from earlier work).
     async Task<string> PanelScansAsync(string connectionString, Guid user, Guid? grant)
     {
         await using var connection = new Npgsql.NpgsqlConnection(connectionString);
@@ -634,9 +659,10 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
         await ScalarAsync("SELECT length(set_config('app.user_id', @user, true) || set_config('app.acting_grant', @grant, true))");
         const string Scans = "SELECT pg_stat_get_xact_numscans('ehr.patient_assignments'::regclass)";
-        var before = await ScalarAsync(Scans);
+        const string IndexScans = "SELECT pg_stat_get_xact_numscans('ehr.ix_patient_assignments_history'::regclass)";
+        var (before, indexBefore) = (await ScalarAsync(Scans), await ScalarAsync(IndexScans));
         var lines = await ScalarAsync("SELECT count(*) FROM ehr.record_views(NULL, NULL)");
-        return $"{lines} {await ScalarAsync(Scans) - before}";
+        return $"{lines} {await ScalarAsync(Scans) - before} {await ScalarAsync(IndexScans) - indexBefore}";
     }
 
     // The panel's history decides what a proxy without sensitive items is shown, so the apps can't rewrite it: through
@@ -720,56 +746,72 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
     // The panel history is read with the patient's ID worked out once: the session's context functions never run for each
     // row of the panels' table (a review measured 0.6 s a page when they did, at 60,000 rows), nor for each row of any other
-    // table the function reads. Read from the plan auto_explain gives for the statement inside the function, as a proxy
-    // without sensitive items, on a table of some thousands of rows: no filter or index condition names a function of the
-    // schema, so each is a value worked out once.
+    // table the function reads. Read from the plan auto_explain gives for the statement inside the function, on a table of
+    // some thousands of rows: no filter or index condition names a function of the schema, so each is a value worked out
+    // once. Both of the function's reads of the panels' table go by their index on the patient and clinician (step 13c2),
+    // never the whole table nor every assignment of the clinician: a proxy without sensitive items' read of the patient's
+    // history, and, on the patient's own page, the check that a view under emergency access was made off the panel, for a
+    // clinician with thousands of assignments (a review measured 21 to 26 ms a page at 60,000 before the index).
     [Fact]
-    public async Task The_panel_history_is_read_without_the_session_worked_out_for_each_row()
+    public async Task The_panel_history_is_read_by_its_index_without_the_session_worked_out_for_each_row()
     {
         var (_, patient, own) = await PatientAsync();
         var proxy = await ProxyAsync(own, patient, includeSensitive: false);
-        var colleague = await StaffAsync("Dr. Olive", StaffRoles.Clinician);
-        var elsewhere = await Accounts.PatientAsync(database, colleague);
-        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
-            """
-            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at)
-            SELECT gen_random_uuid(), @patient, @clinician, now() - make_interval(days => 400 + n), now() - make_interval(days => 399 + n)
-            FROM generate_series(1, 3000) AS n
-            """, ("patient", elsewhere), ("clinician", colleague));
+        var colleague = await PanelHistoryAsync();
+        await WindowAsync(colleague, patient, fromMinutesAgo: 60, untilMinutesAgo: -60);
+        await EventAsync(patient, colleague, "read", "patients", 5);
 
-        var plans = new List<string>();
-        await using (var connection = new Npgsql.NpgsqlConnection(database.SuperuserConnectionString))
+        foreach (var (user, grant, emergency) in new[] { (proxy.Account, (Guid?)proxy.Grant, false), (own, null, true) })
         {
-            await connection.OpenAsync(Cancel);
-            connection.Notice += (_, notice) => plans.Add(notice.Notice.MessageText);
-            await using var transaction = await connection.BeginTransactionAsync(Cancel);
-            foreach (var sql in new[]
+            var plans = await PlansAsync(user, grant);
+            // Each node that reads the panels' table or one of its indexes, with the lines that describe it, down to the
+            // next node; those the page ran.
+            var scans = plans.SelectMany(plan =>
             {
-                "LOAD 'auto_explain'", "SET LOCAL auto_explain.log_min_duration = 0", "SET LOCAL auto_explain.log_nested_statements = on",
-                "SET LOCAL auto_explain.log_analyze = on", "SET LOCAL auto_explain.log_timing = off", "SET LOCAL auto_explain.log_level = notice",
-                "SET LOCAL client_min_messages = notice", "SET LOCAL ROLE ehr_app",
-                $"SELECT set_config('app.user_id', '{proxy.Account}', true), set_config('app.acting_grant', '{proxy.Grant}', true)",
-                "SELECT count(*) FROM ehr.record_views(NULL, NULL)",
-            })
+                var lines = plan.Split('\n');
+                return lines.Select((line, index) => (line, index))
+                    .Where(node => node.line.Contains(" on patient_assignments", StringComparison.Ordinal) || node.line.Contains(" on ix_patient_assignments", StringComparison.Ordinal))
+                    .Select(node => string.Join('\n', lines.Skip(node.index).TakeWhile((line, offset) => offset == 0 || !line.Contains("->", StringComparison.Ordinal))));
+            }).Where(scan => !scan.Contains("never executed", StringComparison.Ordinal)).ToList();
+            // One read, by the history index (an index scan, or a bitmap of it), and no row read only to be thrown away.
+            Assert.Contains(scans, scan => scan.Contains("ix_patient_assignments_history", StringComparison.Ordinal));
+            Assert.All(scans, scan =>
             {
-                await using var command = new Npgsql.NpgsqlCommand(sql, connection, transaction);
-                await command.ExecuteNonQueryAsync(Cancel);
-            }
+                Assert.DoesNotContain("Seq Scan", scan, StringComparison.Ordinal);
+                Assert.DoesNotContain("ix_patient_assignments_clinician_id", scan, StringComparison.Ordinal);
+                Assert.DoesNotContain("Rows Removed", scan, StringComparison.Ordinal);
+                Assert.DoesNotMatch(@"ehr\.\w+\(", scan);
+            });
+            // The patient's page asks about the clinician of the view under emergency access; the proxy's reads the history.
+            Assert.Equal(emergency, scans.Any(scan => scan.Split('\n').Any(line => line.Contains("Cond:", StringComparison.Ordinal) && line.Contains("clinician_id", StringComparison.Ordinal))));
+            var body = Assert.Single(plans, plan => plan.Contains(" on audit_events ", StringComparison.Ordinal));
+            Assert.All(body.Split('\n').Where(line => line.Contains("Filter:", StringComparison.Ordinal) || line.Contains("Cond:", StringComparison.Ordinal)),
+                line => Assert.DoesNotMatch(@"ehr\.\w+\(", line));
+        }
+    }
+
+    // The plans auto_explain gives for a page of the function and the statements inside it, as the session given.
+    async Task<List<string>> PlansAsync(Guid user, Guid? grant)
+    {
+        var plans = new List<string>();
+        await using var connection = new Npgsql.NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync(Cancel);
+        connection.Notice += (_, notice) => plans.Add(notice.Notice.MessageText);
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        foreach (var sql in new[]
+        {
+            "LOAD 'auto_explain'", "SET LOCAL auto_explain.log_min_duration = 0", "SET LOCAL auto_explain.log_nested_statements = on",
+            "SET LOCAL auto_explain.log_analyze = on", "SET LOCAL auto_explain.log_timing = off", "SET LOCAL auto_explain.log_level = notice",
+            "SET LOCAL client_min_messages = notice", "SET LOCAL ROLE ehr_app",
+            $"SELECT set_config('app.user_id', '{user}', true), set_config('app.acting_grant', '{grant?.ToString() ?? ""}', true)",
+            "SELECT count(*) FROM ehr.record_views(NULL, NULL)",
+        })
+        {
+            await using var command = new Npgsql.NpgsqlCommand(sql, connection, transaction);
+            await command.ExecuteNonQueryAsync(Cancel);
         }
 
-        // Each scan of the panels' table with the lines that describe it, down to the next node.
-        var scans = plans.SelectMany(plan =>
-        {
-            var lines = plan.Split('\n');
-            return lines.Select((line, index) => (line, index)).Where(node => node.line.Contains(" on patient_assignments ", StringComparison.Ordinal))
-                .Select(node => string.Join('\n', lines.Skip(node.index).TakeWhile((line, offset) => offset == 0 || !line.Contains("->", StringComparison.Ordinal))));
-        }).ToList();
-        var history = Assert.Single(scans, scan => scan.Contains("Seq Scan", StringComparison.Ordinal) && !scan.Contains("never executed", StringComparison.Ordinal));
-        Assert.True(int.Parse(System.Text.RegularExpressions.Regex.Match(history, @"Rows Removed by Filter: (\d+)").Groups[1].Value, CultureInfo.InvariantCulture) >= 3000, history);
-        Assert.All(scans, scan => Assert.DoesNotMatch(@"ehr\.\w+\(", scan));
-        var body = Assert.Single(plans, plan => plan.Contains(" on audit_events ", StringComparison.Ordinal));
-        Assert.All(body.Split('\n').Where(line => line.Contains("Filter:", StringComparison.Ordinal) || line.Contains("Cond:", StringComparison.Ordinal)),
-            line => Assert.DoesNotMatch(@"ehr\.\w+\(", line));
+        return plans;
     }
 
     // The twelve months bound what a page reads before it is cut: a record with more than a page of views from before

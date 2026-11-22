@@ -2233,3 +2233,23 @@ VALUES ('20261122061618_PreVisitForms', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+SELECT set_config('lock_timeout', '5s', true);
+
+CREATE INDEX ix_patient_assignments_history ON ehr.patient_assignments (patient_id, clinician_id);
+
+ALTER TABLE ehr.audit_events ADD part character varying(24);
+
+ALTER TABLE ehr.audit_events ADD CONSTRAINT ck_audit_events_part
+    CHECK (part IS NULL
+           OR action IN ('read', 'read_sensitive', 'download', 'download_sensitive')
+           AND part IN ('chart', 'lists', 'orders', 'results', 'vitals', 'search', 'panel',
+                        'schedule', 'inbox', 'appointments', 'home', 'conversations', 'access',
+                        'visit-note', 'note-draft', 'offline', 'fhir', 'summaries', 'printable',
+                        'download', 'views', 'refills', 'forms')) NOT VALID;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261122064253_AuditEventParts', '10.0.13');
+
+COMMIT;
+

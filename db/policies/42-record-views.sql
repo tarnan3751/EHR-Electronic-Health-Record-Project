@@ -93,9 +93,8 @@ AS $$
     -- And, for a proxy without sensitive items, the patient's panel history: who had the patient on their panel, from
     -- when and until when, a few rows. It is read for every such proxy's page, whatever the page holds, before anything
     -- else, so the page's time doesn't depend on whether there are views it leaves out (a review found that reading it
-    -- only when a staff member's view needed it told a proxy, by the page's time, that one such view existed). By one
-    -- scan of the panels' table, comparing each row with the patient's ID, since no index finds one patient's ended
-    -- assignments.
+    -- only when a staff member's view needed it told a proxy, by the page's time, that one such view existed). By the
+    -- index on the patient and clinician (ix_patient_assignments_history, step 13c2), which holds ended assignments too.
     viewer AS MATERIALIZED (
         SELECT c.*, h.panel_clinicians, h.panel_from, h.panel_until
         FROM who c
@@ -170,7 +169,8 @@ AS $$
                            WHERE b.clinician_id = k.actor_id AND b.patient_id = (SELECT v.subject FROM viewer v)
                              AND b.granted_at <= k.occurred_at AND k.occurred_at < b.expires_at)
                -- On the panel at that moment: the same test as the panel history's above, against the table, since that
-               -- history is read above only for a proxy without sensitive items.
+               -- history is read above only for a proxy without sensitive items; by the same index, so a clinician's
+               -- thousands of assignments aren't read for each line.
                AND NOT EXISTS (SELECT 1 FROM ehr.patient_assignments a
                                WHERE a.clinician_id = k.actor_id AND a.patient_id = (SELECT v.subject FROM viewer v)
                                  AND a.assigned_at <= k.occurred_at AND (a.ended_at IS NULL OR a.ended_at > k.occurred_at)),
