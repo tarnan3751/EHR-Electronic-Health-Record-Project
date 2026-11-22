@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from ehr_dictation import spanish, translation
+from ehr_dictation import prompt, spanish, translation
 from ehr_dictation.transcript import Placed, Segment, Transcript, utf16_offset
 
 
@@ -352,3 +352,60 @@ def test_the_same_words_said_twice_may_each_be_cited_once():
         {"spanish": ["Ibuprofeno 400 mg", "cada 8 horas"], "english": "Ibuprofen 400 mg every 8 hours."},
     ]}, [], transcript(text))
     assert checks.fields["subjective"].pending and checks.fields["plan"].pending
+
+
+# ---- What the English is written in, and a quote cut short (sentences outside the test set) --------------------------
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    # Another script, which the transcript never uses (run A2 wrote "咳嗽" for "cough").
+    ("Tiene tos seca por las noches.", "Has a dry 咳嗽 at night."),
+    # An Italian word, with a letter the transcript never uses.
+    ("Es independiente para las actividades de la vida diaria.", "Independent for attività of daily living."),
+    # The same word where the transcript uses its letter elsewhere: it still isn't a word the transcript says.
+    ("Es independiente para las actividades de la vida diaria, dice à veces.",
+     "Independent for attività of daily living."),
+])
+def test_a_word_written_in_letters_english_doesnt_use_is_bad_format(text, english):
+    assert reasons(text, [text], english) == ["bad_format"]
+
+
+def test_an_eponym_the_transcript_says_keeps_its_accent():
+    text = "Signo de Lasègue positivo en la pierna derecha."
+    assert reasons(text, [text], "Positive Lasègue sign in the right leg.") == []
+
+
+def test_the_english_may_write_micrograms_as_the_spanish_does():
+    assert reasons("Levotiroxina 50 μg al día.", ["Levotiroxina 50 μg al día."], "Levothyroxine 50 μg daily.") == []
+
+
+def test_what_the_letter_check_still_misses():
+    # A word the transcript says passes, accent or not: a Spanish word left untranslated. So does a word written in
+    # English's letters whatever its language: an Italian one without its accent, or no word at all. The review shows
+    # the Spanish beside it.
+    assert reasons("Dolor en la rodilla.", ["Dolor en la rodilla."], "Pain in the rodilla.") == []
+    assert reasons("Dolor en la región lumbar.", ["Dolor en la región lumbar."], "Pain in the región lumbar.") == []
+    text = "Es independiente para las actividades de la vida diaria."
+    assert reasons(text, [text], "Independent for attivita of daily living.") == []
+    assert reasons(text, [text], "Independent for activitudes of daily living.") == []
+
+
+# The most the Spanish schema lets one quote hold: a longer passage reaches the checks cut at that many characters.
+QUOTE_LIMIT = prompt.load(language="es").schema["properties"]["statements"]["items"]["properties"]["spanish"]["items"][
+    "maxLength"]
+LONG = ("Refiere que se cansa bastante más al caminar por las tardes, le cuesta mucho subir las escaleras de su casa y "
+        "tiene que detenerse a descansar a mitad de camino, aunque niega dolor torácico y niega disnea en reposo.")
+LONG_ENGLISH = ("Gets much more tired walking in the afternoon, finds it very hard to climb the stairs at home and has to "
+                "stop to rest halfway, though denies chest pain and denies dyspnea at rest.")
+
+
+def test_a_quote_cut_inside_a_word_at_the_schemas_limit_is_not_found():
+    cut = LONG[:QUOTE_LIMIT]
+    assert cut.endswith(" niega dis")  # "disnea" cut short: never matched as the start of a longer word
+    assert reasons(LONG, [cut], LONG_ENGLISH) == ["source_not_in_transcript"]
+    assert reasons("Niega disnea.", ["Niega dis"], "Denies dyspnea.") == ["source_not_in_transcript"]
+
+
+def test_a_quote_ending_between_words_is_found():
+    assert reasons(LONG, [LONG[:QUOTE_LIMIT].rsplit(" ", 1)[0]], LONG_ENGLISH) == []
+    assert reasons(LONG, [LONG], LONG_ENGLISH) == []

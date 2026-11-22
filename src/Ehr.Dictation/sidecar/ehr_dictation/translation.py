@@ -9,9 +9,12 @@ with one list of statements, each the Spanish passages it rests on, copied word 
 their English (note-fields-es.schema.json), which llama.parse_statements() sorts into each field's statements. For each
 statement:
 
-1. The English is cleaned as validation.py cleans a value, and bad_format applies the same way. An instruction in it
-   to order something or change the allergy list is cut out by validation.py's own rule (the English backstop); a
-   statement that was only an instruction is dropped.
+1. The English is cleaned as validation.py cleans a value, and bad_format applies the same way: a character the
+   transcript never uses fails, so a word of Italian or Chinese written into the English ("attività", "咳嗽") does.
+   Here, too, a word holding a letter English isn't written in (ENGLISH_LETTERS) must be a word of the transcript as
+   said (an eponym, "Lasègue"), so such a word fails even where the transcript uses its letters elsewhere. An
+   instruction in it to order something or change the allergy list is cut out by validation.py's own rule (the English
+   backstop); a statement that was only an instruction is dropped.
 2. Each Spanish passage must be in the transcript, word for word, ignoring case, punctuation and accents
    (source_not_in_transcript), not in a passage marked unclear, and two words or more unless it holds a number. Every
    check below reads the transcript's own words where the passage was found, never the model's copy. No word may be
@@ -47,7 +50,10 @@ statement:
 
 What these don't check: the meaning of every other word. "dolor abdominal leve" translated "mild chest pain" passes
 (the severity and the length agree), and so does a finding moved inside a statement; nor a drug name no list knows,
-written with no dose just after it, for one no list knows either ("continuar plixor" written "continue vortanex"). The
+written with no dose just after it, for one no list knows either ("continuar plixor" written "continue vortanex"); nor
+a word left in the English that isn't English, if the transcript says it or it is written in English's letters: a
+Spanish word left untranslated ("pain in the rodilla", "pain in the región lumbar"), or a word of no language. A quote is matched whole word by whole word, so one the schema's length cut
+short inside a word ("niega dis") is never taken for the word it begins: it isn't found. The
 review shows each English statement beside its Spanish for the clinician to compare, and says so.
 
 Warnings, each a code and a place in the transcript, never text, as validation.py's: possible_correction (a later
@@ -60,6 +66,7 @@ written with a separator that reads two ways ("1.000"), pointing at it; and ambi
 from __future__ import annotations
 
 import re
+import string
 from dataclasses import dataclass, field
 
 from . import drugnames, spanish, validation
@@ -117,6 +124,9 @@ REASONS = (
     "translation_adds_words",
 )
 LOCATING = frozenset({"source_too_short", "source_not_in_transcript", "source_in_unclear_passage"})
+# The letters English is written in, and the one other the English checks read (the μ of "μg"). A word of a
+# statement's English holding any other must be a word of the transcript (step 1 of the header).
+ENGLISH_LETTERS = frozenset(string.ascii_lowercase + "μ")
 
 
 # ---- What goes out ---------------------------------------------------------------------------------------------------
@@ -195,6 +205,7 @@ class _Context:
     unclear: list[tuple[int, int]]
     directives: list[tuple[int, int]]
     letters: frozenset[str]
+    words: frozenset[str]  # every word of the transcript as said, lower case, accents kept
     terms: list[_Term]
     measured: list[tuple[spanish.Number, str]]
     cues: set[int]
@@ -267,6 +278,7 @@ def _context(transcript: Transcript) -> _Context:
         unclear=transcript.unclear_ranges(),
         directives=[(start, end) for start, end, _ in spanish.directives(text)],
         letters=frozenset(validation.clean(text).casefold()),
+        words=frozenset(t.text for t in spanish.tokens(validation.clean(text))),
         terms=terms,
         measured=spanish.measured(text, toks),
         cues=cues,
@@ -643,7 +655,9 @@ def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]], ci
         result.dropped = True
         return result
     if (english != raw or validation.BAD_FORMAT.search(english)
-            or any(c not in ctx.letters and c not in validation.NEUTRAL_CHARACTERS for c in english.casefold())):
+            or any(c not in ctx.letters and c not in validation.NEUTRAL_CHARACTERS for c in english.casefold())
+            or any(any(c.isalpha() and c not in ENGLISH_LETTERS for c in t.text) and t.text not in ctx.words
+                   for t in spanish.tokens(english))):
         result.reasons.add("bad_format")
     if len(english) > MAX_ENGLISH:
         result.reasons.add("too_long")
