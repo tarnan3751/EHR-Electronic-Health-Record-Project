@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Domain.Audit;
 
-// The audit log as admins review it: the newest events first, narrowed by action, actor, patient or time, a page at
-// a time. Row-level security hands an admin every event and anyone else none, so nothing here checks who asks. Actors
+// The audit log as admins review it: the newest events first, narrowed by action, actor, patient, the part of the
+// record a read was for (step 13c2) or time, a page at a time. Row-level security hands an admin every event and anyone else none, so nothing here checks who asks. Actors
 // are named from the account tables, which admins may read. Patients appear by ID only: an admin has no access to
 // patient data (db/policies/30-rls.sql), and asks a clinician when a review needs the name; the values a write changed,
 // which the trigger recorded, are the one place an admin sees any, and never those of a sensitive item: for such a write
@@ -20,6 +20,11 @@ public sealed class AuditLog(EhrDbContext db)
         if (filter.Action is { Length: > 0 })
         {
             events = events.Where(e => e.Action == filter.Action);
+        }
+
+        if (filter.Part is { Length: > 0 })
+        {
+            events = events.Where(e => e.Part == filter.Part);
         }
 
         if (filter.ActorId is { } actor)
@@ -58,6 +63,7 @@ public sealed class AuditLog(EhrDbContext db)
                 Source = e.Source,
                 Reason = e.Reason,
                 Sensitive = e.Sensitive,
+                Part = e.Part,
             })
             .ToListAsync(cancellationToken);
         var more = page.Count > PageSize;
@@ -94,8 +100,8 @@ public sealed class AuditLog(EhrDbContext db)
 sealed record ShownDetails(Guid Id, string? Details);
 
 // What to show: one action or any; one staff or patient account or anyone; one patient or any; from a moment on;
-// before a moment (also how the next, older page is asked for).
-public sealed record AuditFilter(string? Action, Guid? ActorId, Guid? PatientId, DateTimeOffset? From, DateTimeOffset? Before);
+// before a moment (also how the next, older page is asked for); reads for one part of the record or any.
+public sealed record AuditFilter(string? Action, Guid? ActorId, Guid? PatientId, DateTimeOffset? From, DateTimeOffset? Before, string? Part = null);
 
 // A page of events, newest first, the names of the accounts that acted, and whether older events remain.
 public sealed record AuditPage(IReadOnlyList<AuditEvent> Events, IReadOnlyDictionary<Guid, string> Actors, bool More);
