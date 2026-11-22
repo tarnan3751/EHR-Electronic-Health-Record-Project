@@ -137,7 +137,7 @@ The same app, served from the cloud copy when the clinic is unreachable. It look
 
 For patients. Light app bar (`surface-raised`, `line` bottom border) with the full-color lockup, or the reversed lockup in dark. Navigation starts with "My record"; results, appointments and messages join it as they are built. Larger and calmer: `portal-body` text, `display` for the welcome line, 44px controls, cards with `radius-lg` and `space-6` padding, and a single column at `width-reading`. Results lead with one plain-language sentence, with the clinical value and its reference range underneath. Registration, sign-in, "Forgot password" and "Send a new link" sit in a single `width-form` column, with the mark centered above.
 
-A question with set answers, such as each question of a pre-visit form, is a radio group (`sc-choice`): a fieldset whose legend is the question, each answer a full-width label with its radio button, 44px tall, bordered in `line-strong`, its border `primary` and its ground `surface-subtle` once chosen. The arrow keys move between a question's answers, and the radio button shows the focus ring.
+A question with set answers, such as each question of a pre-visit form, is a radio group (`sc-choice`): a fieldset whose legend is the question, each answer a full-width label with its radio button, `control-height-portal` (44px) tall, bordered in `line-strong`, its border `primary` and its ground `surface-subtle` once chosen. The arrow keys move between a question's answers, and the radio button shows the focus ring.
 
 ### Printed pages
 

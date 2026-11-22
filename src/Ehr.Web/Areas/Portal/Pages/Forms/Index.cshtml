@@ -7,7 +7,7 @@
     var now = DateTimeOffset.UtcNow;
     // Those that can be filled in now or later, soonest first; then those sent, newest first. One that closed unanswered
     // is no longer anything to do, and isn't listed.
-    var toFill = (Model.Forms?.Forms ?? []).Where(form => form.Response is null && form.AppointmentHeld && form.ClosesAt > now)
+    var toFill = (Model.Forms?.Forms ?? []).Where(form => form.Response is null && !form.ClosedAt(now))
         .OrderBy(form => form.AppointmentStartsAt).ToList();
     var sent = (Model.Forms?.Forms ?? []).Where(form => form.Response is not null).OrderByDescending(form => form.Response!.AnsweredAt).ToList();
     static string When(DateTimeOffset moment) => $"{moment.UtcDateTime:MMM d, yyyy, HH:mm} UTC";
@@ -19,7 +19,7 @@
 }
 else
 {
-    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">@FormNotices.NotMonitoredState</span> @FormNotices.NotMonitored</p>
+    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">@FormNotices.NotMonitoredState</span> @FormNotices.NotMonitored(Model.ActingFor)</p>
     <h2>To fill in</h2>
     @if (toFill.Count == 0)
     {

@@ -12,21 +12,31 @@
     static string When(DateTimeOffset moment) => $"{moment.UtcDateTime:MMM d, yyyy, HH:mm} UTC";
 }
 <h1>Pre-visit form</h1>
-@if (answered is { Alert: true })
+@foreach (var help in Model.Help)
 {
-    @* The PHQ-9's question 9 answered other than "Not at all": what to do now, first, never the answer (FormNotices). *@
-    <p class="sc-notice sc-notice--warning" role="alert" data-form-help>@FormNotices.AfterAnswerToReview(Model.ActingFor)</p>
+    @* An answer that needs review, such as the PHQ-9's question 9 answered other than "Not at all", sent or not: what to
+       do now, first, never the answer (FormNotices). *@
+    if (FormNotices.Help(help, Model.ActingFor, sent: answered is not null) is { } words)
+    {
+        <p class="sc-notice sc-notice--warning" role="alert" data-form-help>@words</p>
+    }
+}
+@if (Model.NotSent)
+{
+    @* Nothing was stored, so nobody at the clinic was told. *@
+    <p class="sc-notice sc-notice--danger" role="alert" data-form-not-sent><span class="sc-notice__state">Not sent:</span> @(own ? "your answers were not sent to your care team" : "these answers were not sent to the care team"). @(form.ClosedAt(now) ? "This form can no longer be filled in." : "This form can't be filled in yet.")</p>
 }
 @if (Model.Sent && answered is not null)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Answers sent:</span> your care team will go over them with you at your visit.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Answers sent:</span> @(own ? "your care team will go over them with you at your visit." : $"{Model.ActingFor}'s care team will go over them at the visit.")</p>
 }
-<p class="sc-notice sc-notice--info" data-form-not-monitored><span class="sc-notice__state">@FormNotices.NotMonitoredState</span> @FormNotices.NotMonitored</p>
+<p class="sc-notice sc-notice--info" data-form-not-monitored><span class="sc-notice__state">@FormNotices.NotMonitoredState</span> @FormNotices.NotMonitored(Model.ActingFor)</p>
 <h2>@form.Title</h2>
 <p class="sc-muted">Before @(own ? "your" : "the") appointment on @When(form.AppointmentStartsAt) with @form.AppointmentClinician.</p>
 @if (answered is not null)
 {
-    <p>Sent @When(answered.AnsweredAt) by @(answered.Proxy ?? (own ? "you" : "the patient")).</p>
+    @* Who sent them, never by an account's name: the reader, the patient, or someone the record is shared with. *@
+    <p>Sent @When(answered.AnsweredAt) by @(answered.ByReader ? "you" : answered.ByProxy ? "someone the record is shared with" : "the patient").</p>
     <p>@definition.Prompt</p>
     <dl class="record" data-form-answers>
         @foreach (var item in definition.Items)
@@ -37,7 +47,7 @@
         }
     </dl>
 }
-else if (!form.AppointmentHeld || form.ClosesAt <= now)
+else if (form.ClosedAt(now))
 {
     <p>This form can no longer be filled in.</p>
 }

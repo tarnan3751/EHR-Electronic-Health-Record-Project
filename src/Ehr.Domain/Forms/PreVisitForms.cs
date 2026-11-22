@@ -14,9 +14,13 @@ namespace Ehr.Domain.Forms;
 // own, so a refusal leaves the page's transaction usable.
 public sealed class PreVisitForms(EhrDbContext db)
 {
-    // A form opens this many days before its appointment, and closes at the appointment's scheduled end: the database's
-    // rule, which this only shows.
+    // A form opens this many days before its appointment, and closes at the appointment's scheduled end, or, once checked
+    // in, when its visit ends, at the latest this many hours after the scheduled end: the database's rule
+    // (db/policies/85-pre-visit-forms.sql), which this only shows. The hours are the window the vital-signs rule gives a
+    // visit; the database can't hold "the end of the clinic's day", since it isn't given the clinic's time zone.
     public const int OpenDays = 7;
+
+    public const int LateVisitHours = 12;
 
     // The questionnaires a clinician can ask for, by code and title: reference data, not PHI.
     public async Task<IReadOnlyList<(string Code, string Title)>> QuestionnairesAsync(CancellationToken cancellationToken) =>

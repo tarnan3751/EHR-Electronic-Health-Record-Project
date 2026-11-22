@@ -15,30 +15,32 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Test Case ID: TC-UC22-06
 // Purpose / scenario: Someone a patient shares their record with, without sensitive items, can't learn that the record
 //   has pre-visit forms: no link, no count, no form, and a form's address answers exactly as an address that is no form
-//   at all, as does another patient's form and one not open yet; the same statements run for the first three. A copy of
-//   the record says it never holds pre-visit forms, for every record alike. Signed out, the portal's forms send to
-//   sign-in.
+//   at all, as does another patient's form; the same statements run for the three. Someone given sensitive items sees
+//   the link whether or not the record has forms, so the link says nothing of them either. A copy of the record says it
+//   never holds pre-visit forms, for every record alike. Signed out, the portal's forms send to sign-in.
 // Type: Non-functional (security)
 // Requirements: NFR-06, proposed FR-59, FR-19
 // Use case: UC 22, Answer a pre-visit form
 // Preconditions: Two patients with the same name, each with a portal account, have each given the same account
-//   ("Synthetic Watcher") access to their record without sensitive items. The first has a PHQ-9 asked for and answered,
-//   a GAD-7 open, and a PHQ-9 before an appointment ten days ahead; the second has no forms. Another patient has a form.
+//   ("Synthetic Watcher") access to their record without sensitive items, and the second has given another account
+//   ("Synthetic Reader") access with sensitive items. The first has a PHQ-9 asked for and answered, a GAD-7 open, and a
+//   PHQ-9 before an appointment ten days ahead; the second has no forms. Another patient has a form.
 // Inputs and system conditions: GET /portal, /portal/forms, /portal/record and /portal/forms/{form} as the proxy on each
 //   record; POST /portal/forms/{form}; PhiReader.PortalFormAsync, the reads those handlers make, with every statement
 //   captured; signed out, GET /portal/forms.
 // Test data: Clinician "Dr. Forms Six".
 // Steps:
-//   1. As the proxy, on each record, open the home page, Pre-visit forms and Download my record.
+//   1. As the proxy, on each record, open the home page, Pre-visit forms and Download my record. As the proxy with
+//      sensitive items, open the second record's home page.
 //   2. As the proxy on the first record, open and send to: its answered PHQ-9, a made-up form, the other patient's form.
-//      As the patient, send to the PHQ-9 not open yet.
 //   3. Read the first, the made-up and the other patient's form as the reader does, counting statements.
 //   4. Signed out, open Pre-visit forms.
-// Expected result: Step 1: no "Forms to fill in" on either home page; Pre-visit forms and Download my record are the
+// Expected result: Step 1: no "Pre-visit forms" link on either home page, but there for the proxy with sensitive items,
+//   with nothing to fill in; Pre-visit forms and Download my record are the
 //   same on both records, but for the antiforgery token, and the download page says "Neither holds the care team's
 //   notes, messages, pre-visit forms, or who has looked at the record." Step 2: every one is 404 with the same body.
-//   Step 3: nothing is returned, and the same number of statements, each the same, is sent for the three. Step 4: sent
-//   to the portal's sign-in.
+//   Step 3: nothing is returned, and the same number of statements, each the same, is sent for the three, the forms
+//   read asking for the record's own forms by its patient. Step 4: sent to the portal's sign-in.
 // Creator: Tahseen Arnan
 public class TC_UC22_06_Nfr06_NoHintForAProxy(WebApps apps) : IClassFixture<WebApps>
 {
@@ -51,14 +53,13 @@ public class TC_UC22_06_Nfr06_NoHintForAProxy(WebApps apps) : IClassFixture<WebA
     public async Task A_proxy_without_sensitive_items_finds_no_trace_of_a_records_forms()
     {
         var visit = await VisitAsync(apps, "Dr. Forms Six");
-        var later = await BookAsync(apps, visit.Session, visit.Patient, visit.Clinician.Id, days: 10, time: "16:00");
+        var later = await BookAsync(apps, visit, days: 10, time: "16:00");
         foreach (var (appointment, code) in new[] { (visit.Appointment, Phq9), (visit.Appointment, Gad7), (later, Phq9) })
         {
             using var asked = await AskAsync(visit.Session.Client, visit.Patient, appointment, code);
         }
 
         var answered = await RequestAsync(apps, visit.Appointment, Phq9);
-        var notOpen = await RequestAsync(apps, later, Phq9);
         await AnswerAsync(apps, visit.Account, answered, Answers(PhqItems, 1, 1, 0, 0, 0, 0, 0, 0, 0));
         var other = await VisitAsync(apps, "Dr. Forms Other");
         using (var asked = await AskAsync(other.Session.Client, other.Patient, other.Appointment, Phq9))
@@ -85,8 +86,16 @@ public class TC_UC22_06_Nfr06_NoHintForAProxy(WebApps apps) : IClassFixture<WebA
 
         var withForms = await PagesAsync(onForms);
         var without = await PagesAsync(onEmpty);
-        Assert.DoesNotContain("Forms to fill in", Text(withForms.Home));
+        Assert.DoesNotContain("Pre-visit forms", Text(withForms.Home));
         Assert.DoesNotContain("data-forms", withForms.Home);
+        Assert.DoesNotContain("data-forms", without.Home);
+
+        // With sensitive items, the link is there on a record that has no forms at all.
+        var reader = await ProxyTests.PersonAsync(apps, "Synthetic", "Reader");
+        await ProxyTests.ViewAsync(reader, await GrantAsync(apps, emptyAccount, empty, reader.Email, sensitive: true));
+        var readerHome = Text(await reader.Client.GetStringAsync("/portal", Cancel));
+        Assert.Contains("Pre-visit forms", readerHome);
+        Assert.DoesNotContain("to fill in", readerHome);
         Assert.Equal(Steady(without.Forms), Steady(withForms.Forms));
         Assert.Equal(Steady(without.Record), Steady(withForms.Record));
         Assert.Contains("Neither holds the care team's notes, messages, pre-visit forms, or who has looked at the record.", Text(withForms.Record));
@@ -105,14 +114,6 @@ public class TC_UC22_06_Nfr06_NoHintForAProxy(WebApps apps) : IClassFixture<WebA
             bodies.Add(Steady(await send.Content.ReadAsStringAsync(Cancel)));
         }
 
-        // And the patient's own form not open yet: sending to it is answered the same way.
-        var (portal, _) = await PortalAsync(apps, visit);
-        using (var early = await SendAsync(portal, notOpen, answers))
-        {
-            Assert.Equal(HttpStatusCode.NotFound, early.StatusCode);
-            bodies.Add(Steady(await early.Content.ReadAsStringAsync(Cancel)));
-        }
-
         Assert.Single(bodies.Distinct());
 
         // The reads behind those answers send the same statements for the three, whoever's they are.
@@ -124,6 +125,10 @@ public class TC_UC22_06_Nfr06_NoHintForAProxy(WebApps apps) : IClassFixture<WebA
 
         Assert.All(sent, statements => Assert.Equal(sent[0], statements));
         Assert.NotEmpty(sent[0]);
+        // The forms read every forms page shares (PhiReader.FormEntriesAsync) asks for the record's own forms by name,
+        // whatever row-level security would also do: a clinician reads every patient's.
+        Assert.Contains(sent[0], statement => statement.Contains("questionnaire_requests", StringComparison.Ordinal)
+            && Regex.IsMatch(statement, "\\.patient_id = @patientId\\b"));
 
         // Signed out: the portal's sign-in, for the list and for a form alike.
         using var signedOut = await Client(apps.OnPrem, new System.Net.CookieContainer()).GetAsync("/portal/forms", Cancel);

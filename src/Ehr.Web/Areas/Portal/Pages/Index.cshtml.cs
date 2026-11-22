@@ -25,7 +25,11 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public bool MayMessage => subject.MayMessage;
 
-    // Pre-visit forms that can be filled in now (step 13e): none for a proxy without sensitive items, who is shown no link.
+    // Pre-visit forms (step 13e), every one a sensitive item: the link is the patient's, and a proxy's whose access
+    // includes sensitive items, whether or not the record has any forms, so it hints at nothing; a proxy without them
+    // never sees it. With it, how many can be filled in now.
+    public bool MaySeeForms => subject.Acting is null || subject.Acting.IncludeSensitive;
+
     public int OpenForms { get; private set; }
 
     public async Task OnGetAsync()
@@ -36,7 +40,7 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
         var appointments = await phi.AppointmentsAsync(patientId, past: 0, HttpContext.RequestAborted);
         Patient = appointments?.Patient;
         Upcoming = [.. (appointments?.Upcoming ?? []).Take(3)];
-        if (Patient is not null && (subject.Acting is null || subject.Acting.IncludeSensitive))
+        if (Patient is not null && MaySeeForms)
         {
             OpenForms = await phi.OpenFormsAsync(patientId, HttpContext.RequestAborted);
         }

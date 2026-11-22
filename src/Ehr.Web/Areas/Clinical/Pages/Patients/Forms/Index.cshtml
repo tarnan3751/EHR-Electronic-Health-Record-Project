@@ -115,19 +115,23 @@ else
                             }
                             @if (answered.Alert)
                             {
-                                @* The PHQ-9's question 9 answered other than "Not at all" (step 13e). *@
-                                <text> </text><span class="sc-tag sc-tag--danger" data-form-alert>Item 9: needs review</span>
+                                @* An alert question answered so that it needs review, such as the PHQ-9's question 9 (step 13e). *@
+                                @foreach (var (number, _) in form.Definition.NeedingReview(answered.Answers))
+                                {
+                                    <text> </text><span class="sc-tag sc-tag--danger" data-form-alert>An answer needs review: question @number</span>
+                                }
                             }
-                            <br><span class="sc-muted">Answered @Clinic.Format(answered.AnsweredAt) by @(answered.Proxy is { } proxy ? $"{proxy}, not the patient" : "the patient")</span>
+                            <br><span class="sc-muted">Answered @Clinic.Format(answered.AnsweredAt) by @(answered.ByProxy ? $"{answered.Proxy}, not the patient" : "the patient")</span>
                             <span class="sc-list__actions"><a asp-page="Response" asp-route-patientId="@patient.Id" asp-route-responseId="@answered.Id" aria-label="Answers: @form.Title, @Clinic.Format(answered.AnsweredAt)">Answers</a></span>
                         }
-                        else if (!form.AppointmentHeld || form.ClosesAt <= DateTimeOffset.UtcNow)
+                        else if (form.ClosedAt(DateTimeOffset.UtcNow))
                         {
                             <br><span class="sc-muted">Not answered. Closed.</span>
                         }
                         else
                         {
-                            <br><span class="sc-muted">Not answered yet: open from @Clinic.Format(form.OpensAt) until @Clinic.Format(form.ClosesAt).</span>
+                            @* Checked in with the visit in progress: open until 12 hours after the scheduled end, or the visit's end. *@
+                            <br><span class="sc-muted">Not answered yet: open from @Clinic.Format(form.OpensAt) until @Clinic.Format(form.ClosesAt)@(form.VisitUnderWay ? ", while the visit is in progress" : "").</span>
                         }
                         <br><span class="sc-muted">Asked by @form.RequestedBy, @Clinic.Format(form.RequestedAt)</span>
                     </li>

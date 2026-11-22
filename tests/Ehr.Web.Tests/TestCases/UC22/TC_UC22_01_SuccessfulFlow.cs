@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Test data: Clinician "Dr. Forms One". Answers: "Several days" to the first seven questions, "Not at all" to the last
 //   two, and "Somewhat difficult" to the difficulty question: a total of 7.
 // Steps:
-//   1. Sign in to the portal and follow "Forms to fill in (1)".
+//   1. Sign in to the portal and follow "Pre-visit forms (1 to fill in)".
 //   2. Follow "Fill in the form".
 //   3. Choose the answers and "Send to my care team".
 //   4. As the clinician, open the patient's pre-visit forms with sensitive items shown.
@@ -29,8 +29,9 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   no questionnaire; the prompt and the ten questions in the form's words, each a group of its answers; the authors'
 //   attribution line. Step 3: the page says "Answers sent: your care team will go over them with you at your visit."
 //   and lists each answer given, with no score, band or "of 27"; the answers are stored with the database's score of 7,
-//   band Mild, no follow-up and no alert, as the patient's own; the home page no longer offers forms; no email. Step 4:
-//   "Score 7 of 27 · Mild", answered by the patient.
+//   band Mild, no follow-up and no alert, as the patient's own; the home page still links to "Pre-visit forms", with
+//   nothing to fill in; no email; neither the home page, the forms page nor the form shows the number 7 or a score
+//   element. Step 4: "Score 7 of 27 · Mild", answered by the patient.
 // Creator: Tahseen Arnan
 public class TC_UC22_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -50,7 +51,7 @@ public class TC_UC22_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         var (portal, _) = await PortalAsync(apps, visit);
 
         var home = await portal.GetStringAsync("/portal", Cancel);
-        Assert.Contains("Forms to fill in (1)", Text(home));
+        Assert.Contains("Pre-visit forms (1 to fill in)", Text(home));
         var sensitiveReads = await apps.AuditEventsAsync(AuditActions.ReadSensitive, visit.Account, visit.Patient);
         var list = Text(await portal.GetStringAsync("/portal/forms", Cancel));
         Assert.Contains("Not monitored: your care team reads this form before your visit, not when you send it. If you need help now, call 911. "
@@ -83,8 +84,16 @@ public class TC_UC22_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([$"7 Mild false false {visit.Account} none"], await QueryAsync(apps,
             "SELECT score || ' ' || band || ' ' || follow_up || ' ' || alert || ' ' || answered_by || ' ' || coalesce(proxy_grant_id::text, 'none') FROM ehr.questionnaire_responses WHERE request_id = @request",
             ("request", request)));
-        Assert.DoesNotContain("Forms to fill in", Text(await portal.GetStringAsync("/portal", Cancel)));
         Assert.Equal(emails, apps.Emails.Sent.Count);
+
+        // The link stays, with nothing to fill in, and no portal page shows the score, however it might be worded.
+        var after = await portal.GetStringAsync("/portal", Cancel);
+        Assert.Contains("Pre-visit forms", Text(after));
+        Assert.DoesNotContain("to fill in", Text(after));
+        foreach (var page in new[] { after, await portal.GetStringAsync("/portal/forms", Cancel), await portal.GetStringAsync(FormPath(request), Cancel) })
+        {
+            ShowsNoScore(page, 7);
+        }
 
         var clinician = Text(await visit.Session.Client.GetStringAsync(FormsPath(visit.Patient) + "?sensitive=true", Cancel));
         Assert.Contains("Score 7 of 27 · Mild", clinician);

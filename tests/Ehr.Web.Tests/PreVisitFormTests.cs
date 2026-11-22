@@ -29,22 +29,31 @@ static class PreVisitFormTests
         items.Select((item, place) => (item, Frequency[scores[place]])).ToDictionary(pair => pair.item, pair => pair.Item2);
 
     // A clinician signed in on the on-site app, a patient on their panel with a confirmed portal account, and an
-    // appointment with the clinician `days` from now, booked through the page.
-    public sealed record Visit(StaffAccount Clinician, Session Session, Guid Patient, Guid Account, string Email, Guid Appointment);
+    // appointment with the clinician `days` from today, booked through the page. Now is the database's clock, read once
+    // at the start: the rules that judge a form's times read it, and the container's clock can lag the machine's.
+    public sealed record Visit(StaffAccount Clinician, Session Session, Guid Patient, Guid Account, string Email, Guid Appointment, DateTimeOffset Now);
 
     public static async Task<Visit> VisitAsync(WebApps apps, string name, int days = 2, string time = "16:00")
     {
+        DateTimeOffset now = await apps.Database.NowAsync();
         var (clinician, patient, session) = await AppointmentTests.ClinicianAsync(apps, name);
         var (email, _) = await apps.CreatePatientAccountAsync(patient);
         var account = Guid.Parse((await QueryAsync(apps, "SELECT id::text FROM ehr.patient_users WHERE patient_id = @patient", ("patient", patient))).Single());
-        var appointment = await BookAsync(apps, session, patient, clinician.Id, days, time);
-        return new Visit(clinician, session, patient, account, email, appointment);
+        var appointment = await BookAsync(apps, session, patient, clinician.Id, now, days, time);
+        return new Visit(clinician, session, patient, account, email, appointment, now);
     }
 
-    // Another appointment for the patient, through the booking page; its ID.
-    public static async Task<Guid> BookAsync(WebApps apps, Session session, Guid patient, Guid clinician, int days, string time)
+    // The day `days` after the visit's today, by the database's clock, as the booking page takes it.
+    public static string Day(Visit visit, int days) => visit.Now.UtcDateTime.Date.AddDays(days).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    // Another appointment for the visit's patient with its clinician, `days` from the visit's today; its ID.
+    public static Task<Guid> BookAsync(WebApps apps, Visit visit, int days, string time) =>
+        BookAsync(apps, visit.Session, visit.Patient, visit.Clinician.Id, visit.Now, days, time);
+
+    // An appointment through the booking page; its ID.
+    static async Task<Guid> BookAsync(WebApps apps, Session session, Guid patient, Guid clinician, DateTimeOffset now, int days, string time)
     {
-        var day = DateTime.UtcNow.Date.AddDays(days).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var day = now.UtcDateTime.Date.AddDays(days).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var before = await AppointmentTests.RowsAsync(apps, patient, "id::text");
         using var booked = await AppointmentTests.BookAsync(session.Client, patient, clinician, day, time, "Synthetic: follow-up");
         Assert.Equal(System.Net.HttpStatusCode.OK, booked.StatusCode);
@@ -108,6 +117,16 @@ static class PreVisitFormTests
 
     // A page's words with each run of white space made one space, so a table's row reads as one line.
     public static string Text(string html) => System.Text.RegularExpressions.Regex.Replace(Words(html), "\\s+", " ");
+
+    // A portal page shows no score: no score element, and the total nowhere as a number of its own once the page's dates
+    // and times are taken out, however it might be worded.
+    public static void ShowsNoScore(string html, int score)
+    {
+        Assert.DoesNotContain("data-form-score", html, StringComparison.Ordinal);
+        var words = System.Text.RegularExpressions.Regex.Replace(Text(html),
+            "\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{1,2}\\b|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}:\\d{2}", " ");
+        Assert.DoesNotMatch($"\\b{score}\\b", words);
+    }
 
     // A proxy grant the patient gives in the portal's database rules, as their own account: to `email`, for 30 days,
     // with or without sensitive items. Its ID.

@@ -8,8 +8,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Test Case ID: TC-UC22-03
 // Purpose / scenario: What a form refuses. A question left without an answer, or answered with something that isn't one
 //   of its answers, is asked again with the other answers kept; a score sent with the answers changes nothing; a form
-//   sent once can't be sent again; a form not open yet, or closed because its appointment was cancelled, can't be sent;
-//   another patient's form doesn't exist.
+//   sent once can't be sent again; a form not open yet, or closed because its appointment was cancelled, can't be sent,
+//   and the page says so; another patient's form doesn't exist.
 // Type: Functional (invalid input)
 // Requirements: proposed FR-59
 // Use case: UC 22, Answer a pre-visit form
@@ -29,7 +29,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   two questions, the cursor on the first of them, the other answers still chosen; nothing stored. Step 2: stored
 //   with the database's score of 27, Severe, needing follow-up. Step 3: the answers page; still one set of answers.
 //   Step 4: the first says when it can be filled in and has no form to send; the cancelled one says it can no longer be
-//   filled in; sending either is 404 and stores nothing. Step 5: 404 for both.
+//   filled in; sending either is 409, "Not sent: your answers were not sent to your care team." with why ("This form
+//   can't be filled in yet." and "This form can no longer be filled in."), and stores nothing. Step 5: 404 for both.
 // Creator: Tahseen Arnan
 public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
@@ -39,8 +40,8 @@ public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
     public async Task Missing_or_made_up_answers_a_second_send_and_forms_that_arent_open_or_arent_theirs_are_refused()
     {
         var visit = await VisitAsync(apps, "Dr. Forms Three");
-        var early = await BookAsync(apps, visit.Session, visit.Patient, visit.Clinician.Id, days: 10, time: "16:00");
-        var cancelled = await BookAsync(apps, visit.Session, visit.Patient, visit.Clinician.Id, days: 4, time: "16:00");
+        var early = await BookAsync(apps, visit, days: 10, time: "16:00");
+        var cancelled = await BookAsync(apps, visit, days: 4, time: "16:00");
         foreach (var appointment in new[] { visit.Appointment, early, cancelled })
         {
             using var asked = await AskAsync(visit.Session.Client, visit.Patient, appointment, Phq9);
@@ -89,10 +90,11 @@ public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Send to my care team", notYetPage);
         var closed = await RequestAsync(apps, cancelled, Phq9);
         Assert.Contains("This form can no longer be filled in.", Text(await portal.GetStringAsync(FormPath(closed), Cancel)));
-        foreach (var shut in new[] { notYet, closed })
+        foreach (var (shut, why) in new[] { (notYet, "This form can't be filled in yet."), (closed, "This form can no longer be filled in.") })
         {
             using var refused = await SendAsync(portal, shut, Answers(PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+            Assert.Contains("Not sent: your answers were not sent to your care team. " + why, Text(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Empty(await QueryAsync(apps, "SELECT id::text FROM ehr.questionnaire_responses WHERE request_id IN (@a, @b)", ("a", notYet), ("b", closed)));

@@ -14,19 +14,34 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true" asp-fragment="appointment-@form.AppointmentId">Back to pre-visit forms</a></p>
+    @if (Model.FromInbox)
+    {
+        <p><a asp-page="/Inbox/Index">Back to the inbox</a></p>
+    }
+    else
+    {
+        <p><a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true" asp-fragment="appointment-@form.AppointmentId">Back to pre-visit forms</a></p>
+    }
 </div>
 <h1>Pre-visit form: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Answers.CareTeam is { } team)
+{
+    @* Opened from the reader's inbox, not their panel: whose patient this is, and the one way to the chart. *@
+    <p class="sc-notice sc-notice--info" data-form-not-on-panel><span class="sc-notice__state">Not on your panel:</span> @patient.GivenName @patient.FamilyName is @(team.Count == 0 ? "on no clinician's panel" : $"on the panel of {string.Join(", ", team)}"), and the chart opens to you only under emergency access, which <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">the chart</a> asks you for.</p>
+}
 <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded.</p>
 @if (answered.Alert)
 {
-    <p class="sc-notice sc-notice--danger" data-form-alert><span class="sc-notice__state">Needs review:</span> question 9 was answered other than "Not at all". A final decision about the risk of self-harm needs a clinical interview.</p>
+    @foreach (var (number, item) in definition.NeedingReview(answered.Answers))
+    {
+        <p class="sc-notice sc-notice--danger" data-form-alert><span class="sc-notice__state">An answer needs review:</span> question @number, "@item.Text".</p>
+    }
 }
 <section class="sc-panel" aria-label="The form">
     <dl class="record">
         <dt>Questionnaire</dt><dd>@form.Title <span class="sc-tag sc-tag--warning">Sensitive</span></dd>
         <dt>Before</dt><dd>@Clinic.Format(form.AppointmentStartsAt) with @form.AppointmentClinician</dd>
-        <dt>Answered</dt><dd>@Clinic.Format(answered.AnsweredAt) by @(answered.Proxy is { } proxy ? $"{proxy}, not the patient" : "the patient")</dd>
+        <dt>Answered</dt><dd>@Clinic.Format(answered.AnsweredAt) by @(answered.ByProxy ? $"{answered.Proxy}, not the patient" : "the patient")</dd>
         @if (answered.Score is { } score)
         {
             <dt>Score</dt>
