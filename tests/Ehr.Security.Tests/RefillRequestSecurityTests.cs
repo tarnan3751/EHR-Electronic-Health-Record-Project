@@ -803,4 +803,23 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
 
         Assert.Equal(["completed true"], await AsSuperuserAsync("SELECT status || ' ' || sensitive FROM ehr.refill_requests WHERE id = @id", ("id", request)));
     }
+
+    // The review's finding: which medications have a request waiting was worked out from the page's 50 latest requests.
+    // The portal is given every waiting request, however many answered ones are newer.
+    [Fact]
+    public async Task The_portal_is_given_every_waiting_request_however_many_answered_ones_are_newer()
+    {
+        var (clinician, patient, account) = await OnPanelAsync();
+        await AskAsync(account, patient, await MedicationAsync(patient));
+        var answered = await MedicationAsync(patient, code: "197361", display: "amlodipine 5 MG Oral Tablet");
+        for (var i = 0; i < 51; i++)
+        {
+            Assert.Equal(1, await DeclineAsync(clinician, await AskAsync(account, patient, answered)));
+        }
+
+        Assert.Equal(["1 5"], await Accounts.QueryAsync(App, account,
+            "SELECT count(*) FILTER (WHERE status = 'requested') || ' ' || count(*) FILTER (WHERE status = 'rejected') FROM ehr.portal_refill_requests(5)"));
+        Assert.Equal(["lisinopril 10 MG Oral Tablet"], await Accounts.QueryAsync(App, account,
+            "SELECT medication_display FROM ehr.portal_refill_requests(5) WHERE status = 'requested'"));
+    }
 }

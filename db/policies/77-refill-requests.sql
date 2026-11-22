@@ -273,17 +273,19 @@ CREATE OR REPLACE TRIGGER medication_statements_follow_refills
     FOR EACH ROW WHEN (NEW.sensitive IS DISTINCT FROM OLD.sensitive)
     EXECUTE FUNCTION ehr.follow_refill_medication();
 
--- The portal's refill requests, for the record the session is looking at: the latest first, up to max_rows, each with
--- the medication it was asked for (its entry on the chart and its name then), the note, whether the reader asked it
--- ('you') or, for the patient themselves, someone they share their record with ('proxy'), when, its state, what was
--- ordered or the care team's message, when it was answered, and whether it is sensitive; and nothing else of it: not
--- who answered it, the order, or which account asked. The patient's own, and a proxy's only while their access is in
--- force and includes messages; a sensitive one only where ehr.portal_sees_sensitive says so: always the patient's own, a
--- proxy's only when the patient allowed sensitive items. Row-level security can't keep some of a row's columns from a
--- session that may read the row, so no portal session reads the table (30-rls.sql): this is the portal's only way to a
--- request, as ehr.standing_visit_summaries is to a summary. Runs as its owner, reading the requests through the owner's
--- policy (30-rls.sql); its search_path is pinned, and only the runtime roles may call it. Anyone who isn't a portal
--- session looking at a record gets nothing.
+-- The portal's refill requests, for the record the session is looking at: every one still waiting, which says which
+-- medications have a request waiting already whatever the page shows (one a medication, so as many as the record has),
+-- and the latest answered ones, up to max_rows; the latest first, each with the medication it was asked for (its entry
+-- on the chart and its name then), the note, whether the reader asked it ('you') or, for the patient themselves,
+-- someone they share their record with ('proxy'), when, its state, what was ordered or the care team's message, when it
+-- was answered, and whether it is sensitive; and nothing else of it: not who answered it, the order, or which account
+-- asked. The patient's own, and a proxy's only while their access is in force and includes messages; a sensitive one
+-- only where ehr.portal_sees_sensitive says so: always the patient's own, a proxy's only when the patient allowed
+-- sensitive items. Row-level security can't keep some of a row's columns from a session that may read the row, so no
+-- portal session reads the table (30-rls.sql): this is the portal's only way to a request, as
+-- ehr.standing_visit_summaries is to a summary. Runs as its owner, reading the requests through the owner's policy
+-- (30-rls.sql); its search_path is pinned, and only the runtime roles may call it. Anyone who isn't a portal session
+-- looking at a record gets nothing.
 CREATE OR REPLACE FUNCTION ehr.portal_refill_requests(max_rows integer)
     RETURNS TABLE (medication_statement_id uuid, medication_display text, note text, asked text, requested_at timestamptz, status text,
                    ordered_display text, decline_message text, decided_at timestamptz, sensitive boolean)
@@ -296,11 +298,14 @@ AS $$
            CASE WHEN r.requested_by = (SELECT ehr.current_user_id()) THEN 'you'
                 WHEN (SELECT ehr.acting_grant_id()) IS NULL THEN 'proxy' END,
            r.requested_at, r.status::text, r.ordered_display::text, r.decline_message::text, r.decided_at, r.sensitive
-    FROM ehr.refill_requests r
-    WHERE r.patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_may_message())
-      AND (NOT r.sensitive OR (SELECT ehr.portal_sees_sensitive()))
+    FROM (
+        SELECT r.*, row_number() OVER (PARTITION BY r.status = 'requested' ORDER BY r.requested_at DESC, r.id) AS latest
+        FROM ehr.refill_requests r
+        WHERE r.patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_may_message())
+          AND (NOT r.sensitive OR (SELECT ehr.portal_sees_sensitive()))
+    ) r
+    WHERE r.status = 'requested' OR r.latest <= max_rows
     ORDER BY r.requested_at DESC, r.id
-    LIMIT max_rows
 $$;
 REVOKE ALL ON FUNCTION ehr.portal_refill_requests(integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION ehr.portal_refill_requests(integer) TO ehr_app, ehr_read;

@@ -17,7 +17,8 @@ public sealed record PortalRefillRequest(
 // context is set.
 public static class RefillRequestQueries
 {
-    // The latest first, up to the limit, under the patient's rules for messages and sensitive items.
+    // Every waiting one and the latest answered ones, up to the limit, latest first, under the patient's rules for
+    // messages and sensitive items.
     public static async Task<List<PortalRefillRequest>> PortalAsync(EhrDbContext db, int limit, CancellationToken cancellationToken)
     {
         var connection = db.Database.GetDbConnection();

@@ -1359,9 +1359,10 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
     // The portal's refill page for the record the session is looking at: the medications it may ask to renew (active and
     // coded as a product the clinic orders, as row-level security lets the portal read them: none entered in error, a
-    // sensitive one only where the patient's rule allows), but those with a request waiting; its requests, latest first,
-    // up to the limit, as the database gives the portal them (ehr.portal_refill_requests: the portal reads no row of the
-    // table); and whether anyone on the patient's panel could answer one. Sensitive medications and requests are left out
+    // sensitive one only where the patient's rule allows), but those with a request waiting; its requests, every waiting
+    // one and the latest answered ones up to the limit, latest first, as the database gives the portal them
+    // (ehr.portal_refill_requests: the portal reads no row of the table), so which medications wait never depends on the
+    // limit; and whether anyone on the patient's panel could answer one. Sensitive medications and requests are left out
     // unless asked for, and asking is recorded as a view of the patient's sensitive items, in place of the plain read:
     // one recorded read of the patient. Null when the session may read no such patient.
     public async Task<PatientRefills?> RefillsAsync(Guid patientId, bool sensitive, int limit, CancellationToken cancellationToken)
