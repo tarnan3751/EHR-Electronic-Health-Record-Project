@@ -147,9 +147,12 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         };
         if (decision == AiProposalStates.Edited && string.IsNullOrWhiteSpace(approved))
             return ReviewResult.Invalid("Enter the corrected value, or reject the proposal.");
-        // Step 16: with a recorded visit's transcript gone, nobody can check a proposal against what was said (the
-        // database refuses the same, db/policies/56-ambient-listening.sql).
-        if (decision == AiProposalStates.Accepted && review.Mode == AiReviewModes.Ambient && !await phi.AmbientTranscriptKeptAsync(review.Id, cancel))
+        // Step 16: with a recorded visit's transcript gone, nobody can check a proposal against what was said, so none goes
+        // into the note as offered: not accepted, nor edited back to the same words (the database refuses the same,
+        // db/policies/56-ambient-listening.sql).
+        if (review.Mode == AiReviewModes.Ambient
+            && (decision == AiProposalStates.Accepted || decision == AiProposalStates.Edited && Words(approved!) == Words(proposal.OriginalValue))
+            && !await phi.AmbientTranscriptKeptAsync(review.Id, cancel))
             return ReviewResult.Invalid(TranscriptGone);
         var values = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         if (approved is not null) values[proposal.Field] = approved;
@@ -280,6 +283,9 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         var draft = await phi.LockDraftAsync(snapshot.DraftId, snapshot.PatientId, cancel);
         return draft is null ? (null, null) : (await phi.AiReviewAsync(id, cancel, tracking: true), draft);
     }
+
+    // A value's words, trimmed, with every run of whitespace one space.
+    static string Words(string value) => string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     static void Advance(ClinicalDraft draft)
     {

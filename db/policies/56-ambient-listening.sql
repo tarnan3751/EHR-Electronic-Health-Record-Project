@@ -12,8 +12,8 @@
 -- - ehr.ambient_transcripts: the conversation's transcript, kept only while its review is open: written as the review
 --   is staged, which leaves it pending; deleted in the transaction that finishes or ends the review; and deleted by
 --   ehr.purge_ambient_transcripts, as the system's act, 7 days after it was written if nobody has. Once it is gone from a
---   review still open, none of that review's proposals can be accepted as offered: only rejected, or edited into the
---   clinician's own words.
+--   review still open, none of that review's proposals can go into the note as offered: only rejected, or edited into
+--   the clinician's own words.
 
 -- The consent: its clinician is the one signed in and its time this database's clock, whatever was sent.
 CREATE OR REPLACE FUNCTION ehr.guard_ambient_consent() RETURNS trigger
@@ -66,7 +66,9 @@ CREATE OR REPLACE TRIGGER ai_note_reviews_ambient
     BEFORE INSERT OR UPDATE ON ehr.ai_note_reviews FOR EACH ROW EXECUTE FUNCTION ehr.guard_ambient_review();
 
 -- A proposal is as sensitive as its review, for good. Once the conversation's transcript of a review still open is gone
--- (ehr.purge_ambient_transcripts), nobody can check a proposal against what was said, so none is accepted as offered.
+-- (ehr.purge_ambient_transcripts), nobody can check a proposal against what was said, so none goes into the note as
+-- offered: not accepted, nor edited back to the words offered (the same once trimmed, with every run of whitespace one
+-- space), which the review page would otherwise have offered ready to approve.
 CREATE OR REPLACE FUNCTION ehr.guard_ambient_proposal() RETURNS trigger
     LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
 AS $$
@@ -81,7 +83,10 @@ BEGIN
     IF NEW.sensitive IS DISTINCT FROM OLD.sensitive THEN
         RAISE EXCEPTION 'A proposal''s sensitivity never changes' USING ERRCODE = '23514';
     END IF;
-    IF NEW.state = 'accepted' AND OLD.state <> 'accepted' AND review.mode = 'ambient'
+    IF review.mode = 'ambient' AND NEW.state IS DISTINCT FROM OLD.state
+       AND (NEW.state = 'accepted'
+            OR NEW.state = 'edited' AND btrim(regexp_replace(NEW.approved_value, '[[:space:]]+', ' ', 'g'))
+                                      = btrim(regexp_replace(NEW.original_value, '[[:space:]]+', ' ', 'g')))
        AND NOT EXISTS (SELECT 1 FROM ehr.ambient_transcripts t WHERE t.id = review.id) THEN
         RAISE EXCEPTION 'The conversation''s transcript was deleted: reject this proposal, or edit it into your own words'
             USING ERRCODE = '23514';

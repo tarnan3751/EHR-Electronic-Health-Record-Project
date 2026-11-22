@@ -122,7 +122,13 @@
                                         <div class="sc-stack">
                                             <div class="sc-field sc-field--wide">
                                                 <label for="edited-@field">Corrected @field</label>
-                                                <textarea id="edited-@field" class="sc-field__input" name="EditedValue" rows="5">@(Model.ProposalId == proposal.Id ? Model.EditedValue : proposal.OriginalValue)</textarea>
+                                                @* Step 16: with a visit's transcript gone, the words offered can't go in as they are, so they aren't
+                                                   offered here ready to approve. *@
+                                                @if (Model.TranscriptGone)
+                                                {
+                                                    <p class="sc-field__hint" id="edited-@field-hint" data-ambient-own-note>Write it as your own note: with the visit's transcript deleted, the words offered can't go in as they are.</p>
+                                                }
+                                                <textarea id="edited-@field" class="sc-field__input" name="EditedValue" rows="5" aria-describedby="@(Model.TranscriptGone ? $"edited-{field}-hint" : null)">@(Model.ProposalId == proposal.Id ? Model.EditedValue : Model.TranscriptGone ? "" : proposal.OriginalValue)</textarea>
                                             </div>
                                             <div class="sc-actions"><button class="sc-btn" name="Decision" value="edited">Approve edited @field</button></div>
                                         </div>

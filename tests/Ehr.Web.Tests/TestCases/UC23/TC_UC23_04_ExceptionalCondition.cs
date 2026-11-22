@@ -22,12 +22,14 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   1. Open the chart and the Listen page on each site; start listening through the cloud app.
 //   2. Draft a visit at the clinic, open its review off-site, and decide a proposal through the cloud app.
 //   3. With the service unreachable, start listening.
-//   4. Draft a visit, purge its transcript, open its review, and accept, then edit, a proposal.
+//   4. Draft a visit, purge its transcript, open its review, and accept a proposal, edit it back to its own words, and
+//      edit it into others.
 // Expected result: Step 1: "Listen to the visit" on the clinic's chart only; off-site, the page's "Unavailable:" notice
 //   and no listening controls; the start refused by the cloud app, nothing forwarded, nothing sent to the service. Step 2:
 //   off-site, "Read-only here:" with the review's proposals, no transcript and no decisions; the forwarded decision refused
 //   with "Finish this review at the clinic…". Step 3: 503, no consent recorded. Step 4: the review says the transcript was
-//   deleted after 7 days and offers no Accept; accepting is refused with that sentence; editing is saved.
+//   deleted after 7 days, offers no Accept, and leaves the box to edit it empty, saying why; accepting, or editing back
+//   to the words offered, even spaced differently, is refused with that sentence; editing into other words is saved.
 // Creator: Tahseen Arnan
 public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -100,12 +102,16 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var html = await l.Session.Client.GetStringAsync(d.ReviewUrl, Cancel);
         Assert.Contains("transcript was deleted after 7 days, so its proposals can", html);
         Assert.DoesNotContain("value=\"accepted\"", html);
+        // Nor offered, ready to approve, in the box to edit it: the page says why.
+        Assert.Matches("<textarea id=\"edited-objective\"[^>]*aria-describedby=\"edited-objective-hint\"[^>]*></textarea>", html);
+        Assert.Contains("Write it as your own note: with the visit's transcript deleted, the words offered can't go in as they are.", html);
 
         var proposals = await ProposalsAsync(apps, l.Review);
-        using (var accepted = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals["objective"].Id, d.Version, "accepted"))
+        foreach (var (decision, words) in new[] { ("accepted", ""), ("edited", "Your chest is clear."), ("edited", "  Your chest\n is   clear. ") })
         {
-            Assert.Equal(HttpStatusCode.UnprocessableEntity, accepted.StatusCode);
-            Assert.Contains("transcript was deleted after 7 days, so its proposals can", await accepted.Content.ReadAsStringAsync(Cancel));
+            using var refused = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals["objective"].Id, d.Version, decision, words);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+            Assert.Contains("transcript was deleted after 7 days, so its proposals can", await refused.Content.ReadAsStringAsync(Cancel));
         }
 
         using var edited = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals["objective"].Id, d.Version, "edited", "Synthetic: chest clear.");

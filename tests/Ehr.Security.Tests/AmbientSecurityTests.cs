@@ -336,9 +336,14 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         // Nor written again, so that they could be: a transcript is written once, as its review is staged.
         await Refused("23514", () => Execute(visit, "INSERT INTO ehr.ambient_transcripts (id, patient_id, transcript) VALUES (@review, @patient, @transcript::jsonb)"));
 
-        // Its proposals can't be accepted as offered any more: rejected, or edited into the clinician's own words.
+        // Its proposals can't go into the note as offered any more: not accepted, nor edited back to the words offered
+        // (trimmed, every run of whitespace one space); rejected, or edited into the clinician's own words.
         await Refused("23514", () => Execute(visit,
             "UPDATE ehr.ai_field_proposals SET state = 'accepted', approved_value = original_value, decision_key = gen_random_uuid() WHERE id = @proposal"));
+        await Refused("23514", () => Execute(visit,
+            "UPDATE ehr.ai_field_proposals SET state = 'edited', approved_value = original_value, decision_key = gen_random_uuid() WHERE id = @proposal"));
+        await Refused("23514", () => Execute(visit,
+            "UPDATE ehr.ai_field_proposals SET state = 'edited', approved_value = E' Synthetic \\n\\t  proposal  ', decision_key = gen_random_uuid() WHERE id = @proposal"));
         await Execute(visit,
             "UPDATE ehr.ai_field_proposals SET state = 'edited', approved_value = 'Synthetic words of the clinician', decision_key = gen_random_uuid() WHERE id = @proposal");
         await Execute(visit, "UPDATE ehr.ai_note_reviews SET state = 'completed', imported_version = 1 WHERE id = @review");
