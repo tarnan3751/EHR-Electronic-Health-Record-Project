@@ -56,6 +56,12 @@ def dictation() -> bytes:
     return wav(samples + noise(samples.size / SAMPLE_RATE, -80))
 
 
+def one_passage() -> bytes:
+    """A second's pause, then speech: one passage, heard clearly."""
+    samples = np.concatenate([np.zeros(SAMPLE_RATE, np.float32), tone(3)])
+    return wav(samples + noise(samples.size / SAMPLE_RATE, -80))
+
+
 class FailingAtTheEnd(FakeRecognizer):
     """Transcribes the chunks, and fails on the rest of the recording after stop."""
 
@@ -72,6 +78,13 @@ class Misheard(FakeRecognizer):
 
     def recognize(self, samples: np.ndarray) -> Recognition:
         return Recognition("Lisinopril 10 mg no weight 20 mg daily {period}", 0.9)
+
+
+class Dictating(FakeRecognizer):
+    """Hears a short dictation, all of it one field's."""
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        return Recognition("Cough for three days with a sore throat {period}", 0.9)
 
 
 class Instructing(FakeRecognizer):
@@ -149,6 +162,14 @@ def answers(settings: Settings) -> dict[str, dict]:
     with client(settings, FakeLlama(flagged), Misheard()) as http:
         session = stopped(http)
         keep("result-200-done-possible_correction", "result",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+
+    # The whole dictation sorted into one field, the others not dictated: pending, with a one_field_holds_dictation
+    # warning that points at all its sources cover.
+    whole = answer(("Cough for three days with a sore throat.", ["Cough for three days with a sore throat"]))
+    with client(settings, FakeLlama(whole), Dictating()) as http:
+        session = stopped(http, one_passage())
+        keep("result-200-done-one_field_holds_dictation", "result",
              http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
 
     unavailable: dict[str, Callable[[], FakeLlama]] = {
@@ -239,6 +260,9 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     assert bodies["audio-409-out_of_order"]["expectedSeq"] == 1
     warned = bodies["result-200-done-possible_correction"]["fields"]["plan"]
     assert warned["status"] == "pending" and "possible_correction" in [w["code"] for w in warned["warnings"]]
+    whole = bodies["result-200-done-one_field_holds_dictation"]["fields"]
+    assert [w["code"] for w in whole["subjective"]["warnings"]] == ["one_field_holds_dictation"]
+    assert all(whole[name]["reasons"] == ["not_dictated"] for name in ("objective", "assessment", "plan"))
     near = bodies["result-200-done"]["fields"]["subjective"]
     assert [w["code"] for w in near["warnings"]] == ["near_unclear_passage"]
     failed = bodies["result-200-unavailable-transcription_failed"]

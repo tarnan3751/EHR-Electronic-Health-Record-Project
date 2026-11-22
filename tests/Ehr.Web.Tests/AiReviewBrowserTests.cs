@@ -167,6 +167,31 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignNote, patientId: patient));
     }
 
+    // The whole dictation sorted into one field (the expansion plan's step 14; the eval's d39): the review shows the
+    // field's warning in words beside it, and accepting it is still the clinician's choice.
+    [Fact]
+    public async Task A_field_holding_the_whole_dictation_is_shown_with_its_warning_and_can_still_be_accepted()
+    {
+        var (patient, session) = await AccountAsync();
+        apps.Dictation.WholeDictation = true;
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await LaunchAsync(playwright);
+        await using var context = await ContextAsync(browser, session);
+        var page = await context.NewPageAsync();
+        var errors = new List<string>();
+        page.PageError += (_, error) => errors.Add(error);
+        await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate", proposals: 1);
+
+        Assert.Equal(["This section holds the whole dictation. Sort it into the sections it belongs to before accepting it."],
+            await page.Locator("[data-dictation-field=subjective] .sc-proposal__warning").AllTextContentsAsync());
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-dictation-field=subjective] [value=accepted]')"));
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('1 of 1')");
+        Assert.Equal("Accepted", await page.Locator("[data-dictation-field=subjective] [data-field-status]").TextContentAsync());
+        Assert.Empty(errors);
+    }
+
     // TC-UC14-05 (NFR-12) in the SE document (Satwik Yash Padhy): write and sign a note with the keyboard only, typed
     // from scratch with no dictation. From the chart, the keyboard reaches "New note", fills Subjective, Objective,
     // Assessment and Plan in the editor (step 14), which saves them, then reviews, confirms and signs. The test above is TC-UC14-05 through

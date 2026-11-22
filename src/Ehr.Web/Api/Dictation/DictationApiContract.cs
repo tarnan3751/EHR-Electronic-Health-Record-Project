@@ -141,6 +141,11 @@ public enum WarningCode
     // right next to what the value was sorted from.
     [JsonStringEnumMemberName("near_unclear_passage")]
     NearUnclearPassage,
+
+    // The only field proposed, every other not dictated, quotes nearly all of the transcript (nine words in ten): the
+    // whole dictation, plan and findings alike, went into one section, for the clinician to sort before accepting it.
+    [JsonStringEnumMemberName("one_field_holds_dictation")]
+    OneFieldHoldsDictation,
 }
 
 // What produced the transcript and the fields, for the note to store with them. Language is null when the service's

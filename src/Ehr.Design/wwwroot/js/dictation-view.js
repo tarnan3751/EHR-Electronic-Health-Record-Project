@@ -19,6 +19,7 @@ window.SwiftChartDictationView = class {
         const warningWords = {
             possible_correction: "You may have corrected this later in the dictation: check the highlighted words.",
             near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
+            one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
         };
         const instructionWords = { order: "Order", allergy_change: "Allergy change" };
 

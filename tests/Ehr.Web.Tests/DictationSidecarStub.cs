@@ -39,6 +39,9 @@ public sealed class DictationSidecarStub : HttpMessageHandler
     // A History beside the four fields, as no service since the expansion plan's step 14 sends.
     public bool LiveHistory { get; set; }
 
+    // The whole transcript sorted into Subjective, the other three not dictated, with the warning the service puts on it.
+    public bool WholeDictation { get; set; }
+
     public StubSorting Sorting { get; set; }
 
     // Every request fails to connect.
@@ -61,6 +64,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         IncludePlan = false;
         IncludeObjective = false;
         LiveHistory = false;
+        WholeDictation = false;
         Unreachable = false;
         Slow = false;
         Undecodable = false;
@@ -151,6 +155,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         }
     }
 
+    static string Text(StubSession session) => string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => Sentences[chunk % Sentences.Length]));
+
     static object Transcript(StubSession session)
     {
         var text = new StringBuilder();
@@ -203,6 +209,26 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         return sorting switch
         {
             StubSorting.Pending => new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver, provenance },
+            StubSorting.Done when WholeDictation => new
+            {
+                transcript,
+                sorting = "done",
+                fields = (object?)new
+                {
+                    subjective = new
+                    {
+                        status = "pending",
+                        value = Text(session),
+                        sources = new[] { new { start = 0, end = Text(session).Length } },
+                        warnings = new[] { new { code = "one_field_holds_dictation", start = 0, end = Text(session).Length } },
+                    },
+                    objective = new { status = "empty", reasons = new[] { "not_dictated" } },
+                    assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
+                    plan = new { status = "empty", reasons = new[] { "not_dictated" } },
+                },
+                notCarriedOver,
+                provenance,
+            },
             StubSorting.Done => new
             {
                 transcript,

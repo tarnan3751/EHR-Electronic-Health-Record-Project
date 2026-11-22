@@ -324,7 +324,7 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     }
 
 
-WARNING_CODES = ("possible_correction", "near_unclear_passage")
+WARNING_CODES = ("possible_correction", "near_unclear_passage", "one_field_holds_dictation")
 CLEAN = "noise:none"
 
 

@@ -19,6 +19,7 @@ def test_the_values():
     assert (segmenter.MIN_PAUSE, segmenter.KEEP, segmenter.MAX_SEGMENT) == (40, 300, 2000)
     assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 30, 600)
     assert (validation.DIRECTIVE_REACH, validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (14, 5, 3)
+    assert validation.WHOLE_DICTATION == 0.9
     assert validation.LIMITS == {"subjective": 3000, "objective": 3000, "assessment": 2000, "plan": 2000}
     limits = settings.Settings(api_key="k", llama_api_key="k")
     assert (limits.max_session_seconds, limits.max_session_bytes, limits.max_chunk_bytes) == (180, 10 << 20, 2 << 20)
@@ -111,6 +112,15 @@ def test_an_unclear_passage_within_5_words_flags_the_value():
 
     assert field("Cough for three days.", "Cough for three days", text=five).warnings != []
     assert field("Cough for three days.", "Cough for three days", text=six).warnings == []
+
+
+def test_the_only_field_offered_is_flagged_from_nine_in_ten_of_the_words():
+    ten = transcript("Mild cough for three days and a sore throat today.")
+
+    assert [code for code, _, _ in field("Mild cough for three days and a sore throat.",
+                                         "Mild cough for three days and a sore throat", text=ten).warnings] == [
+        "one_field_holds_dictation"]
+    assert field("Cough for three days and a sore throat.", "cough for three days and a sore throat", text=ten).warnings == []
 
 
 def test_field_and_source_limits():

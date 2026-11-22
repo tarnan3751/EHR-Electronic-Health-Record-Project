@@ -37,7 +37,7 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "2ce2c88541996632e1616ed958e50b6c82687eee4e0e99286e5e9be72411e296",
-  "scoring": "d88ea0217b098d9b443ef5e0e60548c8d2a6ebe4e41f189e475fa4a6b11b99e3"
+  "scoring": "026e03f8645def626035dd71e9a9d279a135d145b2588a0a2a35ed2eb3d08014"
  },
  "dataset": {
   "recordings_sha256": "b4f7b366b225fbd6d4f6d5840345db1e3940d2e6253b3fbb880eee8cf2b59fa5",
@@ -2815,8 +2815,416 @@
      }
     }
    },
+   "one_field_holds_dictation": {
+    "flagged": 1,
+    "retracted_caught": 0,
+    "rules": {
+     "right": 204,
+     "flagged": 0,
+     "false_alarm_rate": 0.0,
+     "clean": {
+      "right": 106,
+      "flagged": 0,
+      "false_alarm_rate": 0.0
+     },
+     "by_tag": {
+      "accent:es-voice": {
+       "right": 36,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:fr-voice": {
+       "right": 17,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:gb": {
+       "right": 55,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:hi-voice": {
+       "right": 42,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:us": {
+       "right": 54,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "allergy-change": {
+       "right": 60,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "container:mp4": {
+       "right": 108,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "container:webm": {
+       "right": 96,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "dates": {
+       "right": 39,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "drug-new": {
+       "right": 99,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "drug-uncommon": {
+       "right": 71,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "experiencer": {
+       "right": 34,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "injection": {
+       "right": 23,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "long": {
+       "right": 41,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "max-length": {
+       "right": 6,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "missing-field": {
+       "right": 5,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "mixed-plan": {
+       "right": 46,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "negation": {
+       "right": 203,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:babble@0dB": {
+       "right": 0,
+       "flagged": 0,
+       "false_alarm_rate": null
+      },
+      "noise:babble@10dB": {
+       "right": 12,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:babble@20dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:babble@5dB": {
+       "right": 7,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:hvac@0dB": {
+       "right": 0,
+       "flagged": 0,
+       "false_alarm_rate": null
+      },
+      "noise:hvac@10dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:hvac@20dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:hvac@5dB": {
+       "right": 2,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@0dB": {
+       "right": 3,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@10dB": {
+       "right": 10,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@20dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@5dB": {
+       "right": 12,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:none": {
+       "right": 106,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "numbers": {
+       "right": 204,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "order-attempt": {
+       "right": 48,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "recombination": {
+       "right": 32,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "self-correction": {
+       "right": 79,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "short": {
+       "right": 5,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "spoken-punctuation": {
+       "right": 196,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "vitals": {
+       "right": 125,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      }
+     }
+    },
+    "clinical": {
+     "right": 204,
+     "flagged": 0,
+     "false_alarm_rate": 0.0,
+     "clean": {
+      "right": 106,
+      "flagged": 0,
+      "false_alarm_rate": 0.0
+     },
+     "by_tag": {
+      "accent:es-voice": {
+       "right": 36,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:fr-voice": {
+       "right": 17,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:gb": {
+       "right": 55,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:hi-voice": {
+       "right": 42,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "accent:us": {
+       "right": 54,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "allergy-change": {
+       "right": 60,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "container:mp4": {
+       "right": 108,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "container:webm": {
+       "right": 96,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "dates": {
+       "right": 39,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "drug-new": {
+       "right": 99,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "drug-uncommon": {
+       "right": 71,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "experiencer": {
+       "right": 34,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "injection": {
+       "right": 23,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "long": {
+       "right": 41,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "max-length": {
+       "right": 6,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "missing-field": {
+       "right": 5,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "mixed-plan": {
+       "right": 46,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "negation": {
+       "right": 203,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:babble@0dB": {
+       "right": 0,
+       "flagged": 0,
+       "false_alarm_rate": null
+      },
+      "noise:babble@10dB": {
+       "right": 12,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:babble@20dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:babble@5dB": {
+       "right": 7,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:hvac@0dB": {
+       "right": 0,
+       "flagged": 0,
+       "false_alarm_rate": null
+      },
+      "noise:hvac@10dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:hvac@20dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:hvac@5dB": {
+       "right": 2,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@0dB": {
+       "right": 3,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@10dB": {
+       "right": 10,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@20dB": {
+       "right": 13,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:monitor@5dB": {
+       "right": 12,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "noise:none": {
+       "right": 106,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "numbers": {
+       "right": 204,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "order-attempt": {
+       "right": 48,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "recombination": {
+       "right": 32,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "self-correction": {
+       "right": 79,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "short": {
+       "right": 5,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "spoken-punctuation": {
+       "right": 196,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      },
+      "vitals": {
+       "right": 125,
+       "flagged": 0,
+       "false_alarm_rate": 0.0
+      }
+     }
+    }
+   },
    "any": {
-    "flagged": 14,
+    "flagged": 15,
     "retracted_caught": 6,
     "rules": {
      "right": 204,
@@ -16899,7 +17307,13 @@
      "status": "pending",
      "reasons": [],
      "value": "three-year-old in room for left acute otitis media his third. Since the summer start amoxicillin 90 mg/kg. a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better. Ne in 48 to 72 hours. Mom should bring him back for review. and if he has one more infection before the spring, we will refer him to the ear, nose, and throat team to talk about grommits. he can go back to nursery when the fever settles. end He is eating normally again.",
-     "warnings": []
+     "warnings": [
+      [
+       "one_field_holds_dictation",
+       24,
+       497
+      ]
+     ]
     },
     "objective": {
      "proposed": "",
@@ -17943,7 +18357,7 @@
  ],
  "rescored_from": {
   "scoring": "d88ea0217b098d9b443ef5e0e60548c8d2a6ebe4e41f189e475fa4a6b11b99e3",
-  "gold_sha256": "27e68a3ca7d27390ce6a3cb9c23eb8d853304e095f48b2f34a60982126ff6e5a",
+  "gold_sha256": "524bfd61be72452d8abc0030e877846b770a49bb29a8d19d698dc5f36582d742",
   "structuring_outputs_reused": true
  }
 }

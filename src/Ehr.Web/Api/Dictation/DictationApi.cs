@@ -51,8 +51,9 @@ namespace Ehr.Web.Api.Dictation;
 // [{start, end}], warnings: [{code, start, end}]}, a proposal for the clinician to approve, or {status: "empty",
 // reasons: [code, ...]}: nothing dictated, or discarded by validation, with the reasons' codes and never the discarded
 // text. A warning is "possible_correction", pointing at a later number, date or drug in the transcript that may be a
-// correction the checks didn't hear, or "near_unclear_passage", pointing at a passage marked unclear beside one of the
-// value's sources; the review screen shows it beside the field. When sorting is
+// correction the checks didn't hear, "near_unclear_passage", pointing at a passage marked unclear beside one of the
+// value's sources, or "one_field_holds_dictation", on the only field proposed when it quotes nearly the whole transcript,
+// pointing at what it quotes; the review screen shows it beside the field. When sorting is
 // "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid",
 // "transcript_too_long" or "transcription_failed" (the transcript is then as it was live, not final), fields is null
 // or all empty, and message is DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is

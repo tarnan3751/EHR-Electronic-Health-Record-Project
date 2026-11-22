@@ -917,3 +917,50 @@ def test_a_value_far_from_an_unclear_passage_is_not_flagged():
     earlier = transcript(("Fever since Tuesday.", "too_noisy"), "She says it is worse at night and lying flat. Cough for "
                                                                  "three days.")
     assert field("Cough for three days.", "Cough for three days", text=earlier).warnings == []
+
+
+# ---- One field holding the whole dictation ---------------------------------------------------------------------------
+
+# A quick dictation, as eval's d39 is: all of it findings and plan, with nothing said to be history.
+QUICK = ("Quick dictation. Left acute otitis media, his third this year. Start amoxicillin 90 mg per kg a day split "
+         "twice daily for 10 days. Ibuprofen for pain and fever. Review in 48 to 72 hours if he is not better.")
+QUICK_SENTENCES = [s.strip() for s in QUICK.split(".")[1:] if s.strip()]
+
+
+# The whole dictation sorted into one field, the others not dictated: still offered, since every word is grounded, but
+# with a warning pointing at all that its sources cover, so the clinician sorts it before accepting it.
+def test_a_dictation_sorted_whole_into_one_field_is_offered_with_a_warning():
+    text = transcript(QUICK)
+
+    checked = field(". ".join(QUICK_SENTENCES) + ".", *QUICK_SENTENCES, text=text)
+
+    assert checked.pending
+    assert [(code, text.text[start:end]) for code, start, end in checked.warnings] == [
+        ("one_field_holds_dictation", QUICK[len("Quick dictation. "):-1])]
+    assert checked.to_json(text)["warnings"][0]["code"] == "one_field_holds_dictation"
+
+
+# A short dictation that is one field, such as an addendum to a plan (eval's d33, whose plan covers 78 of every 100
+# words): its lead-in and sign-off aren't quoted, so it isn't warned of.
+def test_an_addendum_that_is_all_plan_is_not_flagged():
+    said = ("Addendum. Plan: hold the spironolactone for now and repeat potassium and kidney function on Thursday at the "
+            "surgery. Continue the rest of his medicines unchanged. End of addendum.")
+    sources = ["hold the spironolactone for now and repeat potassium and kidney function on Thursday at the surgery",
+               "Continue the rest of his medicines unchanged"]
+
+    checked = field("Hold the spironolactone for now and repeat potassium and kidney function on Thursday at the "
+                    "surgery. Continue the rest of his medicines unchanged.", *sources, name="plan", text=transcript(said))
+
+    assert checked.pending and checked.warnings == []
+
+
+def test_a_field_quoting_the_whole_dictation_is_not_flagged_when_another_is_offered_too():
+    text = transcript(QUICK)
+    fields = {name: {"value": "", "sources": []} for name in FIELDS}
+    fields["subjective"] = {"value": ". ".join(QUICK_SENTENCES) + ".", "sources": QUICK_SENTENCES}
+    fields["assessment"] = {"value": "Left acute otitis media, his third this year.", "sources": [QUICK_SENTENCES[0]]}
+
+    checked = check(fields, [], text).fields
+
+    assert checked["subjective"].pending and checked["assessment"].pending
+    assert checked["subjective"].warnings == [] and checked["assessment"].warnings == []
