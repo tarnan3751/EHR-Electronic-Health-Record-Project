@@ -81,7 +81,8 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("htmx.min.js", confirmation);
         using var unconfirmed = await PostAsync(page, "Sign", 2);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unconfirmed.StatusCode);
-        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
+        // By the database's clock, which stamps the times.
+        DateTimeOffset before = (await apps.Database.NowAsync()).AddSeconds(-1);
         using var signed = await PostAsync(page, "Sign", 2, extra: [("Confirmed", true), ("SignerId", Guid.NewGuid()), ("SignedAt", "2000-01-01")]);
         Assert.Equal(HttpStatusCode.OK, signed.StatusCode);
         var url = (await JsonAsync(signed)).GetProperty("url").GetString()!;
@@ -94,7 +95,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         var (count, signer, time) = await SignedAsync(page.Draft);
         Assert.Equal(1, count);
         Assert.Equal((await apps.ClinicianAsync()).Id, signer);
-        Assert.InRange(time, before, DateTimeOffset.UtcNow.AddSeconds(1));
+        Assert.InRange(time, before, (DateTimeOffset)(await apps.Database.NowAsync()).AddSeconds(1));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignNote, signer, page.Patient));
         Assert.Contains("Signed note", await page.Session.Client.GetStringAsync($"/patients/{page.Patient}", Cancel));
         using var retry = await PostAsync(page, "Sign", 2, extra: [("Confirmed", true)]);
