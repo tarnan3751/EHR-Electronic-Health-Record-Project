@@ -20,6 +20,7 @@ namespace Ehr.Migrations
                     patient_id = table.Column<Guid>(type: "uuid", nullable: false),
                     medication_statement_id = table.Column<Guid>(type: "uuid", nullable: false),
                     medication_display = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    medication_code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     note = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     requested_by = table.Column<Guid>(type: "uuid", nullable: false),
                     requested_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),

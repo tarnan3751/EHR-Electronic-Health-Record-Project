@@ -273,7 +273,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
         var warnings = catalogCode is null ? [] : await OrderSafety.WarningsAsync(db, id, catalogCode, replaces, cancellationToken);
         var request = refill is { } asked ? await ReadRefillAsync(patient, allergies, asked, cancellationToken) : null;
-        var renews = request is not null && catalogCode is not null && catalogCode == request.Medication.Code;
+        // The product that was asked for, which the chart's entry must still have (77-refill-requests.sql).
+        var renews = request is not null && catalogCode is not null && catalogCode == request.AskedCode && catalogCode == request.Medication.Code;
 
         audit.Record(request?.Sensitive == true ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
         await db.SaveChangesAsync(cancellationToken);
@@ -1468,8 +1469,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         var r = row.Request;
-        return new RefillReview(patient, allergies, r.Id, r.MedicationDisplay, r.Note, askedBy, r.RequestedAt, r.Status, r.OrderedDisplay, r.DeclineMessage,
-            row.DecidedBy, r.DecidedAt, r.Sensitive, row.Medication, row.Item);
+        return new RefillReview(patient, allergies, r.Id, r.MedicationDisplay, r.MedicationCode, r.Note, askedBy, r.RequestedAt, r.Status, r.OrderedDisplay,
+            r.DeclineMessage, row.DecidedBy, r.DecidedAt, r.Sensitive, row.Medication, row.Item);
     }
 
     // One view of one patient, one event; nothing for a read by ID that found nothing.

@@ -2309,6 +2309,12 @@ namespace Ehr.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("decline_message");
 
+                    b.Property<string>("MedicationCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("medication_code");
+
                     b.Property<string>("MedicationDisplay")
                         .IsRequired()
                         .HasMaxLength(300)

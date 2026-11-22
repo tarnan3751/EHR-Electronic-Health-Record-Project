@@ -883,4 +883,34 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
             "SELECT r.status || '|' || o.duplicate_reason FROM ehr.refill_requests r JOIN ehr.orders o ON o.id = r.order_id WHERE r.id = @id",
             ("id", request)));
     }
+
+    // The second review's finding: a clinician may change a medication's code (65-chart-lists.sql), and an approval was
+    // held to the chart's entry as it stood, not to what was asked: a request for amlodipine 5 mg was approved with 10 mg,
+    // and the portal said so. The database copies the code asked for, whatever the client sends, and an approval needs
+    // the chart's entry to still have it; after a change the request is only declined.
+    [Fact]
+    public async Task A_request_whose_medication_was_changed_since_it_was_asked_is_only_declined()
+    {
+        var (clinician, patient, account) = await OnPanelAsync();
+        var medication = await MedicationAsync(patient, code: "197361", display: "amlodipine 5 MG Oral Tablet");
+        var request = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, account,
+            """
+            INSERT INTO ehr.refill_requests (id, patient_id, medication_statement_id, medication_display, medication_code, requested_by, requested_at, status, sensitive)
+            VALUES (@id, @patient, @medication, 'Forged name', '308135', gen_random_uuid(), now(), 'requested', false)
+            """, ("id", request), ("patient", patient), ("medication", medication));
+        Assert.Equal(["197361"], await AsSuperuserAsync("SELECT medication_code FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+
+        await RunAsync(clinician, "UPDATE ehr.medication_statements SET code = '308135', display = 'amlodipine 10 MG Oral Tablet' WHERE id = @id", ("id", medication));
+        foreach (var code in new[] { "308135", "197361" })
+        {
+            await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ApproveAsync(clinician, patient, request, code), "refill_requests_medication_changed");
+        }
+
+        // Nor can the code asked for be changed to match.
+        await RefusedAsync(PostgresErrorCodes.InsufficientPrivilege,
+            () => RunAsync(clinician, "UPDATE ehr.refill_requests SET medication_code = '308135' WHERE id = @id", ("id", request)));
+        Assert.Equal(1, await DeclineAsync(clinician, request));
+        Assert.Equal(["rejected 197361"], await AsSuperuserAsync("SELECT status || ' ' || medication_code FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+    }
 }

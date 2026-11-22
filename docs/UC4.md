@@ -112,6 +112,6 @@ These need line-by-line review (AGENTS.md):
 - A note is marked sensitive when it is signed, and an addendum when it is written (`docs/UC14.md`); a signed note can't be marked afterwards.
 - "No known allergies" is cleared by adding an allergy; there is no button to take it back on its own.
 - A medication isn't sensitive by rule; that waits for drug-class data.
-- A medication's refill requests (step 13d, `docs/UC21.md`) follow it: marking it sensitive, or unmarking it, marks its requests the same. Stopping it, or marking it entered in error, leaves a waiting request in the care team's inboxes, to be declined with a message: it can no longer be approved.
+- A medication's refill requests (step 13d, `docs/UC21.md`) follow it: marking it sensitive, or unmarking it, marks its requests the same. Stopping it, marking it entered in error, or changing it to another drug or strength, leaves a waiting request in the care team's inboxes, to be declined with a message: it can no longer be approved.
 - The reference codes are a subset until step 2a.
 - The suggestions are the browser's own list, which differs a little between browsers.

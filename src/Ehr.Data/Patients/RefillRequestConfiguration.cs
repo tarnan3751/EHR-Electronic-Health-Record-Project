@@ -28,6 +28,8 @@ public sealed class RefillRequestConfiguration : IEntityTypeConfiguration<Refill
         });
 
         request.Property(r => r.MedicationDisplay).HasMaxLength(300);
+        // As long as a medication's code can be.
+        request.Property(r => r.MedicationCode).HasMaxLength(20);
         request.Property(r => r.Note).HasMaxLength(MaxNoteLength);
         request.Property(r => r.Status).HasMaxLength(20);
         // As long as a catalog item's name can be.

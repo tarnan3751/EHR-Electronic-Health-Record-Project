@@ -28,9 +28,10 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 // item is fixed, the clinic's catalog item for the medication's own product, with the request beside it and every check
 // of an order. "Sign order" signs it and answers the request with it, in one transaction, and the database holds the
 // order to that same product. Another strength, form or drug is a new order, written from the chart once the request is
-// declined. If someone answered the request first, or its medication was stopped, nothing is saved and the form says
-// so. The request's ID is a query a link carries, which a sign-in drops: after one, the clinician is on a new order
-// with no request, and approves it from the request's page again. The patient is then told by email, as on a decline.
+// declined. If someone answered the request first, or its medication was stopped or changed, nothing is saved and the
+// form says so. The request's ID is a query a link carries, which a sign-in drops: after one, the clinician is on a new
+// order with no request, and approves it from the request's page again. The patient is then told by email, as on a
+// decline.
 //
 // The same rule as the chart's "New note": only for a patient on the clinician's panel. Anyone else, a clinician under
 // emergency access included, is sent back to the chart before anything about the patient is read. Off-site, the cloud

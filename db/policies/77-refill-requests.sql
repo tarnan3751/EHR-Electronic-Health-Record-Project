@@ -13,15 +13,18 @@
 --     ehr.follow_refill_medication takes), so the mark copied here is the one that stands; the medication must be
 --     active and coded as a product the clinic can order (its RxNorm code an item of the order catalog: one coded as an
 --     ingredient, or not coded, is not renewed here); the note, trimmed, is up to 500 characters or none; who asked and
---     when are the database's, and so are the medication's name and sensitivity; it starts waiting, with no answer.
+--     when are the database's, and so are the medication's name, code and sensitivity; it starts waiting, with no
+--     answer.
 --   Update by the tables' owner: only the sensitivity, which ehr.follow_refill_medication keeps the medication's.
 --   Update by the apps: the one answer, once, by someone signed in, and nothing else moves. Its sensitivity is never
 --     theirs to change.
 --     Approved, by naming the order signed for it: an active medication order of this patient, signed in this
---       transaction by the clinician answering, for the same product as the medication on the chart (the order's catalog
---       item is the medication's own RxNorm code: another strength, form, salt or route is a new order, not a renewal);
---       the medication still active, and locked until the transaction ends, so stopping it waits for the approval or the
---       approval sees it stopped. The database copies what was ordered.
+--       transaction by the clinician answering, for the product that was asked for (the order's catalog item is the
+--       RxNorm code the medication had when asked: another strength, form, salt or route is a new order, not a
+--       renewal), which the chart's entry must still have: a clinician may change an entry's code
+--       (65-chart-lists.sql), and a request asked for before the change is then only declined; the medication still
+--       active, and locked until the transaction ends, so stopping it waits for the approval or the approval sees it
+--       stopped. The database copies what was ordered.
 --     Declined, with a message for the patient of up to 1,000 characters.
 --     Who answered and when are the database's.
 -- READ COMMITTED, as signing an order requires (60-orders.sql): a statement that waited for a lock reads what was
@@ -78,6 +81,7 @@ BEGIN
             RAISE EXCEPTION 'A note is up to 500 characters' USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_note';
         END IF;
         NEW.medication_display := medication.display;
+        NEW.medication_code := medication.code;
         NEW.sensitive := medication.sensitive;
         NEW.requested_by := ehr.current_user_id();
         NEW.requested_at := clock_timestamp();
@@ -110,6 +114,10 @@ BEGIN
         FOR SHARE;
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Only an active medication is renewed' USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_medication_active';
+        END IF;
+        IF medication.code IS DISTINCT FROM OLD.medication_code THEN
+            RAISE EXCEPTION 'The medication on the chart has changed since this was asked; decline the request'
+                USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_medication_changed';
         END IF;
 
         SELECT i.display, o.catalog_code INTO ordered

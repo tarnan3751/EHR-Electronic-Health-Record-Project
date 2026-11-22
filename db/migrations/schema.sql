@@ -2112,6 +2112,7 @@ CREATE TABLE ehr.refill_requests (
     patient_id uuid NOT NULL,
     medication_statement_id uuid NOT NULL,
     medication_display character varying(300) NOT NULL,
+    medication_code character varying(20) NOT NULL,
     note character varying(500),
     requested_by uuid NOT NULL,
     requested_at timestamp with time zone NOT NULL,

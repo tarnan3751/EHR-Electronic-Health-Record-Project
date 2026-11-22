@@ -19,7 +19,8 @@ namespace Ehr.Domain.Refills;
 // A clinician with the patient on their panel answers a request once: approves it by signing an order for the same
 // medication on the order form, which answers it in the same transaction (ClinicalOrders.SignAsync), or declines it here,
 // with a message for the patient. The database holds who may, that it happens once, and that an approval is a new order
-// for the same medication product, and marks every care-team member's inbox item done. Either way the patient is told by
+// for the medication product that was asked for, while the chart still has it, and marks every care-team member's inbox
+// item done. Either way the patient is told by
 // email that there is something new in their portal, with nothing about it.
 public sealed class RefillRequests(EhrDbContext db, PhiReader phi, PortalNotices notices)
 {
@@ -177,19 +178,23 @@ public sealed record PatientRefills(
     bool SensitiveShown, bool HasCareTeam);
 
 // A refill request as the clinician's pages show it, already recorded as one read of the patient: the patient and their
-// allergies, for the banner; what was asked, when, by whom ("Name" for the patient, "Name (proxy)" for someone they
-// share their record with) and with what note; its state and answer, with who answered; whether it is sensitive; its
-// medication as the chart has it now; and the clinic's catalog item for that medication's product (its own code), when
-// there is one: the one item that renews it.
+// allergies, for the banner; what was asked (the medication's name and drug code then), when, by whom ("Name" for the
+// patient, "Name (proxy)" for someone they share their record with) and with what note; its state and answer, with who
+// answered; whether it is sensitive; its medication as the chart has it now; and the clinic's catalog item for that
+// medication's product (its own code), when there is one: the one item that renews it.
 public sealed record RefillReview(
-    Ehr.Data.Patients.Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, Guid Id, string MedicationDisplay, string? Note, string AskedBy,
-    DateTimeOffset RequestedAt, string Status, string? OrderedDisplay, string? DeclineMessage, string? DecidedBy, DateTimeOffset? DecidedAt, bool Sensitive,
-    RefillMedication Medication, string? CatalogItem)
+    Ehr.Data.Patients.Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, Guid Id, string MedicationDisplay, string AskedCode, string? Note,
+    string AskedBy, DateTimeOffset RequestedAt, string Status, string? OrderedDisplay, string? DeclineMessage, string? DecidedBy, DateTimeOffset? DecidedAt,
+    bool Sensitive, RefillMedication Medication, string? CatalogItem)
 {
     public bool Waiting => Status == RefillRequestStatus.Requested;
 
-    // Approving is signing an order for the same product, which only an active medication coded as one may have.
-    public bool Renewable => Waiting && Medication.Status == MedicationStatementStatus.Active && CatalogItem is not null;
+    // The chart's entry has another drug code than it had when this was asked: a clinician changed it since.
+    public bool Changed => Medication.Code != AskedCode;
+
+    // Approving is signing an order for the product that was asked for, which only an active medication still coded as
+    // that product, one the clinic orders, may have.
+    public bool Renewable => Waiting && Medication.Status == MedicationStatementStatus.Active && !Changed && CatalogItem is not null;
 }
 
 // The medication a request names, as the chart has it now.

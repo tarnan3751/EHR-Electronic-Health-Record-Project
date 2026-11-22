@@ -68,6 +68,10 @@ else
     {
         <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication is no longer active on the chart (@statusSaid). Decline the request with a message, so the patient knows.</p>
     }
+    else if (refill.Changed)
+    {
+        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication on the chart has changed since this was asked. Decline the request with a message, so the patient knows, and write a new order from the chart.</p>
+    }
     else
     {
         <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication on the chart isn't coded as a product the clinic orders. Decline the request with a message, so the patient knows, and write a new order from the chart.</p>
