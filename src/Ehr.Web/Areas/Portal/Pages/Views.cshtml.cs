@@ -182,7 +182,8 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
             new("Your record, downloaded with its sensitive items", "The record, downloaded with its sensitive items",
                 "Your record, downloaded with its sensitive items {0} times", "The record, downloaded with its sensitive items {0} times")),
         [AuditParts.Views] = Counted("Who viewed your record", "Who viewed the record"),
-        [AuditParts.Refills] = Counted("Your refill requests", "The refill requests"),
+        [AuditParts.Refills] = Counted("Your refill requests", "The refill requests",
+            Counted("Your refill requests, with the sensitive ones", "The refill requests, with the sensitive ones")),
         // A pre-visit form (step 13e), always a sensitive item: the same words whether the part was recorded with the read
         // or named from the forms' tables (RecordViewParts.Form, the same key).
         [AuditParts.Forms] = new("A pre-visit form", "A pre-visit form", "{0} pre-visit forms", "{0} pre-visit forms",

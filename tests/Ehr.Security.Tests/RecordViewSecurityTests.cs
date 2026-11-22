@@ -924,6 +924,31 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         Assert.Equal(before, await AsSuperuserAsync(Oid));
     }
 
+    // A clinician off the panel with no emergency-access window, reading a pre-visit form's answers as one who holds its
+    // alert may (step 13e): to the patient, and a proxy with sensitive items, a pre-visit form's view, not marked as
+    // emergency access; to a proxy without sensitive items, nothing.
+    [Fact]
+    public async Task An_alert_holder_off_the_panel_is_a_form_view_unmarked_and_nothing_to_a_proxy_without_sensitive_items()
+    {
+        var (_, patient, own) = await PatientAsync();
+        var full = await ProxyAsync(own, patient, includeSensitive: true);
+        var restricted = await ProxyAsync(own, patient, includeSensitive: false);
+        var holder = await StaffAsync("Dr. Holly", StaffRoles.Clinician);
+        await PanelAsync(holder, patient, fromMinutesAgo: 60, untilMinutesAgo: 30);
+        await EventAsync(patient, holder, "read_sensitive", "patients", 5, part: AuditParts.Forms);
+
+        foreach (var connection in new[] { App, Read })
+        {
+            foreach (var (user, grant) in new[] { (own, (Guid?)null), (full.Account, full.Grant) })
+            {
+                Assert.Equal(["staff|Dr. Holly|clinician|forms|false|false"],
+                    (await ViewsAsync(connection, user, grant)).Where(line => line.Contains("Dr. Holly", StringComparison.Ordinal)));
+            }
+
+            Assert.DoesNotContain(await ViewsAsync(connection, restricted.Account, restricted.Grant), line => line.Contains("Dr. Holly", StringComparison.Ordinal));
+        }
+    }
+
     // The twelve months bound what a page reads before it is cut: a record with more than a page of views from before
     // them, and three inside them, gives the three and no more to come.
     [Fact]

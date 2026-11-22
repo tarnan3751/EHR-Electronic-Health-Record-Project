@@ -112,6 +112,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("note addendum", "clinical_notes visit-note", "patients visit-note")]
     [InlineData("dictation api", "patients note-draft")]
     [InlineData("desktop draft sync", "clinical_drafts note-draft")]
+    [InlineData("refill review", "patients refills")]
+    [InlineData("refill order form", "patients refills")]
     public async Task Each_api_and_page_that_needs_an_entry_records_its_part(string what, params string[] reads)
     {
         var (clinician, session, patient) = await PatientAsync();
@@ -150,6 +152,17 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
                     return session.Client.SendAsync(start, Cancel);
                 };
                 break;
+            case "refill review" or "refill order form":
+                await RefillRequestTests.MedicationAsync(apps, patient.Patient);
+                using (var asked = await RefillRequestTests.AskAsync(patient.Client, RefillRequestTests.Lisinopril))
+                {
+                    Assert.True(asked.IsSuccessStatusCode, asked.StatusCode.ToString());
+                }
+
+                var refill = await RefillRequestTests.RequestIdAsync(apps, patient.Patient);
+                var refillPath = what == "refill review" ? RefillRequestTests.ReviewPath(patient.Patient, refill) : RefillRequestTests.ApprovePath(patient.Patient, refill);
+                request = () => session.Client.GetAsync(refillPath, Cancel);
+                break;
             default:
                 var desktop = CreateClient(apps.OnPrem);
                 desktop.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await apps.DesktopSignInAsync(apps.OnPrem, clinician));
@@ -168,6 +181,80 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.True(response.IsSuccessStatusCode, $"{what}: {response.StatusCode}");
         Assert.Equal(reads, await ReadsAsync(patient.Patient, clinician.Id, since));
+    }
+
+    // Pre-visit forms (step 13e): the clinician's page of them and one form's answers, the portal's page of them and one
+    // form; each a read of the patient with the forms' part.
+    [Fact]
+    public async Task The_pre_visit_forms_pages_record_their_part()
+    {
+        var visit = await PreVisitFormTests.VisitAsync(apps, "Dr. Forms Parts");
+        using (var asked = await PreVisitFormTests.AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, PreVisitFormTests.Phq9))
+        {
+            Assert.True(asked.IsSuccessStatusCode, asked.StatusCode.ToString());
+        }
+
+        var form = await PreVisitFormTests.RequestAsync(apps, visit.Appointment, PreVisitFormTests.Phq9);
+        var answers = await PreVisitFormTests.AnswerAsync(apps, visit.Account, form, PreVisitFormTests.Answers(PreVisitFormTests.PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        var (portal, _) = await PreVisitFormTests.PortalAsync(apps, visit);
+        foreach (var (client, actor, path) in new[]
+        {
+            (visit.Session.Client, visit.Clinician.Id, PreVisitFormTests.FormsPath(visit.Patient)),
+            (visit.Session.Client, visit.Clinician.Id, $"{PreVisitFormTests.FormsPath(visit.Patient)}/{answers}"),
+            (portal, visit.Account, "/portal/forms"),
+            (portal, visit.Account, PreVisitFormTests.FormPath(form)),
+        })
+        {
+            var since = DateTimeOffset.UtcNow;
+            using var response = await client.GetAsync(path, Cancel);
+            Assert.True(response.IsSuccessStatusCode, $"{path}: {response.StatusCode}");
+            Assert.Equal(["patients forms"], await ReadsAsync(visit.Patient, actor, since));
+        }
+    }
+
+    // A clinician who holds a pre-visit form's alert (step 13e) without the patient on their panel reads its answers from
+    // the inbox, not through emergency access: the patient is shown the view as a pre-visit form's, unmarked; so is a
+    // proxy with sensitive items; a proxy without them is shown nothing of it.
+    [Fact]
+    public async Task An_alert_holder_off_the_panel_reading_a_forms_answers_is_shown_as_a_form_view_and_not_as_emergency_access()
+    {
+        var visit = await PreVisitFormTests.VisitAsync(apps, "Dr. Forms Owner");
+        using (var asked = await PreVisitFormTests.AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, PreVisitFormTests.Phq9))
+        {
+            Assert.True(asked.IsSuccessStatusCode, asked.StatusCode.ToString());
+        }
+
+        var answers = await PreVisitFormTests.AnswerAsync(apps, visit.Account, await PreVisitFormTests.RequestAsync(apps, visit.Appointment, PreVisitFormTests.Phq9),
+            PreVisitFormTests.Answers(PreVisitFormTests.PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 1));
+        var item = (await PreVisitFormTests.QueryAsync(apps, "SELECT id::text FROM ehr.inbox_items WHERE recipient_id = @clinician AND kind = 'form-alert'",
+            ("clinician", visit.Clinician.Id))).Single();
+        using (var done = await PostFormAsync(visit.Session.Client, $"/inbox?handler=Done&id={item}", "/inbox"))
+        {
+            Assert.Equal(HttpStatusCode.OK, done.StatusCode);
+        }
+
+        // Given the item on joining the panel, which nobody on it held open; kept on leaving.
+        var covering = await apps.CreateStaffAsync("Dr. Forms Holder", StaffRoles.Clinician);
+        await apps.AssignAsync(covering, visit.Patient);
+        await PreVisitFormTests.QueryAsync(apps, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @covering AND ended_at IS NULL", ("covering", covering.Id));
+        var (portal, jar) = await PreVisitFormTests.PortalAsync(apps, visit);
+        var patient = new ProxyTests.Person(visit.Patient, visit.Account, visit.Email, portal, jar);
+        var (allowed, _) = await VisitSummaryTests.ProxyForAsync(apps, patient, "Formsallowed", sensitive: true);
+        var (without, _) = await VisitSummaryTests.ProxyForAsync(apps, patient, "Formswithout", sensitive: false);
+        var holder = await SignInAsync(apps.OnPrem, covering);
+        var since = DateTimeOffset.UtcNow;
+        using (var read = await holder.Client.GetAsync($"{PreVisitFormTests.FormsPath(visit.Patient)}/{answers}", Cancel))
+        {
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        }
+
+        Assert.Equal(["patients forms"], await ReadsAsync(visit.Patient, covering.Id, since));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, covering.Id));
+        string[] Holder(string html) => [.. RecordViewTests.Lines(html).Where(line => line.Contains("Dr. Forms Holder", StringComparison.Ordinal))
+            .Select(line => string.Join(" | ", line.Split(" | ").Take(3)))];
+        Assert.Equal(["staff | Dr. Forms Holder, clinician | A pre-visit form"], Holder(await RecordViewTests.PageAsync(portal)));
+        Assert.Equal(["staff | Dr. Forms Holder, clinician | A pre-visit form"], Holder(await RecordViewTests.PageAsync(allowed.Client)));
+        Assert.Empty(Holder(await RecordViewTests.PageAsync(without.Client)));
     }
 
     // A read or a download recorded without the part of the record it was for is refused, whichever way it is recorded,
