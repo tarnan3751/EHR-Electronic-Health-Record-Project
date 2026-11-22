@@ -515,6 +515,15 @@ def test_a_qualifier_stops_at_a_new_subject():
     ("I'm not sure she has gout.", "She has gout.", "certainty_dropped"),
     ("I am not sure whether she has gout.", "She has gout.", "certainty_dropped"),
     ("It could be that she has gout.", "She has gout.", "certainty_dropped"),
+    ("We don't think she has pneumonia.", "She has pneumonia.", "negation_dropped"),
+    ("We doubt she has strep.", "She has strep.", "negation_dropped"),
+    ("We think she has gout.", "She has gout.", "certainty_dropped"),
+    ("We're not sure she has gout.", "She has gout.", "certainty_dropped"),
+    ("We wonder if she has gout.", "She has gout.", "certainty_dropped"),
+    ("I don't think she does have pneumonia.", "She does have pneumonia.", "negation_dropped"),
+    ("I think she doesn't have pneumonia.", "She doesn't have pneumonia.", "certainty_dropped"),
+    ("I think she did have a fever.", "She did have a fever.", "certainty_dropped"),
+    ("I think she isn't septic.", "She isn't septic.", "certainty_dropped"),
 ])
 def test_a_cue_that_names_the_subject_reaches_past_it(said, value, reason):
     assert own(said, value).reasons == [reason]
@@ -559,6 +568,12 @@ def test_doubt_without_a_subject_or_after_the_finding_must_be_kept(said, value):
 ])
 def test_doubt_after_a_comma_reaches_back_over_its_own_clause_only(said, value):
     assert own(said, value, value.rstrip(".")).pending
+
+
+# Known false refusal, kept on the safe side: "may have" giving leave is read as doubt.
+def test_may_have_is_read_as_doubt_even_when_it_gives_leave():
+    assert own("She may have ibuprofen as needed for pain.", "Ibuprofen as needed for pain.").reasons == [
+        "certainty_dropped"]
 
 
 def test_the_cues_that_name_a_subject_are_made_for_any_subject():

@@ -109,13 +109,15 @@ and every check reads the cleaned text. The checks, each with the reason code re
   contrast ("but"), a new subject ("she", "patient"), a step of the plan or a heading after its first word ("no further
   pancreatitis continue monthly olezarsen"), and for someone else, a word of telling ("mom says the rash started
   Monday" is the patient's rash). A cue that names the subject itself, with its verb, reaches what follows them
-  (subject_cues()): a negation in "I don't think she has pneumonia", "I do not believe that he has a fracture", "I
-  doubt she has strep", "unlikely that the patient has appendicitis"; uncertainty in "I think she has gout", "maybe
-  it's viral", "possibly he is anemic", "she might have gout", "I wonder if she has gout", "I'm not sure she has gout",
-  "it could be that she has gout". The subject is she, he, it, they or the patient, and its verb a form of "have" or
-  "be" (or "might", "may" or "could" with "have" or "be"). Doubt said after a comma closing a clause ("she has gout, I
-  think", "..., I believe", "..., I suspect", "..., probably", "..., probably not", "..., possibly", "..., maybe")
-  reaches back over all of the clause before the comma.
+  (subject_cues()): a negation in "I don't think she has pneumonia", "we do not believe that he has a fracture", "I
+  doubt she has strep", "unlikely that the patient has appendicitis"; uncertainty in "I think she has gout", "we think
+  she doesn't have gout", "maybe it's viral", "possibly he is anemic", "she might have gout", "I wonder if she has
+  gout", "we're not sure she has gout", "it could be that she has gout". The one in doubt is I or we; the subject is
+  she, he, it, they or the patient, and its verb a form of "have" or "be", negated or not, or "does", "did" or "do"
+  with "have" (or "might", "may" or "could" with "have" or "be": "she may have ibuprofen as needed" is read as doubt
+  too, a known false refusal). Doubt said after a comma closing a clause ("she has gout, I think", "..., I believe",
+  "..., I suspect", "..., probably", "..., probably not", "..., possibly", "..., maybe") reaches back over all of the
+  clause before the comma.
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -1114,17 +1116,21 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
 def subject_cues(*subjects: str) -> tuple[str, str]:
     """Cues that name who has what follows, for NEGATION and CERTAINTY, as patterns: a new subject ends a cue's reach
     ("no fever she is eating well"), so these take the subject and its verb into the cue, and reach what follows them
-    ("I don't think she has pneumonia", "she might have gout"). Each subject is one or more words ("the patient")."""
+    ("I don't think she has pneumonia", "we think she doesn't have gout", "she might have gout"). The one in doubt is
+    the clinician ("I" or "we"); each subject is one or more words ("the patient")."""
     who = "|".join(r"\s+".join(subject.split()) for subject in subjects)
-    has = rf"(?:{who})(?:['’](?:s|re|ve)|\s+(?:has|have|had|is|are|was|were))"
+    has = (
+        rf"(?:{who})(?:['’](?:s|re|ve)|\s+(?:(?:has|have|had|is|are|was|were)(?:n['’]t|\s+not)?"
+        rf"|(?:does|did|do)(?:n['’]t|\s+not)?\s+have))"
+    )
     negation = (
-        rf"i\s+(?:don['’]t|do\s+not)\s+(?:think|believe)(?:\s+that)?\s+{has}|i\s+doubt(?:\s+that)?\s+{has}"
-        rf"|unlikely\s+that\s+{has}"
+        rf"(?:i|we)\s+(?:don['’]t|do\s+not)\s+(?:think|believe)(?:\s+that)?\s+{has}"
+        rf"|(?:i|we)\s+doubt(?:\s+that)?\s+{has}|unlikely\s+that\s+{has}"
     )
     certainty = (
-        rf"it\s+could\s+be\s+that\s+{has}|i\s+think(?:\s+that)?\s+{has}|(?:maybe|possibly|perhaps)\s+{has}"
-        rf"|(?:{who})\s+(?:might|may|could)\s+(?:have|be)|i\s+wonder\s+(?:if|whether)\s+{has}"
-        rf"|i(?:['’]m|\s+am)\s+not\s+sure(?:\s+(?:if|that|whether))?\s+{has}"
+        rf"it\s+could\s+be\s+that\s+{has}|(?:i|we)\s+think(?:\s+that)?\s+{has}|(?:maybe|possibly|perhaps)\s+{has}"
+        rf"|(?:{who})\s+(?:might|may|could)\s+(?:have|be)|(?:i|we)\s+wonder\s+(?:if|whether)\s+{has}"
+        rf"|(?:i['’]m|i\s+am|we['’]re|we\s+are)\s+not\s+sure(?:\s+(?:if|that|whether))?\s+{has}"
     )
     return negation, certainty
 
