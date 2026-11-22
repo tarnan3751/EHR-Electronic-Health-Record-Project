@@ -13,6 +13,7 @@ using Ehr.Domain.Proxies;
 using Ehr.Domain.Refills;
 using Ehr.Domain.Results;
 using Ehr.Domain.Scheduling;
+using Ehr.Domain.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Domain.Phi;
@@ -660,20 +661,25 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         return new PatientVitals(patient, allergies, signs);
     }
 
-    // The patient's newest vital signs that stand (none entered in error, step 9b), up to 120 values, the newest first:
-    // what a note's Objective may be given (the expansion plan's step 14; Notes.ObjectiveVitals takes the latest day's).
-    // Read only when the clinician asks, and recorded as the vital signs page's read is, with its part. Null when the
-    // patient isn't the reader's to see.
-    public async Task<IReadOnlyList<Observation>?> ObjectiveVitalsAsync(Guid patientId, CancellationToken cancellationToken)
+    // The vital signs a note's Objective may be given (the expansion plan's step 14): every value that stands (none entered
+    // in error, step 9b) taken on the clinic's day of the patient's newest standing one, however many there are, so each
+    // sign taken that day is among them and a blood pressure's two values come together (Notes.ObjectiveVitals takes the
+    // newest of each). Two statements, each a range of the index on the patient and the time taken: the newest moment,
+    // then that day's bounds on the clinic's clock (a day the clocks change on is 23 or 25 hours). Read only when the
+    // clinician asks, for a patient on their panel (the page checks), and recorded as the vital signs page's read is,
+    // with its part.
+    public async Task<IReadOnlyList<Observation>> ObjectiveVitalsAsync(Guid patientId, ClinicTime clinic, CancellationToken cancellationToken)
     {
-        if (!await db.Patients.AsNoTracking().AnyAsync(p => p.Id == patientId, cancellationToken))
+        var standing = db.Observations.AsNoTracking()
+            .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.VitalSigns && o.Value != null && ObservationStatus.Released.Contains(o.Status));
+        var newest = await standing.OrderByDescending(o => o.EffectiveAt).Select(o => (DateTimeOffset?)o.EffectiveAt).FirstOrDefaultAsync(cancellationToken);
+        IReadOnlyList<Observation> signs = [];
+        if (newest is { } moment)
         {
-            return null;
+            var (from, to) = clinic.DayBounds(DateOnly.FromDateTime(clinic.At(moment).DateTime));
+            signs = await standing.Where(o => o.EffectiveAt >= from && o.EffectiveAt < to).ToListAsync(cancellationToken);
         }
 
-        var signs = await db.Observations.AsNoTracking()
-            .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.VitalSigns && o.Value != null && ObservationStatus.Released.Contains(o.Status))
-            .OrderByDescending(o => o.EffectiveAt).ThenByDescending(o => o.IssuedAt).Take(120).ToListAsync(cancellationToken);
         audit.Record(AuditActions.Read, patientId, PatientsTable, patientId, part: AuditParts.Vitals);
         await db.SaveChangesAsync(cancellationToken);
         return signs;

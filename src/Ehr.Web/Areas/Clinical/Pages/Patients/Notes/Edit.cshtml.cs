@@ -74,13 +74,12 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
     public async Task<IActionResult> OnGetVitalsAsync(Guid patientId, Guid draftId)
     {
         Response.Headers.CacheControl = "no-store";
-        if (!await Phi.IsAssignedAsync(patientId, HttpContext.RequestAborted)
-            || await Phi.ObjectiveVitalsAsync(patientId, HttpContext.RequestAborted) is not { } signs)
+        if (!await Phi.IsAssignedAsync(patientId, HttpContext.RequestAborted))
         {
             return NotFound();
         }
 
-        var offer = ObjectiveVitals.Of(signs, clinic);
+        var offer = ObjectiveVitals.Of(await Phi.ObjectiveVitalsAsync(patientId, clinic, HttpContext.RequestAborted), clinic);
         return new JsonResult(new { text = offer.Text, day = offer.Day, today = offer.Today });
     }
 
