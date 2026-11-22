@@ -32,8 +32,10 @@ public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture
     public async Task Unsound_vital_signs_are_not_saved_and_a_clinician_off_the_panel_records_none()
     {
         var (_, patient, session) = await OnPanelAsync(apps);
-        var tomorrow = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm");
-        var now = DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm");
+        // Times by the database's clock, which judges them.
+        var started = await apps.Database.NowAsync();
+        var tomorrow = started.AddDays(1).ToString("yyyy-MM-ddTHH:mm");
+        var now = started.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm");
 
         foreach (var (values, at, message) in new ((string, string)[] Values, string At, string Message)[]
         {

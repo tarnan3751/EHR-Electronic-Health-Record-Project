@@ -136,7 +136,7 @@ public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var session = await SignInAsync(apps.OnPrem, clinician);
         foreach (var (minutesAgo, systolic, diastolic) in new[] { (90, "131", "85"), (30, "122", "79") })
         {
-            using var recorded = await VitalTests.RecordAsync(session.Client, patient, minutesAgo, (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic));
+            using var recorded = await VitalTests.RecordAsync(apps, session.Client, patient, minutesAgo, (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic));
             Assert.Equal(VitalTests.Path(patient), PathOf(recorded));
         }
 
@@ -186,6 +186,6 @@ public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(R4.OperationOutcome.IssueSeverity.Warning,
             Assert.IsType<R4.OperationOutcome>(bundle.Entry.Single(e => e.Search?.Mode == R4.Bundle.SearchEntryMode.Outcome).Resource).Issue.Single().Severity);
         // The oldest, taken 601 hours ago, is the one left out.
-        Assert.True(found.Min(o => Assert.IsType<R4.FhirDateTime>(o.Effective).ToDateTimeOffset(TimeSpan.Zero)) > DateTimeOffset.UtcNow.AddHours(-601));
+        Assert.True(found.Min(o => Assert.IsType<R4.FhirDateTime>(o.Effective).ToDateTimeOffset(TimeSpan.Zero)) > (DateTimeOffset)(await apps.Database.NowAsync()).AddHours(-601));
     }
 }

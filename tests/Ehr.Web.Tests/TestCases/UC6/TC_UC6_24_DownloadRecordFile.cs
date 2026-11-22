@@ -60,10 +60,14 @@ public class TC_UC6_24_DownloadRecordFile(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(events, await AllEventsAsync(patient.Account));
 
+        // The file is named by the UTC day of the request: the day read just before it, or after it if midnight came
+        // between.
+        var before = DateTime.UtcNow;
         var file = await DownloadAsync(patient.Client);
+        var after = DateTime.UtcNow;
         Assert.Equal(FhirRequests.ContentType, file.ContentType);
         Assert.Equal("attachment", file.Disposition);
-        Assert.Equal($"health-record-{DateTime.UtcNow:yyyy-MM-dd}.json", file.FileName);
+        Assert.Contains(file.FileName, new[] { $"health-record-{before:yyyy-MM-dd}.json", $"health-record-{after:yyyy-MM-dd}.json" });
         Assert.Contains("no-store", (file.CacheControl ?? "").Split(", "));
         Assert.DoesNotContain(file.Headers, header => header.StartsWith("Access-Control-", StringComparison.OrdinalIgnoreCase));
         var bundle = Bundle(file);

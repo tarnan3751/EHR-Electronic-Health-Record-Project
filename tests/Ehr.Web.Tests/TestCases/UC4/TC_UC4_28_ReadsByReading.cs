@@ -34,9 +34,9 @@ public class TC_UC4_28_ReadsByReading(WebApps apps) : IClassFixture<WebApps>
     public async Task A_blood_pressure_is_shown_as_one_readings_two_numbers_everywhere()
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
-        await apps.InsertVisitAsync(patient, DateTimeOffset.UtcNow.AddMinutes(-30), reason: "Synthetic follow-up");
-        using var earlier = await RecordAsync(session.Client, patient, 2 * 24 * 60, (Systolic, "130"), (Diastolic, "95"), (HeartRate, "74"));
-        using var latest = await RecordAsync(session.Client, patient, 10, (Systolic, "118"), (Diastolic, "92"), (HeartRate, "70"));
+        await apps.InsertVisitAsync(patient, (await apps.Database.NowAsync()).AddMinutes(-30), reason: "Synthetic follow-up");
+        using var earlier = await RecordAsync(apps, session.Client, patient, 2 * 24 * 60, (Systolic, "130"), (Diastolic, "95"), (HeartRate, "74"));
+        using var latest = await RecordAsync(apps, session.Client, patient, 10, (Systolic, "118"), (Diastolic, "92"), (HeartRate, "70"));
         var page = await ReadAsync(latest);
 
         Assert.Matches(

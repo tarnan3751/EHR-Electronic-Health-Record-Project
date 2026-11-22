@@ -49,8 +49,10 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
         var offeredAt = clock.From(DateTime.ParseExact(offered, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture))!.Value;
         Assert.InRange(offeredAt, now.AddMinutes(-2), now.AddMinutes(2));
 
-        // Three hours ago, to the minute, typed as the clinic's clock read then.
-        var taken = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, TimeSpan.Zero).AddHours(-3);
+        // Three hours ago by the database's clock, which judges the time, to the minute, typed as the clinic's clock
+        // read then.
+        var databaseNow = await apps.Database.NowAsync();
+        var taken = new DateTimeOffset(databaseNow.Year, databaseNow.Month, databaseNow.Day, databaseNow.Hour, databaseNow.Minute, 0, TimeSpan.Zero).AddHours(-3);
         var typed = clock.Plain(taken, "yyyy-MM-ddTHH:mm");
         Assert.NotEqual(taken.UtcDateTime.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture), typed);
         using var recorded = await RecordAtAsync(session.Client, patient, typed, (HeartRate, "72"));

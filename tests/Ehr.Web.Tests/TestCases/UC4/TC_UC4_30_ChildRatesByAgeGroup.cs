@@ -52,7 +52,7 @@ public class TC_UC4_30_ChildRatesByAgeGroup(WebApps apps) : IClassFixture<WebApp
 
         var newborn = await apps.InsertPatientAsync("Synthetic", "Newborn", today.AddDays(-10));
         await apps.AssignAsync(clinician, newborn);
-        using var rate = await RecordAsync(session.Client, newborn, 10, (HeartRate, "105"));
+        using var rate = await RecordAsync(apps, session.Client, newborn, 10, (HeartRate, "105"));
         Assert.Matches("(?s)<td class=\"sc-table__mono\">\\s*105\\s*<span class=\"sc-tag sc-tag--warning\">Low</span>", Row(await ReadAsync(rate), "Heart rate"));
         Assert.Equal(["8867-4 107-181"], await ProxyTests.QueryAsync(apps,
             "SELECT code || ' ' || trim_scale(reference_low) || '-' || trim_scale(reference_high) FROM ehr.observations WHERE patient_id = @patient", newborn));

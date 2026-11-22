@@ -45,9 +45,9 @@ public class TC_UC4_21_VitalSignRangesByAge(WebApps apps) : IClassFixture<WebApp
         await ProxyTests.QueryAsync(apps, "UPDATE ehr.patients SET birth_date = (now() - interval '3 years 2 months')::date WHERE id = @patient RETURNING id::text", child);
         await ProxyTests.QueryAsync(apps, "UPDATE ehr.patients SET birth_date = DATE '1980-05-01' WHERE id = @patient RETURNING id::text", adult);
 
-        using var forAdult = await RecordAsync(session.Client, adult, 10, Set);
+        using var forAdult = await RecordAsync(apps, session.Client, adult, 10, Set);
         var grown = await ReadAsync(forAdult);
-        using var forChild = await RecordAsync(session.Client, child, 10, Set);
+        using var forChild = await RecordAsync(apps, session.Client, child, 10, Set);
         var young = await ReadAsync(forChild);
 
         Assert.Equal(["8310-5 36.1-37.5 high", $"{Diastolic} 60-79", $"{Systolic} 90-129", $"{HeartRate} 60-100 high", "9279-1 12-20 high"], await RangesAsync(apps, adult));
@@ -73,8 +73,8 @@ public class TC_UC4_21_VitalSignRangesByAge(WebApps apps) : IClassFixture<WebApp
         // Six years and a month old: in Fleming's 4 to 6 years two months ago (heart rate up to 131), 6 to 8 now (123).
         await ProxyTests.QueryAsync(apps, "UPDATE ehr.patients SET birth_date = (now() - interval '6 years 1 month')::date WHERE id = @patient RETURNING id::text", child);
 
-        using var before = await RecordAsync(session.Client, child, 62 * 24 * 60, (HeartRate, "128"));
-        using var now = await RecordAsync(session.Client, child, 10, (HeartRate, "100"));
+        using var before = await RecordAsync(apps, session.Client, child, 62 * 24 * 60, (HeartRate, "128"));
+        using var now = await RecordAsync(apps, session.Client, child, 10, (HeartRate, "100"));
         var page = await ReadAsync(now);
 
         Assert.Equal([$"{HeartRate} 65-131", $"{HeartRate} 59-123"], await ProxyTests.QueryAsync(apps,

@@ -39,7 +39,7 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
     public async Task A_blood_pressure_is_marked_as_one_reading_and_corrected_as_a_new_one()
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
-        var taken = DateTime.UtcNow.AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm");
+        var taken = (await apps.Database.NowAsync()).AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm");
         using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "150"), (Diastolic, "95"), (HeartRate, "70"));
         Assert.Contains("Saved:", await ReadAsync(recorded));
 
@@ -82,7 +82,7 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
     public async Task A_blood_pressure_value_marked_alone_before_readings_is_shown_with_a_dash()
     {
         var (_, patient, session) = await OnPanelAsync(apps);
-        var taken = DateTime.UtcNow.AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm");
+        var taken = (await apps.Database.NowAsync()).AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm");
         using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "140"), (Diastolic, "90"));
         Assert.Contains("Saved:", await ReadAsync(recorded));
         await ProxyTests.QueryAsync(apps,

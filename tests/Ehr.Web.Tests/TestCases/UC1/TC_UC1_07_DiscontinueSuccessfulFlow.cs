@@ -59,7 +59,8 @@ public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<W
         Assert.DoesNotContain("htmx.min.js", form);
         Assert.Equal(reads + 1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
 
-        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
+        // By the database's clock, which stamps the times.
+        DateTimeOffset before = (await apps.Database.NowAsync()).AddSeconds(-1);
         using var discontinued = await DiscontinueAsync(session.Client, patient, order, "  Synthetic: symptoms resolved ");
         Assert.Equal(HttpStatusCode.OK, discontinued.StatusCode);
         var url = System.Text.Json.JsonDocument.Parse(await discontinued.Content.ReadAsStringAsync(Cancel)).RootElement.GetProperty("url").GetString()!;
@@ -88,7 +89,7 @@ public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<W
         command.Parameters.AddWithValue("order", order);
         await using var reader = await command.ExecuteReaderAsync(Cancel);
         Assert.True(await reader.ReadAsync(Cancel));
-        Assert.InRange(reader.GetFieldValue<DateTimeOffset>(0), before, DateTimeOffset.UtcNow.AddSeconds(1));
+        Assert.InRange(reader.GetFieldValue<DateTimeOffset>(0), before, (DateTimeOffset)(await apps.Database.NowAsync()).AddSeconds(1));
         Assert.Equal("SYN-LAB-001", reader.GetString(1));
         Assert.Equal("Synthetic fatigue", reader.GetString(2));
         Assert.Equal(clinician.Id, reader.GetGuid(3));

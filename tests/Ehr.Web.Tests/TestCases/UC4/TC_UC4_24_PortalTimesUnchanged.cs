@@ -34,8 +34,8 @@ public class TC_UC4_24_PortalTimesUnchanged(WebApps apps) : IClassFixture<WebApp
         var clock = ClinicTimeTests.ChicagoClock;
         using var chicago = ClinicTimeTests.Chicago(apps);
         var (clinician, patient, session) = await OnPanelAsync(apps);
-        using var first = await RecordAsync(session.Client, patient, 24 * 60 + 5, (HeartRate, "72"));
-        using var second = await RecordAsync(session.Client, patient, 10, (HeartRate, "64"));
+        using var first = await RecordAsync(apps, session.Client, patient, 24 * 60 + 5, (HeartRate, "72"));
+        using var second = await RecordAsync(apps, session.Client, patient, 10, (HeartRate, "64"));
         var times = (await ProxyTests.QueryAsync(apps,
             "SELECT to_char(effective_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI') FROM ehr.observations WHERE patient_id = @patient AND category = 'vital-signs' ORDER BY effective_at", patient))
             .Select(text => new DateTimeOffset(DateTime.ParseExact(text, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture), TimeSpan.Zero)).ToList();

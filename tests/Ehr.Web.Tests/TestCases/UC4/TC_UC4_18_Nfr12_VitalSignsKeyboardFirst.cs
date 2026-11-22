@@ -33,7 +33,7 @@ public class TC_UC4_18_Nfr12_VitalSignsKeyboardFirst(WebApps apps) : IClassFixtu
     public async Task Recording_vital_signs_and_reading_a_trends_table_work_from_the_keyboard()
     {
         var (_, patient, session) = await OnPanelAsync(apps);
-        using var earlier = await RecordAsync(session.Client, patient, 24 * 60, (Systolic, "148"), (Diastolic, "92"));
+        using var earlier = await RecordAsync(apps, session.Client, patient, 24 * 60, (Systolic, "148"), (Diastolic, "92"));
         await using var server = await ClinicalBrowserHost.StartAsync(apps);
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);

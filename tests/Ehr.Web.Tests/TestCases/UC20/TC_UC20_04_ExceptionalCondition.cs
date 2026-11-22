@@ -153,12 +153,12 @@ public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         await SettledAsync(apps, patient);
         var log = new List<string>();
         var lab = new LabSimulator(Client(apps.OnPrem), LabSettings.Default, log.Add, since);
-        Assert.Equal(new LabRound(1, 0, 0, 1), await lab.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(-1), Cancel));
+        Assert.Equal(new LabRound(1, 0, 0, 1), await lab.RunOnceAsync((await apps.Database.NowAsync()).AddMinutes(-1), Cancel));
         using (await DiscontinueAsync(session.Client, patient, thyroid, "Synthetic: no longer needed"))
         {
         }
 
-        Assert.Equal(new LabRound(0, 0, 1, 0), await lab.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(1), Cancel));
+        Assert.Equal(new LabRound(0, 0, 1, 0), await lab.RunOnceAsync((await apps.Database.NowAsync()).AddMinutes(1), Cancel));
         Assert.Equal($"Order {thyroid}: the clinic takes no results for it from this lab (discontinued); dropped.", log[^1]);
         Assert.Equal(["0"], await ResultsOnFileAsync(apps, patient));
         Assert.Equal(1, await apps.AuditEventsAsync("sent_to_lab", patientId: patient));

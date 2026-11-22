@@ -47,7 +47,7 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("No results yet.", empty);
         Assert.Contains("Hemoglobin [Mass/volume] in Blood <span>(g/dL; reference 12 to 17.5)</span>", empty);
 
-        using var filed = await FileAsync(session.Client, patient, order, (Platelets, "250"), (Hemoglobin, "9.1"));
+        using var filed = await FileAsync(apps, session.Client, patient, order, (Platelets, "250"), (Hemoglobin, "9.1"));
         var page = await ReadAsync(filed);
         Assert.Contains("Saved:", page);
         Assert.Contains("Outside the reference range: 1 of 2 results, listed first.", Words(page));

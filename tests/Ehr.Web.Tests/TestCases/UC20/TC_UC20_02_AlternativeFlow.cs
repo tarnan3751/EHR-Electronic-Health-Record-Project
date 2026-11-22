@@ -43,13 +43,13 @@ public class TC_UC20_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 
         // Step 1.
         var count = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
-        using (await FileAsync(session.Client, patient, count, (Hemoglobin, "13.1")))
+        using (await FileAsync(apps, session.Client, patient, count, (Hemoglobin, "13.1")))
         {
         }
 
         var thyroid = await SignedAsync(session.Client, patient, "lab", "Thyroid-stimulating hormone (TSH)", Cbc);
         await SettledAsync(apps, patient);
-        var signed = DateTimeOffset.UtcNow;
+        DateTimeOffset signed = await apps.Database.NowAsync();
 
         // Step 2.
         var (firstLog, secondLog) = (new List<string>(), new List<string>());
@@ -76,7 +76,7 @@ public class TC_UC20_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         await SettledAsync(apps, patient);
         var thirdLog = new List<string>();
         var third = new LabSimulator(Client(apps.OnPrem), LabSettings.Default, thirdLog.Add);
-        Assert.Equal(new LabRound(1, 0, 0, 1), await third.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(-1), Cancel));
+        Assert.Equal(new LabRound(1, 0, 0, 1), await third.RunOnceAsync((await apps.Database.NowAsync()).AddMinutes(-1), Cancel));
         Assert.StartsWith($"Order {vitaminD}: 1 test,", Assert.Single(thirdLog), StringComparison.Ordinal);
         Assert.Equal(5, await apps.AuditEventsAsync("sent_to_lab", patientId: patient));
     }

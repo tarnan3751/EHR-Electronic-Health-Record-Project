@@ -13,9 +13,16 @@ namespace Ehr.Security.Tests;
 // asked that are still waiting, each with its waiting tests and the patient's diagnoses that aren't sensitive, and
 // records each order handed over. A filing goes through ehr.file_result as a clinician's does, all or none and once,
 // completes the order, tells its signer, and is audited with the lab as the source and no account.
-public class LabSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
+public class LabSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>, IAsyncLifetime
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
+
+    // When the test started, by the database's clock, which its rules hold a collection time to.
+    DateTimeOffset Started { get; set; }
+
+    public async ValueTask InitializeAsync() => Started = await database.NowAsync();
+
+    public ValueTask DisposeAsync() => default;
 
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
@@ -132,7 +139,7 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         await using var command = new NpgsqlCommand("SELECT ehr.file_lab_results(@key, @order, @collected, @codes, @values, @units)", connection, transaction);
         command.Parameters.Add(new NpgsqlParameter("key", NpgsqlDbType.Text) { Value = (object?)key ?? DBNull.Value });
         command.Parameters.AddWithValue("order", order);
-        command.Parameters.AddWithValue("collected", collectedAt ?? DateTimeOffset.UtcNow.AddMinutes(-30));
+        command.Parameters.AddWithValue("collected", collectedAt ?? Started.AddMinutes(-30));
         command.Parameters.AddWithValue("codes", results.Select(r => r.Code).ToArray());
         command.Parameters.AddWithValue("values", results.Select(r => r.Value).ToArray());
         command.Parameters.AddWithValue("units", results.Select(r => r.Unit).ToArray());
@@ -405,7 +412,7 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
     {
         var (clinician, patient) = await PanelAsync();
         var order = await SignAsync(clinician, patient);
-        var collected = DateTimeOffset.UtcNow.AddMinutes(-20);
+        var collected = Started.AddMinutes(-20);
         var before = await EventsAsync(patient);
 
         Assert.Equal("filed", await FileAsync(Key, order, [("718-7", 9.1m, "g/dL"), ("777-3", 250m, "10*3/uL")], collected));
@@ -459,7 +466,7 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         Assert.Equal("closed", await FileAsync(Key, acknowledged, [("777-3", 250m, "10*3/uL")]));
         Assert.Equal("not-reported", await FileAsync(Key, open, [("718-7", 9.1m, "g/dL"), ("4548-4", 6.1m, "%")]));
         Assert.Equal("wrong-unit", await FileAsync(Key, open, [("718-7", 91m, "g/L")]));
-        Assert.Equal("in-the-future", await FileAsync(Key, open, Hemoglobin, DateTimeOffset.UtcNow.AddMinutes(30)));
+        Assert.Equal("in-the-future", await FileAsync(Key, open, Hemoglobin, Started.AddMinutes(30)));
         foreach (var malformed in new (string, decimal, string)[][]
         {
             [],
@@ -487,7 +494,7 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
     {
         var (clinician, patient) = await PanelAsync();
         var order = await SignAsync(clinician, patient);
-        var collected = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var collected = Started.AddMinutes(-5);
         await using var first = new NpgsqlConnection(App);
         await first.OpenAsync(Cancel);
 

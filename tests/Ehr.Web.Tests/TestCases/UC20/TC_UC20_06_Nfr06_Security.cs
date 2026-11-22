@@ -80,7 +80,7 @@ public class TC_UC20_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
             Assert.DoesNotContain(personal, text, StringComparison.OrdinalIgnoreCase);
         }
 
-        var collected = DateTimeOffset.UtcNow.AddMinutes(-15);
+        DateTimeOffset collected = (await apps.Database.NowAsync()).AddMinutes(-15);
         var filed = await PostAsync(lab, order, collected, (Hemoglobin, 9.1m, "g/dL"));
         answers.Add(filed);
         Assert.Equal(HttpStatusCode.NoContent, filed.StatusCode);

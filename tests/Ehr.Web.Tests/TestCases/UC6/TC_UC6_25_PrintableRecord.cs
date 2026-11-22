@@ -64,7 +64,7 @@ public class TC_UC6_25_PrintableRecord(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("6.9 % High", words);
         Assert.Contains("4 to 5.6 %", words);
         Assert.Contains("Note from the care team: Synthetic: we'll talk about this at your next visit.", words);
-        Assert.Contains(DateTimeOffset.UtcNow.AddDays(-3).UtcDateTime.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture) + " UTC", words);
+        Assert.Contains(chart.ResultsAt.UtcDateTime.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture) + " UTC", words);
         Assert.Contains("Blood pressure", words);
         Assert.Contains("128/82 mmHg", words);
         Assert.Contains("72 per minute", words);

@@ -51,7 +51,9 @@ public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebAp
     public async Task A_different_value_for_the_same_time_is_refused_before_and_after_check_in()
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
-        var taken = DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm");
+        // By the database's clock, which judges the time and starts the visit.
+        var started = await apps.Database.NowAsync();
+        var taken = started.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm");
         using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "120"), (Diastolic, "80"));
         Assert.Contains("Saved:", await ReadAsync(recorded));
 
@@ -69,7 +71,7 @@ public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebAp
         Assert.Equal(["8480-6 120 final visit R1", "8462-4 80 final visit R1"], await ReadingsAsync(apps, patient));
         Assert.Equal([$"{Diastolic} 80", $"{Systolic} 120"], await RecordedAsync(apps, patient));
 
-        var earlier = DateTime.UtcNow.AddMinutes(-10).ToString("yyyy-MM-ddTHH:mm");
+        var earlier = started.AddMinutes(-10).ToString("yyyy-MM-ddTHH:mm");
         using var rate = await RecordAtAsync(session.Client, patient, earlier, (HeartRate, "70"));
         Assert.Contains("Saved:", await ReadAsync(rate));
         using var other = await RecordAtAsync(session.Client, patient, earlier, (HeartRate, "72"));

@@ -39,11 +39,11 @@ public class TC_UC6_14_TrendsInPortal(WebApps apps) : IClassFixture<WebApps>
         foreach (var value in new[] { "9.1", "13.5" })
         {
             var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
-            using var filed = await FileAsync(session.Client, patient, order, (Hemoglobin, value));
+            using var filed = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, value));
         }
 
-        using var first = await VitalTests.RecordAsync(session.Client, patient, 24 * 60, (VitalTests.HeartRate, "72"), (VitalTests.Systolic, "148"), (VitalTests.Diastolic, "92"));
-        using var second = await VitalTests.RecordAsync(session.Client, patient, 10, (VitalTests.HeartRate, "64"));
+        using var first = await VitalTests.RecordAsync(apps, session.Client, patient, 24 * 60, (VitalTests.HeartRate, "72"), (VitalTests.Systolic, "148"), (VitalTests.Diastolic, "92"));
+        using var second = await VitalTests.RecordAsync(apps, session.Client, patient, 10, (VitalTests.HeartRate, "64"));
         Assert.Equal(4, (await VitalTests.RecordedAsync(apps, patient)).Count);
 
         var page = await portal.Client.GetStringAsync("/portal/results", Cancel);

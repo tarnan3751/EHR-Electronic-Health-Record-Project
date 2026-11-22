@@ -52,7 +52,7 @@ public class TC_UC20_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         }
 
         var vitaminD = await SignedAsync(session.Client, patient, "lab", "Vitamin D, 25-hydroxy", Cbc);
-        using (await FileAsync(session.Client, patient, vitaminD, ("62292-8", "41")))
+        using (await FileAsync(apps, session.Client, patient, vitaminD, ("62292-8", "41")))
         using (await AcknowledgeAsync(session.Client, patient, vitaminD))
         {
         }
@@ -61,7 +61,8 @@ public class TC_UC20_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("active,revoked,completed,active", await StatusAsync(apps, patient));
         Assert.Equal(["1"], await ProxyTests.QueryAsync(apps, "SELECT count(*)::text FROM ehr.result_acknowledgments WHERE patient_id = @patient", patient));
         var lab = Client(apps.OnPrem);
-        var collected = DateTimeOffset.UtcNow.AddMinutes(-10);
+        DateTimeOffset started = await apps.Database.NowAsync();
+        var collected = started.AddMinutes(-10);
         var mrn = WebApps.MrnOf(patient);
 
         async Task RefusedAsync(HttpResponseMessage response, HttpStatusCode status, string error, Guid? order = null)
@@ -112,7 +113,7 @@ public class TC_UC20_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         await RefusedAsync(await PostAsync(lab, vitaminD, collected, ("62292-8", 42m, "ng/mL")), HttpStatusCode.Conflict, "closed", vitaminD);
         await RefusedAsync(await PostAsync(lab, count, collected, (Hemoglobin, 9.1m, "g/dL"), ("4548-4", 6.1m, "%")), HttpStatusCode.UnprocessableEntity, "not-reported");
         await RefusedAsync(await PostAsync(lab, count, collected, (Hemoglobin, 91m, "g/L")), HttpStatusCode.UnprocessableEntity, "wrong-unit");
-        await RefusedAsync(await PostAsync(lab, count, DateTimeOffset.UtcNow.AddDays(1), (Hemoglobin, 9.1m, "g/dL")), HttpStatusCode.UnprocessableEntity, "in-the-future");
+        await RefusedAsync(await PostAsync(lab, count, started.AddDays(1), (Hemoglobin, 9.1m, "g/dL")), HttpStatusCode.UnprocessableEntity, "in-the-future");
 
         // Step 3.
         using (var filed = await PostAsync(lab, count, collected, (Hemoglobin, 9.1m, "g/dL")))
