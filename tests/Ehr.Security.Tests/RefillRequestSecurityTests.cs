@@ -804,6 +804,45 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         Assert.Equal(["completed true"], await AsSuperuserAsync("SELECT status || ' ' || sensitive FROM ehr.refill_requests WHERE id = @id", ("id", request)));
     }
 
+    // The review's finding: nothing held the signer to the person answering. An order signed as one clinician, in the
+    // transaction a colleague on the panel then answers in, is not the colleague's to approve with.
+    [Fact]
+    public async Task An_order_signed_by_someone_else_never_answers_a_request()
+    {
+        var (signer, patient, account) = await OnPanelAsync();
+        var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, colleague, patient);
+        var request = await AskAsync(account, patient, await MedicationAsync(patient));
+        var order = Guid.CreateVersion7();
+
+        var (connection, transaction) = await BeginAsync(App, signer);
+        await using (connection)
+        {
+            await using (var sign = new NpgsqlCommand(
+                "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @patient, 'medication', '314076', '{}', 'active')",
+                connection, transaction))
+            {
+                sign.Parameters.AddWithValue("order", order);
+                sign.Parameters.AddWithValue("patient", patient);
+                await sign.ExecuteNonQueryAsync(Cancel);
+            }
+
+            await using (var asColleague = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction))
+            {
+                asColleague.Parameters.AddWithValue("user", colleague.ToString());
+                await asColleague.ExecuteNonQueryAsync(Cancel);
+            }
+
+            await using var answer = new NpgsqlCommand("UPDATE ehr.refill_requests SET order_id = @order WHERE id = @request", connection, transaction);
+            answer.Parameters.AddWithValue("order", order);
+            answer.Parameters.AddWithValue("request", request);
+            var refused = await Assert.ThrowsAsync<PostgresException>(() => answer.ExecuteNonQueryAsync(Cancel));
+            Assert.Equal("refill_requests_order", refused.ConstraintName);
+        }
+
+        Assert.Equal(["requested"], await AsSuperuserAsync("SELECT status FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+    }
+
     // The review's finding: which medications have a request waiting was worked out from the page's 50 latest requests.
     // The portal is given every waiting request, however many answered ones are newer.
     [Fact]
