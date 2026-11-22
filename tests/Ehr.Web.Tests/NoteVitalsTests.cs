@@ -59,6 +59,24 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
         await command.ExecuteNonQueryAsync(Cancel);
     }
 
+    // A patient's values taken at a moment, marked entered in error as the vital signs page marks them (step 9b), by the
+    // superuser with the triggers held: this file asks what is read, not who may mark.
+    async Task MarkInErrorAsync(Guid patient, DateTime at, Guid clinician)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            SET LOCAL session_replication_role = replica;
+            UPDATE ehr.observations SET status = 'entered-in-error', entered_in_error_reason = 'Synthetic: wrong patient.', entered_in_error_by = @clinician,
+                entered_in_error_at = now()
+            WHERE patient_id = @patient AND effective_at = @at
+            """, connection);
+        command.Parameters.AddWithValue("patient", patient);
+        command.Parameters.AddWithValue("at", DateTime.SpecifyKind(at, DateTimeKind.Utc));
+        command.Parameters.AddWithValue("clinician", clinician);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync(Cancel));
+    }
+
     static async Task<string> DraftAsync(HttpClient client, Guid patient)
     {
         using var created = await PostFormAsync(client, $"/patients/{patient}?handler=NewNote", $"/patients/{patient}");
@@ -99,6 +117,21 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(
             $"Vital signs, {day:yyyy-MM-dd}: blood pressure 128/82 mmHg at {At(day, 6, 30)}; heart rate 99 per minute at {At(day, 8, 59)}.",
+            await OfferAsync(session.Client, await DraftAsync(session.Client, patient)));
+    }
+
+    // A value marked in error is no day's newest: when the newest value, on a later day than any that stands, was marked
+    // in error, the day offered is the latest that has one standing.
+    [Fact]
+    public async Task A_later_day_whose_only_value_was_marked_in_error_is_not_the_day_offered()
+    {
+        var (clinician, patient, session) = await ChartListTests.OnPanelAsync(apps, "Remeasured");
+        var day = await DayAsync();
+        await InsertAsync(patient, day.AddDays(-1).AddHours(9), (VitalSign.Temperature, 37.4m));
+        await InsertAsync(patient, day.AddHours(9), (VitalSign.HeartRate, 140));
+        await MarkInErrorAsync(patient, day.AddHours(9), clinician.Id);
+
+        Assert.Equal($"Vital signs, {Clinic.Format(new DateTimeOffset(day.AddDays(-1).AddHours(9), TimeSpan.Zero))}: temperature 37.4 °C.",
             await OfferAsync(session.Client, await DraftAsync(session.Client, patient)));
     }
 
