@@ -185,6 +185,12 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
             "INSERT INTO ehr.ambient_transcripts (id, patient_id, transcript) VALUES (@review, @patient, @transcript::jsonb);", "", StringComparison.Ordinal)));
         await Refused("23514", () => Execute(recording, "INSERT INTO ehr.ambient_transcripts (id, patient_id, transcript) VALUES (@review, @patient, @transcript::jsonb)"));
 
+        // Staged in savepoints, as EF Core saves: the transcript is still written in the staging's transaction.
+        var saved = await RecordingAsync();
+        await Execute(saved, "SAVEPOINT review;\n" + Stage.Replace("INSERT INTO ehr.ai_field_proposals", "RELEASE SAVEPOINT review;\nSAVEPOINT rest;\nINSERT INTO ehr.ai_field_proposals", StringComparison.Ordinal)
+            + "RELEASE SAVEPOINT rest;");
+        Assert.Equal(["1"], await Query(saved, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @review"));
+
         var visit = await PendingAsync();
         Assert.Equal(["True"], await Query(visit, "SELECT sensitive FROM ehr.ambient_transcripts WHERE id = @review"));
         Assert.Equal(["True"], await Query(visit, "SELECT sensitive FROM ehr.ai_field_proposals WHERE id = @proposal"));
@@ -209,6 +215,10 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         await Refused("23514", () => Execute(visit, "DELETE FROM ehr.ambient_transcripts WHERE id = @review"));
         await Refused("42501", () => Execute(visit, "DELETE FROM ehr.ambient_transcripts WHERE id = @review", Read));
         await Refused("23514", () => Execute(visit, Finish));
+        // Nor passed at commit because its clinician is no longer signed in by then: what can't be seen is refused.
+        await Refused("42501", () => Execute(visit, Finish + "SELECT set_config('app.user_id', '', true);"));
+        Assert.Equal(["pending 1"], await Query(visit,
+            "SELECT r.state || ' ' || (SELECT count(*) FROM ehr.ambient_transcripts t WHERE t.id = r.id) FROM ehr.ai_note_reviews r WHERE r.id = @review"));
 
         await Execute(visit, Finish + "DELETE FROM ehr.ambient_transcripts WHERE id = @review;");
         Assert.Equal(["completed 0"], await Query(visit,
@@ -322,6 +332,9 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         Assert.Equal(["delete  true"], await Accounts.QueryAsync(database.SuperuserConnectionString, null,
             "SELECT action || ' ' || coalesce(actor_id::text, '') || ' ' || (jsonb_path_query_first(details, '$.*.transcript.sha256') IS NOT NULL)::text FROM ehr.audit_events WHERE table_name = 'ambient_transcripts' AND row_id = @review AND action = 'delete'",
             Parameters(visit)));
+
+        // Nor written again, so that they could be: a transcript is written once, as its review is staged.
+        await Refused("23514", () => Execute(visit, "INSERT INTO ehr.ambient_transcripts (id, patient_id, transcript) VALUES (@review, @patient, @transcript::jsonb)"));
 
         // Its proposals can't be accepted as offered any more: rejected, or edited into the clinician's own words.
         await Refused("23514", () => Execute(visit,

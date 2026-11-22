@@ -95,12 +95,20 @@ CREATE OR REPLACE TRIGGER ai_field_proposals_ambient
 
 -- The transcript: written only for a review of a conversation as it is staged, never changed, and deleted only once its
 -- review is finished or ended, or by the purge below (which runs as ehr_owner, the one role that may delete it while
--- its review is open; the runtime roles can't become it).
+-- its review is open; the runtime roles can't become it). Written once: in the transaction that stages the review, so
+-- never again once the purge has deleted it from a review still open, which would let its proposals be accepted as
+-- offered again. That transaction is told as 52-visit-summaries.sql tells it: the review's row as this sees it was
+-- written by this transaction, a savepoint of it included (EF Core saves in savepoints), so its xmin is at or after
+-- this transaction's own ID, compared as PostgreSQL compares them (modulo 2^32), and still in progress; no other
+-- transaction's uncommitted row is visible. A review still pending was staged by an earlier transaction, since any
+-- later change to it (55-ai-review.sql) finishes it, and a transaction that has written nothing has no ID.
 CREATE OR REPLACE FUNCTION ehr.guard_ambient_transcript() RETURNS trigger
     LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     review ehr.ai_note_reviews%ROWTYPE;
+    this bigint := pg_current_xact_id_if_assigned()::text::bigint;
+    after bigint;
 BEGIN
     IF TG_OP = 'UPDATE' THEN
         RAISE EXCEPTION 'A conversation''s transcript is never changed' USING ERRCODE = '23514';
@@ -116,7 +124,11 @@ BEGIN
         RETURN OLD;
     END IF;
     SELECT * INTO review FROM ehr.ai_note_reviews r WHERE r.id = NEW.id;
+    SELECT (r.xmin::text::bigint - this % 4294967296 + 4294967296) % 4294967296 INTO after
+        FROM ehr.ai_note_reviews r WHERE r.id = NEW.id;
     IF NOT FOUND OR review.mode <> 'ambient' OR review.state <> 'pending' OR review.patient_id <> NEW.patient_id
+       OR NOT (CASE WHEN this IS NOT NULL AND after < 2147483648
+                    THEN pg_xact_status((this + after)::text::xid8) = 'in progress' ELSE false END)
        OR jsonb_typeof(NEW.transcript -> 'text') IS DISTINCT FROM 'string'
        OR jsonb_typeof(NEW.transcript -> 'segments') IS DISTINCT FROM 'array' THEN
         RAISE EXCEPTION 'A transcript is kept only for a review of a conversation as it is staged' USING ERRCODE = '23514';
@@ -132,7 +144,9 @@ CREATE OR REPLACE TRIGGER ambient_transcripts_guard
 
 -- At commit, a review of a conversation keeps its transcript exactly while it is open: one staged in this transaction
 -- has it, and one finished or ended has none. Run as the caller, who sees their own review and its transcript; at the
--- end of the transaction, so the review's update and the transcript's write or delete may come in either order.
+-- end of the transaction, so the review's update and the transcript's write or delete may come in either order. A
+-- review the caller can't see by then (its user changed before the commit) is refused, never passed: the transcript
+-- would be just as unseen.
 CREATE OR REPLACE FUNCTION ehr.check_ambient_transcript_kept() RETURNS trigger
     LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
 AS $$
@@ -141,6 +155,9 @@ DECLARE
     kept boolean;
 BEGIN
     SELECT r.state INTO state FROM ehr.ai_note_reviews r WHERE r.id = NEW.id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'A review of a conversation is checked at commit by the clinician who changed it' USING ERRCODE = '42501';
+    END IF;
     kept := EXISTS (SELECT 1 FROM ehr.ambient_transcripts t WHERE t.id = NEW.id);
     IF state IN ('completed', 'cancelled') AND kept THEN
         RAISE EXCEPTION 'A finished review of a conversation keeps no transcript' USING ERRCODE = '23514';
