@@ -83,8 +83,10 @@ and every check reads the cleaned text. The checks, each with the reason code re
   refilled ("have her lisinopril refilled", not "it was refilled"), to call in anything ("call in something for her
   nausea", not "call in sick"), to send something to the pharmacy (anywhere on in the sentence: "send amoxicillin 500
   mg by mouth three times a day for 7 days to her pharmacy"), to make an orders section, or to change the allergy list
-  (add, remove, record, clear, update), whoever's list it is called ("her", "his", "their", "my", "your": "I'll add
-  penicillin to your allergies", as said to the patient); hyphens are ignored ("re-fill"). A word
+  (add, remove, record, clear, update; or note, record, document or flag that the patient is allergic or reacts to
+  something: "note that she's allergic to penicillin", not "she is allergic to penicillin"), whoever's list it is
+  called ("her", "his", "their", "my", "your": "I'll add penicillin to your allergies", as said to the patient);
+  hyphens are ignored ("re-fill"). A word
   before the verb makes it a noun only right before it ("no order", "the lab order"): after a comma or a full stop the
   verb starts an instruction ("No, order a chest X-ray", "Check the lab. Order a CBC"). A plan stays a plan:
   "start", "continue", "increase" or "stop" a drug, orders in the past or by someone else ("her cardiologist ordered an
@@ -731,9 +733,11 @@ _ALLERGY_CHANGES = [
 #   when ("she will call in sick", "mom will call in tomorrow about the rash"); nor someone else calling in, in the past
 #   ("her husband did call in", "she was calling in from work"), though someone asked to is an instruction ("the nurse
 #   was asked to call in amoxicillin");
-# - "note" or "record" an allergy as an instruction: at the start of its clause, or after asking for it ("we need to
-#   record", "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy", "I note
-#   a penicillin allergy in her chart" are documentation).
+# - "note" or "record" an allergy, or note, record, document or flag (or make a note) that the patient is allergic or
+#   reacts to something, as an instruction: at the start of its clause, or after asking for it ("we need to record",
+#   "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy", "I note a
+#   penicillin allergy in her chart" are documentation), and never the statement alone ("she is allergic to
+#   penicillin").
 _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
 _NOT_AN_ORDER = re.compile(
     r"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|about|yesterday|to say|for an? appointment)\b",
@@ -741,7 +745,11 @@ _NOT_AN_ORDER = re.compile(
 )
 _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|was|were|had been)\s+$", re.IGNORECASE)
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
-_NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
+_NOTE_ALLERGY = re.compile(
+    rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg"
+    r"|\b(?:note|record|document|flag|make\s+a\s+note)\s+that\b[^.,;:!?\n]{0,40}?\b(?:allerg|react)",
+    re.IGNORECASE,
+)
 _ASKING = re.compile(r"\b(?:need to|make sure(?: to)?|remember to|be sure to|don't forget to|do not forget to)\b", re.I)
 _NOTING = frozenset({"i", "we"})
 

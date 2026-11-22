@@ -987,6 +987,42 @@ def test_a_refill_had_or_sorted_out_already_is_not_an_instruction(said):
     assert own(said, said).pending
 
 
+# Noting that the patient is allergic or reacts to something is an instruction to change the allergy list when a
+# noting verb starts its clause; the statement alone, or someone's note of it, is documentation and stays.
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Note that she's allergic to penicillin.",
+        "Make a note that he is allergic to codeine.",
+        "Please record that she reacts to sulfa.",
+        "Document that the patient had a reaction to latex.",
+    ],
+)
+def test_noting_that_the_patient_is_allergic_is_an_allergy_list_instruction(said):
+    text = transcript(f"Continue lisinopril. {said}")
+
+    (listed,) = not_carried_over(text)
+
+    assert listed["reason"] == "allergy_change"
+    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".")
+    assert own(text.text, "Continue lisinopril. " + said).value == "Continue lisinopril."
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "She is allergic to penicillin.",
+        "I note that she is allergic to penicillin.",
+        "Her chart notes that she's allergic to penicillin.",
+        "Noted that she is allergic to penicillin.",
+        "Note that the rash came back after amoxicillin.",
+    ],
+)
+def test_that_the_patient_is_allergic_said_alone_or_noted_by_someone_is_documentation(said):
+    assert not_carried_over(transcript(said)) == []
+    assert own(said, said).pending
+
+
 # Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
 @pytest.mark.parametrize(
     ("said", "reason"),
