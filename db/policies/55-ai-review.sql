@@ -121,12 +121,18 @@ CREATE OR REPLACE TRIGGER ai_field_proposals_guard
 --     gives there, waiting; never once the review's draft is signed.
 --   Update: decided once; nothing else about it moves, and who and when are the database's (the column grants keep the
 --     apps to the decision's columns; this holds the tables' owner to them too).
---     Ordered, by naming the order signed for it: an active order of the patient, signed now (in this transaction, as
---       77-refill-requests.sql tells it) by the clinician deciding, and not a change of another order. Signing it went
---       through every rule and check of 60-orders.sql and 61-order-safety.sql, as any order's does: this only links it.
+--     Ordered, by naming the order signed for it: an active order of the patient, signed now by the clinician deciding,
+--       and not a change of another order. Signing it went through every rule and check of 60-orders.sql and
+--       61-order-safety.sql, as any order's does: this only links it. "Now" is signed_at >= now(), as
+--       77-refill-requests.sql tells it: since this transaction began, which is the order this transaction signed, or
+--       one the same clinician signed for the same patient in another transaction of theirs committed since this one
+--       began; never one signed before it. Letting the second through is safe: it is that clinician's own order for that
+--       patient, through every check, and the app links only the order it has just signed, in the same savepoint.
 --     Recorded, by naming the allergy added for it: an active, coded allergy of the patient, not "No known allergies",
 --       added now by the clinician deciding, as its first row in ehr.chart_history says (written only by
---       65-chart-lists.sql's trigger, as its owner): one that was there before and only changed now isn't.
+--       65-chart-lists.sql's trigger, as its owner): one that was there before and only changed now isn't. "Now" is
+--       changed_at >= now(), as for an order: added in this transaction, or by the same clinician for the same patient
+--       in another of their transactions committed since this one began, which is as safe, for the same reasons.
 --     Dismissed.
 --   The table's checks hold the rest: waiting with no decision and nothing named, and a decision with who and when (so
 --   by someone signed in); an order's proposal ordered with its order alone, an allergy's recorded with its allergy

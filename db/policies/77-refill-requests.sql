@@ -18,10 +18,11 @@
 --   Update by the tables' owner: only the sensitivity, which ehr.follow_refill_medication keeps the medication's.
 --   Update by the apps: the one answer, once, by someone signed in, and nothing else moves. Its sensitivity is never
 --     theirs to change.
---     Approved, by naming the order signed for it: an active medication order of this patient, signed in this
---       transaction by the clinician answering, for the product that was asked for (the order's catalog item is the
---       RxNorm code the medication had when asked: another strength, form, salt or route is a new order, not a
---       renewal), which the chart's entry must still have: a clinician may change an entry's code
+--     Approved, by naming the order signed for it: an active medication order of this patient, signed now by the
+--       clinician answering (signed_at >= now(): since this transaction began, which is the order it signed, or one the
+--       same clinician signed for the same patient in another transaction of theirs committed since then), for the
+--       product that was asked for (the order's catalog item is the RxNorm code the medication had when asked: another
+--       strength, form, salt or route is a new order, not a renewal), which the chart's entry must still have: a clinician may change an entry's code
 --       (65-chart-lists.sql), and a request asked for before the change is then only declined; the medication still
 --       active, and locked until the transaction ends, so stopping it waits for the approval or the approval sees it
 --       stopped. The database copies what was ordered.
