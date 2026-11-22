@@ -74,14 +74,15 @@ namespace Ehr.Web.Api.Dictation;
 //   400 bad_form_token, or bad_seq
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop; a visit's says its recording was stopped), or not_stopped (a result
-//       before stop)
+//       before stop); for a visit (AmbientApi.cs), speakers_given (who each voice is, said already)
 //   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes)
 //   415 unsupported_type: the body isn't audio/*
 //   422 not_audio: "The audio couldn't be decoded."; or unsupported_language: "That language isn't available for this
 //       recording."
 //   429 busy: the service is busy
 //   502 bad_answer: the service answered something this API doesn't know
-//   503 unavailable: not configured, the service can't be reached or says it's unavailable, or it refused the key
+//   503 unavailable: not configured, the service can't be reached or says it's unavailable, or it refused the key; or,
+//       starting a visit, listening_unavailable: the service has no speaker model to tell voices apart
 //   504 timed_out: the service didn't answer within DictationSidecar.DefaultTimeout (20 seconds)
 // A model that is unavailable or too slow isn't a refusal: the result says so. What is logged is the operation and
 // the service's status, never a body, a transcript or a field.
@@ -303,6 +304,7 @@ public static partial class DictationApi
                     { Error: "stopped" } => Refuse(StatusCodes.Status409Conflict, "stopped",
                         ambient ? "This visit's recording has already been stopped." : "This dictation has stopped, so it takes no more audio."),
                     { Error: "not_stopped" } => Refuse(StatusCodes.Status409Conflict, "not_stopped", "Stop the dictation before asking for its result."),
+                    { Error: "speakers_given" } => Refuse(StatusCodes.Status409Conflict, "speakers_given", "Who each voice is was already given for this visit."),
                     _ => Unexpected(response.StatusCode, operation, log),
                 };
             case HttpStatusCode.RequestEntityTooLarge:
@@ -322,6 +324,9 @@ public static partial class DictationApi
                 };
             case HttpStatusCode.TooManyRequests:
                 return Refuse(StatusCodes.Status429TooManyRequests, "busy", "Dictation is busy. Try again in a moment.");
+            case HttpStatusCode.ServiceUnavailable when await ErrorBodyAsync(response, cancellationToken) is { Error: "listening_unavailable" }:
+                return Refuse(StatusCodes.Status503ServiceUnavailable, "listening_unavailable",
+                    "Listening to a visit isn't set up on the clinic's dictation server: it has no model to tell voices apart.");
             case HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden:
                 log.LogError("The dictation service refused the key: Ehr:Dictation:ApiKey doesn't match the service's.");
                 return Unavailable();

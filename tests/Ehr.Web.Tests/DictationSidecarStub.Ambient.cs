@@ -11,13 +11,14 @@ namespace Ehr.Web.Tests;
 // with ?mode=ambient&speakers=N and called with DictationSidecar.ModeHeader every time (a call of the other kind finds no
 // session); audio taken in order with no transcript until stop, and how long nobody has spoken (QuietSeconds); at stop, a
 // made-up conversation of two or three voices (or one more, ExtraVoice, saying an order), awaiting the clinician's word
-// on who each is; a mapping that leaves a voice out, doesn't name one clinician and one patient, or names more people,
-// all but "unsure", than the consent did, refused with 422 speakers_incomplete; and then the note's fields drafted from
-// it by who said what: Subjective from the patient's words, with the warning that they are the patient's own, and
-// Objective, Assessment and Plan from the clinician's, each source with its speaker, and the order said by a voice
-// named unsure listed as not carried over, with its speaker. Once the voices are named, every segment says who said it,
-// whether or not the fields could be sorted: the app stages nothing else (DictationApi.TrustedResult), and the service
-// must send the same.
+// on who each is; a mapping that leaves a voice out, names a role it doesn't know or a second other, doesn't name one
+// clinician and one patient, or names more people, all but "unsure", than the consent did, refused with 422
+// speakers_incomplete; the same names again answered as now and others refused with 409 speakers_given; and then the
+// note's fields drafted from it by who said what: Subjective from the patient's words, with the warning that they are
+// the patient's own, and Objective, Assessment and Plan from the clinician's, each source with its speaker, and the
+// order said by a voice named unsure listed as not carried over, with its speaker. Once the voices are named, every
+// segment says who said it, whether or not the fields could be sorted: the app stages nothing else
+// (DictationApi.TrustedResult), and the service must send the same.
 public sealed partial class DictationSidecarStub
 {
     // How long nobody has spoken, as the service measures it, in every audio answer.
@@ -79,19 +80,28 @@ public sealed partial class DictationSidecarStub
                 return Json(HttpStatusCode.OK, Conversation(session, Sorting == StubSorting.Done ? StubSorting.Pending : Sorting));
 
             case ([_, _, _, "speakers"], "POST"):
-                if (!session.Stopped || session.Roles is not null)
+                if (!session.Stopped)
                 {
-                    return Error(HttpStatusCode.Conflict, session.Stopped ? "speakers_given" : "not_stopped");
+                    return Error(HttpStatusCode.Conflict, "not_stopped");
                 }
 
                 var given = JsonDocument.Parse(body).RootElement.GetProperty("speakers").EnumerateObject()
                     .ToDictionary(voice => int.Parse(voice.Name, CultureInfo.InvariantCulture), voice => voice.Value.GetString()!);
                 var roles = given.Values.ToList();
                 if (!given.Keys.Order().SequenceEqual(Enumerable.Range(1, session.Voices))
+                    || roles.Any(role => role is not ("clinician" or "patient" or "other" or "unsure"))
                     || roles.Count(role => role == "clinician") != 1 || roles.Count(role => role == "patient") != 1
-                    || roles.Count(role => role != "unsure") > session.Speakers)
+                    || roles.Count(role => role == "other") > 1 || roles.Count(role => role != "unsure") > session.Speakers)
                 {
                     return Error(HttpStatusCode.UnprocessableEntity, "speakers_incomplete");
+                }
+
+                // The same names again are answered as now, so a page that lost the answer can ask again; others, refused.
+                if (session.Roles is not null)
+                {
+                    return session.Roles.OrderBy(role => role.Key).SequenceEqual(given.OrderBy(role => role.Key))
+                        ? Json(HttpStatusCode.OK, Conversation(session, Sorting))
+                        : Error(HttpStatusCode.Conflict, "speakers_given");
                 }
 
                 session.Roles = given;

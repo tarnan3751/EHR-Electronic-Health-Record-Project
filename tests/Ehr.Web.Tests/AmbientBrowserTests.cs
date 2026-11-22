@@ -287,11 +287,13 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
             await page.Locator("[data-dictation-not-carried-list] li").TextContentAsync());
     }
 
-    // TC-UC23-04 in the browser: fetching the draft after Stop. An answer this app couldn't use (502) isn't asked for
-    // again; a service that doesn't answer (503) is asked a few times, then the page gives up and says what to do.
+    // TC-UC23-04 in the browser: fetching the visit after Stop. An answer this app couldn't use (502) isn't asked for
+    // again; a service that doesn't answer (503) is asked a few times, then the page gives up and says what to do. Its
+    // voices aren't named yet, which the draft's Retrieve can't do, so the page says only that the visit can be discarded
+    // and that the service keeps nothing past 10 minutes, never to retrieve it.
     [Theory]
     [InlineData(502, """{"error":"bad_answer","message":"Dictation isn't working right now."}""", 1, "Dictation isn't working right now.")]
-    [InlineData(503, """{"error":"unavailable","message":"Dictation isn't available right now."}""", 4, "The draft couldn't be fetched: the dictation service isn't answering.")]
+    [InlineData(503, """{"error":"unavailable","message":"Dictation isn't available right now."}""", 4, "The visit couldn't be fetched: the dictation service isn't answering")]
     public async Task TC_UC23_04_fetching_the_draft_is_asked_a_few_times_at_most(int status, string answer, int asked, string said)
     {
         var (patient, session) = await AccountAsync(apps);
@@ -309,8 +311,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(asked, (await EventsAsync(page)).Count(e => e.StartsWith("sent POST ", StringComparison.Ordinal) && e.EndsWith("/stop", StringComparison.Ordinal)));
         if (status == 503)
         {
-            Assert.Contains("Open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes.",
-                await page.TextContentAsync("[data-ambient-status]"));
+            var said503 = await page.TextContentAsync("[data-ambient-status]");
+            Assert.Contains("Discard the visit from its draft; the service keeps nothing for more than 10 minutes.", said503);
+            Assert.DoesNotContain("retrieve", said503, StringComparison.OrdinalIgnoreCase);
         }
     }
 

@@ -433,7 +433,8 @@
 
     // One call that answers with the result, sent again with backoff while the connection is down or the service busy, a
     // few times at most. Null when it can't, having said why and what to do. A 502, an answer this app couldn't use, isn't
-    // sent again: it would come back the same.
+    // sent again: it would come back the same. Before the voices are named, the draft's Retrieve can't name them, so the
+    // page then says only that the visit can be discarded and that the service keeps nothing past 10 minutes.
     async function ask(route, body) {
         for (let attempt = 1; ; attempt++) {
             if (state.ended) {
@@ -458,7 +459,9 @@
             }
 
             if (attempt >= mostAttempts) {
-                say("The draft couldn't be fetched: the dictation service isn't answering. Nothing was added to the note. Open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes.", true);
+                say(state.drafting
+                    ? "The draft couldn't be fetched: the dictation service isn't answering. Nothing was added to the note. Open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes."
+                    : "The visit couldn't be fetched: the dictation service isn't answering, so its voices can't be named. Nothing was added to the note. Discard the visit from its draft; the service keeps nothing for more than 10 minutes.", true);
                 return null;
             }
 
