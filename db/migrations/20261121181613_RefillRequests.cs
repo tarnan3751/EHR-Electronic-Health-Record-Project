@@ -117,13 +117,17 @@ namespace Ehr.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             // Written by hand, in part. On a database with its policies applied, db/policies/77-refill-requests.sql
-            // puts a trigger on the medications whose function changes this table: it goes first, so no change to a
-            // medication's sensitivity is left naming a table that is gone. The table's own triggers go with it, and
+            // puts a trigger on the medications whose function changes this table, and two on the panels whose function
+            // reads it: they go first, so no change to a medication's sensitivity or to a panel is left naming a table
+            // that is gone. The table's own triggers go with it, and
             // their functions after it: nothing of this step is left for the older schema to carry. Its inbox items
             // stay: their kind was in the inbox's check before this step.
             migrationBuilder.Sql("""
                 DROP TRIGGER IF EXISTS medication_statements_follow_refills ON ehr.medication_statements;
+                DROP TRIGGER IF EXISTS patient_assignments_join_refills ON ehr.patient_assignments;
+                DROP TRIGGER IF EXISTS patient_assignments_leave_refills ON ehr.patient_assignments;
                 DROP FUNCTION IF EXISTS ehr.follow_refill_medication();
+                DROP FUNCTION IF EXISTS ehr.follow_refill_care_team();
                 """);
 
             migrationBuilder.DropTable(

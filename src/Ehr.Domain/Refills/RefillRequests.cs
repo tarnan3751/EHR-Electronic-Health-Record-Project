@@ -12,8 +12,8 @@ namespace Ehr.Domain.Refills;
 // database transaction; requests are read through PhiReader. The database decides who may ask about which medication
 // (the session's own record, a medication it may read, active and coded as a product the clinic orders), sets who asked
 // and when and the medication's name and sensitivity, keeps one open request a medication, refuses a request nobody on
-// the care team would be told of, and tells the care team (db/policies/30-rls.sql and 77-refill-requests.sql). Nothing
-// about the patient comes from
+// the care team would be told of, and tells the care team, as it changes (db/policies/30-rls.sql and
+// 77-refill-requests.sql). Nothing about the patient comes from
 // the request: the page passes the session's patient.
 //
 // A clinician with the patient on their panel answers a request once: approves it by signing an order for the same

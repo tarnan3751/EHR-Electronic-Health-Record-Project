@@ -158,9 +158,10 @@ CREATE OR REPLACE TRIGGER refill_requests_immutable
 -- What follows from a request, which the person asking or answering has no rights to do themselves. Runs as its owner,
 -- ehr_owner (SECURITY DEFINER), which alone may add inbox items (10-grants.sql), with its search_path pinned; nobody but
 -- its owner may call it directly.
---   Asked: an inbox item for each clinician with the patient on their active panel whose account can sign in, the care
---     team, saying only that a patient asked to renew a medication. With none, the request is refused: nobody would
---     be told of it, and the portal says to call the clinic.
+--   Asked: an inbox item for each clinician with the patient on their active panel whose account isn't disabled, the
+--     care team, saying only that a patient asked to renew a medication. An account locked for a while after failed
+--     sign-ins is on the team still; one an admin disabled (locked out for good, 80-appointments.sql's test) is not.
+--     With none, the request is refused: nobody would be told of it, and the portal says to call the clinic.
 --   Answered: every item still open for it is done, for the whole care team, whoever answered.
 CREATE OR REPLACE FUNCTION ehr.deliver_refill_request() RETURNS trigger
     LANGUAGE plpgsql
@@ -176,7 +177,7 @@ BEGIN
         FROM ehr.patient_assignments a
         JOIN ehr.staff_users s ON s.id = a.clinician_id
         WHERE a.patient_id = NEW.patient_id AND a.ended_at IS NULL
-          AND s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end <= now());
+          AND s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end < now() + interval '10 years');
         GET DIAGNOSTICS delivered = ROW_COUNT;
         IF delivered = 0 THEN
             RAISE EXCEPTION 'This patient has no care team to answer a refill request'
@@ -198,6 +199,48 @@ CREATE OR REPLACE TRIGGER refill_requests_answered
     AFTER UPDATE ON ehr.refill_requests
     FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
     EXECUTE FUNCTION ehr.deliver_refill_request();
+
+-- A waiting request follows the care team, so it never sits where nobody can answer it. When a clinician joins a
+-- patient's panel, they get an item for each of that patient's waiting requests, but one they hold open already; when
+-- their assignment ends, their open refill items for that patient are done, since they can no longer answer them. A
+-- request whose patient is left with nobody on the panel stays waiting, and goes to whoever joins next. The test of who
+-- is on the team is the one asking uses. Runs as its owner (SECURITY DEFINER), which alone may add inbox items and close
+-- refill items (10-grants.sql, 70-inbox.sql); its search_path is pinned, and nobody but its owner may call it directly.
+-- It reads the requests and the staff account, and writes the inbox: nothing else.
+CREATE OR REPLACE FUNCTION ehr.follow_refill_care_team() RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at)
+        SELECT uuidv7(), s.id, 'refill-request', r.patient_id, 'refill_requests', r.id, 'A patient asked to renew a medication', clock_timestamp()
+        FROM ehr.refill_requests r
+        JOIN ehr.staff_users s ON s.id = NEW.clinician_id
+        WHERE r.patient_id = NEW.patient_id AND r.status = 'requested'
+          AND s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end < now() + interval '10 years')
+          AND NOT EXISTS (
+              SELECT 1 FROM ehr.inbox_items i
+              WHERE i.recipient_id = NEW.clinician_id AND i.source_table = 'refill_requests' AND i.source_id = r.id AND i.done_at IS NULL);
+    ELSE
+        UPDATE ehr.inbox_items SET done_at = clock_timestamp()
+        WHERE recipient_id = OLD.clinician_id AND patient_id = OLD.patient_id AND kind = 'refill-request' AND source_table = 'refill_requests'
+          AND done_at IS NULL;
+    END IF;
+
+    RETURN NULL;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.follow_refill_care_team() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER patient_assignments_join_refills
+    AFTER INSERT ON ehr.patient_assignments
+    FOR EACH ROW WHEN (NEW.ended_at IS NULL)
+    EXECUTE FUNCTION ehr.follow_refill_care_team();
+CREATE OR REPLACE TRIGGER patient_assignments_leave_refills
+    AFTER UPDATE ON ehr.patient_assignments
+    FOR EACH ROW WHEN (OLD.ended_at IS NULL AND NEW.ended_at IS NOT NULL)
+    EXECUTE FUNCTION ehr.follow_refill_care_team();
 
 -- A request is sensitive when its medication is: when a medication is marked sensitive, or unmarked, its requests
 -- follow, waiting or answered, so someone the patient shares their record with but not sensitive items loses them at

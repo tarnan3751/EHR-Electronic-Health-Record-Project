@@ -13,8 +13,8 @@ namespace Ehr.Security.Tests;
 // patient has a care team to tell; the database sets the rest and puts an item in each care-team clinician's inbox. A
 // clinician with the patient on their panel answers it once: approves it with the order they signed for it in the same
 // transaction, for the same product as the medication on the chart, or declines it with a message; every item is then
-// done. Its sensitivity is its medication's. The portal reads no row, only what ehr.portal_refill_requests gives.
-// Nothing else changes and nothing is deleted.
+// done. The items follow the care team as it changes. Its sensitivity is its medication's. The portal reads no row, only
+// what ehr.portal_refill_requests gives. Nothing else changes and nothing is deleted.
 public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -664,5 +664,82 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         }
 
         Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.refill_requests WHERE patient_id = @patient", ("patient", patient)));
+    }
+
+    // The review's finding: a request asked while one care team was on the panel waited for good once they had all left and
+    // someone else joined. Items follow the panel: a clinician who joins gets the patient's waiting requests, one who leaves
+    // has theirs done, and a request left with nobody on the panel goes to whoever joins next.
+    [Fact]
+    public async Task A_waiting_request_follows_the_care_team_when_it_changes()
+    {
+        var (first, patient, account) = await OnPanelAsync();
+        var second = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, second, patient);
+        var request = await AskAsync(account, patient, await MedicationAsync(patient));
+        Task<List<string>> OpenAsync(Guid clinician) => AsSuperuserAsync(
+            "SELECT source_id::text FROM ehr.inbox_items WHERE recipient_id = @to AND kind = 'refill-request' AND done_at IS NULL", ("to", clinician));
+        Task LeaveAsync(Guid clinician) => RunAsync(clinician,
+            "UPDATE ehr.patient_assignments SET ended_at = now() WHERE patient_id = @patient AND clinician_id = @clinician AND ended_at IS NULL",
+            ("patient", patient), ("clinician", clinician));
+
+        // Both leave: their items are done, and the request still waits, with nobody to answer it.
+        await LeaveAsync(first);
+        await LeaveAsync(second);
+        Assert.Empty(await OpenAsync(first));
+        Assert.Empty(await OpenAsync(second));
+        Assert.Equal(["requested"], await AsSuperuserAsync("SELECT status FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+        // Off the panel, neither can answer it.
+        Assert.Equal(0, await DeclineAsync(first, request));
+
+        // A third joins: the request is theirs to answer, and they answer it.
+        var third = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, third, patient);
+        Assert.Equal([request.ToString()], await OpenAsync(third));
+        Assert.Equal(1, await DeclineAsync(third, request));
+        Assert.Empty(await OpenAsync(third));
+
+        // Rejoining: an item for each request still waiting, once, and none for an answered one.
+        var later = await AskAsync(account, patient, await MedicationAsync(patient));
+        await LeaveAsync(third);
+        Assert.Empty(await OpenAsync(third));
+        await Accounts.AssignAsync(database, third, patient);
+        await Accounts.AssignAsync(database, first, patient);
+        Assert.Equal([later.ToString()], await OpenAsync(third));
+        Assert.Equal([later.ToString()], await OpenAsync(first));
+        // An item held already isn't given twice: one of the third's, open, before they join again.
+        await LeaveAsync(third);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at) VALUES (gen_random_uuid(), @to, 'refill-request', @patient, 'refill_requests', @id, 'A patient asked to renew a medication', now())",
+            ("to", third), ("patient", patient), ("id", later));
+        await Accounts.AssignAsync(database, third, patient);
+        Assert.Equal([later.ToString()], await OpenAsync(third));
+    }
+
+    // A clinician locked out for a while after failed sign-ins is on the care team still; one an admin disabled (locked
+    // out for good) is not, as for appointments (80-appointments.sql).
+    [Fact]
+    public async Task A_clinician_locked_for_a_while_is_told_and_a_disabled_one_is_not()
+    {
+        var (locked, patient, account) = await OnPanelAsync();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "UPDATE ehr.staff_users SET lockout_end = now() + interval '15 minutes' WHERE id = @id", ("id", locked));
+        var request = await AskAsync(account, patient, await MedicationAsync(patient));
+        Assert.Equal([$"{locked} refill-request A patient asked to renew a medication true"], await ItemsAsync(request));
+
+        var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var disabled = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, joining, patient);
+        await Accounts.AssignAsync(database, disabled, patient);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "UPDATE ehr.staff_users SET lockout_end = now() + interval '15 minutes' WHERE id = @id", ("id", joining));
+        await Accounts.LockOutAsync(database, disabled);
+        var asked = await AskAsync(account, patient, await MedicationAsync(patient));
+        Assert.Equal([.. new[] { locked, joining }.Select(id => id.ToString()).Order(StringComparer.Ordinal)
+            .Select(id => $"{id} refill-request A patient asked to renew a medication true")], await ItemsAsync(asked));
+
+        // A patient whose only clinician is disabled has no care team.
+        var (alone, lonely, lonelyAccount) = await OnPanelAsync();
+        await Accounts.LockOutAsync(database, alone);
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, async () => await AskAsync(lonelyAccount, lonely, await MedicationAsync(lonely)), "refill_requests_care_team");
     }
 }

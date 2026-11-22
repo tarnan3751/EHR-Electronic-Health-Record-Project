@@ -17,12 +17,12 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Refills;
 // recorded read of the patient through the PHI reader, a view of their sensitive items when the request is sensitive;
 // HEAD is refused before anything is read.
 //
-// The order form's rule: only for a patient on the clinician's panel, who are those the request reached; anyone else is
-// sent to the chart before anything is read, which asks for a reason when the patient isn't on their panel. Whoever
-// answers first answers it: the database refuses a second answer, and the page says so. A medication stopped or entered
-// in error since, or no longer coded as a product the clinic orders, can't be renewed, so the page offers only Decline.
-// Off-site the cloud app forwards the decline; while the clinic's server can't be reached the answers are replaced by a
-// sentence, and the "Not saved" page shows the message again to copy (UC 2, ShownIfNotSaved).
+// The order form's rule: only for a patient on the clinician's panel, who are those holding the request's items; anyone
+// else is sent to the chart before anything is read, which asks for a reason when the patient isn't on their panel.
+// Whoever answers first answers it: the database refuses a second answer, and the page says so. A medication stopped or
+// entered in error since, or no longer coded as a product the clinic orders, can't be renewed, so the page offers only
+// Decline. Off-site the cloud app forwards the decline; while the clinic's server can't be reached the answers are
+// replaced by a sentence, and the "Not saved" page shows the message again to copy (UC 2, ShownIfNotSaved).
 [ShownIfNotSaved(nameof(Message))]
 public class ReviewModel(PhiReader phi, PatientAssignments assignments, RefillRequests refills, IOptions<SiteAddresses> addresses) : PageModel
 {

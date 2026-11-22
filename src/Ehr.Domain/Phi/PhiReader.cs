@@ -1382,12 +1382,14 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .OrderBy(m => m.Display).ThenBy(m => m.Id)
             .Select(m => new RenewableMedication(m.Id, m.Display, m.Dosage, m.Sensitive)).ToListAsync(cancellationToken))
             .Where(m => !waiting.Contains(m.Id)).ToList();
-        var now = DateTimeOffset.UtcNow;
+        // Disabled is locked out for good (80-appointments.sql's test): a clinician locked for a while after failed sign-ins
+        // is on the team still.
+        var disabled = DateTimeOffset.UtcNow.AddYears(10);
         var careTeam = await (
             from assignment in db.PatientAssignments
             join staff in db.StaffUsers on assignment.ClinicianId equals staff.Id
             where assignment.PatientId == patientId && assignment.EndedAt == null && staff.Roles.Contains(Ehr.Data.Accounts.StaffRoles.Clinician)
-                && (staff.LockoutEnd == null || staff.LockoutEnd <= now)
+                && (staff.LockoutEnd == null || staff.LockoutEnd < disabled)
             select assignment.Id).AnyAsync(cancellationToken);
         var hidden = sensitive ? 0 : medications.Count(m => m.Sensitive) + requests.Count(r => r.Sensitive);
 
