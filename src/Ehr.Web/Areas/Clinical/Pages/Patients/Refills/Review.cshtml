@@ -60,7 +60,8 @@ else
 {
     @if (refill.Renewable)
     {
-        <p><a class="sc-btn sc-btn--primary" asp-page="/Patients/Orders/New" asp-route-id="@patient.Id" asp-route-type="medication" asp-route-refill="@refill.Id" autofocus data-refill-approve>Approve: write the order</a></p>
+        @* The cursor starts here, unless a decline came back to be fixed: then it is in the message (below). *@
+        <p><a class="sc-btn sc-btn--primary" asp-page="/Patients/Orders/New" asp-route-id="@patient.Id" asp-route-type="medication" asp-route-refill="@refill.Id" autofocus="@(Model.Error is null)" data-refill-approve>Approve: write the order</a></p>
         <p class="sc-muted">The order form opens with the same medication, @refill.CatalogItem, and checks it as any order. Signing it approves the request. To order another strength, form or drug, decline the request with a message and write a new order from the chart.</p>
     }
     else if (status != MedicationStatementStatus.Active)

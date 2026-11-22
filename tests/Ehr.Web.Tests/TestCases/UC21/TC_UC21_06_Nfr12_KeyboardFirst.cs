@@ -9,8 +9,8 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 // Test Case ID: TC-UC21-06
 // Purpose / scenario: Answering refill requests works from the keyboard alone: from the inbox to the request, whose page
 //   opens on "Approve: write the order"; to the order form, which opens on its item, filled in; through the details to
-//   "Sign order"; and back to the inbox for the next request, declined with a message. Every control reached shows the
-//   focus ring.
+//   "Sign order"; and back to the inbox for the next request, declined with a message, after a message of spaces alone was
+//   refused and the cursor came back in the message. Every control reached shows the focus ring.
 // Type: Non-functional (usability)
 // Requirements: NFR-12, proposed FR-58
 // Use case: UC 21, Answer a refill request
@@ -22,11 +22,12 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //   1. In the inbox, press Tab until "Review the request" has the focus, and press Enter.
 //   2. Press Enter on "Approve: write the order"; Tab to the dose, route and frequency, typing each; Tab to "Sign order"
 //      and press Enter.
-//   3. Back in the inbox, Tab to "Review the request" and press Enter; Tab to the message, type it, Tab to "Decline
-//      request" and press Enter.
+//   3. Back in the inbox, Tab to "Review the request" and press Enter; Tab to the message, type three spaces, Tab to
+//      "Decline request" and press Enter; type the message, Tab to "Decline request" and press Enter.
 // Expected result: Step 1: the request's page opens with the focus on "Approve: write the order". Step 2: the order form
 //   opens with the item "lisinopril 10 MG Oral Tablet", fixed, and the focus in the dose; signing lands on the request's
-//   page, "Approved:". Step 3: the page says "Declined:". Both requests are answered; no script errors.
+//   page, "Approved:". Step 3: the spaces come back refused with the focus in the message, not on "Approve"; then the
+//   page says "Declined:". Both requests are answered; no script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -90,6 +91,13 @@ public class TC_UC21_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         await page.WaitForURLAsync("**/refills/*");
         await page.WaitForFunctionAsync("document.activeElement.matches('[data-refill-approve]')");
         await AiReviewBrowserTests.TabToAsync(page, "#refill-message");
+        Assert.True(await page.EvaluateAsync<bool>(focusRing));
+        // Spaces alone pass the browser's check and not the server's: the page comes back with the cursor in the message.
+        await page.Keyboard.TypeAsync("   ");
+        await AiReviewBrowserTests.TabToAsync(page, "[data-refill-decline] button[type=submit]");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForSelectorAsync(".sc-field__error");
+        await page.WaitForFunctionAsync("document.activeElement.matches('#refill-message')");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.TypeAsync("Synthetic: please book a visit.");
         await AiReviewBrowserTests.TabToAsync(page, "[data-refill-decline] button[type=submit]");
