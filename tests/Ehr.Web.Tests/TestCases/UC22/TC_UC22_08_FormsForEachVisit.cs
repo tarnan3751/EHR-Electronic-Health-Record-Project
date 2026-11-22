@@ -105,10 +105,11 @@ public class TC_UC22_08_FormsForEachVisit(WebApps apps) : IClassFixture<WebApps>
 
         var answers = Text(await visit.Session.Client.GetStringAsync($"{FormsPath(visit.Patient)}/{first}", Cancel));
         Assert.Contains("Over the last 2 weeks, how often have you been bothered by any of the following problems?", answers);
-        Assert.Contains("Little interest or pleasure in doing things Nearly every day 3", answers);
-        Assert.Contains("Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual Several days 1", answers);
-        Assert.Contains("Thoughts that you would be better off dead or of hurting yourself in some way Not at all 0", answers);
-        Assert.Contains("get along with other people? Not answered —", answers);
+        Assert.Contains("Little interest or pleasure in doing things Nearly every day · score 3", answers);
+        Assert.Contains("Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual Several days · score 1", answers);
+        Assert.Contains("Thoughts that you would be better off dead or of hurting yourself in some way Not at all · score 0", answers);
+        Assert.Contains("get along with other people? Not answered", answers);
+        Assert.DoesNotContain("Not answered ·", answers, StringComparison.Ordinal);
         Assert.Contains("12 of 27 · Moderate Needs follow-up", answers);
         Assert.Contains("Developed by Drs. Robert L. Spitzer, Janet B.W. Williams, Kurt Kroenke and colleagues", answers);
         Assert.Equal(sensitiveReads + 2, await apps.AuditEventsAsync(AuditActions.ReadSensitive, visit.Clinician.Id, visit.Patient));

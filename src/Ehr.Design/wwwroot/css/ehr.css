@@ -834,6 +834,28 @@
         accent-color: var(--primary);
     }
 
+    /* A form's answers: each question, then the answer chosen beneath it, at every width. A question is a sentence, so
+       a two-column list of facts (dl.record) would give it the whole width and squeeze the answer. */
+    .sc-answers {
+        max-width: var(--width-reading);
+        margin: 0 0 var(--space-6);
+    }
+
+    .sc-answers > dt {
+        color: var(--ink-muted);
+    }
+
+    .sc-answers > dd {
+        margin: var(--space-1) 0 var(--space-4);
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .sc-answers__score {
+        color: var(--ink-muted);
+        font-weight: 400;
+    }
+
     /* Notice. It starts with its state, so the color only supports the words. */
     .sc-notice {
         border-radius: var(--radius-md);

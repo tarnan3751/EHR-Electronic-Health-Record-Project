@@ -51,22 +51,18 @@
 </section>
 <h2>Answers</h2>
 <p>@definition.Prompt</p>
-<div class="sc-table-wrap">
-    <table class="sc-table" data-form-answers>
-        <thead><tr><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Score</th></tr></thead>
-        <tbody>
-            @foreach (var item in definition.Items)
+@* Each question, then the answer chosen beneath it, with its score when the question is scored (sc-answers). *@
+<dl class="sc-answers" data-form-answers>
+    @foreach (var item in definition.Items)
+    {
+        var chosen = answered.Answers.TryGetValue(item.Code, out var code) ? definition.AnswersTo(item).FirstOrDefault(answer => answer.Code == code) : null;
+        <dt>@item.Text</dt>
+        <dd>@(chosen?.Text ?? "Not answered")@if (item.Scored && chosen?.Score is { } points)
             {
-                var chosen = answered.Answers.TryGetValue(item.Code, out var code) ? definition.AnswersTo(item).FirstOrDefault(answer => answer.Code == code) : null;
-                <tr>
-                    <td>@item.Text</td>
-                    <td>@(chosen?.Text ?? "Not answered")</td>
-                    <td class="sc-table__mono">@(item.Scored && chosen?.Score is { } points ? points.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
+                <text> </text><span class="sc-answers__score">· score @points.ToString(System.Globalization.CultureInfo.InvariantCulture)</span>
+            }</dd>
+    }
+</dl>
 @if (definition.Attribution is { } attribution)
 {
     <p class="sc-muted">@attribution</p>

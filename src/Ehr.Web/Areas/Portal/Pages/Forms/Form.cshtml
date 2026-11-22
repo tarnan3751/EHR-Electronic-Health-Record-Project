@@ -38,7 +38,7 @@
     @* Who sent them, never by an account's name: the reader, the patient, or someone the record is shared with. *@
     <p>Sent @When(answered.AnsweredAt) by @(answered.ByReader ? "you" : answered.ByProxy ? "someone the record is shared with" : "the patient").</p>
     <p>@definition.Prompt</p>
-    <dl class="record" data-form-answers>
+    <dl class="sc-answers" data-form-answers>
         @foreach (var item in definition.Items)
         {
             var chosen = answered.Answers.TryGetValue(item.Code, out var code) ? definition.AnswersTo(item).FirstOrDefault(answer => answer.Code == code) : null;

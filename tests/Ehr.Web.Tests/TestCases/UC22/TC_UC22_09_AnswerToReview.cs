@@ -120,7 +120,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
             Assert.Contains("Not on your panel: Synthetic Booked is on the panel of Dr. Forms Colleague, Dr. Forms Nine, and the chart opens to you only "
                 + "under emergency access, which the chart asks you for.", page);
             Assert.Contains("An answer needs review: question 9, \"Thoughts that you would be better off dead or of hurting yourself in some way\".", page);
-            Assert.Contains("Thoughts that you would be better off dead or of hurting yourself in some way Several days 1", page);
+            Assert.Contains("Thoughts that you would be better off dead or of hurting yourself in some way Several days · score 1", page);
             Assert.Contains("Back to the inbox", page);
         }
 
