@@ -20,22 +20,26 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   14, and the clinician an unsigned draft written then, each with a History, as the SoapNotes migration left them.
 // Inputs and system conditions: GET /patients/{id}/notes/{note}, its /addendum and /summary; POST
 //   /api/desktop/offline-panel; GET /patients/{id}/notes/drafts/{draft} on-site and on the cloud app cut off from the
-//   clinic; POST it with handler Review (save, then the signing checks).
+//   clinic; POST it with handler Save as the form posts without JavaScript, and with handler Review (save, then the
+//   signing checks).
 // Test data: the signed note's History "Synthetic history: signed as History, temperature 37.9."; the draft's History
 //   "Synthetic history: drafted as History, chest clear."
 // Steps:
 //   1. Open the signed note, its addendum page and its summary page; download the offline copy.
 //   2. Open the draft in the editor, and look at the saved draft.
 //   3. Open the draft off-site with the clinic's server unreachable, and look at the saved draft.
-//   4. Choose "Sign note…" with Objective left empty.
-//   5. Type Objective, and sign.
+//   4. Without JavaScript, save it with a visit type that isn't on the list ("general-surgery").
+//   5. Choose "Sign note…" with Objective left empty.
+//   6. Type Objective, and sign.
 // Expected result: Step 1: each page shows History, Assessment and Plan, with "Written as History, Assessment and Plan,
 //   before notes had four sections.", and no Subjective; the offline copy gives the note's History as signed. Step 2:
 //   Subjective holds the History, Objective is empty, and a notice starting "Check:" says to move today's vital signs,
 //   examination findings and reviewed results to Objective; the saved draft is exactly as it was. Step 3: the draft is
-//   shown read-only under History, Assessment and Plan, and the saved draft is exactly as it was. Step 4: the draft is
-//   saved, in one update that writes the four sections and clears the History, and signing is refused with "Enter
-//   Objective before signing." Step 5: the note is signed in four sections.
+//   shown read-only under History, Assessment and Plan, and the saved draft is exactly as it was. Step 4: nothing is
+//   saved ("Choose a visit type from the list."), and the page shows the History in Subjective with the "Check:" notice
+//   again; the saved draft is exactly as it was. Step 5: the draft is saved, in one update that writes the four sections
+//   and clears the History, and signing is refused with "Enter Objective before signing." Step 6: the note is signed in
+//   four sections.
 // Creator: Tahseen Arnan
 public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFixture<WebApps>
 {
@@ -82,6 +86,18 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
         Assert.Contains("It is shown as last saved.", offSite);
         Assert.Matches($"(?s)<h2>History</h2><p class=\"sc-note__text\">{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</p>", offSite);
         Assert.DoesNotContain("<textarea", offSite);
+        Assert.Equal(saved, await RowAsync());
+
+        using (var refused = await PostFormAsync(session.Client, path + "?handler=Save", path, ("Version", 1), ("Subjective", DraftHistory), ("Objective", ""),
+            ("Assessment", "Synthetic assessment: earlier."), ("Plan", "Synthetic plan: earlier."), ("NoteTemplateCode", "general-surgery")))
+        {
+            Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+            var page = await refused.Content.ReadAsStringAsync(Cancel);
+            Assert.Contains("Choose a visit type from the list.", Words(page));
+            Assert.Contains("Check: this draft was written before notes had four sections.", Words(page));
+            Assert.Matches($"<textarea[^>]*id=\"Subjective\"[^>]*>\\s*{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</textarea>", page);
+        }
+
         Assert.Equal(saved, await RowAsync());
 
         var token = Token(editor);

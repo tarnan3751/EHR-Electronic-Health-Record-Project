@@ -119,6 +119,13 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         }
 
         Version = result.Draft?.Version ?? Version;
+        // Where the sections' text came from is the saved draft's (step 14): after a failed save, a draft written before
+        // four sections, or last saved on the desktop, still is one, and the page says so again.
+        if ((result.Draft ?? await Phi.ReadDraftAsync(draftId, patientId, HttpContext.RequestAborted, tracking: false)) is { } stored)
+        {
+            (Origin, Saved) = (NoteContent.OriginOf(stored), NoteSections.AsSaved(stored));
+        }
+
         Templates = await notes.TemplatesAsync(HttpContext.RequestAborted);
         // Tag helpers prefer posted ModelState over updated properties.
         ModelState.Remove(nameof(Version));
