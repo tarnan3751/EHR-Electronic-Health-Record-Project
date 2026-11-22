@@ -80,8 +80,12 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         await page.Keyboard.PressAsync("Tab");
         Assert.Equal("Download as a file (FHIR)", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         Assert.True(await page.EvaluateAsync<bool>(FocusRing));
+        // The file is named by the UTC day of the request: the day read just before it, or after it if midnight came
+        // between.
+        var before = DateTime.UtcNow;
         var download = await page.RunAndWaitForDownloadAsync(() => page.Keyboard.PressAsync("Enter"));
-        Assert.Equal($"health-record-{DateTime.UtcNow:yyyy-MM-dd}.json", download.SuggestedFilename);
+        var after = DateTime.UtcNow;
+        Assert.Contains(download.SuggestedFilename, new[] { $"health-record-{before:yyyy-MM-dd}.json", $"health-record-{after:yyyy-MM-dd}.json" });
         Assert.Contains("sertraline", await System.IO.File.ReadAllTextAsync(await download.PathAsync(), TestContext.Current.CancellationToken));
 
         await page.Keyboard.PressAsync("Tab");
