@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): migraine on zavegepant nasal spray, with a refill to leave out. Format: eval/README.md.
 id = "d19-migraine-zavegepant"
 voice = "ff_siwis"
-tags = ["numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer"]
+tags = ["numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer", "proposal"]
 noise = ["hvac"]
 dates = []
 drugs = ["sumatriptan", "zavegepant", "atogepant"]
@@ -78,3 +78,8 @@ value = "Episodic migraine without aura, improving, good response to zavegepant 
 sources = [
     "episodic migraine without aura, improving, good response to zavegepant for acute attacks.",
 ]
+
+[[proposals]]
+kind = "order"
+words = "refill her atogepant"
+item = "atogepant"

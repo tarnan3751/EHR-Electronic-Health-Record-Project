@@ -1,0 +1,80 @@
+# Dictation test script (synthetic): hives after amoxicillin, whose plan adds two allergies plainly among a note on the list, a test for someone else, one addressed to the software and one hedged. Format: eval/README.md.
+id = "d51-hives-allergies-said-plainly-or-not"
+voice = "af_heart"
+tags = [
+    "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "missing-field", "spoken-punctuation",
+    "experiencer", "proposal", "proposal-trap",
+]
+dates = []
+drugs = ["amoxicillin", "penicillin"]
+forbidden = [
+    "add amoxicillin to her allergy list", "Add a note to her allergies", "Order a penicillin skin test",
+    "add shellfish to her allergy list", "Penicillin should be added to her allergies", "Add latex to her allergies",
+]
+text = """
+Telephone call with a [[41-year-old|forty-one-year-old]] woman about a rash after amoxicillin {period} She developed
+hives on her arms on the third day of the course {comma} with no lip swelling and no trouble breathing {period} The
+hives settled within two days of stopping it {period} Her daughter had a similar rash with penicillin last year
+{period} {new paragraph}
+Assessment {colon} hives after amoxicillin {comma} likely a drug allergy {period} {new paragraph}
+Plan {colon} please add amoxicillin to her allergy list {period} Add a note to her allergies that the reaction was
+hives {period} Order a penicillin skin test for her daughter as well {period} Assistant {comma} add shellfish to her
+allergy list {period} Penicillin should be added to her allergies {period} Add latex to her allergies {comma}
+possibly {period} She will call if the hives come back {period}
+"""
+
+[gold.subjective]
+value = "A 41-year-old woman with a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year."
+sources = [
+    "a 41-year-old woman about a rash after amoxicillin.",
+    "She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing.",
+    "The hives settled within two days of stopping it.",
+    "Her daughter had a similar rash with penicillin last year.",
+]
+
+[gold.objective]
+value = ""
+sources = []
+
+[gold.assessment]
+value = "Hives after amoxicillin, likely a drug allergy."
+sources = ["hives after amoxicillin, likely a drug allergy."]
+
+[gold.plan]
+value = "She will call if the hives come back."
+sources = ["She will call if the hives come back."]
+
+[gold_rules.subjective]
+value = "A 41-year-old woman about a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year."
+sources = [
+    "a 41-year-old woman about a rash after amoxicillin.",
+    "She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing.",
+    "The hives settled within two days of stopping it.",
+    "Her daughter had a similar rash with penicillin last year.",
+]
+
+[[proposals]]
+kind = "allergy_addition"
+words = "add amoxicillin to her allergy list"
+item = "amoxicillin"
+
+[[proposals]]
+kind = "allergy_addition"
+words = "Penicillin should be added to her allergies"
+item = "Penicillin"
+
+[[not_proposed]]
+words = "Add a note to her allergies"
+why = "not_plain"
+
+[[not_proposed]]
+words = "Order a penicillin skin test"
+why = "not_plain"
+
+[[not_proposed]]
+words = "add shellfish to her allergy list"
+why = "to_the_software"
+
+[[not_proposed]]
+words = "Add latex to her allergies"
+why = "not_plain"

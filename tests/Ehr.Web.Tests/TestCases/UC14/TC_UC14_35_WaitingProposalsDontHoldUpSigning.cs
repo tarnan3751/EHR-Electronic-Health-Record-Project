@@ -17,16 +17,17 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Preconditions: Dr. Test has the patient on their panel, signed in on the on-site app, and dictated a note whose review
 //   proposes an order and an allergy to add; a colleague has the patient on their panel too.
 // Inputs and system conditions: GET the note being written; the review's Decide and Complete; the editor's Review and
-//   confirm; GET the signed note; the review's DismissProposal; on the on-site app.
+//   confirm; GET the signed note and its review; the review's DismissProposal; on the on-site app.
 // Test data: the stub's dictation, each proposed field accepted.
 // Steps:
 //   1. Open the note being written.
-//   2. Accept each field, complete the review, sign the note, and open it.
+//   2. Accept each field, complete the review, sign the note, and open it and its review.
 //   3. Dismiss the order's proposal, and open the note again; the colleague opens it.
 // Expected result: Step 1: "Awaiting review: 2 orders or allergies proposed from dictation. Review them. They don't hold
 //   up signing the note." with the way to the review. Step 2: the note is signed with both proposals waiting, and its page
-//   says the same. Step 3: "Awaiting review: an order or allergy proposed from dictation."; the colleague's page says
-//   nothing of them.
+//   says the same; the review says "The note is signed. The review of its fields is read-only. The proposed orders and
+//   allergies below can still be opened in their forms or dismissed.", and offers both. Step 3: "Awaiting review: an
+//   order or allergy proposed from dictation."; the colleague's page says nothing of them.
 // Creator: Tahseen Arnan
 public class TC_UC14_35_WaitingProposalsDontHoldUpSigning(WebApps apps) : IClassFixture<WebApps>
 {
@@ -44,6 +45,10 @@ public class TC_UC14_35_WaitingProposalsDontHoldUpSigning(WebApps apps) : IClass
         Assert.Contains("Awaiting review: 2 orders or allergies proposed from dictation.", Said(html));
         Assert.Contains($"/notes/drafts/{dictated.Draft}/review/{dictated.Review}", html);
         Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Order));
+        var review = await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel);
+        Assert.Contains("The note is signed. The review of its fields is read-only. The proposed orders and allergies below can still be opened in their forms or dismissed.", Said(review));
+        Assert.NotEmpty(LinkTo(review.Replace("&amp;", "&", StringComparison.Ordinal), OrderFormPath(dictated.Patient, dictated.Order)));
+        Assert.Equal(2, CountOf(review, "Dismiss proposal"));
 
         using (var dismissed = await DismissAsync(dictated, dictated.Order))
         {

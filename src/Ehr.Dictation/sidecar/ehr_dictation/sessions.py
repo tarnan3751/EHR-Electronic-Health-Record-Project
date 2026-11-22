@@ -10,7 +10,10 @@ free in time; if not, the chunk is kept and the answer has the transcript as it 
 Stop takes no more audio and, in the background, transcribes the rest, drops the audio, and has K2 Horizon sort the
 transcript. Stop and result answer within a few seconds whatever state that has reached: the transcript (final once
 transcribed), the fields once sorted, and every instruction in the transcript to order something or change the allergy
-list, which the note never carries (notCarriedOver), so the review screen can say what still needs placing. If K2
+list, which the note never carries (notCarriedOver), so the review screen can say what still needs placing, and, once
+the transcript is final, those of them the dictation proposes (proposals: an order, or an allergy to add, dictated
+plainly; validation.proposals(), the one place they are made). A session whose dictation must propose nothing has
+`proposes` set to False, and its results carry none. If K2
 Horizon is unavailable or too slow, the result keeps the transcript and says why the fields are missing (UC 10); if
 MedASR fails on the rest of the recording, or ffmpeg can't decode it in time twice over, it keeps the transcript as it
 was live, not final, with the reason transcription_failed. The fields are checked (validation.py) and marked pending; a field that failed
@@ -91,6 +94,9 @@ class Session:
     sorting: str = "pending"
     reason: str | None = None
     checks: validation.Checks | None = None
+    # Whether its results propose the orders and allergies to add it dictates (the expansion plan's step 15). The one
+    # switch for them: a kind of session that must propose nothing sets it False when it starts.
+    proposes: bool = True
     finished_at: float | None = None
     task: asyncio.Task | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -271,6 +277,7 @@ class Sessions:
             "reason": session.reason if sorting == "unavailable" else None,
             "fields": session.checks.to_json(session.transcript) if sorting == "done" and session.checks else None,
             "notCarriedOver": validation.not_carried_over(session.transcript),
+            "proposals": validation.proposals(session.transcript) if session.proposes else [],
             "provenance": self.provenance(),
         }
 
@@ -295,11 +302,12 @@ class Sessions:
             session.progress = progress
             session.transcript = assemble(progress.segments, final=True)
             log.info(
-                "session %s stopped: %.1f s of audio, %d passages (%d unclear), %.2f s",
+                "session %s stopped: %.1f s of audio, %d passages (%d unclear), %d proposals, %.2f s",
                 session.id,
                 samples.size / audio.SAMPLE_RATE,
                 len(session.transcript.placed),
                 len(session.transcript.unclear_ranges()),
+                len(validation.proposals(session.transcript)) if session.proposes else 0,
                 time.perf_counter() - started,
             )
             await self._sort(session)
