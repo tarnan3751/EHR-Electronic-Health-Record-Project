@@ -4,15 +4,18 @@
 //    (Ehr.Web, Api/Dictation/AmbientApi.cs, whose header is the contract). Only after its 201 is the microphone opened:
 //    nothing is captured or kept in the browser before.
 // 2. The visit's audio goes up in numbered five-second chunks, in whatever format the browser records (AGENTS.md: never
-//    hard-code one). The page shows that it is recording, and for how long, the whole time, and so does the tab's title.
-//    Pause, or the page going out of sight, pauses the recorder and switches the microphone's tracks off, and nothing is
-//    sent until the clinician resumes. It stops on its own at the session's limit or after five minutes with nobody
-//    speaking, and at once, keeping nothing, if the clinician is signed out or the listening is refused.
+//    hard-code one). The page shows that it is recording, and for how long, the whole time, and so does the tab's title;
+//    the clock that ticks is apart from the status line, a live region, which says each change and warning and keeps it
+//    until the next. Pause, or the page going out of sight, even while listening starts, pauses the recorder and
+//    switches the microphone's tracks off, and nothing is sent until the clinician resumes. It stops on its own at the
+//    session's limit or after five minutes with nobody speaking, and at once, keeping nothing, if the clinician is
+//    signed out or the listening is refused.
 // 3. Stop and draft: the server transcribes the visit and tells its voices apart; the clinician says who each voice is,
 //    with no role chosen for them, and the note is drafted and saved for review (UC 13), where the page goes.
 // Stop and discard, at any point before that, switches the microphone off first, then discards the session and its
-// review: nothing recorded is kept. Leaving the page before the voices are named does the same. Every piece of text is set
-// with textContent, never parsed as HTML.
+// review: nothing recorded is kept. Leaving the page before the voices are named does the same, and leaving it at all
+// ends listening here for good. A chunk the recorder hands over after its listening is discarded, stopped or ended is
+// dropped. Every piece of text is set with textContent, never parsed as HTML.
 "use strict";
 
 (() => {
@@ -27,6 +30,7 @@
     const token = root.querySelector("input[name=__RequestVerificationToken]")?.value ?? "";
     const consent = part("consent");
     const statusArea = part("status");
+    const clock = part("clock");
     const capture = part("capture");
     const pauseButton = part("pause");
     const speakersArea = part("speakers");
@@ -45,14 +49,15 @@
 
     function fresh() {
         return { requestId: null, session: null, stream: null, recorder: null, queue: [], nextSeq: 0, sending: false,
-            paused: false, hidden: false, stopping: false, drafting: false, ended: false, persisted: false,
-            retryMs: firstRetryMs, retryTimer: 0, clock: 0, recordedMs: 0, resumedAt: 0, voices: [] };
+            paused: false, hidden: false, stopping: false, stopped: false, drafting: false, ended: false, left: false,
+            persisted: false, warned: false, retrying: false, retryMs: firstRetryMs, retryTimer: 0, clock: 0, recordedMs: 0,
+            resumedAt: 0, voices: [] };
     }
 
-    function say(text, isError = false, recording = false) {
+    // The status line, a live region: each message stays until the next replaces it.
+    function say(text, isError = false) {
         statusArea.textContent = text;
         statusArea.classList.toggle("sc-status--error", isError);
-        statusArea.dataset.state = recording ? "recording" : "idle";
     }
 
     function call(method, path, body, type) {
@@ -90,10 +95,13 @@
         return (state.recordedMs + (state.resumedAt ? Date.now() - state.resumedAt : 0)) / 1000;
     }
 
+    // The clock, every second while recording, with its red dot: not a live region, so a screen reader isn't read it each
+    // second; the tab's title says it too.
     function showRecording() {
         const max = state.session?.maxSeconds ?? 0;
         const elapsed = recordedSeconds();
-        say(`Recording the visit: ${minutes(elapsed)} of ${minutes(max)}.`, false, true);
+        clock.textContent = `Recording the visit: ${minutes(elapsed)} of ${minutes(max)}.`;
+        clock.dataset.state = "recording";
         document.title = `● Recording: ${title}`;
         if (max > 0 && elapsed >= max) {
             stopAndDraft(`Stopped at the ${Math.round(max / 60)}-minute limit. Say who each voice is to draft the note.`);
@@ -152,18 +160,21 @@
         }
 
         // No mimeType: the browser picks the format it records (WebM in Chromium, MP4 in WebKit), and the server decodes
-        // either.
-        const recorder = new MediaRecorder(state.stream);
-        state.recorder = recorder;
+        // either. Its chunks belong to this listening alone: one handed over once it was discarded, ended, or after the
+        // recorder stopped (a real recorder's last comes after stop() returns) is dropped, never queued for the next.
+        const own = state;
+        const recorder = new MediaRecorder(own.stream);
+        own.recorder = recorder;
         recorder.addEventListener("dataavailable", (event) => {
-            if (event.data && event.data.size > 0 && !state.ended) {
-                state.queue.push({ seq: state.nextSeq++, blob: event.data, type: event.data.type || recorder.mimeType || "audio/*" });
+            if (event.data && event.data.size > 0 && own === state && !own.ended && !own.stopped) {
+                own.queue.push({ seq: own.nextSeq++, blob: event.data, type: event.data.type || recorder.mimeType || "audio/*" });
                 pump();
             }
         });
         recorder.addEventListener("stop", () => {
-            stopTracks();
-            if (!state.ended) {
+            own.stopped = true;
+            stopTracks(own);
+            if (own === state && !own.ended) {
                 pump();
             }
         });
@@ -173,8 +184,15 @@
         consent.hidden = true;
         capture.hidden = false;
         showRecording();
+        say("Listening: the visit is being recorded.");
         part("stop").focus();
+        // Out of sight while listening started: paused at once, as it would be had it gone out of sight now.
+        if (document.visibilityState === "hidden") {
+            pause(hiddenMessage);
+        }
     }
+
+    const hiddenMessage = "Paused while this page was out of sight: nothing was recorded. Select Resume listening to carry on.";
 
     function microphoneProblem(error) {
         switch (error?.name) {
@@ -215,6 +233,11 @@
                 if (response.ok) {
                     state.queue.shift();
                     state.retryMs = firstRetryMs;
+                    if (state.retrying) {
+                        state.retrying = false;
+                        say("Connected again: the audio recorded meanwhile has been sent.");
+                    }
+
                     heard(body);
                     continue;
                 }
@@ -258,18 +281,24 @@
     }
 
     function retryLater() {
-        say("The connection to the clinic's server dropped. Still recording here; the audio is sent when it's back.", true, true);
+        state.retrying = true;
+        say("The connection to the clinic's server dropped. Still recording here; the audio is sent when it's back.", true);
         clearTimeout(state.retryTimer);
         state.retryTimer = setTimeout(pump, state.retryMs);
         state.retryMs = Math.min(state.retryMs * 2, mostRetryMs);
     }
 
+    // The warning stays until someone speaks, or something else is said.
     function heard(received) {
         const quiet = received.quietSeconds ?? 0;
         if (quiet >= quietSeconds) {
             stopAndDraft("Stopped: nobody has spoken for 5 minutes. Say who each voice is to draft the note.");
-        } else if (quiet >= warnQuietSeconds && !state.stopping) {
-            say("Nobody has spoken for 4 minutes: listening stops in a minute unless someone speaks.", false, true);
+        } else if (quiet >= warnQuietSeconds && !state.stopping && !state.warned) {
+            state.warned = true;
+            say("Nobody has spoken for 4 minutes: listening stops in a minute unless someone speaks.");
+        } else if (quiet < warnQuietSeconds && state.warned) {
+            state.warned = false;
+            say("Listening: someone spoke, so listening carries on.");
         }
     }
 
@@ -284,6 +313,8 @@
         state.recordedMs += Date.now() - state.resumedAt;
         state.resumedAt = 0;
         clearInterval(state.clock);
+        clock.textContent = `Paused at ${minutes(recordedSeconds())} of ${minutes(state.session?.maxSeconds ?? 0)}.`;
+        clock.dataset.state = "idle";
         pauseButton.textContent = "Resume listening";
         document.title = `Paused: ${title}`;
         say(reason, false);
@@ -301,24 +332,18 @@
         state.clock = setInterval(showRecording, 1000);
         pauseButton.textContent = "Pause listening";
         showRecording();
+        say("Listening again: the visit is being recorded.");
         pump();
     }
 
-    function stopTracks() {
-        state.stream?.getTracks().forEach((track) => { track.enabled = false; track.stop(); });
+    function stopTracks(of = state) {
+        of.stream?.getTracks().forEach((track) => { track.enabled = false; track.stop(); });
     }
 
     // Ends the listening here at once and keeps nothing: the microphone first, then what was sent.
     function end(message) {
         const session = state.session;
-        state.ended = true;
-        clearInterval(state.clock);
-        clearTimeout(state.retryTimer);
-        if (state.recorder && state.recorder.state !== "inactive") {
-            state.recorder.stop();
-        }
-
-        stopTracks();
+        stopHere();
         document.title = title;
         capture.hidden = true;
         speakersArea.hidden = true;
@@ -335,13 +360,32 @@
         call("DELETE", `${api}/${session.sessionId}`).catch(() => { });
     }
 
-    async function discard(message) {
-        end(message || "Discarded: nothing recorded was kept.");
-        statusArea.classList.remove("sc-status--error");
+    // Ends it here for good: nothing more recorded, queued or sent.
+    function stopHere() {
+        state.ended = true;
+        state.queue = [];
+        clearInterval(state.clock);
+        clearTimeout(state.retryTimer);
+        if (state.recorder && state.recorder.state !== "inactive") {
+            state.recorder.stop();
+        }
+
+        stopTracks();
+    }
+
+    // Back to the consent, for a listening of its own, with the cursor on its heading: the button just used has gone.
+    function askAgain() {
         state = fresh();
         consent.hidden = false;
         consent.reset();
         consent.querySelector("button").disabled = false;
+        part("consent-heading").focus();
+    }
+
+    async function discard(message) {
+        end(message || "Discarded: nothing recorded was kept.");
+        statusArea.classList.remove("sc-status--error");
+        askAgain();
     }
 
     // 3. Stop and draft: the rest of the audio goes up, and the server transcribes the visit and tells its voices apart.
@@ -480,7 +524,7 @@
 
         if (result) {
             await stage();
-        } else {
+        } else if (!state.ended) {
             state.drafting = false;
             speakersArea.hidden = false;
             checkVoices();
@@ -528,7 +572,7 @@
     // Out of sight, the recording pauses, and resumes only when the clinician says so.
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") {
-            pause("Paused while this page was out of sight: nothing was recorded. Select Resume listening to carry on.");
+            pause(hiddenMessage);
         }
     });
 
@@ -539,14 +583,39 @@
         }
     });
 
-    // Leaving before the voices are named discards it all, as Stop and discard would. Once drafting has started, the
-    // draft is saved for review whenever it is retrieved.
+    // Leaving the page ends listening here for good: the microphone off, nothing waiting kept, nothing sent again. Before
+    // the voices are named it discards it all too, as Stop and discard would; once drafting has started, the draft is
+    // saved for review whenever it is retrieved.
     window.addEventListener("pagehide", () => {
-        if (state.session && !state.persisted && !state.ended && !state.drafting) {
-            stopTracks();
+        if (!state.session || state.persisted || state.ended) {
+            return;
+        }
+
+        const session = state.session;
+        stopHere();
+        state.left = true;
+        if (!state.drafting) {
             const headers = { RequestVerificationToken: token };
-            fetch(`${reviewApi}/review/${state.session.reviewId}/discard`, { method: "POST", headers, credentials: "same-origin", keepalive: true }).catch(() => { });
-            fetch(`${api}/${state.session.sessionId}`, { method: "DELETE", headers, credentials: "same-origin", keepalive: true }).catch(() => { });
+            fetch(`${reviewApi}/review/${session.reviewId}/discard`, { method: "POST", headers, credentials: "same-origin", keepalive: true }).catch(() => { });
+            fetch(`${api}/${session.sessionId}`, { method: "DELETE", headers, credentials: "same-origin", keepalive: true }).catch(() => { });
+        }
+    });
+
+    // Back from the browser's back/forward cache: the listening ended when the page was left, and the page says so, never
+    // "Recording".
+    window.addEventListener("pageshow", (event) => {
+        if (!event.persisted || !state.left) {
+            return;
+        }
+
+        document.title = title;
+        capture.hidden = true;
+        speakersArea.hidden = true;
+        if (state.drafting) {
+            say("Listening ended when you left this page while the note was being drafted. Open the draft to retrieve it.");
+        } else {
+            say("Listening ended when you left this page: nothing recorded was kept.");
+            askAgain();
         }
     });
 })();

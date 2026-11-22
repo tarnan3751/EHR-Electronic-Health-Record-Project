@@ -54,7 +54,7 @@ public class TC_UC23_06_Nfr12_KeyboardConsentFirst(WebApps apps) : IClassFixture
         await page.Keyboard.PressAsync("Space");
         await page.Keyboard.PressAsync("Tab");
         await page.Keyboard.PressAsync("Enter");
-        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-status]').textContent.startsWith('Recording the visit')");
+        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-clock]').textContent.startsWith('Recording the visit')");
         await page.WaitForFunctionAsync("window.__ambient.events.filter(e => e.startsWith('sent ') && e.includes('/audio')).length >= 2");
         var events = await AmbientBrowserTests.EventsAsync(page);
         var started = Array.FindIndex(events, e => e.EndsWith("/ambient/start 201", StringComparison.Ordinal));
@@ -62,7 +62,7 @@ public class TC_UC23_06_Nfr12_KeyboardConsentFirst(WebApps apps) : IClassFixture
         var firstAudio = Array.FindIndex(events, e => e.StartsWith("sent ", StringComparison.Ordinal) && e.Contains("/audio", StringComparison.Ordinal));
         Assert.True(started >= 0 && started < microphone && microphone < firstAudio, string.Join(" | ", events));
         Assert.StartsWith("● Recording", await page.TitleAsync(), StringComparison.Ordinal);
-        Assert.Equal("recording", await page.GetAttributeAsync("[data-ambient-status]", "data-state"));
+        Assert.Equal("recording", await page.GetAttributeAsync("[data-ambient-clock]", "data-state"));
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-ambient-stop]')"));
 
         // Paused from the keyboard: the microphone's track is off, and no chunk goes up until it resumes.

@@ -37,7 +37,7 @@ else
         <noscript><p class="sc-notice sc-notice--danger">Listening to a visit needs JavaScript. You can still type the note.</p></noscript>
 
         <form class="sc-form sc-form--wide" data-ambient-consent>
-            <h2>Before you start</h2>
+            <h2 tabindex="-1" data-ambient-consent-heading>Before you start</h2>
             <p>Ask the patient, and anyone else who will speak, whether they agree to this visit being recorded to draft your note. Read them this:</p>
             <blockquote class="sc-notice sc-notice--info" data-ambient-statement>
                 <p>“I'd like SwiftChart to listen to our conversation to help me write today's note. The recording is deleted as soon as it's turned into text. I check everything before it goes in your record. The text is deleted once I've checked it, or after a week at the latest, except what it suggested for the note. You can say no, or ask me to stop at any time, and your care won't change either way. Is that all right with you?”</p>
@@ -64,10 +64,13 @@ else
             </div>
         </form>
 
+        @* What changes is said here, each message kept until the next; the clock that ticks while listening is apart, beneath
+           the heading, and not announced. *@
         <p class="sc-status" role="status" aria-live="polite" data-ambient-status></p>
 
         <section data-ambient-capture hidden aria-labelledby="ambient-capture">
             <h2 id="ambient-capture">Listening to the visit</h2>
+            <p class="sc-status" data-ambient-clock></p>
             <div class="sc-actions">
                 <button type="button" class="sc-btn" data-ambient-pause>Pause listening</button>
                 <button type="button" class="sc-btn sc-btn--primary" data-ambient-stop>Stop and draft the note</button>
