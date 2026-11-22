@@ -1,9 +1,15 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Domain.Audit;
+using Ehr.Web.Api.Dictation;
 using Ehr.Web.Areas.Portal.Pages;
 using Ehr.Web.CloudAudit;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
@@ -91,6 +97,92 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(reads, await ReadsAsync(patient.Patient, actor, since));
+    }
+
+    // The reads of the pages and APIs that need something of the patient's first: an order's results, an appointment's
+    // page, the FHIR API's searches of entries, a signed note's sensitivity and addendum pages, the dictation API starting a
+    // note, and the desktop app's draft sync. One row each, so a wrong part on any one of them turns its own row red.
+    [Theory]
+    [InlineData("order results", "patients results")]
+    [InlineData("appointment", "patients appointments")]
+    [InlineData("fhir conditions", "patients fhir")]
+    [InlineData("fhir observations", "patients fhir")]
+    [InlineData("fhir allergies", "patients fhir")]
+    [InlineData("note sensitivity", "clinical_notes visit-note", "patients visit-note")]
+    [InlineData("note addendum", "clinical_notes visit-note", "patients visit-note")]
+    [InlineData("dictation api", "patients note-draft")]
+    [InlineData("desktop draft sync", "clinical_drafts note-draft")]
+    public async Task Each_api_and_page_that_needs_an_entry_records_its_part(string what, params string[] reads)
+    {
+        var (clinician, session, patient) = await PatientAsync();
+        var chart = $"/patients/{patient.Patient}";
+        Func<Task<HttpResponseMessage>> request;
+        switch (what)
+        {
+            case "order results":
+                var order = await OrderTests.SignedAsync(session.Client, patient.Patient, "lab", "Complete blood count (CBC)", OrderTests.Cbc);
+                request = () => session.Client.GetAsync($"{chart}/orders/{order}/results", Cancel);
+                break;
+            case "appointment":
+                await RecordViewTests.DayAndInboxAsync(apps, clinician.Id, patient.Patient);
+                var appointment = await AppointmentTests.IdAsync(apps, patient.Patient);
+                request = () => session.Client.GetAsync($"/appointments/{appointment}", Cancel);
+                break;
+            case "fhir conditions" or "fhir observations" or "fhir allergies":
+                var resource = what switch { "fhir conditions" => "Condition", "fhir observations" => "Observation", _ => "AllergyIntolerance" };
+                request = () => session.Client.GetAsync($"/fhir/{resource}?patient={patient.Patient}", Cancel);
+                break;
+            case "note sensitivity" or "note addendum":
+                var note = await NoteAddendumTests.SignedNoteAsync(session.Client, patient.Patient);
+                var path = what == "note sensitivity" ? NoteAddendumTests.SensitivityPath(patient.Patient, note) : NoteAddendumTests.AddendumPath(patient.Patient, note);
+                request = () => session.Client.GetAsync(path, Cancel);
+                break;
+            case "dictation api":
+                apps.Dictation.Reset();
+                var token = Token(await session.Client.GetStringAsync($"{chart}/dictate", Cancel));
+                request = () =>
+                {
+                    var start = new HttpRequestMessage(HttpMethod.Post, DictationApi.Path + "/for-note")
+                    {
+                        Content = JsonContent.Create(new { reviewId = Guid.NewGuid(), patientId = patient.Patient }),
+                    };
+                    start.Headers.Add("RequestVerificationToken", token);
+                    return session.Client.SendAsync(start, Cancel);
+                };
+                break;
+            default:
+                var desktop = CreateClient(apps.OnPrem);
+                desktop.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await apps.DesktopSignInAsync(apps.OnPrem, clinician));
+                using (var pushed = await desktop.PostAsJsonAsync("/api/desktop/drafts/push",
+                    new { Key = Guid.NewGuid(), Id = Guid.NewGuid(), PatientId = patient.Patient, BaseVersion = (long?)null, Body = "Synthetic draft" }, JsonSerializerOptions.Web, Cancel))
+                {
+                    Assert.Equal(HttpStatusCode.OK, pushed.StatusCode);
+                }
+
+                request = () => desktop.PostAsJsonAsync("/api/desktop/drafts/pull", new { Since = "0", Patients = new[] { patient.Patient } }, JsonSerializerOptions.Web, Cancel);
+                break;
+        }
+
+        var since = DateTimeOffset.UtcNow;
+        using var response = await request();
+
+        Assert.True(response.IsSuccessStatusCode, $"{what}: {response.StatusCode}");
+        Assert.Equal(reads, await ReadsAsync(patient.Patient, clinician.Id, since));
+    }
+
+    // A read or a download recorded without the part of the record it was for is refused, whichever way it is recorded,
+    // so a page whose read forgot it fails; any other event is recorded with none.
+    [Fact]
+    public async Task A_read_recorded_without_its_part_is_refused()
+    {
+        using var scope = apps.OnPrem.Services.CreateScope();
+        var audit = scope.ServiceProvider.GetRequiredService<AuditRecorder>();
+        var patient = Guid.CreateVersion7();
+
+        Assert.All(AuditActions.Reads, action => Assert.Throws<InvalidOperationException>(() => audit.Record(action, patient, "patients", patient)));
+        Assert.Throws<InvalidOperationException>(() => audit.RecordReads("patients", null!, [(patient, patient)]));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => audit.RecordAllAsync(null!, [(AuditActions.Read, patient, "patients", patient)], Cancel));
+        Assert.Null(audit.Record(AuditActions.SignOut, patient).Part);
     }
 
     // The parts are one list wherever they are kept: the code's (AuditParts), the database's check, the cloud app's

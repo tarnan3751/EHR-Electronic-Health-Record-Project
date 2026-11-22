@@ -9,7 +9,8 @@ namespace Ehr.Domain.Audit;
 // once, in that transaction, so they commit with it too. The actor is the signed-in user
 // unless the caller knows better, as at a sign-in, where the user isn't signed in yet. On the cloud site, whose database
 // is a replica that takes no writes, the host registers an IAuditQueue and events go there instead. A read says which
-// part of the record it was for (AuditParts, step 13c2), which the PHI reader gives; no other event has one.
+// part of the record it was for (AuditParts, step 13c2), which the PHI reader gives; no other event has one. A read or
+// download recorded without one is refused here, so a page whose read forgot it fails its tests rather than record it.
 public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource source, IAuditQueue? queue = null)
 {
     public AuditEvent Record(
@@ -43,20 +44,28 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
         }
     }
 
-    AuditEvent New(string action, Guid? patientId, string? tableName, Guid? rowId, string? reason, Guid? actorId, string? details, string? part) => new()
+    AuditEvent New(string action, Guid? patientId, string? tableName, Guid? rowId, string? reason, Guid? actorId, string? details, string? part)
     {
-        Id = Guid.CreateVersion7(),
-        OccurredAt = DateTimeOffset.UtcNow,
-        Action = action,
-        Source = source.Name,
-        ActorId = actorId ?? user.UserId,
-        PatientId = patientId,
-        TableName = tableName,
-        RowId = rowId,
-        Reason = reason,
-        Details = details,
-        Part = part,
-    };
+        if (part is null && AuditActions.Reads.Contains(action))
+        {
+            throw new InvalidOperationException($"A '{action}' is recorded with the part of the record it was for (AuditParts).");
+        }
+
+        return new()
+        {
+            Id = Guid.CreateVersion7(),
+            OccurredAt = DateTimeOffset.UtcNow,
+            Action = action,
+            Source = source.Name,
+            ActorId = actorId ?? user.UserId,
+            PatientId = patientId,
+            TableName = tableName,
+            RowId = rowId,
+            Reason = reason,
+            Details = details,
+            Part = part,
+        };
+    }
 
     void Store(IReadOnlyCollection<AuditEvent> auditEvents)
     {
