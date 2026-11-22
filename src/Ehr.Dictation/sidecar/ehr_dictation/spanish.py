@@ -547,8 +547,9 @@ EXPERIENCER_BEFORE = _phrases(
     "antecedentes familiares de; antecedentes familiares; antecedente familiar de; historia familiar de; familiares; familiar"
 )
 # A relative after one of these (and maybe "su", "el", "la") is someone the patient is with or speaks to: "acompañado
-# de su madre". Unless a relative clause says what they have: "su madre, que tiene diabetes".
-NOT_EXPERIENCER_AFTER = frozenset("con por a de para junto".split())
+# de su madre", "se informa al padre" ("al" is "a el"). Unless a relative clause says what they have: "su madre, que
+# tiene diabetes".
+NOT_EXPERIENCER_AFTER = frozenset("con por a al de para junto".split())
 POSSESSIVES = frozenset("su sus el la los las mi".split())
 WHO_HAS = re.compile(r"\s*,?\s+(?:que|quien)\s+(?=(?:tiene|tuvo|tenia|padece|padecio|es|era|fue)\b)")
 # Someone telling, not having: "la madre refiere tos nocturna" is the patient's cough.

@@ -269,6 +269,10 @@ def test_un_una_and_uno_are_one(text, english, expected):
     ("Se aconseja a su esposo la vacuna.", "Her husband was advised about the vaccine.", []),
     ("La madre tiene asma.", "Asthma is explained to the mother.", ["experiencer_dropped"]),
     ("La madre tiene asma.", "Mother has asthma.", []),
+    # "Al" is "a el": the father told is not the father having it, as "a la madre" isn't.
+    ("Se informa al padre del plan.", "The father is informed of the plan.", []),
+    ("Se explica al abuelo la dieta.", "The diet is explained to the grandfather.", []),
+    ("El padre tiene diabetes.", "Diabetes is reported to the father.", ["experiencer_dropped"]),
 ])
 def test_a_relative_told_something_has_nothing(text, english, expected):
     assert reasons(text, [text], english) == expected
