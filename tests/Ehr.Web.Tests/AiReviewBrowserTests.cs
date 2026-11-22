@@ -346,7 +346,13 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
         await TabToAsync(page, "[data-dictation-field=plan] .sc-translation__pair");
         Assert.Equal(plan.Spanish, await HighlightedAsync(page));
-        Assert.Contains("This number can be read two ways", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning").TextContentAsync());
+        Assert.Contains("This number can be read two ways", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning").First.TextContentAsync());
+        // The Spanish quoted in a warning is marked as Spanish; in the Spanish transcript, an unclear passage's English
+        // explanation is on an English wrapper, and the passage itself stays Spanish.
+        Assert.Equal("Cada tercer día", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning span[lang=es]").TextContentAsync());
+        var unclear = page.Locator("[data-dictation-transcript] span[lang=en][title] > mark.sc-transcript__unclear[lang=es]");
+        Assert.Equal("Patient was counseled on diet.", await unclear.TextContentAsync());
+        Assert.StartsWith("Say this again: it wasn't heard as Spanish", await page.Locator("[data-dictation-transcript] span[lang=en][title]").GetAttributeAsync("title"));
         await TabToAsync(page, "[data-dictation-field=plan] [value=accepted]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('4 of 4')");

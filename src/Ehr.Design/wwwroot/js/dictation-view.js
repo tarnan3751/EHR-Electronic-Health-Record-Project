@@ -22,6 +22,7 @@ window.SwiftChartDictationView = class {
             near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
             ambiguous_number: "This number can be read two ways, with a decimal point or a thousands separator: check the highlighted words.",
+            // Its Spanish words are marked as Spanish where it is shown (warningNote).
             ambiguous_frequency: "“Cada tercer día” can mean every other day or every third day: check which you meant.",
         };
         const instructionWords = { order: "Order", allergy_change: "Allergy change" };
@@ -79,9 +80,21 @@ window.SwiftChartDictationView = class {
                 let node = document.createTextNode(text.slice(from, to));
                 if (segment?.unclear) {
                     const mark = element("mark", undefined, "sc-transcript__unclear");
-                    mark.title = `Say this again: ${unclearWords[segment.unclear] ?? "it may be wrong"}.`;
+                    const why = `Say this again: ${unclearWords[segment.unclear] ?? "it may be wrong"}.`;
                     mark.append(node);
-                    node = mark;
+                    if (transcriptArea.lang === "es") {
+                        // In a Spanish transcript (step 17) the explanation is English and the words Spanish: the title
+                        // goes on an English wrapper, so neither is read in the other's language.
+                        const english = element("span");
+                        english.lang = "en";
+                        english.title = why;
+                        mark.lang = "es";
+                        english.append(mark);
+                        node = english;
+                    } else {
+                        mark.title = why;
+                        node = mark;
+                    }
                 } else if (segment && !segment.final) {
                     const span = element("span", undefined, "sc-transcript__tentative");
                     span.append(node);
@@ -165,7 +178,7 @@ window.SwiftChartDictationView = class {
                     control.onblur = () => renderTranscript(state.transcript);
                 }
                 for (const warning of field.warnings ?? []) {
-                    const note = element("p", warningWords[warning.code] ?? "Check this field against the transcript.", "sc-proposal__warning");
+                    const note = warningNote(warning.code);
                     highlightOnFocus(note, [warning]);
                     value.append(note);
                 }
@@ -180,6 +193,23 @@ window.SwiftChartDictationView = class {
             } else {
                 setStatus(status, sorting === "unavailable" ? "Not sorted" : "Not dictated yet");
             }
+        }
+
+        // A warning's words for the clinician, with any Spanish in them marked as Spanish (step 17).
+        function warningNote(code) {
+            const words = warningWords[code] ?? "Check this field against the transcript.";
+            const note = element("p", undefined, "sc-proposal__warning");
+            const spanish = code === "ambiguous_frequency" ? "Cada tercer día" : null;
+            if (!spanish) {
+                note.textContent = words;
+                return note;
+            }
+
+            const at = words.indexOf(spanish);
+            const quoted = element("span", spanish);
+            quoted.lang = "es";
+            note.append(document.createTextNode(words.slice(0, at)), quoted, document.createTextNode(words.slice(at + spanish.length)));
+            return note;
         }
 
         // A value proposed from Spanish (step 17): each English sentence beside the Spanish words it was translated from,

@@ -36,7 +36,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         "Pulmones limpios.",
         "Patient was counseled on diet.",
         "Probable cuadro viral, pido una radiografi\u0301a de tórax.",
-        "Líquidos abundantes y reposo relativo durante los próximos tres a cinco días, paracetamol 1.000 mg cada ocho horas si tiene dolor o malestar general, y regresar a consulta si aparece dificultad para respirar o fiebre que no cede.",
+        "Líquidos abundantes y reposo relativo durante los próximos tres a cinco días, paracetamol 1.000 mg si tiene dolor o malestar general, hierro cada tercer día, y regresar a consulta si aparece dificultad para respirar o fiebre que no cede.",
     ];
 
     // What the Spanish mode proposes from those five chunks: for each field, each English sentence with the Spanish words
@@ -46,7 +46,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         ("subjective", [("Cough for three days.", "Tos desde hace tres días"), ("Denies fever.", "niega fiebre")]),
         ("objective", [("Lungs clear.", "Pulmones limpios.")]),
         ("assessment", [("Likely viral illness.", "Probable cuadro viral")]),
-        ("plan", [("Plenty of fluids and relative rest for the next three to five days, acetaminophen 1000 mg every 8 hours if there is pain or general malaise, and return to clinic if difficulty breathing or a fever that does not go away appears.", SpanishSentences[4])]),
+        ("plan", [("Plenty of fluids and relative rest for the next three to five days, acetaminophen 1000 mg if there is pain or general malaise, iron every other day, and return to clinic if difficulty breathing or a fever that does not go away appears.", SpanishSentences[4])]),
     ];
 
     readonly ConcurrentDictionary<string, StubSession> sessions = new();
@@ -386,7 +386,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     // The Spanish mode's answer: the transcript in Spanish, the order it holds not carried over, and from five chunks or
     // more, each field's English sentences, joined by a space as the value, each citing the Spanish words it was
-    // translated from; the plan's 1.000 mg carries the warning that it reads two ways.
+    // translated from; the plan's 1.000 mg and "cada tercer día" carry the warnings that they read two ways.
     object SortedSpanish(StubSession session, StubSorting sorting)
     {
         var transcript = Transcript(session, SpanishSentences);
@@ -444,6 +444,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             {
                 var number = text.IndexOf("1.000 mg", StringComparison.Ordinal);
                 warnings.Add(new { code = "ambiguous_number", start = number, end = number + "1.000 mg".Length });
+                var frequency = text.IndexOf("cada tercer día", StringComparison.Ordinal);
+                warnings.Add(new { code = "ambiguous_frequency", start = frequency, end = frequency + "cada tercer día".Length });
             }
 
             fields[field] = new { status = "pending", value = value.ToString(), sources, warnings, statements = translated };
