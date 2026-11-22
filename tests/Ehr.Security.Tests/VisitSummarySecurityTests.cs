@@ -252,6 +252,31 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.Single(await SummariesAsync(patient));
     }
 
+    // A note signed before step 14 still takes an addendum and a summary, as the app role signs and releases them for any
+    // note: the note stays exactly as it was signed, and an addendum signed sensitive after the summary makes the summary
+    // sensitive, inherited, as it does for a note of four sections.
+    [Fact]
+    public async Task A_note_signed_before_four_sections_takes_an_addendum_and_a_summary()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        await Accounts.AssignAsync(database, clinician, patient);
+        var (_, note) = await EarlierNotes.SignedAsync(database, clinician, patient, "Synthetic history: a dry cough for two days.");
+        const string row = "SELECT to_jsonb(n)::text FROM ehr.clinical_notes n WHERE id = @note";
+        var signed = await AsSuperuserAsync(row, ("note", note));
+
+        await AddendumAsync(clinician, patient, note);
+        var summary = await ReleaseAsync(clinician, patient, note);
+        Assert.Equal(["false false none none"], await MarkOfAsync(summary));
+        await AddendumAsync(clinician, patient, note, sensitive: true);
+
+        Assert.Equal([$"true true none {Inherited}"], await MarkOfAsync(summary));
+        Assert.Equal([$"{clinician} false", $"{clinician} true"], await AsSuperuserAsync(
+            "SELECT author_id || ' ' || sensitive FROM ehr.note_addenda WHERE note_id = @note ORDER BY signed_at", ("note", note)));
+        Assert.Equal([$"{clinician}"], await AsSuperuserAsync("SELECT released_by::text FROM ehr.visit_summaries WHERE id = @id", ("id", summary)));
+        Assert.Equal(signed, await AsSuperuserAsync(row, ("note", note)));
+    }
+
     // The patient's MRN and a section of the note are looked for as they look too, and what is stored is what was typed:
     // a summary with dashes, fullwidth letters and characters that show nothing, and no code, is released as it was
     // sent.
