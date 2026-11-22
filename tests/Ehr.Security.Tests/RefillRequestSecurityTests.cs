@@ -985,6 +985,75 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         Assert.Equal(2, (await ItemsAsync(request)).Count(item => item.EndsWith(" true", StringComparison.Ordinal)));
     }
 
+    // The same lock when a request is answered: a clinician who joined as it was declined was given an item for it
+    // that the answer's update never saw, which stayed open for good, since no one may mark a refill item done. Now
+    // whichever comes second sees the first: the joiner has no open item for the answered request.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_clinician_who_joins_while_a_request_is_answered_is_left_no_item_open(bool answeredFirst)
+    {
+        var (clinician, patient, account) = await OnPanelAsync();
+        var request = await AskAsync(account, patient, await MedicationAsync(patient));
+        var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+
+        var (answering, answeringTransaction) = await BeginAsync(App, clinician);
+        var (joins, joinsTransaction) = await BeginAsync(App, joining);
+        await using (answering)
+        await using (joins)
+        {
+            Task AnsweringAsync() => RunOnAsync(answering, answeringTransaction, "UPDATE ehr.refill_requests SET decline_message = 'Synthetic: please book a visit.' WHERE id = @id",
+                ("id", request));
+            Task JoiningAsync() => RunOnAsync(joins, joinsTransaction, JoinPanel, ("patient", patient), ("clinician", joining));
+
+            await (answeredFirst ? AnsweringAsync() : JoiningAsync());
+            var waiting = answeredFirst ? JoiningAsync() : AnsweringAsync();
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), Cancel)));
+            await (answeredFirst ? answeringTransaction : joinsTransaction).CommitAsync(Cancel);
+            await waiting;
+            await (answeredFirst ? joinsTransaction : answeringTransaction).CommitAsync(Cancel);
+        }
+
+        Assert.Equal(["rejected"], await AsSuperuserAsync("SELECT status FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+        Assert.DoesNotContain(await ItemsAsync(request), item => item.EndsWith(" true", StringComparison.Ordinal));
+    }
+
+    // And when a clinician leaves: a request asked as they left gave them an item for a patient no longer theirs. Now
+    // whichever comes second sees the first: the leaver has no open item, the clinician who stays has one.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_clinician_who_leaves_while_a_request_is_asked_is_left_no_item_open(bool askedFirst)
+    {
+        var (staying, patient, account) = await OnPanelAsync();
+        var leaving = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, leaving, patient);
+        var medication = await MedicationAsync(patient);
+        var request = Guid.CreateVersion7();
+
+        var (asking, askingTransaction) = await BeginAsync(App, account);
+        var (leaves, leavesTransaction) = await BeginAsync(App, leaving);
+        await using (asking)
+        await using (leaves)
+        {
+            Task AskingAsync() => RunOnAsync(asking, askingTransaction, Ask,
+                ("id", request), ("patient", patient), ("medication", medication), ("note", DBNull.Value), ("sensitive", false));
+            Task LeavingAsync() => RunOnAsync(leaves, leavesTransaction,
+                "UPDATE ehr.patient_assignments SET ended_at = now() WHERE patient_id = @patient AND clinician_id = @clinician AND ended_at IS NULL",
+                ("patient", patient), ("clinician", leaving));
+
+            await (askedFirst ? AskingAsync() : LeavingAsync());
+            var waiting = askedFirst ? LeavingAsync() : AskingAsync();
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), Cancel)));
+            await (askedFirst ? askingTransaction : leavesTransaction).CommitAsync(Cancel);
+            await waiting;
+            await (askedFirst ? leavesTransaction : askingTransaction).CommitAsync(Cancel);
+        }
+
+        Assert.Equal([$"{staying} refill-request A patient asked to renew a medication true"],
+            [.. (await ItemsAsync(request)).Where(item => item.EndsWith(" true", StringComparison.Ordinal))]);
+    }
+
     // A clinician joining a patient's panel, as the chart's "Add to my panel" does.
     const string JoinPanel = "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (gen_random_uuid(), @patient, @clinician, now())";
 

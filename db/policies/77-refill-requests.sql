@@ -35,13 +35,13 @@
 -- ClinicalOrders runs first): this trigger runs only once the request's row is locked, too late to take them first,
 -- and its own FOR SHARE below finds the medication's row locked already. Asking takes the advisory lock alone, and the
 -- key-share lock its foreign key takes doesn't wait for an update of the medication's sensitivity or status.
--- Last comes a patient's care-team lock (an advisory lock on 'ehr.refill_care_team:' and the patient's ID), which only
--- asking and a clinician joining the panel take: asking once its request is inserted, after the medication's advisory
--- lock (ehr.deliver_refill_request), and joining alone (ehr.follow_refill_care_team), each before it reads who is on
--- the panel or which requests wait. So one of the two waits for the other and then sees what it wrote. Nothing that
--- holds it waits for a medication's lock or a request's row, so it closes no circle with an approval or a marking.
--- One lock for each patient whose panel a transaction joins: a panel of a hundred at once (the benchmark's) is a
--- hundred, well within the lock table.
+-- Last comes a patient's care-team lock (an advisory lock on 'ehr.refill_care_team:' and the patient's ID), which
+-- whatever writes the patient's refill items takes before it reads: asking, once its request is inserted, after the
+-- medication's advisory lock, and answering, after the request's row (ehr.deliver_refill_request); a clinician joining
+-- or leaving the panel, alone (ehr.follow_refill_care_team). So of two at once, one waits for the other and then sees
+-- what it wrote. Nothing that holds it waits for a medication's lock or a request's row, so it closes no circle with an
+-- approval or a marking. One lock for each patient whose panel a transaction joins: a panel of a hundred at once (the
+-- benchmark's) is a hundred, well within the lock table.
 CREATE OR REPLACE FUNCTION ehr.guard_refill_request() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -185,7 +185,8 @@ CREATE OR REPLACE TRIGGER refill_requests_immutable
 --     With none, the request is refused: nobody would be told of it, and the portal says to call the clinic. Under the
 --     patient's care-team lock, which a clinician joining the panel takes too ("Lock order" above): a clinician who
 --     joins while the request is being asked is either seen here or sees the request.
---   Answered: every item still open for it is done, for the whole care team, whoever answered.
+--   Answered: every item still open for it is done, for the whole care team, whoever answered. Under the care-team lock
+--     too, so a clinician joining at that moment is either given no item or has it done here.
 CREATE OR REPLACE FUNCTION ehr.deliver_refill_request() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -208,6 +209,7 @@ BEGIN
                 USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_care_team';
         END IF;
     ELSE
+        PERFORM pg_advisory_xact_lock(hashtextextended('ehr.refill_care_team:' || NEW.patient_id::text, 0));
         UPDATE ehr.inbox_items SET done_at = clock_timestamp()
         WHERE source_table = 'refill_requests' AND source_id = NEW.id AND done_at IS NULL;
     END IF;
@@ -228,11 +230,12 @@ CREATE OR REPLACE TRIGGER refill_requests_answered
 -- patient's panel, they get an item for each of that patient's waiting requests, but one they hold open already; when
 -- their assignment ends, their open refill items for that patient are done, since they can no longer answer them. A
 -- request whose patient is left with nobody on the panel stays waiting, and goes to whoever joins next. The test of who
--- is on the team is the one asking uses. Joining takes the patient's care-team lock first, as asking does ("Lock order"
--- above), so a request asked while a clinician joins reaches them one way or the other. Runs as its owner (SECURITY
--- DEFINER), which alone may add inbox items and close refill items (10-grants.sql, 70-inbox.sql); its search_path is
--- pinned, and nobody but its owner may call it directly. It reads the requests and the staff account, and writes the
--- inbox: nothing else.
+-- is on the team is the one asking uses. Joining and leaving take the patient's care-team lock first, as asking and
+-- answering do ("Lock order" above), so a request asked while a clinician joins reaches them one way or the other, and
+-- one asked or answered while they join or leave leaves them no item open that they can't act on. Runs as its owner
+-- (SECURITY DEFINER), which alone may add inbox items and close refill items (10-grants.sql, 70-inbox.sql); its
+-- search_path is pinned, and nobody but its owner may call it directly. It reads the requests and the staff account,
+-- and writes the inbox: nothing else.
 CREATE OR REPLACE FUNCTION ehr.follow_refill_care_team() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -251,6 +254,7 @@ BEGIN
               SELECT 1 FROM ehr.inbox_items i
               WHERE i.recipient_id = NEW.clinician_id AND i.source_table = 'refill_requests' AND i.source_id = r.id AND i.done_at IS NULL);
     ELSE
+        PERFORM pg_advisory_xact_lock(hashtextextended('ehr.refill_care_team:' || OLD.patient_id::text, 0));
         UPDATE ehr.inbox_items SET done_at = clock_timestamp()
         WHERE recipient_id = OLD.clinician_id AND patient_id = OLD.patient_id AND kind = 'refill-request' AND source_table = 'refill_requests'
           AND done_at IS NULL;
