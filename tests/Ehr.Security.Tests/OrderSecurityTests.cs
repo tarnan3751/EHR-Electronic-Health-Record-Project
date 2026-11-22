@@ -8,8 +8,9 @@ namespace Ehr.Security.Tests;
 // UC 1 Place an order (Tahseen Arnan): what the database lets each account do with orders, as the runtime roles, in SQL
 // of its own, so these hold whatever the app checks (db/policies/30-rls.sql and 60-orders.sql). Only a clinician signs,
 // only as themselves, only for a patient on their panel; nothing edits or deletes an order (discontinuing and changing
-// one are OrderChangeSecurityTests'); the database sets the time; a second active order for the same item needs a reason, even when two arrive at once; and the write audit names
-// the clinician and the time.
+// one are OrderChangeSecurityTests'); the database sets the time; a second active order for the same item needs a reason, even when two arrive at once,
+// and so does one for the same medication product under another item; and the write audit names the clinician and the
+// time.
 public class OrderSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -27,6 +28,12 @@ public class OrderSecurityTests(MigratedDatabase database) : IClassFixture<Migra
     const string InsertWithReason = """
         INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status, duplicate_reason)
         VALUES (@id, @patient, 'lab', 'SYN-LAB-001', '{"indication": "Synthetic fatigue"}', 'active', @reason)
+        """;
+
+    // A medication order, by catalog item, with a duplicate's reason or none.
+    const string InsertMedication = """
+        INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status, duplicate_reason)
+        VALUES (@id, @patient, 'medication', @code, '{}', 'active', @reason)
         """;
 
     const string InsertAsSigner = """
@@ -176,6 +183,31 @@ public class OrderSecurityTests(MigratedDatabase database) : IClassFixture<Migra
         Assert.Equal(["Synthetic repeat after a hemolysed sample"], await Accounts.QueryAsync(App, clinician,
             "SELECT duplicate_reason FROM ehr.orders WHERE id = @id", ("id", again)));
         Assert.Equal(["2"], await CountAsync(patient));
+    }
+
+    // A medication is on order whichever of its catalog items was picked: the clinic's common item for lisinopril 10 mg
+    // (SYN-MED-001) and RxNorm's own (314076) are one product, both ways round, as the review of step 13d found a
+    // refill's approval could order the one beside the other. Another strength (314077) and another drug (SYN-MED-003,
+    // atorvastatin) are not on order.
+    [Fact]
+    public async Task A_medication_on_order_under_another_item_for_the_same_product_needs_a_reason()
+    {
+        foreach (var (first, then) in new[] { ("SYN-MED-001", "314076"), ("314076", "SYN-MED-001") })
+        {
+            var (clinician, patient) = await OnPanelAsync();
+            await OrderAsync(App, clinician, patient, InsertMedication, ("code", first), ("reason", DBNull.Value));
+
+            var duplicate = await Assert.ThrowsAsync<PostgresException>(
+                () => OrderAsync(App, clinician, patient, InsertMedication, ("code", then), ("reason", DBNull.Value)));
+            Assert.Equal(PostgresErrorCodes.UniqueViolation, duplicate.SqlState);
+
+            var again = await OrderAsync(App, clinician, patient, InsertMedication, ("code", then), ("reason", "Synthetic: a second supply."));
+            Assert.Equal(["Synthetic: a second supply."], await Accounts.QueryAsync(App, clinician,
+                "SELECT duplicate_reason FROM ehr.orders WHERE id = @id", ("id", again)));
+            await OrderAsync(App, clinician, patient, InsertMedication, ("code", "314077"), ("reason", DBNull.Value));
+            await OrderAsync(App, clinician, patient, InsertMedication, ("code", "SYN-MED-003"), ("reason", DBNull.Value));
+            Assert.Equal(["4"], await CountAsync(patient));
+        }
     }
 
     // The lock the trigger takes makes the second of two submissions at once wait for the first, and then see it.

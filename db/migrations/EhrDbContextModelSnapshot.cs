@@ -2286,6 +2286,110 @@ namespace Ehr.Migrations
                     b.ToTable("patient_enrollments", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.RefillRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("DeclineMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("decline_message");
+
+                    b.Property<string>("MedicationCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("medication_code");
+
+                    b.Property<string>("MedicationDisplay")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("medication_display");
+
+                    b.Property<Guid>("MedicationStatementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("medication_statement_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("OrderedDisplay")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("ordered_display");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refill_requests");
+
+                    b.HasIndex("DecidedBy")
+                        .HasDatabaseName("ix_refill_requests_decided_by");
+
+                    b.HasIndex("MedicationStatementId")
+                        .HasDatabaseName("ix_refill_requests_medication_statement_id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refill_requests_order_id");
+
+                    b.HasIndex("RequestedBy")
+                        .HasDatabaseName("ix_refill_requests_requested_by");
+
+                    b.HasIndex("PatientId", "RequestedAt")
+                        .HasDatabaseName("ix_refill_requests_patient_id_requested_at");
+
+                    b.HasIndex(new[] { "MedicationStatementId" }, "Open")
+                        .IsUnique()
+                        .HasDatabaseName("ux_refill_requests_open")
+                        .HasFilter("status = 'requested'");
+
+                    b.ToTable("refill_requests", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_refill_requests_answer", "(status = 'requested') = (decided_at IS NULL) AND (decided_at IS NULL) = (decided_by IS NULL) AND (status = 'completed') = (order_id IS NOT NULL) AND (order_id IS NULL) = (ordered_display IS NULL) AND (status = 'rejected') = (decline_message IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_refill_requests_status", "status IN ('requested', 'completed', 'rejected')");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.VisitSummary", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3418,6 +3522,42 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_patient_enrollments_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.RefillRequest", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refill_requests_staff_users_decided_by");
+
+                    b.HasOne("Ehr.Data.Patients.MedicationStatement", null)
+                        .WithMany()
+                        .HasForeignKey("MedicationStatementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refill_requests_medication_statements_medication_statement_");
+
+                    b.HasOne("Ehr.Data.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refill_requests_orders_order_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refill_requests_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Accounts.PatientUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refill_requests_patient_users_requested_by");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.VisitSummary", b =>

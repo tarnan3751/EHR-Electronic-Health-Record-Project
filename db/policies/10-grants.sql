@@ -142,6 +142,14 @@ GRANT SELECT, INSERT ON ehr.visit_summaries TO ehr_app;
 GRANT UPDATE (withdrawn_reason, sensitive, sensitive_reason) ON ehr.visit_summaries TO ehr_app;
 GRANT SELECT ON ehr.visit_summaries TO ehr_read;
 
+-- Refill requests (step 13d): a patient's ask to renew a medication. PHI: row-level security, the write-audit trigger
+-- and the trigger that holds every change follow (77-refill-requests.sql). A patient or their proxy asks (INSERT). The
+-- one UPDATE the apps make is the answer, on these two columns alone: the order that approves it, or the message that
+-- declines it; its state, who and when, what was ordered and its sensitivity are the database's. Never DELETE.
+GRANT SELECT, INSERT ON ehr.refill_requests TO ehr_app;
+GRANT UPDATE (order_id, decline_message) ON ehr.refill_requests TO ehr_app;
+GRANT SELECT ON ehr.refill_requests TO ehr_read;
+
 -- UC 1 (Tahseen Arnan). The catalog of what can be ordered: not PHI, grants only, seeded by its migration and read by
 -- both apps. Nothing at runtime changes it.
 GRANT SELECT ON ehr.order_catalog_items TO ehr_app, ehr_read;

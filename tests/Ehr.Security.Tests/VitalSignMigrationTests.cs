@@ -59,6 +59,14 @@ public class VitalSignMigrationTests(MigratedDatabase database) : IClassFixture<
                 + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'ehr'::regnamespace AND proname IN ('follow_summary_sources', 'guard_visit_summary', 'reject_visit_summary_delete',
                     'deliver_summary_withdrawn', 'standing_visit_summaries', 'withdrawn_visit_summaries', 'withdrawn_summary_was_viewed', 'visit_summary_problems', 'summary_sources_sensitive')))::text
             """));
+        // Nor of step 13d: the triggers it put on the medications and the panels, and its functions.
+        Assert.Equal(["0"], await AsSuperuserAsync(
+            """
+            SELECT ((SELECT count(*) FROM pg_trigger WHERE tgname IN ('medication_statements_follow_refills', 'patient_assignments_join_refills',
+                    'patient_assignments_leave_refills'))
+                + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'ehr'::regnamespace AND proname IN ('follow_refill_medication', 'follow_refill_care_team',
+                    'guard_refill_request', 'reject_refill_request_delete', 'deliver_refill_request', 'portal_refill_requests')))::text
+            """));
         // Nothing of step 10b is left behind for the older schema to carry.
         Assert.Equal(["0"], await AsSuperuserAsync(
             """

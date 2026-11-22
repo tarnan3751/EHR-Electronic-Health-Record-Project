@@ -19,10 +19,12 @@ AS $$
         WHEN table_name = 'visit_summaries' THEN 'summary'
         WHEN table_name IN ('message_threads', 'messages') THEN 'messages'
         WHEN table_name IN ('clinical_notes', 'note_addenda', 'clinical_drafts', 'ai_note_reviews', 'ai_field_proposals') THEN 'note'
-        -- The rest of the chart, and what the clinic keeps about the patient: the record, until step 13c2.
+        -- The rest of the chart, and what the clinic keeps about the patient: the record, until step 13c2. A refill
+        -- request (step 13d) has no read of its own: its pages record a read of the patient. Should one be recorded,
+        -- step 13c2 names its part, hidden from a proxy whose access doesn't include messages, as asking is.
         WHEN table_name IN ('patient_assignments', 'break_glass_accesses', 'allergy_intolerances', 'medication_statements', 'conditions',
                             'chart_history', 'inbox_items', 'appointments', 'proxy_grants', 'result_acknowledgments', 'encounters',
-                            'orders', 'observations') THEN 'record'
+                            'orders', 'observations', 'refill_requests') THEN 'record'
     END
 $$;
 REVOKE ALL ON FUNCTION ehr.record_view_part(text, text) FROM PUBLIC;

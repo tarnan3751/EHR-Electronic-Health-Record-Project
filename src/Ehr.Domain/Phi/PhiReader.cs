@@ -10,6 +10,7 @@ using Ehr.Domain.Audit;
 using Ehr.Domain.Messaging;
 using Ehr.Domain.Orders;
 using Ehr.Domain.Proxies;
+using Ehr.Domain.Refills;
 using Ehr.Domain.Results;
 using Ehr.Domain.Scheduling;
 using Microsoft.EntityFrameworkCore;
@@ -254,7 +255,9 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // UC 1 (Tahseen Arnan): the order form's view of a patient (OrderForm). One view of one patient, so one recorded read
     // of the patient, as the chart's is, whatever orders the duplicate check finds. For a change, `replaces` is the
     // order being replaced: it comes back when it is an active order of this patient, and isn't counted as a duplicate.
-    public async Task<OrderForm?> OrderFormAsync(Guid id, string? catalogCode, Guid? replaces, CancellationToken cancellationToken)
+    // Step 13d: `refill` is a refill request the order approves; it comes back when it is this patient's, with whether the
+    // chosen item renews its medication, and showing it is a view of sensitive items when the request is sensitive.
+    public async Task<OrderForm?> OrderFormAsync(Guid id, string? catalogCode, Guid? replaces, CancellationToken cancellationToken, Guid? refill = null)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (patient is null)
@@ -269,10 +272,13 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             : await ActiveOrders(id, catalogCode, except: replaces).ToListAsync(cancellationToken);
 
         var warnings = catalogCode is null ? [] : await OrderSafety.WarningsAsync(db, id, catalogCode, replaces, cancellationToken);
+        var request = refill is { } asked ? await ReadRefillAsync(patient, allergies, asked, cancellationToken) : null;
+        // The product that was asked for, which the chart's entry must still have (77-refill-requests.sql).
+        var renews = request is not null && catalogCode is not null && catalogCode == request.AskedCode && catalogCode == request.Medication.Code;
 
-        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        audit.Record(request?.Sensitive == true ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
         await db.SaveChangesAsync(cancellationToken);
-        return new OrderForm(patient, allergies, duplicates, replaced) { Warnings = warnings };
+        return new OrderForm(patient, allergies, duplicates, replaced) { Warnings = warnings, Refill = request, RenewsRefill = renews };
     }
 
     // UC 1: a patient's discontinued orders, newest first, each with who discontinued it, when and why, and the order
@@ -306,12 +312,18 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .Where(a => a.PatientId == id && a.ClinicalStatus == AllergyClinicalStatus.Active)
             .OrderBy(a => a.Criticality == AllergyCriticality.High ? 0 : 1).ThenBy(a => a.Display).ThenBy(a => a.Id);
 
-    // A patient's active orders, of one catalog item or of all, newest first, with only the fields that are shown:
-    // just the one order, or all but one, when asked.
+    // A patient's active orders, of one product or of all, newest first, with only the fields that are shown: just the
+    // one order, or all but one, when asked. The same product is the signing trigger's (60-orders.sql): the same catalog
+    // item or, for a medication, another item for the same RxNorm product, such as the clinic's common item and
+    // RxNorm's own, so the form warns of what the database would refuse without a reason.
     IQueryable<ActiveOrder> ActiveOrders(Guid id, string? catalogCode, Guid? only = null, Guid? except = null) =>
         from order in db.Orders.AsNoTracking()
         join item in db.OrderCatalogItems on order.CatalogCode equals item.Code
-        where order.PatientId == id && order.Status == OrderStatus.Active && (catalogCode == null || order.CatalogCode == catalogCode)
+        where order.PatientId == id && order.Status == OrderStatus.Active
+            && (catalogCode == null || order.CatalogCode == catalogCode
+                || (item.Type == OrderType.Medication && item.StandardSystem == ClinicalCodeSystem.RxNorm
+                    && db.OrderCatalogItems.Any(chosen => chosen.Code == catalogCode && chosen.Type == OrderType.Medication
+                        && chosen.StandardSystem == ClinicalCodeSystem.RxNorm && chosen.StandardCode == item.StandardCode)))
             && (only == null || order.Id == only) && (except == null || order.Id != except)
         orderby order.SignedAt descending, order.Id
         select new ActiveOrder(order.Id, order.Type, item.Display, order.Details, order.SignedAt);
@@ -1071,14 +1083,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return new PatientVisitSummaries(patient, shown, sensitive ? withdrawn : [.. withdrawn.Where(w => !w.Sensitive)], hidden, sensitive);
     }
 
-    // How many visit summaries were released for a patient in the last day, the one just released included: whether the
-    // patient has already been told today that there is something new. A number, about no summary in particular: not a
-    // recorded read.
-    public Task<int> SummariesReleasedTodayAsync(Guid patientId, CancellationToken cancellationToken)
-    {
-        var since = DateTimeOffset.UtcNow.AddDays(-1);
-        return db.VisitSummaries.CountAsync(s => s.PatientId == patientId && s.ReleasedAt > since, cancellationToken);
-    }
+    // How many visit summaries were released for a patient since a moment, the one just released included: from the
+    // start of the clinic's day, whether the patient has already been told today that there is something new
+    // (PortalNotices). A number, about no summary in particular: not a recorded read.
+    public Task<int> SummariesReleasedSinceAsync(Guid patientId, DateTimeOffset since, CancellationToken cancellationToken) =>
+        db.VisitSummaries.CountAsync(s => s.PatientId == patientId && s.ReleasedAt >= since, cancellationToken);
 
     public const string AuditTable = "audit_events";
 
@@ -1349,6 +1358,120 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     {
         SensitiveShown = sensitive,
     };
+
+    // Refill requests (the expansion plan's step 13d).
+
+    // The portal's refill page for the record the session is looking at: the medications it may ask to renew (active and
+    // coded as a product the clinic orders, as row-level security lets the portal read them: none entered in error, a
+    // sensitive one only where the patient's rule allows), but those with a request waiting; its requests, every waiting
+    // one and the latest answered ones up to the limit, latest first, as the database gives the portal them
+    // (ehr.portal_refill_requests: the portal reads no row of the table), so which medications wait never depends on the
+    // limit; and whether anyone on the patient's panel could answer one. Sensitive medications and requests are left out
+    // unless asked for, and asking is recorded as a view of the patient's sensitive items, in place of the plain read:
+    // one recorded read of the patient. Null when the session may read no such patient.
+    public async Task<PatientRefills?> RefillsAsync(Guid patientId, bool sensitive, int limit, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var requests = await RefillRequestQueries.PortalAsync(db, limit, cancellationToken);
+        var waiting = requests.Where(r => r.Status == RefillRequestStatus.Requested).Select(r => r.MedicationStatementId).ToHashSet();
+        // Coded as a product the clinic orders, by the catalog's key: one coded as an ingredient, or not coded, isn't
+        // renewed here (77-refill-requests.sql).
+        var medications = (await db.MedicationStatements.AsNoTracking()
+            .Where(m => m.PatientId == patientId && m.Status == MedicationStatementStatus.Active && m.Code != null
+                && db.OrderCatalogItems.Any(i => i.Code == m.Code && i.Type == OrderType.Medication))
+            .OrderBy(m => m.Display).ThenBy(m => m.Id)
+            .Select(m => new RenewableMedication(m.Id, m.Display, m.Dosage, m.Sensitive)).ToListAsync(cancellationToken))
+            .Where(m => !waiting.Contains(m.Id)).ToList();
+        // Disabled is locked out for good (80-appointments.sql's test): a clinician locked for a while after failed sign-ins
+        // is on the team still.
+        var disabled = DateTimeOffset.UtcNow.AddYears(10);
+        var careTeam = await (
+            from assignment in db.PatientAssignments
+            join staff in db.StaffUsers on assignment.ClinicianId equals staff.Id
+            where assignment.PatientId == patientId && assignment.EndedAt == null && staff.Roles.Contains(Ehr.Data.Accounts.StaffRoles.Clinician)
+                && (staff.LockoutEnd == null || staff.LockoutEnd < disabled)
+            select assignment.Id).AnyAsync(cancellationToken);
+        var hidden = sensitive ? 0 : medications.Count(m => m.Sensitive) + requests.Count(r => r.Sensitive);
+
+        audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new PatientRefills(patient, sensitive ? medications : [.. medications.Where(m => !m.Sensitive)],
+            sensitive ? requests : [.. requests.Where(r => !r.Sensitive)], hidden, sensitive, careTeam);
+    }
+
+    // A refill request of the patient's for the clinician's page that answers it: one recorded read of the patient, of
+    // their sensitive items when the request is sensitive, since the page names its medication. Null when it isn't this
+    // patient's or the reader's to see.
+    public async Task<RefillReview?> RefillRequestAsync(Guid patientId, Guid requestId, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var allergies = await CurrentAllergies(patientId).ToListAsync(cancellationToken);
+        if (await ReadRefillAsync(patient, allergies, requestId, cancellationToken) is not { } request)
+        {
+            return null;
+        }
+
+        audit.Record(request.Sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return request;
+    }
+
+    // How many of a patient's refill requests were answered since a moment, the one just answered included: from the
+    // start of the clinic's day, whether the patient has already been told today (PortalNotices). A number, about no
+    // request in particular: not a recorded read.
+    public Task<int> RefillAnswersSinceAsync(Guid patientId, DateTimeOffset since, CancellationToken cancellationToken) =>
+        db.RefillRequests.CountAsync(r => r.PatientId == patientId && r.DecidedAt >= since, cancellationToken);
+
+    // A request of the patient's with its medication, who asked and who answered, and the catalog item for its
+    // medication: recording nothing. Who asked is the patient by name, or someone they share their record with as
+    // "Name (proxy)", as a conversation names them (ThreadAsync).
+    async Task<RefillReview?> ReadRefillAsync(Patient patient, List<AllergyIntolerance> allergies, Guid requestId, CancellationToken cancellationToken)
+    {
+        // One statement: the request, its medication, the account that asked, who answered, and the catalog's item.
+        var row = await (
+            from request in db.RefillRequests.AsNoTracking()
+            join medication in db.MedicationStatements on request.MedicationStatementId equals medication.Id
+            join asker in db.PatientUsers on request.RequestedBy equals asker.Id
+            where request.Id == requestId && request.PatientId == patient.Id
+            select new
+            {
+                Request = request,
+                Medication = new RefillMedication(medication.Display, medication.Dosage, medication.Status, medication.Code, medication.Sensitive),
+                AskerPatient = asker.PatientId,
+                AskerName = asker.DisplayName,
+                DecidedBy = db.StaffUsers.Where(u => u.Id == request.DecidedBy).Select(u => u.DisplayName).FirstOrDefault(),
+                // The same product, by its own code: the catalog's key.
+                Item = db.OrderCatalogItems.Where(i => i.Code == medication.Code && i.Type == OrderType.Medication).Select(i => i.Display).FirstOrDefault(),
+            }).SingleOrDefaultAsync(cancellationToken);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var askedBy = $"{patient.GivenName} {patient.FamilyName}";
+        if (row.AskerPatient != patient.Id)
+        {
+            // A proxy who is a patient here is named by their own record; a proxy-only account by the name it gave.
+            var name = row.AskerPatient is { } own
+                ? await db.Patients.AsNoTracking().Where(p => p.Id == own).Select(p => p.GivenName + " " + p.FamilyName).SingleOrDefaultAsync(cancellationToken)
+                : row.AskerName;
+            askedBy = $"{(string.IsNullOrWhiteSpace(name) ? "Someone" : name)} (proxy)";
+        }
+
+        var r = row.Request;
+        return new RefillReview(patient, allergies, r.Id, r.MedicationDisplay, r.MedicationCode, r.Note, askedBy, r.RequestedAt, r.Status, r.OrderedDisplay,
+            r.DeclineMessage, row.DecidedBy, r.DecidedAt, r.Sensitive, row.Medication, row.Item);
+    }
 
     // One view of one patient, one event; nothing for a read by ID that found nothing.
     async Task<PatientEntries<T>> RecordAsync<T>(Guid patientId, Guid? only, PatientEntries<T> read, bool sensitive, CancellationToken cancellationToken)

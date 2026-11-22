@@ -111,6 +111,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // (ExpectedColumnPrivileges).
         [("ehr_app", "visit_summaries")] = ["SELECT", "INSERT"],
         [("ehr_read", "visit_summaries")] = ["SELECT"],
+        // Step 13d: a refill request is asked for, never edited or deleted. Answering it is a column grant
+        // (ExpectedColumnPrivileges).
+        [("ehr_app", "refill_requests")] = ["SELECT", "INSERT"],
+        [("ehr_read", "refill_requests")] = ["SELECT"],
         [("ehr_app", "clinical_drafts")] = ["SELECT", "INSERT", "UPDATE"],
         // UC 14 adds replica draft reads under the same private-author/active-panel RLS as the primary.
         [("ehr_read", "clinical_drafts")] = ["SELECT"],
@@ -301,6 +305,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_app", "note_addenda", "UPDATE")] = ["sensitive", "sensitive_reason"],
         // Step 13a: withdrawing a visit summary, and marking it sensitive or unmarking it, each with a reason.
         [("ehr_app", "visit_summaries", "UPDATE")] = ["sensitive", "sensitive_reason", "withdrawn_reason"],
+        // Step 13d: answering a refill request, by the order that approves it or the message that declines it.
+        [("ehr_app", "refill_requests", "UPDATE")] = ["decline_message", "order_id"],
         // Step 9b: marking a vital sign entered in error.
         [("ehr_app", "observations", "UPDATE")] = ["entered_in_error_reason", "status"],
         // Marking an inbox item done.

@@ -246,6 +246,13 @@ public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance
     // Step 8: what the database knows against ordering the chosen item for this patient (an allergy, a class the
     // patient is allergic to, an interaction with something they take). Empty until an item is chosen.
     public IReadOnlyList<Ehr.Data.Orders.SafetyWarning> Warnings { get; init; } = [];
+
+    // Step 13d: the refill request the order approves, when the form was opened to approve one of this patient's; and
+    // whether the chosen item renews its medication: the same product, the medication's own code. False until an item is
+    // chosen.
+    public Ehr.Domain.Refills.RefillReview? Refill { get; init; }
+
+    public bool RenewsRefill { get; init; }
 }
 
 // UC 1: a patient's discontinued orders as their page lists them, already recorded as one read of the patient. More is

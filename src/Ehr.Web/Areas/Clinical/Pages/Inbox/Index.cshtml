@@ -69,6 +69,11 @@ else
                                 @* Step 13a: someone else withdrew a visit summary this clinician released. *@
                                 <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="summary" data-inbox-source>Open the note</a>
                             }
+                            @if (clinician && item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests" && item.PatientId is not null)
+                            {
+                                @* Step 13d: where it gets answered, which is what marks it done. *@
+                                <a asp-page="/Patients/Refills/Review" asp-route-patientId="@item.PatientId" asp-route-requestId="@item.SourceId" data-inbox-source>Review the request</a>
+                            }
                             @if (clinician && item.SourceTable == "message_threads" && item.PatientId is not null)
                             {
                                 @* Where it came from: the conversation, which is where it gets answered. *@
@@ -92,8 +97,10 @@ else
                         {
                             <td>
                                 @* An order's results are done by acknowledging them on their own page, which records who and
-                                   when. Anything else, a result item with no order behind it included, is marked done here. *@
-                                @if (OnPrem.IsReachable && !(item.Kind == InboxItemKind.Result && item.SourceTable == "orders"))
+                                   when, and a refill request by answering it (step 13d). Anything else, a result item with no
+                                   order behind it included, is marked done here. *@
+                                @if (OnPrem.IsReachable && !(item.Kind == InboxItemKind.Result && item.SourceTable == "orders")
+                                     && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests"))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
                                         <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary">Mark done</button>

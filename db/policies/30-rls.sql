@@ -808,6 +808,58 @@ CREATE POLICY visit_summaries_panel_update ON ehr.visit_summaries FOR UPDATE
 DROP POLICY IF EXISTS visit_summaries_owner_select ON ehr.visit_summaries;
 CREATE POLICY visit_summaries_owner_select ON ehr.visit_summaries FOR SELECT TO ehr_owner USING (true);
 
+-- Refill requests (PHI; step 13d): a patient's ask to renew a medication, and the care team's answer. Clinicians read
+-- them all, as they read the chart. A portal session asks for the record it is looking at, as the account it is signed
+-- in as, under access that includes messages, about a medication of that record it may read itself: the medications'
+-- own policy above then refuses one entered in error, and a sensitive one unless the session may see sensitive items.
+-- It reads none of the table: the portal is given its requests through ehr.portal_refill_requests, which returns what of
+-- each the portal shows and nothing else (77-refill-requests.sql). A clinician with the patient on their active panel
+-- answers one, as themselves (the trigger sets who first). The trigger holds every change and the one answer
+-- (77-refill-requests.sql). Nothing deletes one (10-grants.sql). Admins and nobody see none.
+ALTER TABLE ehr.refill_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.refill_requests FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS refill_requests_clinician_select ON ehr.refill_requests;
+CREATE POLICY refill_requests_clinician_select ON ehr.refill_requests FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS refill_requests_own_insert ON ehr.refill_requests;
+CREATE POLICY refill_requests_own_insert ON ehr.refill_requests FOR INSERT
+    WITH CHECK (
+        patient_id = (SELECT ehr.current_patient_id())
+        AND (SELECT ehr.portal_may_message())
+        AND requested_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.medication_statements m
+            WHERE m.id = refill_requests.medication_statement_id AND m.patient_id = refill_requests.patient_id
+        )
+    );
+DROP POLICY IF EXISTS refill_requests_panel_update ON ehr.refill_requests;
+CREATE POLICY refill_requests_panel_update ON ehr.refill_requests FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = refill_requests.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND decided_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = refill_requests.patient_id AND a.ended_at IS NULL
+        )
+    );
+-- The portal's requests (ehr.portal_refill_requests) and the sensitivity that follows the medication's
+-- (ehr.follow_refill_medication) run as the tables' owner, which forced row-level security binds too: these let them
+-- read the requests and change them, and the trigger holds the owner to the sensitivity alone. The owner's alone; no
+-- runtime role is or can become it.
+DROP POLICY IF EXISTS refill_requests_owner_select ON ehr.refill_requests;
+CREATE POLICY refill_requests_owner_select ON ehr.refill_requests FOR SELECT TO ehr_owner USING (true);
+DROP POLICY IF EXISTS refill_requests_owner_update ON ehr.refill_requests;
+CREATE POLICY refill_requests_owner_update ON ehr.refill_requests FOR UPDATE TO ehr_owner USING (true) WITH CHECK (true);
+
 -- UC 1 (Tahseen Arnan). Orders (PHI) are read as signed notes are: by every clinician, on the chart's access model. A
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;
 -- the signing trigger also locks, checks for a duplicate and sets the time (60-orders.sql). The one update is
