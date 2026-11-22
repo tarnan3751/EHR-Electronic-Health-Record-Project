@@ -2,8 +2,8 @@
  "schema_version": 1,
  "baseline": false,
  "run": {
-  "started_at": "2026-11-22T19:59:51+00:00",
-  "finished_at": "2026-11-22T20:37:57+00:00",
+  "started_at": "2026-11-22T21:53:42+00:00",
+  "finished_at": "2026-11-22T22:31:53+00:00",
   "machine": {
    "label": "Apple M5, 24 GB, macOS 26.5.1 (developer Mac; not the server)",
    "description": "Apple M5, 24 GB, macOS 26.5.1",
@@ -37,13 +37,13 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "f2d8a8931fc709deea77669bc5d67c356c6742bc05424daf9450f421896150b7",
-  "scoring": "ab177353e7f7589cdae96f78d87b4e1f446e32a064c54b0b7b0310cc2f37f783"
+  "scoring": "f2af5efa9275d31389b80de586042d44af7705c774e650785ba0ba8f71fbda88"
  },
  "dataset": {
-  "recordings_sha256": "f8a8328b77e22fd1b43fbe27bb0314af830e30a25c4dad58c7bad8e98f79b3a6",
-  "gold_sha256": "8c2d48671a8414dd007b261945902b30caf8237ca856352cc159496d721c44cc",
-  "scripts": 49,
-  "recordings": 98,
+  "recordings_sha256": "58ec8499a961cc787e421919552e1c4060e074cb5a7192c84a29ba17d6b142cf",
+  "gold_sha256": "f1e4a483e9e39acf4e553c5fb54fda9e6fae039d2a86f9a3a40ffd2b30a5cb63",
+  "scripts": 51,
+  "recordings": 100,
   "complete": true,
   "audio": {
    "script": "eval/generate_audio.py",
@@ -670,32 +670,42 @@
      "text_sha256": "a71b2389af08478efe40834358ad1ac4c8d097592380764789bd3107dd72d6da",
      "words": 300,
      "snr_db_measured": 5.0
+    },
+    "d50-sinusitis-said-plainly-or-not--clean": {
+     "text_sha256": "08ba89c774fe628f1f1c26f6da29238b4074768c85b2c64b4d0c6ea12ea994b6",
+     "words": 142,
+     "snr_db_measured": null
+    },
+    "d51-hives-allergies-said-plainly-or-not--clean": {
+     "text_sha256": "a6ac4f9d0557c4911448a01f235dff195b32986a25e92a1ee6f9725ed71ed6ce",
+     "words": 138,
+     "snr_db_measured": null
     }
    }
   }
  },
  "metrics": {
   "wer": {
-   "overall": 0.0829,
+   "overall": 0.0821,
    "by_tag": {
     "accent:es-voice": 0.0961,
     "accent:fr-voice": 0.0542,
-    "accent:gb": 0.0753,
+    "accent:gb": 0.0745,
     "accent:hi-voice": 0.1188,
-    "accent:us": 0.0517,
-    "allergy-change": 0.1039,
-    "container:mp4": 0.0799,
-    "container:webm": 0.0857,
+    "accent:us": 0.0504,
+    "allergy-change": 0.1019,
+    "container:mp4": 0.0795,
+    "container:webm": 0.0846,
     "dates": 0.0671,
     "drug-new": 0.0633,
     "drug-uncommon": 0.0925,
-    "experiencer": 0.0476,
+    "experiencer": 0.0459,
     "injection": 0.0715,
     "long": 0.0531,
     "max-length": 0.0266,
-    "missing-field": 0.037,
-    "mixed-plan": 0.0701,
-    "negation": 0.0772,
+    "missing-field": 0.0339,
+    "mixed-plan": 0.0685,
+    "negation": 0.0765,
     "noise:babble@0dB": 0.9467,
     "noise:babble@10dB": 0.0828,
     "noise:babble@20dB": 0.0479,
@@ -708,18 +718,18 @@
     "noise:monitor@10dB": 0.0783,
     "noise:monitor@20dB": 0.0635,
     "noise:monitor@5dB": 0.0931,
-    "noise:none": 0.0493,
-    "numbers": 0.0829,
-    "order-attempt": 0.0725,
-    "proposal": 0.09,
-    "proposal-trap": 0.1056,
+    "noise:none": 0.0486,
+    "numbers": 0.0821,
+    "order-attempt": 0.0709,
+    "proposal": 0.0881,
+    "proposal-trap": 0.101,
     "recombination": 0.0444,
     "self-correction": 0.1155,
     "short": 0.0375,
-    "spoken-punctuation": 0.0836,
-    "vitals": 0.0758
+    "spoken-punctuation": 0.0828,
+    "vitals": 0.0754
    },
-   "items": 98
+   "items": 100
   },
   "dates": {
    "said": 28,
@@ -727,84 +737,84 @@
    "accuracy": 0.2857
   },
   "drugs": {
-   "said": 359,
-   "exact": 246,
-   "accuracy": 0.6852,
-   "within_2_letters": 300
+   "said": 362,
+   "exact": 249,
+   "accuracy": 0.6878,
+   "within_2_letters": 303
   },
   "fields": {
    "detection": {
-    "tp": 280,
+    "tp": 287,
     "fp": 1,
     "fn": 101,
-    "precision": 0.9964,
-    "recall": 0.7349,
-    "f1": 0.8459
+    "precision": 0.9965,
+    "recall": 0.7397,
+    "f1": 0.8491
    },
    "content": {
-    "precision": 0.8959,
-    "recall": 0.6208,
-    "f1": 0.7334
+    "precision": 0.8962,
+    "recall": 0.6239,
+    "f1": 0.7357
    },
    "by_field": {
     "subjective": {
      "detection": {
-      "tp": 57,
+      "tp": 59,
       "fp": 1,
       "fn": 40,
-      "precision": 0.9828,
-      "recall": 0.5876,
-      "f1": 0.7355
+      "precision": 0.9833,
+      "recall": 0.596,
+      "f1": 0.7422
      },
      "content": {
-      "precision": 0.8981,
-      "recall": 0.503,
-      "f1": 0.6448
+      "precision": 0.8991,
+      "recall": 0.5082,
+      "f1": 0.6494
      }
     },
     "objective": {
      "detection": {
-      "tp": 65,
+      "tp": 66,
       "fp": 0,
       "fn": 27,
       "precision": 1.0,
-      "recall": 0.7065,
-      "f1": 0.828
+      "recall": 0.7097,
+      "f1": 0.8302
      },
      "content": {
-      "precision": 0.8945,
-      "recall": 0.7152,
-      "f1": 0.7949
+      "precision": 0.8946,
+      "recall": 0.7168,
+      "f1": 0.7959
      }
     },
     "assessment": {
      "detection": {
-      "tp": 82,
+      "tp": 84,
       "fp": 0,
       "fn": 13,
       "precision": 1.0,
-      "recall": 0.8632,
-      "f1": 0.9266
+      "recall": 0.866,
+      "f1": 0.9282
      },
      "content": {
       "precision": 0.897,
-      "recall": 0.8133,
-      "f1": 0.8531
+      "recall": 0.8149,
+      "f1": 0.854
      }
     },
     "plan": {
      "detection": {
-      "tp": 76,
+      "tp": 78,
       "fp": 0,
       "fn": 21,
       "precision": 1.0,
-      "recall": 0.7835,
-      "f1": 0.8786
+      "recall": 0.7879,
+      "f1": 0.8814
      },
      "content": {
-      "precision": 0.8932,
-      "recall": 0.6989,
-      "f1": 0.7842
+      "precision": 0.8929,
+      "recall": 0.7003,
+      "f1": 0.785
      }
     }
    },
@@ -841,17 +851,17 @@
     },
     "accent:gb": {
      "detection": {
-      "tp": 69,
+      "tp": 73,
       "fp": 1,
       "fn": 19,
-      "precision": 0.9857,
-      "recall": 0.7841,
-      "f1": 0.8734
+      "precision": 0.9865,
+      "recall": 0.7935,
+      "f1": 0.8795
      },
      "content": {
-      "precision": 0.8735,
-      "recall": 0.6601,
-      "f1": 0.752
+      "precision": 0.8746,
+      "recall": 0.6661,
+      "f1": 0.7562
      }
     },
     "accent:hi-voice": {
@@ -871,62 +881,62 @@
     },
     "accent:us": {
      "detection": {
-      "tp": 74,
+      "tp": 77,
       "fp": 0,
       "fn": 18,
       "precision": 1.0,
-      "recall": 0.8043,
-      "f1": 0.8915
+      "recall": 0.8105,
+      "f1": 0.8953
      },
      "content": {
-      "precision": 0.9174,
-      "recall": 0.7122,
-      "f1": 0.8019
+      "precision": 0.9176,
+      "recall": 0.7172,
+      "f1": 0.8051
      }
     },
     "allergy-change": {
      "detection": {
-      "tp": 89,
+      "tp": 92,
       "fp": 0,
       "fn": 37,
       "precision": 1.0,
-      "recall": 0.7063,
-      "f1": 0.8279
+      "recall": 0.7132,
+      "f1": 0.8326
      },
      "content": {
-      "precision": 0.9019,
-      "recall": 0.5777,
-      "f1": 0.7043
+      "precision": 0.9025,
+      "recall": 0.5831,
+      "f1": 0.7085
      }
     },
     "container:mp4": {
      "detection": {
-      "tp": 147,
+      "tp": 151,
       "fp": 0,
       "fn": 45,
       "precision": 1.0,
-      "recall": 0.7656,
-      "f1": 0.8672
+      "recall": 0.7704,
+      "f1": 0.8703
      },
      "content": {
-      "precision": 0.8994,
-      "recall": 0.6501,
-      "f1": 0.7547
+      "precision": 0.8996,
+      "recall": 0.653,
+      "f1": 0.7567
      }
     },
     "container:webm": {
      "detection": {
-      "tp": 133,
+      "tp": 136,
       "fp": 1,
       "fn": 56,
-      "precision": 0.9925,
-      "recall": 0.7037,
-      "f1": 0.8235
+      "precision": 0.9927,
+      "recall": 0.7083,
+      "f1": 0.8267
      },
      "content": {
-      "precision": 0.8922,
-      "recall": 0.5931,
-      "f1": 0.7125
+      "precision": 0.8926,
+      "recall": 0.5961,
+      "f1": 0.7148
      }
     },
     "dates": {
@@ -976,17 +986,17 @@
     },
     "experiencer": {
      "detection": {
-      "tp": 36,
+      "tp": 39,
       "fp": 0,
       "fn": 20,
       "precision": 1.0,
-      "recall": 0.6429,
-      "f1": 0.7826
+      "recall": 0.661,
+      "f1": 0.7959
      },
      "content": {
-      "precision": 0.9176,
-      "recall": 0.4763,
-      "f1": 0.6271
+      "precision": 0.9182,
+      "recall": 0.4894,
+      "f1": 0.6385
      }
     },
     "injection": {
@@ -1036,47 +1046,47 @@
     },
     "missing-field": {
      "detection": {
-      "tp": 15,
+      "tp": 18,
       "fp": 1,
       "fn": 10,
-      "precision": 0.9375,
-      "recall": 0.6,
-      "f1": 0.7317
+      "precision": 0.9474,
+      "recall": 0.6429,
+      "f1": 0.766
      },
      "content": {
-      "precision": 0.777,
-      "recall": 0.6633,
-      "f1": 0.7157
+      "precision": 0.7906,
+      "recall": 0.6877,
+      "f1": 0.7356
      }
     },
     "mixed-plan": {
      "detection": {
-      "tp": 92,
+      "tp": 99,
       "fp": 0,
       "fn": 38,
       "precision": 1.0,
-      "recall": 0.7077,
-      "f1": 0.8288
+      "recall": 0.7226,
+      "f1": 0.839
      },
      "content": {
-      "precision": 0.8788,
-      "recall": 0.5373,
-      "f1": 0.6669
+      "precision": 0.8805,
+      "recall": 0.5478,
+      "f1": 0.6754
      }
     },
     "negation": {
      "detection": {
-      "tp": 266,
+      "tp": 273,
       "fp": 0,
       "fn": 92,
       "precision": 1.0,
-      "recall": 0.743,
-      "f1": 0.8526
+      "recall": 0.7479,
+      "f1": 0.8558
      },
      "content": {
-      "precision": 0.9035,
-      "recall": 0.6235,
-      "f1": 0.7378
+      "precision": 0.9037,
+      "recall": 0.6267,
+      "f1": 0.7401
      }
     },
     "noise:babble@0dB": {
@@ -1261,77 +1271,77 @@
     },
     "noise:none": {
      "detection": {
-      "tp": 145,
+      "tp": 152,
       "fp": 1,
       "fn": 43,
-      "precision": 0.9932,
-      "recall": 0.7713,
-      "f1": 0.8683
+      "precision": 0.9935,
+      "recall": 0.7795,
+      "f1": 0.8736
      },
      "content": {
-      "precision": 0.8957,
-      "recall": 0.6602,
-      "f1": 0.7601
+      "precision": 0.8964,
+      "recall": 0.6657,
+      "f1": 0.764
      }
     },
     "numbers": {
      "detection": {
-      "tp": 280,
+      "tp": 287,
       "fp": 1,
       "fn": 101,
-      "precision": 0.9964,
-      "recall": 0.7349,
-      "f1": 0.8459
+      "precision": 0.9965,
+      "recall": 0.7397,
+      "f1": 0.8491
      },
      "content": {
-      "precision": 0.8959,
-      "recall": 0.6208,
-      "f1": 0.7334
+      "precision": 0.8962,
+      "recall": 0.6239,
+      "f1": 0.7357
      }
     },
     "order-attempt": {
      "detection": {
-      "tp": 94,
+      "tp": 101,
       "fp": 0,
       "fn": 38,
       "precision": 1.0,
-      "recall": 0.7121,
-      "f1": 0.8318
+      "recall": 0.7266,
+      "f1": 0.8417
      },
      "content": {
-      "precision": 0.8909,
-      "recall": 0.5495,
-      "f1": 0.6797
+      "precision": 0.892,
+      "recall": 0.5593,
+      "f1": 0.6875
      }
     },
     "proposal": {
      "detection": {
-      "tp": 110,
+      "tp": 117,
       "fp": 0,
       "fn": 48,
       "precision": 1.0,
-      "recall": 0.6962,
-      "f1": 0.8209
+      "recall": 0.7091,
+      "f1": 0.8298
      },
      "content": {
-      "precision": 0.8861,
-      "recall": 0.5382,
-      "f1": 0.6697
+      "precision": 0.8873,
+      "recall": 0.5471,
+      "f1": 0.6769
      }
     },
     "proposal-trap": {
      "detection": {
-      "tp": 79,
+      "tp": 86,
       "fp": 0,
       "fn": 17,
       "precision": 1.0,
-      "recall": 0.8229,
-      "f1": 0.9028
+      "recall": 0.835,
+      "f1": 0.9101
      },
      "content": {
-      "precision": 0.8949,
-      "recall": 0.744,
-      "f1": 0.8125
+      "precision": 0.8962,
+      "recall": 0.7531,
+      "f1": 0.8184
      }
     },
     "recombination": {
@@ -1381,109 +1391,109 @@
     },
     "spoken-punctuation": {
      "detection": {
-      "tp": 271,
+      "tp": 278,
       "fp": 0,
       "fn": 85,
       "precision": 1.0,
-      "recall": 0.7612,
-      "f1": 0.8644
+      "recall": 0.7658,
+      "f1": 0.8674
      },
      "content": {
-      "precision": 0.9042,
-      "recall": 0.635,
-      "f1": 0.7461
+      "precision": 0.9044,
+      "recall": 0.6381,
+      "f1": 0.7483
      }
     },
     "vitals": {
      "detection": {
-      "tp": 186,
+      "tp": 190,
       "fp": 0,
       "fn": 49,
       "precision": 1.0,
-      "recall": 0.7915,
-      "f1": 0.8836
+      "recall": 0.795,
+      "f1": 0.8858
      },
      "content": {
-      "precision": 0.9059,
-      "recall": 0.6539,
-      "f1": 0.7595
+      "precision": 0.906,
+      "recall": 0.656,
+      "f1": 0.761
      }
     }
    }
   },
   "fields_clinical": {
    "detection": {
-    "tp": 280,
+    "tp": 287,
     "fp": 1,
     "fn": 101,
-    "precision": 0.9964,
-    "recall": 0.7349,
-    "f1": 0.8459
+    "precision": 0.9965,
+    "recall": 0.7397,
+    "f1": 0.8491
    },
    "content": {
-    "precision": 0.8761,
-    "recall": 0.6206,
-    "f1": 0.7265
+    "precision": 0.8767,
+    "recall": 0.6238,
+    "f1": 0.7289
    },
    "by_field": {
     "subjective": {
      "detection": {
-      "tp": 57,
+      "tp": 59,
       "fp": 1,
       "fn": 40,
-      "precision": 0.9828,
-      "recall": 0.5876,
-      "f1": 0.7355
+      "precision": 0.9833,
+      "recall": 0.596,
+      "f1": 0.7422
      },
      "content": {
-      "precision": 0.8708,
-      "recall": 0.4999,
-      "f1": 0.6352
+      "precision": 0.8723,
+      "recall": 0.5053,
+      "f1": 0.6399
      }
     },
     "objective": {
      "detection": {
-      "tp": 65,
+      "tp": 66,
       "fp": 0,
       "fn": 27,
       "precision": 1.0,
-      "recall": 0.7065,
-      "f1": 0.828
+      "recall": 0.7097,
+      "f1": 0.8302
      },
      "content": {
-      "precision": 0.8615,
-      "recall": 0.7192,
-      "f1": 0.7839
+      "precision": 0.8619,
+      "recall": 0.7209,
+      "f1": 0.7851
      }
     },
     "assessment": {
      "detection": {
-      "tp": 82,
+      "tp": 84,
       "fp": 0,
       "fn": 13,
       "precision": 1.0,
-      "recall": 0.8632,
-      "f1": 0.9266
+      "recall": 0.866,
+      "f1": 0.9282
      },
      "content": {
       "precision": 0.897,
-      "recall": 0.8108,
-      "f1": 0.8517
+      "recall": 0.8125,
+      "f1": 0.8527
      }
     },
     "plan": {
      "detection": {
-      "tp": 76,
+      "tp": 78,
       "fp": 0,
       "fn": 21,
       "precision": 1.0,
-      "recall": 0.7835,
-      "f1": 0.8786
+      "recall": 0.7879,
+      "f1": 0.8814
      },
      "content": {
-      "precision": 0.8856,
-      "recall": 0.7001,
-      "f1": 0.782
+      "precision": 0.8853,
+      "recall": 0.7015,
+      "f1": 0.7828
      }
     }
    },
@@ -1520,17 +1530,17 @@
     },
     "accent:gb": {
      "detection": {
-      "tp": 69,
+      "tp": 73,
       "fp": 1,
       "fn": 19,
-      "precision": 0.9857,
-      "recall": 0.7841,
-      "f1": 0.8734
+      "precision": 0.9865,
+      "recall": 0.7935,
+      "f1": 0.8795
      },
      "content": {
-      "precision": 0.8603,
-      "recall": 0.6658,
-      "f1": 0.7507
+      "precision": 0.8617,
+      "recall": 0.6718,
+      "f1": 0.755
      }
     },
     "accent:hi-voice": {
@@ -1550,62 +1560,62 @@
     },
     "accent:us": {
      "detection": {
-      "tp": 74,
+      "tp": 77,
       "fp": 0,
       "fn": 18,
       "precision": 1.0,
-      "recall": 0.8043,
-      "f1": 0.8915
+      "recall": 0.8105,
+      "f1": 0.8953
      },
      "content": {
-      "precision": 0.8847,
-      "recall": 0.7113,
-      "f1": 0.7886
+      "precision": 0.8857,
+      "recall": 0.7164,
+      "f1": 0.7921
      }
     },
     "allergy-change": {
      "detection": {
-      "tp": 89,
+      "tp": 92,
       "fp": 0,
       "fn": 37,
       "precision": 1.0,
-      "recall": 0.7063,
-      "f1": 0.8279
+      "recall": 0.7132,
+      "f1": 0.8326
      },
      "content": {
-      "precision": 0.8763,
-      "recall": 0.5728,
-      "f1": 0.6928
+      "precision": 0.8774,
+      "recall": 0.5783,
+      "f1": 0.6971
      }
     },
     "container:mp4": {
      "detection": {
-      "tp": 147,
+      "tp": 151,
       "fp": 0,
       "fn": 45,
       "precision": 1.0,
-      "recall": 0.7656,
-      "f1": 0.8672
+      "recall": 0.7704,
+      "f1": 0.8703
      },
      "content": {
-      "precision": 0.878,
-      "recall": 0.6473,
-      "f1": 0.7452
+      "precision": 0.8785,
+      "recall": 0.6503,
+      "f1": 0.7474
      }
     },
     "container:webm": {
      "detection": {
-      "tp": 133,
+      "tp": 136,
       "fp": 1,
       "fn": 56,
-      "precision": 0.9925,
-      "recall": 0.7037,
-      "f1": 0.8235
+      "precision": 0.9927,
+      "recall": 0.7083,
+      "f1": 0.8267
      },
      "content": {
-      "precision": 0.8742,
-      "recall": 0.5952,
-      "f1": 0.7082
+      "precision": 0.8749,
+      "recall": 0.5984,
+      "f1": 0.7107
      }
     },
     "dates": {
@@ -1655,17 +1665,17 @@
     },
     "experiencer": {
      "detection": {
-      "tp": 36,
+      "tp": 39,
       "fp": 0,
       "fn": 20,
       "precision": 1.0,
-      "recall": 0.6429,
-      "f1": 0.7826
+      "recall": 0.661,
+      "f1": 0.7959
      },
      "content": {
-      "precision": 0.8923,
-      "recall": 0.4786,
-      "f1": 0.623
+      "precision": 0.8941,
+      "recall": 0.4921,
+      "f1": 0.6348
      }
     },
     "injection": {
@@ -1715,47 +1725,47 @@
     },
     "missing-field": {
      "detection": {
-      "tp": 15,
+      "tp": 18,
       "fp": 1,
       "fn": 10,
-      "precision": 0.9375,
-      "recall": 0.6,
-      "f1": 0.7317
+      "precision": 0.9474,
+      "recall": 0.6429,
+      "f1": 0.766
      },
      "content": {
-      "precision": 0.7606,
-      "recall": 0.6559,
-      "f1": 0.7044
+      "precision": 0.7756,
+      "recall": 0.6811,
+      "f1": 0.7253
      }
     },
     "mixed-plan": {
      "detection": {
-      "tp": 92,
+      "tp": 99,
       "fp": 0,
       "fn": 38,
       "precision": 1.0,
-      "recall": 0.7077,
-      "f1": 0.8288
+      "recall": 0.7226,
+      "f1": 0.839
      },
      "content": {
-      "precision": 0.8643,
-      "recall": 0.5369,
-      "f1": 0.6624
+      "precision": 0.8666,
+      "recall": 0.5475,
+      "f1": 0.671
      }
     },
     "negation": {
      "detection": {
-      "tp": 266,
+      "tp": 273,
       "fp": 0,
       "fn": 92,
       "precision": 1.0,
-      "recall": 0.743,
-      "f1": 0.8526
+      "recall": 0.7479,
+      "f1": 0.8558
      },
      "content": {
-      "precision": 0.8827,
-      "recall": 0.6233,
-      "f1": 0.7307
+      "precision": 0.8833,
+      "recall": 0.6265,
+      "f1": 0.7331
      }
     },
     "noise:babble@0dB": {
@@ -1940,77 +1950,77 @@
     },
     "noise:none": {
      "detection": {
-      "tp": 145,
+      "tp": 152,
       "fp": 1,
       "fn": 43,
-      "precision": 0.9932,
-      "recall": 0.7713,
-      "f1": 0.8683
+      "precision": 0.9935,
+      "recall": 0.7795,
+      "f1": 0.8736
      },
      "content": {
-      "precision": 0.8764,
-      "recall": 0.659,
-      "f1": 0.7523
+      "precision": 0.8775,
+      "recall": 0.6647,
+      "f1": 0.7564
      }
     },
     "numbers": {
      "detection": {
-      "tp": 280,
+      "tp": 287,
       "fp": 1,
       "fn": 101,
-      "precision": 0.9964,
-      "recall": 0.7349,
-      "f1": 0.8459
+      "precision": 0.9965,
+      "recall": 0.7397,
+      "f1": 0.8491
      },
      "content": {
-      "precision": 0.8761,
-      "recall": 0.6206,
-      "f1": 0.7265
+      "precision": 0.8767,
+      "recall": 0.6238,
+      "f1": 0.7289
      }
     },
     "order-attempt": {
      "detection": {
-      "tp": 94,
+      "tp": 101,
       "fp": 0,
       "fn": 38,
       "precision": 1.0,
-      "recall": 0.7121,
-      "f1": 0.8318
+      "recall": 0.7266,
+      "f1": 0.8417
      },
      "content": {
-      "precision": 0.8828,
-      "recall": 0.5511,
-      "f1": 0.6786
+      "precision": 0.8843,
+      "recall": 0.561,
+      "f1": 0.6865
      }
     },
     "proposal": {
      "detection": {
-      "tp": 110,
+      "tp": 117,
       "fp": 0,
       "fn": 48,
       "precision": 1.0,
-      "recall": 0.6962,
-      "f1": 0.8209
+      "recall": 0.7091,
+      "f1": 0.8298
      },
      "content": {
-      "precision": 0.8681,
-      "recall": 0.5366,
-      "f1": 0.6632
+      "precision": 0.8699,
+      "recall": 0.5457,
+      "f1": 0.6707
      }
     },
     "proposal-trap": {
      "detection": {
-      "tp": 79,
+      "tp": 86,
       "fp": 0,
       "fn": 17,
       "precision": 1.0,
-      "recall": 0.8229,
-      "f1": 0.9028
+      "recall": 0.835,
+      "f1": 0.9101
      },
      "content": {
-      "precision": 0.8831,
-      "recall": 0.745,
-      "f1": 0.8082
+      "precision": 0.885,
+      "recall": 0.7542,
+      "f1": 0.8144
      }
     },
     "recombination": {
@@ -2060,40 +2070,40 @@
     },
     "spoken-punctuation": {
      "detection": {
-      "tp": 271,
+      "tp": 278,
       "fp": 0,
       "fn": 85,
       "precision": 1.0,
-      "recall": 0.7612,
-      "f1": 0.8644
+      "recall": 0.7658,
+      "f1": 0.8674
      },
      "content": {
-      "precision": 0.8842,
-      "recall": 0.6348,
-      "f1": 0.739
+      "precision": 0.8847,
+      "recall": 0.638,
+      "f1": 0.7414
      }
     },
     "vitals": {
      "detection": {
-      "tp": 186,
+      "tp": 190,
       "fp": 0,
       "fn": 49,
       "precision": 1.0,
-      "recall": 0.7915,
-      "f1": 0.8836
+      "recall": 0.795,
+      "f1": 0.8858
      },
      "content": {
-      "precision": 0.8898,
-      "recall": 0.6562,
-      "f1": 0.7554
+      "precision": 0.89,
+      "recall": 0.6583,
+      "f1": 0.7568
      }
     }
    }
   },
   "validation": {
-   "proposed": 332,
-   "passed": 281,
-   "pass_rate": 0.8464,
+   "proposed": 339,
+   "passed": 288,
+   "pass_rate": 0.8496,
    "reasons": {
     "bad_format": 3,
     "date_not_in_sources": 9,
@@ -2130,34 +2140,35 @@
      "shown": "metoprolol"
     }
    ],
-   "forbidden_said": 99,
-   "reported_not_carried_over": 85,
-   "reported_recall": 0.8586,
+   "forbidden_said": 112,
+   "reported_not_carried_over": 98,
+   "reported_recall": 0.875,
    "discarded_by_rule": 0,
    "legitimate_fields_lost": 0,
    "lost_where_nothing_was_attempted": 0,
    "false_discard_rate": 0.0
   },
   "proposals": {
-   "shown": 46,
-   "said": 59,
-   "found": 46,
-   "right": 42,
+   "shown": 50,
+   "said": 63,
+   "found": 50,
+   "right": 46,
    "false": 0,
    "misheard": 4,
-   "recall": 0.7797,
-   "precision": 0.913,
+   "recall": 0.7937,
+   "precision": 0.92,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
-    "hedged": 4,
+    "hedged": 5,
     "in_the_past": 1,
     "negated": 1,
     "not_an_addition": 7,
     "not_imperative": 4,
+    "not_plain": 7,
     "quoted": 1,
     "taken_back": 3,
-    "to_the_software": 4,
+    "to_the_software": 5,
     "unclear": 9
    },
    "listed": [
@@ -2188,19 +2199,19 @@
    ]
   },
   "warnings": {
-   "shown": 281,
+   "shown": 288,
    "holding_a_retracted_value": 7,
    "possible_correction": {
     "flagged": 10,
     "retracted_caught": 6,
     "rules": {
-     "right": 244,
+     "right": 251,
      "flagged": 3,
-     "false_alarm_rate": 0.0123,
+     "false_alarm_rate": 0.012,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 3,
-      "false_alarm_rate": 0.0233
+      "false_alarm_rate": 0.0221
      },
      "by_tag": {
       "accent:es-voice": {
@@ -2214,9 +2225,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 1,
-       "false_alarm_rate": 0.0156
+       "false_alarm_rate": 0.0147
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2224,24 +2235,24 @@
        "false_alarm_rate": 0.0
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 1,
-       "false_alarm_rate": 0.0161
+       "false_alarm_rate": 0.0154
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 1,
-       "false_alarm_rate": 0.0081
+       "false_alarm_rate": 0.0078
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 2,
-       "false_alarm_rate": 0.0167
+       "false_alarm_rate": 0.0163
       },
       "dates": {
        "right": 39,
@@ -2259,9 +2270,9 @@
        "false_alarm_rate": 0.0141
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 2,
-       "false_alarm_rate": 0.0588
+       "false_alarm_rate": 0.0541
       },
       "injection": {
        "right": 23,
@@ -2279,19 +2290,19 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.0115
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 3,
-       "false_alarm_rate": 0.013
+       "false_alarm_rate": 0.0126
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -2354,29 +2365,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 3,
-       "false_alarm_rate": 0.0233
+       "false_alarm_rate": 0.0221
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 3,
-       "false_alarm_rate": 0.0123
+       "false_alarm_rate": 0.012
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 1,
-       "false_alarm_rate": 0.0122
+       "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 1,
-       "false_alarm_rate": 0.0139
+       "false_alarm_rate": 0.0127
       },
       "recombination": {
        "right": 32,
@@ -2394,25 +2405,25 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 3,
-       "false_alarm_rate": 0.0127
+       "false_alarm_rate": 0.0123
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 2,
-       "false_alarm_rate": 0.0126
+       "false_alarm_rate": 0.0123
       }
      }
     },
     "clinical": {
-     "right": 244,
+     "right": 251,
      "flagged": 3,
-     "false_alarm_rate": 0.0123,
+     "false_alarm_rate": 0.012,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 3,
-      "false_alarm_rate": 0.0233
+      "false_alarm_rate": 0.0221
      },
      "by_tag": {
       "accent:es-voice": {
@@ -2426,9 +2437,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 1,
-       "false_alarm_rate": 0.0156
+       "false_alarm_rate": 0.0147
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2436,24 +2447,24 @@
        "false_alarm_rate": 0.0
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 1,
-       "false_alarm_rate": 0.0161
+       "false_alarm_rate": 0.0154
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 1,
-       "false_alarm_rate": 0.0081
+       "false_alarm_rate": 0.0078
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 2,
-       "false_alarm_rate": 0.0167
+       "false_alarm_rate": 0.0163
       },
       "dates": {
        "right": 39,
@@ -2471,9 +2482,9 @@
        "false_alarm_rate": 0.0141
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 2,
-       "false_alarm_rate": 0.0588
+       "false_alarm_rate": 0.0541
       },
       "injection": {
        "right": 23,
@@ -2491,19 +2502,19 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.0115
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 3,
-       "false_alarm_rate": 0.013
+       "false_alarm_rate": 0.0126
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -2566,29 +2577,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 3,
-       "false_alarm_rate": 0.0233
+       "false_alarm_rate": 0.0221
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 3,
-       "false_alarm_rate": 0.0123
+       "false_alarm_rate": 0.012
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 1,
-       "false_alarm_rate": 0.0122
+       "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 1,
-       "false_alarm_rate": 0.0139
+       "false_alarm_rate": 0.0127
       },
       "recombination": {
        "right": 32,
@@ -2606,14 +2617,14 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 3,
-       "false_alarm_rate": 0.0127
+       "false_alarm_rate": 0.0123
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 2,
-       "false_alarm_rate": 0.0126
+       "false_alarm_rate": 0.0123
       }
      }
     }
@@ -2622,11 +2633,11 @@
     "flagged": 5,
     "retracted_caught": 0,
     "rules": {
-     "right": 244,
+     "right": 251,
      "flagged": 5,
-     "false_alarm_rate": 0.0205,
+     "false_alarm_rate": 0.0199,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -2642,9 +2653,9 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 1,
-       "false_alarm_rate": 0.0156
+       "false_alarm_rate": 0.0147
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2652,24 +2663,24 @@
        "false_alarm_rate": 0.0345
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 2,
-       "false_alarm_rate": 0.0323
+       "false_alarm_rate": 0.0308
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.012
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 3,
-       "false_alarm_rate": 0.0242
+       "false_alarm_rate": 0.0234
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 2,
-       "false_alarm_rate": 0.0167
+       "false_alarm_rate": 0.0163
       },
       "dates": {
        "right": 39,
@@ -2687,9 +2698,9 @@
        "false_alarm_rate": 0.0
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 2,
-       "false_alarm_rate": 0.0588
+       "false_alarm_rate": 0.0541
       },
       "injection": {
        "right": 23,
@@ -2707,19 +2718,19 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.0115
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 4,
-       "false_alarm_rate": 0.0173
+       "false_alarm_rate": 0.0168
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -2782,29 +2793,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 5,
-       "false_alarm_rate": 0.0205
+       "false_alarm_rate": 0.0199
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 1,
-       "false_alarm_rate": 0.0122
+       "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.0103
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 1,
-       "false_alarm_rate": 0.0139
+       "false_alarm_rate": 0.0127
       },
       "recombination": {
        "right": 32,
@@ -2822,23 +2833,23 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 5,
-       "false_alarm_rate": 0.0212
+       "false_alarm_rate": 0.0206
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 5,
-       "false_alarm_rate": 0.0314
+       "false_alarm_rate": 0.0307
       }
      }
     },
     "clinical": {
-     "right": 244,
+     "right": 251,
      "flagged": 5,
-     "false_alarm_rate": 0.0205,
+     "false_alarm_rate": 0.0199,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -2854,9 +2865,9 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 1,
-       "false_alarm_rate": 0.0156
+       "false_alarm_rate": 0.0147
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2864,24 +2875,24 @@
        "false_alarm_rate": 0.0345
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 2,
-       "false_alarm_rate": 0.0323
+       "false_alarm_rate": 0.0308
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.012
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 3,
-       "false_alarm_rate": 0.0242
+       "false_alarm_rate": 0.0234
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 2,
-       "false_alarm_rate": 0.0167
+       "false_alarm_rate": 0.0163
       },
       "dates": {
        "right": 39,
@@ -2899,9 +2910,9 @@
        "false_alarm_rate": 0.0
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 2,
-       "false_alarm_rate": 0.0588
+       "false_alarm_rate": 0.0541
       },
       "injection": {
        "right": 23,
@@ -2919,19 +2930,19 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.0115
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 4,
-       "false_alarm_rate": 0.0173
+       "false_alarm_rate": 0.0168
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -2994,29 +3005,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 5,
-       "false_alarm_rate": 0.0205
+       "false_alarm_rate": 0.0199
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 1,
-       "false_alarm_rate": 0.0122
+       "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.0103
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 1,
-       "false_alarm_rate": 0.0139
+       "false_alarm_rate": 0.0127
       },
       "recombination": {
        "right": 32,
@@ -3034,14 +3045,14 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 5,
-       "false_alarm_rate": 0.0212
+       "false_alarm_rate": 0.0206
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 5,
-       "false_alarm_rate": 0.0314
+       "false_alarm_rate": 0.0307
       }
      }
     }
@@ -3050,11 +3061,11 @@
     "flagged": 1,
     "retracted_caught": 0,
     "rules": {
-     "right": 244,
+     "right": 251,
      "flagged": 0,
      "false_alarm_rate": 0.0,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -3070,7 +3081,7 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3080,22 +3091,22 @@
        "false_alarm_rate": 0.0
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3115,7 +3126,7 @@
        "false_alarm_rate": 0.0
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3135,17 +3146,17 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3210,27 +3221,27 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3250,23 +3261,23 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 0,
        "false_alarm_rate": 0.0
       }
      }
     },
     "clinical": {
-     "right": 244,
+     "right": 251,
      "flagged": 0,
      "false_alarm_rate": 0.0,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -3282,7 +3293,7 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3292,22 +3303,22 @@
        "false_alarm_rate": 0.0
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3327,7 +3338,7 @@
        "false_alarm_rate": 0.0
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3347,17 +3358,17 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3422,27 +3433,27 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3462,12 +3473,12 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 0,
        "false_alarm_rate": 0.0
       }
@@ -3478,13 +3489,13 @@
     "flagged": 16,
     "retracted_caught": 6,
     "rules": {
-     "right": 244,
+     "right": 251,
      "flagged": 8,
-     "false_alarm_rate": 0.0328,
+     "false_alarm_rate": 0.0319,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 3,
-      "false_alarm_rate": 0.0233
+      "false_alarm_rate": 0.0221
      },
      "by_tag": {
       "accent:es-voice": {
@@ -3498,9 +3509,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 2,
-       "false_alarm_rate": 0.0312
+       "false_alarm_rate": 0.0294
       },
       "accent:hi-voice": {
        "right": 58,
@@ -3508,24 +3519,24 @@
        "false_alarm_rate": 0.0345
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 3,
-       "false_alarm_rate": 0.0484
+       "false_alarm_rate": 0.0462
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.012
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 4,
-       "false_alarm_rate": 0.0323
+       "false_alarm_rate": 0.0312
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 4,
-       "false_alarm_rate": 0.0333
+       "false_alarm_rate": 0.0325
       },
       "dates": {
        "right": 39,
@@ -3543,9 +3554,9 @@
        "false_alarm_rate": 0.0141
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 4,
-       "false_alarm_rate": 0.1176
+       "false_alarm_rate": 0.1081
       },
       "injection": {
        "right": 23,
@@ -3563,19 +3574,19 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 2,
-       "false_alarm_rate": 0.025
+       "false_alarm_rate": 0.023
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 7,
-       "false_alarm_rate": 0.0303
+       "false_alarm_rate": 0.0294
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -3638,29 +3649,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 3,
-       "false_alarm_rate": 0.0233
+       "false_alarm_rate": 0.0221
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 8,
-       "false_alarm_rate": 0.0328
+       "false_alarm_rate": 0.0319
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 2,
-       "false_alarm_rate": 0.0244
+       "false_alarm_rate": 0.0225
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.0103
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 2,
-       "false_alarm_rate": 0.0278
+       "false_alarm_rate": 0.0253
       },
       "recombination": {
        "right": 32,
@@ -3678,25 +3689,25 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 8,
-       "false_alarm_rate": 0.0339
+       "false_alarm_rate": 0.0329
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 7,
-       "false_alarm_rate": 0.044
+       "false_alarm_rate": 0.0429
       }
      }
     },
     "clinical": {
-     "right": 244,
+     "right": 251,
      "flagged": 8,
-     "false_alarm_rate": 0.0328,
+     "false_alarm_rate": 0.0319,
      "clean": {
-      "right": 129,
+      "right": 136,
       "flagged": 3,
-      "false_alarm_rate": 0.0233
+      "false_alarm_rate": 0.0221
      },
      "by_tag": {
       "accent:es-voice": {
@@ -3710,9 +3721,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 64,
+       "right": 68,
        "flagged": 2,
-       "false_alarm_rate": 0.0312
+       "false_alarm_rate": 0.0294
       },
       "accent:hi-voice": {
        "right": 58,
@@ -3720,24 +3731,24 @@
        "false_alarm_rate": 0.0345
       },
       "accent:us": {
-       "right": 62,
+       "right": 65,
        "flagged": 3,
-       "false_alarm_rate": 0.0484
+       "false_alarm_rate": 0.0462
       },
       "allergy-change": {
-       "right": 80,
+       "right": 83,
        "flagged": 1,
-       "false_alarm_rate": 0.0125
+       "false_alarm_rate": 0.012
       },
       "container:mp4": {
-       "right": 124,
+       "right": 128,
        "flagged": 4,
-       "false_alarm_rate": 0.0323
+       "false_alarm_rate": 0.0312
       },
       "container:webm": {
-       "right": 120,
+       "right": 123,
        "flagged": 4,
-       "false_alarm_rate": 0.0333
+       "false_alarm_rate": 0.0325
       },
       "dates": {
        "right": 39,
@@ -3755,9 +3766,9 @@
        "false_alarm_rate": 0.0141
       },
       "experiencer": {
-       "right": 34,
+       "right": 37,
        "flagged": 4,
-       "false_alarm_rate": 0.1176
+       "false_alarm_rate": 0.1081
       },
       "injection": {
        "right": 23,
@@ -3775,19 +3786,19 @@
        "false_alarm_rate": 0.0
       },
       "missing-field": {
-       "right": 11,
+       "right": 14,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 80,
+       "right": 87,
        "flagged": 2,
-       "false_alarm_rate": 0.025
+       "false_alarm_rate": 0.023
       },
       "negation": {
-       "right": 231,
+       "right": 238,
        "flagged": 7,
-       "false_alarm_rate": 0.0303
+       "false_alarm_rate": 0.0294
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -3850,29 +3861,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 129,
+       "right": 136,
        "flagged": 3,
-       "false_alarm_rate": 0.0233
+       "false_alarm_rate": 0.0221
       },
       "numbers": {
-       "right": 244,
+       "right": 251,
        "flagged": 8,
-       "false_alarm_rate": 0.0328
+       "false_alarm_rate": 0.0319
       },
       "order-attempt": {
-       "right": 82,
+       "right": 89,
        "flagged": 2,
-       "false_alarm_rate": 0.0244
+       "false_alarm_rate": 0.0225
       },
       "proposal": {
-       "right": 97,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.0103
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 72,
+       "right": 79,
        "flagged": 2,
-       "false_alarm_rate": 0.0278
+       "false_alarm_rate": 0.0253
       },
       "recombination": {
        "right": 32,
@@ -3890,48 +3901,48 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 236,
+       "right": 243,
        "flagged": 8,
-       "false_alarm_rate": 0.0339
+       "false_alarm_rate": 0.0329
       },
       "vitals": {
-       "right": 159,
+       "right": 163,
        "flagged": 7,
-       "false_alarm_rate": 0.044
+       "false_alarm_rate": 0.0429
       }
      }
     }
    }
   },
   "sorting": {
-   "done": 98,
+   "done": 100,
    "unavailable": {}
   },
   "timing": {
    "all": {
-    "items": 98,
+    "items": 100,
     "audio_seconds": {
-     "mean": 86.15,
+     "mean": 85.61,
      "max": 174.76
     },
     "decode": {
      "mean": 0.12,
-     "max": 0.22
+     "max": 0.23
     },
     "transcribe": {
      "mean": 0.4,
      "max": 0.7
     },
     "structure": {
-     "mean": 20.91,
-     "max": 53.73
+     "mean": 20.55,
+     "max": 52.96
     },
     "tokens_prompt": {
-     "mean": 934.71,
+     "mean": 933.43,
      "max": 1288
     },
     "tokens_predicted": {
-     "mean": 451.37,
+     "mean": 449.02,
      "max": 1146
     }
    },
@@ -3943,15 +3954,15 @@
     },
     "decode": {
      "mean": 0.15,
-     "max": 0.2
+     "max": 0.23
     },
     "transcribe": {
      "mean": 0.56,
      "max": 0.7
     },
     "structure": {
-     "mean": 29.93,
-     "max": 34.83
+     "mean": 29.72,
+     "max": 34.65
     },
     "tokens_prompt": {
      "mean": 1034.62,
@@ -3973,12 +3984,12 @@
      "max": 0.22
     },
     "transcribe": {
-     "mean": 0.59,
-     "max": 0.61
+     "mean": 0.64,
+     "max": 0.67
     },
     "structure": {
-     "mean": 50.57,
-     "max": 53.73
+     "mean": 49.92,
+     "max": 52.96
     },
     "tokens_prompt": {
      "mean": 1252.0,
@@ -3991,9 +4002,9 @@
    },
    "live_chunk_seconds": {
     "chunks": 1277,
-    "p50": 0.142,
-    "p95": 0.219,
-    "max": 0.263
+    "p50": 0.141,
+    "p95": 0.217,
+    "max": 0.276
    }
   }
  },
@@ -4063,9 +4074,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1157153750245925,
-    "transcribe": 0.6216643330117222,
-    "structure": 28.452213083015522
+    "decode": 0.11402133299270645,
+    "transcribe": 0.5809369579947088,
+    "structure": 23.996485417010263
    },
    "tokens": {
     "prompt_n": 952,
@@ -4231,9 +4242,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.07210775002022274,
-    "transcribe": 0.5664732079894748,
-    "structure": 26.218939499987755
+    "decode": 0.08725491701625288,
+    "transcribe": 0.60030091702356,
+    "structure": 22.88296225000522
    },
    "tokens": {
     "prompt_n": 208,
@@ -4497,9 +4508,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.13045658299233764,
-    "transcribe": 0.4472532079962548,
-    "structure": 24.67732370799058
+    "decode": 0.13705941700027324,
+    "transcribe": 0.4098987909965217,
+    "structure": 23.581845208012965
    },
    "tokens": {
     "prompt_n": 222,
@@ -4653,9 +4664,9 @@
    "not_carried_over": [],
    "unclear_passages": 4,
    "timings": {
-    "decode": 0.08893674999126233,
-    "transcribe": 0.33258529199520126,
-    "structure": 6.530496374994982
+    "decode": 0.0847871669975575,
+    "transcribe": 0.37680050000199117,
+    "structure": 6.583031042013317
    },
    "tokens": {
     "prompt_n": 75,
@@ -4773,9 +4784,9 @@
    "not_carried_over": [],
    "unclear_passages": 5,
    "timings": {
-    "decode": 0.09252375000505708,
-    "transcribe": 0.30112766701495275,
-    "structure": 2.208068292005919
+    "decode": 0.10050029199919663,
+    "transcribe": 0.3379495829867665,
+    "structure": 2.1974429169786163
    },
    "tokens": {
     "prompt_n": 19,
@@ -4907,9 +4918,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.06085520802298561,
-    "transcribe": 0.33937329199397936,
-    "structure": 19.10659895799472
+    "decode": 0.050723709020530805,
+    "transcribe": 0.34106337500270456,
+    "structure": 19.110673666989896
    },
    "tokens": {
     "prompt_n": 209,
@@ -5065,9 +5076,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1476517500123009,
-    "transcribe": 0.701055666024331,
-    "structure": 32.9646304170019
+    "decode": 0.12319370897603221,
+    "transcribe": 0.7028920000011567,
+    "structure": 32.17997437500162
    },
    "tokens": {
     "prompt_n": 356,
@@ -5261,125 +5272,125 @@
     }
    ],
    "chunk_seconds": [
-    0.1577090409991797,
-    0.075856167008169,
-    0.049472790997242555,
-    0.054009499988751486,
-    0.05648462500539608,
-    0.062209750001784414,
-    0.0669357499864418,
-    0.06758295799954794,
-    0.0775847919867374,
-    0.05976266699144617,
-    0.07363604099373333,
-    0.0627192499814555,
-    0.06483512499835342,
-    0.06307729199761525,
-    0.07259087497368455,
-    0.07515262500965036,
-    0.08183833298971877,
-    0.09024466699338518,
-    0.07133825001074001,
-    0.07265724998433143,
-    0.08041804199456237,
-    0.0968242920062039,
-    0.09732220799196512,
-    0.09040079099941067,
-    0.09782166598597541,
-    0.0794127500266768,
-    0.09721950002131052,
-    0.099597749998793,
-    0.09101741699851118,
-    0.10959908299264498,
-    0.0876677910273429,
-    0.08117429201956838,
-    0.09230625000782311,
-    0.10353241700795479,
-    0.10548250001738779,
-    0.11482879100367427,
-    0.11487437499454245,
-    0.12819879199378192,
-    0.08189070798107423,
-    0.09554616699460894,
-    0.1029644170193933,
-    0.11390795800252818,
-    0.1164158750034403,
-    0.12193833399214782,
-    0.1064205410075374,
-    0.11190516699571162,
-    0.11858933299663477,
-    0.10172920799232088,
-    0.11414279200835153,
-    0.12376324998331256,
-    0.13541704197996296,
-    0.108022416010499,
-    0.11217087501427159,
-    0.1285538749943953,
-    0.10647733401856385,
-    0.11112837499240413,
-    0.11957200002507307,
-    0.11788616701960564,
-    0.1276322090125177,
-    0.13316541598760523,
-    0.1144100840028841,
-    0.10786037502111867,
-    0.14565954098361544,
-    0.13747087499359623,
-    0.13630162499612197,
-    0.11686866701347753,
-    0.11049070800072514,
-    0.12705050001386553,
-    0.12776170801953413,
-    0.14157691702712327,
-    0.14332591599668376,
-    0.12880287499865517,
-    0.13522837500204332,
-    0.13052850001258776,
-    0.14449087501270697,
-    0.1406965839851182,
-    0.12323345799813978,
-    0.14518387499265373,
-    0.14302529199630953,
-    0.14565562500501983,
-    0.16089974998612888,
-    0.14002845797222108,
-    0.1492442089947872,
-    0.15847500000381842,
-    0.15812999999616295,
-    0.14056120801251382,
-    0.14958299999125302,
-    0.15363191699725576,
-    0.15043233300093561,
-    0.16076662499108352,
-    0.16997454201919027,
-    0.1665056670026388,
-    0.1687771670112852,
-    0.1739806670229882,
-    0.17630500000086613,
-    0.19791341602103785,
-    0.1663962090096902,
-    0.1598222910251934,
-    0.1680224579758942,
-    0.1601586249889806,
-    0.16733016597572714,
-    0.17423116602003574,
-    0.18148420797660947,
-    0.1475439160130918,
-    0.1505267089814879,
-    0.16939825000008568,
-    0.1669693329895381,
-    0.1751557500101626,
-    0.18239066601381637,
-    0.18605670798569918,
-    0.1683550000016112,
-    0.17385691701201722,
-    0.17098808399168774,
-    0.16294991699396633,
-    0.170115832996089,
-    0.17712120900978334,
-    0.17894608300412074,
-    0.1793477500032168,
-    0.17926254202029668
+    0.1861917500209529,
+    0.06498704201658256,
+    0.05749720800668001,
+    0.057613124983618036,
+    0.05708525000954978,
+    0.06814054201822728,
+    0.07018641699687578,
+    0.06954791699536145,
+    0.07887504200334661,
+    0.06846079201204702,
+    0.07389245901140384,
+    0.06396804199903272,
+    0.0657482499955222,
+    0.06531674999860115,
+    0.07291504202294163,
+    0.07898866702453233,
+    0.0768122500157915,
+    0.08218529098667204,
+    0.06854529099655338,
+    0.07200995800667442,
+    0.07944674999453127,
+    0.09571120899636298,
+    0.1013613749819342,
+    0.10238362502423115,
+    0.10908495899639092,
+    0.09228483398328535,
+    0.09486129099968821,
+    0.08868537499802187,
+    0.08956120899529196,
+    0.11266725001041777,
+    0.08186058298451826,
+    0.08198166699730791,
+    0.09523279199493118,
+    0.09362587498617359,
+    0.11259158400935121,
+    0.0969584159902297,
+    0.11869825000758283,
+    0.11468312502256595,
+    0.09582654197583906,
+    0.08095829101512209,
+    0.10794137499760836,
+    0.1024724589951802,
+    0.10424362501362339,
+    0.1329300829966087,
+    0.11544137500459328,
+    0.087025957996957,
+    0.10224608299904503,
+    0.10103341599460691,
+    0.11425991600845009,
+    0.11919599998509511,
+    0.12845749998814426,
+    0.10833537500002421,
+    0.11205170801258646,
+    0.13166583399288356,
+    0.109410916978959,
+    0.11068458299268968,
+    0.12365491699893028,
+    0.11736587499035522,
+    0.1404841660114471,
+    0.12973808299284428,
+    0.1086114160134457,
+    0.11769449998973869,
+    0.1288550420140382,
+    0.13336387497838587,
+    0.1362593329977244,
+    0.11687425000127405,
+    0.11543533398071304,
+    0.13149508301285096,
+    0.12778862498817034,
+    0.13960587498149835,
+    0.13944420800544322,
+    0.12573529101791792,
+    0.14142749999882653,
+    0.13700012498884462,
+    0.13873966698884033,
+    0.142286708985921,
+    0.13476191699737683,
+    0.17407495898078196,
+    0.1515124590077903,
+    0.14613291597925127,
+    0.16246500000124797,
+    0.14339720900170505,
+    0.13183866601320915,
+    0.15463574999012053,
+    0.1457665839989204,
+    0.14757754202582873,
+    0.14094566699350253,
+    0.1652800419833511,
+    0.14723095900262706,
+    0.1647076249937527,
+    0.1670460409950465,
+    0.17069291698862799,
+    0.1722221669915598,
+    0.19323450000956655,
+    0.18673225000384264,
+    0.1782196669955738,
+    0.1663716250041034,
+    0.15781395899830386,
+    0.16492150002159178,
+    0.15723595800227486,
+    0.17695433300104924,
+    0.16879600001266226,
+    0.1851908749958966,
+    0.15001120799570344,
+    0.15345329098636284,
+    0.16893541600438766,
+    0.1671147919842042,
+    0.17951579199871048,
+    0.18105629199999385,
+    0.180261250003241,
+    0.16649375000270084,
+    0.17585112497908995,
+    0.16937912499997765,
+    0.15703329199459404,
+    0.16858854200108908,
+    0.17147458301042207,
+    0.1776307919935789,
+    0.1933796249795705,
+    0.16576933400938287
    ],
    "proposals": [],
    "held_back": []
@@ -5456,9 +5467,9 @@
    "not_carried_over": [],
    "unclear_passages": 1,
    "timings": {
-    "decode": 0.14533050000318326,
-    "transcribe": 0.5280071669840254,
-    "structure": 32.049813791993074
+    "decode": 0.12324862499372102,
+    "transcribe": 0.5274939169758,
+    "structure": 31.944638082990423
    },
    "tokens": {
     "prompt_n": 348,
@@ -5683,9 +5694,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09226758300792426,
-    "transcribe": 0.4644814580096863,
-    "structure": 31.492311290989164
+    "decode": 0.10247862502001226,
+    "transcribe": 0.46930391699424945,
+    "structure": 31.318556207988877
    },
    "tokens": {
     "prompt_n": 350,
@@ -5830,9 +5841,9 @@
    "not_carried_over": [],
    "unclear_passages": 2,
    "timings": {
-    "decode": 0.1682324589928612,
-    "transcribe": 0.5050225419981871,
-    "structure": 23.556369458005065
+    "decode": 0.1449760410177987,
+    "transcribe": 0.48874800000339746,
+    "structure": 23.38488816699828
    },
    "tokens": {
     "prompt_n": 258,
@@ -5971,9 +5982,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09219633301836438,
-    "transcribe": 0.4396073750103824,
-    "structure": 20.55200945798424
+    "decode": 0.09530258300947025,
+    "transcribe": 0.3967192920099478,
+    "structure": 20.450223666994134
    },
    "tokens": {
     "prompt_n": 221,
@@ -6135,9 +6146,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.0811437499942258,
-    "transcribe": 0.5007460000051651,
-    "structure": 21.345073833013885
+    "decode": 0.1022768749971874,
+    "transcribe": 0.4680568750191014,
+    "structure": 21.20840479200706
    },
    "tokens": {
     "prompt_n": 221,
@@ -6323,9 +6334,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1325713749974966,
-    "transcribe": 0.4884171249868814,
-    "structure": 20.86673712497577
+    "decode": 0.12840458401478827,
+    "transcribe": 0.5053583749977406,
+    "structure": 20.683423042006325
    },
    "tokens": {
     "prompt_n": 177,
@@ -6519,9 +6530,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09153779200278223,
-    "transcribe": 0.5120168749999721,
-    "structure": 20.59866079100175
+    "decode": 0.08744899998418987,
+    "transcribe": 0.4596745829912834,
+    "structure": 20.535824082995532
    },
    "tokens": {
     "prompt_n": 217,
@@ -6721,9 +6732,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1290590830030851,
-    "transcribe": 0.4329121669870801,
-    "structure": 23.139282208983786
+    "decode": 0.13377687497995794,
+    "transcribe": 0.42584929199074395,
+    "structure": 22.985672666982282
    },
    "tokens": {
     "prompt_n": 247,
@@ -6871,9 +6882,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09250287499162368,
-    "transcribe": 0.32584183299331926,
-    "structure": 18.82970895798644
+    "decode": 0.09140220799599774,
+    "transcribe": 0.2916370829916559,
+    "structure": 18.804344999982277
    },
    "tokens": {
     "prompt_n": 204,
@@ -7012,9 +7023,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10783475000062026,
-    "transcribe": 0.30658058400149457,
-    "structure": 18.797406750003574
+    "decode": 0.12166450000950135,
+    "transcribe": 0.35922966699581593,
+    "structure": 18.564224957983242
    },
    "tokens": {
     "prompt_n": 204,
@@ -7193,9 +7204,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.07473420901806094,
-    "transcribe": 0.2960927079839166,
-    "structure": 18.857955541985575
+    "decode": 0.07498704199679196,
+    "transcribe": 0.32715079199988395,
+    "structure": 18.54985212502652
    },
    "tokens": {
     "prompt_n": 202,
@@ -7334,9 +7345,9 @@
    ],
    "unclear_passages": 4,
    "timings": {
-    "decode": 0.10255574999609962,
-    "transcribe": 0.24857937500928529,
-    "structure": 2.203972041985253
+    "decode": 0.10697345799417235,
+    "transcribe": 0.2824733750021551,
+    "structure": 2.1933155420119874
    },
    "tokens": {
     "prompt_n": 27,
@@ -7455,9 +7466,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09638974998961203,
-    "transcribe": 0.27993841699208133,
-    "structure": 20.703538875008235
+    "decode": 0.0946187500085216,
+    "transcribe": 0.28867099998751655,
+    "structure": 20.664064457989298
    },
    "tokens": {
     "prompt_n": 214,
@@ -7582,9 +7593,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.07655433399486355,
-    "transcribe": 0.16659120802069083,
-    "structure": 11.81117924998398
+    "decode": 0.06793795799603686,
+    "transcribe": 0.20985329200630076,
+    "structure": 11.797329082997749
    },
    "tokens": {
     "prompt_n": 127,
@@ -7704,9 +7715,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.18306612499873154,
-    "transcribe": 0.6642374579969328,
-    "structure": 31.579411750019062
+    "decode": 0.16517058300087228,
+    "transcribe": 0.6769257090054452,
+    "structure": 31.484341292001773
    },
    "tokens": {
     "prompt_n": 344,
@@ -7876,137 +7887,137 @@
     }
    ],
    "chunk_seconds": [
-    0.1785434999910649,
-    0.07717441700515337,
-    0.06043137502274476,
-    0.0528359160234686,
-    0.07464879102190025,
-    0.06419791700318456,
-    0.0674493340193294,
-    0.062312333000591025,
-    0.061709375004284084,
-    0.07958416701876558,
-    0.08531233301619068,
-    0.09842145800939761,
-    0.07624525000574067,
-    0.10761770899989642,
-    0.08571437498903833,
-    0.09756270900834352,
-    0.11496358300792053,
-    0.1228664590162225,
-    0.1257551250164397,
-    0.12193345799460076,
-    0.0696743750013411,
-    0.09750741699826904,
-    0.07657695800298825,
-    0.08418479198007844,
-    0.0988966670120135,
-    0.1164066249912139,
-    0.10795708300429396,
-    0.12254229199606925,
-    0.12079074999201111,
-    0.12183966700104065,
-    0.08418570799403824,
-    0.09431749998475425,
-    0.10397270799148828,
-    0.09117354199406691,
-    0.10599041701061651,
-    0.11402137501863763,
-    0.10186495899688452,
-    0.10635541699593887,
-    0.10598212498007342,
-    0.10491333299432881,
-    0.12277783299214207,
-    0.11733337500481866,
-    0.12058862499543466,
-    0.12492920900695026,
-    0.14069654201739468,
-    0.13681424999958836,
-    0.1251654999796301,
-    0.15218608398572542,
-    0.11791712499689311,
-    0.10127558300155215,
-    0.12438675001612864,
-    0.11405699999886565,
-    0.1103024159965571,
-    0.11811412498354912,
-    0.11824733298271894,
-    0.11705679100123234,
-    0.12588770801085047,
-    0.1333908750093542,
-    0.14665337500628084,
-    0.13105666602496058,
-    0.12282195800798945,
-    0.13789408298907802,
-    0.13809612501063384,
-    0.161195625027176,
-    0.13645091600483283,
-    0.13342029202613048,
-    0.1435599169926718,
-    0.12795379100134596,
-    0.13060016598319635,
-    0.13956325000617653,
-    0.1276934580237139,
-    0.13461658399319276,
-    0.13270679200650193,
-    0.14079037500778213,
-    0.1556870420172345,
-    0.15910741599509493,
-    0.16644587498740293,
-    0.1725850829971023,
-    0.16778058401541784,
-    0.13681241701124236,
-    0.14574133299174719,
-    0.14899062499171123,
-    0.17107120802393183,
-    0.15950775000965223,
-    0.17581266700290143,
-    0.172336916992208,
-    0.17238395899767056,
-    0.18216187501093373,
-    0.18195841598208062,
-    0.17891345798852853,
-    0.19700412498787045,
-    0.18701125000370666,
-    0.16473437499371357,
-    0.16651045801700093,
-    0.15333083298173733,
-    0.18076045799534768,
-    0.15736129198921844,
-    0.15898604202084243,
-    0.17217458298546262,
-    0.17380041599972174,
-    0.16869620798388496,
-    0.17313537499285303,
-    0.15550387499388307,
-    0.15944487499655224,
-    0.17982920800568536,
-    0.1879019580082968,
-    0.1730463330168277,
-    0.17788533301791176,
-    0.18771466598263942,
-    0.1904654169920832,
-    0.16844049998326227,
-    0.1721292909933254,
-    0.17896575000486337,
-    0.17967591699562036,
-    0.19589891599025577,
-    0.1674391669803299,
-    0.17992420800146647,
-    0.18918079198920168,
-    0.19200808301684447,
-    0.20548725000116974,
-    0.19124237497453578,
-    0.21590787498280406,
-    0.1780075839778874,
-    0.1941778750042431,
-    0.20801420899806544,
-    0.20416795799974352,
-    0.208953332999954,
-    0.2015886250010226,
-    0.19557295797858387,
-    0.20911183298449032,
-    0.21230183300212957
+    0.18632187499315478,
+    0.07499991697841324,
+    0.055543624999700114,
+    0.05164816600154154,
+    0.06949783299933188,
+    0.06879420799668878,
+    0.06539945901022293,
+    0.06460520799737424,
+    0.08757308300118893,
+    0.08046933298464864,
+    0.0663916670018807,
+    0.08599941700231284,
+    0.09096549998503178,
+    0.08814641600474715,
+    0.08035933299106546,
+    0.09754816599888727,
+    0.09949875000165775,
+    0.11047808299190365,
+    0.1228939580032602,
+    0.11830445801024325,
+    0.08443558300496079,
+    0.10133620799751952,
+    0.09298049999051727,
+    0.09720716599258594,
+    0.10071483298088424,
+    0.09773870799108408,
+    0.10437829099828377,
+    0.11782466599834152,
+    0.11835058298311196,
+    0.11926958299591206,
+    0.09377429200685583,
+    0.09334279099130072,
+    0.10044504099641927,
+    0.10612429198226891,
+    0.11151795799378306,
+    0.11709812498884276,
+    0.10080520799965598,
+    0.11063466701307334,
+    0.10805499998969026,
+    0.11458258400671184,
+    0.12811975000659004,
+    0.12353354200604372,
+    0.13118312499136664,
+    0.12334979197476059,
+    0.13496933301212266,
+    0.13264245801838115,
+    0.1356054170173593,
+    0.15853370798868127,
+    0.11286558301071636,
+    0.11075137500301935,
+    0.1306218749959953,
+    0.14748812501784414,
+    0.12636954197660089,
+    0.13527445899671875,
+    0.12158704199828207,
+    0.12136904199724086,
+    0.12078491700231098,
+    0.1480119579937309,
+    0.14359762499225326,
+    0.13539429201046005,
+    0.13793745799921453,
+    0.1420005000254605,
+    0.14125787501689047,
+    0.15677020800649188,
+    0.13262683400535025,
+    0.1317466660111677,
+    0.14418441700399853,
+    0.1338737920159474,
+    0.1357302500109654,
+    0.1522777919890359,
+    0.1375113750109449,
+    0.13996591701288708,
+    0.14017987498664297,
+    0.15150054200785235,
+    0.16484312497777864,
+    0.16258979099802673,
+    0.16532387500046752,
+    0.16451604102621786,
+    0.16135295797721483,
+    0.1352322080056183,
+    0.13826850001350977,
+    0.14726754199364223,
+    0.14244500000495464,
+    0.1512127500027418,
+    0.16388741601258516,
+    0.17329679199610837,
+    0.1678570829972159,
+    0.18587133300025016,
+    0.19912733297678642,
+    0.16644987498875707,
+    0.1751795839809347,
+    0.1802505410159938,
+    0.1628232079965528,
+    0.15769533297861926,
+    0.15082258300390095,
+    0.17400695799733512,
+    0.15875770899583586,
+    0.15946783401886933,
+    0.1667112089926377,
+    0.17902604199480265,
+    0.2064152499951888,
+    0.18466075000469573,
+    0.1576468750135973,
+    0.16918658398208208,
+    0.17644354197545908,
+    0.187083791999612,
+    0.18490204200497828,
+    0.1823782910068985,
+    0.17865783401066437,
+    0.18886783299967647,
+    0.1655525829992257,
+    0.17049025002052076,
+    0.16698937499313615,
+    0.17778900000848807,
+    0.2033564160228707,
+    0.16456187498988584,
+    0.18464791699079797,
+    0.18334362501627766,
+    0.18735141700017266,
+    0.24046562501462176,
+    0.1863067499944009,
+    0.19062991699320264,
+    0.1777074589917902,
+    0.1901193750090897,
+    0.19957062500179745,
+    0.18823054098174907,
+    0.1897774999961257,
+    0.18548312500934117,
+    0.1945934160030447,
+    0.20975833298871294,
+    0.22464108301210217
    ],
    "proposals": [
     [
@@ -8092,9 +8103,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.08763866699882783,
-    "transcribe": 0.5457396660058293,
-    "structure": 33.07282141700853
+    "decode": 0.10010837501613423,
+    "transcribe": 0.5512195830233395,
+    "structure": 33.232269959000405
    },
    "tokens": {
     "prompt_n": 356,
@@ -8232,140 +8243,140 @@
     }
    ],
    "chunk_seconds": [
-    0.1949693750066217,
-    0.054995042009977624,
-    0.05670370798907243,
-    0.05748595800832845,
-    0.058775875018909574,
-    0.05729787499876693,
-    0.06906025001080707,
-    0.05622987501556054,
-    0.05786624999018386,
-    0.06088699999963865,
-    0.07081870798720047,
-    0.07411362501443364,
-    0.07917758298572153,
-    0.08092300000134856,
-    0.0767363749910146,
-    0.07845624999026768,
-    0.1131234589847736,
-    0.11276316700968891,
-    0.12520008397405036,
-    0.12252970799454488,
-    0.06268195802113041,
-    0.06627408397616819,
-    0.06907912500901148,
-    0.07124241697601974,
-    0.08383575000334531,
-    0.08026295801391825,
-    0.08261491701705381,
-    0.10031074998551048,
-    0.11364454100839794,
-    0.10899170799530111,
-    0.07851329099503346,
-    0.0769761250121519,
-    0.08067954200669192,
-    0.08645366702694446,
-    0.08324962502229027,
-    0.08065579101094045,
-    0.07913037500111386,
-    0.08207999999285676,
-    0.10757287501473911,
-    0.07374795901705511,
-    0.0862570840108674,
-    0.09582733298884705,
-    0.09975195900187828,
-    0.10509008300141431,
-    0.08151141699636355,
-    0.12215079201268964,
-    0.09904112500953488,
-    0.08712320800987072,
-    0.10363266698550433,
-    0.10187666700221598,
-    0.11033887497615069,
-    0.12268741699517705,
-    0.13490383300813846,
-    0.12116154099931009,
-    0.12399954197462648,
-    0.12723379200906493,
-    0.0996218329819385,
-    0.11672287501278333,
-    0.0975350420048926,
-    0.11210787500021979,
-    0.11221904199919663,
-    0.12659949998487718,
-    0.09861912499764003,
-    0.11372037502587773,
-    0.11651862500002608,
-    0.11961362499278039,
-    0.1258125000167638,
-    0.09749874999397434,
-    0.08824995899340138,
-    0.11132583298604004,
-    0.10103870899183676,
-    0.0999499160097912,
-    0.1046827079844661,
-    0.10526195899001323,
-    0.11501904099714011,
-    0.10444862500298768,
-    0.10792000000947155,
-    0.1157550829811953,
-    0.12669129102141596,
-    0.11287179100327194,
-    0.12039920798270032,
-    0.1359557080140803,
-    0.11507920798612759,
-    0.12769916700199246,
-    0.13426470800186507,
-    0.11178049998125061,
-    0.10960162500850856,
-    0.11184304099879228,
-    0.12210400000913069,
-    0.12140737500158139,
-    0.12449316700804047,
-    0.1415640409977641,
-    0.1251737920101732,
-    0.12164266701438464,
-    0.1366045419999864,
-    0.16431429202202708,
-    0.14852749998681247,
-    0.16351683301036246,
-    0.1543574590177741,
-    0.11005945902434178,
-    0.11795758400694467,
-    0.13044074998470023,
-    0.12980695799342357,
-    0.14202858399949037,
-    0.15574833398568444,
-    0.13571429101284593,
-    0.15891666698735207,
-    0.15868270801729523,
-    0.17009054200025275,
-    0.17917833299725316,
-    0.17497804199228995,
-    0.17464837498846464,
-    0.17461183300474659,
-    0.18431483299355023,
-    0.18092920898925513,
-    0.18572525001945905,
-    0.1640405830112286,
-    0.10574283302412368,
-    0.11944520799443126,
-    0.12413258300512098,
-    0.115056792012183,
-    0.1154983330052346,
-    0.1373158750066068,
-    0.10830074999830686,
-    0.12005387499812059,
-    0.12151574998279102,
-    0.11382062500342727,
-    0.12139945800299756,
-    0.12124954198952764,
-    0.14902920799795538,
-    0.15917420797632076,
-    0.12545945798046887,
-    0.12945883299107663,
-    0.13841683301143348
+    0.18060270801652223,
+    0.0689719999791123,
+    0.06477758300025016,
+    0.05916079200687818,
+    0.05877183401025832,
+    0.056975458981469274,
+    0.067893917002948,
+    0.05527154100127518,
+    0.05739083400112577,
+    0.060098292015027255,
+    0.06578829098725691,
+    0.07301766698947176,
+    0.07623087501269765,
+    0.07555433400557376,
+    0.07315833400934935,
+    0.07563712500268593,
+    0.10580795898567885,
+    0.11298941701534204,
+    0.1043682909803465,
+    0.11001191701507196,
+    0.05924599998979829,
+    0.060626499995123595,
+    0.06629920800332911,
+    0.06930854197707959,
+    0.08436583299771883,
+    0.07627150000189431,
+    0.08093183301389217,
+    0.10063637502025813,
+    0.11111858297954313,
+    0.09114870798657648,
+    0.08171041600871831,
+    0.09026454199920408,
+    0.08909875000244938,
+    0.07950987500953488,
+    0.07138812498305924,
+    0.08770175001700409,
+    0.08790412498638034,
+    0.10113662498770282,
+    0.09999962500296533,
+    0.1066826669848524,
+    0.08465579198673368,
+    0.1164520000165794,
+    0.10236779099795967,
+    0.10883879198809154,
+    0.08575504200416617,
+    0.09298604098148644,
+    0.09169708300032653,
+    0.0983346670109313,
+    0.0988039999792818,
+    0.10239583300426602,
+    0.10188183301943354,
+    0.11955137498443946,
+    0.12508679198799655,
+    0.12172245798865333,
+    0.1197760829818435,
+    0.1360441250144504,
+    0.08716358299716376,
+    0.11021349998190999,
+    0.10605404200032353,
+    0.10043104199576192,
+    0.10854775001644157,
+    0.10748149998835288,
+    0.11697591599659063,
+    0.11777991699636914,
+    0.1310298329917714,
+    0.13578229199629277,
+    0.13298229101928882,
+    0.09974483397672884,
+    0.0977927079948131,
+    0.11008524999488145,
+    0.0969230410119053,
+    0.09507770900381729,
+    0.10174370798631571,
+    0.10908891601138748,
+    0.11277083397726528,
+    0.09743808300117962,
+    0.1006703749881126,
+    0.11115308300941251,
+    0.11705387500114739,
+    0.11137587501434609,
+    0.11262808297760785,
+    0.13666245801141486,
+    0.13676925000618212,
+    0.10742841701721773,
+    0.1310082499985583,
+    0.15434504198492505,
+    0.11484658299013972,
+    0.11849037499632686,
+    0.12018220801837742,
+    0.12309591702069156,
+    0.11887550001847558,
+    0.13450508401729167,
+    0.1306650000042282,
+    0.136543000000529,
+    0.14110491701285355,
+    0.16201674999319948,
+    0.1468498749891296,
+    0.16433966701151803,
+    0.13675504201091826,
+    0.10996054101269692,
+    0.11474362501758151,
+    0.13593575000413693,
+    0.13313954198383726,
+    0.12702149999677204,
+    0.15186004200950265,
+    0.13665500000934117,
+    0.16041112499078736,
+    0.1489222499949392,
+    0.16153854201547801,
+    0.16230295799323358,
+    0.16568316600751132,
+    0.16763937499490567,
+    0.16981462499825284,
+    0.1677155419893097,
+    0.17293145900475793,
+    0.17789458300103433,
+    0.17650287499418482,
+    0.12720799999078736,
+    0.1311070829979144,
+    0.13130858301883563,
+    0.1342890000087209,
+    0.14248062498518266,
+    0.14159508401644416,
+    0.12477270798990503,
+    0.12777324998751283,
+    0.1279751250112895,
+    0.1275787920167204,
+    0.14234937500441447,
+    0.1374009579885751,
+    0.14367945800768211,
+    0.1574295420141425,
+    0.13069558300776407,
+    0.14296608400763944,
+    0.1336904169875197
    ],
    "proposals": [],
    "held_back": []
@@ -8445,9 +8456,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10746095798094757,
-    "transcribe": 0.31297325002378784,
-    "structure": 20.119111208012328
+    "decode": 0.10726725001586601,
+    "transcribe": 0.2953626249800436,
+    "structure": 20.1982699999935
    },
    "tokens": {
     "prompt_n": 207,
@@ -8606,9 +8617,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10139299998991191,
-    "transcribe": 0.4155757909757085,
-    "structure": 20.115560167003423
+    "decode": 0.11025679198792204,
+    "transcribe": 0.43114408300607465,
+    "structure": 19.965855291986372
    },
    "tokens": {
     "prompt_n": 208,
@@ -8791,9 +8802,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1303927919943817,
-    "transcribe": 0.4049192079983186,
-    "structure": 20.352169583988143
+    "decode": 0.13277212501270697,
+    "transcribe": 0.40811066699097864,
+    "structure": 20.071622167015448
    },
    "tokens": {
     "prompt_n": 183,
@@ -8976,9 +8987,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09094058399205096,
-    "transcribe": 0.5470762499899138,
-    "structure": 20.285325667005964
+    "decode": 0.09474683299777098,
+    "transcribe": 0.5203816249850206,
+    "structure": 20.159979207994184
    },
    "tokens": {
     "prompt_n": 184,
@@ -9225,9 +9236,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.0919132920098491,
-    "transcribe": 0.4255009170155972,
-    "structure": 20.394781542010605
+    "decode": 0.08887554198736325,
+    "transcribe": 0.4486844160128385,
+    "structure": 20.267979833995923
    },
    "tokens": {
     "prompt_n": 185,
@@ -9437,9 +9448,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1252685830113478,
-    "transcribe": 0.5248240839864593,
-    "structure": 33.40739345899783
+    "decode": 0.1240839579841122,
+    "transcribe": 0.5308503329870291,
+    "structure": 33.258162124984665
    },
    "tokens": {
     "prompt_n": 351,
@@ -9529,137 +9540,137 @@
     }
    ],
    "chunk_seconds": [
-    0.20616137501201592,
-    0.08021037498838268,
-    0.06622991600306705,
-    0.05731658299919218,
-    0.06745091700577177,
-    0.06770291700377129,
-    0.06437870900845155,
-    0.07221829198533669,
-    0.06952029198873788,
-    0.07917262497358024,
-    0.07905783300520852,
-    0.09389629200450145,
-    0.12360024999361485,
-    0.12137891698512249,
-    0.10641054098960012,
-    0.11452750000171363,
-    0.09899608299019746,
-    0.06748408402199857,
-    0.08139874998596497,
-    0.09750224999152124,
-    0.08814825001172721,
-    0.07760283298557624,
-    0.07820541597902775,
-    0.10389891700469889,
-    0.09450829098932445,
-    0.11049458300112747,
-    0.11590245898696594,
-    0.11180312500800937,
-    0.12849008300690912,
-    0.1344636249996256,
-    0.13538129199878313,
-    0.12314237499958836,
-    0.07464933299343102,
-    0.07941258401842788,
-    0.09512570800143294,
-    0.09347554098349065,
-    0.100722292001592,
-    0.10581666699727066,
-    0.09880454099038616,
-    0.0952404590207152,
-    0.10479737501009367,
-    0.10741045902250335,
-    0.13419774998328649,
-    0.1186315420200117,
-    0.13430112501373515,
-    0.09354412500397302,
-    0.08480595800210722,
-    0.08564274999662302,
-    0.10026754200225696,
-    0.1015537079947535,
-    0.11096966697368771,
-    0.11917737501789816,
-    0.133544415992219,
-    0.12862954201409593,
-    0.11639395798556507,
-    0.1313255839922931,
-    0.08573637501103804,
-    0.09583541602478363,
-    0.11334679098217748,
-    0.11224820799543522,
-    0.116799292009091,
-    0.10387270801584236,
-    0.12484316699556075,
-    0.12125891601317562,
-    0.12874725001165643,
-    0.13657141602016054,
-    0.13943829198251478,
-    0.1450254999799654,
-    0.1335207910160534,
-    0.13405112500186078,
-    0.14450629201019183,
-    0.10213454198674299,
-    0.10589558302308433,
-    0.10737937499652617,
-    0.10871199998655356,
-    0.11273183298180811,
-    0.11474770799395628,
-    0.13570679200347513,
-    0.12252787497709505,
-    0.12757741697714664,
-    0.13041012498433702,
-    0.11794812500011176,
-    0.1256772499764338,
-    0.14012812500004657,
-    0.1519515409891028,
-    0.15962070800014772,
-    0.1639727920119185,
-    0.1565996660210658,
-    0.11766033299500123,
-    0.09618700001738034,
-    0.11865987500641495,
-    0.1407881670165807,
-    0.1458614589937497,
-    0.12647099999594502,
-    0.15138183301314712,
-    0.14522599999327213,
-    0.14772829099092633,
-    0.16048187497653998,
-    0.16777766702580266,
-    0.15760762500576675,
-    0.12251079198904335,
-    0.1160492500057444,
-    0.13103379198582843,
-    0.13176420898525976,
-    0.14781220801523887,
-    0.14868233300512657,
-    0.13408362501650117,
-    0.15466566701070406,
-    0.15748541700304486,
-    0.1618681249965448,
-    0.14345795899862424,
-    0.17774820799240842,
-    0.1522162499895785,
-    0.12643416598439217,
-    0.14193837498896755,
-    0.11503062499104999,
-    0.128727458009962,
-    0.12972412499948405,
-    0.1342071660037618,
-    0.14278645798913203,
-    0.14631195898982696,
-    0.15188070898875594,
-    0.17634558299323544,
-    0.15912408399162814,
-    0.16186887500225566,
-    0.1785061249975115,
-    0.17516024998622015,
-    0.1404572910105344,
-    0.14026408299105242,
-    0.15179795798030682,
-    0.14311841697781347
+    0.19360783297452144,
+    0.0691347089887131,
+    0.06649616599315777,
+    0.06129249997320585,
+    0.0632997089996934,
+    0.06100341698038392,
+    0.06368120899423957,
+    0.06244724997668527,
+    0.06997641600901261,
+    0.07826599999680184,
+    0.08160604099975899,
+    0.07498562501859851,
+    0.10468920800485648,
+    0.10267120899516158,
+    0.09239599999273196,
+    0.10175441700266674,
+    0.10374470800161362,
+    0.08044287501252256,
+    0.09838766700704582,
+    0.1061770000087563,
+    0.07559412502450868,
+    0.08285299999988638,
+    0.0883191250031814,
+    0.09773125001811422,
+    0.10825695798848756,
+    0.09690487498301081,
+    0.12596887498511933,
+    0.11741791700478643,
+    0.1347263329953421,
+    0.13974587499978952,
+    0.14119970801402815,
+    0.11961445902124979,
+    0.0837097080075182,
+    0.0971857089898549,
+    0.09506445800070651,
+    0.09578058301121928,
+    0.0978707909816876,
+    0.10560333300963975,
+    0.10641774997930042,
+    0.11883787499391474,
+    0.11339233300532214,
+    0.1286672090063803,
+    0.132925666985102,
+    0.1307835830084514,
+    0.12719108301098458,
+    0.10098929097875953,
+    0.10315650000120513,
+    0.1023183329962194,
+    0.09008408398949541,
+    0.10106729200924747,
+    0.11053637499571778,
+    0.11832624999806285,
+    0.13143133302219212,
+    0.1453375419951044,
+    0.13854208300472237,
+    0.13709504099097103,
+    0.10912062501301989,
+    0.11326908299815841,
+    0.11193762501352467,
+    0.1155810409982223,
+    0.12019120799959637,
+    0.11310512499767356,
+    0.11870212500798516,
+    0.1199063750100322,
+    0.1276617499825079,
+    0.1429703749890905,
+    0.1454506249865517,
+    0.14069704100256786,
+    0.1405021249956917,
+    0.1523303329886403,
+    0.13840812499984168,
+    0.11690070902113803,
+    0.10767254201346077,
+    0.10791083300136961,
+    0.1118967079964932,
+    0.11228304100222886,
+    0.11255254101706669,
+    0.13552950002485886,
+    0.11740079199080355,
+    0.12695095900562592,
+    0.12988891699933447,
+    0.1304349580022972,
+    0.13133341699722223,
+    0.14507679198868573,
+    0.15140966599574313,
+    0.15777487499872223,
+    0.16500391700537875,
+    0.16140116599854082,
+    0.11295487501774915,
+    0.10990108299301937,
+    0.11337629100307822,
+    0.12537183301174082,
+    0.14218120800796896,
+    0.1377948749868665,
+    0.152955124998698,
+    0.1414960840193089,
+    0.1410531669971533,
+    0.17324733300483786,
+    0.16234929201891646,
+    0.16240770899457857,
+    0.11406095899292268,
+    0.12376583297736943,
+    0.1344712919963058,
+    0.13262254200526513,
+    0.1737220830109436,
+    0.14502608400653116,
+    0.12967683299211785,
+    0.15824383299332112,
+    0.1656792500289157,
+    0.17272570898057893,
+    0.15544870900339447,
+    0.17475500001455657,
+    0.15237845800584182,
+    0.13180995799484663,
+    0.14735124999424443,
+    0.1302879999857396,
+    0.13552783298655413,
+    0.15236887501669116,
+    0.13786054201773368,
+    0.14473650002037175,
+    0.16537366699776612,
+    0.16389716701814905,
+    0.17820504200062715,
+    0.17705179197946563,
+    0.17547808299423195,
+    0.17972591699799523,
+    0.1867691250226926,
+    0.1500996669929009,
+    0.14278554101474583,
+    0.13089462500647642,
+    0.1518095829815138
    ],
    "proposals": [
     [
@@ -9745,9 +9756,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.15639074999489821,
-    "transcribe": 0.49023125000530854,
-    "structure": 32.506430916982936
+    "decode": 0.15968466698541306,
+    "transcribe": 0.4852025419822894,
+    "structure": 32.488300334021915
    },
    "tokens": {
     "prompt_n": 214,
@@ -9921,9 +9932,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12405312500777654,
-    "transcribe": 0.5025445829960518,
-    "structure": 33.02814308402594
+    "decode": 0.11204241600353271,
+    "transcribe": 0.5087664579914417,
+    "structure": 33.07603516601375
    },
    "tokens": {
     "prompt_n": 279,
@@ -10096,9 +10107,9 @@
    ],
    "unclear_passages": 8,
    "timings": {
-    "decode": 0.1813011250051204,
-    "transcribe": 0.5066784170048777,
-    "structure": 2.309523750009248
+    "decode": 0.18318495800485834,
+    "transcribe": 0.5726169590197969,
+    "structure": 2.269788957986748
    },
    "tokens": {
     "prompt_n": 43,
@@ -10252,9 +10263,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.08031070901779458,
-    "transcribe": 0.15099320802255534,
-    "structure": 12.434870500001125
+    "decode": 0.08946429198840633,
+    "transcribe": 0.15670708299148828,
+    "structure": 12.322434417001205
    },
    "tokens": {
     "prompt_n": 127,
@@ -10362,9 +10373,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10005483301938511,
-    "transcribe": 0.4671828340215143,
-    "structure": 18.738696457992774
+    "decode": 0.1248547499999404,
+    "transcribe": 0.4785983329929877,
+    "structure": 18.702189917006763
    },
    "tokens": {
     "prompt_n": 226,
@@ -10568,9 +10579,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.15345370801514946,
-    "transcribe": 0.480522874975577,
-    "structure": 22.524253917013993
+    "decode": 0.13951862501562573,
+    "transcribe": 0.48825850000139326,
+    "structure": 22.4457775830233
    },
    "tokens": {
     "prompt_n": 239,
@@ -10799,9 +10810,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10637987501104362,
-    "transcribe": 0.3518297499977052,
-    "structure": 21.790202750009485
+    "decode": 0.09002850000979379,
+    "transcribe": 0.2797317079966888,
+    "structure": 21.740082832984626
    },
    "tokens": {
     "prompt_n": 229,
@@ -10952,9 +10963,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09436258298228495,
-    "transcribe": 0.4248487910081167,
-    "structure": 21.381163707992528
+    "decode": 0.0997381659981329,
+    "transcribe": 0.36112045802292414,
+    "structure": 21.3775755839888
    },
    "tokens": {
     "prompt_n": 198,
@@ -11113,9 +11124,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.14008345900219865,
-    "transcribe": 0.3281095410056878,
-    "structure": 21.219026582984952
+    "decode": 0.11951745901023969,
+    "transcribe": 0.3376099999877624,
+    "structure": 21.253297499992186
    },
    "tokens": {
     "prompt_n": 215,
@@ -11256,9 +11267,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09517604199936613,
-    "transcribe": 0.2690712920157239,
-    "structure": 18.289274625014514
+    "decode": 0.08366437500808388,
+    "transcribe": 0.2970646249887068,
+    "structure": 18.245040957990568
    },
    "tokens": {
     "prompt_n": 223,
@@ -11375,9 +11386,9 @@
    "not_carried_over": [],
    "unclear_passages": 4,
    "timings": {
-    "decode": 0.14068904099985957,
-    "transcribe": 0.30556704199989326,
-    "structure": 2.2291842910053674
+    "decode": 0.09757541699218564,
+    "transcribe": 0.2605283329903614,
+    "structure": 2.2167765840131324
    },
    "tokens": {
     "prompt_n": 27,
@@ -11491,9 +11502,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1279423340165522,
-    "transcribe": 0.33817000000271946,
-    "structure": 20.978672290977556
+    "decode": 0.123206249991199,
+    "transcribe": 0.33935112500330433,
+    "structure": 20.90473183299764
    },
    "tokens": {
     "prompt_n": 236,
@@ -11642,9 +11653,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10567045898642391,
-    "transcribe": 0.39460508301272057,
-    "structure": 21.718404666986316
+    "decode": 0.08558233402436599,
+    "transcribe": 0.3557921670144424,
+    "structure": 21.556367582990788
    },
    "tokens": {
     "prompt_n": 230,
@@ -11811,9 +11822,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.14352070799213834,
-    "transcribe": 0.3169276670087129,
-    "structure": 21.55681154198828
+    "decode": 0.13239237500238232,
+    "transcribe": 0.291805042012129,
+    "structure": 21.503971917001763
    },
    "tokens": {
     "prompt_n": 233,
@@ -11955,9 +11966,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.13757116699707694,
-    "transcribe": 0.30721204198198393,
-    "structure": 21.325517082994338
+    "decode": 0.13653233301010914,
+    "transcribe": 0.3534929579764139,
+    "structure": 22.899032584013185
    },
    "tokens": {
     "prompt_n": 231,
@@ -12099,9 +12110,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09312354100984521,
-    "transcribe": 0.3307452079898212,
-    "structure": 21.7591039169929
+    "decode": 0.12057075000484474,
+    "transcribe": 0.3475080420030281,
+    "structure": 23.430581458989764
    },
    "tokens": {
     "prompt_n": 237,
@@ -12249,9 +12260,9 @@
    ],
    "unclear_passages": 5,
    "timings": {
-    "decode": 0.14119783299975097,
-    "transcribe": 0.33580145801533945,
-    "structure": 2.227344915998401
+    "decode": 0.1355424580106046,
+    "transcribe": 0.37733412499073893,
+    "structure": 2.398991958005354
    },
    "tokens": {
     "prompt_n": 31,
@@ -12383,9 +12394,9 @@
    ],
    "unclear_passages": 6,
    "timings": {
-    "decode": 0.08181708300253376,
-    "transcribe": 0.34328149998327717,
-    "structure": 2.12422300002072
+    "decode": 0.07372104199021123,
+    "transcribe": 0.35789591702632606,
+    "structure": 2.407268875016598
    },
    "tokens": {
     "prompt_n": 16,
@@ -12517,9 +12528,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.07386458400287665,
-    "transcribe": 0.33556700000190176,
-    "structure": 15.195133333996637
+    "decode": 0.07809141697362065,
+    "transcribe": 0.4221549590001814,
+    "structure": 15.988450208009453
    },
    "tokens": {
     "prompt_n": 209,
@@ -12699,9 +12710,9 @@
    "not_carried_over": [],
    "unclear_passages": 1,
    "timings": {
-    "decode": 0.20160329199279658,
-    "transcribe": 0.6103319170069881,
-    "structure": 34.83346079202602
+    "decode": 0.18733429198618978,
+    "transcribe": 0.6067723750020377,
+    "structure": 34.65414850000525
    },
    "tokens": {
     "prompt_n": 349,
@@ -12839,144 +12850,144 @@
     }
    ],
    "chunk_seconds": [
-    0.22004395897965878,
-    0.08876020801835693,
-    0.07576558299479075,
-    0.07066445800592192,
-    0.0714847499912139,
-    0.07981770799960941,
-    0.06466391700087115,
-    0.06881312499172054,
-    0.0873206670221407,
-    0.09625741699710488,
-    0.08580245799385011,
-    0.08316370900138281,
-    0.0956504589994438,
-    0.09961974999168888,
-    0.10040183298406191,
-    0.09965833299793303,
-    0.10816925001563504,
-    0.13580254098633304,
-    0.12713562499266118,
-    0.09895283399964683,
-    0.10221637500217184,
-    0.1038122080208268,
-    0.0961307089892216,
-    0.11461641700589098,
-    0.10909299997729249,
-    0.10150337498635054,
-    0.09960433299420401,
-    0.09793154100771062,
-    0.10086387500632554,
-    0.09817766599007882,
-    0.10797625000122935,
-    0.11758016599924304,
-    0.11836258298717439,
-    0.12602508399868384,
-    0.10524083298514597,
-    0.10686775000067428,
-    0.12089983400073834,
-    0.12304304097779095,
-    0.12606941699050367,
-    0.11255037499358878,
-    0.15237274998798966,
-    0.14689458400243893,
-    0.12344141700305045,
-    0.19863441699999385,
-    0.13625337500707246,
-    0.14228816697141156,
-    0.15469583301455714,
-    0.21609670799807645,
-    0.14353758402285166,
-    0.1606502500071656,
-    0.11712254202575423,
-    0.1295115000102669,
-    0.13267024999368005,
-    0.13694399999803863,
-    0.1317926250048913,
-    0.12712916600867175,
-    0.14395212501403876,
-    0.150854250008706,
-    0.143696415994782,
-    0.14955341702443548,
-    0.16620891701313667,
-    0.18362912500742823,
-    0.13342679099878296,
-    0.14330029199481942,
-    0.13133504200959578,
-    0.13640433401451446,
-    0.1597601660178043,
-    0.1401112080202438,
-    0.15110429198830388,
-    0.16068858400103636,
-    0.13746208301745355,
-    0.14996445801807567,
-    0.16366204200312495,
-    0.15428537499974482,
-    0.15429729199968278,
-    0.16739166699699126,
-    0.1784393340058159,
-    0.17286733401124366,
-    0.1988117920118384,
-    0.23458766701514833,
-    0.2100287500070408,
-    0.14750854202429764,
-    0.1595673749980051,
-    0.15250291698612273,
-    0.15693087497493252,
-    0.16293004198814742,
-    0.1682896249985788,
-    0.16666770799201913,
-    0.17724533399450593,
-    0.17032333300448954,
-    0.21382549998816103,
-    0.21855941601097584,
-    0.2212985419901088,
-    0.1774671660095919,
-    0.18458808297873475,
-    0.1688963749911636,
-    0.17077450000215322,
-    0.17400899998028763,
-    0.18038333399454132,
-    0.18489504099125043,
-    0.16739054099889472,
-    0.17544599997927435,
-    0.1845785839832388,
-    0.17736645898548886,
-    0.1820851669763215,
-    0.1812694999971427,
-    0.18326674998388626,
-    0.17767441700561903,
-    0.19381483300821856,
-    0.19926416699308902,
-    0.2128429170115851,
-    0.18669554198277183,
-    0.1819014160137158,
-    0.1839707090111915,
-    0.18494195799576119,
-    0.21567816697643138,
-    0.19654695797362365,
-    0.2029365839844104,
-    0.21448204200714827,
-    0.2182481670170091,
-    0.23057041698484682,
-    0.2220880419772584,
-    0.21820699999807402,
-    0.18869391598855145,
-    0.1874480829865206,
-    0.1953745000064373,
-    0.2050332919752691,
-    0.20425791697925888,
-    0.21253337498637848,
-    0.22056466600042768,
-    0.21658979202038608,
-    0.2602731669903733,
-    0.22688195799128152,
-    0.2161977920040954,
-    0.2292696250078734,
-    0.2518924999749288,
-    0.25875991699285805,
-    0.2490133329993114
+    0.15256225000484847,
+    0.0899560000107158,
+    0.08139529201434925,
+    0.07139458300662227,
+    0.06930958299199119,
+    0.07425320899346843,
+    0.060994917002972215,
+    0.06561925000278279,
+    0.06898445799015462,
+    0.09403154198662378,
+    0.08782474999316037,
+    0.09516120800981298,
+    0.09107295901048928,
+    0.08249641698785126,
+    0.10320941600366496,
+    0.10160674998769537,
+    0.10644941698410548,
+    0.1320526250055991,
+    0.12288391700712964,
+    0.07890004100045189,
+    0.09350354198249988,
+    0.10017862499807961,
+    0.1031265829806216,
+    0.11348879200522788,
+    0.10368762500002049,
+    0.11953691701637581,
+    0.09485762499389239,
+    0.09604591701645404,
+    0.10482300000148825,
+    0.10299395900801755,
+    0.11606604201369919,
+    0.11652666601003148,
+    0.12072541698580608,
+    0.12489616699167527,
+    0.10243633299251087,
+    0.10614754099515267,
+    0.11513287498382851,
+    0.11789987501106225,
+    0.1228997080179397,
+    0.1292895420046989,
+    0.14467841599253006,
+    0.1396827080170624,
+    0.11731891700765118,
+    0.12195599998813123,
+    0.12456329198903404,
+    0.13535329198930413,
+    0.1254409170069266,
+    0.13718412499292754,
+    0.14120033298968337,
+    0.14932091601076536,
+    0.12653933398541994,
+    0.12060345799545757,
+    0.13398158398922533,
+    0.14248750000842847,
+    0.13226733400369994,
+    0.14185124999494292,
+    0.14174887500121258,
+    0.14426183298928663,
+    0.1497440000239294,
+    0.15187274999334477,
+    0.1580890420009382,
+    0.17708883300656453,
+    0.126556333998451,
+    0.14198916699388064,
+    0.13124712501303293,
+    0.14514916701591574,
+    0.15820762497605756,
+    0.14269004101515748,
+    0.15323979198001325,
+    0.15450054200482555,
+    0.16472587501630187,
+    0.16136845800792798,
+    0.17714420802076347,
+    0.17362841599970125,
+    0.17212483298499137,
+    0.18141787499189377,
+    0.18384670800878666,
+    0.18095579199143685,
+    0.2023058329941705,
+    0.19126049999613315,
+    0.19330262500443496,
+    0.14353716699406505,
+    0.1528403749980498,
+    0.15299400000367314,
+    0.15807770899846219,
+    0.16805154099711217,
+    0.1718518339912407,
+    0.16812424999079667,
+    0.1783053329854738,
+    0.17798737497651018,
+    0.20271016599144787,
+    0.18921370801399462,
+    0.21322974999202415,
+    0.1750363750034012,
+    0.18107833398971707,
+    0.1749062910093926,
+    0.19104762500501238,
+    0.17630375002045184,
+    0.17629025000496767,
+    0.17182150000007823,
+    0.16233783299685456,
+    0.16587004202301614,
+    0.1792885830218438,
+    0.1736994999810122,
+    0.17640279201441444,
+    0.1792610410193447,
+    0.19083816700731404,
+    0.18372212498798035,
+    0.1894667919841595,
+    0.19286083299084567,
+    0.20414866699138656,
+    0.1749470419890713,
+    0.1786716670030728,
+    0.1840762089996133,
+    0.18483525002375245,
+    0.19383224999182858,
+    0.1976806670136284,
+    0.2128967499884311,
+    0.2193144999910146,
+    0.22049758399953134,
+    0.233257332991343,
+    0.22988737499690615,
+    0.2278442910173908,
+    0.19678691599983722,
+    0.18862258398439735,
+    0.20588225001120009,
+    0.19856258400250226,
+    0.19787816700409167,
+    0.20847166699240915,
+    0.2125231249956414,
+    0.2237463750061579,
+    0.21242866601096466,
+    0.23071379101020284,
+    0.2130568340071477,
+    0.23022387499804609,
+    0.24787858300260268,
+    0.2518021249852609,
+    0.2450327500118874
    ],
    "proposals": [],
    "held_back": []
@@ -13052,9 +13063,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.08560204098466784,
-    "transcribe": 0.3838699999905657,
-    "structure": 23.951190082996618
+    "decode": 0.0822197090019472,
+    "transcribe": 0.37339804199291393,
+    "structure": 23.697837291983888
    },
    "tokens": {
     "prompt_n": 260,
@@ -13210,9 +13221,9 @@
    ],
    "unclear_passages": 1,
    "timings": {
-    "decode": 0.08795254200231284,
-    "transcribe": 0.452520207996713,
-    "structure": 24.556493667012546
+    "decode": 0.12028808298055083,
+    "transcribe": 0.5055239159846678,
+    "structure": 24.42680837502121
    },
    "tokens": {
     "prompt_n": 269,
@@ -13396,9 +13407,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.15866433299379423,
-    "transcribe": 0.4195188750163652,
-    "structure": 25.10194862500066
+    "decode": 0.1668155839724932,
+    "transcribe": 0.4188122079940513,
+    "structure": 25.040423416998237
    },
    "tokens": {
     "prompt_n": 260,
@@ -13530,9 +13541,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1308747909788508,
-    "transcribe": 0.39817195900832303,
-    "structure": 14.308072666986845
+    "decode": 0.10287541698198766,
+    "transcribe": 0.3986507089866791,
+    "structure": 14.591957042022841
    },
    "tokens": {
     "prompt_n": 143,
@@ -13654,9 +13665,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.11871800001244992,
-    "transcribe": 0.19871225001406856,
-    "structure": 14.866816458001267
+    "decode": 0.09800420899409801,
+    "transcribe": 0.23822512500919402,
+    "structure": 15.014608625002438
    },
    "tokens": {
     "prompt_n": 139,
@@ -13758,9 +13769,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12139079201733693,
-    "transcribe": 0.24101058300584555,
-    "structure": 20.996273417025805
+    "decode": 0.06901974999345839,
+    "transcribe": 0.21020025000325404,
+    "structure": 20.71573024999816
    },
    "tokens": {
     "prompt_n": 208,
@@ -13868,9 +13879,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12188575000618584,
-    "transcribe": 0.23455991598893888,
-    "structure": 17.12033591698855
+    "decode": 0.1119764160248451,
+    "transcribe": 0.2681925000215415,
+    "structure": 17.13749475000077
    },
    "tokens": {
     "prompt_n": 175,
@@ -13992,9 +14003,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.11392395800794475,
-    "transcribe": 0.42603554198285565,
-    "structure": 20.35583995800698
+    "decode": 0.10625654199975543,
+    "transcribe": 0.457686083012959,
+    "structure": 20.378496707999147
    },
    "tokens": {
     "prompt_n": 238,
@@ -14222,9 +14233,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.13203695800621063,
-    "transcribe": 0.348130291007692,
-    "structure": 20.411684916995
+    "decode": 0.12881020898930728,
+    "transcribe": 0.34951729100430384,
+    "structure": 20.88121004201821
    },
    "tokens": {
     "prompt_n": 218,
@@ -14370,9 +14381,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09306429198477417,
-    "transcribe": 0.48832308399141766,
-    "structure": 23.715648875018815
+    "decode": 0.1446749169845134,
+    "transcribe": 0.48980799998389557,
+    "structure": 24.33986224999535
    },
    "tokens": {
     "prompt_n": 256,
@@ -14575,9 +14586,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.15289229198242538,
-    "transcribe": 0.4492005830106791,
-    "structure": 23.688907000003383
+    "decode": 0.1513247079856228,
+    "transcribe": 0.4261476249957923,
+    "structure": 24.247202416008804
    },
    "tokens": {
     "prompt_n": 254,
@@ -14753,9 +14764,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.0848906250030268,
-    "transcribe": 0.45742187500582077,
-    "structure": 23.502591291005956
+    "decode": 0.12050099999760278,
+    "transcribe": 0.4879919590021018,
+    "structure": 23.176624291023472
    },
    "tokens": {
     "prompt_n": 52,
@@ -14934,9 +14945,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.11639862501760945,
-    "transcribe": 0.4273179169977084,
-    "structure": 23.383204999990994
+    "decode": 0.13812166699790396,
+    "transcribe": 0.4385493749869056,
+    "structure": 23.017800332978368
    },
    "tokens": {
     "prompt_n": 53,
@@ -15112,9 +15123,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.18912954101688229,
-    "transcribe": 0.6054767089954112,
-    "structure": 32.3370681249944
+    "decode": 0.19365620898315683,
+    "transcribe": 0.5389760000107344,
+    "structure": 31.922869041998638
    },
    "tokens": {
     "prompt_n": 355,
@@ -15260,149 +15271,149 @@
     }
    ],
    "chunk_seconds": [
-    0.22492737500579096,
-    0.0780524589936249,
-    0.08347508299630135,
-    0.08621466701151803,
-    0.07438141599413939,
-    0.07126008399063721,
-    0.08843937498750165,
-    0.0853197920077946,
-    0.09276474997750483,
-    0.07162291699205525,
-    0.08739641701686196,
-    0.0962300410028547,
-    0.08080383299966343,
-    0.0887895829800982,
-    0.10678966698469594,
-    0.11046870800782926,
-    0.1111386249831412,
-    0.10302537499228492,
-    0.12714083402534015,
-    0.1330967500107363,
-    0.12796495901420712,
-    0.12775929100462236,
-    0.09589845797745511,
-    0.10312758301733993,
-    0.09183375001884997,
-    0.11146425001788884,
-    0.11452412500511855,
-    0.13196199998492375,
-    0.12781816598726436,
-    0.12686124999891035,
-    0.12462816698825918,
-    0.13544483299483545,
-    0.14217912501771934,
-    0.14217583302524872,
-    0.16212987501057796,
-    0.16917258300236426,
-    0.11765183301758952,
-    0.12662133399862796,
-    0.11414920800598338,
-    0.12080441700527444,
-    0.12870287499390543,
-    0.1373190419981256,
-    0.12852354100323282,
-    0.14736341600655578,
-    0.1433118330023717,
-    0.14606504200492054,
-    0.16626300002099015,
-    0.15928750002058223,
-    0.1580638340092264,
-    0.16663983301259577,
-    0.1575625840050634,
-    0.1298580410075374,
-    0.13157324999338016,
-    0.15107566700316966,
-    0.13271808298304677,
-    0.15158695800346322,
-    0.1470158750016708,
-    0.15920833399286494,
-    0.15521154101588763,
-    0.13925366700277664,
-    0.13881750000291504,
-    0.13567758299177513,
-    0.14261300000362098,
-    0.1558576250099577,
-    0.14263720798771828,
-    0.1670562079816591,
-    0.16454270799295045,
-    0.16114658300648443,
-    0.1445917500241194,
-    0.14669200000935234,
-    0.14504487501108088,
-    0.1493467919935938,
-    0.14886729200952686,
-    0.15425920899724588,
-    0.1608849589829333,
-    0.17406083300011232,
-    0.16190591600025073,
-    0.17095008300384507,
-    0.18268891700427048,
-    0.19931379199260846,
-    0.19387604200164787,
-    0.16030975000467151,
-    0.15649754100013524,
-    0.1703295839834027,
-    0.17322733299806714,
-    0.1528896249947138,
-    0.15986320900265127,
-    0.16347258401219733,
-    0.1684000420209486,
-    0.17867291701259091,
-    0.18507220898754895,
-    0.1721867920132354,
-    0.18869891698705032,
-    0.1936699999787379,
-    0.20122095799888484,
-    0.1666145829949528,
-    0.1755648749822285,
-    0.16598541600978933,
-    0.1831626669736579,
-    0.17837574999430217,
-    0.1804694169841241,
-    0.1842399160086643,
-    0.16988925001351163,
-    0.16813949999050237,
-    0.1811159159988165,
-    0.18106820798129775,
-    0.189602083992213,
-    0.18995566701050848,
-    0.19057995799812488,
-    0.19601700000930578,
-    0.20375479201902635,
-    0.2091367499961052,
-    0.1762736669916194,
-    0.18755962498835288,
-    0.18097279101493768,
-    0.19387341602123342,
-    0.19409466700744815,
-    0.19602983302320354,
-    0.19990137498825788,
-    0.19672604100196622,
-    0.20441337500233203,
-    0.1919177910021972,
-    0.19035400002030656,
-    0.18818595798802562,
-    0.20062550000147894,
-    0.20517125001060776,
-    0.21078208298422396,
-    0.21055120800156146,
-    0.2113325830141548,
-    0.2082263750198763,
-    0.21374020900111645,
-    0.22541770798852667,
-    0.2234314999950584,
-    0.25074754099478014,
-    0.2521030419738963,
-    0.1965975420025643,
-    0.21167491600499488,
-    0.20222583401482552,
-    0.20200825002393685,
-    0.20671258302172646,
-    0.2234445830108598,
-    0.21937154099578038,
-    0.21753495899611153
+    0.19686699999147095,
+    0.08568345801904798,
+    0.06872599999769591,
+    0.08138012498966418,
+    0.06583791601588018,
+    0.07891783400555141,
+    0.07149812500574626,
+    0.09389950000331737,
+    0.09617249999428168,
+    0.08341749999090098,
+    0.08849229098996148,
+    0.09018912498140708,
+    0.08875412499764934,
+    0.101228416984668,
+    0.09293979202629998,
+    0.10830366698792204,
+    0.12876833401969634,
+    0.12923658298677765,
+    0.1164071669918485,
+    0.13079325002036057,
+    0.12820487501448952,
+    0.13557625000248663,
+    0.09424249999574386,
+    0.10010887499083765,
+    0.11248295902623795,
+    0.11142383399419487,
+    0.10799820799729787,
+    0.11667879100423306,
+    0.11468637501820922,
+    0.12182083298102953,
+    0.12097816698951647,
+    0.13072370798909105,
+    0.1291480420040898,
+    0.1360184160002973,
+    0.15855879199807532,
+    0.1710428749793209,
+    0.11193608300527558,
+    0.12153745800605975,
+    0.12027937499806285,
+    0.12156008300371468,
+    0.12472454100497998,
+    0.126589832972968,
+    0.1346566659922246,
+    0.13915837500826456,
+    0.1317157080047764,
+    0.1457767500251066,
+    0.16955045799841173,
+    0.15598758301348425,
+    0.1594794589909725,
+    0.16183574998285621,
+    0.16034129101899453,
+    0.11975549999624491,
+    0.1290244999981951,
+    0.1503303330100607,
+    0.14743708301102743,
+    0.135388624999905,
+    0.144366333988728,
+    0.1510032499791123,
+    0.1516765409905929,
+    0.14094266601023264,
+    0.14127449999796227,
+    0.13521212499472313,
+    0.13461870801984333,
+    0.1562395000073593,
+    0.14590720800333656,
+    0.17000608399393968,
+    0.15739949999260716,
+    0.15779820797615685,
+    0.137982957996428,
+    0.14989979198435321,
+    0.14375887499772944,
+    0.15285408397903666,
+    0.15492762500070967,
+    0.16551324998727068,
+    0.1681224999774713,
+    0.17733345800661482,
+    0.16471045900834724,
+    0.16736587500781752,
+    0.21757654199609533,
+    0.2036955839721486,
+    0.18842145797680132,
+    0.1502368329965975,
+    0.1554719170089811,
+    0.15774329099804163,
+    0.17183504201238975,
+    0.1608377090014983,
+    0.1597287500044331,
+    0.16977524998947047,
+    0.1672042499994859,
+    0.1665116669901181,
+    0.171172917005606,
+    0.1709172499831766,
+    0.17518229101551697,
+    0.17903904200647958,
+    0.18873720898409374,
+    0.16690291700069793,
+    0.17679045800468884,
+    0.16132758400635794,
+    0.17530816601356491,
+    0.18461245798971504,
+    0.17474575000233017,
+    0.18567483400693163,
+    0.17470662499545142,
+    0.16874370799632743,
+    0.17223462497349828,
+    0.18749691598350182,
+    0.19119066698476672,
+    0.19370987499132752,
+    0.1884450000070501,
+    0.2047670420142822,
+    0.22187316700001247,
+    0.21434150001732633,
+    0.1793017919990234,
+    0.19942458299919963,
+    0.19269812499987893,
+    0.17616845801239833,
+    0.1844644169905223,
+    0.18821241598925553,
+    0.1979213749873452,
+    0.19307874998776242,
+    0.2033931250043679,
+    0.18897033299435861,
+    0.18741720900288783,
+    0.18592237500706688,
+    0.19593154100584798,
+    0.1980101660010405,
+    0.19885191600769758,
+    0.21342849999200553,
+    0.2115652909851633,
+    0.20627120899735019,
+    0.2215377500106115,
+    0.22900525000295602,
+    0.263109457999235,
+    0.24831933400128037,
+    0.25395316700451076,
+    0.19411825001589023,
+    0.2006896249949932,
+    0.20330616598948836,
+    0.19667220901465043,
+    0.20230154201271944,
+    0.2084090419812128,
+    0.21308883299934678,
+    0.21451900000101887
    ],
    "proposals": [],
    "held_back": []
@@ -15477,9 +15488,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.09825679200002924,
-    "transcribe": 0.21403941698372364,
-    "structure": 25.73046154199983
+    "decode": 0.06943900001351722,
+    "transcribe": 0.1998084579827264,
+    "structure": 25.500767791992985
    },
    "tokens": {
     "prompt_n": 197,
@@ -15592,9 +15603,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.14826204199925996,
-    "transcribe": 0.5744524170004297,
-    "structure": 26.483628082991345
+    "decode": 0.17639170799520798,
+    "transcribe": 0.5470754999842029,
+    "structure": 26.162692125013564
    },
    "tokens": {
     "prompt_n": 283,
@@ -15822,9 +15833,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10822104098042473,
-    "transcribe": 0.3210263329965528,
-    "structure": 20.4221214169811
+    "decode": 0.097408000001451,
+    "transcribe": 0.3369677090086043,
+    "structure": 20.260404334025225
    },
    "tokens": {
     "prompt_n": 211,
@@ -15963,9 +15974,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12614666699664667,
-    "transcribe": 0.2599310830119066,
-    "structure": 12.004948374989908
+    "decode": 0.1418722909875214,
+    "transcribe": 0.27981329199974425,
+    "structure": 11.84097670900519
    },
    "tokens": {
     "prompt_n": 133,
@@ -16105,9 +16116,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10874087500269525,
-    "transcribe": 0.24584079199121334,
-    "structure": 16.885861457994906
+    "decode": 0.10299466698779725,
+    "transcribe": 0.24833062500692904,
+    "structure": 16.76990716700675
    },
    "tokens": {
     "prompt_n": 177,
@@ -16229,9 +16240,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.11593441700097173,
-    "transcribe": 0.20230216599884443,
-    "structure": 15.721322666009655
+    "decode": 0.11561595799867064,
+    "transcribe": 0.22903012498863973,
+    "structure": 15.69522079100716
    },
    "tokens": {
     "prompt_n": 165,
@@ -16342,9 +16353,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1216734999907203,
-    "transcribe": 0.4452721660200041,
-    "structure": 19.67833774999599
+    "decode": 0.09594583298894577,
+    "transcribe": 0.42981970799155533,
+    "structure": 19.610257457999978
    },
    "tokens": {
     "prompt_n": 242,
@@ -16528,9 +16539,9 @@
    "not_carried_over": [],
    "unclear_passages": 1,
    "timings": {
-    "decode": 0.1157577499980107,
-    "transcribe": 0.4954133749997709,
-    "structure": 20.072408624982927
+    "decode": 0.12669537498732097,
+    "transcribe": 0.5214587500086054,
+    "structure": 20.005557292024605
    },
    "tokens": {
     "prompt_n": 251,
@@ -16713,9 +16724,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1512828750128392,
-    "transcribe": 0.4182672500028275,
-    "structure": 20.153006500011543
+    "decode": 0.1495412919903174,
+    "transcribe": 0.4248172079969663,
+    "structure": 20.02635533301509
    },
    "tokens": {
     "prompt_n": 239,
@@ -16868,9 +16879,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10841641700244509,
-    "transcribe": 0.3330270830192603,
-    "structure": 16.793953207990853
+    "decode": 0.08949095898424275,
+    "transcribe": 0.3309187499980908,
+    "structure": 16.778377290989738
    },
    "tokens": {
     "prompt_n": 203,
@@ -16995,9 +17006,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.18671241699485108,
-    "transcribe": 0.4576067919842899,
-    "structure": 31.044298583990894
+    "decode": 0.18655454198597,
+    "transcribe": 0.49829479097388685,
+    "structure": 30.698253084003227
    },
    "tokens": {
     "prompt_n": 340,
@@ -17079,137 +17090,137 @@
     }
    ],
    "chunk_seconds": [
-    0.22561424999730662,
-    0.08917070901952684,
-    0.08616716600954533,
-    0.07153783401008695,
-    0.08233320797444321,
-    0.06996200000867248,
-    0.07764787500491366,
-    0.09626858399133198,
-    0.09984354098560289,
-    0.10958879100508057,
-    0.10512149997521192,
-    0.1270443749963306,
-    0.11529133399017155,
-    0.1175125419977121,
-    0.12065066699869931,
-    0.12164608298917301,
-    0.13585795898688957,
-    0.13553812500322238,
-    0.1228377920051571,
-    0.09135904198046774,
-    0.09647145800408907,
-    0.10068745902390219,
-    0.10694345799856819,
-    0.10342270898399875,
-    0.11236433399608359,
-    0.11647916602669284,
-    0.11061491601867601,
-    0.13146270799916238,
-    0.1305689160071779,
-    0.12116400001104921,
-    0.15117883300990798,
-    0.14980483299586922,
-    0.14881083299405873,
-    0.15288145901286043,
-    0.1090118340216577,
-    0.11128124999231659,
-    0.11605450001661666,
-    0.12107287501567043,
-    0.120757833996322,
-    0.1272745830065105,
-    0.12277583300601691,
-    0.13318562498898245,
-    0.14004895798279904,
-    0.1428912080009468,
-    0.14074837500811554,
-    0.1477444999909494,
-    0.16389929200522602,
-    0.1501251249865163,
-    0.21953420800855383,
-    0.13248245799331926,
-    0.1393476249941159,
-    0.1336082920024637,
-    0.1331365000223741,
-    0.1433410419849679,
-    0.14350895798997954,
-    0.14195295801619068,
-    0.16917020801338367,
-    0.1486074999847915,
-    0.15181804198073223,
-    0.18730191700160503,
-    0.1604101669800002,
-    0.16772220798884518,
-    0.16794533299980685,
-    0.13203654199605808,
-    0.133235458022682,
-    0.1419390420196578,
-    0.14092483301647007,
-    0.14438187499763444,
-    0.1473134160041809,
-    0.15511770799639635,
-    0.16348491600365378,
-    0.1628632500069216,
-    0.16502183300326578,
-    0.19800612499238923,
-    0.166208042006474,
-    0.18124050000915304,
-    0.144337292003911,
-    0.1656768329849001,
-    0.15789620898431167,
-    0.15911762497853488,
-    0.15949495800305158,
-    0.16690012498293072,
-    0.17058391601312906,
-    0.17249854101100937,
-    0.16938974999357015,
-    0.19733487500343472,
-    0.1729173749918118,
-    0.1856570410018321,
-    0.187964958982775,
-    0.19506487500621006,
-    0.19717658302397467,
-    0.20096120800008066,
-    0.166964125004597,
-    0.16557675000512972,
-    0.16607987499446608,
-    0.16983866700320505,
-    0.1738378330192063,
-    0.17874570802086964,
-    0.1803419589996338,
-    0.190301916009048,
-    0.18892958300421014,
-    0.19683500000974163,
-    0.20448512499569915,
-    0.1966228749952279,
-    0.20054016599897295,
-    0.19560162498964928,
-    0.17416649998631328,
-    0.18015979198389687,
-    0.18475012498674914,
-    0.19328374997712672,
-    0.18335400000796653,
-    0.19453183299629018,
-    0.19776291699963622,
-    0.1963689159892965,
-    0.1944580839772243,
-    0.2043628749961499,
-    0.21020120801404119,
-    0.21405141599825583,
-    0.21868354099569842,
-    0.23632583301514387,
-    0.22383529099170119,
-    0.18036154098808765,
-    0.1897113329905551,
-    0.20103379199281335,
-    0.19525833299849182,
-    0.19300687502254732,
-    0.24815283398493193,
-    0.20315587500226684,
-    0.21991979199810885,
-    0.21375287498813123,
-    0.21288916599587537
+    0.21813920899876393,
+    0.0830625840171706,
+    0.08572733399341814,
+    0.06917491601780057,
+    0.07784641699981876,
+    0.06846174999373034,
+    0.08376262499950826,
+    0.0895235420030076,
+    0.09748224998475052,
+    0.10948387501412071,
+    0.09794512501684949,
+    0.12874391698278487,
+    0.11535245800041594,
+    0.09884408398647793,
+    0.11729162497795187,
+    0.12020124998525716,
+    0.1375946659827605,
+    0.14215383300324902,
+    0.13072375001502223,
+    0.09849829101585783,
+    0.09901812500902452,
+    0.10344758300925605,
+    0.11021954100579023,
+    0.11456554199685343,
+    0.10521141599747352,
+    0.11285479200887494,
+    0.12481241600471549,
+    0.11656658299034461,
+    0.13887879101093858,
+    0.1354065420164261,
+    0.1348099590104539,
+    0.14209166599903256,
+    0.14275704199098982,
+    0.14077995799016207,
+    0.10731399999349378,
+    0.10938779200660065,
+    0.1092389169789385,
+    0.11303279199637473,
+    0.12113999997382052,
+    0.12982437500613742,
+    0.13642208400415257,
+    0.13707929098745808,
+    0.12889470902155153,
+    0.1381384170090314,
+    0.13385783301782794,
+    0.15166566701373085,
+    0.17150737502379343,
+    0.16744170800666325,
+    0.15382245799992234,
+    0.11905670800479129,
+    0.1296294579806272,
+    0.13883820801856928,
+    0.1285831249842886,
+    0.14664391599944793,
+    0.13387791698914953,
+    0.15132958398316987,
+    0.16605254099704325,
+    0.14693487499607727,
+    0.15192658398882486,
+    0.16540604198235087,
+    0.15481120799086057,
+    0.15777862499817275,
+    0.17392825000570156,
+    0.148959999991348,
+    0.13507145797484554,
+    0.14311125001404434,
+    0.13978983298875391,
+    0.16203249999671243,
+    0.1641256250150036,
+    0.15997016601613723,
+    0.17198004201054573,
+    0.16328629199415445,
+    0.16945333301555365,
+    0.16876829098328017,
+    0.1737183749792166,
+    0.17425091698532924,
+    0.1481621660059318,
+    0.1551905420201365,
+    0.15015495801344514,
+    0.15672454200102948,
+    0.15813487500417978,
+    0.1650077080121264,
+    0.17603724999935366,
+    0.1829597080068197,
+    0.16843862499808893,
+    0.18534558301325887,
+    0.17855929097277112,
+    0.17371279100188985,
+    0.19536924999556504,
+    0.1925634589861147,
+    0.1919801659823861,
+    0.2012346669798717,
+    0.16904354200232774,
+    0.16465804202016443,
+    0.16588108299765736,
+    0.17201566699077375,
+    0.17716150000342168,
+    0.18565191599191166,
+    0.18497516700881533,
+    0.18751987497671507,
+    0.1850477079860866,
+    0.20134570798836648,
+    0.20457945801899768,
+    0.20793479200801812,
+    0.21609304202138446,
+    0.20667200000025332,
+    0.17507329100044444,
+    0.18283799997880124,
+    0.17603837497881614,
+    0.18050479199155234,
+    0.20134770800359547,
+    0.2085375830065459,
+    0.19319958298001438,
+    0.20246895900345407,
+    0.19229687500046566,
+    0.20385650001117028,
+    0.216801625007065,
+    0.21450295898830518,
+    0.2098886249877978,
+    0.23560041701421142,
+    0.22529670799849555,
+    0.19343641700106673,
+    0.197664666979108,
+    0.19975733300088905,
+    0.19309133299975656,
+    0.19777729199267924,
+    0.20862054199096747,
+    0.20161612500669435,
+    0.21643337499699555,
+    0.21839516700129025,
+    0.2127700409910176
    ],
    "proposals": [],
    "held_back": []
@@ -17278,9 +17289,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.15471199998864904,
-    "transcribe": 0.498482499999227,
-    "structure": 30.860736540984362
+    "decode": 0.1523269579920452,
+    "transcribe": 0.4720442079997156,
+    "structure": 30.565269542013993
    },
    "tokens": {
     "prompt_n": 333,
@@ -17477,9 +17488,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.13701891698292457,
-    "transcribe": 0.669263707997743,
-    "structure": 31.895595375011908
+    "decode": 0.1364576249907259,
+    "transcribe": 0.6553682500089053,
+    "structure": 31.547145374992397
    },
    "tokens": {
     "prompt_n": 337,
@@ -17700,9 +17711,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.19285262501216494,
-    "transcribe": 0.651774458005093,
-    "structure": 31.945029291993706
+    "decode": 0.2298024999909103,
+    "transcribe": 0.6224523750133812,
+    "structure": 31.544490416999906
    },
    "tokens": {
     "prompt_n": 336,
@@ -17949,9 +17960,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12546691700117663,
-    "transcribe": 0.396855166007299,
-    "structure": 24.4199644580076
+    "decode": 0.11718533301609568,
+    "transcribe": 0.3861193339980673,
+    "structure": 24.05221020799945
    },
    "tokens": {
     "prompt_n": 261,
@@ -18087,9 +18098,9 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.1036614170006942,
-    "transcribe": 0.24938891700003296,
-    "structure": 12.627219207992312
+    "decode": 0.06727720799972303,
+    "transcribe": 0.21597195797949098,
+    "structure": 12.601684082997963
    },
    "tokens": {
     "prompt_n": 129,
@@ -18226,9 +18237,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10655954200774431,
-    "transcribe": 0.2803895420220215,
-    "structure": 18.894641374994535
+    "decode": 0.07084266698802821,
+    "transcribe": 0.31687966699246317,
+    "structure": 18.896874124999158
    },
    "tokens": {
     "prompt_n": 231,
@@ -18386,9 +18397,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.2188356659899,
-    "transcribe": 0.6082424159976654,
-    "structure": 53.72538175000227
+    "decode": 0.2208804170077201,
+    "transcribe": 0.6675758750061505,
+    "structure": 52.95821341598639
    },
    "tokens": {
     "prompt_n": 577,
@@ -18526,181 +18537,181 @@
     }
    ],
    "chunk_seconds": [
-    0.17012433300260454,
-    0.18342799998936243,
-    0.07597470900509506,
-    0.07528866699431092,
-    0.06879925000248477,
-    0.07297087501501665,
-    0.09181558300042525,
-    0.09659979198477231,
-    0.09727266698610038,
-    0.1008680000086315,
-    0.10367337500792928,
-    0.10103104199515656,
-    0.09556895899004303,
-    0.1001007079903502,
-    0.12422583298757672,
-    0.091878999985056,
-    0.09249495799303986,
-    0.09932399998069741,
-    0.10478604200761765,
-    0.11019775000750087,
-    0.11132054100744426,
-    0.11611820801044814,
-    0.1169024579867255,
-    0.11555787498946302,
-    0.12153591701644473,
-    0.13801245798822492,
-    0.08986258300137706,
-    0.10671237501082942,
-    0.10364279200439341,
-    0.11236579201067798,
-    0.1286092920054216,
-    0.12410975000238977,
-    0.11924920798628591,
-    0.14259970802231692,
-    0.1085967920080293,
-    0.10071545900427736,
-    0.10724858401226811,
-    0.11049145899596624,
-    0.12261849999777041,
-    0.12548483299906366,
-    0.13553024997236207,
-    0.13250433301436715,
-    0.13379854100639932,
-    0.1577085419849027,
-    0.15555624998523854,
-    0.1210115410212893,
-    0.14574437498231418,
-    0.133650875010062,
-    0.1321487499808427,
-    0.1202598340169061,
-    0.13754804199561477,
-    0.14817699999548495,
-    0.12203587501426227,
-    0.1250699579832144,
-    0.1311618330073543,
-    0.14660808400367387,
-    0.14126295800087973,
-    0.1540067089954391,
-    0.1468297500105109,
-    0.15243837499292567,
-    0.14965325000230223,
-    0.18239554099272937,
-    0.16212749999249354,
-    0.18101179102086462,
-    0.14364929200382903,
-    0.15701616599108092,
-    0.1463994170189835,
-    0.14973691699560732,
-    0.15288808301556855,
-    0.16742729200632311,
-    0.1604469159792643,
-    0.17508295801235363,
-    0.1700157499872148,
-    0.1672294579911977,
-    0.1710375840193592,
-    0.17624895900371484,
-    0.19058791699353606,
-    0.1436583329923451,
-    0.1490914580062963,
-    0.16280575000564568,
-    0.16030516600585543,
-    0.16628620799747296,
-    0.17980233297566883,
-    0.194759999983944,
-    0.18079345801379532,
-    0.18541233299765736,
-    0.18796308297896758,
-    0.1676128749968484,
-    0.15627887501614168,
-    0.17032312499941327,
-    0.16411758301546797,
-    0.1903424579941202,
-    0.1843944160209503,
-    0.1729397920134943,
-    0.17872312499093823,
-    0.18277608399512246,
-    0.21323449999908917,
-    0.22382133398787118,
-    0.16403237500344403,
-    0.1792485000041779,
-    0.18207562499446794,
-    0.17240833400865085,
-    0.18669720797333866,
-    0.1907666250190232,
-    0.1924549579853192,
-    0.187770708987955,
-    0.18883758300216869,
-    0.20740912499604747,
-    0.20519658300327137,
-    0.20889804197940975,
-    0.19345304201124236,
-    0.18459537500166334,
-    0.1932450830063317,
-    0.1895643750031013,
-    0.19441662498866208,
-    0.21464833299978636,
-    0.19375579201732762,
-    0.19952620801632293,
-    0.1995215420029126,
-    0.234070749982493,
-    0.2222415419819299,
-    0.2215507910004817,
-    0.1924439999856986,
-    0.205234458000632,
-    0.19796108300215565,
-    0.20114779198775068,
-    0.2036407080013305,
-    0.22486762498738244,
-    0.20651258301222697,
-    0.23842845900799148,
-    0.20745824999175966,
-    0.24974899998051114,
-    0.2279942910245154,
-    0.23068566599977203,
-    0.19693370899767615,
-    0.19779641699278727,
-    0.20402991701848805,
-    0.2065378330007661,
-    0.2072278750129044,
-    0.2305957920034416,
-    0.2163189590210095,
-    0.2189673329994548,
-    0.21686229199985974,
-    0.22142250000615604,
-    0.21948699999484234,
-    0.23967741598607972,
-    0.21941033299663104,
-    0.2071775000076741,
-    0.20984899997711182,
-    0.2248578339931555,
-    0.22529762500198558,
-    0.22084816702408716,
-    0.244995499990182,
-    0.2300431669864338,
-    0.23690299998270348,
-    0.23103804100537673,
-    0.2322048329806421,
-    0.20204258398734964,
-    0.2219098329951521,
-    0.2263071660127025,
-    0.23399320800672285,
-    0.23630912500084378,
-    0.24867820800864138,
-    0.24282591699738987,
-    0.24170654101180844,
-    0.2476040829787962,
-    0.2634165839990601,
-    0.2280256669910159,
-    0.2247900830116123,
-    0.22409324999898672,
-    0.23373320899554528,
-    0.23874091697507538,
-    0.23700812499737367,
-    0.23754625002038665,
-    0.24899458399158902
+    0.19246662501245737,
+    0.11809541698312387,
+    0.08779133399366401,
+    0.0719798750069458,
+    0.07530441600829363,
+    0.0716671250120271,
+    0.07687537500169128,
+    0.1069025420001708,
+    0.09414375000051223,
+    0.10234633399522863,
+    0.10429787501925603,
+    0.10108708302141167,
+    0.1032623750215862,
+    0.1038634589931462,
+    0.12186924999696203,
+    0.09695729200029746,
+    0.07839741700445302,
+    0.12366337500861846,
+    0.10694637498818338,
+    0.11267716600559652,
+    0.1079553329909686,
+    0.12108320801053196,
+    0.12016041702008806,
+    0.11656445797416382,
+    0.12274441699264571,
+    0.13716220800415613,
+    0.09571712499018759,
+    0.10211445900495164,
+    0.10888516699196771,
+    0.11393570801010355,
+    0.12422129197511822,
+    0.11203933399519883,
+    0.10167754100984894,
+    0.14587116599432193,
+    0.10234737498103641,
+    0.10880887499661185,
+    0.11568683298537508,
+    0.11902129201916978,
+    0.12412795799900778,
+    0.1368314580176957,
+    0.14050950002274476,
+    0.13110595900798216,
+    0.1371614160016179,
+    0.1432581250264775,
+    0.1487762920150999,
+    0.11453270900528878,
+    0.12208462500711903,
+    0.12254525002208538,
+    0.1245650420023594,
+    0.129834833991481,
+    0.1468815420230385,
+    0.14300087501760572,
+    0.1291884999955073,
+    0.12199037498794496,
+    0.12695666699437425,
+    0.13022408401593566,
+    0.14130024999030866,
+    0.14777670800685883,
+    0.13797799998428673,
+    0.15367837500525638,
+    0.1520909999962896,
+    0.17124912497820333,
+    0.15709975000936538,
+    0.17480074998456985,
+    0.13320908299647272,
+    0.1396537079999689,
+    0.14257120797992684,
+    0.14963879200513475,
+    0.1422305000014603,
+    0.1595157500123605,
+    0.16058233298826963,
+    0.16600724999443628,
+    0.1720516250061337,
+    0.1679732079792302,
+    0.16388966699014418,
+    0.16937308298656717,
+    0.18521654198411852,
+    0.1486303329875227,
+    0.1469932920008432,
+    0.15729724999982864,
+    0.1621465419884771,
+    0.16994433299987577,
+    0.17711062502348796,
+    0.18793341700802557,
+    0.17084891599370167,
+    0.18014012501225807,
+    0.19528504100162536,
+    0.15948600001865998,
+    0.18803758401190862,
+    0.17319687499548309,
+    0.16342479098238982,
+    0.1668593329959549,
+    0.1718906669993885,
+    0.17835270799696445,
+    0.17372341599548236,
+    0.1785916249791626,
+    0.2150336249906104,
+    0.2197801250149496,
+    0.1621290829789359,
+    0.17620258301030844,
+    0.18461733299773186,
+    0.18202691699843854,
+    0.1857316660170909,
+    0.18639712501317263,
+    0.1847601659828797,
+    0.185222583997529,
+    0.18795512500219047,
+    0.20594283298123628,
+    0.2159033750067465,
+    0.20720274999621324,
+    0.17930254101520404,
+    0.18721383402589709,
+    0.18959500000346452,
+    0.19102466700132936,
+    0.19252362500992604,
+    0.21099870899342932,
+    0.20173045797855593,
+    0.19552558299619704,
+    0.19715733398334123,
+    0.2217683750204742,
+    0.21895954202045687,
+    0.2254499999980908,
+    0.17679287499049678,
+    0.18412395802442916,
+    0.18853720801416785,
+    0.19652054199832492,
+    0.1946347499906551,
+    0.22115558400400914,
+    0.20057133299997076,
+    0.23956725001335144,
+    0.20717629199498333,
+    0.23398283301503398,
+    0.21805049999966286,
+    0.23552833299618214,
+    0.19677537499228492,
+    0.2167115830234252,
+    0.2086696670157835,
+    0.20753433302161284,
+    0.20833095800480805,
+    0.27575299999443814,
+    0.2141247499966994,
+    0.2154129999980796,
+    0.21487854202860035,
+    0.23065333301201463,
+    0.23031595899374224,
+    0.2438970840012189,
+    0.19719079101923853,
+    0.2048884159885347,
+    0.21161945900530554,
+    0.21654491699882783,
+    0.217883500008611,
+    0.22005783300846815,
+    0.2327985419833567,
+    0.23543954102206044,
+    0.23710158400353976,
+    0.24231970799155533,
+    0.23934129200642928,
+    0.2089702500088606,
+    0.22135924999020062,
+    0.21725220800726674,
+    0.22516908301622607,
+    0.23113166698021814,
+    0.24050241700024344,
+    0.23986483298358507,
+    0.23943291601608507,
+    0.25019495899323374,
+    0.25895929100806825,
+    0.23346416698768735,
+    0.22836220799945295,
+    0.22551479199319147,
+    0.2383478340052534,
+    0.24033608302124776,
+    0.23743058400577866,
+    0.25058416702086106,
+    0.25159620799240656
    ],
    "proposals": [
     [
@@ -18813,9 +18824,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12030729200341739,
-    "transcribe": 0.5724414580035955,
-    "structure": 47.420604000013554
+    "decode": 0.11076624999986961,
+    "transcribe": 0.6052940420049708,
+    "structure": 46.872008249978535
    },
    "tokens": {
     "prompt_n": 505,
@@ -18937,181 +18948,181 @@
     }
    ],
    "chunk_seconds": [
-    0.17038250001496635,
-    0.0723000830039382,
-    0.0580708330089692,
-    0.06113933300366625,
-    0.12592745799338445,
-    0.06993699999293312,
-    0.0767872080032248,
-    0.08872545798658393,
-    0.09751437499653548,
-    0.10049087498919107,
-    0.10280987501027994,
-    0.09072962499340065,
-    0.11530433301231824,
-    0.0971093749976717,
-    0.1199929160065949,
-    0.13105375002487563,
-    0.12060479199863039,
-    0.08058604100369848,
-    0.08028608400491066,
-    0.14311704199644737,
-    0.08774170800461434,
-    0.1122380000015255,
-    0.10160691698547453,
-    0.10661933402298018,
-    0.11237445901497267,
-    0.11473033399670385,
-    0.12474945801659487,
-    0.13726108300033957,
-    0.09165149999898858,
-    0.12009320899960585,
-    0.09870266600046307,
-    0.10332150000613183,
-    0.11073891699197702,
-    0.10759712499566376,
-    0.10650862500187941,
-    0.12729845801368356,
-    0.11558250000234693,
-    0.11805487499805167,
-    0.1422730420017615,
-    0.13176308397669345,
-    0.10020099999383092,
-    0.13183704201946966,
-    0.11236612501670606,
-    0.1083250830124598,
-    0.11622716701822355,
-    0.12147337500937283,
-    0.13449933301308192,
-    0.12928270801785402,
-    0.14298066700575873,
-    0.12251070799538866,
-    0.1573535829957109,
-    0.14382358398870565,
-    0.1547898749995511,
-    0.13995516701834276,
-    0.0990103330113925,
-    0.10623179201502353,
-    0.10795533302007243,
-    0.12594187501235865,
-    0.12484341600793414,
-    0.12275937502272427,
-    0.1254829170065932,
-    0.13763424998614937,
-    0.11307674998533912,
-    0.1679234999755863,
-    0.12947645800886676,
-    0.14492637501098216,
-    0.13858683401485905,
-    0.09906254202360287,
-    0.10270433302503079,
-    0.1077290830144193,
-    0.11654412499046884,
-    0.1108023340057116,
-    0.10978395902202465,
-    0.11926266699447297,
-    0.13555170799372718,
-    0.12982420800835826,
-    0.1454354999877978,
-    0.13453366700559855,
-    0.15266695799073204,
-    0.15337854099925607,
-    0.1179018749971874,
-    0.1244552910211496,
-    0.12444216600852087,
-    0.12625445798039436,
-    0.13051683400408365,
-    0.13712820800719783,
-    0.1319434169854503,
-    0.13412679097382352,
-    0.14806916698580608,
-    0.15656574998865835,
-    0.15737362499930896,
-    0.17152008399716578,
-    0.14563004198134877,
-    0.12522470898693427,
-    0.1272571660229005,
-    0.13432970800204203,
-    0.13383658402017318,
-    0.14361891700536944,
-    0.18190508297993802,
-    0.1581741249829065,
-    0.15208554198034108,
-    0.1521984160062857,
-    0.14741674999822862,
-    0.17100199998822063,
-    0.16238762499415316,
-    0.15896091700415127,
-    0.18306879099691287,
-    0.16809520800597966,
-    0.1227051249879878,
-    0.14381233300082386,
-    0.14423745800741017,
-    0.14504429200314917,
-    0.1476229580002837,
-    0.15073579200543463,
-    0.15595845799543895,
-    0.15201312498538755,
-    0.1640882499923464,
-    0.15427391597768292,
-    0.13786112499656156,
-    0.14631537499371916,
-    0.14973529099370353,
-    0.1439001249964349,
-    0.14981150001403876,
-    0.15766695799538866,
-    0.1604197499982547,
-    0.15910208300920203,
-    0.17245808299048804,
-    0.17455841699847952,
-    0.19149462500354275,
-    0.17432766701676883,
-    0.14863924999372102,
-    0.13886249999632128,
-    0.14220045797992498,
-    0.16156099998624995,
-    0.15057024999987334,
-    0.15109758300241083,
-    0.16202179100946523,
-    0.17465450000599958,
-    0.16359779101912864,
-    0.16640262497821823,
-    0.17659216598258354,
-    0.1748967079911381,
-    0.195964709011605,
-    0.13983020899468102,
-    0.14852312501170672,
-    0.15326012499281205,
-    0.1599473329843022,
-    0.1611875419912394,
-    0.1736185839981772,
-    0.16314395898371004,
-    0.16812670801300555,
-    0.1757755830185488,
-    0.1765520830231253,
-    0.1948335000197403,
-    0.17916850000619888,
-    0.1844193750002887,
-    0.14921741600846872,
-    0.15173341700574383,
-    0.15499854198424146,
-    0.15533429200877436,
-    0.19215862499549985,
-    0.1666439579857979,
-    0.16727641699253581,
-    0.176866042020265,
-    0.1656902499962598,
-    0.18016862499644049,
-    0.18496395900729112,
-    0.19796787499217317,
-    0.21472033401369117,
-    0.23108891601441428,
-    0.20486149998032488,
-    0.16287075000582263,
-    0.16307529198820703,
-    0.1616848330013454,
-    0.17046087500057183
+    0.17513062499347143,
+    0.06983154098270461,
+    0.0813699170248583,
+    0.08468854101374745,
+    0.10315325000556186,
+    0.0863248750101775,
+    0.07659383400459774,
+    0.09476695899502374,
+    0.10301429100218229,
+    0.09384279200457968,
+    0.08179566598846577,
+    0.10796729198773392,
+    0.10870766700827517,
+    0.10419658300816081,
+    0.1193391669949051,
+    0.1363136250001844,
+    0.1395034580200445,
+    0.08430704200873151,
+    0.09257800001068972,
+    0.0997641249850858,
+    0.09689033299218863,
+    0.09634462499525398,
+    0.0960718750138767,
+    0.1050734170130454,
+    0.10071237498777919,
+    0.1112545839860104,
+    0.11892679199809209,
+    0.12379754200810567,
+    0.10080804201425053,
+    0.0952770409930963,
+    0.09864400001242757,
+    0.08810550000634976,
+    0.1068608750065323,
+    0.11054100000183098,
+    0.11218291698605753,
+    0.11917304201051593,
+    0.11277291699661873,
+    0.11836516699986532,
+    0.1111232909897808,
+    0.1312874169962015,
+    0.08097120802267455,
+    0.10380299997632392,
+    0.10688958398532122,
+    0.10388866602443159,
+    0.11384274999727495,
+    0.1163055419747252,
+    0.11484083399409428,
+    0.1194397080107592,
+    0.1292961250001099,
+    0.1413430409738794,
+    0.1450018750037998,
+    0.1389365840004757,
+    0.1425179579819087,
+    0.14203570800600573,
+    0.09747579199029133,
+    0.10813641699496657,
+    0.11080979200778529,
+    0.11482966699986719,
+    0.10963949997676536,
+    0.11952750000637025,
+    0.12535870799911208,
+    0.13027358299586922,
+    0.12420745799317956,
+    0.14815741698839702,
+    0.1418729160213843,
+    0.14783099998021498,
+    0.14252979200682603,
+    0.11251174999051727,
+    0.11613691700040363,
+    0.12375470899860375,
+    0.11641737498575822,
+    0.12386529200011864,
+    0.12473333399975672,
+    0.12075345800258219,
+    0.1441655410162639,
+    0.13477958299336024,
+    0.14711370898294263,
+    0.13824062500498258,
+    0.14797920800629072,
+    0.15287687498494051,
+    0.1200248749810271,
+    0.12141370901372284,
+    0.12588341598166153,
+    0.12562008301028982,
+    0.11955420800950378,
+    0.13454954198095948,
+    0.13703554100356996,
+    0.1395782500039786,
+    0.14426899998215958,
+    0.14757879101671278,
+    0.14885345799848437,
+    0.16895341701456346,
+    0.12768945799325593,
+    0.12857124998117797,
+    0.11809899998479523,
+    0.1330549159902148,
+    0.1282063339895103,
+    0.1384412499901373,
+    0.1368335000006482,
+    0.14620354201178998,
+    0.14083537497208454,
+    0.14517112501198426,
+    0.145813833019929,
+    0.17493520901189186,
+    0.16530833300203085,
+    0.15682629100047052,
+    0.18261391698615626,
+    0.16656616699765436,
+    0.13540554099017754,
+    0.14795358301489614,
+    0.15634370798943564,
+    0.13608075000229292,
+    0.14007674998720177,
+    0.1497531670029275,
+    0.15710987499915063,
+    0.14641987497452646,
+    0.1639071670069825,
+    0.14423999999416992,
+    0.14614408399211243,
+    0.14911025000037625,
+    0.15933262498583645,
+    0.1414365000091493,
+    0.14920324998092838,
+    0.15595787501661107,
+    0.1594838340242859,
+    0.1595490420004353,
+    0.17012887500459328,
+    0.17098475000238977,
+    0.1969155409897212,
+    0.17920949999825098,
+    0.14264129198272713,
+    0.14624583299155347,
+    0.15511845800210722,
+    0.14861504102009349,
+    0.15019858299638145,
+    0.15418937499634922,
+    0.1575540829799138,
+    0.1753011659893673,
+    0.15583691699430346,
+    0.1767122499877587,
+    0.17398562500602566,
+    0.17146541600232013,
+    0.18153029200038873,
+    0.1363700420188252,
+    0.147080583992647,
+    0.14626312497421168,
+    0.15442820801399648,
+    0.15664354100590572,
+    0.18506441698991694,
+    0.1537798329954967,
+    0.1601440829981584,
+    0.16125758399721235,
+    0.1633389159978833,
+    0.17837074998533353,
+    0.1787512080045417,
+    0.1842079579946585,
+    0.1384825420100242,
+    0.14643545798026025,
+    0.1504632500000298,
+    0.15320762500050478,
+    0.1544799580005929,
+    0.1628643750154879,
+    0.16182337500504218,
+    0.1628665419993922,
+    0.16393737500766292,
+    0.1693989580089692,
+    0.17007279201061465,
+    0.18795904199942015,
+    0.20882341600372456,
+    0.21694512499379925,
+    0.20497562500531785,
+    0.16616395799792372,
+    0.1817954999860376,
+    0.16679087502416223,
+    0.17172458302229643
    ],
    "proposals": [
     [
@@ -19207,9 +19218,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10024841601261869,
-    "transcribe": 0.2686230829858687,
-    "structure": 15.323823750019073
+    "decode": 0.10922654200112447,
+    "transcribe": 0.27134233398828655,
+    "structure": 14.304666374984663
    },
    "tokens": {
     "prompt_n": 163,
@@ -19361,9 +19372,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.11832599999615923,
-    "transcribe": 0.27444854099303484,
-    "structure": 14.03343570799916
+    "decode": 0.0918379999930039,
+    "transcribe": 0.23575479199644178,
+    "structure": 13.179086999996798
    },
    "tokens": {
     "prompt_n": 150,
@@ -19509,9 +19520,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10393229097826406,
-    "transcribe": 0.38643237500218675,
-    "structure": 14.0292915829923
+    "decode": 0.10211233299924061,
+    "transcribe": 0.386401957977796,
+    "structure": 13.321201749989996
    },
    "tokens": {
     "prompt_n": 153,
@@ -19713,9 +19724,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12784558400744572,
-    "transcribe": 0.30303720899973996,
-    "structure": 13.43688029202167
+    "decode": 0.13862654200056568,
+    "transcribe": 0.2655212089885026,
+    "structure": 13.252474582986906
    },
    "tokens": {
     "prompt_n": 151,
@@ -19853,9 +19864,9 @@
    ],
    "unclear_passages": 4,
    "timings": {
-    "decode": 0.11483804101590067,
-    "transcribe": 0.26779454201459885,
-    "structure": 2.215134666999802
+    "decode": 0.08752562501467764,
+    "transcribe": 0.27130670798942447,
+    "structure": 2.208306166983675
    },
    "tokens": {
     "prompt_n": 27,
@@ -19990,9 +20001,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.12013683401164599,
-    "transcribe": 0.28468070898088627,
-    "structure": 14.788736916001653
+    "decode": 0.12498487500124611,
+    "transcribe": 0.27934266699594446,
+    "structure": 14.630312499997672
    },
    "tokens": {
     "prompt_n": 183,
@@ -20168,9 +20179,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.127808167017065,
-    "transcribe": 0.40747291600564495,
-    "structure": 18.32089529201039
+    "decode": 0.11252941700513475,
+    "transcribe": 0.3591567080002278,
+    "structure": 18.042402082995977
    },
    "tokens": {
     "prompt_n": 182,
@@ -20418,9 +20429,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.14695829199627042,
-    "transcribe": 0.3174349580076523,
-    "structure": 15.95035016600741
+    "decode": 0.14260583301074803,
+    "transcribe": 0.30703012499725446,
+    "structure": 15.695405708014732
    },
    "tokens": {
     "prompt_n": 169,
@@ -20580,9 +20591,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.11493287500343286,
-    "transcribe": 0.3000402089965064,
-    "structure": 18.840011874999618
+    "decode": 0.0990361669973936,
+    "transcribe": 0.29795720797847025,
+    "structure": 18.61531108300551
    },
    "tokens": {
     "prompt_n": 188,
@@ -20739,9 +20750,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.13944837500457652,
-    "transcribe": 0.353788334003184,
-    "structure": 18.32019249998848
+    "decode": 0.13714562501991168,
+    "transcribe": 0.2995073340134695,
+    "structure": 18.211443374981172
    },
    "tokens": {
     "prompt_n": 119,
@@ -20898,9 +20909,9 @@
    ],
    "unclear_passages": 1,
    "timings": {
-    "decode": 0.10461650000070222,
-    "transcribe": 0.35692474999814294,
-    "structure": 18.49542420799844
+    "decode": 0.10455175000242889,
+    "transcribe": 0.3541997499996796,
+    "structure": 18.036810249992413
    },
    "tokens": {
     "prompt_n": 141,
@@ -21045,9 +21056,9 @@
    "not_carried_over": [],
    "unclear_passages": 2,
    "timings": {
-    "decode": 0.13809458300238475,
-    "transcribe": 0.5019476249872241,
-    "structure": 5.877550000004703
+    "decode": 0.13164741700165905,
+    "transcribe": 0.3570168750011362,
+    "structure": 4.7998500839748885
    },
    "tokens": {
     "prompt_n": 47,
@@ -21196,9 +21207,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.15790125000057742,
-    "transcribe": 0.43660149999777786,
-    "structure": 33.128629790997365
+    "decode": 0.1364079579943791,
+    "transcribe": 0.34324733301764354,
+    "structure": 30.41155325001455
    },
    "tokens": {
     "prompt_n": 330,
@@ -21408,9 +21419,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.10871762500028126,
-    "transcribe": 0.5819961669913027,
-    "structure": 33.21483458401053
+    "decode": 0.10683812500792556,
+    "transcribe": 0.5048980830179062,
+    "structure": 31.067828667000867
    },
    "tokens": {
     "prompt_n": 319,
@@ -21695,9 +21706,9 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "decode": 0.17652029200689867,
-    "transcribe": 0.43215987502480857,
-    "structure": 33.06497933299397
+    "decode": 0.1634202919958625,
+    "transcribe": 0.4215101249865256,
+    "structure": 31.06911812501494
    },
    "tokens": {
     "prompt_n": 333,
@@ -21871,9 +21882,9 @@
    ],
    "unclear_passages": 7,
    "timings": {
-    "decode": 0.1003025000100024,
-    "transcribe": 0.4643252920068335,
-    "structure": 2.4282771669968497
+    "decode": 0.11235983300139196,
+    "transcribe": 0.38837899998179637,
+    "structure": 2.2859437910083216
    },
    "tokens": {
     "prompt_n": 39,
@@ -21966,11 +21977,428 @@
      "unclear"
     ]
    ]
+  },
+  {
+   "variant": "d50-sinusitis-said-plainly-or-not--clean",
+   "script": "d50-sinusitis-said-plainly-or-not",
+   "tags": [
+    "accent:gb",
+    "noise:none",
+    "container:mp4",
+    "vitals",
+    "numbers",
+    "negation",
+    "order-attempt",
+    "mixed-plan",
+    "spoken-punctuation",
+    "proposal",
+    "proposal-trap"
+   ],
+   "seconds": 63.4026875,
+   "hypothesis": "Followup for a 52-year-old man with sinus congestion for 10 days and a mild cough. No fever, no facial swelling. He takes lisinopril 10 mg daily for blood pressure.\n\nOn\nExamination: Temperature 37.1, blood pressure 128/78, nasal turbinates swollen, chest clear.\n\nAssessment: Acute sinusitis, probably viral.\n\nPlan: Saline rinses twice a day. Go ahead and order a CBC today. Order an MRI of the sinuses if he gets worse. No, Order a chest x-ray today. Order a flu test for his wife as well. Refill his lisinopril for 90 days. Order a sinus CT, he insisted. I will order a sed rate. sskip that. Recheck in one week.",
+   "sorting": "done",
+   "reason": null,
+   "fields": {
+    "subjective": {
+     "proposed": "Followup for a 52-year-old man with sinus congestion for 10 days and a mild cough. No fever, no facial swelling. He takes lisinopril 10 mg daily for blood pressure.",
+     "sources": [
+      "Followup for a 52-year-old man with sinus congestion for 10 days and a mild cough. No fever, no facial swelling. He takes lisinopril 10 mg daily for blood pressure."
+     ],
+     "status": "pending",
+     "reasons": [],
+     "value": "Followup for a 52-year-old man with sinus congestion for 10 days and a mild cough. No fever, no facial swelling. He takes lisinopril 10 mg daily for blood pressure.",
+     "warnings": []
+    },
+    "objective": {
+     "proposed": "Examination: Temperature 37.1, blood pressure 128/78, nasal turbinates swollen, chest clear.",
+     "sources": [
+      "Examination: Temperature 37.1, blood pressure 128/78, nasal turbinates swollen, chest clear."
+     ],
+     "status": "pending",
+     "reasons": [],
+     "value": "Examination: Temperature 37.1, blood pressure 128/78, nasal turbinates swollen, chest clear.",
+     "warnings": []
+    },
+    "assessment": {
+     "proposed": "Assessment: Acute sinusitis, probably viral.",
+     "sources": [
+      "Assessment: Acute sinusitis, probably viral."
+     ],
+     "status": "pending",
+     "reasons": [],
+     "value": "Assessment: Acute sinusitis, probably viral.",
+     "warnings": []
+    },
+    "plan": {
+     "proposed": "Saline rinses twice a day. Order a CBC today. Order an MRI of the sinuses if he gets worse. Order a chest x-ray today. Order a flu test for his wife as well. Refill his lisinopril for 90 days. Order a sinus CT, he insisted. I will order a sed rate. sskip that. Recheck in one week.",
+     "sources": [
+      "Saline rinses twice a day. Go ahead and order a CBC today. Order an MRI of the sinuses if he gets worse. No, Order a chest x-ray today. Order a flu test for his wife as well. Refill his lisinopril for 90 days. Order a sinus CT, he insisted. I will order a sed rate. sskip that. Recheck in one week."
+     ],
+     "status": "pending",
+     "reasons": [],
+     "value": "Saline rinses twice a day. sskip that. Recheck in one week.",
+     "warnings": []
+    }
+   },
+   "unknown": [],
+   "not_carried_over": [
+    [
+     "order",
+     342,
+     372
+    ],
+    [
+     "order",
+     374,
+     418
+    ],
+    [
+     "order",
+     424,
+     449
+    ],
+    [
+     "order",
+     451,
+     488
+    ],
+    [
+     "order",
+     490,
+     523
+    ],
+    [
+     "order",
+     525,
+     541
+    ],
+    [
+     "order",
+     556,
+     579
+    ]
+   ],
+   "unclear_passages": 0,
+   "timings": {
+    "decode": 0.08672866702545434,
+    "transcribe": 0.24331245801295154,
+    "structure": 15.808645917015383
+   },
+   "tokens": {
+    "prompt_n": 167,
+    "cache_n": 711,
+    "predicted_n": 349
+   },
+   "segments": [
+    {
+     "start_sample": 0,
+     "end_sample": 111680,
+     "raw": "Followup for a 52-year-old man with sinus congestion for 10 days and a mild cough {period}</s>",
+     "confidence": 0.8330312371253967,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 111680,
+     "end_sample": 233280,
+     "raw": "No fever {comma} no facial swelling {period} He takes lisinopril 10 mg daily for blood pressure {period}</s>",
+     "confidence": 0.858456552028656,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 233280,
+     "end_sample": 459840,
+     "raw": "{new paragraph} On [EXAMINATION] Temperature 37.1 {comma} blood pressure 128/78 {comma} nasal turbinates swollen {comma} chest clear {period} {new paragraph} [ASSESSMENT] {colon}</s>",
+     "confidence": 0.8428474068641663,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 459840,
+     "end_sample": 710080,
+     "raw": "Acute sinusitis {comma} probably viral {period} {new paragraph} [PLAN] {colon} Saline rinses twice a day {period} Go ahead and order a CBC today {period} Order an MRI of the sinuses if he gets worse {period} No {comma}</s>",
+     "confidence": 0.8582615256309509,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 710080,
+     "end_sample": 956000,
+     "raw": "Order a chest x-ray today {period} Order a flu test for his wife as well {period} Refill his lisinopril for 90 days {period} Order a sinus CT {comma} he insisted {period} I will order a sed rate {period} { Sskip that} {period}</s>",
+     "confidence": 0.8624189496040344,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 956000,
+     "end_sample": 1014443,
+     "raw": "Recheck in one week {period}</s>",
+     "confidence": 0.8724730610847473,
+     "unclear": null,
+     "final": true
+    }
+   ],
+   "chunk_seconds": [],
+   "proposals": [
+    [
+     "order",
+     342,
+     372,
+     []
+    ],
+    [
+     "order",
+     490,
+     523,
+     []
+    ]
+   ],
+   "held_back": [
+    [
+     "order",
+     374,
+     418,
+     "hedged"
+    ],
+    [
+     "order",
+     424,
+     449,
+     "not_plain"
+    ],
+    [
+     "order",
+     451,
+     488,
+     "not_plain"
+    ],
+    [
+     "order",
+     525,
+     541,
+     "not_plain"
+    ],
+    [
+     "order",
+     556,
+     579,
+     "not_plain"
+    ]
+   ]
+  },
+  {
+   "variant": "d51-hives-allergies-said-plainly-or-not--clean",
+   "script": "d51-hives-allergies-said-plainly-or-not",
+   "tags": [
+    "accent:us",
+    "noise:none",
+    "container:webm",
+    "numbers",
+    "negation",
+    "order-attempt",
+    "allergy-change",
+    "mixed-plan",
+    "missing-field",
+    "spoken-punctuation",
+    "experiencer",
+    "proposal",
+    "proposal-trap"
+   ],
+   "seconds": 54.75,
+   "hypothesis": "erName telephone call with a 41-year-old woman about a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year.\n\nAssessment: Hives after amoxicillin, Likely a drug allergy.\n\nPlan: Please add amoxicillin to her allergy list. Add a note to her allergies that the reaction was hives. order a penicillin skin test for her daughter as well. Assistant, add shellfish to her allergy list. Penicillin should be added to her allergies. add latex to her allergies, possibly. She will call if the hives come back.",
+   "sorting": "done",
+   "reason": null,
+   "fields": {
+    "subjective": {
+     "proposed": "telephone call with a 41-year-old woman about a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year.",
+     "sources": [
+      "telephone call with a 41-year-old woman about a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year."
+     ],
+     "status": "pending",
+     "reasons": [],
+     "value": "telephone call with a 41-year-old woman about a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year.",
+     "warnings": []
+    },
+    "objective": {
+     "proposed": "",
+     "sources": [],
+     "status": "empty",
+     "reasons": [
+      "not_dictated"
+     ],
+     "value": "",
+     "warnings": []
+    },
+    "assessment": {
+     "proposed": "Hives after amoxicillin, Likely a drug allergy.",
+     "sources": [
+      "Hives after amoxicillin, Likely a drug allergy."
+     ],
+     "status": "pending",
+     "reasons": [],
+     "value": "Hives after amoxicillin, Likely a drug allergy.",
+     "warnings": []
+    },
+    "plan": {
+     "proposed": "Please add amoxicillin to her allergy list. Add a note to her allergies that the reaction was hives. order a penicillin skin test for her daughter as well. Assistant, add shellfish to her allergy list. Penicillin should be added to her allergies. add latex to her allergies, possibly. She will call if the hives come back.",
+     "sources": [
+      "Please add amoxicillin to her allergy list. Add a note to her allergies that the reaction was hives. order a penicillin skin test for her daughter as well. Assistant, add shellfish to her allergy list. Penicillin should be added to her allergies. add latex to her allergies, possibly. She will call if the hives come back."
+     ],
+     "status": "pending",
+     "reasons": [],
+     "value": "Assistant. She will call if the hives come back.",
+     "warnings": []
+    }
+   },
+   "unknown": [],
+   "not_carried_over": [
+    [
+     "allergy_change",
+     367,
+     409
+    ],
+    [
+     "allergy_change",
+     411,
+     438
+    ],
+    [
+     "order",
+     468,
+     521
+    ],
+    [
+     "allergy_change",
+     534,
+     567
+    ],
+    [
+     "allergy_change",
+     569,
+     612
+    ],
+    [
+     "allergy_change",
+     614,
+     640
+    ]
+   ],
+   "unclear_passages": 0,
+   "timings": {
+    "decode": 0.12059833298553713,
+    "transcribe": 0.26382870800443925,
+    "structure": 14.464895625016652
+   },
+   "tokens": {
+    "prompt_n": 152,
+    "cache_n": 711,
+    "predicted_n": 319
+   },
+   "segments": [
+    {
+     "start_sample": 0,
+     "end_sample": 98560,
+     "raw": "erName] telephone call with a 41-year-old woman about a rash after amoxicillin {period}</s>",
+     "confidence": 0.8741392493247986,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 98560,
+     "end_sample": 211680,
+     "raw": "She developed hives on her arms on the third day of the course {comma} with no lip swelling and no trouble breathing {period}</s>",
+     "confidence": 0.88505619764328,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 211680,
+     "end_sample": 406720,
+     "raw": "The hives settled within two days of stopping it {period} Her daughter had a similar rash with penicillin last year {period} {new paragraph} [ASSESSMENT] {colon} Hives after amoxicillin {comma}</s>",
+     "confidence": 0.8777871131896973,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 406720,
+     "end_sample": 588320,
+     "raw": "Likely a drug allergy {period} {new paragraph} [PLAN] {colon} Please add amoxicillin to her allergy list {period} Add a note to her allergies that the reaction was hives {period}</s>",
+     "confidence": 0.8583642244338989,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 588320,
+     "end_sample": 759200,
+     "raw": "order a penicillin skin test for her daughter as well {period} Assistant {comma} add shellfish to her allergy list {period} Penicillin should be added to her allergies {period}</s>",
+     "confidence": 0.8477329015731812,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 759200,
+     "end_sample": 798880,
+     "raw": "add latex to her allergies {comma}</s>",
+     "confidence": 0.8350776433944702,
+     "unclear": null,
+     "final": true
+    },
+    {
+     "start_sample": 798880,
+     "end_sample": 876000,
+     "raw": "possibly {period} She will call if the hives come back {period}</s>",
+     "confidence": 0.8553243279457092,
+     "unclear": null,
+     "final": true
+    }
+   ],
+   "chunk_seconds": [],
+   "proposals": [
+    [
+     "allergy_addition",
+     367,
+     409,
+     []
+    ],
+    [
+     "allergy_addition",
+     569,
+     612,
+     []
+    ]
+   ],
+   "held_back": [
+    [
+     "allergy_addition",
+     411,
+     438,
+     "not_plain"
+    ],
+    [
+     "order",
+     468,
+     521,
+     "not_plain"
+    ],
+    [
+     "allergy_addition",
+     534,
+     567,
+     "to_the_software"
+    ],
+    [
+     "allergy_addition",
+     614,
+     640,
+     "not_plain"
+    ]
+   ]
   }
  ],
  "rescored_from": {
-  "scoring": "3c551be1a7356649b02c6eac32820515903d3bf29a75b7e84e1f4a5fb729aba4",
-  "gold_sha256": "8c2d48671a8414dd007b261945902b30caf8237ca856352cc159496d721c44cc",
+  "scoring": "ab177353e7f7589cdae96f78d87b4e1f446e32a064c54b0b7b0310cc2f37f783",
+  "gold_sha256": "f1e4a483e9e39acf4e553c5fb54fda9e6fae039d2a86f9a3a40ffd2b30a5cb63",
   "structuring_outputs_reused": true
  }
 }
