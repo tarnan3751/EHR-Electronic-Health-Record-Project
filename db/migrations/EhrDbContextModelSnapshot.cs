@@ -1391,6 +1391,89 @@ namespace Ehr.Migrations
                     b.ToTable("result_acknowledgments", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.AiChartProposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AllergyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("allergy_id");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<short>("Ordinal")
+                        .HasColumnType("smallint")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("review_id");
+
+                    b.Property<string>("State")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ai_chart_proposals");
+
+                    b.HasIndex("AllergyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_chart_proposals_allergy_id");
+
+                    b.HasIndex("DecidedBy")
+                        .HasDatabaseName("ix_ai_chart_proposals_decided_by");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_chart_proposals_order_id");
+
+                    b.HasIndex("ReviewId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_chart_proposals_review_id_ordinal");
+
+                    b.HasIndex("ReviewId", "PatientId")
+                        .HasDatabaseName("ix_ai_chart_proposals_review_id_patient_id");
+
+                    b.ToTable("ai_chart_proposals", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_chart_proposals_decision", "(state = 'pending') = (decided_at IS NULL) AND (decided_at IS NULL) = (decided_by IS NULL) AND (state = 'ordered') = (order_id IS NOT NULL) AND (state = 'recorded') = (allergy_id IS NOT NULL) AND (order_id IS NULL OR kind = 'order') AND (allergy_id IS NULL OR kind = 'allergy_addition')");
+
+                            t.HasCheckConstraint("ck_ai_chart_proposals_kind", "kind IN ('order', 'allergy_addition')");
+
+                            t.HasCheckConstraint("ck_ai_chart_proposals_ordinal", "ordinal BETWEEN 0 AND 19");
+
+                            t.HasCheckConstraint("ck_ai_chart_proposals_state", "state IN ('pending', 'ordered', 'recorded', 'dismissed')");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3644,6 +3727,35 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_result_acknowledgments_orders_order_id_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AiChartProposal", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.AllergyIntolerance", null)
+                        .WithMany()
+                        .HasForeignKey("AllergyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_chart_proposals_allergy_intolerances_allergy_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_chart_proposals_staff_users_decided_by");
+
+                    b.HasOne("Ehr.Data.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_chart_proposals_orders_order_id");
+
+                    b.HasOne("Ehr.Data.Patients.AiNoteReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_chart_proposals_ai_note_reviews_review_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>

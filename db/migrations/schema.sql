@@ -2310,3 +2310,41 @@ VALUES ('20261122105343_SoapNotes', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.ai_chart_proposals (
+    id uuid NOT NULL,
+    review_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    ordinal smallint NOT NULL,
+    kind character varying(16) NOT NULL,
+    state character varying(16) NOT NULL,
+    order_id uuid,
+    allergy_id uuid,
+    decided_by uuid,
+    decided_at timestamp with time zone,
+    CONSTRAINT pk_ai_chart_proposals PRIMARY KEY (id),
+    CONSTRAINT ck_ai_chart_proposals_decision CHECK ((state = 'pending') = (decided_at IS NULL) AND (decided_at IS NULL) = (decided_by IS NULL) AND (state = 'ordered') = (order_id IS NOT NULL) AND (state = 'recorded') = (allergy_id IS NOT NULL) AND (order_id IS NULL OR kind = 'order') AND (allergy_id IS NULL OR kind = 'allergy_addition')),
+    CONSTRAINT ck_ai_chart_proposals_kind CHECK (kind IN ('order', 'allergy_addition')),
+    CONSTRAINT ck_ai_chart_proposals_ordinal CHECK (ordinal BETWEEN 0 AND 19),
+    CONSTRAINT ck_ai_chart_proposals_state CHECK (state IN ('pending', 'ordered', 'recorded', 'dismissed')),
+    CONSTRAINT fk_ai_chart_proposals_ai_note_reviews_review_id_patient_id FOREIGN KEY (review_id, patient_id) REFERENCES ehr.ai_note_reviews (id, patient_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ai_chart_proposals_allergy_intolerances_allergy_id FOREIGN KEY (allergy_id) REFERENCES ehr.allergy_intolerances (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ai_chart_proposals_orders_order_id FOREIGN KEY (order_id) REFERENCES ehr.orders (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ai_chart_proposals_staff_users_decided_by FOREIGN KEY (decided_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_ai_chart_proposals_allergy_id ON ehr.ai_chart_proposals (allergy_id);
+
+CREATE INDEX ix_ai_chart_proposals_decided_by ON ehr.ai_chart_proposals (decided_by);
+
+CREATE UNIQUE INDEX ix_ai_chart_proposals_order_id ON ehr.ai_chart_proposals (order_id);
+
+CREATE UNIQUE INDEX ix_ai_chart_proposals_review_id_ordinal ON ehr.ai_chart_proposals (review_id, ordinal);
+
+CREATE INDEX ix_ai_chart_proposals_review_id_patient_id ON ehr.ai_chart_proposals (review_id, patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261122164730_AiChartProposals', '10.0.13');
+
+COMMIT;
+

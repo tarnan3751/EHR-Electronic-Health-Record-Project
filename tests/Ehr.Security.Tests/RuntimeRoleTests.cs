@@ -105,6 +105,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "ai_note_reviews")] = ["SELECT"],
         [("ehr_app", "ai_field_proposals")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_read", "ai_field_proposals")] = ["SELECT"],
+        // Step 15: a dictation's proposed orders and allergies, staged with their review; deciding one is a column grant
+        // (ExpectedColumnPrivileges).
+        [("ehr_app", "ai_chart_proposals")] = ["SELECT", "INSERT"],
+        [("ehr_read", "ai_chart_proposals")] = ["SELECT"],
         [("ehr_app", "clinical_notes")] = ["SELECT", "INSERT"],
         [("ehr_read", "clinical_notes")] = ["SELECT"],
         [("ehr_app", "note_addenda")] = ["SELECT", "INSERT"],
@@ -314,6 +318,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_app", "visit_summaries", "UPDATE")] = ["sensitive", "sensitive_reason", "withdrawn_reason"],
         // Step 13d: answering a refill request, by the order that approves it or the message that declines it.
         [("ehr_app", "refill_requests", "UPDATE")] = ["decline_message", "order_id"],
+        // Step 15: deciding a dictation's proposed order or allergy, once.
+        [("ehr_app", "ai_chart_proposals", "UPDATE")] = ["allergy_id", "order_id", "state"],
         // Step 9b: marking a vital sign entered in error.
         [("ehr_app", "observations", "UPDATE")] = ["entered_in_error_reason", "status"],
         // Marking an inbox item done.

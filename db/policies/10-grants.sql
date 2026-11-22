@@ -207,4 +207,11 @@ GRANT UPDATE (done_at) ON ehr.inbox_items TO ehr_app;
 GRANT SELECT, INSERT, UPDATE ON ehr.ai_note_reviews, ehr.ai_field_proposals TO ehr_app;
 GRANT SELECT ON ehr.ai_note_reviews, ehr.ai_field_proposals TO ehr_read;
 
+-- The expansion plan's step 15: the orders and allergies to add a dictation proposes, staged with their review and
+-- decided once. The decision is a column grant on its three columns; who and when are the database's, and what each
+-- decision needs is 55-ai-review.sql's. Never DELETE.
+GRANT SELECT, INSERT ON ehr.ai_chart_proposals TO ehr_app;
+GRANT UPDATE (state, order_id, allergy_id) ON ehr.ai_chart_proposals TO ehr_app;
+GRANT SELECT ON ehr.ai_chart_proposals TO ehr_read;
+
 COMMIT;

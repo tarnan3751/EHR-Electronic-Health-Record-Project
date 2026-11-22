@@ -113,3 +113,82 @@ $$;
 REVOKE ALL ON FUNCTION ehr.guard_ai_field_proposal() FROM PUBLIC;
 CREATE OR REPLACE TRIGGER ai_field_proposals_guard
     BEFORE INSERT OR UPDATE ON ehr.ai_field_proposals FOR EACH ROW EXECUTE FUNCTION ehr.guard_ai_field_proposal();
+
+-- The orders and allergies to add a dictation proposes (the expansion plan's step 15; FR-14 as reworded). Before each
+-- insert or update, by whoever makes it. Runs as the caller, so the grants and forced row-level security bind it: only
+-- the review's own clinician sees the review, and so its proposals.
+--   Insert, as a review is staged: the proposal at its place in the review's stored result, of the kind the result
+--     gives there, waiting; never once the review's draft is signed.
+--   Update: decided once; nothing else about it moves, and who and when are the database's (the column grants keep the
+--     apps to the decision's columns; this holds the tables' owner to them too).
+--     Ordered, by naming the order signed for it: an active order of the patient, signed now (in this transaction, as
+--       77-refill-requests.sql tells it) by the clinician deciding, and not a change of another order. Signing it went
+--       through every rule and check of 60-orders.sql and 61-order-safety.sql, as any order's does: this only links it.
+--     Recorded, by naming the allergy added for it: an active, coded allergy of the patient, not "No known allergies",
+--       added now by the clinician deciding, as its first row in ehr.chart_history says (written only by
+--       65-chart-lists.sql's trigger, as its owner): one that was there before and only changed now isn't.
+--     Dismissed.
+--   The table's checks hold the rest: waiting with no decision and nothing named, and a decision with who and when (so
+--   by someone signed in); an order's proposal ordered with its order alone, an allergy's recorded with its allergy
+--   alone, a dismissed one naming neither. An order, or an allergy, decides one proposal (unique indexes). The note may
+--   be signed meanwhile: a proposal waits for its decision whatever becomes of the note, and blocks nothing
+--   (50-clinical-notes.sql never reads it).
+CREATE OR REPLACE FUNCTION ehr.guard_ai_chart_proposal() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+    review ehr.ai_note_reviews%ROWTYPE;
+BEGIN
+    -- Not found reads as all nulls, refused here too.
+    SELECT r.* INTO review FROM ehr.ai_note_reviews r WHERE r.id = NEW.review_id;
+    IF review.patient_id IS DISTINCT FROM NEW.patient_id THEN
+        RAISE EXCEPTION 'A proposal belongs to a dictation review of yours'
+            USING ERRCODE = '23514', CONSTRAINT = 'ai_chart_proposals_review';
+    END IF;
+
+    IF TG_OP = 'INSERT' THEN
+        -- A review with no stored result yet has no kind at any place.
+        IF NEW.kind IS DISTINCT FROM review.result_json #>> ARRAY['proposals', NEW.ordinal::text, 'kind']
+           OR NEW.state IS DISTINCT FROM 'pending'
+           OR EXISTS (SELECT 1 FROM ehr.clinical_notes n WHERE n.draft_id = review.draft_id) THEN
+            RAISE EXCEPTION 'Only a waiting proposal its review''s stored result holds is staged'
+                USING ERRCODE = '23514', CONSTRAINT = 'ai_chart_proposals_staged';
+        END IF;
+        RETURN NEW;
+    END IF;
+
+    -- Its patient is held to its review's above.
+    IF NEW.id IS DISTINCT FROM OLD.id OR NEW.review_id IS DISTINCT FROM OLD.review_id
+       OR NEW.ordinal IS DISTINCT FROM OLD.ordinal OR NEW.kind IS DISTINCT FROM OLD.kind THEN
+        RAISE EXCEPTION 'A proposal stays what its dictation gave' USING ERRCODE = '42501';
+    END IF;
+    IF OLD.state IS DISTINCT FROM 'pending' THEN
+        RAISE EXCEPTION 'A proposal is decided once' USING ERRCODE = '23514', CONSTRAINT = 'ai_chart_proposals_decided';
+    END IF;
+    IF NEW.state = 'ordered' AND NOT EXISTS (
+        SELECT 1 FROM ehr.orders o
+        WHERE o.id = NEW.order_id AND o.patient_id = NEW.patient_id AND o.status = 'active'
+          AND o.signer_id = ehr.current_user_id() AND o.signed_at >= now() AND o.replaces_order_id IS NULL) THEN
+        RAISE EXCEPTION 'A proposed order is decided by the order signed for it, now, by whoever decides it'
+            USING ERRCODE = '23514', CONSTRAINT = 'ai_chart_proposals_order';
+    END IF;
+    -- An allergy with no code isn't one whose code is not "No known allergies". Its history is found by the index on the
+    -- patient, the table and the time.
+    IF NEW.state = 'recorded' AND NOT EXISTS (
+        SELECT 1 FROM ehr.allergy_intolerances a
+        JOIN ehr.chart_history h ON h.patient_id = a.patient_id AND h.table_name = 'allergy_intolerances' AND h.row_id = a.id
+        WHERE a.id = NEW.allergy_id AND a.patient_id = NEW.patient_id AND a.clinical_status = 'active'
+          AND a.code_system IS NOT NULL AND a.code <> 'no-known-allergy'
+          AND h.changed_at >= now() AND h.before IS NULL AND h.changed_by_id = ehr.current_user_id()) THEN
+        RAISE EXCEPTION 'A proposed allergy is decided by the coded allergy added for it, now, by whoever decides it'
+            USING ERRCODE = '23514', CONSTRAINT = 'ai_chart_proposals_allergy';
+    END IF;
+
+    NEW.decided_by := ehr.current_user_id();
+    NEW.decided_at := clock_timestamp();
+    RETURN NEW;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.guard_ai_chart_proposal() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER ai_chart_proposals_guard
+    BEFORE INSERT OR UPDATE ON ehr.ai_chart_proposals FOR EACH ROW EXECUTE FUNCTION ehr.guard_ai_chart_proposal();

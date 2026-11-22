@@ -103,6 +103,7 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<AiNoteReview> AiNoteReviews => Set<AiNoteReview>();
     public DbSet<AiFieldProposal> AiFieldProposals => Set<AiFieldProposal>();
+    public DbSet<AiChartProposal> AiChartProposals => Set<AiChartProposal>();
 
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
 
