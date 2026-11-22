@@ -48,6 +48,9 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["chart_history"] = Protection.Phi,
         ["inbox_items"] = Protection.Phi,
         ["appointments"] = Protection.Phi,
+        // Pre-visit forms (step 13e): sensitive items always.
+        ["questionnaire_requests"] = Protection.Phi,
+        ["questionnaire_responses"] = Protection.Phi,
         ["proxy_grants"] = Protection.Phi,
         ["result_acknowledgments"] = Protection.Phi,
         ["message_threads"] = Protection.Phi,

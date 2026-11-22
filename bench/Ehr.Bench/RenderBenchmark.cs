@@ -205,6 +205,10 @@ internal static partial class RenderBenchmark
                 // one. A generator of its own, so the rows after them pick as they did.
                 var refills = await AskRefillsAsync(app, clinicianId, patientUserId, [(portalPatient, null), (panel[0], proxyGrant)]);
                 results.AddRange(await MeasureRefillsAsync(client, times, "", refills));
+                // Pre-visit forms (step 13e): for the portal patient, forms asked for before three appointments and all but
+                // one answered. The clinician's page with them hidden and shown, and one form's answers.
+                var forms = await PreVisitFormsAsync(app, clinicianId, patientUserId, portalPatient);
+                results.AddRange(await MeasureFormsAsync(client, times, "", forms));
                 // Kept to the end, off-site rows included: the off-site portal rows use the same session.
                 var portalSession = new CookieContainer();
                 // Download my record (step 13b) is measured for the seeded patient with the most entries too.
@@ -222,6 +226,8 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal choose, a record shared", typing: false, () => "/portal/choose"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
                     results.Add(await MeasureAsync(portal, times, "Portal refills, the patient's own", typing: false, () => "/portal/refills"));
+                    // Pre-visit forms (step 13e): the list, and the GAD-7 still open.
+                    results.AddRange(await MeasurePortalFormsAsync(portal, times, "", forms));
                     // Download my record (step 13b): the page, the FHIR file and the printable page.
                     results.AddRange(await MeasureRecordAsync(portal, times, "", "the patient's own", page: true));
                     results.Add(await MeasureAsync(portal, times, "Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
@@ -239,6 +245,8 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal results, as a proxy", typing: false, () => "/portal/results"));
                     results.Add(await MeasureAsync(portal, times, "Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
                     results.Add(await MeasureAsync(portal, times, "Portal refills, as a proxy", typing: false, () => "/portal/refills"));
+                    // A proxy without sensitive items: the record has no forms for them, as the database decides.
+                    results.Add(await MeasureAsync(portal, times, "Portal pre-visit forms, as a proxy", typing: false, () => "/portal/forms"));
                     results.AddRange(await MeasureRecordAsync(portal, times, "", "as a proxy", page: false));
                     // And for the seeded patient whose record has the most entries, with a session of its own.
                     using (var largest = await PortalSignInAsync(app, largestSession, largestEmail, largestPassword))
@@ -256,7 +264,7 @@ internal static partial class RenderBenchmark
                     {
                         await SettleAsync(database);
                         results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills));
+                            refills, forms));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -448,7 +456,7 @@ internal static partial class RenderBenchmark
     static async Task<List<Result>> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
-        CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills)
+        CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -490,9 +498,12 @@ internal static partial class RenderBenchmark
                 return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
             }));
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
+            // Pre-visit forms (step 13e): the clinician's pages, read from the cloud copy; asking says why it can't.
+            results.AddRange(await MeasureFormsAsync(client, times, "Off-site, ", forms));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, as a proxy", typing: false, () => "/portal/refills"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Portal pre-visit forms, as a proxy", typing: false, () => "/portal/forms"));
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "as a proxy", page: false));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
             using (var mine = await PostFormAsync(portal, "/portal/acting?handler=Mine", await portal.GetStringAsync("/portal/summaries")))
@@ -505,6 +516,7 @@ internal static partial class RenderBenchmark
 
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, the patient's own", typing: false, () => "/portal/summaries"));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, the patient's own", typing: false, () => "/portal/refills"));
+            results.AddRange(await MeasurePortalFormsAsync(portal, times, "Off-site, ", forms));
             results.AddRange(await MeasureRecordAsync(portal, times, "Off-site, ", "the patient's own", page: true));
             using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
             results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
@@ -1479,6 +1491,107 @@ internal static partial class RenderBenchmark
         await transaction.CommitAsync();
         return (day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), [.. appointments.Select(appointment => appointment.Id)]);
     }
+
+    // Step 13e: what the forms' rows open. The patient, one answered form (a PHQ-9 with an answer to review) and one
+    // still open (a GAD-7), which the portal's rows open.
+    sealed record FormRows(Guid Patient, Guid Response, Guid Open);
+
+    // For the patient, three appointments in the days ahead, each with a PHQ-9 and a GAD-7 asked for by the clinician,
+    // then all but the last GAD-7 answered by the patient's own portal account: through the app's own service and the
+    // database's rules, which score them. One PHQ-9 has an answer to review, which puts an item in the clinician's inbox.
+    static async Task<FormRows> PreVisitFormsAsync(BenchApp app, Guid clinicianId, Guid patientUserId, Guid patient)
+    {
+        var requests = new List<(Guid Id, string Code, DateTimeOffset StartsAt)>();
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+            var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+            var forms = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Forms.PreVisitForms>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            for (var day = 1; day <= 3; day++)
+            {
+                var appointment = new Ehr.Data.Scheduling.Appointment
+                {
+                    Id = Guid.CreateVersion7(),
+                    PatientId = patient,
+                    ClinicianId = clinicianId,
+                    StartsAt = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(day).AddHours(16), TimeSpan.Zero),
+                    Minutes = 20,
+                    Reason = "Synthetic: follow-up",
+                    Status = Ehr.Data.Scheduling.AppointmentStatus.Booked,
+                };
+                db.Add(appointment);
+                await db.SaveChangesAsync();
+                foreach (var code in new[] { "44249-1", "69737-5" })
+                {
+                    if (await forms.AskAsync(patient, appointment.Id, code, CancellationToken.None) != Ehr.Domain.Forms.FormResult.Saved)
+                    {
+                        throw new InvalidOperationException("The benchmark's pre-visit form was refused.");
+                    }
+                }
+            }
+
+            requests.AddRange((await db.QuestionnaireRequests.AsNoTracking().Where(r => r.PatientId == patient)
+                .Join(db.Appointments, r => r.AppointmentId, a => a.Id, (r, a) => new { r.Id, r.QuestionnaireCode, a.StartsAt }).ToListAsync())
+                .Select(r => (r.Id, r.QuestionnaireCode, r.StartsAt)).OrderBy(r => r.StartsAt).ThenBy(r => r.QuestionnaireCode));
+            await transaction.CommitAsync();
+        }
+
+        // Each answer by its total: the PHQ-9's 6, 12 (question 9 "Several days", so to review) and 8; the GAD-7's 4 and 11.
+        string[] phq = ["44250-9", "44255-8", "44259-0", "44254-1", "44251-7", "44258-2", "44252-5", "44253-3", "44260-8"];
+        string[] gad = ["69725-0", "68509-9", "69733-4", "69734-2", "69735-9", "69689-8", "69736-7"];
+        string[] answers = ["LA6568-5", "LA6569-3", "LA6570-1", "LA6571-9"];
+        Dictionary<string, string> Answers(string[] items, int[] scores) => items.Select((item, place) => (item, answers[scores[place]])).ToDictionary(pair => pair.item, pair => pair.Item2);
+        var sent = new Dictionary<int, Dictionary<string, string>>
+        {
+            [0] = Answers(phq, [1, 1, 1, 1, 1, 1, 0, 0, 0]),
+            [1] = Answers(gad, [1, 1, 1, 1, 0, 0, 0]),
+            [2] = Answers(phq, [2, 2, 2, 2, 1, 1, 1, 0, 1]),
+            [3] = Answers(gad, [2, 2, 2, 2, 1, 1, 1]),
+            [4] = Answers(phq, [1, 1, 1, 1, 1, 1, 1, 1, 0]),
+        };
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<UserContext>().UserId = patientUserId;
+            var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+            var forms = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Forms.PreVisitForms>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            foreach (var (place, given) in sent)
+            {
+                if (await forms.SendAsync(patient, requests[place].Id, given, CancellationToken.None) != Ehr.Domain.Forms.FormResult.Saved)
+                {
+                    throw new InvalidOperationException("The benchmark's pre-visit form's answers were refused.");
+                }
+            }
+
+            await transaction.CommitAsync();
+        }
+
+        await using var read = app.Services.CreateAsyncScope();
+        read.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var responses = read.ServiceProvider.GetRequiredService<EhrDbContext>();
+        await using var reading = await responses.Database.BeginTransactionAsync();
+        var review = await responses.QuestionnaireResponses.AsNoTracking().Where(r => r.RequestId == requests[2].Id).Select(r => r.Id).SingleAsync();
+        await reading.CommitAsync();
+        return new FormRows(patient, review, requests[5].Id);
+    }
+
+    // The clinician's pre-visit forms pages: the patient's forms hidden, then shown, and one form's answers.
+    static async Task<List<Result>> MeasureFormsAsync(HttpClient client, DatabaseTimes times, string prefix, FormRows forms) =>
+    [
+        await MeasureAsync(client, times, prefix + "Pre-visit forms, a patient on the panel", typing: false, () => $"/patients/{forms.Patient}/forms"),
+        await MeasureAsync(client, times, prefix + "Pre-visit forms with sensitive items, a patient on the panel", typing: false,
+            () => $"/patients/{forms.Patient}/forms?sensitive=true"),
+        await MeasureAsync(client, times, prefix + "Pre-visit form answers, a patient on the panel", typing: false,
+            () => $"/patients/{forms.Patient}/forms/{forms.Response}"),
+    ];
+
+    // The portal's pre-visit forms pages, as the patient: the list, and the form still open.
+    static async Task<List<Result>> MeasurePortalFormsAsync(HttpClient portal, DatabaseTimes times, string prefix, FormRows forms) =>
+    [
+        await MeasureAsync(portal, times, prefix + "Portal pre-visit forms, the patient's own", typing: false, () => "/portal/forms"),
+        await MeasureAsync(portal, times, prefix + "Portal pre-visit form, the patient's own", typing: false, () => $"/portal/forms/{forms.Open}"),
+    ];
 
     // The schedule's pages: a clinician's day, each patient named a recorded read; the form that books an appointment;
     // and one appointment's page.

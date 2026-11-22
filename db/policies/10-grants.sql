@@ -188,6 +188,13 @@ GRANT UPDATE (starts_at, minutes, reason, status, cancel_reason, encounter_id) O
 GRANT SELECT ON ehr.appointments TO ehr_read;
 GRANT INSERT ON ehr.encounters TO ehr_app;
 
+-- Pre-visit forms (step 13e): a clinician's request that a patient fill in a questionnaire before an appointment, and
+-- the answers. PHI, and sensitive items always: row-level security and the write-audit trigger follow. A clinician
+-- asks and a portal session answers: INSERT, which a trigger holds to what each may do and fills in itself
+-- (85-pre-visit-forms.sql). Never UPDATE or DELETE: a form is a record.
+GRANT SELECT, INSERT ON ehr.questionnaire_requests, ehr.questionnaire_responses TO ehr_app;
+GRANT SELECT ON ehr.questionnaire_requests, ehr.questionnaire_responses TO ehr_read;
+
 -- The staff inbox: what needs a staff member's action. PHI: row-level security and the write-audit trigger follow.
 -- Read by its recipient. The one change is marking an item done: UPDATE on that column alone, and a trigger sets the
 -- time and refuses anything else (70-inbox.sql). No INSERT yet: each kind of item gets its grant, or its trigger, with

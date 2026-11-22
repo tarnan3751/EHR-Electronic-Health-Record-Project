@@ -44,6 +44,8 @@ Open a patient on your panel. Each of **Allergies**, **Medications** and **Diagn
 
 Mental-health, substance-use and some other diagnoses are sensitive by their code (`docs/expansion/reference-data.md` has the ranges), and you can mark any diagnosis or medication sensitive. The chart leaves sensitive items out and says how many it left out. **Show sensitive items** reloads the chart with them, each tagged "Sensitive", and that view is recorded in the audit log as `read_sensitive`. The history page follows the same rule, and so does opening a sensitive entry's form. Sensitive items are never in the patient banner, and the desktop app doesn't keep them offline.
 
+Pre-visit forms (the plan's step 13e, `docs/UC22.md`) are sensitive items always. The chart's Appointments section links to the patient's **Pre-visit forms** page, with how many there are, and never lists them; that page shows them only when asked, recorded the same way. A clinician with a pre-visit form's answer to review in their own inbox sees a danger notice at the top of the chart, "Needs review: a pre-visit form has an answer for you to review.", until they mark the item done. The desktop app keeps no form and counts them among the sensitive items it doesn't keep.
+
 ## Decisions
 
 - **Who.** Clinicians only, and only for a patient on their panel, as for orders and notes. Under emergency access the chart and the history can be read, and nothing can be changed.

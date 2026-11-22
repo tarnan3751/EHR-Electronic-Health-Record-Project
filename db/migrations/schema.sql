@@ -2150,3 +2150,86 @@ VALUES ('20261121181613_RefillRequests', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.inbox_items DROP CONSTRAINT ck_inbox_items_kind;
+
+ALTER TABLE ehr.inbox_items ADD sensitive boolean NOT NULL DEFAULT FALSE;
+
+CREATE TABLE ehr.questionnaire_requests (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    appointment_id uuid NOT NULL,
+    clinician_id uuid NOT NULL,
+    questionnaire_code character varying(20) NOT NULL,
+    definition jsonb NOT NULL,
+    requested_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    requested_at timestamp with time zone NOT NULL DEFAULT (now()),
+    sensitive boolean NOT NULL,
+    CONSTRAINT pk_questionnaire_requests PRIMARY KEY (id),
+    CONSTRAINT ck_questionnaire_requests_definition CHECK (jsonb_typeof(definition) = 'object'),
+    CONSTRAINT ck_questionnaire_requests_sensitive CHECK (sensitive),
+    CONSTRAINT fk_questionnaire_requests_appointments_appointment_id FOREIGN KEY (appointment_id) REFERENCES ehr.appointments (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_questionnaires_questionnaire_code FOREIGN KEY (questionnaire_code) REFERENCES ehr.questionnaires (code) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_staff_users_requested_by FOREIGN KEY (requested_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.questionnaire_responses (
+    id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    questionnaire_code character varying(20) NOT NULL,
+    clinician_id uuid NOT NULL,
+    answers jsonb NOT NULL,
+    score integer,
+    band character varying(60),
+    follow_up boolean NOT NULL,
+    alert boolean NOT NULL,
+    answered_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    proxy_grant_id uuid,
+    answered_at timestamp with time zone NOT NULL DEFAULT (now()),
+    sensitive boolean NOT NULL,
+    CONSTRAINT pk_questionnaire_responses PRIMARY KEY (id),
+    CONSTRAINT ck_questionnaire_responses_answers CHECK (jsonb_typeof(answers) = 'object'),
+    CONSTRAINT ck_questionnaire_responses_score CHECK (score >= 0),
+    CONSTRAINT ck_questionnaire_responses_sensitive CHECK (sensitive),
+    CONSTRAINT fk_questionnaire_responses_patient_users_answered_by FOREIGN KEY (answered_by) REFERENCES ehr.patient_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_proxy_grants_proxy_grant_id FOREIGN KEY (proxy_grant_id) REFERENCES ehr.proxy_grants (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_questionnaire_requests_request_id FOREIGN KEY (request_id) REFERENCES ehr.questionnaire_requests (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_questionnaires_questionnaire_code FOREIGN KEY (questionnaire_code) REFERENCES ehr.questionnaires (code) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_form_alert_sensitive CHECK (kind <> 'form-alert' OR sensitive);
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert'));
+
+CREATE UNIQUE INDEX ix_questionnaire_requests_appointment_id_questionnaire_code ON ehr.questionnaire_requests (appointment_id, questionnaire_code);
+
+CREATE INDEX ix_questionnaire_requests_clinician_id ON ehr.questionnaire_requests (clinician_id);
+
+CREATE INDEX ix_questionnaire_requests_patient_id_requested_at ON ehr.questionnaire_requests (patient_id, requested_at);
+
+CREATE INDEX ix_questionnaire_requests_questionnaire_code ON ehr.questionnaire_requests (questionnaire_code);
+
+CREATE INDEX ix_questionnaire_requests_requested_by ON ehr.questionnaire_requests (requested_by);
+
+CREATE INDEX ix_questionnaire_responses_answered_by ON ehr.questionnaire_responses (answered_by);
+
+CREATE INDEX ix_questionnaire_responses_clinician_id ON ehr.questionnaire_responses (clinician_id);
+
+CREATE INDEX ix_questionnaire_responses_patient_id_answered_at ON ehr.questionnaire_responses (patient_id, answered_at);
+
+CREATE INDEX ix_questionnaire_responses_proxy_grant_id ON ehr.questionnaire_responses (proxy_grant_id);
+
+CREATE INDEX ix_questionnaire_responses_questionnaire_code ON ehr.questionnaire_responses (questionnaire_code);
+
+CREATE UNIQUE INDEX ix_questionnaire_responses_request_id ON ehr.questionnaire_responses (request_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261122061618_PreVisitForms', '10.0.13');
+
+COMMIT;
+

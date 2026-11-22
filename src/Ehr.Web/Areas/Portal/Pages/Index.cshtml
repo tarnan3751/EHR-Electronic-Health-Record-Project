@@ -28,6 +28,11 @@
     <p><a asp-page="/Record/Index" class="sc-btn">@(own ? "Download my record" : "Download this record")</a></p>
     @* Step 13c: who has looked at the record, from the audit log. *@
     <p><a asp-page="/Views" class="sc-btn">@(own ? "Who viewed my record" : "Who viewed this record")</a></p>
+    @* Step 13e: always, but never to a proxy without sensitive items; how many can be filled in, while any can. *@
+    @if (Model.MaySeeForms)
+    {
+        <p><a asp-page="/Forms/Index" class="@(Model.OpenForms > 0 ? "sc-btn sc-btn--primary" : "sc-btn")" data-forms>Pre-visit forms@(Model.OpenForms > 0 ? $" ({Model.OpenForms} to fill in)" : "")</a></p>
+    }
     <section class="sc-panel" aria-labelledby="home-appointments">
         <h2 class="sc-panel__title" id="home-appointments">@(own ? "Your next appointments" : "Next appointments")</h2>
         @if (Model.Upcoming.Count > 0)

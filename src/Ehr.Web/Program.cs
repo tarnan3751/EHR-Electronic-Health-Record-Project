@@ -52,6 +52,8 @@ builder.Services.AddScoped<Ehr.Domain.Proxies.ProxyInvitations>();
 builder.Services.AddScoped<Ehr.Web.PortalSubject>();
 // Appointments (Ehr.Domain.Scheduling).
 builder.Services.AddScoped<Ehr.Domain.Scheduling.Appointments>();
+// Pre-visit forms (Ehr.Domain.Forms; step 13e).
+builder.Services.AddScoped<Ehr.Domain.Forms.PreVisitForms>();
 // The staff inbox (Ehr.Domain.Inbox).
 builder.Services.AddScoped<Ehr.Domain.Inbox.StaffInbox>();
 

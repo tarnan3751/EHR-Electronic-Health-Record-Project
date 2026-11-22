@@ -37,6 +37,11 @@ public class InboxItem
 
     // When the recipient marked it done, set by the database; null while it still needs action.
     public DateTimeOffset? DoneAt { get; set; }
+
+    // Whether it is about a sensitive item, such as a pre-visit form's answer (step 13e): set by the database's own
+    // trigger that creates it, so the write audit marks its events sensitive and the admin audit view shows none of
+    // their values. Its summary never says more than its kind does.
+    public bool Sensitive { get; set; }
 }
 
 // The kinds of item, each created by its own feature (docs/expansion/PLAN.md: steps 5, 7, 13d and 18).
@@ -56,7 +61,10 @@ public static class InboxItemKind
     // Someone else withdrew a visit summary the recipient released (step 13a).
     public const string SummaryWithdrawn = "summary-withdrawn";
 
-    public static readonly string[] All = [Message, Result, RefillRequest, EmergencyAccessReview, Addendum, SummaryWithdrawn];
+    // A pre-visit form has an answer that needs review: a PHQ-9 question 9 answered other than "Not at all" (step 13e).
+    public const string FormAlert = "form-alert";
+
+    public static readonly string[] All = [Message, Result, RefillRequest, EmergencyAccessReview, Addendum, SummaryWithdrawn, FormAlert];
 
     // What the inbox calls each kind.
     public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
@@ -67,6 +75,7 @@ public static class InboxItemKind
         [EmergencyAccessReview] = "Emergency access to review",
         [Addendum] = "Addendum to your note",
         [SummaryWithdrawn] = "Visit summary withdrawn",
+        [FormAlert] = "Pre-visit form to review",
     };
 }
 
@@ -79,6 +88,8 @@ public sealed class InboxItemConfiguration : IEntityTypeConfiguration<InboxItem>
         {
             table.HasCheckConstraint("ck_inbox_items_kind", $"kind IN ({string.Join(", ", InboxItemKind.All.Select(kind => $"'{kind}'"))})");
             table.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
+            // An item about a pre-visit form's answer is a sensitive item's, always (step 13e).
+            table.HasCheckConstraint("ck_inbox_items_form_alert_sensitive", $"kind <> '{InboxItemKind.FormAlert}' OR sensitive");
         });
         item.Property(i => i.Kind).HasMaxLength(40);
         item.Property(i => i.SourceTable).HasMaxLength(63);
