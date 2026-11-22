@@ -22,6 +22,17 @@ The limits are fixed here rather than read from the environment, so every server
     stop_wait_seconds                      stop answers within 8 seconds, with whatever is ready
     max_result_wait_seconds                result waits at most 10 seconds for the fields
 
+Listening to a visit (the expansion plan's step 16; listening.py) has limits of its own, besides counting against the
+sessions at once above:
+
+    ambient_max_sessions                   2 visits at once across the server, counted until each one's draft is ready,
+                                           since each holds up to 32 MB of recording and decodes it to 77 MB
+    ambient_max_session_bytes              32 MB a visit
+    ambient_max_session_seconds            20 minutes of audio a visit: about 5 or 6 windows of about 450 words
+                                           (conversation.py) to draft, a few minutes; each window has
+                                           structuring_seconds once its turn comes, and waits for its turn while any
+                                           dictation is being sorted
+
 The on-prem app gives every call 20 seconds (Ehr.Web, Api/Dictation), so no answer here may take longer.
 """
 
@@ -57,6 +68,10 @@ class Settings:
     call_seconds: float = 15.0
     stop_wait_seconds: float = 8.0  # how long stop waits for the transcript and fields before answering without them
     max_result_wait_seconds: float = 10.0
+
+    ambient_max_sessions: int = 2
+    ambient_max_session_bytes: int = 32 * 1024 * 1024
+    ambient_max_session_seconds: int = 1200
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] = os.environ) -> Settings:
