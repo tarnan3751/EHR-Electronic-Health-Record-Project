@@ -10,16 +10,17 @@ namespace Ehr.Domain.Refills;
 // Refill requests (the expansion plan's step 13d): the patient, or someone they share their record with whose access
 // includes messages, asks the care team in the portal to renew a medication on the chart. Called inside the page's
 // database transaction; requests are read through PhiReader. The database decides who may ask about which medication
-// (the session's own record, a medication it may read, active and coded), sets who asked and when and the medication's
-// name and sensitivity, keeps one open request a medication, refuses a request nobody on the care team would be told
-// of, and tells the care team (db/policies/30-rls.sql and 77-refill-requests.sql). Nothing about the patient comes from
+// (the session's own record, a medication it may read, active and coded as a product the clinic orders), sets who asked
+// and when and the medication's name and sensitivity, keeps one open request a medication, refuses a request nobody on
+// the care team would be told of, and tells the care team (db/policies/30-rls.sql and 77-refill-requests.sql). Nothing
+// about the patient comes from
 // the request: the page passes the session's patient.
 //
 // A clinician with the patient on their panel answers a request once: approves it by signing an order for the same
 // medication on the order form, which answers it in the same transaction (ClinicalOrders.SignAsync), or declines it here,
 // with a message for the patient. The database holds who may, that it happens once, and that an approval is a new order
-// for the same medication, and marks every care-team member's inbox item done. Either way the patient is told by email
-// that there is something new in their portal, with nothing about it.
+// for the same medication product, and marks every care-team member's inbox item done. Either way the patient is told by
+// email that there is something new in their portal, with nothing about it.
 public sealed class RefillRequests(EhrDbContext db, PhiReader phi, PortalNotices notices)
 {
     public const int MaxNoteLength = RefillRequestConfiguration.MaxNoteLength;
@@ -164,7 +165,8 @@ public enum RefillAsked
     TooLong,
 }
 
-// A medication the portal offers to renew: active and coded, one the session may read, with no request of it waiting.
+// A medication the portal offers to renew: active and coded as a product the clinic orders, one the session may read,
+// with no request of it waiting.
 public sealed record RenewableMedication(Guid Id, string Display, string? Dosage, bool Sensitive);
 
 // The portal's refill page for one record, already recorded as one read of the patient: the medications it may ask to
@@ -177,8 +179,8 @@ public sealed record PatientRefills(
 // A refill request as the clinician's pages show it, already recorded as one read of the patient: the patient and their
 // allergies, for the banner; what was asked, when, by whom ("Name" for the patient, "Name (proxy)" for someone they
 // share their record with) and with what note; its state and answer, with who answered; whether it is sensitive; its
-// medication as the chart has it now; and the clinic's catalog item for that medication, when there is one, to order it
-// again.
+// medication as the chart has it now; and the clinic's catalog item for that medication's product (its own code), when
+// there is one: the one item that renews it.
 public sealed record RefillReview(
     Ehr.Data.Patients.Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, Guid Id, string MedicationDisplay, string? Note, string AskedBy,
     DateTimeOffset RequestedAt, string Status, string? OrderedDisplay, string? DeclineMessage, string? DecidedBy, DateTimeOffset? DecidedAt, bool Sensitive,
@@ -186,8 +188,8 @@ public sealed record RefillReview(
 {
     public bool Waiting => Status == RefillRequestStatus.Requested;
 
-    // Approving is signing an order for it, which only an active medication may have.
-    public bool Renewable => Waiting && Medication.Status == MedicationStatementStatus.Active;
+    // Approving is signing an order for the same product, which only an active medication coded as one may have.
+    public bool Renewable => Waiting && Medication.Status == MedicationStatementStatus.Active && CatalogItem is not null;
 }
 
 // The medication a request names, as the chart has it now.

@@ -12,9 +12,8 @@ public sealed record PortalRefillRequest(
     string? OrderedDisplay, string? DeclineMessage, DateTimeOffset? DecidedAt, bool Sensitive);
 
 // Asks the database about refill requests (step 13d, db/policies/77-refill-requests.sql): for the portal, which reads no
-// row of the table, the requests of the record the session is looking at; and for the order form, whether an item renews
-// a request's medication. Raw SQL, so it lives here (AGENTS.md); it runs in the caller's transaction, where the user
-// context is set.
+// row of the table, the requests of the record the session is looking at. Raw SQL, so it lives here (AGENTS.md); it runs
+// in the caller's transaction, where the user context is set.
 public static class RefillRequestQueries
 {
     // The latest first, up to the limit, under the patient's rules for messages and sensitive items.
@@ -43,24 +42,5 @@ public static class RefillRequestQueries
         }
 
         return rows;
-    }
-
-    // Whether the catalog item renews the medication of that code: the database's rule, which an approval is held to
-    // (ehr.renews_same_medication), asked by the order form before it signs.
-    public static async Task<bool> RenewsAsync(EhrDbContext db, string? medicationCode, string catalogCode, CancellationToken cancellationToken)
-    {
-        var connection = db.Database.GetDbConnection();
-        await using var command = connection.CreateCommand();
-        command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
-        command.CommandText = "SELECT ehr.renews_same_medication(@medication, @catalog)";
-        foreach (var (name, value) in new (string, object)[] { ("medication", (object?)medicationCode ?? DBNull.Value), ("catalog", catalogCode) })
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = name;
-            parameter.Value = value;
-            command.Parameters.Add(parameter);
-        }
-
-        return await command.ExecuteScalarAsync(cancellationToken) is true;
     }
 }

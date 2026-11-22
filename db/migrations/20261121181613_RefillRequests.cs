@@ -135,7 +135,6 @@ namespace Ehr.Migrations
                 DROP FUNCTION IF EXISTS ehr.reject_refill_request_delete();
                 DROP FUNCTION IF EXISTS ehr.deliver_refill_request();
                 DROP FUNCTION IF EXISTS ehr.portal_refill_requests(integer);
-                DROP FUNCTION IF EXISTS ehr.renews_same_medication(text, text);
                 """);
         }
     }

@@ -15,8 +15,8 @@ static partial class RefillRequestTests
 
     public const string PortalPath = "/portal/refills";
 
-    // Lisinopril 10 mg, as the chart's coded entry names it (RxNorm 314076); the clinic's common item for it is
-    // "Lisinopril 10 mg tablet" (SYN-MED-001).
+    // Lisinopril 10 mg, as the chart's coded entry names it (RxNorm 314076), and as the catalog's item for that product,
+    // under the same code, names it: the one item that renews it.
     public const string Lisinopril = "lisinopril 10 MG Oral Tablet";
 
     public const string LisinoprilCode = "314076";

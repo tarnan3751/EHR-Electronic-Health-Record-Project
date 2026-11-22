@@ -248,7 +248,8 @@ public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance
     public IReadOnlyList<Ehr.Data.Orders.SafetyWarning> Warnings { get; init; } = [];
 
     // Step 13d: the refill request the order approves, when the form was opened to approve one of this patient's; and
-    // whether the chosen item renews its medication (ehr.renews_same_medication). False until an item is chosen.
+    // whether the chosen item renews its medication: the same product, the medication's own code. False until an item is
+    // chosen.
     public Ehr.Domain.Refills.RefillReview? Refill { get; init; }
 
     public bool RenewsRefill { get; init; }

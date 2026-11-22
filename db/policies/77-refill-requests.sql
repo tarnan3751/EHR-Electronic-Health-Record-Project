@@ -1,53 +1,27 @@
 -- Refill requests (the expansion plan's step 13d): the patient, or someone they share their record with whose access
 -- includes messages, asks the care team in the portal to renew a medication on the chart; one of the care team approves
--- it by signing an order for the same medication through the order form, or declines it with a message for the patient.
+-- it by signing an order for the same medication product through the order form, or declines it with a message for the
+-- patient.
 -- What the database itself holds them to, whatever the app does. Who may ask, read and answer is row-level security's
 -- (30-rls.sql), but for the portal, which reads them only through ehr.portal_refill_requests below; the grants are in
 -- 10-grants.sql. Plain SQL, safe to run again.
-
--- Whether a catalog item renews a medication: an RxNorm medication item whose product is made of exactly the
--- medication's ingredients, at whatever strength or form. A medication on the chart is coded as a product, sometimes as
--- an ingredient, which counts as itself (61-order-safety.sql reads them the same way). An uncoded medication, and an item
--- with no RxNorm product behind it, renew nothing. Reads reference data alone, as the caller. The order form asks it
--- before signing, and ehr.guard_refill_request asks it again when a request is approved.
-CREATE OR REPLACE FUNCTION ehr.renews_same_medication(medication_code text, catalog_code text) RETURNS boolean
-    LANGUAGE sql
-    STABLE
-    SET search_path = pg_catalog, pg_temp
-AS $$
-    WITH asked AS (
-        SELECT DISTINCT coalesce(d.ingredient_code, medication_code) AS ingredient
-        FROM (SELECT 1) AS one
-        LEFT JOIN ehr.drug_ingredients d ON d.product_code = medication_code
-        WHERE medication_code IS NOT NULL
-    ),
-    ordered AS (
-        SELECT DISTINCT d.ingredient_code AS ingredient
-        FROM ehr.order_catalog_items i
-        JOIN ehr.drug_ingredients d ON d.product_code = i.standard_code
-        WHERE i.code = catalog_code AND i.type = 'medication' AND i.standard_system = 'rxnorm'
-    )
-    SELECT EXISTS (SELECT 1 FROM asked) AND EXISTS (SELECT 1 FROM ordered)
-       AND NOT EXISTS (SELECT ingredient FROM asked EXCEPT SELECT ingredient FROM ordered)
-       AND NOT EXISTS (SELECT ingredient FROM ordered EXCEPT SELECT ingredient FROM asked)
-$$;
-REVOKE ALL ON FUNCTION ehr.renews_same_medication(text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION ehr.renews_same_medication(text, text) TO ehr_app, ehr_read;
 
 -- Before a request is inserted or updated, whoever makes the change, the tables' owner included. Runs as the caller.
 --   Insert, as row-level security has already required a portal session asking for the record it is looking at, under
 --     access that includes messages, about a medication of that record it may read (30-rls.sql):
 --     one at a time with the medication's sensitivity changing, under the medication's lock (the one
 --     ehr.follow_refill_medication takes), so the mark copied here is the one that stands; the medication must be
---     active and coded; the note, trimmed, is up to 500 characters or none; who asked and when are the database's, and
---     so are the medication's name and sensitivity; it starts waiting, with no answer.
+--     active and coded as a product the clinic can order (its RxNorm code an item of the order catalog: one coded as an
+--     ingredient, or not coded, is not renewed here); the note, trimmed, is up to 500 characters or none; who asked and
+--     when are the database's, and so are the medication's name and sensitivity; it starts waiting, with no answer.
 --   Update by the tables' owner: only the sensitivity, which ehr.follow_refill_medication keeps the medication's.
 --   Update by the apps: the one answer, once, by someone signed in, and nothing else moves. Its sensitivity is never
 --     theirs to change.
 --     Approved, by naming the order signed for it: an active medication order of this patient, signed in this
---       transaction by the clinician answering, for the same medication at any strength or form
---       (ehr.renews_same_medication); the medication still active, and locked until the transaction ends, so stopping it
---       waits for the approval or the approval sees it stopped. The database copies what was ordered.
+--       transaction by the clinician answering, for the same product as the medication on the chart (the order's catalog
+--       item is the medication's own RxNorm code: another strength, form, salt or route is a new order, not a renewal);
+--       the medication still active, and locked until the transaction ends, so stopping it waits for the approval or the
+--       approval sees it stopped. The database copies what was ordered.
 --     Declined, with a message for the patient of up to 1,000 characters.
 --     Who answered and when are the database's.
 -- READ COMMITTED, as signing an order requires (60-orders.sql): a statement that waited for a lock reads what was
@@ -88,8 +62,9 @@ BEGIN
         IF medication.status IS DISTINCT FROM 'active' THEN
             RAISE EXCEPTION 'Only an active medication is renewed' USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_medication_active';
         END IF;
-        IF medication.code IS NULL THEN
-            RAISE EXCEPTION 'A medication with no drug code can''t be renewed here' USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_medication_coded';
+        IF NOT EXISTS (SELECT 1 FROM ehr.order_catalog_items i WHERE i.code = medication.code AND i.type = 'medication') THEN
+            RAISE EXCEPTION 'A medication not coded as a product the clinic orders can''t be renewed here'
+                USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_medication_coded';
         END IF;
 
         NEW.note := NULLIF(btrim(NEW.note, E' \t\r\n'), '');
@@ -140,8 +115,8 @@ BEGIN
             RAISE EXCEPTION 'A refill request is approved by the medication order signed for it, now, by whoever approves it'
                 USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_order';
         END IF;
-        IF NOT ehr.renews_same_medication(medication.code, ordered.catalog_code) THEN
-            RAISE EXCEPTION 'A refill renews the same medication' USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_same_medication';
+        IF ordered.catalog_code IS DISTINCT FROM medication.code THEN
+            RAISE EXCEPTION 'A refill renews the same medication product' USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_same_medication';
         END IF;
 
         NEW.status := 'completed';

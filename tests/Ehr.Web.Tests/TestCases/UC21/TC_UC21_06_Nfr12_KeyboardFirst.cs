@@ -25,8 +25,8 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //   3. Back in the inbox, Tab to "Review the request" and press Enter; Tab to the message, type it, Tab to "Decline
 //      request" and press Enter.
 // Expected result: Step 1: the request's page opens with the focus on "Approve: write the order". Step 2: the order form
-//   opens with the item "Lisinopril 10 mg tablet" and the focus in it; signing lands on the request's page, "Approved:".
-//   Step 3: the page says "Declined:". Both requests are answered; no script errors.
+//   opens with the item "lisinopril 10 MG Oral Tablet", fixed, and the focus in the dose; signing lands on the request's
+//   page, "Approved:". Step 3: the page says "Declined:". Both requests are answered; no script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -68,8 +68,9 @@ public class TC_UC21_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         await page.Keyboard.PressAsync("Enter");
 
         await page.WaitForURLAsync(url => url.Contains("refill=", StringComparison.Ordinal));
-        await page.WaitForFunctionAsync("document.activeElement.matches('#order-item')");
-        Assert.Equal("Lisinopril 10 mg tablet", await page.EvaluateAsync<string>("document.activeElement.value"));
+        await page.WaitForFunctionAsync("document.activeElement.matches('#order-dose')");
+        Assert.Equal("lisinopril 10 MG Oral Tablet", await page.EvaluateAsync<string>("document.querySelector('#order-item').value"));
+        Assert.True(await page.EvaluateAsync<bool>("document.querySelector('#order-item').readOnly"));
         foreach (var (field, value) in new[] { ("#order-dose", "10 mg"), ("#order-route", "By mouth"), ("#order-frequency", "Once a day") })
         {
             await AiReviewBrowserTests.TabToAsync(page, field);

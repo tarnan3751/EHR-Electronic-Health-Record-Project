@@ -28,7 +28,8 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 // Expected result: Step 1: the inbox lists a "Refill request" item, "A patient asked to renew a medication", with the
 //   patient's name, a link to the request and no "Mark done"; the request's page shows the medication asked for and as
 //   the chart has it, who asked, the note, and the link to approve; it is one recorded read of the patient. Step 2: the
-//   order form says what the order approves and opens with "Lisinopril 10 mg tablet"; signing goes back to the
+//   order form says what the order approves and opens with the item "lisinopril 10 MG Oral Tablet", the medication's own
+//   product, which can't be changed there; signing goes back to the
 //   request's page, which says "Approved:" and names Dr. Test and the item ordered. Step 3: the chart lists the order
 //   under Active orders, signed by Dr. Test; the colleague's inbox has no item for it.
 // Creator: Tahseen Arnan
@@ -71,21 +72,23 @@ public class TC_UC21_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         var form = await session.Client.GetStringAsync(ApprovePath(patient.Patient, request), Cancel);
         Assert.Contains("Approves: the refill request for", Said(form));
-        Assert.Contains("name=\"Item\" value=\"Lisinopril 10 mg tablet\"", form);
+        Assert.Contains("name=\"Item\" value=\"lisinopril 10 MG Oral Tablet\"", form);
+        Assert.Contains("It renews the same medication: lisinopril 10 MG Oral Tablet.", Said(form));
+        Assert.Matches("id=\"order-item\"[^>]*readonly", form);
         using var approved = await ApproveAsync(session.Client, patient.Patient, request);
         var answered = Said(await ReadAsync(approved));
         Assert.Equal(ReviewPath(patient.Patient, request), PathOf(approved));
         Assert.Contains("Approved: the order is signed, and the patient sees what was ordered.", answered);
         Assert.Contains("Approved by Dr. Test", answered);
-        Assert.Contains("ordered Lisinopril 10 mg tablet.", answered);
+        Assert.Contains("ordered lisinopril 10 MG Oral Tablet.", answered);
 
-        Assert.Equal([$"completed|{Lisinopril}|Synthetic: I have three days left.|{patient.Account}|Lisinopril 10 mg tablet|-|{clinician.Id}"],
+        Assert.Equal([$"completed|{Lisinopril}|Synthetic: I have three days left.|{patient.Account}|lisinopril 10 MG Oral Tablet|-|{clinician.Id}"],
             await RequestsAsync(apps, patient.Patient));
         Assert.Equal([$"active|{clinician.Id}"], await ProxyTests.QueryAsync(apps,
             $"SELECT o.status || '|' || o.signer_id FROM ehr.orders o JOIN ehr.refill_requests r ON r.order_id = o.id WHERE r.id = '{request}' AND o.patient_id = @patient",
             patient.Patient));
-        var chart = Words(await session.Client.GetStringAsync($"/patients/{patient.Patient}", Cancel));
-        Assert.Contains("Lisinopril 10 mg tablet", chart);
+        var chart = Said(await session.Client.GetStringAsync($"/patients/{patient.Patient}", Cancel));
+        Assert.Contains("lisinopril 10 MG Oral Tablet (Medication) Dose: 50 mg", chart);
         Assert.All(await ItemsAsync(apps, patient.Patient, request), item => Assert.EndsWith(" true", item));
         var colleagues = await SignInAsync(apps.OnPrem, colleague);
         Assert.DoesNotContain("A patient asked to renew a medication", Words(await colleagues.Client.GetStringAsync("/inbox", Cancel)));

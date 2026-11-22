@@ -273,7 +273,7 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
         var warnings = catalogCode is null ? [] : await OrderSafety.WarningsAsync(db, id, catalogCode, replaces, cancellationToken);
         var request = refill is { } asked ? await ReadRefillAsync(patient, allergies, asked, cancellationToken) : null;
-        var renews = request is not null && catalogCode is not null && await RefillRequestQueries.RenewsAsync(db, request.Medication.Code, catalogCode, cancellationToken);
+        var renews = request is not null && catalogCode is not null && catalogCode == request.Medication.Code;
 
         audit.Record(request?.Sensitive == true ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
         await db.SaveChangesAsync(cancellationToken);
@@ -1358,12 +1358,12 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
     // Refill requests (the expansion plan's step 13d).
 
     // The portal's refill page for the record the session is looking at: the medications it may ask to renew (active and
-    // coded, as row-level security lets the portal read them: none entered in error, a sensitive one only where the
-    // patient's rule allows), but those with a request waiting; its requests, latest first, up to the limit, as the
-    // database gives the portal them (ehr.portal_refill_requests: the portal reads no row of the table); and whether
-    // anyone on the patient's panel could answer one. Sensitive medications and requests are left out unless asked for,
-    // and asking is recorded as a view of the patient's sensitive items, in place of the plain read: one recorded read of
-    // the patient. Null when the session may read no such patient.
+    // coded as a product the clinic orders, as row-level security lets the portal read them: none entered in error, a
+    // sensitive one only where the patient's rule allows), but those with a request waiting; its requests, latest first,
+    // up to the limit, as the database gives the portal them (ehr.portal_refill_requests: the portal reads no row of the
+    // table); and whether anyone on the patient's panel could answer one. Sensitive medications and requests are left out
+    // unless asked for, and asking is recorded as a view of the patient's sensitive items, in place of the plain read:
+    // one recorded read of the patient. Null when the session may read no such patient.
     public async Task<PatientRefills?> RefillsAsync(Guid patientId, bool sensitive, int limit, CancellationToken cancellationToken)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
@@ -1374,8 +1374,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
 
         var requests = await RefillRequestQueries.PortalAsync(db, limit, cancellationToken);
         var waiting = requests.Where(r => r.Status == RefillRequestStatus.Requested).Select(r => r.MedicationStatementId).ToHashSet();
+        // Coded as a product the clinic orders, by the catalog's key: one coded as an ingredient, or not coded, isn't
+        // renewed here (77-refill-requests.sql).
         var medications = (await db.MedicationStatements.AsNoTracking()
-            .Where(m => m.PatientId == patientId && m.Status == MedicationStatementStatus.Active && m.Code != null)
+            .Where(m => m.PatientId == patientId && m.Status == MedicationStatementStatus.Active && m.Code != null
+                && db.OrderCatalogItems.Any(i => i.Code == m.Code && i.Type == OrderType.Medication))
             .OrderBy(m => m.Display).ThenBy(m => m.Id)
             .Select(m => new RenewableMedication(m.Id, m.Display, m.Dosage, m.Sensitive)).ToListAsync(cancellationToken))
             .Where(m => !waiting.Contains(m.Id)).ToList();
@@ -1442,9 +1445,8 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
                 AskerPatient = asker.PatientId,
                 AskerName = asker.DisplayName,
                 DecidedBy = db.StaffUsers.Where(u => u.Id == request.DecidedBy).Select(u => u.DisplayName).FirstOrDefault(),
-                Item = db.OrderCatalogItems
-                    .Where(i => i.Type == OrderType.Medication && i.StandardSystem == "rxnorm" && i.StandardCode == medication.Code)
-                    .OrderByDescending(i => i.Common).ThenBy(i => i.Code).Select(i => i.Display).FirstOrDefault(),
+                // The same product, by its own code: the catalog's key.
+                Item = db.OrderCatalogItems.Where(i => i.Code == medication.Code && i.Type == OrderType.Medication).Select(i => i.Display).FirstOrDefault(),
             }).SingleOrDefaultAsync(cancellationToken);
         if (row is null)
         {

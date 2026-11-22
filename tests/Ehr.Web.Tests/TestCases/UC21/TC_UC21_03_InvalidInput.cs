@@ -20,7 +20,8 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //   has asked to renew lisinopril and amlodipine. Another patient of Dr. Test's has a request too.
 // Inputs and system conditions: POST /patients/{id}/refills/{request}?handler=Decline; GET and POST
 //   /patients/{id}/orders/new?type=medication&refill={request}; GET /patients/{id}/refills/{request}; on the on-site app.
-// Test data: Atorvastatin 20 mg tablet, another drug; a message of 1,001 characters.
+// Test data: Atorvastatin 20 mg tablet, another drug, posted though the form's item can't be changed; a message of 1,001
+//   characters.
 // Steps:
 //   1. Decline lisinopril's request with no message, then with 1,001 characters.
 //   2. Approve it with Atorvastatin 20 mg tablet.
@@ -29,7 +30,7 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //   5. As the colleague, open the request; as Dr. Test, open the other patient's request under this patient.
 //   6. Open the order form with both a refill and an order to replace.
 // Expected result: Step 1: 422, "Write a message for the patient" and "Shorten the message to 1,000 characters or
-//   fewer.". Step 2: 422, "A refill renews the same medication, at any strength."; no order saved. Step 3: the page says
+//   fewer.". Step 2: 422, "It renews the same medication: lisinopril 10 MG Oral Tablet."; no order saved. Step 3: the page says
 //   "Can't be approved:" and offers only Decline; the form goes back to the request; its post answers 409 and orders
 //   nothing. Step 4: the decline is saved; the approval answers 409, "someone answered this refill request first", and
 //   orders nothing; the second decline answers 409, "Not saved: someone answered this request first.". Step 5: the
@@ -65,7 +66,7 @@ public class TC_UC21_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         using (var refused = await ApproveAsync(session.Client, patient.Patient, lisinoprilRequest, "Atorvastatin 20 mg tablet"))
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
-            Assert.Contains("A refill renews the same medication, at any strength.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("It renews the same medication: lisinopril 10 MG Oral Tablet.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Equal(["0"], await ProxyTests.QueryAsync(apps, "SELECT count(*)::text FROM ehr.orders WHERE patient_id = @patient", patient.Patient));

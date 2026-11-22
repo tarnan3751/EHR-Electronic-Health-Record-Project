@@ -100,8 +100,8 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
     // when the order to replace is no longer active, because someone discontinued or changed it first; nothing is saved.
     //
     // Approving a refill request (`refill`, step 13d) signs the order and answers the request with it, in the same
-    // savepoint: the database holds the answer to an order signed now, by this clinician, for the same medication, while
-    // the request waits and the medication is active (77-refill-requests.sql). Answered when someone answered the request
+    // savepoint: the database holds the answer to an order signed now, by this clinician, for the same medication product,
+    // while the request waits and the medication is active (77-refill-requests.sql). Answered when someone answered the request
     // first, NotRenewable when its medication is no longer active or the order isn't one that renews it; nothing is
     // saved then, not the order either.
     public async Task<(Order? Order, SignRefusal? Refusal)> SignAsync(

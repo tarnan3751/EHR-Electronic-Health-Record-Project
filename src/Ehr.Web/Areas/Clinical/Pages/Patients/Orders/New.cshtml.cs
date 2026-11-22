@@ -24,10 +24,11 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 // replaced, in one transaction. The order being replaced isn't a duplicate of its replacement. If someone discontinued
 // or changed it first, nothing is saved and the form says so.
 //
-// Approving a refill request (step 13d) is this form too (?type=medication&refill=<request>), from the request's page: it
-// opens with the clinic's item for the medication, the request beside it, and every check of an order. "Sign order" signs
-// it and answers the request with it, in one transaction, and the database holds the order to the same medication, at
-// any strength. If someone answered the request first, or its medication was stopped, nothing is saved and the form says
+// Approving a refill request (step 13d) is this form too (?type=medication&refill=<request>), from the request's page: its
+// item is fixed, the clinic's catalog item for the medication's own product, with the request beside it and every check
+// of an order. "Sign order" signs it and answers the request with it, in one transaction, and the database holds the
+// order to that same product. Another strength, form or drug is a new order, written from the chart once the request is
+// declined. If someone answered the request first, or its medication was stopped, nothing is saved and the form says
 // so. The request's ID is a query a link carries, which a sign-in drops: after one, the clinician is on a new order
 // with no request, and approves it from the request's page again. The patient is then told by email, as on a decline.
 //
@@ -118,8 +119,12 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             Details = OrderForms.Values(replaced.Details);
         }
 
-        // The clinic's item for the medication asked for, when it has one: the clinician may choose another strength.
-        Item ??= Form.Refill?.CatalogItem;
+        // The one item that renews the medication asked for: its own product.
+        if (Form.Refill is { } refill)
+        {
+            Item = refill.CatalogItem;
+        }
+
         return Page();
     }
 
@@ -164,9 +169,9 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             errors["ChangeReason"] = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
         }
 
-        if (Form.Refill is not null && item is not null && !Form.RenewsRefill)
+        if (Form.Refill is { } asked && !Form.RenewsRefill)
         {
-            errors["Item"] = "A refill renews the same medication, at any strength. To order something else, decline the request and order it from the chart.";
+            errors["Item"] = $"It renews the same medication: {asked.CatalogItem}. To order another, decline the request with a message and write a new order from the chart.";
         }
 
         if (errors.Count > 0)

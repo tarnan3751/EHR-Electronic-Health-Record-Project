@@ -8,12 +8,13 @@ namespace Ehr.Security.Tests;
 
 // The expansion plan's step 13d: what the database lets each account do with a refill request, as the runtime roles, in
 // SQL of its own (db/policies/10-grants.sql, 30-rls.sql, 40-audit.sql, 70-inbox.sql and 77-refill-requests.sql). The
-// patient, or a proxy whose access includes messages, asks about an active, coded medication of the record they are
-// looking at that they may read themselves, one open request a medication, while the patient has a care team to tell;
-// the database sets the rest and puts an item in each care-team clinician's inbox. A clinician with the patient on their
-// panel answers it once: approves it with the order they signed for it in the same transaction, for the same medication
-// at any strength, or declines it with a message; every item is then done. Its sensitivity is its medication's. The
-// portal reads no row, only what ehr.portal_refill_requests gives. Nothing else changes and nothing is deleted.
+// patient, or a proxy whose access includes messages, asks about an active medication of the record they are looking
+// at, coded as a product the clinic orders, that they may read themselves, one open request a medication, while the
+// patient has a care team to tell; the database sets the rest and puts an item in each care-team clinician's inbox. A
+// clinician with the patient on their panel answers it once: approves it with the order they signed for it in the same
+// transaction, for the same product as the medication on the chart, or declines it with a message; every item is then
+// done. Its sensitivity is its medication's. The portal reads no row, only what ehr.portal_refill_requests gives.
+// Nothing else changes and nothing is deleted.
 public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -22,8 +23,9 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
 
-    // Lisinopril 10 mg, as the chart's coded entry writes it, and the clinic's common item for it (SYN-MED-001); the
-    // same ingredient at 20 mg (314077); lisinopril with hydrochlorothiazide (197885); and atorvastatin (SYN-MED-003).
+    // Lisinopril 10 mg, as the chart's coded entry writes it, and the catalog's item for that product, under the same
+    // code. Not the same product: the clinic's common item for it (SYN-MED-001, an item of its own), the same ingredient
+    // at 20 mg (314077), lisinopril with hydrochlorothiazide (197885) and atorvastatin (SYN-MED-003).
     const string Lisinopril = "314076";
 
     // Asked as the portal asks, with forged values for everything the database sets.
@@ -113,12 +115,14 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
 
     // Approved as the order form approves one: the order signed, then the request answered with it, in one transaction.
     const string Approve = """
-        INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @patient, @type, @code, '{}', 'active');
+        INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status, duplicate_reason) VALUES (@order, @patient, @type, @code, '{}', 'active', @reason);
         UPDATE ehr.refill_requests SET order_id = @order WHERE id = @request;
         """;
 
-    Task<int> ApproveAsync(Guid clinician, Guid patient, Guid request, string code = "SYN-MED-001", string type = "medication", Guid? order = null) =>
-        RunAsync(clinician, Approve, ("order", order ?? Guid.CreateVersion7()), ("patient", patient), ("type", type), ("code", code), ("request", request));
+    Task<int> ApproveAsync(Guid clinician, Guid patient, Guid request, string code = Lisinopril, string type = "medication", Guid? order = null,
+        string? duplicateReason = null) =>
+        RunAsync(clinician, Approve, ("order", order ?? Guid.CreateVersion7()), ("patient", patient), ("type", type), ("code", code), ("request", request),
+            ("reason", (object?)duplicateReason ?? DBNull.Value));
 
     Task<int> DeclineAsync(Guid? clinician, Guid request, string message = "  Synthetic: please book a visit first.  ", string? connection = null) =>
         RunAsync(connection ?? App, clinician, "UPDATE ehr.refill_requests SET decline_message = @message WHERE id = @id", IsolationLevel.ReadCommitted,
@@ -316,24 +320,33 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
     }
 
     [Fact]
-    public async Task A_clinician_on_the_panel_approves_with_the_order_signed_for_it_now_at_any_strength_and_every_item_is_done()
+    public async Task A_clinician_on_the_panel_approves_only_with_an_order_for_the_same_product_signed_now_and_every_item_is_done()
     {
         var (clinician, patient, account) = await OnPanelAsync();
         var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
         await Accounts.AssignAsync(database, colleague, patient);
         var same = await AskAsync(account, patient, await MedicationAsync(patient));
-        var stronger = await AskAsync(account, patient, await MedicationAsync(patient));
+        var again = await AskAsync(account, patient, await MedicationAsync(patient));
+        var metoprolol = await AskAsync(account, patient, await MedicationAsync(patient, code: "866436", display: "24 HR metoprolol succinate 50 MG Extended Release Oral Tablet"));
+
+        // Not the same product: another strength, the clinic's common item for the drug, which is an item of its own,
+        // and (the review's probe) the same ingredient's injection for an extended-release tablet.
+        foreach (var (request, code) in new[] { (same, "314077"), (same, "SYN-MED-001"), (metoprolol, "866508") })
+        {
+            await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ApproveAsync(clinician, patient, request, code), "refill_requests_same_medication");
+        }
 
         var order = Guid.CreateVersion7();
         Assert.Equal(2, await ApproveAsync(clinician, patient, same, order: order));
-        // Lisinopril at 20 mg renews lisinopril at 10 mg: the same ingredient.
-        Assert.Equal(2, await ApproveAsync(colleague, patient, stronger, code: "314077"));
+        // A second order of the product needs the duplicate's reason, as any order does.
+        Assert.Equal(2, await ApproveAsync(colleague, patient, again, duplicateReason: "Synthetic: a second supply."));
+        Assert.Equal(2, await ApproveAsync(clinician, patient, metoprolol, code: "866436"));
 
-        Assert.Equal([$"completed|lisinopril 10 MG Oral Tablet|-|{account}|true|Lisinopril 10 mg tablet|-|{clinician}|false"], await RowAsync(same));
-        Assert.Equal([$"completed|lisinopril 10 MG Oral Tablet|-|{account}|true|lisinopril 20 MG Oral Tablet|-|{colleague}|false"], await RowAsync(stronger));
+        Assert.Equal([$"completed|lisinopril 10 MG Oral Tablet|-|{account}|true|lisinopril 10 MG Oral Tablet|-|{clinician}|false"], await RowAsync(same));
+        Assert.Equal([$"completed|lisinopril 10 MG Oral Tablet|-|{account}|true|lisinopril 10 MG Oral Tablet|-|{colleague}|false"], await RowAsync(again));
         Assert.Equal([order.ToString()], await AsSuperuserAsync("SELECT order_id::text FROM ehr.refill_requests WHERE id = @id", ("id", same)));
-        Assert.All((await ItemsAsync(same)).Concat(await ItemsAsync(stronger)), item => Assert.EndsWith(" false", item));
-        Assert.Equal(4, (await ItemsAsync(same)).Count + (await ItemsAsync(stronger)).Count);
+        Assert.All((await ItemsAsync(same)).Concat(await ItemsAsync(again)), item => Assert.EndsWith(" false", item));
+        Assert.Equal(4, (await ItemsAsync(same)).Count + (await ItemsAsync(again)).Count);
     }
 
     // The coordinator's addition to the plan: a request can't be closed against an order signed before, by the same
@@ -344,7 +357,7 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         var (clinician, patient, account) = await OnPanelAsync();
         var request = await AskAsync(account, patient, await MedicationAsync(patient));
         var earlier = Guid.CreateVersion7();
-        await RunAsync(clinician, "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@id, @patient, 'medication', 'SYN-MED-001', '{}', 'active')",
+        await RunAsync(clinician, "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@id, @patient, 'medication', '314076', '{}', 'active')",
             ("id", earlier), ("patient", patient));
 
         await RefusedAsync(PostgresErrorCodes.CheckViolation,
@@ -365,6 +378,7 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         foreach (var (code, type, constraint) in new[]
         {
             ("SYN-MED-003", "medication", "refill_requests_same_medication"), ("197885", "medication", "refill_requests_same_medication"),
+            ("314077", "medication", "refill_requests_same_medication"), ("SYN-MED-001", "medication", "refill_requests_same_medication"),
             ("SYN-LAB-001", "lab", "refill_requests_order"),
         })
         {
@@ -373,7 +387,7 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
 
         await Accounts.AssignAsync(database, clinician, elsewhere);
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RunAsync(clinician,
-            "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @elsewhere, 'medication', 'SYN-MED-001', '{}', 'active'); UPDATE ehr.refill_requests SET order_id = @order WHERE id = @id",
+            "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @elsewhere, 'medication', '314076', '{}', 'active'); UPDATE ehr.refill_requests SET order_id = @order WHERE id = @id",
             ("order", Guid.CreateVersion7()), ("elsewhere", elsewhere), ("id", request)), "refill_requests_order");
 
         // Off the panel, an administrator, the patient: no row to answer. The cloud app's role: no UPDATE.
@@ -387,7 +401,7 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         var second = await AskAsync(account, patient, await MedicationAsync(patient));
         var order = Guid.CreateVersion7();
         await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => RunAsync(clinician, Approve + "UPDATE ehr.refill_requests SET order_id = @order WHERE id = @second;",
-            ("order", order), ("patient", patient), ("type", "medication"), ("code", "SYN-MED-001"), ("request", request), ("second", second)));
+            ("order", order), ("patient", patient), ("type", "medication"), ("code", Lisinopril), ("request", request), ("second", second), ("reason", DBNull.Value)));
 
         // Answered once: approved, then neither declined nor approved again; declined, then not approved.
         Assert.Equal(2, await ApproveAsync(clinician, patient, request));
@@ -411,7 +425,7 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         await RefusedAsync(PostgresErrorCodes.StringDataRightTruncation, () => DeclineAsync(clinician, request, new string('x', 1001)));
         // An order and a message together.
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RunAsync(clinician,
-            "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @patient, 'medication', 'SYN-MED-001', '{}', 'active'); UPDATE ehr.refill_requests SET order_id = @order, decline_message = 'Both.' WHERE id = @id",
+            "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @patient, 'medication', '314076', '{}', 'active'); UPDATE ehr.refill_requests SET order_id = @order, decline_message = 'Both.' WHERE id = @id",
             ("order", Guid.CreateVersion7()), ("patient", patient), ("id", request)));
         // Columns the apps may not update, and deleting.
         foreach (var sql in new[]
@@ -487,7 +501,7 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         await using (stopping)
         {
             await using var approve = new NpgsqlCommand(Approve, approving, approvingTransaction);
-            foreach (var (name, value) in new (string, object)[] { ("order", order), ("patient", patient), ("type", "medication"), ("code", "SYN-MED-001"), ("request", request) })
+            foreach (var (name, value) in new (string, object)[] { ("order", order), ("patient", patient), ("type", "medication"), ("code", Lisinopril), ("request", request), ("reason", DBNull.Value) })
             {
                 approve.Parameters.AddWithValue(name, value);
             }
@@ -538,7 +552,7 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
             Assert.Equal(1, await decline.ExecuteNonQueryAsync(Cancel));
 
             await using var approve = new NpgsqlCommand(Approve, approving, approvingTransaction);
-            foreach (var (name, value) in new (string, object)[] { ("order", order), ("patient", patient), ("type", "medication"), ("code", "SYN-MED-001"), ("request", request) })
+            foreach (var (name, value) in new (string, object)[] { ("order", order), ("patient", patient), ("type", "medication"), ("code", Lisinopril), ("request", request), ("reason", DBNull.Value) })
             {
                 approve.Parameters.AddWithValue(name, value);
             }
@@ -635,5 +649,20 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
 
         Assert.Equal(2, events.Length);
         Assert.Equal(["0"], await Accounts.QueryAsync(App, admin, "SELECT count(*)::text FROM ehr.shown_audit_details(@ids)", ("ids", events)));
+    }
+
+    [Fact]
+    public async Task A_medication_not_coded_as_a_product_the_clinic_orders_is_not_renewed()
+    {
+        var (_, patient, account) = await OnPanelAsync();
+
+        // Coded as its ingredient, and as a branded product the catalog doesn't hold.
+        foreach (var (code, display) in new[] { ("29046", "lisinopril"), ("104377", "lisinopril 10 MG Oral Tablet [Zestril]") })
+        {
+            var medication = await MedicationAsync(patient, code: code, display: display);
+            await RefusedAsync(PostgresErrorCodes.CheckViolation, () => AskAsync(account, patient, medication), "refill_requests_medication_coded");
+        }
+
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*)::text FROM ehr.refill_requests WHERE patient_id = @patient", ("patient", patient)));
     }
 }

@@ -69,7 +69,7 @@ else
             <div class="sc-notice sc-notice--info" data-order-refill>
                 <p><span class="sc-notice__state">Approves:</span> the refill request for <strong>@refill.MedicationDisplay</strong>@if (refill.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }, asked by @refill.AskedBy, @Clinic.Format(refill.RequestedAt).</p>
                 <p>On the chart: @refill.Medication.Display@(refill.Medication.Dosage is { } dosage ? $", {dosage}" : "").@if (refill.Note is { } note) { <br><text>The patient's note: </text><span class="sc-note__text">@note</span> }</p>
-                <p>Signing this order approves the request, and the patient sees what was ordered. It renews the same medication, at any strength.</p>
+                <p>Signing this order approves the request, and the patient sees what was ordered. It renews the same medication: @refill.CatalogItem.</p>
             </div>
         }
         @if (replaced is not null)
@@ -80,7 +80,7 @@ else
                 <p>Signing the change discontinues that order and keeps it in the chart's discontinued orders.</p>
             </div>
         }
-        @{ Field("Item", "order-item", "Item", required: true, Model.Item, "order-items"); }
+        @{ Field("Item", "order-item", "Item", required: true, Model.Item, Model.Form.Refill is null ? "order-items" : null); }
         <datalist id="order-items">
             @foreach (var item in Model.Catalog)
             {
@@ -185,6 +185,9 @@ else
     string Focused() => Model.ShowingNotes
         // Back only to show notes: the cursor is on "Sign order".
         ? ""
+        // A refill's item is fixed (step 13d): the cursor starts in its first detail.
+        : Model.Form.Refill is not null
+        ? OrderForms.Fields[Model.KnownType!].Select(detail => detail.Name).FirstOrDefault(Model.Errors.ContainsKey) ?? OrderForms.Fields[Model.KnownType!][0].Name
         : Model.Errors.Count == 0 || Model.Errors.ContainsKey("Item")
         ? "Item"
         : OrderForms.Fields[Model.KnownType!].Select(detail => detail.Name).FirstOrDefault(Model.Errors.ContainsKey) ?? "";
@@ -193,11 +196,13 @@ else
     void Field(string name, string id, string label, bool required, string? value, string? list)
     {
         var error = Model.Errors.GetValueOrDefault(name);
+        // A refill's item is fixed (step 13d): the medication's own product, nothing to search for.
+        var fixedItem = name == "Item" && Model.Form.Refill is not null;
         <div class="sc-field">
             <label for="@id">@label @if (required) { <span>(required)</span> }</label>
             <input id="@id" class="sc-field__input" name="@(name == "Item" ? "Item" : $"Details[{name}]")" value="@value" list="@list" maxlength="@OrderForms.MaximumLength"
-                   autocomplete="off" required="@required" aria-invalid="@(error is null ? null : "true")" autofocus="@(name == Focused())"
-                   data-code-search="@(name == "Item" ? $"order-{Model.KnownType}" : null)"
+                   autocomplete="off" required="@required" aria-invalid="@(error is null ? null : "true")" autofocus="@(name == Focused())" readonly="@fixedItem"
+                   data-code-search="@(name == "Item" && !fixedItem ? $"order-{Model.KnownType}" : null)"
                    aria-describedby="@(error is null ? null : $"{id}-error")">
             @if (error is not null)
             {

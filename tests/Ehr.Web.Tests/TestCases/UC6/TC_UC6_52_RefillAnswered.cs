@@ -7,7 +7,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 
 // Test Case ID: TC-UC6-52
 // Purpose / scenario: The patient sees what became of their requests: one approved, with what the care team ordered,
-//   which may be another strength than asked; one declined, with the care team's message, line breaks kept. The page
+//   the same product as asked; one declined, with the care team's message, line breaks kept. The page
 //   never names the clinician who answered. The patient's own address gets one email that there is something new in the
 //   portal, naming nothing, with a link to the portal's home; the second answer that day sends none, and someone the
 //   patient shares their record with, who asked, gets none.
@@ -17,14 +17,14 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Preconditions: The patient has a portal account, signed in, and has given access with messages to someone, signed in
 //   and looking at the patient's record. Dr. Test has the patient on their panel.
 // Inputs and system conditions: the proxy asks for lisinopril, the patient for amlodipine; Dr. Test approves the
-//   lisinopril request with lisinopril 20 mg and declines amlodipine's; then GET /portal/refills as the patient.
+//   lisinopril request and declines amlodipine's; then GET /portal/refills as the patient.
 // Test data: the message "Synthetic: we need to check your blood pressure first.\nPlease book a visit.".
 // Steps:
 //   1. The proxy and the patient each ask.
-//   2. Dr. Test approves the first with lisinopril 20 MG Oral Tablet, and declines the second with the message.
+//   2. Dr. Test approves the first, and declines the second with the message.
 //   3. The patient opens the page.
 // Expected result: The page lists amlodipine "Declined" with the message as written, and lisinopril "Approved", "your
-//   care team ordered lisinopril 20 MG Oral Tablet"; "Dr. Test" is nowhere on it. The patient's address has one new
+//   care team ordered lisinopril 10 MG Oral Tablet"; "Dr. Test" is nowhere on it. The patient's address has one new
 //   email, "There is something new in your patient portal", with no medication in it and a button to /portal; the
 //   proxy's address has none.
 // Creator: Tahseen Arnan
@@ -53,7 +53,7 @@ public class TC_UC6_52_RefillAnswered(WebApps apps) : IClassFixture<WebApps>
         var amlodipine = await RequestIdAsync(apps, patient.Patient);
         var (patientEmails, proxyEmails) = (EmailsTo(apps, patient.Email).Count, EmailsTo(apps, proxy.Email).Count);
 
-        using (var approved = await ApproveAsync(session.Client, patient.Patient, lisinopril, "lisinopril 20 MG Oral Tablet"))
+        using (var approved = await ApproveAsync(session.Client, patient.Patient, lisinopril))
         {
             Assert.Contains("Approved:", Words(await ReadAsync(approved)));
         }
@@ -65,7 +65,7 @@ public class TC_UC6_52_RefillAnswered(WebApps apps) : IClassFixture<WebApps>
 
         var words = Words(await patient.Client.GetStringAsync(PortalPath, Cancel));
         Assert.Contains("Approved", words);
-        Assert.Contains("your care team ordered lisinopril 20 MG Oral Tablet.", words);
+        Assert.Contains("your care team ordered lisinopril 10 MG Oral Tablet.", words);
         Assert.Contains("Declined", words);
         Assert.Contains("Your care team says:", words);
         Assert.Contains("Synthetic: we need to check your blood pressure first.\nPlease book a visit.", words);

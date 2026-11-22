@@ -8,7 +8,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 
 // Test Case ID: TC-UC6-51
 // Purpose / scenario: The patient asks the care team to renew a medication from the portal's home: the page offers the
-//   active medications with a drug code, each with how it is taken, and not one that was stopped or has no code; the
+//   active medications coded as a product the clinic orders, each with how it is taken, and not one that was stopped,
+//   has no code, or is coded as its ingredient; the
 //   request, with the patient's note, then waits for the care team, who each find it in their inbox, and the medication
 //   is no longer offered while it waits. No email is sent for asking.
 // Type: Functional (successful flow: refill requests)
@@ -18,7 +19,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   have the patient on their panel.
 // Inputs and system conditions: GET /portal, GET /portal/refills, POST /portal/refills, on the on-site app.
 // Test data: Active, coded: lisinopril 10 MG Oral Tablet, "1 tablet by mouth daily". Stopped: atorvastatin 20 MG Oral
-//   Tablet. With no code: "Albuterol inhaler". The note "Synthetic: I have three days left.".
+//   Tablet. With no code: "Albuterol inhaler". Coded as its ingredient: "Metformin, coded as an ingredient" (RxNorm
+//   6809). The note "Synthetic: I have three days left.".
 // Steps:
 //   1. Open the portal's home and follow "Renew a medication".
 //   2. Choose lisinopril, type the note, and choose "Send request".
@@ -41,6 +43,7 @@ public class TC_UC6_51_AskToRenew(WebApps apps) : IClassFixture<WebApps>
         await MedicationAsync(apps, patient.Patient);
         await MedicationAsync(apps, patient.Patient, "atorvastatin 20 MG Oral Tablet", "617310", status: "stopped");
         await MedicationAsync(apps, patient.Patient, "Albuterol inhaler", code: null);
+        await MedicationAsync(apps, patient.Patient, "Metformin, coded as an ingredient", "6809");
         var emails = EmailsTo(apps, patient.Email).Count;
 
         var home = await patient.Client.GetStringAsync("/portal", Cancel);
@@ -55,6 +58,7 @@ public class TC_UC6_51_AskToRenew(WebApps apps) : IClassFixture<WebApps>
             Assert.Contains("1 tablet by mouth daily", Words(html));
             Assert.DoesNotContain("atorvastatin", html);
             Assert.DoesNotContain("Albuterol", html);
+            Assert.DoesNotContain("coded as an ingredient", html);
             Assert.Contains("No requests yet.", Words(html));
         }
 

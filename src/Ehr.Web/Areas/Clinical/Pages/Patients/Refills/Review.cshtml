@@ -61,11 +61,15 @@ else
     @if (refill.Renewable)
     {
         <p><a class="sc-btn sc-btn--primary" asp-page="/Patients/Orders/New" asp-route-id="@patient.Id" asp-route-type="medication" asp-route-refill="@refill.Id" autofocus data-refill-approve>Approve: write the order</a></p>
-        <p class="sc-muted">The order form opens with the medication, and checks it as any order. Signing it approves the request.</p>
+        <p class="sc-muted">The order form opens with the same medication, @refill.CatalogItem, and checks it as any order. Signing it approves the request. To order another strength, form or drug, decline the request with a message and write a new order from the chart.</p>
+    }
+    else if (status != MedicationStatementStatus.Active)
+    {
+        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication is no longer active on the chart (@statusSaid). Decline the request with a message, so the patient knows.</p>
     }
     else
     {
-        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication is no longer active on the chart (@statusSaid). Decline the request with a message, so the patient knows.</p>
+        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication on the chart isn't coded as a product the clinic orders. Decline the request with a message, so the patient knows, and write a new order from the chart.</p>
     }
     <form method="post" asp-page-handler="Decline" class="sc-form" data-refill-decline>
         @if (Model.Error is not null)
