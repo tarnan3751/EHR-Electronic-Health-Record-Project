@@ -339,7 +339,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
     internal static string LinkTo(string html, string path) =>
         System.Text.RegularExpressions.Regex.Match(html, $"<a [^>]*href=\"{System.Text.RegularExpressions.Regex.Escape(path)}\"[^>]*>").Value;
 
-    static int CountOf(string text, string part) => (text.Length - text.Replace(part, "", StringComparison.Ordinal).Length) / part.Length;
+    internal static int CountOf(string text, string part) => (text.Length - text.Replace(part, "", StringComparison.Ordinal).Length) / part.Length;
 
     // TC-UC13-11: Dismiss decides a proposal once, with nothing written to the chart: the review shows it dismissed, with
     // when, and the cursor goes to the next one waiting; dismissing it again changes nothing; a form opened before it was
