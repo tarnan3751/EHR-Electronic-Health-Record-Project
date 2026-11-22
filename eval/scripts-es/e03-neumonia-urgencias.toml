@@ -1,0 +1,60 @@
+id = "e03-neumonia-urgencias"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "vitals", "decimal-comma", "units", "frequency", "routes", "sides", "negation", "certainty", "self-correction", "drug-name-differs"]
+noise = ["babble"]
+dates = []
+drugs = ["amoxicilina", "paracetamol"]
+drugs_en = ["amoxicillin", "acetaminophen"]
+retracted = ["500 mg"]
+negated = ["hemoptysis"]
+affirmed = ["productive cough", "fever"]
+text = """
+Mujer de [[45|cuarenta y cinco]] años que acude a urgencias por tos productiva y fiebre de [[3|tres]] días. Refiere
+dolor pleurítico en el costado derecho. Niega hemoptisis. En la exploración, temperatura [[38,9|treinta y ocho coma
+nueve]] grados, FC [[104|ciento cuatro]], FR [[24|veinticuatro]], [[SatO2|saturación]] [[92 %|noventa y dos por ciento]] al aire
+ambiente. Crepitantes en la base derecha. Impresión: posible neumonía adquirida en la comunidad. Descartar COVID.
+Plan: amoxicilina [[500 mg|quinientos miligramos]], no, perdón, [[1 g|un gramo]] por vía oral cada [[8|ocho]] horas
+durante [[7|siete]] días. Paracetamol [[1 g|un gramo]] cada [[8|ocho]] horas si hay fiebre. Control en
+[[48|cuarenta y ocho]] horas.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 45 años que acude a urgencias por tos productiva y fiebre de 3 días."]
+english = "45-year-old woman in the emergency department with productive cough and fever for 3 days."
+
+[[gold.subjective]]
+spanish = ["Refiere dolor pleurítico en el costado derecho."]
+english = "Reports pleuritic pain in the right side."
+
+[[gold.subjective]]
+spanish = ["Niega hemoptisis."]
+english = "Denies hemoptysis."
+
+[[gold.objective]]
+spanish = ["temperatura 38,9 grados, FC 104, FR 24, SatO2 92 % al aire ambiente."]
+english = "Temperature 38.9 degrees, HR 104, RR 24, SpO2 92% on room air."
+
+[[gold.objective]]
+spanish = ["Crepitantes en la base derecha."]
+english = "Crackles at the right base."
+
+[[gold.assessment]]
+spanish = ["posible neumonía adquirida en la comunidad."]
+english = "Possible community-acquired pneumonia."
+
+[[gold.assessment]]
+spanish = ["Descartar COVID."]
+english = "Rule out COVID."
+
+[[gold.plan]]
+spanish = ["amoxicilina 500 mg, no, perdón, 1 g por vía oral cada 8 horas durante 7 días."]
+english = "Amoxicillin 1 g by mouth every 8 hours for 7 days."
+
+[[gold.plan]]
+spanish = ["Paracetamol 1 g cada 8 horas si hay fiebre."]
+english = "Acetaminophen 1 g every 8 hours if there is fever."
+
+[[gold.plan]]
+spanish = ["Control en 48 horas."]
+english = "Follow-up in 48 hours."

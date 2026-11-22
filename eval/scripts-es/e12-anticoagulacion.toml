@@ -1,0 +1,59 @@
+id = "e12-anticoagulacion"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "decimal-comma", "units", "frequency", "ambiguous", "self-correction", "negation", "actions", "dates"]
+noise = ["monitor"]
+dates = []
+drugs = ["warfarina", "apixabán"]
+drugs_en = ["warfarin", "apixaban"]
+retracted = ["7 días"]
+negated = ["blood in the urine"]
+affirmed = ["gum bleeding"]
+text = """
+Control de anticoagulación. Mujer de [[76|setenta y seis]] años con fibrilación auricular. Toma warfarina
+[[5 mg|cinco miligramos]] al día. Refiere que ha tenido sangrado de encías al cepillarse. Niega sangre en la orina o en
+las heces. El INR de hoy es de [[3,6|tres coma seis]]. Impresión: fibrilación auricular con INR por encima del rango.
+Plan: omitir la dosis de hoy. Después, warfarina [[5 mg|cinco miligramos]] al día excepto [[2,5 mg|dos coma cinco
+miligramos]] cada tercer día. Repetir INR en [[7|siete]] días, no, espera, en [[5|cinco]] días. Valorar el cambio a
+apixabán en la próxima visita.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 76 años con fibrilación auricular."]
+english = "76-year-old woman with atrial fibrillation."
+
+[[gold.subjective]]
+spanish = ["Toma warfarina 5 mg al día."]
+english = "Takes warfarin 5 mg daily."
+
+[[gold.subjective]]
+spanish = ["Refiere que ha tenido sangrado de encías al cepillarse."]
+english = "Reports gum bleeding when brushing."
+
+[[gold.subjective]]
+spanish = ["Niega sangre en la orina o en las heces."]
+english = "Denies blood in the urine or stool."
+
+[[gold.objective]]
+spanish = ["El INR de hoy es de 3,6."]
+english = "INR today is 3.6."
+
+[[gold.assessment]]
+spanish = ["fibrilación auricular con INR por encima del rango."]
+english = "Atrial fibrillation with INR above range."
+
+[[gold.plan]]
+spanish = ["omitir la dosis de hoy."]
+english = "Hold today's dose."
+
+[[gold.plan]]
+spanish = ["warfarina 5 mg al día excepto 2,5 mg cada tercer día."]
+english = "Warfarin 5 mg daily except 2.5 mg every other day."
+
+[[gold.plan]]
+spanish = ["Repetir INR en 7 días, no, espera, en 5 días."]
+english = "Repeat INR in 5 days."
+
+[[gold.plan]]
+spanish = ["Valorar el cambio a apixabán en la próxima visita."]
+english = "Consider switching to apixaban at the next visit."

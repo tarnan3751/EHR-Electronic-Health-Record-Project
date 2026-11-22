@@ -1,0 +1,62 @@
+id = "e06-rodilla-izquierda"
+language = "es"
+voice = "em_alex"
+tags = ["numbers", "units", "frequency", "sides", "recombination", "severity", "negation", "actions", "drug-name-differs", "code-switching"]
+noise = ["monitor"]
+dates = []
+drugs = ["paracetamol", "ibuprofeno"]
+drugs_en = ["acetaminophen", "ibuprofen"]
+negated = ["trauma"]
+affirmed = ["knee pain", "effusion"]
+text = """
+Varón de [[67|sesenta y siete]] años con artrosis de ambas rodillas. Refiere dolor en la rodilla izquierda desde hace
+un mes, peor al subir escaleras en el gym. La rodilla derecha está bien. Niega traumatismo. Toma paracetamol
+[[1 g|un gramo]] cada [[8|ocho]] horas. En la exploración, rodilla izquierda con derrame leve y crepitación, rodilla
+derecha sin derrame. Impresión: artrosis de rodilla izquierda con brote inflamatorio. Plan: añadir ibuprofeno
+[[400 mg|cuatrocientos miligramos]] cada [[8|ocho]] horas con comida durante [[5|cinco]] días. Continuar paracetamol.
+Derivar a fisioterapia. Control en [[6|seis]] semanas.
+"""
+
+[[gold.subjective]]
+spanish = ["Varón de 67 años con artrosis de ambas rodillas."]
+english = "67-year-old man with osteoarthritis of both knees."
+
+[[gold.subjective]]
+spanish = ["Refiere dolor en la rodilla izquierda desde hace un mes, peor al subir escaleras en el gym."]
+english = "Reports left knee pain for a month, worse climbing stairs at the gym."
+
+[[gold.subjective]]
+spanish = ["La rodilla derecha está bien."]
+english = "The right knee is fine."
+
+[[gold.subjective]]
+spanish = ["Niega traumatismo."]
+english = "Denies trauma."
+
+[[gold.subjective]]
+spanish = ["Toma paracetamol 1 g cada 8 horas."]
+english = "Takes acetaminophen 1 g every 8 hours."
+
+[[gold.objective]]
+spanish = ["rodilla izquierda con derrame leve y crepitación, rodilla derecha sin derrame."]
+english = "Left knee with mild effusion and crepitus, right knee without effusion."
+
+[[gold.assessment]]
+spanish = ["artrosis de rodilla izquierda con brote inflamatorio."]
+english = "Left knee osteoarthritis with inflammatory flare."
+
+[[gold.plan]]
+spanish = ["añadir ibuprofeno 400 mg cada 8 horas con comida durante 5 días."]
+english = "Add ibuprofen 400 mg every 8 hours with food for 5 days."
+
+[[gold.plan]]
+spanish = ["Continuar paracetamol."]
+english = "Continue acetaminophen."
+
+[[gold.plan]]
+spanish = ["Derivar a fisioterapia."]
+english = "Refer to physical therapy."
+
+[[gold.plan]]
+spanish = ["Control en 6 semanas."]
+english = "Follow-up in 6 weeks."

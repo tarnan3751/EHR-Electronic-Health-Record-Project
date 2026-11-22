@@ -1,0 +1,51 @@
+id = "e04-alergias"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "units", "frequency", "sides", "negation", "certainty", "actions", "allergy-change", "mixed-plan"]
+dates = []
+drugs = ["amoxicilina", "ibuprofeno", "cetirizina"]
+drugs_en = ["amoxicillin", "ibuprofen", "cetirizine"]
+forbidden = ["Agrega la amoxicilina a sus alergias", "Quita el ibuprofeno de su lista de alergias"]
+forbidden_en = ["allergies", "allergy list"]
+negated = ["difficulty breathing", "lip swelling", "mucosal involvement"]
+affirmed = ["hives"]
+text = """
+Consulta por erupción cutánea. Mujer de [[33|treinta y tres]] años que empezó con ronchas en los brazos hace [[2|dos]]
+días, después de tomar amoxicilina. No tiene dificultad para respirar ni hinchazón de labios. Es alérgica a la sulfa
+desde la infancia. Tolera el ibuprofeno sin problema. En la exploración, habones en ambos brazos, sin afectación de
+mucosas. Impresión: urticaria probablemente por amoxicilina. Plan: suspender amoxicilina. Agrega la amoxicilina a sus
+alergias. Quita el ibuprofeno de su lista de alergias. Cetirizina [[10 mg|diez miligramos]] al día durante
+[[5|cinco]] días.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 33 años que empezó con ronchas en los brazos hace 2 días, después de tomar amoxicilina."]
+english = "33-year-old woman who started with hives on the arms 2 days ago, after taking amoxicillin."
+
+[[gold.subjective]]
+spanish = ["No tiene dificultad para respirar ni hinchazón de labios."]
+english = "No difficulty breathing or lip swelling."
+
+[[gold.subjective]]
+spanish = ["Es alérgica a la sulfa desde la infancia."]
+english = "Allergic to sulfa since childhood."
+
+[[gold.subjective]]
+spanish = ["Tolera el ibuprofeno sin problema."]
+english = "Tolerates ibuprofen without problems."
+
+[[gold.objective]]
+spanish = ["habones en ambos brazos, sin afectación de mucosas."]
+english = "Wheals on both arms, no mucosal involvement."
+
+[[gold.assessment]]
+spanish = ["urticaria probablemente por amoxicilina."]
+english = "Urticaria probably due to amoxicillin."
+
+[[gold.plan]]
+spanish = ["suspender amoxicilina."]
+english = "Stop amoxicillin."
+
+[[gold.plan]]
+spanish = ["Cetirizina 10 mg al día durante 5 días."]
+english = "Cetirizine 10 mg daily for 5 days."

@@ -1,0 +1,62 @@
+id = "e14-nino-sano"
+language = "es"
+voice = "am_michael"
+tags = ["numbers", "units", "missing-field", "short"]
+dates = []
+drugs = []
+drugs_en = []
+text = """
+Revisión de niña sana de [[18|dieciocho]] meses. La madre no tiene preocupaciones. Come bien y duerme toda la noche.
+Camina sola y dice unas [[10|diez]] palabras. Va a la guardería desde hace [[2|dos]] meses. No ha tenido enfermedades
+desde la última visita. Peso [[11 kg|once kilos]], talla
+[[81 cm|ochenta y un centímetros]]. Desarrollo adecuado para la edad. Exploración normal. Plan: vacunas de los
+[[18|dieciocho]] meses hoy. Se explica a la madre la alimentación. Próxima revisión a los [[2|dos]] años.
+"""
+
+[[gold.subjective]]
+spanish = ["Revisión de niña sana de 18 meses."]
+english = "Checkup of a healthy 18-month-old girl."
+
+[[gold.subjective]]
+spanish = ["La madre no tiene preocupaciones."]
+english = "Mother has no concerns."
+
+[[gold.subjective]]
+spanish = ["Come bien y duerme toda la noche."]
+english = "Eats well and sleeps through the night."
+
+[[gold.subjective]]
+spanish = ["Camina sola y dice unas 10 palabras."]
+english = "Walks alone and says about 10 words."
+
+[[gold.subjective]]
+spanish = ["Va a la guardería desde hace 2 meses."]
+english = "Has attended daycare for 2 months."
+
+[[gold.subjective]]
+spanish = ["No ha tenido enfermedades desde la última visita."]
+english = "No illnesses since the last visit."
+
+[[gold.objective]]
+spanish = ["Peso 11 kg, talla 81 cm."]
+english = "Weight 11 kg, height 81 cm."
+
+[[gold.objective]]
+spanish = ["Desarrollo adecuado para la edad."]
+english = "Development appropriate for age."
+
+[[gold.objective]]
+spanish = ["Exploración normal."]
+english = "Normal examination."
+
+[[gold.plan]]
+spanish = ["vacunas de los 18 meses hoy."]
+english = "18-month vaccines today."
+
+[[gold.plan]]
+spanish = ["Se explica a la madre la alimentación."]
+english = "Feeding advice given to the mother."
+
+[[gold.plan]]
+spanish = ["Próxima revisión a los 2 años."]
+english = "Next checkup at 2 years."

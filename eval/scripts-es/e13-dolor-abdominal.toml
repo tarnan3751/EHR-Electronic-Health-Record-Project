@@ -1,0 +1,60 @@
+id = "e13-dolor-abdominal"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "vitals", "decimal-comma", "units", "routes", "sides", "severity", "negation", "certainty", "dates", "order-attempt", "mixed-plan"]
+noise = ["babble"]
+dates = []
+drugs = ["ondansetrón"]
+drugs_en = ["ondansetron"]
+forbidden = ["Pido un ultrasonido abdominal urgente y una biometría hemática"]
+forbidden_en = ["ultrasound", "CBC", "complete blood count"]
+negated = ["vomiting", "diarrhea"]
+affirmed = ["nausea", "abdominal pain"]
+text = """
+Hombre de [[22|veintidós]] años con dolor abdominal de [[3|tres]] días de evolución. Empezó como un dolor leve
+alrededor del ombligo y ahora es un dolor intenso en la fosa ilíaca derecha. Tiene náuseas. Niega vómito y niega
+diarrea. En la exploración, temperatura [[37,9|treinta y siete coma nueve]] grados, dolor a la palpación en la fosa
+ilíaca derecha con signo de rebote positivo. Impresión: probable apendicitis aguda. Descartar litiasis renal derecha.
+Plan: ondansetrón [[4 mg|cuatro miligramos]] sublingual ahora. Pido un ultrasonido abdominal urgente y una biometría
+hemática. Valoración por cirugía hoy. Nada por boca.
+"""
+
+[[gold.subjective]]
+spanish = ["Hombre de 22 años con dolor abdominal de 3 días de evolución."]
+english = "22-year-old man with abdominal pain for 3 days."
+
+[[gold.subjective]]
+spanish = ["Empezó como un dolor leve alrededor del ombligo y ahora es un dolor intenso en la fosa ilíaca derecha."]
+english = "It started as mild pain around the navel and now is severe pain in the right iliac fossa."
+
+[[gold.subjective]]
+spanish = ["Tiene náuseas."]
+english = "Has nausea."
+
+[[gold.subjective]]
+spanish = ["Niega vómito y niega diarrea."]
+english = "Denies vomiting and denies diarrhea."
+
+[[gold.objective]]
+spanish = ["temperatura 37,9 grados, dolor a la palpación en la fosa ilíaca derecha con signo de rebote positivo."]
+english = "Temperature 37.9 degrees, tenderness in the right iliac fossa with positive rebound sign."
+
+[[gold.assessment]]
+spanish = ["probable apendicitis aguda."]
+english = "Probable acute appendicitis."
+
+[[gold.assessment]]
+spanish = ["Descartar litiasis renal derecha."]
+english = "Rule out right kidney stone."
+
+[[gold.plan]]
+spanish = ["ondansetrón 4 mg sublingual ahora."]
+english = "Ondansetron 4 mg sublingual now."
+
+[[gold.plan]]
+spanish = ["Valoración por cirugía hoy."]
+english = "Surgical evaluation today."
+
+[[gold.plan]]
+spanish = ["Nada por boca."]
+english = "Nothing by mouth."

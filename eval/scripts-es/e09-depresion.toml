@@ -1,0 +1,56 @@
+id = "e09-depresion"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "units", "frequency", "negation", "certainty", "actions", "spoken-punctuation"]
+dates = []
+drugs = ["sertralina"]
+drugs_en = ["sertraline"]
+negated = ["suicidal ideation", "alcohol use"]
+affirmed = ["improvement in mood"]
+text = """
+Seguimiento de depresión. {punto y aparte} Mujer de [[29|veintinueve]] años en tratamiento con sertralina
+[[50 mg|cincuenta miligramos]] al día desde hace [[6|seis]] semanas. Refiere mejoría parcial del ánimo y del sueño. Ha vuelto a trabajar a media jornada. No
+tiene ideas suicidas. Niega consumo de alcohol. {punto y aparte} [[PHQ-9|P H Q nueve]] de [[12|doce]], previamente [[18|dieciocho]].
+{punto y aparte} Impresión: probable trastorno depresivo mayor en remisión parcial. {punto y aparte} Plan: aumentar
+sertralina a [[100 mg|cien miligramos]] al día. Psicoterapia semanal. Control en [[4|cuatro]] semanas.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 29 años en tratamiento con sertralina 50 mg al día desde hace 6 semanas."]
+english = "29-year-old woman on sertraline 50 mg daily for 6 weeks."
+
+[[gold.subjective]]
+spanish = ["Refiere mejoría parcial del ánimo y del sueño."]
+english = "Reports partial improvement in mood and sleep."
+
+[[gold.subjective]]
+spanish = ["Ha vuelto a trabajar a media jornada."]
+english = "She has gone back to work half-time."
+
+[[gold.subjective]]
+spanish = ["No tiene ideas suicidas."]
+english = "No suicidal ideation."
+
+[[gold.subjective]]
+spanish = ["Niega consumo de alcohol."]
+english = "Denies alcohol use."
+
+[[gold.objective]]
+spanish = ["PHQ-9 de 12, previamente 18."]
+english = "PHQ-9 of 12, previously 18."
+
+[[gold.assessment]]
+spanish = ["probable trastorno depresivo mayor en remisión parcial."]
+english = "Probable major depressive disorder in partial remission."
+
+[[gold.plan]]
+spanish = ["aumentar sertralina a 100 mg al día."]
+english = "Increase sertraline to 100 mg daily."
+
+[[gold.plan]]
+spanish = ["Psicoterapia semanal."]
+english = "Weekly psychotherapy."
+
+[[gold.plan]]
+spanish = ["Control en 4 semanas."]
+english = "Follow-up in 4 weeks."

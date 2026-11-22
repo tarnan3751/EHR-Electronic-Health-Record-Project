@@ -1,0 +1,58 @@
+id = "e02-dm2-metformina"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "decimal-comma", "units", "frequency", "actions", "self-correction", "experiencer", "severity"]
+dates = []
+drugs = ["metformina", "semaglutida"]
+drugs_en = ["metformin", "semaglutide"]
+retracted = ["0,5 mg"]
+affirmed = ["polyuria"]
+family = [["type 2 diabetes", "mother"]]
+text = """
+Paciente de [[58|cincuenta y ocho]] años con diabetes tipo [[2|dos]]. Toma metformina [[850 mg|ochocientos cincuenta
+miligramos]] dos veces al día. Refiere poliuria leve. Su madre tiene diabetes tipo [[2|dos]]. Hemoglobina glucosilada
+de [[8,4|ocho coma cuatro]] por ciento. Peso [[96 kg|noventa y seis kilos]]. Impresión: diabetes tipo [[2|dos]] mal
+controlada. Plan: continuar metformina [[850 mg|ochocientos cincuenta miligramos]] dos veces al día. Agregar
+semaglutida [[0,5 mg|cero coma cinco miligramos]] semanal, no, perdón, [[0,25 mg|cero coma veinticinco miligramos]]
+semanal durante el primer mes. Control en [[3|tres]] meses.
+"""
+
+[[gold.subjective]]
+spanish = ["Paciente de 58 años con diabetes tipo 2."]
+english = "58-year-old patient with type 2 diabetes."
+
+[[gold.subjective]]
+spanish = ["Toma metformina 850 mg dos veces al día."]
+english = "Takes metformin 850 mg twice a day."
+
+[[gold.subjective]]
+spanish = ["Refiere poliuria leve."]
+english = "Reports mild polyuria."
+
+[[gold.subjective]]
+spanish = ["Su madre tiene diabetes tipo 2."]
+english = "Her mother has type 2 diabetes."
+
+[[gold.objective]]
+spanish = ["Hemoglobina glucosilada de 8,4 por ciento."]
+english = "Hemoglobin A1c 8.4 percent."
+
+[[gold.objective]]
+spanish = ["Peso 96 kg."]
+english = "Weight 96 kg."
+
+[[gold.assessment]]
+spanish = ["diabetes tipo 2 mal controlada."]
+english = "Type 2 diabetes poorly controlled."
+
+[[gold.plan]]
+spanish = ["continuar metformina 850 mg dos veces al día."]
+english = "Continue metformin 850 mg twice a day."
+
+[[gold.plan]]
+spanish = ["Agregar semaglutida 0,5 mg semanal, no, perdón, 0,25 mg semanal durante el primer mes."]
+english = "Add semaglutide 0.25 mg weekly for the first month."
+
+[[gold.plan]]
+spanish = ["Control en 3 meses."]
+english = "Follow-up in 3 months."
