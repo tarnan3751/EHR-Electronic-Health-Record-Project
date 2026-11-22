@@ -195,10 +195,6 @@ internal static partial class RenderBenchmark
                 // allergy form opened from them; and its editor, which says they wait. A generator of its own.
                 var proposed = await DictateProposalsAsync(app, clinicianId, noted);
                 results.AddRange(await MeasureProposalsAsync(client, times, "", proposed));
-                // The review of a dictation (UC 13), in English and, since the expansion plan's step 17, in Spanish, each
-                // English sentence beside the Spanish it was translated from. A generator of its own, as above.
-                var reviewed = await StageReviewsAsync(app, clinicianId, noted);
-                results.AddRange(await MeasureReviewsAsync(client, times, "", reviewed));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -280,16 +276,23 @@ internal static partial class RenderBenchmark
                     }
                     results.Add(await MeasureAsync(portal, times, "Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
 
+                    // The review of a dictation (UC 13), in English and, since the expansion plan's step 17, in Spanish, each
+                    // English sentence beside the Spanish it was translated from: staged on new drafts of the patients with
+                    // signed notes only after every row that reads those patients' drafts, on-site and off-site, so that no
+                    // row's data changes; then measured on-site here, and off-site as the last of the off-site rows.
                     if (database is null)
                     {
                         Console.WriteLine("Off-site: not measured with --stack, which has no ehr_read login for the replica.");
                         Console.WriteLine("The lab's door: not measured with --stack, whose lab key is in the stack's .env alone.");
+                        results.AddRange(await MeasureReviewsAsync(client, times, "", await StageReviewsAsync(app, clinicianId, noted)));
                     }
                     else
                     {
                         await SettleAsync(database);
-                        results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills, forms, drafted, proposed, reviewed));
+                        var (offSite, reviewed) = await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
+                            refills, forms, drafted, proposed, () => StageReviewsAsync(app, clinicianId, noted));
+                        results.AddRange(offSite);
+                        results.AddRange(await MeasureReviewsAsync(client, times, "", reviewed));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -478,11 +481,11 @@ internal static partial class RenderBenchmark
 
     // UC 2 (Tahseen Arnan): the same requests to the cloud app, with the on-site session's cookies, during an outage. Its
     // audit queue goes in a folder of its own, deleted at the end.
-    static async Task<List<Result>> MeasureOffSiteAsync(
+    static async Task<(List<Result> Results, List<Reviewed> Reviewed)> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
         CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms,
-        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, List<Reviewed> reviewed)
+        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, Func<Task<List<Reviewed>>> stageReviews)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -536,7 +539,6 @@ internal static partial class RenderBenchmark
                 var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
                 return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
             }));
-            results.AddRange(await MeasureReviewsAsync(client, times, "Off-site, ", reviewed));
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
             // A dictation's proposals (step 15), read from the cloud copy: opening or dismissing one says why it can't.
             results.AddRange(await MeasureProposalsAsync(client, times, "Off-site, ", proposed));
@@ -563,7 +565,10 @@ internal static partial class RenderBenchmark
             using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
             results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
-            return results;
+            // Last: the dictation reviews, staged now, after every row that reads those patients' drafts.
+            var reviewed = await stageReviews();
+            results.AddRange(await MeasureReviewsAsync(client, times, "Off-site, ", reviewed));
+            return (results, reviewed);
         }
         finally
         {
