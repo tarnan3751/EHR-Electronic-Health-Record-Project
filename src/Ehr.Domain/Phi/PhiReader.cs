@@ -311,12 +311,18 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
             .Where(a => a.PatientId == id && a.ClinicalStatus == AllergyClinicalStatus.Active)
             .OrderBy(a => a.Criticality == AllergyCriticality.High ? 0 : 1).ThenBy(a => a.Display).ThenBy(a => a.Id);
 
-    // A patient's active orders, of one catalog item or of all, newest first, with only the fields that are shown:
-    // just the one order, or all but one, when asked.
+    // A patient's active orders, of one product or of all, newest first, with only the fields that are shown: just the
+    // one order, or all but one, when asked. The same product is the signing trigger's (60-orders.sql): the same catalog
+    // item or, for a medication, another item for the same RxNorm product, such as the clinic's common item and
+    // RxNorm's own, so the form warns of what the database would refuse without a reason.
     IQueryable<ActiveOrder> ActiveOrders(Guid id, string? catalogCode, Guid? only = null, Guid? except = null) =>
         from order in db.Orders.AsNoTracking()
         join item in db.OrderCatalogItems on order.CatalogCode equals item.Code
-        where order.PatientId == id && order.Status == OrderStatus.Active && (catalogCode == null || order.CatalogCode == catalogCode)
+        where order.PatientId == id && order.Status == OrderStatus.Active
+            && (catalogCode == null || order.CatalogCode == catalogCode
+                || (item.Type == OrderType.Medication && item.StandardSystem == ClinicalCodeSystem.RxNorm
+                    && db.OrderCatalogItems.Any(chosen => chosen.Code == catalogCode && chosen.Type == OrderType.Medication
+                        && chosen.StandardSystem == ClinicalCodeSystem.RxNorm && chosen.StandardCode == item.StandardCode)))
             && (only == null || order.Id == only) && (except == null || order.Id != except)
         orderby order.SignedAt descending, order.Id
         select new ActiveOrder(order.Id, order.Type, item.Display, order.Details, order.SignedAt);

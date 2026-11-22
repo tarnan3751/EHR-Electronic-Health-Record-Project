@@ -15,8 +15,8 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 // UC 1 Place an order (Tahseen Arnan). The order form: the patient's name and allergies at the top, one recorded read
 // through the PHI reader; the type, picked by link; the item, suggested from the type's catalog as the clinician types
 // (a datalist); and the type's details, the required ones marked. "Sign order" checks for missing fields and for an
-// active order of the same item, which needs a reason; the database checks the duplicate again, under a lock, sets the
-// signer and the time, and records the write. Then the chart confirms the order and lists it. Cancel is a link back to
+// active order of the same product (the same item, or another item for the same RxNorm medication), which needs a
+// reason; the database checks the duplicate again, under a lock, sets the signer and the time, and records the write. Then the chart confirms the order and lists it. Cancel is a link back to
 // the chart, which saves nothing.
 //
 // Changing an order is this form too (?replaces=<order>): a signed order is never edited, so the form opens filled with

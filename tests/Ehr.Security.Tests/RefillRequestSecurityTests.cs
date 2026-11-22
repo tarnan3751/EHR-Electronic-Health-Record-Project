@@ -861,4 +861,26 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         Assert.Equal(["lisinopril 10 MG Oral Tablet"], await Accounts.QueryAsync(App, account,
             "SELECT medication_display FROM ehr.portal_refill_requests(5) WHERE status = 'requested'"));
     }
+
+    // The second review's probe: with the clinic's own item for lisinopril 10 mg on order (SYN-MED-001), approving a
+    // lisinopril request with RxNorm's item for the same product (314076) signed a second lisinopril 10 mg order with no
+    // reason. The two items are one product (60-orders.sql), so the approval needs the duplicate's reason, as any order
+    // does.
+    [Fact]
+    public async Task Approving_beside_the_clinics_own_item_for_the_product_needs_the_duplicates_reason()
+    {
+        var (clinician, patient, account) = await OnPanelAsync();
+        await RunAsync(clinician,
+            "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (gen_random_uuid(), @patient, 'medication', 'SYN-MED-001', '{}', 'active')",
+            ("patient", patient));
+        var request = await AskAsync(account, patient, await MedicationAsync(patient));
+
+        await RefusedAsync(PostgresErrorCodes.UniqueViolation, () => ApproveAsync(clinician, patient, request));
+        Assert.Equal(["requested"], await AsSuperuserAsync("SELECT status FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+
+        Assert.Equal(2, await ApproveAsync(clinician, patient, request, duplicateReason: "Synthetic: renewal of the current prescription."));
+        Assert.Equal(["completed|Synthetic: renewal of the current prescription."], await AsSuperuserAsync(
+            "SELECT r.status || '|' || o.duplicate_reason FROM ehr.refill_requests r JOIN ehr.orders o ON o.id = r.order_id WHERE r.id = @id",
+            ("id", request)));
+    }
 }
