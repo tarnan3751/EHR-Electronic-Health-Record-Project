@@ -273,10 +273,23 @@ HELD_BACK = [
     "Order a CBC she said.",
     "Order a CBC because her mother asked.",
     "Add penicillin to your allergies.",
+    # A sentence of four words or fewer after it that points back at it, which may take it back in words the rules
+    # can't read: a retraction misheard, or said some other way.
+    "Order a urine culture. Scrach that. Recheck in two weeks.",
+    "Refill her metformin. Canncel it.",
+    "Add penicillin to her allergy list. Dropp that one.",
+    "Order a CBC and a BMP. Not those.",
+    "Order a CBC. Not that one.",
+    "Order a CBC. Labs go with that.",
 ]
 
 # Plain, as the review's own controls: proposed, these words.
 CONTROLS = [
+    # A sentence after it that points back at it in five words or more, or doesn't point back at all, leaves it plain.
+    ("Order a CBC. The labs go with that.", ["Order a CBC"]),
+    ("Order a CBC. It should be fasting today please.", ["Order a CBC"]),
+    ("Order a CBC. Thanks.", ["Order a CBC"]),
+    ("Order a CBC. Recheck in one week.", ["Order a CBC"]),
     ("There is no fever, chest pain, or shortness of breath. Order a CBC.", ["Order a CBC"]),
     ("Add penicillin as an allergy.", ["Add penicillin as an allergy"]),
     ("Add an allergy to codeine.", ["Add an allergy to codeine"]),

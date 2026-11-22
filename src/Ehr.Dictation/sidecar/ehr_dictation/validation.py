@@ -45,8 +45,9 @@ sentence accounted for:
   after "because" may have its own subject ("because he has felt run down");
 - an allergy to add names a substance of one to five words, not a note, a reaction or "that", on her, his, their or
   the list ("your" list, said to the software, is no patient's);
-- it doesn't come right after a sentence of a few words that is a bare negation or doubt ("No.", "Not today.", "I'm
-  not sure.").
+- it doesn't come right after a sentence of four words or fewer that is a bare negation or doubt ("No.", "Not
+  today.", "I'm not sure."), nor right before one that points back at it (that, it, this, these, those, them), which
+  may take it back in words the rules can't read: "Skip that." heard as "Sskip that.", "Not that one.".
 Every rule below holds it back too, a second layer, and weigh() names the first that applies (HELD_BACK): not_final (the transcript isn't final yet); to_the_software (its
 sentence tells the software to ignore, disregard or forget its rules, instructions or directions, calls on it
 ("Assistant, ...", "Dear model, ..."), or is a note to the assistant, the AI or the system); mixed_kinds (an order and an allergy change run together); not_an_addition (an orders section, or an allergy
@@ -1281,6 +1282,7 @@ def _is_content(word: str) -> bool:
 
 MAX_PROPOSALS = 20  # at most, in one dictation, as the on-prem app stages them
 TAKEN_BACK_REACH = 25  # at most, words after an instruction in which taking it back holds it back
+BARE_SENTENCE = 4  # at most, words in a sentence right before or after a plain instruction that bears on it alone
 # Why a listed instruction isn't proposed, in the order the rules are tried: the first that applies is the one given.
 HELD_BACK = (
     "not_final", "to_the_software", "mixed_kinds", "not_an_addition", "negated", "hedged", "for_later", "taken_back",
@@ -1486,6 +1488,8 @@ _NOT_PLAIN_BEFORE = (
     | _PEOPLE | _SOFTWARE
 )
 _OPENING_CONDITIONS = _CONDITIONS - {"event", "case", "otherwise"}
+# Words that point back at what was just said.
+_POINTS_BACK = frozenset("that it this these those them".split())
 # A step of the plan said with its verb, which an instruction may follow after a comma alone; and what may come before
 # that verb.
 _PLAN_STEPS = frozenset(
@@ -1542,9 +1546,14 @@ def _plain(text: str, sentence: int, sentence_end: int, start: int, at: int, kin
         return False
     # Nor right after a bare negation or doubt, a sentence of a few words: "No. Order a CBC", "I'm not sure. Order ...".
     previous = tokens(text[max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, max(sentence - 1, 0))), default=0) : sentence])
-    if previous and len(previous) <= 4 and any(
+    if previous and len(previous) <= BARE_SENTENCE and any(
         token.text in {"no", "not", "nothing", "none", "never", "sure"} | _HEDGES or token.text.endswith("n't") for token in previous
     ):
+        return False
+    # Nor right before a sentence of a few words that points back at it, which may take it back in words the rules
+    # can't read: "Order a sed rate. Sskip that." (a retraction misheard), "Order a CBC. Not that one."
+    following = tokens(text[sentence_end + 1 : _sentence_end(text, sentence_end + 1)]) if sentence_end < len(text) else []
+    if following and len(following) <= BARE_SENTENCE and any(_bare(token.text) in _POINTS_BACK for token in following):
         return False
 
     # From the verb to the end of the sentence: no clause after it, nothing but the instruction's own words.
