@@ -93,8 +93,9 @@ CODE_SHA256 = code_sha256()
 
 # For the eval: the files that check a proposal, which re-scoring stored answers may change (eval/ehr_eval/rescore.py),
 # and those that make the transcript and the model's answer, which it may not. Neither are the HTTP layer (api.py),
-# which the eval doesn't go through, or this file, since results record the models' own hashes.
-CHECKS = ("validation.py", "textnorm.py")
+# which the eval doesn't go through, or this file, since results record the models' own hashes. The checks of a Spanish
+# dictation (the expansion plan's step 17) are checks too.
+CHECKS = ("validation.py", "textnorm.py", "spanish.py", "translation.py", "drugnames.py")
 CHECKS_CODE_SHA256 = code_sha256(names=CHECKS)
 PIPELINE_CODE_SHA256 = code_sha256(
     names=[path.name for path in PACKAGE.glob("*.py") if path.name not in {*CHECKS, "api.py", "provenance.py"}]
