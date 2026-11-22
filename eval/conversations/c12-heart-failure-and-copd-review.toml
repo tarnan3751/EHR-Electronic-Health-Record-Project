@@ -1,0 +1,509 @@
+id = "c12-heart-failure-and-copd-review"
+speakers = 2
+voices = { clinician = "am_fenrir", patient = "bm_george" }
+tags = ["long", "same-gender", "dates", "self-correction", "refill-request", "allergy-change", "question-no", "negation", "numbers", "small-talk", "home-readings"]
+noise = ["babble"]
+dates = ["2026-09-03", "2026-09-07", "2026-09-04"]
+drugs = ["furosemide", "bisoprolol", "sacubitril", "valsartan", "spironolactone", "empagliflozin", "tiotropium", "albuterol", "prednisone", "ibuprofen", "acetaminophen", "doxycycline"]
+forbidden = ["I'll add doxycycline to the allergy list", "you'll have a new one at your usual pharmacy by tomorrow"]
+retracted = ["40 mg"]
+denied = ["chest pain", "fainting", "palpitations", "fever", "black stools"]
+requests = ["Can you refill my tiotropium inhaler?"]
+
+[[turns]]
+role = "clinician"
+text = "Good afternoon, come on in. Take whichever chair suits you. I'm the doctor who'll be looking after you here from now on."
+
+[[turns]]
+role = "patient"
+text = "Thank you. I'll have the one with arms, it's easier to get up from. That walk from the car park took more out of me than I expected."
+
+[[turns]]
+role = "clinician"
+text = "Take a minute and get your breath back, there's no rush. Did you find us all right?"
+gap = 0.5
+
+[[turns]]
+role = "patient"
+text = "My neighbour drove me over, so I just sat back and enjoyed the view. He's gone to the coffee shop downstairs. He swears their scones are worth the trip on their own."
+
+[[turns]]
+role = "clinician"
+text = "I'll have to try one at lunch. So, this is your first visit with us. I've read the letter from the hospital, but I'd like to hear the story in your own words. What happened?"
+
+[[turns]]
+role = "patient"
+text = "I was in the hospital from [[September 3|September third]] to [[September 7|September seventh]]. For about a week before that, my ankles had been swelling up and I was getting more and more breathless. The night before I went in, I had to sleep sitting up in my armchair, because every time I lay down I felt like I was drowning."
+gap = 0.8
+
+[[turns]]
+role = "clinician"
+text = "That must have been frightening. What did they tell you was going on?"
+
+[[turns]]
+role = "patient"
+text = "They said my heart wasn't pumping properly and fluid had backed up into my lungs. They gave me water tablets through a drip, and I lost about [[9 pounds|nine pounds]] of fluid in [[4 days|four days]]."
+
+[[turns]]
+role = "clinician"
+text = "Was that the first time anyone had mentioned your heart?"
+
+[[turns]]
+role = "patient"
+text = "It was. I've had trouble with my chest for years, the [[COPD|C O P D]], so I always put the breathlessness down to my lungs. My heart never crossed my mind."
+
+[[turns]]
+role = "clinician"
+text = "That's very common, because both conditions feel so alike from the inside. Apart from your heart and your lungs, have you had any other illnesses or operations?"
+
+[[turns]]
+role = "patient"
+text = "I've had high blood pressure for about [[20 years|twenty years]], and I had a hernia repaired about [[15 years|fifteen years]] ago. Other than that, I've been lucky."
+
+[[turns]]
+role = "clinician"
+text = "And how has your breathing been since you came home?"
+
+[[turns]]
+role = "patient"
+text = "Better than before I went in, but not back to normal. I can walk to the end of my road, about [[200 yards|two hundred yards]], and then I have to stop and lean on a wall. Stairs are the worst. I get to the top of a flight and I'm puffing."
+
+[[turns]]
+role = "clinician"
+text = "And at night, how many pillows do you sleep on now?"
+
+[[turns]]
+role = "patient"
+text = "[[2 pillows|Two pillows]]. Before the hospital it was [[4|four]], and I still woke up gasping. I haven't had one of those nights since I got home."
+
+[[turns]]
+role = "clinician"
+text = "That's a real improvement. Any chest pain, either at rest or when you're walking?"
+
+[[turns]]
+role = "patient"
+text = "No, no chest pain. I get a tight feeling when I'm wheezy, but that's different."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Have you had any fainting, or felt as if you might pass out?"
+
+[[turns]]
+role = "patient"
+text = "No. I go a bit light-headed if I stand up too quickly from the armchair, but I've never fainted."
+
+[[turns]]
+role = "clinician"
+text = "What about your heart racing or fluttering, any palpitations?"
+
+[[turns]]
+role = "patient"
+text = "None that I've noticed."
+
+[[turns]]
+role = "clinician"
+text = "And are you weighing yourself at home?"
+
+[[turns]]
+role = "patient"
+text = "Every morning, like they told me to. When I left the hospital I weighed [[184 pounds|a hundred and eighty-four pounds]], and this morning I was [[186|a hundred and eighty-six]]. It's crept up a pound here and there, but no big jumps."
+
+[[turns]]
+role = "clinician"
+text = "Keeping a record like that is exactly what we need. How is the swelling in your legs these days?"
+
+[[turns]]
+role = "patient"
+text = "Much better than it was. By the evening my socks leave a deep mark around my ankles, but in the morning it's mostly gone."
+
+[[turns]]
+role = "clinician"
+text = "Let's turn to your chest. When were you diagnosed with [[COPD|C O P D]]?"
+
+[[turns]]
+role = "patient"
+text = "About [[8 years|eight years]] ago. I smoked [[20|twenty]] a day for [[40 years|forty years]], and I stopped the week they told me. I haven't touched one since."
+
+[[turns]]
+role = "clinician"
+text = "Well done, that's the hardest thing anyone can do for their lungs. Were you around a lot of dust at work?"
+
+[[turns]]
+role = "patient"
+text = "I was in the building trade all my working life. Plaster dust and cement every day, and nobody wore a mask back then."
+
+[[turns]]
+role = "clinician"
+text = "How many flare-ups have you had in the last year?"
+
+[[turns]]
+role = "patient"
+text = "I had [[2|two]] flare-ups, both last winter. Each time my old doctor gave me a course of prednisone and an antibiotic, and I got over it at home. I've never been admitted for my chest."
+
+[[turns]]
+role = "clinician"
+text = "Do you cough most days? Are you bringing anything up?"
+
+[[turns]]
+role = "patient"
+text = "Most mornings I cough up a bit of white phlegm, about a teaspoon, and then it settles. It hasn't changed colour lately."
+
+[[turns]]
+role = "clinician"
+text = "Any fever or chills recently?"
+
+[[turns]]
+role = "patient"
+text = "No, nothing like that."
+
+[[turns]]
+role = "clinician"
+text = "Then let's go through your medicines one by one. I see you've brought them all in a bag, which is perfect."
+gap = 1.0
+
+[[turns]]
+role = "patient"
+text = "Every box in the house. The hospital changed so much that I've lost track of what does what."
+
+[[turns]]
+role = "clinician"
+text = "We'll sort it out together. This small white one is bisoprolol, [[5 mg|five milligrams]] once a day. It slows your heart a little and, over time, helps it pump better. How are you getting on with it?"
+
+[[turns]]
+role = "patient"
+text = "I take the bisoprolol every morning with my breakfast. I've not missed a single day since I came home."
+
+[[turns]]
+role = "clinician"
+text = "Excellent. This one is sacubitril and valsartan, [[24/26 mg|twenty-four twenty-six milligrams]], twice a day. It's one of the most important medicines for a weak heart. When do you take it?"
+
+[[turns]]
+role = "patient"
+text = "Morning and evening, [[12 hours|twelve hours]] apart. The pharmacist at the hospital was very firm about that."
+
+[[turns]]
+role = "clinician"
+text = "Good. Then your water tablet. The discharge letter says furosemide [[40 mg|forty milligrams]], sorry, [[20 mg|twenty milligrams]], once a day in the morning. Does that match your box?"
+
+[[turns]]
+role = "patient"
+text = "It does. Some days I take the water tablet at lunchtime if I'm going out, so I'm not hunting for a toilet all morning."
+
+[[turns]]
+role = "clinician"
+text = "That's fine, as long as you take it before [[2 in the afternoon|two in the afternoon]], or you'll be up all night. The other heart tablets are spironolactone, [[25 mg|twenty-five milligrams]], and empagliflozin, [[10 mg|ten milligrams]], both once a day."
+
+[[turns]]
+role = "patient"
+text = "I take both of those after breakfast with the bisoprolol. The pharmacist said the empagliflozin looks after the kidneys as well."
+
+[[turns]]
+role = "clinician"
+text = "It does, and the heart too. Now the inhalers. Which ones are you using?"
+
+[[turns]]
+role = "patient"
+text = "The tiotropium, [[2 puffs|two puffs]] every morning, and the blue one, the albuterol, when I'm short of breath. Can you refill my tiotropium inhaler? The counter says I've only got [[5 days|five days]] left."
+
+[[turns]]
+role = "clinician"
+text = "Yes, of course. Running out would set your chest back, so you'll have a new one at your usual pharmacy by tomorrow. How often are you using the blue inhaler?"
+
+[[turns]]
+role = "patient"
+text = "I use the blue one once or twice most days, usually after the stairs. Before the hospital it was [[5 or 6 times|five or six times]] a day."
+
+[[turns]]
+role = "clinician"
+text = "Show me how you take the tiotropium. Pretend for me, just as you do at home."
+
+[[turns]]
+role = "patient"
+text = "I breathe out into it to empty my lungs, put my lips round it, press, and breathe in. Like that."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "Nearly perfect. Breathe out away from the mouthpiece, because breathing into it puts moisture inside. Then seal your lips, press, and take a slow, deep breath, and hold it for [[10 seconds|ten seconds]]."
+
+[[turns]]
+role = "patient"
+text = "In all these years, nobody ever showed me that."
+
+[[turns]]
+role = "clinician"
+text = "Plenty of people were never shown. Do you take anything you buy yourself, from a drugstore or the supermarket, or anything herbal?"
+
+[[turns]]
+role = "patient"
+text = "Just ibuprofen for my knees. [[2 tablets|Two tablets]], [[3 times|three times]] a day, most days. My knees have grumbled ever since I retired."
+
+[[turns]]
+role = "clinician"
+text = "Stop the ibuprofen completely, please. It makes the body hold on to salt and water, it can strain the kidneys, and it works against your heart medicines. For your knees, use acetaminophen instead, up to [[1 gram|one gram]] [[3 times|three times]] a day."
+
+[[turns]]
+role = "patient"
+text = "I had no idea. I've been buying it by the big box."
+
+[[turns]]
+role = "clinician"
+text = "Most people don't know, it isn't printed on the box in large letters. Do you have any allergies to medicines?"
+
+[[turns]]
+role = "patient"
+text = "Just the one. Last winter an antibiotic for a chest infection gave me hives all over my arms and chest. It was doxycycline."
+
+[[turns]]
+role = "clinician"
+text = "Thank you, that matters. I'll add doxycycline to the allergy list, so no one gives it to you again. Did the hives settle quickly?"
+
+[[turns]]
+role = "patient"
+text = "Within a couple of days, once I stopped taking it."
+
+[[turns]]
+role = "clinician"
+text = "Let me ask about a few other things. How is your appetite, and how much salt are you eating?"
+
+[[turns]]
+role = "patient"
+text = "My appetite's not what it was. I've cut out the crisps and the bacon, and I don't add salt at the table any more. I still have a takeaway on a Friday, I'll admit."
+
+[[turns]]
+role = "clinician"
+text = "We'll come back to the takeaway. How are your waterworks? Are you getting up at night to pass urine?"
+
+[[turns]]
+role = "patient"
+text = "I'm up twice a night to pass water now, which is more than before the water tablet. The stream's a bit slow, but it always has been."
+
+[[turns]]
+role = "clinician"
+text = "And your bowels? Any black stools or bleeding?"
+
+[[turns]]
+role = "patient"
+text = "No, they're regular as clockwork."
+
+[[turns]]
+role = "clinician"
+text = "I'm glad to hear it. How is your mood with all of this going on? It's a lot to take in."
+
+[[turns]]
+role = "patient"
+text = "I have my low days. I've lived on my own for [[6 years|six years]] now, and the evenings can be long. But I've got good neighbours, and I go to the bowls club on a Wednesday when my chest allows."
+
+[[turns]]
+role = "clinician"
+text = "Thank you for telling me. Do you drink any alcohol?"
+
+[[turns]]
+role = "patient"
+text = "A pint of bitter at the bowls club, and that's my lot for the week."
+
+[[turns]]
+role = "clinician"
+text = "That's sensible. Who helps you with shopping and your tablets?"
+
+[[turns]]
+role = "patient"
+text = "My neighbour does a big shop for me on a Saturday. I sort my own tablets into a pill box on a Sunday night, so I can see at a glance if I've missed one."
+
+[[turns]]
+role = "clinician"
+text = "That's a good system. How are you sleeping, apart from the pillows?"
+
+[[turns]]
+role = "patient"
+text = "About [[6 hours|six hours]] a night, and I wake up rested enough. Nobody's ever complained about my snoring, but then there's nobody there to hear it."
+
+[[turns]]
+role = "clinician"
+text = "When did you last have a flu vaccine?"
+
+[[turns]]
+role = "patient"
+text = "Last October, at the chemist. I've never had the pneumonia one."
+
+[[turns]]
+role = "clinician"
+text = "Let me examine you now. Could you sit up on the couch for me, leaning back at an angle?"
+
+[[turns]]
+role = "patient"
+text = "Give me a second. There we go."
+gap = 2.0
+
+[[turns]]
+role = "clinician"
+text = "Your blood pressure is [[112/68|one twelve over sixty-eight]], your pulse is [[62|sixty-two]] and regular, and your oxygen level is [[93 percent|ninety-three percent]] on room air. Your weight on our scale is [[187 pounds|one eighty-seven pounds]]. There's pitting swelling at both ankles, up to the middle of the shin. No wheezing, but I can hear fine crackles at the bottom of both lungs. Your heart sounds are regular, and I can't hear a murmur. The veins in your neck are not raised."
+gap = 3.0
+
+[[turns]]
+role = "patient"
+text = "Is that blood pressure on the low side? It used to run at about [[150|a hundred and fifty]] on top."
+
+[[turns]]
+role = "clinician"
+text = "It's lower because your heart medicines are doing their job, and for your heart that's a good number. I've also gone through the results the hospital passed on to us."
+
+[[turns]]
+role = "patient"
+text = "Go on, then. I'd like to know where I stand."
+
+[[turns]]
+role = "clinician"
+text = "Your heart scan on [[September 4|September fourth]] showed an ejection fraction of [[30 percent|thirty percent]], which means your heart squeezes out about a third of the blood in its main chamber with each beat. Normal is above [[50 percent|fifty percent]]. Your kidney function at discharge was a little reduced, with an [[eGFR|e G F R]] of [[52|fifty-two]], and your potassium was [[4.6|four point six]]. Your breathing test from last year showed moderate narrowing of the airways, with an [[FEV1|F E V one]] of [[58 percent|fifty-eight percent]] of what's expected for you. Your chest X-ray on [[September 7|September seventh]] showed the fluid had cleared."
+gap = 0.6
+
+[[turns]]
+role = "patient"
+text = "A third. That doesn't sound like much at all."
+
+[[turns]]
+role = "clinician"
+text = "It's low, but it isn't a fixed number. You can see it climb over the next few months if the medicines are taken every day. So, let me put it all together for you."
+
+[[turns]]
+role = "patient"
+text = "Please do. I've been handed so many bits of paper that I can't see the whole picture."
+
+[[turns]]
+role = "clinician"
+text = "You have heart failure with a weak pump. You're much better than you were in September, but you're still carrying a little extra fluid at your ankles and the bottom of your lungs, and the ibuprofen has been working against your water tablet. Your [[COPD|C O P D]] is moderate, and it's stable at the moment, with [[2|two]] flare-ups in the last year. Your kidney function is mildly reduced and steady, so your heart medicines are safe to continue. Your knee pain sounds like wear and tear arthritis."
+gap = 0.5
+
+[[turns]]
+role = "patient"
+text = "So what do we do about the fluid?"
+
+[[turns]]
+role = "clinician"
+text = "For the next [[3 days|three days]], take [[2|two]] of the [[20 mg|twenty milligram]] furosemide tablets each morning, then go back to a single tablet. Keep taking the bisoprolol, the sacubitril and valsartan, the spironolactone and the empagliflozin exactly as you are. We'll check your kidney function and potassium today, and again in [[1 week|one week]]."
+
+[[turns]]
+role = "patient"
+text = "And the weighing?"
+
+[[turns]]
+role = "clinician"
+text = "Weigh yourself every morning after the toilet and before breakfast, and write it in your notebook. Call us the same day if your weight goes up [[3 pounds|three pounds]] in a day or [[5 pounds|five pounds]] in a week, or if you need more pillows to breathe at night. Keep your salt under [[2 grams|two grams]] a day, and your fluids to about [[2 liters|two liters]] a day, tea included."
+
+[[turns]]
+role = "patient"
+text = "That's a lot less tea than I'm used to. And the takeaway?"
+overlap = 0.3
+
+[[turns]]
+role = "clinician"
+text = "Every other week is fine, if you skip the salty extras on the side."
+
+[[turns]]
+role = "patient"
+text = "What about that low-salt stuff they sell in the supermarket?"
+
+[[turns]]
+role = "clinician"
+text = "Avoid salt substitutes, because most of them are made of potassium, and with the spironolactone your potassium could climb too high. Herbs, pepper and lemon juice are all safe."
+
+[[turns]]
+role = "patient"
+text = "I can live with that."
+
+[[turns]]
+role = "clinician"
+text = "For your lungs, keep using the tiotropium every morning with the new technique, and the albuterol when you need it. I'd like you to have this year's flu vaccine and a pneumonia vaccine from the nurse before you leave today. I'm also going to refer you to pulmonary rehabilitation, a breathing and exercise class twice a week for [[8 weeks|eight weeks]]."
+
+[[turns]]
+role = "patient"
+text = "Is that the class at the hospital? I've seen the poster on the wall in the outpatients."
+
+[[turns]]
+role = "clinician"
+text = "That's the one. After the inhalers, it's the single best thing for your breathing, and it helps the heart as well."
+
+[[turns]]
+role = "patient"
+text = "Will I need one of those devices fitted in my chest, for the heart?"
+
+[[turns]]
+role = "clinician"
+text = "Not for now, I hope. We'll repeat the heart scan in [[3 months|three months]], once you've been on the full set of medicines, and the heart specialists can decide about a device then."
+
+[[turns]]
+role = "patient"
+text = "Can I still go to bowls on a Wednesday?"
+
+[[turns]]
+role = "clinician"
+text = "Yes, please do. Gentle activity is good for your heart, so keep going, and sit down between ends if you're puffed. Then come back to see me in [[4 weeks|four weeks]], and bring your notebook and every box from that bag."
+
+[[turns]]
+role = "patient"
+text = "That's the best news I've had all day. Thank you for taking the time to explain it all."
+
+[[turns]]
+role = "clinician"
+text = "You're very welcome. You've done the hard part already, by stopping smoking and keeping that notebook. Enjoy your scone on the way out."
+
+[gold.subjective]
+value = "I was in the hospital from September 3 to September 7. For about a week before that, my ankles had been swelling up and I was getting more and more breathless. The night before I went in, I had to sleep sitting up in my armchair, because every time I lay down I felt like I was drowning. They said my heart wasn't pumping properly and fluid had backed up into my lungs. They gave me water tablets through a drip, and I lost about 9 pounds of fluid in 4 days. I've had trouble with my chest for years, the COPD, so I always put the breathlessness down to my lungs. I've had high blood pressure for about 20 years, and I had a hernia repaired about 15 years ago. Better than before I went in, but not back to normal. I can walk to the end of my road, about 200 yards, and then I have to stop and lean on a wall. Stairs are the worst. 2 pillows. Before the hospital it was 4, and I still woke up gasping. No chest pain. I go a bit light-headed if I stand up too quickly from the armchair, but I've never fainted. When I left the hospital I weighed 184 pounds, and this morning I was 186. By the evening my socks leave a deep mark around my ankles, but in the morning it's mostly gone. I smoked 20 a day for 40 years, and I stopped the week they told me. I haven't touched one since. Plaster dust and cement every day. I had 2 flare-ups, both last winter. Each time my old doctor gave me a course of prednisone and an antibiotic, and I got over it at home. Most mornings I cough up a bit of white phlegm, about a teaspoon, and then it settles. I take the bisoprolol every morning with my breakfast. Some days I take the water tablet at lunchtime if I'm going out. I use the blue one once or twice most days, usually after the stairs. Before the hospital it was 5 or 6 times a day. Just ibuprofen for my knees. 2 tablets, 3 times a day, most days. Last winter an antibiotic for a chest infection gave me hives all over my arms and chest. It was doxycycline. I don't add salt at the table any more. I still have a takeaway on a Friday. I'm up twice a night to pass water now. I have my low days. I've lived on my own for 6 years now, and the evenings can be long. About 6 hours a night, and I wake up rested enough."
+sources = [
+    "I was in the hospital from September 3 to September 7",
+    "For about a week before that, my ankles had been swelling up and I was getting more and more breathless",
+    "The night before I went in, I had to sleep sitting up in my armchair, because every time I lay down I felt like I was drowning",
+    "They said my heart wasn't pumping properly and fluid had backed up into my lungs. They gave me water tablets through a drip, and I lost about 9 pounds of fluid in 4 days",
+    "I've had trouble with my chest for years, the COPD, so I always put the breathlessness down to my lungs",
+    "I've had high blood pressure for about 20 years, and I had a hernia repaired about 15 years ago",
+    "Better than before I went in, but not back to normal. I can walk to the end of my road, about 200 yards, and then I have to stop and lean on a wall. Stairs are the worst",
+    "2 pillows. Before the hospital it was 4, and I still woke up gasping",
+    "no chest pain",
+    "I go a bit light-headed if I stand up too quickly from the armchair, but I've never fainted",
+    "When I left the hospital I weighed 184 pounds, and this morning I was 186",
+    "By the evening my socks leave a deep mark around my ankles, but in the morning it's mostly gone",
+    "I smoked 20 a day for 40 years, and I stopped the week they told me. I haven't touched one since",
+    "Plaster dust and cement every day",
+    "I had 2 flare-ups, both last winter. Each time my old doctor gave me a course of prednisone and an antibiotic, and I got over it at home",
+    "Most mornings I cough up a bit of white phlegm, about a teaspoon, and then it settles",
+    "I take the bisoprolol every morning with my breakfast",
+    "Some days I take the water tablet at lunchtime if I'm going out",
+    "I use the blue one once or twice most days, usually after the stairs. Before the hospital it was 5 or 6 times a day",
+    "Just ibuprofen for my knees. 2 tablets, 3 times a day, most days",
+    "Last winter an antibiotic for a chest infection gave me hives all over my arms and chest. It was doxycycline",
+    "I don't add salt at the table any more. I still have a takeaway on a Friday",
+    "I'm up twice a night to pass water now",
+    "I have my low days. I've lived on my own for 6 years now, and the evenings can be long",
+    "About 6 hours a night, and I wake up rested enough",
+]
+
+[gold.objective]
+value = "Your blood pressure is 112/68, your pulse is 62 and regular, and your oxygen level is 93 percent on room air. Your weight on our scale is 187 pounds. There's pitting swelling at both ankles, up to the middle of the shin. No wheezing, but I can hear fine crackles at the bottom of both lungs. Your heart sounds are regular, and I can't hear a murmur. The veins in your neck are not raised. Your heart scan on September 4 showed an ejection fraction of 30 percent. Your kidney function at discharge was a little reduced, with an eGFR of 52, and your potassium was 4.6. Your breathing test from last year showed moderate narrowing of the airways, with an FEV1 of 58 percent of what's expected for you. Your chest X-ray on September 7 showed the fluid had cleared."
+sources = [
+    "Your blood pressure is 112/68, your pulse is 62 and regular, and your oxygen level is 93 percent on room air. Your weight on our scale is 187 pounds. There's pitting swelling at both ankles, up to the middle of the shin. No wheezing, but I can hear fine crackles at the bottom of both lungs. Your heart sounds are regular, and I can't hear a murmur. The veins in your neck are not raised",
+    "Your heart scan on September 4 showed an ejection fraction of 30 percent",
+    "Your kidney function at discharge was a little reduced, with an eGFR of 52, and your potassium was 4.6",
+    "Your breathing test from last year showed moderate narrowing of the airways, with an FEV1 of 58 percent of what's expected for you",
+    "Your chest X-ray on September 7 showed the fluid had cleared",
+]
+
+[gold.assessment]
+value = "You have heart failure with a weak pump. You're much better than you were in September, but you're still carrying a little extra fluid at your ankles and the bottom of your lungs, and the ibuprofen has been working against your water tablet. Your COPD is moderate, and it's stable at the moment, with 2 flare-ups in the last year. Your kidney function is mildly reduced and steady, so your heart medicines are safe to continue. Your knee pain sounds like wear and tear arthritis."
+sources = [
+    "You have heart failure with a weak pump. You're much better than you were in September, but you're still carrying a little extra fluid at your ankles and the bottom of your lungs, and the ibuprofen has been working against your water tablet. Your COPD is moderate, and it's stable at the moment, with 2 flare-ups in the last year. Your kidney function is mildly reduced and steady, so your heart medicines are safe to continue. Your knee pain sounds like wear and tear arthritis",
+]
+
+[gold.plan]
+value = "Breathe out away from the mouthpiece, because breathing into it puts moisture inside. Then seal your lips, press, and take a slow, deep breath, and hold it for 10 seconds. Stop the ibuprofen completely. For your knees, use acetaminophen instead, up to 1 gram 3 times a day. For the next 3 days, take 2 of the 20 mg furosemide tablets each morning, then go back to a single tablet. Keep taking the bisoprolol, the sacubitril and valsartan, the spironolactone and the empagliflozin exactly as you are. We'll check your kidney function and potassium today, and again in 1 week. Weigh yourself every morning after the toilet and before breakfast, and write it in your notebook. Call us the same day if your weight goes up 3 pounds in a day or 5 pounds in a week, or if you need more pillows to breathe at night. Keep your salt under 2 grams a day, and your fluids to about 2 liters a day, tea included. Avoid salt substitutes, because most of them are made of potassium, and with the spironolactone your potassium could climb too high. For your lungs, keep using the tiotropium every morning with the new technique, and the albuterol when you need it. I'd like you to have this year's flu vaccine and a pneumonia vaccine from the nurse before you leave today. I'm also going to refer you to pulmonary rehabilitation, a breathing and exercise class twice a week for 8 weeks. We'll repeat the heart scan in 3 months, once you've been on the full set of medicines. Then come back to see me in 4 weeks, and bring your notebook and every box from that bag."
+sources = [
+    "Breathe out away from the mouthpiece, because breathing into it puts moisture inside. Then seal your lips, press, and take a slow, deep breath, and hold it for 10 seconds",
+    "Stop the ibuprofen completely",
+    "For your knees, use acetaminophen instead, up to 1 gram 3 times a day",
+    "For the next 3 days, take 2 of the 20 mg furosemide tablets each morning, then go back to a single tablet. Keep taking the bisoprolol, the sacubitril and valsartan, the spironolactone and the empagliflozin exactly as you are. We'll check your kidney function and potassium today, and again in 1 week",
+    "Weigh yourself every morning after the toilet and before breakfast, and write it in your notebook. Call us the same day if your weight goes up 3 pounds in a day or 5 pounds in a week, or if you need more pillows to breathe at night. Keep your salt under 2 grams a day, and your fluids to about 2 liters a day, tea included",
+    "Avoid salt substitutes, because most of them are made of potassium, and with the spironolactone your potassium could climb too high",
+    "For your lungs, keep using the tiotropium every morning with the new technique, and the albuterol when you need it. I'd like you to have this year's flu vaccine and a pneumonia vaccine from the nurse before you leave today. I'm also going to refer you to pulmonary rehabilitation, a breathing and exercise class twice a week for 8 weeks",
+    "We'll repeat the heart scan in 3 months, once you've been on the full set of medicines",
+    "Then come back to see me in 4 weeks, and bring your notebook and every box from that bag",
+]

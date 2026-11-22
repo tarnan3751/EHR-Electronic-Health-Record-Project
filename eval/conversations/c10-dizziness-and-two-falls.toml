@@ -1,0 +1,293 @@
+id = "c10-dizziness-and-two-falls"
+speakers = 3
+voices = { clinician = "am_michael", patient = "hm_omega", other = "hf_alpha" }
+tags = ["three-speakers", "same-gender", "self-correction", "relative-health", "question-no", "order-spoken", "negation", "numbers"]
+noise = ["babble"]
+dates = []
+drugs = ["hydrochlorothiazide", "amlodipine", "aspirin", "tamsulosin"]
+forbidden = ["I'm ordering an ECG and some blood work today"]
+retracted = ["25 mg"]
+denied = ["chest pain", "palpitations", "numbness"]
+
+[[turns]]
+role = "clinician"
+text = "Good afternoon, come on in, both of you. Take whichever chairs you like. I understand there have been a couple of falls?"
+
+[[turns]]
+role = "patient"
+text = "Yes. I've fallen twice in the last [[3 weeks|three weeks]]. It's a bit embarrassing, to be honest."
+
+[[turns]]
+role = "other"
+text = "He didn't want to make a fuss, but I booked the appointment anyway. The second fall really frightened me."
+overlap = 0.3
+
+[[turns]]
+role = "clinician"
+text = "I'm glad you both came. Tell me about the first one."
+
+[[turns]]
+role = "patient"
+text = "The first time, I got up in the night to use the bathroom. Everything went grey and I felt light in the head, so I sat down on the floor until it passed. The second time was [[4 days|four days]] ago. I stood up from my chair after lunch, and my legs just gave way. I landed on my left hip."
+
+[[turns]]
+role = "clinician"
+text = "Did you hit your head either time?"
+
+[[turns]]
+role = "patient"
+text = "No. I caught myself on the sink the first time, and on the arm of the chair the second."
+
+[[turns]]
+role = "other"
+text = "He has a bruise on that hip the size of my hand, though. I saw it when I helped him get dressed."
+
+[[turns]]
+role = "clinician"
+text = "Did you have any chest pain before or after either fall?"
+
+[[turns]]
+role = "patient"
+text = "No, no chest pain."
+
+[[turns]]
+role = "clinician"
+text = "Any palpitations, a feeling that your heart is racing or skipping?"
+
+[[turns]]
+role = "patient"
+text = "No, I haven't noticed anything like that."
+gap = 0.6
+
+[[turns]]
+role = "clinician"
+text = "Any weakness or numbness in your arms or legs, or trouble finding your words?"
+
+[[turns]]
+role = "other"
+text = "No, nothing like that. I'd have noticed, I see him every day."
+
+[[turns]]
+role = "clinician"
+text = "When the dizziness comes on, does the room spin, or do you feel like you're going to faint?"
+
+[[turns]]
+role = "patient"
+text = "More like I'm going to faint. It's mostly when I stand up. If I sit back down for a minute, it goes away."
+
+[[turns]]
+role = "clinician"
+text = "And how long has that been going on?"
+
+[[turns]]
+role = "patient"
+text = "It's been about a month now. It started not long after the new pill."
+
+[[turns]]
+role = "clinician"
+text = "Which new pill was that?"
+
+[[turns]]
+role = "other"
+text = "The water pill. I fill his pill box every Sunday, so I brought the list with me. He takes [[25 mg|twenty-five milligrams]], sorry, [[12.5 mg|twelve point five milligrams]] of the water pill every morning. It was added [[6 weeks|six weeks]] ago for swollen ankles. He's also on amlodipine [[5 mg|five milligrams]] once a day, and he's been on that for years."
+gap = 0.8
+
+[[turns]]
+role = "clinician"
+text = "Thank you, that list helps a lot. The water pill is hydrochlorothiazide. Is he taking anything else?"
+
+[[turns]]
+role = "patient"
+text = "Just a baby aspirin in the morning, and tamsulosin at night for my prostate. That's all."
+
+[[turns]]
+role = "other"
+text = "I keep a close eye on all of it, because my own blood pressure runs high too, so I know what these pills can do."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "That makes sense. How much do you drink during the day?"
+
+[[turns]]
+role = "patient"
+text = "[[2 cups|Two cups]] of tea, and a little water with my pills. I don't like having to get up at night."
+
+[[turns]]
+role = "clinician"
+text = "Any alcohol?"
+
+[[turns]]
+role = "patient"
+text = "A small whisky on a Saturday night, that's all."
+
+[[turns]]
+role = "other"
+text = "He's been sleeping more in the afternoons, too. I put it down to the heat."
+
+[[turns]]
+role = "clinician"
+text = "Does he use a stick or a frame at home?"
+
+[[turns]]
+role = "other"
+text = "He has a stick, but he leaves it by the front door."
+
+[[turns]]
+role = "patient"
+text = "I manage fine indoors. There's always something to hold on to."
+
+[[turns]]
+role = "clinician"
+text = "Okay. I'd like to check your blood pressure lying down first, and then standing up. Lie back on the table for me."
+
+[[turns]]
+role = "patient"
+text = "All right."
+gap = 0.8
+
+[[turns]]
+role = "clinician"
+text = "Lying down, your blood pressure is [[148/82|one forty-eight over eighty-two]], and your pulse is [[68|sixty-eight]]. Now I'd like you to stand up slowly and hold on to the edge of the table."
+gap = 3.0
+
+[[turns]]
+role = "other"
+text = "Careful, Dad. Take your time."
+
+[[turns]]
+role = "patient"
+text = "I'm fine, I'm fine. I'm up."
+
+[[turns]]
+role = "clinician"
+text = "After [[3 minutes|three minutes]] standing, it's [[118/70|one eighteen over seventy]], and your pulse is [[84|eighty-four]]. That's a drop of [[30 points|thirty points]]. Do you feel dizzy at the moment?"
+gap = 3.0
+
+[[turns]]
+role = "patient"
+text = "A little, yes. It's the same feeling I had before both falls."
+
+[[turns]]
+role = "clinician"
+text = "Sit back down, and I'll listen to your heart and have a look at that hip."
+
+[[turns]]
+role = "patient"
+text = "Okay."
+gap = 0.5
+
+[[turns]]
+role = "clinician"
+text = "Your strength and sensation are normal in both legs. Your heart rhythm is regular, and I don't hear a murmur. You have a large bruise over your left hip, but you can move it fully and walk on it without pain."
+gap = 3.0
+
+[[turns]]
+role = "other"
+text = "That's a relief. I was sure he'd broken something."
+
+[[turns]]
+role = "clinician"
+text = "So here's what's going on. This is called orthostatic hypotension. Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall. The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse."
+gap = 0.6
+
+[[turns]]
+role = "patient"
+text = "So it's the pills, not my heart?"
+
+[[turns]]
+role = "clinician"
+text = "Most likely the pills, but I want to be sure about your heart as well, so I'm ordering an ECG and some blood work today. Then we'll know how your kidneys and your salt levels are doing, too."
+
+[[turns]]
+role = "patient"
+text = "Okay. What do I do about the pills in the meantime?"
+
+[[turns]]
+role = "clinician"
+text = "Stop the hydrochlorothiazide, starting tomorrow. Keep taking the amlodipine and the aspirin. Take the tamsulosin at bedtime, and when you get up at night, sit on the edge of the bed for a minute before you stand. Drink [[6 glasses|six glasses]] of fluid a day. Put a night light in the hallway and the bathroom. Come back in [[2 weeks|two weeks]], and we'll check your blood pressure lying and standing again."
+
+[[turns]]
+role = "other"
+text = "I'll take the water pill out of his box tonight. And I'll pick up some night lights on the way home."
+
+[[turns]]
+role = "patient"
+text = "And if I get dizzy again before then?"
+
+[[turns]]
+role = "clinician"
+text = "Sit or lie down straight away, and call us. If you fall and hit your head, or you black out, go to the emergency department."
+
+[[turns]]
+role = "other"
+text = "Thank you. That's the first time anyone has explained it properly."
+
+[[turns]]
+role = "patient"
+text = "Yes, thank you. I feel better knowing what it is."
+overlap = 0.3
+
+[[turns]]
+role = "clinician"
+text = "You're welcome. The nurse will take you down for the ECG on your way out."
+
+[gold.subjective]
+value = "I've fallen twice in the last 3 weeks. The first time, I got up in the night to use the bathroom. Everything went grey and I felt light in the head, so I sat down on the floor until it passed. The second time was 4 days ago. I stood up from my chair after lunch, and my legs just gave way. I landed on my left hip. I caught myself on the sink the first time, and on the arm of the chair the second. He has a bruise on that hip the size of my hand. No chest pain. More like I'm going to faint. It's mostly when I stand up. If I sit back down for a minute, it goes away. It's been about a month now. It started not long after the new pill. He takes 12.5 mg of the water pill every morning. It was added 6 weeks ago for swollen ankles. He's also on amlodipine 5 mg once a day, and he's been on that for years. Just a baby aspirin in the morning, and tamsulosin at night for my prostate. 2 cups of tea, and a little water with my pills. A small whisky on a Saturday night. He's been sleeping more in the afternoons, too. He has a stick, but he leaves it by the front door. It's the same feeling I had before both falls."
+sources = [
+    "I've fallen twice in the last 3 weeks",
+    "The first time, I got up in the night to use the bathroom",
+    "Everything went grey and I felt light in the head, so I sat down on the floor until it passed",
+    "The second time was 4 days ago",
+    "I stood up from my chair after lunch, and my legs just gave way",
+    "I landed on my left hip",
+    "I caught myself on the sink the first time, and on the arm of the chair the second",
+    "He has a bruise on that hip the size of my hand",
+    "no chest pain",
+    "More like I'm going to faint",
+    "It's mostly when I stand up",
+    "If I sit back down for a minute, it goes away",
+    "It's been about a month now",
+    "It started not long after the new pill",
+    "He takes 25 mg, sorry, 12.5 mg of the water pill every morning",
+    "It was added 6 weeks ago for swollen ankles",
+    "He's also on amlodipine 5 mg once a day, and he's been on that for years",
+    "Just a baby aspirin in the morning, and tamsulosin at night for my prostate",
+    "2 cups of tea, and a little water with my pills",
+    "A small whisky on a Saturday night",
+    "He's been sleeping more in the afternoons, too",
+    "He has a stick, but he leaves it by the front door",
+    "It's the same feeling I had before both falls",
+]
+
+[gold.objective]
+value = "Lying down, your blood pressure is 148/82, and your pulse is 68. After 3 minutes standing, it's 118/70, and your pulse is 84. That's a drop of 30 points. Your strength and sensation are normal in both legs. Your heart rhythm is regular, and I don't hear a murmur. You have a large bruise over your left hip, but you can move it fully and walk on it without pain."
+sources = [
+    "Lying down, your blood pressure is 148/82, and your pulse is 68",
+    "After 3 minutes standing, it's 118/70, and your pulse is 84",
+    "That's a drop of 30 points",
+    "Your strength and sensation are normal in both legs",
+    "Your heart rhythm is regular, and I don't hear a murmur",
+    "You have a large bruise over your left hip, but you can move it fully and walk on it without pain",
+]
+
+[gold.assessment]
+value = "This is called orthostatic hypotension. Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall. The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse."
+sources = [
+    "This is called orthostatic hypotension",
+    "Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall",
+    "The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse",
+]
+
+[gold.plan]
+value = "Stop the hydrochlorothiazide, starting tomorrow. Keep taking the amlodipine and the aspirin. Take the tamsulosin at bedtime, and when you get up at night, sit on the edge of the bed for a minute before you stand. Drink 6 glasses of fluid a day. Put a night light in the hallway and the bathroom. Come back in 2 weeks, and we'll check your blood pressure lying and standing again. Sit or lie down straight away, and call us. If you fall and hit your head, or you black out, go to the emergency department."
+sources = [
+    "Stop the hydrochlorothiazide, starting tomorrow",
+    "Keep taking the amlodipine and the aspirin",
+    "Take the tamsulosin at bedtime, and when you get up at night, sit on the edge of the bed for a minute before you stand",
+    "Drink 6 glasses of fluid a day",
+    "Put a night light in the hallway and the bathroom",
+    "Come back in 2 weeks, and we'll check your blood pressure lying and standing again",
+    "Sit or lie down straight away, and call us",
+    "If you fall and hit your head, or you black out, go to the emergency department",
+]

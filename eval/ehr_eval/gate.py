@@ -27,7 +27,8 @@ someone committed instead:
    fields_clinical, is reported beside it and not gated), date and drug-name accuracy, and the share of offered words
    the transcript doesn't support.
 
-Other results files (such as compare-low256.json, a comparison run) aren't checked.
+The visits' results (eval/results/ambient-latest.json, listening to a visit) are checked here too, by ambient_gate.py,
+in the same way. Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
     uv run --project eval python -m ehr_eval.gate
 
@@ -44,7 +45,7 @@ from pathlib import Path
 from ehr_dictation import prompt
 from ehr_dictation.transcript import Segment, assemble
 
-from . import scoring
+from . import ambient_gate, scoring
 from .scoring import WARNING_CODES
 from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256
 
@@ -170,7 +171,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                     f"The {name} is {now}, worse than the accepted baseline's {before}. Find what made it worse and fix "
                     f"it, then: {RUN_IT} (Only the owner accepts a new baseline, on the server machine.)"
                 )
-    return problems
+    return problems + ambient_gate.check(results_dir, eval_dir)
 
 
 def _unaccepted(unflagged: list[dict], known: Path) -> list[str]:
@@ -260,6 +261,15 @@ def main() -> int:
         f"accepted). "
         f"Run on {latest['run']['machine']['label']}."
     )
+    visits_path = RESULTS_DIR / "ambient-latest.json"
+    if visits_path.is_file():
+        visits = json.loads(visits_path.read_text(encoding="utf-8"))["metrics"]
+        print(
+            f"The visits' results match too: WER {visits['wer']['overall']} (the patient's on clean recordings "
+            f"{visits['wer']['by_role_clean']['patient']}), field F1 {visits['fields']['content']['f1']}, "
+            f"{visits['attribution']['accuracy']} of the words labelled with the right speaker, every visit drafted, "
+            f"nothing unsafe offered that the owner hasn't accepted."
+        )
     return 0
 
 

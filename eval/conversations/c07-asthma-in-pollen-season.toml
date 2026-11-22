@@ -1,0 +1,230 @@
+id = "c07-asthma-in-pollen-season"
+speakers = 2
+voices = { clinician = "bm_george", patient = "af_heart" }
+tags = ["home-readings", "refill-request", "hedging", "backchannel", "question-no", "negation", "numbers", "order-spoken"]
+noise = ["room"]
+dates = []
+drugs = ["albuterol", "budesonide", "cetirizine"]
+requests = ["Can you refill my albuterol inhaler"]
+forbidden = ["I'll get you a new inhaler before you go"]
+denied = ["fever", "chest pain"]
+
+[[turns]]
+role = "clinician"
+text = "Good afternoon. Come in and have a seat. What's been going on?"
+
+[[turns]]
+role = "patient"
+text = "My asthma has been acting up for about [[2 weeks|two weeks]]. I'm wheezing more, and my chest feels tight, especially in the mornings."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm."
+overlap = 0.2
+
+[[turns]]
+role = "patient"
+text = "I'm using my albuterol [[4 or 5 times|four or five times]] a day now. Usually it's only once or twice a week."
+
+[[turns]]
+role = "clinician"
+text = "Right. Is it waking you up at night?"
+
+[[turns]]
+role = "patient"
+text = "Yes. [[3 nights|Three nights]] this week I woke up coughing and had to use the inhaler."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. And during the day? Are you still getting your walks in?"
+
+[[turns]]
+role = "patient"
+text = "I try. I had to stop halfway up the hill on my walk yesterday, and that hill is usually easy for me."
+
+[[turns]]
+role = "clinician"
+text = "Do you check your peak flow at home?"
+
+[[turns]]
+role = "patient"
+text = "I do, I wrote the numbers down on my phone. Let me find them. Okay. My best is usually around [[450|four hundred fifty]]. Last week I was getting about [[400|four hundred]]. Then the last [[3 mornings|three mornings]] it was [[360|three sixty]], [[350|three fifty]], and [[340|three forty]] today."
+gap = 0.4
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. So this morning you were at about [[75 percent|seventy-five percent]] of your best."
+
+[[turns]]
+role = "patient"
+text = "That's what worried me. It usually stays up around [[420|four twenty]] even when I have a cold."
+
+[[turns]]
+role = "clinician"
+text = "Right. Any fever?"
+
+[[turns]]
+role = "patient"
+text = "No, no fever."
+
+[[turns]]
+role = "clinician"
+text = "Any chest pain?"
+
+[[turns]]
+role = "patient"
+text = "No, just the tightness."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Are you coughing anything up?"
+
+[[turns]]
+role = "patient"
+text = "A little clear phlegm in the morning, that's all."
+
+[[turns]]
+role = "clinician"
+text = "Have you ever needed steroid tablets for your asthma?"
+
+[[turns]]
+role = "patient"
+text = "Once, about [[3 years|three years]] ago, after a bad chest cold."
+
+[[turns]]
+role = "clinician"
+text = "Right. And do you smoke, or does anyone smoke around you?"
+
+[[turns]]
+role = "patient"
+text = "No, never. I can't stand the smell."
+
+[[turns]]
+role = "clinician"
+text = "What do you think set it off this time?"
+
+[[turns]]
+role = "patient"
+text = "The trees outside my building are all in bloom. My eyes are itchy, and my nose has been running for weeks."
+
+[[turns]]
+role = "clinician"
+text = "Right. Are you taking anything for your allergies?"
+overlap = 0.3
+
+[[turns]]
+role = "patient"
+text = "Not this year. I used to take something every spring, but I ran out and never got more."
+
+[[turns]]
+role = "clinician"
+text = "And are you using any other inhalers besides the albuterol?"
+
+[[turns]]
+role = "patient"
+text = "No, just the albuterol. Which reminds me. Can you refill my albuterol inhaler? I'm almost out."
+
+[[turns]]
+role = "clinician"
+text = "Yes, of course. I'll get you a new inhaler before you go. Let me listen to your chest first. Big breaths in and out for me."
+
+[[turns]]
+role = "patient"
+text = "Okay."
+gap = 1.0
+
+[[turns]]
+role = "clinician"
+text = "Your oxygen level is [[97 percent|ninety-seven percent]], and your peak flow here is [[350|three fifty]]. I can hear some wheezing on both sides when you breathe out. Your nose is swollen and pale inside, which fits with allergies."
+gap = 2.5
+
+[[turns]]
+role = "patient"
+text = "So what do you think is going on?"
+
+[[turns]]
+role = "clinician"
+text = "Your asthma isn't as well controlled as it should be right now. I think it's mostly allergy driven. It might be the pollen, since this happens to you every spring."
+
+[[turns]]
+role = "patient"
+text = "That makes sense. It's the same every year, I just never put it together."
+
+[[turns]]
+role = "clinician"
+text = "Here's the plan. Start a budesonide inhaler, [[2 puffs|two puffs]] twice a day, every day, even when you feel fine. Rinse your mouth after each use. Keep using the albuterol when you need it. Take a cetirizine once a day through the pollen season."
+
+[[turns]]
+role = "patient"
+text = "Do I need a spacer with the new inhaler?"
+
+[[turns]]
+role = "clinician"
+text = "It's a dry powder inhaler, so you don't need a spacer. You breathe in hard and fast, and hold your breath for a few seconds. I'll show you before you leave."
+
+[[turns]]
+role = "patient"
+text = "Okay. Should I keep checking my peak flow?"
+
+[[turns]]
+role = "clinician"
+text = "Yes. Check your peak flow every morning and write it down. If it drops below [[250|two hundred fifty]], or you need the albuterol more often than every [[4 hours|four hours]], go to urgent care. Otherwise, come back in [[4 weeks|four weeks]] and bring your numbers."
+
+[[turns]]
+role = "patient"
+text = "I will. Thank you."
+
+[[turns]]
+role = "clinician"
+text = "You're welcome. I hope the pollen settles down soon."
+
+[gold.subjective]
+value = "My asthma has been acting up for about 2 weeks. I'm wheezing more, and my chest feels tight, especially in the mornings. I'm using my albuterol 4 or 5 times a day now. Usually it's only once or twice a week. 3 nights this week I woke up coughing and had to use the inhaler. I had to stop halfway up the hill on my walk yesterday, and that hill is usually easy for me. My best is usually around 450. Last week I was getting about 400. Then the last 3 mornings it was 360, 350, and 340 today. No fever. A little clear phlegm in the morning. Once, about 3 years ago, after a bad chest cold. The trees outside my building are all in bloom. My eyes are itchy, and my nose has been running for weeks. I used to take something every spring, but I ran out."
+sources = [
+    "My asthma has been acting up for about 2 weeks",
+    "I'm wheezing more, and my chest feels tight, especially in the mornings",
+    "I'm using my albuterol 4 or 5 times a day now",
+    "Usually it's only once or twice a week",
+    "3 nights this week I woke up coughing and had to use the inhaler",
+    "I had to stop halfway up the hill on my walk yesterday, and that hill is usually easy for me",
+    "My best is usually around 450",
+    "Last week I was getting about 400",
+    "Then the last 3 mornings it was 360, 350, and 340 today",
+    "no fever",
+    "A little clear phlegm in the morning",
+    "Once, about 3 years ago, after a bad chest cold",
+    "The trees outside my building are all in bloom",
+    "My eyes are itchy, and my nose has been running for weeks",
+    "I used to take something every spring, but I ran out",
+]
+
+[gold.objective]
+value = "Your oxygen level is 97 percent, and your peak flow here is 350. I can hear some wheezing on both sides when you breathe out. Your nose is swollen and pale inside."
+sources = [
+    "Your oxygen level is 97 percent, and your peak flow here is 350",
+    "I can hear some wheezing on both sides when you breathe out",
+    "Your nose is swollen and pale inside",
+]
+
+[gold.assessment]
+value = "Your asthma isn't as well controlled as it should be right now. I think it's mostly allergy driven. It might be the pollen."
+sources = [
+    "Your asthma isn't as well controlled as it should be right now",
+    "I think it's mostly allergy driven",
+    "It might be the pollen",
+]
+
+[gold.plan]
+value = "Start a budesonide inhaler, 2 puffs twice a day, every day, even when you feel fine. Rinse your mouth after each use. Keep using the albuterol when you need it. Take a cetirizine once a day through the pollen season. It's a dry powder inhaler, so you don't need a spacer. You breathe in hard and fast, and hold your breath for a few seconds. Check your peak flow every morning and write it down. If it drops below 250, or you need the albuterol more often than every 4 hours, go to urgent care. Otherwise, come back in 4 weeks and bring your numbers."
+sources = [
+    "Start a budesonide inhaler, 2 puffs twice a day, every day, even when you feel fine",
+    "Rinse your mouth after each use",
+    "Keep using the albuterol when you need it",
+    "Take a cetirizine once a day through the pollen season",
+    "It's a dry powder inhaler, so you don't need a spacer",
+    "You breathe in hard and fast, and hold your breath for a few seconds",
+    "Check your peak flow every morning and write it down",
+    "If it drops below 250, or you need the albuterol more often than every 4 hours, go to urgent care",
+    "Otherwise, come back in 4 weeks and bring your numbers",
+]
