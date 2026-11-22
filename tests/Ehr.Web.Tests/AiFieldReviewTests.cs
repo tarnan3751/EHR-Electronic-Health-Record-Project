@@ -574,13 +574,13 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     static string Translated(string english, string spanish) =>
         $"<li class=\"sc-translation__pair\"><p class=\"sc-translation__english\">{english}</p><p class=\"sc-translation__spanish\">You said: <span lang=\"es\">“{spanish}”</span></p></li>";
 
-    // TC-UC13-10 (successful flow; the expansion plan's step 17, proposed FR-61): a dictation in Spanish is reviewed in the
+    // TC-UC13-15 (successful flow; the expansion plan's step 17, proposed FR-61): a dictation in Spanish is reviewed in the
     // English screens: its transcript in Spanish, a notice that the proposals are translations to check sentence by
     // sentence, and each field's English sentences, each beside the Spanish it was translated from, each field accepted
     // with "Accept translated". The Spanish transcript and each sentence's Spanish words are stored with the review, and
     // what is approved goes into the note in English.
     [Fact]
-    public async Task TC_UC13_10_a_dictation_in_spanish_is_reviewed_a_sentence_at_a_time_beside_its_spanish()
+    public async Task TC_UC13_15_a_dictation_in_spanish_is_reviewed_a_sentence_at_a_time_beside_its_spanish()
     {
         var f = await StageSpanishAsync();
         var html = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
@@ -633,11 +633,11 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
             f.Draft));
     }
 
-    // TC-UC13-11 (alternative flow; step 17): the review of a dictation in Spanish is reopened later, from the draft's and
+    // TC-UC13-16 (alternative flow; step 17): the review of a dictation in Spanish is reopened later, from the draft's and
     // then the signed note's saved reviews, which say it was in Spanish, and still shows each sentence beside its Spanish,
     // read-only once signed. A review of a dictation in English says nothing of a language, as before.
     [Fact]
-    public async Task TC_UC13_11_a_review_in_spanish_reopened_later_and_from_the_signed_note_still_shows_its_spanish()
+    public async Task TC_UC13_16_a_review_in_spanish_reopened_later_and_from_the_signed_note_still_shows_its_spanish()
     {
         var f = await StageSpanishAsync();
         var version = 2L;
@@ -685,7 +685,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
             WebUtility.HtmlDecode(await inEnglish.Session.Client.GetStringAsync(inEnglish.Editor, Cancel)));
     }
 
-    // TC-UC13-12 (invalid input; step 17): a result from Spanish whose sentences don't hold is refused at staging and
+    // TC-UC13-17 (invalid input; step 17): a result from Spanish whose sentences don't hold is refused at staging and
     // nothing is stored, so the review never shows a sentence beside Spanish it didn't come from. Each case is caught by
     // one rule of TrustedResult alone: a sentence that doesn't start where the last one ended (gap), sentences that don't
     // reach the value's end (uncovered), a sentence ending inside a word (mid-word), a sentence citing nothing (uncited),
@@ -704,7 +704,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("english-statements")]
     [InlineData("unknown-language")]
     [InlineData("proposal")]
-    public async Task TC_UC13_12_a_result_from_spanish_whose_sentences_dont_hold_is_refused_and_nothing_is_staged(string kind)
+    public async Task TC_UC13_17_a_result_from_spanish_whose_sentences_dont_hold_is_refused_and_nothing_is_staged(string kind)
     {
         sidecar.Spanish = kind != "english-statements";
         var f = await BeginAsync();

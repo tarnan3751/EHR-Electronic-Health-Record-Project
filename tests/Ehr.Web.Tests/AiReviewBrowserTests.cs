@@ -303,14 +303,14 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     static Task<string> HighlightedAsync(IPage page) =>
         page.EvaluateAsync<string>("[...document.querySelectorAll('[data-dictation-transcript] mark.sc-transcript__source')].map(m => m.textContent).join('')");
 
-    // TC-UC13-13 (NFR-12; the expansion plan's step 17): with the keyboard only, a dictation in Spanish is reviewed: each
+    // TC-UC13-18 (NFR-12; the expansion plan's step 17): with the keyboard only, a dictation in Spanish is reviewed: each
     // translated sentence is reached with Tab and Shift+Tab and highlights the Spanish it came from, each field is accepted
     // with "Accept translated", the review completed and the note signed; then the review is reopened from the signed
     // note's saved reviews, which say it was in Spanish, and its sentences still highlight their Spanish. The reopened
     // review in both themes at 1,280, 640 and 360 pixels: nothing scrolls sideways or is wider than the window, the long
     // Spanish quote wraps inside its pair, side by side with its English at 1,280 and under it at 360.
     [Fact]
-    public async Task TC_UC13_13_a_dictation_in_spanish_reviewed_from_the_keyboard_reopened_and_shown_at_every_width()
+    public async Task TC_UC13_18_a_dictation_in_spanish_reviewed_from_the_keyboard_reopened_and_shown_at_every_width()
     {
         var (patient, session) = await AccountAsync();
         apps.Dictation.Spanish = true;
