@@ -25,10 +25,11 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   one.
 // Inputs and system conditions: GET /portal/record?handler=File&sensitive=true and /portal/record/print?sensitive=true,
 //   on the on-site app.
-// Test data: The note's Subjective "Synthetic subjective: dry cough, quartzwing pattern, nocturnal."; the addendum "Synthetic
-//   addendum: zebrafinch follow-up."; the draft "Synthetic draft: kingfisher"; the withdrawn summary "We talked about the
-//   wrong visit."; the reading's reason "Synthetic: wrong cuff size"; "Synthetic retracted medication"; "Synthetic
-//   unreleased test"; "Synthetic preliminary test"; the cancellation reason "Synthetic: the patient asked to move it".
+// Test data: The note's Subjective "Synthetic subjective: dry cough, quartzwing pattern, nocturnal." and Objective
+//   "Synthetic objective: chest clear."; the addendum "Synthetic addendum: zebrafinch follow-up."; the draft "Synthetic
+//   draft: kingfisher"; the withdrawn summary "We talked about the wrong visit."; the reading's reason "Synthetic: wrong
+//   cuff size"; "Synthetic retracted medication"; "Synthetic unreleased test"; "Synthetic preliminary test"; the
+//   cancellation reason "Synthetic: the patient asked to move it".
 // Steps:
 //   1. Download the file, sensitive items included.
 //   2. Open the printable page, sensitive items included.
@@ -88,7 +89,7 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
         {
             foreach (var never in new[]
             {
-                "quartzwing", NoteAssessment, NotePlan, "zebrafinch", "kingfisher", "wrong visit", "wrong cuff size", "Synthetic retracted medication",
+                "quartzwing", Objective, NoteAssessment, NotePlan, "zebrafinch", "kingfisher", "wrong visit", "wrong cuff size", "Synthetic retracted medication",
                 "Synthetic unreleased test", "Synthetic preliminary test", "asked to move it", "audit",
             })
             {

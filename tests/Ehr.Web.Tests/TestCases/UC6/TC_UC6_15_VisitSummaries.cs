@@ -18,7 +18,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Inputs and system conditions: GET /portal, then GET /portal/summaries, on the on-site app.
 // Test data: The first summary's What we talked about "We talked about your blood pressure."; the second's the test's
 //   summary, What we found on two lines; the notes' Subjective "Synthetic subjective: dry cough, quartzwing pattern,
-//   nocturnal.".
+//   nocturnal." and Objective "Synthetic objective: chest clear.".
 // Steps:
 //   1. Open the portal's home and follow "See your visit summaries".
 // Expected result: The page sends Cache-Control: no-store and lists the second summary before the first, each headed
@@ -66,7 +66,7 @@ public class TC_UC6_15_VisitSummaries(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<h3>What happens next</h3>", html);
         Assert.Contains("Your chest sounded clear.\nYour temperature was normal.", words);
         Assert.Contains(NextSteps, words);
-        foreach (var noteText in new[] { NoteSubjective, NoteAssessment, NotePlan, "quartzwing" })
+        foreach (var noteText in new[] { NoteSubjective, Objective, NoteAssessment, NotePlan, "quartzwing" })
         {
             Assert.DoesNotContain(noteText, words);
         }

@@ -18,8 +18,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   distinctive Subjective and an addendum, released a summary of it and withdrawn it, and released another, sensitive.
 // Inputs and system conditions: GET /portal/summaries (sensitive summaries asked for), /portal, /portal/results,
 //   /portal/appointments, /portal/messages and /portal/access, as the patient and as the proxy, on the on-site app.
-// Test data: The note's Subjective "Synthetic subjective: dry cough, quartzwing pattern, nocturnal."; the addendum
-//   "Synthetic addendum: zebrafinch follow-up.".
+// Test data: The note's Subjective "Synthetic subjective: dry cough, quartzwing pattern, nocturnal." and Objective
+//   "Synthetic objective: chest clear."; the addendum "Synthetic addendum: zebrafinch follow-up.".
 // Steps:
 //   1. As each, open Visit summaries with sensitive summaries asked for, and read its markup and headers.
 //   2. As each, open every other portal page.
@@ -85,7 +85,7 @@ public class TC_UC6_22_Nfr06_VisitSummariesSecurity(WebApps apps) : IClassFixtur
             foreach (var path in new[] { "/portal", "/portal/summaries", "/portal/results", "/portal/appointments", "/portal/messages", "/portal/access" })
             {
                 var page = Words(await reader.Client.GetStringAsync(path, Cancel));
-                foreach (var noteText in new[] { NoteSubjective, NoteAssessment, NotePlan, "quartzwing", "zebrafinch" })
+                foreach (var noteText in new[] { NoteSubjective, Objective, NoteAssessment, NotePlan, "quartzwing", "zebrafinch" })
                 {
                     Assert.DoesNotContain(noteText, page);
                 }
