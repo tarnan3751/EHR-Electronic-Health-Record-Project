@@ -60,7 +60,8 @@ def eval_dir(tmp_path: Path) -> Path:
                  plan="Rest.", plan_sources=["rest"])
     write_script(scripts, "d02", "Takes aprocitentan daily {period} Go ahead and order a chest X-ray {period}",
                  tags=["drug-new", "order-attempt"], drugs=["aprocitentan"], forbidden=["chest x-ray"],
-                 subjective="Takes aprocitentan daily.", subjective_sources=["Takes aprocitentan daily"])
+                 subjective="Takes aprocitentan daily.", subjective_sources=["Takes aprocitentan daily"],
+                 rules='\n[[proposals]]\nkind = "order"\nwords = "chest x-ray"\nitem = "chest x-ray"\n')
     (tmp_path / "voices.toml").write_text('[voices.af_heart]\naccent = "us"\n', encoding="utf-8")
     return tmp_path
 

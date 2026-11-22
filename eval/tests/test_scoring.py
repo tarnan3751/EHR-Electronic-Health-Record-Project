@@ -307,3 +307,24 @@ def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_c
         {"variant": "d03-x", "kind": "order", "shown": "go ahead and order a lipid panol", "why": "misheard"},
         {"variant": "d03-x", "kind": "order", "shown": "go ahead and order a chest x ray", "why": "false"},
     ]
+
+
+# A proposal counts as a gold proposal only where that was said: the same words heard elsewhere, in a passage that
+# mustn't be proposed, are a false proposal, not a right one.
+def test_a_proposal_is_matched_to_gold_by_where_it_was_said_not_by_its_words(eval_dir):
+    write_script(eval_dir / "scripts", "d03", "Plan {colon} go ahead and order a lipid panel {period} Her mother asked about a lipid "
+                 "profile {period}", tags=["order-attempt", "proposal"], forbidden=["order a lipid panel"], plan="Rest.",
+                 plan_sources=["Plan"], rules='\n[[proposals]]\nkind = "order"\nwords = "order a lipid panel"\nitem = "lipid panel"\n')
+    scripts = load_all(eval_dir / "scripts")
+    heard = "Plan: go ahead and order a lipid panel. Her mother asked about order a lipid panel."
+    elsewhere = item("d03", heard)
+    at = heard.rindex("order a lipid panel")
+    elsewhere.proposals = [["order", at, at + len("order a lipid panel"), []]]
+    there = item("d03", heard)
+    at = heard.index("order a lipid panel")
+    there.proposals = [["order", at, at + len("order a lipid panel"), []]]
+
+    proposals = score([elsewhere, there], scripts)["proposals"]
+
+    assert (proposals["right"], proposals["false"], proposals["found"]) == (1, 1, 1)
+    assert proposals["listed"] == [{"variant": "d03-x", "kind": "order", "shown": "order a lipid panel", "why": "false"}]

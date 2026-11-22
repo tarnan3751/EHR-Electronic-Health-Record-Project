@@ -16,7 +16,10 @@ someone committed instead:
    matches no order or allergy to add a script dictates plainly) or misheard (it matches one, but not the item heard
    word for word) has been accepted by the owner in eval/known-limitations.toml, as an [[accepted_proposal]] entry
    naming its recording (variant), its kind and the words shown, as the results list them (shown); a warning doesn't
-   excuse one. Each accepted there still occurs, so the list stays true. The two gates above on orders and allergy
+   excuse one. Each accepted there still occurs, so the list stays true. The gate doesn't take the results' word for
+   what was proposed: it scores the proposals again from the stored recordings (each transcript rebuilt from its
+   passages, the checks run over it, against this commit's gold; no model needed), and fails results whose proposals
+   say anything else. The two gates above on orders and allergy
    changes in the note's fields are unchanged beside it.
 5. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
@@ -39,7 +42,9 @@ import tomllib
 from pathlib import Path
 
 from ehr_dictation import prompt
+from ehr_dictation.transcript import Segment, assemble
 
+from . import scoring
 from .scoring import WARNING_CODES
 from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256
 
@@ -131,7 +136,14 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
     if any(key not in proposals for key in PROPOSAL_METRICS):
         problems.append(f"The results don't say what the dictation proposed. {RUN_IT}")
     else:
-        problems += _unaccepted_proposals(proposals["listed"], eval_dir / KNOWN_LIMITATIONS)
+        again = _proposals_again(latest, eval_dir)
+        if any(proposals.get(key) != again[key] for key in PROPOSAL_METRICS):
+            problems.append(
+                "The results' proposals aren't what their stored recordings give, scored again with this commit's checks "
+                "and gold. Score the stored answers again: "
+                "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
+            )
+        problems += _unaccepted_proposals(again["listed"], eval_dir / KNOWN_LIMITATIONS)
     warnings = latest.get("metrics", {}).get("warnings", {})
     if "shown" not in warnings or any("flagged" not in warnings.get(key, {}) for key in (*WARNING_CODES, "any")):
         problems.append(f"The results don't say which offered values carry a warning. {RUN_IT}")
@@ -180,6 +192,21 @@ def _unaccepted(unflagged: list[dict], known: Path) -> list[str]:
         for variant, field, shown in sorted(listed - found)
     ]
     return problems
+
+
+def _proposals_again(latest: dict, eval_dir: Path) -> dict:
+    """The proposals' measures, scored again from the stored recordings: each transcript rebuilt from MedASR's passages
+    as heard, the checks run over it (scoring.weigh_proposals()), and the scripts' gold. Items of a script the test set
+    no longer has are left out (the coverage check reports them)."""
+    scripts = load_all(eval_dir / "scripts")
+    items = []
+    for stored in latest.get("items", []):
+        if stored.get("script") not in scripts:
+            continue
+        item = scoring.Item(**{key: value for key, value in stored.items() if key != "fields"})
+        scoring.weigh_proposals(item, assemble([Segment(**segment) for segment in item.segments], final=True))
+        items.append(item)
+    return scoring._proposals(items, scripts)
 
 
 def _unaccepted_proposals(listed: list[dict], known: Path) -> list[str]:

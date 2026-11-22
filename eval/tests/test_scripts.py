@@ -300,6 +300,7 @@ def test_what_should_and_shouldnt_be_proposed_is_in_the_display_text_and_never_i
     display = script.display.lower()
     for proposal in script.proposals:
         assert proposal.words.lower() in display and proposal.item.lower() in proposal.words.lower()
+        assert display.count(proposal.words.lower()) == 1, f"{proposal.words!r} is said more than once: where it was said is how it's scored"
         for field, gold in golds(script):
             assert proposal.words.lower() not in gold.value.lower(), f"{field} value has a proposal's words"
     for row in script.not_proposed:

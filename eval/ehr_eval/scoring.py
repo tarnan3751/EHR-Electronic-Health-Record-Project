@@ -23,7 +23,10 @@
   place of a listed instruction, against each script's gold proposals: found where its gold words are, as said or as
   heard (_as_heard()), and of the same kind; right when the item it names was heard word for word, misheard when not;
   false when it matches no gold proposal. Each false or misheard one is listed (listed: the recording, the kind and the
-  words shown, normalized), for the gate to require the owner's acceptance of; recall, precision, how many carry a
+  words shown, normalized), for the gate to require the owner's acceptance of. A proposal is matched by where it was
+  said, not by its words alone: it must overlap where the gold proposal's words were heard (the alignment _as_heard()
+  uses), so the same words said elsewhere, in a passage that mustn't be proposed, never count as it. Recall,
+  precision, how many carry a
   warning, and why the others were held back (the rule, validation.HELD_BACK) are reported beside them.
 - warnings: for each warning code and for any warning, how many offered values carry it, how many of those holding a
   retracted value it caught, and of the right ones (matching the gold, holding nothing retracted), the share flagged
@@ -261,6 +264,16 @@ def _as_heard(item: Item, script: Script, phrases: list[str]) -> list[list[str]]
     his usual pharmacy", heard as "call that into his usual pharmacy", is still found in what was shown or reported,
     and words heard in its place that share little with it are not taken for it: not "add an" for "add an orders
     field", nor "duies penicillin rash me" for "low risk penicillin rash only". An empty phrase gives nothing."""
+    return [
+        ([phrase] if phrase else []) + [text for text, _, _ in places]
+        for phrase, places in zip(phrases, _heard_at(item, script, phrases), strict=True)
+    ]
+
+
+def _heard_at(item: Item, script: Script, phrases: list[str]) -> list[list[tuple[str, int, int]]]:
+    """Where each phrase (normalized) was heard, as _as_heard() reads it: for each place the script says it whose words
+    were heard right enough, the words the transcript has there, and the first and the end of their words' indexes
+    among the hypothesis's words (normalize.words())."""
     reference, heard = words(script.display), words(item.hypothesis)
     placed: dict[int, int] = {}
     right: set[int] = set()
@@ -275,15 +288,15 @@ def _as_heard(item: Item, script: Script, phrases: list[str]) -> list[list[str]]
     for phrase in phrases:
         wanted = phrase.split()
         meaning = set(content_words(phrase)) or set(wanted)
-        variants = [phrase] if wanted else []
+        places = []
         for i in range(len(reference) - len(wanted) + 1):
             if wanted and reference[i : i + len(wanted)] == wanted:
                 there = [placed[j] for j in range(i, i + len(wanted)) if j in placed]
                 counted = [j for j in range(i, i + len(wanted)) if reference[j] in meaning]
                 if there and all(len(right.intersection(share)) >= HEARD_RIGHT * len(share)
                                  for share in (range(i, i + len(wanted)), counted)):
-                    variants.append(" ".join(heard[min(there) : max(there) + 1]))
-        found.append(variants)
+                    places.append((" ".join(heard[min(there) : max(there) + 1]), min(there), max(there) + 1))
+        found.append(places)
     return found
 
 
@@ -351,15 +364,17 @@ def _proposals(items: list[Item], scripts: dict[str, Script]) -> dict:
     for item in items:
         script = scripts[item.script]
         golds = list(script.proposals)
-        heard = _as_heard(item, script, [normalize(gold.words) for gold in golds])
+        places = _heard_at(item, script, [normalize(gold.words) for gold in golds])
         said += len(golds)
         matched: set[int] = set()
         for kind, start, end, warnings in item.proposals:
             shown += 1
             with_warnings += bool(warnings)
             text = normalize(item.hypothesis[start:end])
+            # Matched by where it was said: its words among the hypothesis's overlap where a gold proposal's were heard.
+            first, last = len(words(item.hypothesis[:start])), len(words(item.hypothesis[:end]))
             match = next((k for k, gold in enumerate(golds) if k not in matched and gold.kind == kind
-                          and any(_contains(text, words) for words in heard[k])), None)
+                          and any(first < there_end and there < last for _, there, there_end in places[k])), None)
             if match is not None:
                 matched.add(match)
                 if _contains(text, normalize(golds[match].item)) or not golds[match].item.strip():
