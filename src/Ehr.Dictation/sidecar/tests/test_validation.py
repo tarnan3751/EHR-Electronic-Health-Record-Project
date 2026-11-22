@@ -1133,13 +1133,13 @@ def test_at_most_twenty_are_proposed_and_every_rule_is_named():
 
 
 def test_a_proposal_carries_a_warning_for_a_correction_or_an_unclear_passage_beside_it():
-    corrected = transcript("Order a CBC no weight a CMP for today.")
+    corrected = transcript("Order a CBC for today. No other changes to the plan.")
     beside = transcript("Go ahead and order an A1c.", ("mumble mumble", "too_noisy"))
 
     (warned,) = weigh(corrected)
     (near,) = weigh(beside)
 
     assert warned.held_back is None and [(code, corrected.text[s:e]) for code, s, e in warned.warnings] == [
-        ("possible_correction", "no weight a CMP for today")
+        ("possible_correction", "No other changes to the plan")
     ]
     assert near.held_back is None and [code for code, _, _ in near.warnings] == ["near_unclear_passage"]

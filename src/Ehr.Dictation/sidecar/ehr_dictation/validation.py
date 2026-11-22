@@ -19,24 +19,49 @@ kind and where the clinician said it, so the review screen can say what still ha
 allergy list.
 
 Some of those the dictation proposes (the expansion plan's step 15; FR-14 as reworded): an instruction to place an
-order, or to add an allergy, said plainly, which the clinician may open in the order form or the allergy form, which
-fill in nothing from it. proposals() is the one place they are made; a session that must propose none doesn't ask
-(sessions.py). weigh() tries each listed instruction against these rules in order, and the first that applies holds it
-back (HELD_BACK), still listed as not carried over: not_final (the transcript isn't final yet); to_the_software (its
-sentence tells the software to ignore its rules or instructions, or is a note to the assistant, the AI or the
-system); mixed_kinds (an order and an allergy change run together); not_an_addition (an orders section, or an allergy
+order, or to add an allergy, said in one plain form, which the clinician may open in the order form or the allergy
+form, which fill in nothing from it. proposals() is the one place they are made; a session that must propose none
+doesn't ask (sessions.py). An instruction is proposed only when it is said plainly (_plain()), and everything else is
+held back, still listed as not carried over. Said plainly is the clinician's own direct instruction, all of its
+sentence accounted for:
+- it starts its sentence, or follows "and", "so" or "then" (a comma before it or not) after a statement of the plan
+  ("Continue omeprazole and refill the omeprazole", "..., so please add allopurinol to his allergy list"), and that
+  statement doesn't open with a condition (if, unless, when, once, should, assuming, provided, pending, depending,
+  after, before, until, whether, in case, in the event) nor holds one anywhere (if, unless, whether, assuming,
+  provided, pending, depending), nor a hedge, someone asking (asked, requested, wants, insisted, suggested), someone
+  other than the patient, or words to the software;
+- before its verb comes nothing but a closed lead-in: okay, ok, alright, so, and, also, then, now, next, finally,
+  lastly, "plan:", please, "go ahead and", and the clinician's own intent (I'll, I will, I'm going to, I am going to,
+  we'll, we will, we're going to, we are going to, let's, let us, I'm, I am, we're, we are), then "also" or "just";
+  an allergy to add may name its substance first ("penicillin should be added to her allergies");
+- from its verb to the end of the sentence, no comma (but in a number), semicolon, colon, dash, bracket or quote,
+  and none of: someone other than the patient (a relative, a nurse, a doctor, "the patient", a room, Mr, Mrs, Ms, an
+  -ologist), a hedge (probably, perhaps, possibly, maybe, likely, might, could, would, may), a condition (as above,
+  but "before" or "after" a meal or bedtime), "or", "either", "nor", "instead", "as needed", "prn", a negation, a
+  subject or a word of telling (I, we, you, she, he, they; said, asked, told, insisted, suggested, wants, requested,
+  mentioned, thinks), a reflexive, "any", "something", "whatever", "that" (but "call that in"), a note or a request,
+  words to the software, or another step of the plan (start, continue, stop, remove, update, take...); only a reason
+  after "because" may have its own subject ("because he has felt run down");
+- an allergy to add names a substance of one to five words, not a note, a reaction or "that", on her, his, their or
+  the list ("your" list, said to the software, is no patient's);
+- it doesn't come right after a sentence of a few words that is a bare negation or doubt ("No.", "Not today.", "I'm
+  not sure.").
+Every rule below holds it back too, a second layer, and weigh() names the first that applies (HELD_BACK): not_final (the transcript isn't final yet); to_the_software (its
+sentence tells the software to ignore, disregard or forget its rules, instructions or directions, calls on it
+("Assistant, ...", "Dear model, ..."), or is a note to the assistant, the AI or the system); mixed_kinds (an order and an allergy change run together); not_an_addition (an orders section, or an allergy
 change other than adding one: removing, taking off, clearing, updating, changing, marking); negated (a negation before
 it in its clause: "I don't think we need to order"); hedged (if, unless, when, once, consider, maybe, perhaps,
 probably, might, could, would, discuss, think, whether, or "may" that isn't a date, before it in its clause; a sentence
 opening with a condition; or if, unless, in case, once, when or depending on after it); for_later (its sentence says
 next visit, week, month, year or season, at the follow-up, later, eventually, in the future, down the line, or in so
 many days, weeks, months or years); taken_back (a correction cue, or hold off, never mind, forget that, cancel that,
-on second thought, let's not or not yet, from its start to the end of the next sentence, within TAKEN_BACK_REACH words
-after it); in_the_past (a word of the past in its clause, as for the pharmacy: already, last week, ago); unclear (it
+on second thought, let's not or not yet; ignore, disregard, delete, strike, undo, skip, cancel, scratch, drop,
+retract or rescind; hold or forget that or it; take that back; wait, no; declined or refused; don't need it; no longer
+needed; changed my mind: from its start to the end of the next sentence, within TAKEN_BACK_REACH words after it); in_the_past (a word of the past in its clause, as for the pharmacy: already, last week, ago); unclear (it
 overlaps a passage marked unclear); question (its sentence ends in a question mark); quoted (the clause before it ends
 in a word of telling: "she asked, can you order an MRI"); not_imperative (anything but an opener, from the start of
 its clause or the last "and" or word starting a clause, up to its lead-in or subject: "capillary refill under 2
-seconds"); too_many (past MAX_PROPOSALS). A proposal is its kind (order or allergy_addition), the place of its listed
+seconds"); not_plain (not said plainly, as above); too_many (past MAX_PROPOSALS). A proposal is its kind (order or allergy_addition), the place of its listed
 instruction, and its warnings, never words: possible_correction, pointing from a correction-like word said after the
 instruction, in its words or within WARNING_REACH words after them; and near_unclear_passage, as for a value.
 
@@ -1208,7 +1233,7 @@ TAKEN_BACK_REACH = 25  # at most, words after an instruction in which taking it 
 # Why a listed instruction isn't proposed, in the order the rules are tried: the first that applies is the one given.
 HELD_BACK = (
     "not_final", "to_the_software", "mixed_kinds", "not_an_addition", "negated", "hedged", "for_later", "taken_back",
-    "in_the_past", "unclear", "question", "quoted", "not_imperative", "too_many",
+    "in_the_past", "unclear", "question", "quoted", "not_imperative", "not_plain", "too_many",
 )  # fmt: skip
 # What may come between the start of an instruction's clause and the instruction: its lead-in (LEAD_IN) and the words
 # a clinician starts a step of the plan with.
@@ -1231,15 +1256,22 @@ FOR_LATER = re.compile(
 )
 TAKEN_BACK = re.compile(
     CORRECTION.pattern + r"|\b(?:hold off|never ?mind|forget (?:that|it|about it)|cancel that|on second thought|"
-    r"let's not|let us not|not yet)\b",
+    r"let's not|let us not|not yet)\b"
+    r"|\b(?:hold|forget)\s+(?:that|it|this|those|them)\b"
+    r"|\b(?:ignore|disregard|delete|strike|undo|skip|cancel|cancelled|scratch|drop|retract|rescind)\b"
+    r"|\btake\s+(?:that|it)\s+back\b|\bwait\s*,?\s*no\b|\b(?:declined|declines|refused|refuses)\b"
+    r"|\b(?:don't|doesn't|do not|does not|won't|will not)\s+(?:need|want)\s+(?:it|that|this|one|them)\b"
+    r"|\bno longer need\w*|\bchanged? (?:my|our|her|his) minds?\b",
     re.IGNORECASE,
 )
 TO_THE_SOFTWARE = re.compile(
-    rf"\bignore\b{_SAME_SENTENCE}{{0,60}}?\b(?:rules|instructions|prompt|guidelines)\b"
+    rf"\b(?:ignore|disregard|forget)\b{_SAME_SENTENCE}{{0,60}}?\b(?:rules|instructions|prompt|guidelines|directions)\b"
     r"|\b(?:note|instruction|message|request)s?\s+(?:to|for)\s+(?:the\s+)?(?:\w+\s+)?"
     r"(?:assistant|ai|model|system|software|scribe|computer)\b",
     re.IGNORECASE,
 )
+# The software called on, at the start of a sentence: "Assistant, order a CT", "Dear model, ...".
+VOCATIVE = re.compile(r"(?:dear\s+)?(?:assistant|ai|model|system|computer|scribe|software|chatbot)\s*[,:]", re.IGNORECASE)
 QUOTING = REPORTING | frozenset("wondered wonders wondering asking saying".split())
 
 
@@ -1300,7 +1332,7 @@ def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], st
     sentence = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, start)), default=0)
     sentence_end = _sentence_end(text, at)
     lead = [token for token in words if clause <= token.start and token.end <= at]
-    if TO_THE_SOFTWARE.search(text, sentence, sentence_end):
+    if TO_THE_SOFTWARE.search(text, sentence, sentence_end) or VOCATIVE.match(text[sentence:sentence_end].lstrip()):
         return "to_the_software"
     if kinds & {"order", ORDERS_SECTION} and kinds & {"allergy_change", ALLERGY_ADDITION}:
         return "mixed_kinds"
@@ -1339,7 +1371,175 @@ def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], st
     joins = [i for i, token in enumerate(lead) if token.text in CLAUSE_STARTS or token.text == "and"]
     if any(token.text not in OPENERS for token in lead[joins[-1] + 1 if joins else 0 :] if token.start < start):
         return "not_imperative"
+    if not _plain(text, sentence, sentence_end, start, at, kinds):
+        return "not_plain"
     return None
+
+
+# ---- A plain instruction: the one form a proposal is made from ----------------------------------------------------
+
+# What may come before the verb, from the instruction's start (the sentence's, or a join's): words that open a step of
+# the plan, "please", the clinician's own intent, "go ahead and". Nothing else: not a subject, a condition, a name or
+# a negation.
+PLAIN_LEAD = re.compile(
+    r"(?:(?:okay|ok|alright|so|and|also|then|now|next|finally|lastly|plan)\s*[,:]?\s+)*(?:please\s+)?"
+    r"(?:(?:i'll|i will|i'm going to|i am going to|we'll|we will|we're going to|we are going to|let's|let us|i'm|i am|"
+    r"we're|we are)\s+)?(?:please\s+)?(?:go ahead and\s+)?(?:also\s+|just\s+)?"
+)
+# Where a plain instruction may start after a statement of the plan in its sentence: "Continue omeprazole and refill
+# it", "..., so please add ...", "Stop lisinopril, then order a BMP".
+PLAIN_JOIN = re.compile(r"(?:,\s*)?\b(?:and|so|then)\s+", re.IGNORECASE)
+# The subject of an allergy to add said first, and its verb: "penicillin should be added to her allergies".
+PLAIN_PASSIVE = re.compile(r"(?P<x>[^,;:]+?)\s+(?:should|needs to|must|has to|is to|will)\s+be\s+", re.IGNORECASE)
+_PEOPLE = frozenset(
+    """mother mom father dad brother brothers sister sisters sibling siblings son sons daughter daughters parent parents
+    grandmother grandfather grandparent grandparents grandma grandpa aunt uncle cousin wife husband partner spouse niece
+    nephew friend roommate caregiver nurse nurses colleague resident doctor dr provider physician specialist surgeon
+    mr mrs ms miss mister room bed""".split()
+)
+_HEDGES = frozenset("probably perhaps possibly maybe likely unlikely might could would may".split())
+_CONDITIONS = frozenset(
+    "if unless when whenever once until till after before assuming provided providing pending depending should whether "
+    "event case otherwise".split()
+)
+_TELLING = frozenset(
+    """said says say asked asks ask told tells insisted insists suggested suggests wants want wanted requested request
+    requests mentioned mentions thinks think thought believes wondered wonders""".split()
+)
+_SOFTWARE = frozenset("ignore disregard forget instructions instruction rules rule prompt directions guidelines "
+                      "assistant ai model system computer scribe software chatbot".split())
+# Never in a plain instruction's words, from its verb to the end of its sentence: someone else, a patient by name or
+# place, a hedge, a condition, an alternative or "as needed", a negation, a subject or word of telling, a reflexive, a
+# vague or reported object, the software, or another step of the plan.
+_NOT_PLAIN_AFTER = (
+    _PEOPLE | {"patient", "patients"} | _HEDGES | _CONDITIONS | _TELLING | _SOFTWARE
+    | frozenset(
+        """or either nor instead needed prn no not nothing none never nobody neither i we you she he they yourself
+        himself herself themselves myself ourselves itself any that which whatever something anything everything note
+        notes comment comments""".split()
+    )
+)
+_PLAN_VERBS = frozenset(
+    """start continue stop increase decrease reduce resume hold recheck return schedule refer avoid use apply keep
+    switch discontinue monitor counsel discuss review encourage advise come remove delete add put call mark update
+    change clear take cancel skip give make send renew prescribe see check follow""".split()
+)
+# A meal or bedtime a dose is taken by, which "before" and "after" may name.
+_DOSE_TIME = re.compile(r"\b(?:before|after)\s+(?:meals?|food|breakfast|lunch|dinner|supper|bed|bedtime|exercise)\b", re.I)
+_CALLED_IN = re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in", re.IGNORECASE)
+# Before a join: a condition, a hedge, someone asking, someone else, or the software.
+_NOT_PLAIN_BEFORE = (
+    frozenset("if unless whether assuming provided providing pending depending".split()) | _HEDGES
+    | frozenset("consider considering think thinking discuss discussed discussing wonder wondered wondering".split())
+    | frozenset("asked asks asking requested requests requesting wants wanted insisted insists suggested suggests".split())
+    | _PEOPLE | _SOFTWARE
+)
+_OPENING_CONDITIONS = _CONDITIONS - {"event", "case", "otherwise"}
+# A step of the plan said with its verb, which an instruction may follow after a comma alone; and what may come before
+# that verb.
+_PLAN_STEPS = frozenset(
+    "start continue stop increase decrease reduce resume hold recheck refer avoid use apply keep switch discontinue "
+    "monitor carry add".split()
+)
+_STEP_LEAD = frozenset("okay ok alright so and also then now next finally lastly plan please".split())
+# An allergy to add names a substance, of one to five words, on the patient's own list.
+_ALLERGEN = [
+    re.compile(r"add\s+(?P<x>.+?)\s+(?:to|on|as)\s+(?:(?:her|his|their|the)\s+)?(?:drug\s+|medication\s+)?(?:an?\s+)?allerg", re.I),
+    re.compile(r"add\s+(?:an?\s+|the\s+)?(?:new\s+)?allerg\w*\s+(?:to|for)\s+(?P<x>.+?)\s*$", re.I),
+    re.compile(r"add\s+(?:an?\s+|the\s+)?(?:new\s+)?(?P<x>\w+)\s+allerg", re.I),
+    re.compile(r"put\s+(?P<x>.+?)\s+(?:on|in|into)\s+(?:(?:her|his|their|the)\s+)?allerg", re.I),
+    re.compile(r"list\s+(?P<x>.+?)\s+as\s+(?:an?\s+)?allerg", re.I),
+    re.compile(r"(?:make sure|ensure|confirm)\s+(?P<x>.+?)\s+is\s+on\s+(?:(?:her|his|their|the)\s+)?(?:drug\s+)?allerg", re.I),
+    re.compile(r"(?:record|note|enter|document)\s+(?:an?\s+|the\s+)?(?:new\s+)?allerg\w*\s+to\s+(?P<x>.+?)\s*$", re.I),
+    re.compile(r"(?:record|note|enter|document)\s+(?:an?\s+|the\s+)?(?:new\s+)?(?P<x>\w+)\s+allerg", re.I),
+    re.compile(r"(?:added|put|listed)\s+(?:to|on|as)\s+(?:(?:her|his|their|the)\s+)?(?:drug\s+|medication\s+)?(?:an?\s+)?allerg", re.I),
+]
+_NOT_AN_ALLERGEN = frozenset(
+    """note notes comment comments that which reaction reactions severity was is were are been details detail
+    information info history it allergy allergies""".split()
+)
+
+
+def _plain(text: str, sentence: int, sentence_end: int, start: int, at: int, kinds: frozenset[str]) -> bool:
+    """Whether the instruction is said in the one plain form a proposal is made from (see the module's header)."""
+    passive = PLAIN_PASSIVE.fullmatch(text, start, at)
+    lead_end = start if passive else at
+    # Its start: the sentence's, or the last join before it, the rest of the sentence before that being a statement of
+    # the plan; and from there to the verb (or to the subject said first), only a plain lead-in.
+    begin = before_end = None
+    if _lead_in(text[sentence:lead_end]):
+        begin = sentence
+    else:
+        for join in reversed(list(PLAIN_JOIN.finditer(text, sentence, lead_end))):
+            if _lead_in(text[join.end() : lead_end]):
+                begin, before_end = join.end(), join.start()
+                break
+        # Or a comma after a step of the plan said with its verb, when speech recognition kept no "and": "Continue the
+        # ointments as needed, cephalexin should be added to her allergies".
+        comma = text.rfind(",", sentence, lead_end)
+        if begin is None and comma >= 0 and _lead_in(text[comma + 1 : lead_end]):
+            step = [token.text for token in tokens(text[sentence:comma]) if token.text not in _STEP_LEAD]
+            if step and step[0] in _PLAN_STEPS:
+                begin, before_end = comma + 1, comma
+        if before_end is not None:
+            before = tokens(text[sentence:before_end])
+            if not before or before[0].text in _OPENING_CONDITIONS or _plainly(text[sentence:before_end]).startswith(
+                ("in case", "in the event")
+            ) or any(_bare(token.text) in _NOT_PLAIN_BEFORE or _bare(token.text).endswith("ologist") for token in before):
+                return False
+    if begin is None:
+        return False
+    # Nor right after a bare negation or doubt, a sentence of a few words: "No. Order a CBC", "I'm not sure. Order ...".
+    previous = tokens(text[max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, max(sentence - 1, 0))), default=0) : sentence])
+    if previous and len(previous) <= 4 and any(
+        token.text in {"no", "not", "nothing", "none", "never", "sure"} | _HEDGES or token.text.endswith("n't") for token in previous
+    ):
+        return False
+
+    # From the verb to the end of the sentence: no clause after it, nothing but the instruction's own words.
+    after = text[at:sentence_end]
+    if re.search(r"[;:()\[\]\"“”—–]|,(?!\d)|(?<!\d),|\s-\s", after):
+        return False
+    # Its words after the verb, which may be hyphenated ("e-prescribe"); a reason may have its own subject ("because he
+    # has felt run down").
+    said = _CALLED_IN.sub("call in", after)
+    verb = re.match(r"\S+", said)
+    words = tokens(_DOSE_TIME.sub(" ", said[verb.end() if verb else 0 :]))
+    reason = next((i for i, token in enumerate(words) if token.text == "because"), len(words))
+    for i, token in enumerate(words):
+        word = _bare(token.text)
+        if i > reason and word in {"i", "we", "you", "she", "he", "they"}:
+            continue
+        if word in _NOT_PLAIN_AFTER or word.endswith("ologist") or token.text.endswith("n't") or word in _PLAN_VERBS:
+            return False
+
+    if kinds == {ALLERGY_ADDITION}:
+        allergen = passive.group("x") if passive else next(
+            (m.group("x") for pattern in _ALLERGEN if (m := pattern.match(_plainly(after)))), None
+        )
+        if allergen is None or not 1 <= len(tokens(allergen)) <= 5 or any(
+            _bare(token.text) in _NOT_AN_ALLERGEN for token in tokens(allergen)
+        ):
+            return False
+        if passive and not _ALLERGEN[-1].match(_plainly(after)):
+            return False
+    return True
+
+
+def _lead_in(text: str) -> bool:
+    """Whether the words before an instruction's verb are a plain lead-in (PLAIN_LEAD), or none."""
+    lead = _plainly(text)
+    return not lead or PLAIN_LEAD.fullmatch(lead + " ") is not None
+
+
+def _plainly(text: str) -> str:
+    """Lower case, one space between words, a straight apostrophe."""
+    return " ".join(text.lower().replace("’", "'").split())
+
+
+def _bare(word: str) -> str:
+    """A word without its possessive: "mother's" is "mother"."""
+    return word.removesuffix("'s")
 
 
 def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, int]], start: int, end: int,

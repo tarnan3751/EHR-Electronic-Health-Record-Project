@@ -295,7 +295,7 @@ def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_c
     misheard = heard("Plan: go ahead and order a lipid panol. Rest.")
     false = heard("Plan: go ahead and order a chest X-ray. Rest.")
     held = heard("Plan: consider ordering a lipid panel. Rest.")
-    warned = heard("Plan: go ahead and order a lipid panel no weight. Rest.")
+    warned = heard("Plan: go ahead and order a lipid panel. No rest.")
 
     proposals = score([right, misheard, false, held, warned], scripts)["proposals"]
 
