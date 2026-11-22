@@ -1195,17 +1195,17 @@ REPORTING = frozenset(
 # monthly olezarsen", "no other injury on exam swelling"). Not right after the cue or "to", where the word is what it
 # negates ("not take aspirin", "not able to take aspirin").
 NEXT_CLAUSE = (NEW_CLAUSE - {"patient"}) | frozenset("exam examination assessment impression plan vitals".split())
-# Each kind of qualifier, with its reason code: cues before the words they qualify, cues after them, and what ends
-# their reach.
+# Each kind of qualifier, with its reason code: cues before the words they qualify, cues after them, cues closing a
+# clause after a comma, which reach back over all of it, and what ends their reach.
 QUALIFIERS = (
-    ("negation_dropped", NEGATION, POST_NEGATION, TERMINATORS),
-    ("experiencer_dropped", EXPERIENCER, POST_EXPERIENCER, TERMINATORS | REPORTING),
-    ("certainty_dropped", CERTAINTY, POST_CERTAINTY, TERMINATORS),
-    ("history_dropped", HISTORY, None, TERMINATORS),
+    ("negation_dropped", NEGATION, POST_NEGATION, None, TERMINATORS),
+    ("experiencer_dropped", EXPERIENCER, POST_EXPERIENCER, None, TERMINATORS | REPORTING),
+    ("certainty_dropped", CERTAINTY, POST_CERTAINTY, CLOSING_HEDGE, TERMINATORS),
+    ("history_dropped", HISTORY, None, None, TERMINATORS),
 )
 
 
-def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern | None,
+def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern | None, closing: re.Pattern | None,
            ends: frozenset[str]) -> tuple[set[int], set[int]]:
     """The words the text's cues of one kind reach, and the cues' own words (which are neither reached nor plain:
     "mother" in "mother had a stroke" is who had it)."""
@@ -1227,8 +1227,8 @@ def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern 
                 break
             reached.add(i)
             edge = words[i].end
-    closing = [(cue, len(words)) for cue in CLOSING_HEDGE.finditer(text)] if before is CERTAINTY else []
-    for cue, scope in [(cue, POST_SCOPE) for cue in (after.finditer(text) if after else ())] + closing:
+    closings = [(cue, len(words)) for cue in closing.finditer(text)] if closing else []
+    for cue, scope in [(cue, POST_SCOPE) for cue in (after.finditer(text) if after else ())] + closings:
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
         edge = cue.start()
         for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()][-scope:]):
@@ -1249,7 +1249,7 @@ def _object_of_a_preposition(text: str, start: int) -> bool:
 
 def _qualifiers(text: str, words: list[Token]) -> dict[str, set[int]]:
     """For each kind of qualifier, by its reason code, the words its cues reach in the text."""
-    return {reason: _reach(text, words, before, after, ends)[0] for reason, before, after, ends in QUALIFIERS}
+    return {reason: _reach(text, words, *row)[0] for reason, *row in QUALIFIERS}
 
 
 def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) -> set[str]:
@@ -1258,8 +1258,8 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
     in the transcript, so a source can't leave its qualifier out ("chest pain" quoted from "no chest pain")."""
     words = tokens(value)
     found = set()
-    for reason, before, after, ends in QUALIFIERS:
-        reached, cues = _reach(value, words, before, after, ends)
+    for reason, before, after, closing, ends in QUALIFIERS:
+        reached, cues = _reach(value, words, before, after, closing, ends)
         plain = {stem(word.text) for i, word in enumerate(words) if _is_content(word.text) and i not in reached | cues}
         plain -= {stem(words[i].text) for i in reached if _is_content(words[i].text)}
         qualified = {
