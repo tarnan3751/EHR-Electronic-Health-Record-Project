@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Ehr.Web.Api.Dictation;
+using Ehr.Web.CloudAudit;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
@@ -471,6 +473,25 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         }
 
         Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Allergy));
+    }
+
+    // Off-site with the clinic's server cut off, the note being written is shown as last saved, without the proposals still
+    // waiting, which can't be decided then: so they aren't read, and no read of them is queued for the clinic's audit log.
+    // The review and the signed note, which show them, record theirs (TC-UC13-13, AuditPartTests).
+    [Fact]
+    public async Task Cut_off_the_note_editor_neither_shows_nor_reads_the_proposals_waiting()
+    {
+        var dictated = await DictateAsync(apps);
+        var cutOff = Client(apps.CloudCutOff, dictated.Session.Jar);
+
+        var editor = RefillRequestTests.Said(await cutOff.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel));
+
+        Assert.Contains("This draft can't be changed or signed while the clinic's server can't be reached.", editor);
+        Assert.DoesNotContain("proposed from dictation", editor);
+        var queued = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue).Events
+            .Where(e => e.PatientId == dictated.Patient).Select(e => e.TableName).ToList();
+        Assert.Contains("clinical_drafts", queued);
+        Assert.DoesNotContain("ai_chart_proposals", queued);
     }
 
     // Two tabs signing, or saving, one proposal at once, each having read it waiting: the database holds the second behind
