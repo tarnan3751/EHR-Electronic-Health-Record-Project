@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "The note fields K2 Horizon may propose from one transcript dictated in Spanish (FR-11, proposed FR-61), sent to llama-server as the response format (prompt.py strips $schema and $comment). The four fields of note-fields.schema.json, in English, with no field for orders or allergies (FR-14). Each field is a list of statements: the passages of the Spanish transcript a statement comes from, copied word for word, then their English translation, in that order, so the model quotes before it translates. An empty list means the transcript said nothing for that field. Each description is note-fields.schema.json's, word for word (a test checks). Changing this file needs line-by-line human review (AGENTS.md) and a new run of the Spanish test set (eval/README.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subjective", "objective", "assessment", "plan"],
+  "properties": {
+    "subjective": {
+      "description": "What the patient reports: the reason for the visit, the symptoms and their timing, the relevant past and family history, medications and allergies, and readings they took at home.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements"],
+      "properties": {
+        "statements": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["spanish", "english"],
+            "properties": {
+              "spanish": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "string", "maxLength": 600 } },
+              "english": { "type": "string", "maxLength": 600 }
+            }
+          }
+        }
+      }
+    },
+    "objective": {
+      "description": "What the clinician found: today's vital signs and examination findings, and the results the clinician has already reviewed (labs, ECG, imaging).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements"],
+      "properties": {
+        "statements": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["spanish", "english"],
+            "properties": {
+              "spanish": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "string", "maxLength": 600 } },
+              "english": { "type": "string", "maxLength": 600 }
+            }
+          }
+        }
+      }
+    },
+    "assessment": {
+      "description": "The clinician's impression: diagnoses, differential diagnoses, and how each problem is doing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements"],
+      "properties": {
+        "statements": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["spanish", "english"],
+            "properties": {
+              "spanish": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "string", "maxLength": 600 } },
+              "english": { "type": "string", "maxLength": 600 }
+            }
+          }
+        }
+      }
+    },
+    "plan": {
+      "description": "What the clinician says happens next: treatment, medication changes, tests, referrals, follow-up and advice.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements"],
+      "properties": {
+        "statements": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["spanish", "english"],
+            "properties": {
+              "spanish": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "string", "maxLength": 600 } },
+              "english": { "type": "string", "maxLength": 600 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

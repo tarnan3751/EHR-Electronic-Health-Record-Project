@@ -9,8 +9,8 @@ import jsonschema
 import pytest
 from conftest import answer
 
-from ehr_dictation import prompt, validation
-from ehr_dictation.llama import ModelOutputInvalid, parse_answer
+from ehr_dictation import prompt, translation, validation
+from ehr_dictation.llama import ModelOutputInvalid, parse_answer, parse_statements
 
 SCHEMA = json.loads((prompt.SCHEMA_DIRECTORY / prompt.SCHEMA_FILE).read_text(encoding="utf-8"))
 
@@ -81,3 +81,66 @@ def test_the_schema_limits_are_the_checks_limits():
         value, sources = field["properties"]["value"], field["properties"]["sources"]
         assert value["maxLength"] == validation.LIMITS[name], name
         assert (sources["maxItems"], sources["items"]["maxLength"]) == (validation.MAX_SOURCES, validation.MAX_QUOTE)
+
+
+# ---- The Spanish note schema (the expansion plan's step 17) ---------------------------------------------------------
+
+SPANISH = json.loads((prompt.SCHEMA_DIRECTORY / prompt.LANGUAGES["es"][1]).read_text(encoding="utf-8"))
+
+
+def spanish_answer(**fields: list[dict]) -> str:
+    return json.dumps({name: {"statements": fields.get(name, [])} for name in prompt.FIELDS})
+
+
+def test_the_spanish_schema_is_valid_json_schema_with_the_same_four_fields():
+    jsonschema.Draft202012Validator.check_schema(SPANISH)
+    assert list(SPANISH["properties"]) == list(SCHEMA["properties"]) == list(SPANISH["required"])
+    assert SPANISH["additionalProperties"] is False
+
+
+def test_each_field_is_statements_the_spanish_first_then_the_english():
+    for field in SPANISH["properties"].values():
+        assert field["required"] == ["statements"] and field["additionalProperties"] is False
+        statement = field["properties"]["statements"]["items"]
+        # llama-server writes required properties in the schema's order: the model quotes before it translates.
+        assert statement["required"] == ["spanish", "english"] and list(statement["properties"]) == ["spanish", "english"]
+        assert statement["additionalProperties"] is False
+
+
+def test_the_spanish_fields_mean_what_the_english_fields_mean_and_the_prompt_says_so_word_for_word():
+    system = prompt.load(language="es").system
+    for name, field in SPANISH["properties"].items():
+        assert field["description"] == SCHEMA["properties"][name]["description"]
+        assert f"- {name}: {field['description']}\n" in system + "\n"
+
+
+def test_the_spanish_schema_limits_are_the_checks_limits():
+    for field in SPANISH["properties"].values():
+        statements = field["properties"]["statements"]
+        spanish, english = statements["items"]["properties"]["spanish"], statements["items"]["properties"]["english"]
+        assert statements["maxItems"] == translation.MAX_STATEMENTS
+        assert (spanish["maxItems"], spanish["items"]["maxLength"]) == (translation.MAX_QUOTES, translation.MAX_QUOTE)
+        assert english["maxLength"] == translation.MAX_ENGLISH
+
+
+def test_llama_py_accepts_exactly_what_the_spanish_schema_does():
+    valid = spanish_answer(plan=[{"spanish": ["Suspender metformina."], "english": "Stop metformin."}])
+    jsonschema.validate(json.loads(valid), SPANISH)
+    assert parse_statements(valid)[0]["plan"] == [{"spanish": ["Suspender metformina."], "english": "Stop metformin."}]
+
+    for wrong in (
+        answer(("Cough.", ["cough"])),  # the English shape
+        spanish_answer(plan=[{"spanish": "Suspender metformina.", "english": "Stop metformin."}]),
+        json.dumps({"plan": {"statements": []}}),
+    ):
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(json.loads(wrong), SPANISH)
+        with pytest.raises(ModelOutputInvalid):
+            parse_statements(wrong)
+
+
+def test_an_orders_field_doesnt_match_the_spanish_schema_and_is_reported_as_unknown():
+    extra = json.loads(spanish_answer()) | {"orders": {"statements": []}}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(extra, SPANISH)
+    assert parse_statements(json.dumps(extra))[1] == ["orders"]

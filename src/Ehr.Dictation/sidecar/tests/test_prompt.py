@@ -85,3 +85,28 @@ def test_editing_only_the_comment_for_people_keeps_the_hash(tmp_path):
     edited.write_text(edited.read_text(encoding="utf-8").replace("<!--", "<!-- Reworded.", 1), encoding="utf-8")
 
     assert prompt.load(tmp_path).structuring_sha256 == prompt.load().structuring_sha256
+
+
+# ---- Spanish dictation (the expansion plan's step 17) ---------------------------------------------------------------
+
+
+def test_a_spanish_dictation_is_sent_its_own_prompt_and_schema_with_the_same_generation():
+    english, spanish = prompt.load(), prompt.load(language="es")
+
+    assert spanish.system.startswith("You sort a clinician's dictated transcript, spoken in Spanish")
+    assert "human review" not in spanish.system and "$comment" not in spanish.schema
+    assert spanish.parameters == english.parameters and spanish.language == "es" and english.language == "en"
+    request = spanish.request("Tos de tres días.")
+    assert request["messages"][1]["content"] == "<transcript>\nTos de tres días.\n</transcript>"
+    assert request["response_format"]["json_schema"]["schema"] == spanish.schema
+    assert spanish.structuring_sha256 != english.structuring_sha256
+
+
+def test_the_english_prompt_and_schema_are_what_they_were_before_spanish(tmp_path):
+    # The English files, copied alone into another folder, give the same hashes: adding the Spanish files (and the
+    # language parameter) changed nothing an English dictation is sent.
+    for name in (prompt.PROMPT_FILE, prompt.SCHEMA_FILE):
+        shutil.copy(prompt.SCHEMA_DIRECTORY / name, tmp_path / name)
+    alone, here = prompt.load(tmp_path), prompt.load()
+    assert (alone.prompt_sha256, alone.schema_sha256, alone.structuring_sha256) == (
+        here.prompt_sha256, here.schema_sha256, here.structuring_sha256)

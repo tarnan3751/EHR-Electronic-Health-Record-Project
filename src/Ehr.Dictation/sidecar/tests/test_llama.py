@@ -114,3 +114,35 @@ def test_the_model_file_is_checked_before_every_request():
     with pytest.raises(ModelUnavailable):
         asyncio.run(structurer.propose("Cough for three days."))
     assert structurer.build is None
+
+
+# ---- Spanish dictation (the expansion plan's step 17) ---------------------------------------------------------------
+
+
+def spanish_structurer(llama: FakeLlama) -> Structurer:
+    server = LlamaServer("http://llama.test", "llama-key", transport=httpx2.MockTransport(llama.handle))
+    return Structurer(server, prompt.load(language="es"), "K2-Horizon-7B-Q4_K_M.gguf", timeout=5)
+
+
+def test_a_spanish_dictation_is_sent_the_spanish_prompt_and_its_statements_come_back_with_the_answer_as_written():
+    content = json.dumps({"subjective": {"statements": [{"spanish": ["Niega fiebre."], "english": "Denies fever."}]},
+                          "objective": {"statements": []}, "assessment": {"statements": []},
+                          "plan": {"statements": []}, "orders": {"statements": []}})
+    llama = FakeLlama(content)
+
+    proposal = asyncio.run(spanish_structurer(llama).propose("Niega fiebre."))
+
+    sent = json.loads(llama.requests[-1].content)
+    assert sent["messages"][0]["content"].startswith("You sort a clinician's dictated transcript, spoken in Spanish")
+    assert proposal.fields["subjective"] == [{"spanish": ["Niega fiebre."], "english": "Denies fever."}]
+    assert proposal.fields["plan"] == [] and proposal.unknown == ["orders"] and proposal.content == content
+
+
+def test_a_spanish_answer_in_the_english_shape_is_invalid():
+    with pytest.raises(ModelOutputInvalid):
+        asyncio.run(spanish_structurer(FakeLlama(answer(("Cough.", ["cough"])))).propose("Tos."))
+
+
+def test_an_english_dictations_proposal_keeps_no_answer_text():
+    proposal = propose(FakeLlama(answer(("Cough for three days.", ["Cough for three days"]))))
+    assert proposal.content is None

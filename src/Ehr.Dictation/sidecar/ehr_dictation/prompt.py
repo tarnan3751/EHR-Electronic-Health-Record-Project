@@ -13,6 +13,11 @@ block). Its template's other settings, high, medium and low, all reason at lengt
 tokens for a two-minute dictation, measured, where off answers in about 30 seconds on a GPU. No tools are ever offered.
 The structuring hash covers everything sent except the transcript, so the eval can tell when a result came from a
 different prompt, schema or set of parameters (eval/README.md), such as its comparison run with reasoning on.
+
+A transcript dictated in Spanish (the expansion plan's step 17) is sorted with a prompt and schema of its own,
+structuring-prompt-es.md and note-fields-es.schema.json, into the same four fields in English, each a list of
+statements: the Spanish passages it comes from and their English (translation.py checks them). load(language="es")
+reads those; the English files, and what is sent for an English dictation, are unchanged.
 """
 
 from __future__ import annotations
@@ -28,6 +33,8 @@ FIELDS = ("subjective", "objective", "assessment", "plan")
 SCHEMA_DIRECTORY = Path(__file__).resolve().parents[2] / "schema"
 PROMPT_FILE = "structuring-prompt.md"
 SCHEMA_FILE = "note-fields.schema.json"
+# Each dictation language's prompt and schema: English as above, Spanish translated into the same fields.
+LANGUAGES = {"en": (PROMPT_FILE, SCHEMA_FILE), "es": ("structuring-prompt-es.md", "note-fields-es.schema.json")}
 
 PARAMETERS = {
     "temperature": 0,
@@ -49,6 +56,7 @@ class Structuring:
     prompt_sha256: str
     schema_sha256: str
     structuring_sha256: str
+    language: str = "en"
 
     def user_message(self, transcript: str) -> str:
         return USER_TEMPLATE.format(transcript=MARKER.sub("[removed]", transcript))
@@ -66,11 +74,13 @@ class Structuring:
         }
 
 
-def load(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None) -> Structuring:
-    """The prompt and schema as sent, with PARAMETERS unless the eval asks for others to compare."""
+def load(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None, language: str = "en") -> Structuring:
+    """The prompt and schema as sent for a dictation in `language` ("en" or "es"), with PARAMETERS unless the eval asks
+    for others to compare."""
+    prompt_file, schema_file = LANGUAGES[language]
     parameters = dict(PARAMETERS if parameters is None else parameters)
-    system = HEADER.sub("", (directory / PROMPT_FILE).read_text(encoding="utf-8")).strip()
-    schema = json.loads((directory / SCHEMA_FILE).read_text(encoding="utf-8"))
+    system = HEADER.sub("", (directory / prompt_file).read_text(encoding="utf-8")).strip()
+    schema = json.loads((directory / schema_file).read_text(encoding="utf-8"))
     for key in ("$schema", "$comment"):
         schema.pop(key, None)
     return Structuring(
@@ -82,6 +92,7 @@ def load(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None) -> 
         structuring_sha256=_sha256(
             _canonical({"system": system, "schema": schema, "parameters": parameters, "user": USER_TEMPLATE})
         ),
+        language=language,
     )
 
 
