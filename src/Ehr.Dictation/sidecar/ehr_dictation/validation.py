@@ -108,7 +108,12 @@ and every check reads the cleaned text. The checks, each with the reason code re
   (four back, for one that follows what it qualifies, such as "denied"), and stops at its clause: punctuation, a
   contrast ("but"), a new subject ("she", "patient"), a step of the plan or a heading after its first word ("no further
   pancreatitis continue monthly olezarsen"), and for someone else, a word of telling ("mom says the rash started
-  Monday" is the patient's rash).
+  Monday" is the patient's rash). A cue that names the subject itself, with its verb, reaches what follows them
+  (subject_cues()): a negation in "I don't think she has pneumonia", "I do not believe that he has a fracture", "I
+  doubt she has strep", "unlikely that the patient has appendicitis"; uncertainty in "I think she has gout", "maybe
+  it's viral", "possibly he is anemic", "she might have gout", "I wonder if she has gout", "I'm not sure she has gout",
+  "it could be that she has gout". The subject is she, he, it, they or the patient, and its verb a form of "have" or
+  "be" (or "might", "may" or "could" with "have" or "be").
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -1103,8 +1108,30 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
 
 # ---- Negation, who has it, and how sure ----------------------------------------------------------------------------
 
+
+def subject_cues(*subjects: str) -> tuple[str, str]:
+    """Cues that name who has what follows, for NEGATION and CERTAINTY, as patterns: a new subject ends a cue's reach
+    ("no fever she is eating well"), so these take the subject and its verb into the cue, and reach what follows them
+    ("I don't think she has pneumonia", "she might have gout"). Each subject is one or more words ("the patient")."""
+    who = "|".join(r"\s+".join(subject.split()) for subject in subjects)
+    has = rf"(?:{who})(?:['’](?:s|re|ve)|\s+(?:has|have|had|is|are|was|were))"
+    negation = (
+        rf"i\s+(?:don['’]t|do\s+not)\s+(?:think|believe)(?:\s+that)?\s+{has}|i\s+doubt(?:\s+that)?\s+{has}"
+        rf"|unlikely\s+that\s+{has}"
+    )
+    certainty = (
+        rf"it\s+could\s+be\s+that\s+{has}|i\s+think(?:\s+that)?\s+{has}|(?:maybe|possibly|perhaps)\s+{has}"
+        rf"|(?:{who})\s+(?:might|may|could)\s+(?:have|be)|i\s+wonder\s+(?:if|whether)\s+{has}"
+        rf"|i(?:['’]m|\s+am)\s+not\s+sure(?:\s+(?:if|that|whether))?\s+{has}"
+    )
+    return negation, certainty
+
+
+# The patient, said of in the third person.
+SUBJECT_NEGATION, SUBJECT_CERTAINTY = subject_cues("she", "he", "it", "they", "the patient")
 NEGATION = re.compile(
-    r"\b(?:no(?![\s,]+(?:sorry|wait|correction)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
+    rf"\b(?:{SUBJECT_NEGATION}|"
+    r"no(?![\s,]+(?:sorry|wait|correction)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
     r"free of|ruled out|rules out|doesn't|does not|didn't|did not|isn't|is not|wasn't|was not|hasn't|has not|haven't|"
     r"have not|don't|do not|won't|will not|shouldn't|should not|non)\b",
     re.IGNORECASE,
@@ -1126,7 +1153,8 @@ POST_EXPERIENCER = re.compile(
 )
 # Not certain: "possible community acquired pneumonia", "rule out appendicitis", "pneumonia suspected".
 CERTAINTY = re.compile(
-    r"\b(?:possible|possibly|probable|probably|suspected|suspect|suspicious for|suspicion of|likely|unlikely|"
+    rf"\b(?:{SUBJECT_CERTAINTY}|"
+    r"possible|possibly|probable|probably|suspected|suspect|suspicious for|suspicion of|likely|unlikely|"
     r"rule out|r/o|risk of|risk for|concern for|concerning for|questionable|presumed)\b",
     re.IGNORECASE,
 )

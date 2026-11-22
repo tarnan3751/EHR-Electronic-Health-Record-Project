@@ -4,6 +4,8 @@ The review's and the owner's cases are here verbatim."""
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from ehr_dictation.prompt import FIELDS
@@ -18,6 +20,7 @@ from ehr_dictation.validation import (
     directives,
     not_carried_over,
     proposals,
+    subject_cues,
     weigh,
 )
 
@@ -493,6 +496,47 @@ def test_a_qualifier_stops_at_a_new_subject():
     assert own("No fever she is eating well.", "She is eating well.").pending
     assert own("Mother had a stroke patient has hypertension.", "Patient has hypertension.").pending
     assert own("No fever she is eating well.", "Fever.", "No fever").reasons == ["negation_dropped"]
+
+
+# A cue that names the subject and its verb reaches past them: a value that keeps the finding without the cue is
+# refused, and one that keeps both goes out.
+@pytest.mark.parametrize(("said", "value", "reason"), [
+    ("I don't think she has pneumonia.", "She has pneumonia.", "negation_dropped"),
+    ("I do not believe that he has a fracture.", "He has a fracture.", "negation_dropped"),
+    ("I doubt she has strep.", "She has strep.", "negation_dropped"),
+    ("It is unlikely that the patient has appendicitis.", "The patient has appendicitis.", "negation_dropped"),
+    ("I think she has gout.", "She has gout.", "certainty_dropped"),
+    ("Maybe she has gout.", "She has gout.", "certainty_dropped"),
+    ("Perhaps he is anemic.", "He is anemic.", "certainty_dropped"),
+    ("I think it's viral.", "It's viral.", "certainty_dropped"),
+    ("She might have gout.", "Gout.", "certainty_dropped"),
+    ("They could be dehydrated.", "Dehydrated.", "certainty_dropped"),
+    ("I wonder if she has gout.", "She has gout.", "certainty_dropped"),
+    ("I'm not sure she has gout.", "She has gout.", "certainty_dropped"),
+    ("I am not sure whether she has gout.", "She has gout.", "certainty_dropped"),
+    ("It could be that she has gout.", "She has gout.", "certainty_dropped"),
+])
+def test_a_cue_that_names_the_subject_reaches_past_it(said, value, reason):
+    assert own(said, value).reasons == [reason]
+    assert own(said, said).pending
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("Denies chest pain she has been walking daily.", "She has been walking daily."),
+    ("Maybe she has gout, she is eating well.", "She is eating well."),
+    ("I think she has gout. She is eating well.", "She is eating well."),
+    ("She has gout.", "She has gout."),
+])
+def test_a_new_subject_still_ends_a_cue_that_does_not_name_it(said, value):
+    assert own(said, value, value.rstrip(".")).pending
+
+
+def test_the_cues_that_name_a_subject_are_made_for_any_subject():
+    negation, certainty = subject_cues("you")
+
+    assert re.fullmatch(negation, "I don't think you have", re.IGNORECASE)
+    assert re.fullmatch(certainty, "you might have", re.IGNORECASE)
+    assert not re.search(negation, "I don't think she has", re.IGNORECASE)
 
 
 def test_without_punctuation_a_qualifier_stops_at_the_next_step_or_heading():
