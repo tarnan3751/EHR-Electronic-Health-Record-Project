@@ -59,12 +59,30 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
         Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
     }
 
-    // The expansion plan's step 14 (TC-UC10-08): proposals are staged only for the note's four fields, so a History, the
-    // first of the three fields before then, is refused even when the stored result names one. A History proposal staged
-    // before then is still decided, as any proposal is.
+    // The expansion plan's step 14 (TC-UC10-08): proposals are staged for the note's four fields, Subjective and Objective
+    // as Assessment and Plan, and only for them, so a History, the first of the three fields before then, is refused even
+    // when the stored result names one. A History proposal staged before then is still decided, as any proposal is.
     [Fact]
     public async Task Only_the_four_fields_are_staged_and_a_history_staged_before_them_is_still_decided()
     {
+        // Each of the four, as the app stages a result that proposes them all.
+        var four = await RecordingAsync();
+        await Accounts.ExecuteAsync(App, four.Actor,
+            """
+            UPDATE ehr.ai_note_reviews SET state = 'pending', result_json = @result::jsonb WHERE id = @review;
+            INSERT INTO ehr.ai_field_proposals (id, review_id, patient_id, field, original_value, state)
+            SELECT gen_random_uuid(), @review, @patient, f.key, f.value ->> 'value', 'pending' FROM jsonb_each(@result::jsonb -> 'fields') AS f;
+            """,
+            [.. Parameters(four).Where(parameter => parameter.Name != "result"), ("result", """
+                {"sorting":"done","fields":{
+                  "subjective":{"status":"pending","value":"Synthetic subjective proposal","sources":[{"start":0,"end":9}],"warnings":[]},
+                  "objective":{"status":"pending","value":"Synthetic objective proposal","sources":[{"start":10,"end":19}],"warnings":[]},
+                  "assessment":{"status":"pending","value":"Synthetic assessment proposal","sources":[{"start":20,"end":29}],"warnings":[]},
+                  "plan":{"status":"pending","value":"Synthetic plan proposal","sources":[{"start":30,"end":39}],"warnings":[]}}}
+                """)]);
+        Assert.Equal(["assessment", "objective", "plan", "subjective"],
+            await Query(four, "SELECT field FROM ehr.ai_field_proposals WHERE review_id = @review ORDER BY field"));
+
         // A result and a proposal that name a History, matching each other: only the field's name is wrong.
         var stageHistory = Stage.Replace("'subjective'", "'history'", StringComparison.Ordinal);
         (string Name, object Value)[] WithHistory(Review review) =>

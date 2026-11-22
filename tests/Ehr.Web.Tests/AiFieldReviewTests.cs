@@ -35,9 +35,10 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
             token, json.GetProperty("editorUrl").GetString()!, json.GetProperty("url").GetString()!);
     }
 
-    async Task<Flow> StageAsync(bool plan = true)
+    async Task<Flow> StageAsync(bool plan = true, bool objective = false)
     {
         sidecar.IncludePlan = plan;
+        sidecar.IncludeObjective = objective;
         var flow = await BeginAsync();
         await DictateAsync(flow, 5);
         using var staged = await Stage(flow, 1);
@@ -238,17 +239,30 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // TC-UC13-08 (successful flow; the expansion plan's step 14): a dictation is reviewed in the note's four fields, in
-    // their order, a field the model proposed nothing for saying so; each approved value goes into its own section.
+    // their order: each proposed one staged, shown with the transcript passage it came from, and once accepted put into
+    // its own section of the draft, Objective too. A field the model proposed nothing for says so.
     [Fact]
     public async Task TC_UC13_08_a_dictation_is_reviewed_in_the_four_fields_and_each_goes_into_its_section()
     {
-        var f = await StageAsync();
+        var f = await StageAsync(objective: true);
         var review = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
         Assert.Equal(["subjective", "objective", "assessment", "plan"],
             System.Text.RegularExpressions.Regex.Matches(review, "data-dictation-field=\"([a-z]+)\"").Select(m => m.Groups[1].Value));
-        Assert.Matches("(?s)data-dictation-field=\"objective\".*?No usable suggestion", review);
+        var snapshot = JsonDocument.Parse(System.Net.WebUtility.HtmlDecode(
+            System.Text.RegularExpressions.Regex.Match(review, "<script type=\"application/json\" data-review-snapshot>(.*?)</script>").Groups[1].Value)).RootElement;
+        var transcript = snapshot.GetProperty("result").GetProperty("transcript").GetProperty("text").GetString()!;
+        var fields = snapshot.GetProperty("result").GetProperty("fields");
+        foreach (var (field, value) in new[] { ("subjective", "Cough for three days."), ("objective", "Chest is clear."), ("assessment", "No fever."), ("plan", "Fluids and rest.") })
+        {
+            var proposed = fields.GetProperty(field);
+            Assert.Equal(value, proposed.GetProperty("value").GetString());
+            var source = Assert.Single(proposed.GetProperty("sources").EnumerateArray().ToArray());
+            Assert.Equal(value, transcript[source.GetProperty("start").GetInt32()..source.GetProperty("end").GetInt32()]);
+            Assert.Matches($"(?s)data-dictation-field=\"{field}\"[^>]*data-review-state=\"pending\".*?<dd data-field-value>{System.Text.RegularExpressions.Regex.Escape(value)}</dd>", review);
+        }
+
         var proposals = await Proposals(f);
-        Assert.Equal(["assessment", "plan", "subjective"], proposals.Select(p => p.Field).Order(StringComparer.Ordinal));
+        Assert.Equal(["assessment", "objective", "plan", "subjective"], proposals.Select(p => p.Field));
         var version = 2L;
         foreach (var proposal in proposals)
         {
@@ -259,8 +273,13 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         using var complete = await ReviewPost(f, "Complete", ("Version", version));
         Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
         Assert.Equal(1, await Scalar(
-            "SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND subjective = 'Cough for three days.' AND objective = '' AND assessment = 'No fever.' AND plan <> ''",
+            "SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND subjective = 'Cough for three days.' AND objective = 'Chest is clear.' AND assessment = 'No fever.' AND plan = 'Fluids and rest.'",
             f.Draft));
+
+        // Nothing proposed for a field: the review says so, and nothing is staged for it.
+        var without = await StageAsync(plan: false);
+        Assert.Matches("(?s)data-dictation-field=\"plan\".*?No usable suggestion", await without.Session.Client.GetStringAsync(without.ReviewUrl, Cancel));
+        Assert.DoesNotContain("plan", (await Proposals(without)).Select(p => p.Field));
     }
 
     // TC-UC13-07 (alternative flow; the expansion plan's step 14): a review saved before step 14, of a dictation sorted
