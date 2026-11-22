@@ -150,6 +150,28 @@ def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):
     assert any("didn't sort every recording" in p for p in problems)
 
 
+# The review's case: recordings dropped and the counts made to agree still fail, as do a recording held twice or one no
+# script defines.
+@pytest.mark.parametrize("change", ["drop", "twice", "undefined"])
+def test_results_that_hold_other_recordings_than_the_scripts_define_fail(eval_dir, change):
+    other = results(eval_dir)
+    if change == "drop":
+        other["items"] = other["items"][:1]
+        other["dataset"]["recordings"] = 1
+    elif change == "twice":
+        other["items"][1] = dict(other["items"][0])
+        other["items"][1]["script"] = "d02"
+    else:
+        other["items"][1] = dict(other["items"][1], variant="d02--hvac-20db")
+    other["metrics"]["proposals"] = scoring.score(
+        [scoring.Item(**item) for item in other["items"]], load_all(eval_dir / "scripts"))["proposals"]
+    save(eval_dir, "latest.json", other)
+
+    problems = check(eval_dir / "results", eval_dir)
+
+    assert any("not exactly the 2 the scripts define" in p for p in problems)
+
+
 def test_results_that_dont_say_what_was_shown_fail(eval_dir):
     silent = results(eval_dir)
     silent["metrics"]["order_allergy"] = {}
@@ -307,6 +329,18 @@ def test_a_false_or_misheard_proposal_fails_unless_accepted(eval_dir, why, heard
     save(eval_dir, "latest.json", listed)
 
     assert check(eval_dir / "results", eval_dir) == []
+
+
+# Every measure of the proposals block is scored again, not only the ones the owner's list is checked against.
+@pytest.mark.parametrize("altered", [{"right": 0}, {"recall": 0.5}, {"precision": 0.5}, {"with_warnings": 7},
+                                     {"held_back": {"not_plain": 3}}])
+def test_results_whose_proposals_block_says_anything_else_fail(eval_dir, altered):
+    tampered = results(eval_dir)
+    tampered["metrics"]["proposals"] |= altered
+    save(eval_dir, "latest.json", tampered)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "aren't what their stored recordings give" in problem
 
 
 # The review's case: a results file that says it listed nothing, its proposals altered, still lists the misheard one.

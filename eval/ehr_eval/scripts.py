@@ -64,6 +64,19 @@ def recordings_sha256(eval_dir: Path = EVAL_DIR) -> str:
     return digest.hexdigest()
 
 
+def variant_ids(eval_dir: Path = EVAL_DIR) -> set[str]:
+    """The recordings the test set defines, by id, as generate_audio.py names them: each script's clean one, each of
+    its noises at each SNR in voices.toml, and one more for each script voices.toml calls unusable."""
+    variants = tomllib.loads((eval_dir / "voices.toml").read_text(encoding="utf-8")).get("variants", {})
+    ids = set()
+    for script in load_all(eval_dir / "scripts").values():
+        ids.add(f"{script.id}--clean")
+        ids |= {f"{script.id}--{noise}-{snr}db" for snr in variants.get("snr_db", []) for noise in script.noise}
+        if script.id in variants.get("unusable", []):
+            ids.add(f"{script.id}--{script.noise[0]}-{variants['unusable_snr_db']}db")
+    return ids
+
+
 def gold_sha256(eval_dir: Path = EVAL_DIR) -> str:
     """One hash over the rest of every script, what it is scored against: both gold sets, tags, dates, drugs, forbidden,
     retracted, and what should and shouldn't be proposed. A change means scoring the stored answers again
