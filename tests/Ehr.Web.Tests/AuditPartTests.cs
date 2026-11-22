@@ -9,6 +9,7 @@ using Ehr.Domain.Audit;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.Areas.Portal.Pages;
 using Ehr.Web.CloudAudit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
@@ -327,9 +328,32 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         var patient = Guid.CreateVersion7();
 
         Assert.All(AuditActions.Reads, action => Assert.Throws<InvalidOperationException>(() => audit.Record(action, patient, "patients", patient)));
-        Assert.Throws<InvalidOperationException>(() => audit.RecordReads("patients", null!, [(patient, patient)]));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => audit.RecordReadsAsync("patients", null!, [(patient, patient)], Cancel));
         await Assert.ThrowsAsync<InvalidOperationException>(() => audit.RecordAllAsync(null!, [(AuditActions.Read, patient, "patients", patient)], Cancel));
         Assert.Null(audit.Record(AuditActions.SignOut, patient).Part);
+    }
+
+    // A list's reads, a hundred patients on the clinic's home, are written in one statement, in the page's transaction,
+    // not one statement each when the unit of work is saved: each statement prepares the table's checks again, which cost
+    // the home 1.2 to 1.4 ms a page once the part had its check (step 13c2). Nothing is left for the save to insert, and
+    // the events commit with the transaction.
+    [Fact]
+    public async Task A_lists_reads_are_written_in_one_statement_in_the_pages_transaction()
+    {
+        using var scope = apps.OnPrem.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Ehr.Data.EhrDbContext>();
+        var audit = scope.ServiceProvider.GetRequiredService<AuditRecorder>();
+        (Guid, Guid)[] patients = [.. Enumerable.Range(0, 100).Select(_ => Guid.CreateVersion7()).Select(patient => (patient, patient))];
+
+        await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+        await audit.RecordReadsAsync("patients", AuditParts.Panel, patients, Cancel);
+
+        Assert.Empty(db.ChangeTracker.Entries<AuditEvent>());
+        await transaction.CommitAsync(Cancel);
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var count = new NpgsqlCommand("SELECT count(*) FROM ehr.audit_events WHERE patient_id = ANY(@patients) AND part = 'panel'", connection);
+        count.Parameters.AddWithValue("patients", patients.Select(p => p.Item1).ToArray());
+        Assert.Equal(100L, await count.ExecuteScalarAsync(Cancel));
     }
 
     // The parts are one list wherever they are kept: the code's (AuditParts), the database's check, the cloud app's

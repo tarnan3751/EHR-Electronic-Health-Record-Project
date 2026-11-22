@@ -137,7 +137,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id, part: part);
         if (signed.Count > 0)
         {
-            audit.RecordReads("clinical_notes", part, signed.Select(n => (id, n.Id)));
+            await audit.RecordReadsAsync("clinical_notes", part, signed.Select(n => (id, n.Id)), cancellationToken);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -734,7 +734,8 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
             db.Appointments.Where(a => a.ClinicianId == clinician && a.StartsAt >= from && a.StartsAt < to), latestFirst: false, cancellationToken);
         if (appointments.Count > 0)
         {
-            audit.RecordReads(PatientsTable, AuditParts.Schedule, appointments.Select(a => a.PatientId).Distinct().Select(patient => (patient, patient)));
+            await audit.RecordReadsAsync(PatientsTable, AuditParts.Schedule,
+                appointments.Select(a => a.PatientId).Distinct().Select(patient => (patient, patient)), cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -835,7 +836,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         var named = items.Where(i => i.PatientName is not null).Select(i => i.PatientId!.Value).Distinct().ToList();
         if (named.Count > 0)
         {
-            audit.RecordReads(PatientsTable, AuditParts.Inbox, named.Select(patient => (patient, patient)));
+            await audit.RecordReadsAsync(PatientsTable, AuditParts.Inbox, named.Select(patient => (patient, patient)), cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -872,7 +873,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
             .Where(d => d.ClinicianId == user.UserId && patients.Contains(d.PatientId)).ToListAsync(cancellationToken);
         if (drafts.Count > 0)
         {
-            audit.RecordReads(DraftsTable, AuditParts.NoteDraft, drafts.Select(d => (d.PatientId, d.Id)));
+            await audit.RecordReadsAsync(DraftsTable, AuditParts.NoteDraft, drafts.Select(d => (d.PatientId, d.Id)), cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -895,7 +896,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         if (drafts.Count > 0)
         {
             // Listed on the chart, the one page that asks: part of opening it.
-            audit.RecordReads(DraftsTable, AuditParts.Chart, drafts.Select(d => (d.PatientId, d.Id)));
+            await audit.RecordReadsAsync(DraftsTable, AuditParts.Chart, drafts.Select(d => (d.PatientId, d.Id)), cancel);
             await db.SaveChangesAsync(cancel);
         }
 
@@ -1026,7 +1027,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
                 db.StaffUsers.Where(u => u.Id == a.AuthorId).Select(u => u.DisplayName).FirstOrDefault() ?? "")
             })
             .ToListAsync(cancel);
-        audit.RecordReads("clinical_notes", AuditParts.Offline, notes.Select(n => (n.Note.PatientId, n.Note.Id)));
+        await audit.RecordReadsAsync("clinical_notes", AuditParts.Offline, notes.Select(n => (n.Note.PatientId, n.Note.Id)), cancel);
         await db.SaveChangesAsync(cancel);
         // How many sensitive addenda each note has that aren't in the copy, so the desktop can say so.
         var withheld = await db.NoteAddenda.AsNoTracking().Where(a => ids.Contains(a.NoteId) && a.PatientId == patient && a.Sensitive)
@@ -1162,7 +1163,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
             .OrderBy(r => r.CreatedAt).ToListAsync(cancel);
         if (reviews.Count > 0)
         {
-            audit.RecordReads("ai_note_reviews", part, reviews.Select(r => (r.PatientId, r.Id)));
+            await audit.RecordReadsAsync("ai_note_reviews", part, reviews.Select(r => (r.PatientId, r.Id)), cancel);
             await db.SaveChangesAsync(cancel);
         }
 
@@ -1175,7 +1176,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         var proposals = await query.Where(p => p.ReviewId == review).OrderBy(p => p.Field).ToListAsync(cancel);
         if (proposals.Count > 0)
         {
-            audit.RecordReads("ai_field_proposals", AuditParts.NoteDraft, proposals.Select(p => (p.PatientId, p.Id)));
+            await audit.RecordReadsAsync("ai_field_proposals", AuditParts.NoteDraft, proposals.Select(p => (p.PatientId, p.Id)), cancel);
             await db.SaveChangesAsync(cancel);
         }
 
@@ -1509,7 +1510,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         var more = patients.Count == limit && await ordered.Skip(limit).AnyAsync(cancellationToken);
         if (patients.Count > 0)
         {
-            audit.RecordReads(PatientsTable, part, patients.Select(p => (p.Id, p.Id)));
+            await audit.RecordReadsAsync(PatientsTable, part, patients.Select(p => (p.Id, p.Id)), cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
         }
 

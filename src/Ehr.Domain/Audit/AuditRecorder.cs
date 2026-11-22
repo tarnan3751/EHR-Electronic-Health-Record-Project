@@ -22,15 +22,17 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
         return auditEvent;
     }
 
-    // A read of several rows at once, such as a list of patients: one event for each, stored together, so the cloud
-    // site's queue goes to disk once for the list rather than once a row.
-    public void RecordReads(string tableName, string part, IEnumerable<(Guid PatientId, Guid RowId)> rows) =>
-        Store([.. rows.Select(row => New(AuditActions.Read, row.PatientId, tableName, row.RowId, reason: null, actorId: null, details: null, part))]);
+    // A read of several rows at once, such as a list of patients: one event for each, written together as RecordAllAsync
+    // writes them. Saved with the unit of work, each would take a statement of its own, and each statement prepares the
+    // table's checks again: for a list of 100 patients, step 13c2's check on the part cost the clinic's home 1.2 to 1.4
+    // ms that way (12 to 14 µs a statement), where one statement prepares it once.
+    public Task RecordReadsAsync(string tableName, string part, IEnumerable<(Guid PatientId, Guid RowId)> rows, CancellationToken cancellationToken) =>
+        RecordAllAsync(part, rows.Select(row => (AuditActions.Read, row.PatientId, tableName, row.RowId)), cancellationToken);
 
     // Several reads at once, such as a page with a read of the patient and of each of many of their rows: written
     // together, on-site in one statement at once, in the caller's transaction (AuditEventBatch), where events recorded
     // one by one each take a statement of their own when the unit of work is saved; on the cloud site, given to the
-    // queue together, as RecordReads gives them. One page's reads, so one part.
+    // queue together, so the queue goes to disk once for them rather than once an event. One page's reads, so one part.
     public async Task RecordAllAsync(string part, IEnumerable<(string Action, Guid PatientId, string TableName, Guid RowId)> reads, CancellationToken cancellationToken)
     {
         AuditEvent[] auditEvents = [.. reads.Select(read => New(read.Action, read.PatientId, read.TableName, read.RowId, reason: null, actorId: null, details: null, part))];
