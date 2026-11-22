@@ -115,13 +115,13 @@ def test_the_english_prompt_and_schema_are_what_they_were_before_spanish(tmp_pat
 
 def test_the_spanish_prompts_example_of_a_correction_is_an_answer_the_checks_offer():
     # Rule 6's example: what stands once the correction is made, quoted in two passages, translated whole.
-    said = "Repetir función renal en 1 semana, no, perdón, en 2 semanas"
+    said = "Revisar la presión en 1 mes, no, perdón, en 3 meses"
     system = prompt.load(language="es").system
-    assert f'for "{said}", the "spanish" is "Repetir función renal" and "en 2 semanas"' in system
+    assert f'for "{said}", the "spanish" is "Revisar la presión" and "en 3 meses"' in system
     text = said + "."
-    statement = {"spanish": ["Repetir función renal", "en 2 semanas"], "english": "Repeat kidney function in 2 weeks"}
+    statement = {"spanish": ["Revisar la presión", "en 3 meses"], "english": "Recheck blood pressure in 3 months"}
     checked = translation.check({"plan": [statement]}, [], one_passage(text)).fields["plan"]
-    assert checked.pending and checked.value == "Repeat kidney function in 2 weeks."
+    assert checked.pending and checked.value == "Recheck blood pressure in 3 months."
 
 
 def one_passage(text: str) -> Transcript:

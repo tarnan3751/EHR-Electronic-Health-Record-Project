@@ -10,7 +10,7 @@ from collections import Counter
 import pytest
 
 from dictation_scripts_es import FIELDS, HOLDOUT_DIR, load_scripts, runs
-from ehr_dictation import spanish, translation, validation
+from ehr_dictation import prompt, spanish, translation, validation
 from ehr_dictation.textnorm import tokens
 from ehr_eval import scoring_es
 
@@ -153,3 +153,46 @@ def test_five_scripts_are_held_out_and_run_only_when_asked():
     assert family.family and "allergy-change" in family.tags and family.forbidden
     assert "code-switching" in switching.tags
     assert len(follow_up.drugs) >= 3 and "actions" in follow_up.tags
+
+
+# The Spanish prompt's examples that some script's display text also says, as found when rule 6's example was moved
+# out of the test set: kept as they are until the owner decides, and listed so that a new one fails the test below.
+SHARED_EXAMPLES = {
+    "dos veces al día": {"e02", "e05", "e08", "e10", "e15", "h05"},
+    "paracetamol": {"e03", "e06", "h01"},
+    "amoxicilina": {"e03", "e04"},
+    "TA": {"e01", "e08", "e15", "h01", "h03", "h05"},
+    "EPOC": {"e15"},
+    "niega dolor torácico": {"e01", "e08", "h05"},
+    "sin fiebre": {"e10", "e15"},
+    "posible neumonía": {"e03"},
+    "suspender": {"e04", "e08", "e16", "h01", "h05"},
+    "no, perdón": {"e02", "e03", "e16", "h02"},
+    "mejor dicho": {"h02"},
+    "en 3 meses": {"e02", "e10", "e15", "h05"},
+}
+
+
+def prompt_examples() -> dict[int, list[str]]:
+    """The Spanish each of rules 3 to 7 gives as an example: what an English translation is given for in rules 3 to 5,
+    everything quoted in rule 7, and rule 6's correction cues, its example sentence and the passages it quotes."""
+    system = prompt.load(language="es").system
+    rules = {int(m.group(1)): m.group(2) for m in re.finditer(r"^(\d)\. (.*)$", system, re.M)}
+    found = {n: re.findall(r'"([^"]+)" is "', rules[n]) for n in (3, 4, 5)}
+    found[7] = re.findall(r'"([^"]+)"', rules[7])
+    english = re.search(r'the "english" is "([^"]+)"', rules[6]).group(1)
+    found[6] = [q for q in re.findall(r'"([^"]+)"', rules[6]) if q not in ("spanish", "english", english)]
+    return found
+
+
+def test_the_prompts_examples_are_not_the_test_sets_sentences():
+    # An example the prompt teaches that a script also says would score the script on what the prompt showed.
+    def words(text: str) -> str:
+        return " " + " ".join(token.key for token in spanish.tokens(text)) + " "
+
+    examples = prompt_examples()
+    shared = {example: {script.id[:3] for script in ALL if words(example) in words(script.display)}
+              for rule in examples.values() for example in rule}
+    sentence, quoted = re.search(r'for "([^"]+)", the "spanish" is "([^"]+)"', prompt.load(language="es").system).groups()
+    assert not shared[sentence] and not shared[quoted], "rule 6's example is a script's own sentence"
+    assert {example: scripts for example, scripts in shared.items() if scripts} == SHARED_EXAMPLES
