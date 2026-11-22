@@ -68,6 +68,9 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["ai_note_reviews"] = Protection.Phi,
         ["ai_field_proposals"] = Protection.Phi,
         ["ai_chart_proposals"] = Protection.Phi,
+        // Step 16: a clinician's consent to record a visit, and the conversation's transcript while its review is open.
+        ["ambient_consents"] = Protection.Phi,
+        ["ambient_transcripts"] = Protection.Phi,
         ["clinical_notes"] = Protection.Phi,
         ["note_addenda"] = Protection.Phi,
         ["visit_summaries"] = Protection.Phi,

@@ -1518,6 +1518,10 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("reviewer_id");
 
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
                     b.Property<string>("State")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -1561,6 +1565,10 @@ namespace Ehr.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
 
+                    b.Property<Guid?>("ConsentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consent_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1583,6 +1591,14 @@ namespace Ehr.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("max_seconds");
 
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("dictation")
+                        .HasColumnName("mode");
+
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
@@ -1590,6 +1606,10 @@ namespace Ehr.Migrations
                     b.Property<string>("ResultJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("result_json");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
 
                     b.Property<string>("SessionId")
                         .IsRequired()
@@ -1617,6 +1637,10 @@ namespace Ehr.Migrations
                     b.HasIndex("ClinicianId")
                         .HasDatabaseName("ix_ai_note_reviews_clinician_id");
 
+                    b.HasIndex("ConsentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_note_reviews_consent_id");
+
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_ai_note_reviews_patient_id");
 
@@ -1624,10 +1648,20 @@ namespace Ehr.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_ai_note_reviews_session_id");
 
+                    b.HasIndex("ConsentId", "PatientId")
+                        .HasDatabaseName("ix_ai_note_reviews_consent_id_patient_id");
+
                     b.HasIndex("DraftId", "State")
                         .HasDatabaseName("ix_ai_note_reviews_draft_id_state");
 
-                    b.ToTable("ai_note_reviews", "ehr");
+                    b.ToTable("ai_note_reviews", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_note_reviews_consent", "(mode = 'ambient') = (consent_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_ai_note_reviews_mode", "mode IN ('dictation', 'ambient')");
+
+                            t.HasCheckConstraint("ck_ai_note_reviews_sensitive", "sensitive = (mode = 'ambient')");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AllergyIntolerance", b =>
@@ -1702,6 +1736,98 @@ namespace Ehr.Migrations
                             t.HasCheckConstraint("ck_allergy_intolerances_criticality", "criticality IN ('low', 'high', 'unable-to-assess')");
 
                             t.HasCheckConstraint("ck_allergy_intolerances_severity", "severity IN ('mild', 'moderate', 'severe')");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientConsent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClinicianId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<DateTimeOffset>("ConfirmedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("GivenBy")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("given_by");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<short>("Speakers")
+                        .HasColumnType("smallint")
+                        .HasColumnName("speakers");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ambient_consents");
+
+                    b.HasAlternateKey("Id", "PatientId")
+                        .HasName("ak_ambient_consents_id_patient_id");
+
+                    b.HasIndex("ClinicianId")
+                        .HasDatabaseName("ix_ambient_consents_clinician_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_ambient_consents_patient_id");
+
+                    b.ToTable("ambient_consents", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ambient_consents_given_by", "given_by IN ('patient', 'representative')");
+
+                            t.HasCheckConstraint("ck_ambient_consents_speakers", "speakers IN (2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientTranscript", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
+                    b.Property<string>("Transcript")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("transcript");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ambient_transcripts");
+
+                    b.HasIndex("Id", "PatientId")
+                        .HasDatabaseName("ix_ambient_transcripts_id_patient_id");
+
+                    b.ToTable("ambient_transcripts", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ambient_transcripts_sensitive", "sensitive");
+
+                            t.HasCheckConstraint("ck_ambient_transcripts_transcript", "jsonb_typeof(transcript) = 'object' AND octet_length(transcript::text) <= 1048576");
                         });
                 });
 
@@ -3797,6 +3923,13 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_ai_note_reviews_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Patients.AmbientConsent", null)
+                        .WithMany()
+                        .HasForeignKey("ConsentId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_note_reviews_ambient_consents_consent_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AllergyIntolerance", b =>
@@ -3807,6 +3940,34 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_allergy_intolerances_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientConsent", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambient_consents_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambient_consents_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientTranscript", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.AiNoteReview", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambient_transcripts_ai_note_reviews_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.BreakGlassAccess", b =>

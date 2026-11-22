@@ -22,6 +22,18 @@ DECLARE
     -- A sensitive item, before or after the write: a diagnosis or medication marked sensitive.
     is_sensitive boolean := coalesce((new_row ->> 'sensitive')::boolean, false) OR coalesce((old_row ->> 'sensitive')::boolean, false);
 BEGIN
+    -- A recorded visit's transcript (step 16, 56-ambient-listening.sql) is never copied here, whoever reads the log: its
+    -- SHA-256 and its length in characters stand for it, which say what was kept and that it was deleted.
+    IF TG_TABLE_NAME = 'ambient_transcripts' THEN
+        old_row := CASE WHEN old_row IS NULL THEN NULL ELSE old_row || jsonb_build_object('transcript', jsonb_build_object(
+            'sha256', encode(sha256(convert_to(old_row ->> 'transcript', 'UTF8')), 'hex'),
+            'characters', char_length(old_row ->> 'transcript'))) END;
+        new_row := CASE WHEN new_row IS NULL THEN NULL ELSE new_row || jsonb_build_object('transcript', jsonb_build_object(
+            'sha256', encode(sha256(convert_to(new_row ->> 'transcript', 'UTF8')), 'hex'),
+            'characters', char_length(new_row ->> 'transcript'))) END;
+        kept := coalesce(new_row, old_row);
+    END IF;
+
     IF TG_OP = 'UPDATE' THEN
         -- Only the columns that changed, each with its old and new value.
         SELECT jsonb_object_agg(n.key, jsonb_build_object('old', o.value, 'new', n.value))
@@ -209,6 +221,13 @@ CREATE OR REPLACE TRIGGER ai_field_proposals_audit
 -- marked with a sensitive note above.
 CREATE OR REPLACE TRIGGER ai_chart_proposals_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.ai_chart_proposals
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER ambient_consents_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.ambient_consents
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+CREATE OR REPLACE TRIGGER ambient_transcripts_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.ambient_transcripts
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
 CREATE OR REPLACE TRIGGER chart_history_audit

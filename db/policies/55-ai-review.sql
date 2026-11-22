@@ -43,7 +43,9 @@ BEGIN
     END IF;
     SELECT count(*) INTO proposed FROM jsonb_each(CASE WHEN jsonb_typeof(NEW.result_json->'fields') = 'object' THEN NEW.result_json->'fields' ELSE '{}'::jsonb END) f
         WHERE f.value->>'status' = 'pending';
-    IF OLD.state = 'recording' AND NEW.state = 'pending' AND proposed > 0 AND NEW.imported_version IS NULL THEN
+    -- A review of a recorded visit (step 16) is staged pending even with nothing proposed, so its transcript, kept only
+    -- while it is open, can be read (56-ambient-listening.sql).
+    IF OLD.state = 'recording' AND NEW.state = 'pending' AND (proposed > 0 OR NEW.mode = 'ambient') AND NEW.imported_version IS NULL THEN
         NEW.completed_at := NULL;
         RETURN NEW;
     END IF;
@@ -147,8 +149,9 @@ BEGIN
     END IF;
 
     IF TG_OP = 'INSERT' THEN
-        -- A review with no stored result yet has no kind at any place.
-        IF NEW.kind IS DISTINCT FROM review.result_json #>> ARRAY['proposals', NEW.ordinal::text, 'kind']
+        -- A review with no stored result yet has no kind at any place. A recorded visit's (step 16) proposes nothing beyond
+        -- its note.
+        IF NEW.kind IS DISTINCT FROM review.result_json #>> ARRAY['proposals', NEW.ordinal::text, 'kind'] OR review.mode = 'ambient'
            OR NEW.state IS DISTINCT FROM 'pending'
            OR EXISTS (SELECT 1 FROM ehr.clinical_notes n WHERE n.draft_id = review.draft_id) THEN
             RAISE EXCEPTION 'Only a waiting proposal its review''s stored result holds is staged'

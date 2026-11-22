@@ -214,4 +214,15 @@ GRANT SELECT, INSERT ON ehr.ai_chart_proposals TO ehr_app;
 GRANT UPDATE (state, order_id, allergy_id) ON ehr.ai_chart_proposals TO ehr_app;
 GRANT SELECT ON ehr.ai_chart_proposals TO ehr_read;
 
+-- Ambient listening (step 16): a clinician's consent to record a visit, and a conversation's transcript while its review
+-- is open. PHI: row-level security and the write-audit trigger follow (56-ambient-listening.sql has the rules). A consent
+-- is a record: INSERT, never changed or deleted. A transcript is written as its review is staged, never changed, and
+-- deleted as it is finished: DELETE, which the guard allows only then (the purge after 7 days is its owner's function).
+-- The cloud app may see that a transcript exists, to know a review's proposals are to be decided at the clinic, but
+-- never read one: no SELECT on the transcript column.
+GRANT SELECT, INSERT ON ehr.ambient_consents TO ehr_app;
+GRANT SELECT ON ehr.ambient_consents TO ehr_read;
+GRANT SELECT, INSERT, DELETE ON ehr.ambient_transcripts TO ehr_app;
+GRANT SELECT (id, patient_id, sensitive, created_at) ON ehr.ambient_transcripts TO ehr_read;
+
 COMMIT;
