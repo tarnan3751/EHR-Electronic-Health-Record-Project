@@ -140,6 +140,11 @@ says, has gone into one field, plan and findings alike, to be sorted into the se
 accepted; it points at what the sources cover. A short dictation that is all one field, such as an addendum to a plan, covers less once its lead-in and sign-off
 are left out.
 
+A recorded visit's conversation (the expansion plan's step 16) is checked a window at a time by the same rules, with its
+own besides (the section at the end, "Conversations"): each source must be in the window and said by someone the field
+may quote (wrong_speaker otherwise), a few more words hedge (CONVERSATION_CERTAINTY), and its warnings say who said a
+value's sources; merge() then puts the windows' values together.
+
 The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of these
 checks, so a change to any rule asks for the stored answers to be scored again (eval/ehr_eval/rescore.py).
 """
@@ -187,6 +192,7 @@ REASONS = (
     "source_too_short",
     "source_not_in_transcript",
     "source_in_unclear_passage",
+    "wrong_speaker",
     "source_superseded",
     "number_not_in_sources",
     "date_not_in_sources",
@@ -229,6 +235,8 @@ class Checked:
     spans: list[tuple[int, int]] = field(default_factory=list)  # code points in the transcript, for pending values
     # For pending values (see the module's header): each warning's code, and the place in the transcript it points at.
     warnings: list[tuple[str, int, int]] = field(default_factory=list)
+    # A conversation's (step 16): who said each source, as spans has them.
+    speakers: list[str] = field(default_factory=list)
 
     @property
     def pending(self) -> bool:
@@ -242,7 +250,8 @@ class Checked:
             "value": self.value,
             "sources": [
                 {"start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end)}
-                for start, end in self.spans
+                | ({"speaker": self.speakers[i]} if self.speakers else {})
+                for i, (start, end) in enumerate(self.spans)
             ],
             "warnings": [
                 {"code": code, "start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end)}
@@ -288,6 +297,7 @@ class _Transcript:
     superseded: set[_Term]
     qualified: dict[str, set[int]]  # by reason code: the words each kind of qualifier reaches
     expressions: dict[_Term, int]  # which expression each term belongs to
+    kinds: tuple = ()  # the qualifiers read: QUALIFIERS, or a conversation's CONVERSATION_QUALIFIERS
 
 
 def not_carried_over(transcript: Transcript) -> list[dict]:
@@ -299,25 +309,31 @@ def not_carried_over(transcript: Transcript) -> list[dict]:
     ]
 
 
-def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript) -> Checks:
+def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript, *, scope: Scope | None = None) -> Checks:
+    """The fields checked. With a scope, a conversation's window (step 16): see "Conversations" at the end."""
     words = tokens(transcript.text)
     terms = _terms(words)
     cues, taken_back, superseded = _corrections(transcript.text, words, terms)
+    kinds = QUALIFIERS if scope is None else CONVERSATION_QUALIFIERS
     context = _Transcript(
         text=transcript.text,
         words=words,
         unclear=transcript.unclear_ranges(),
-        directives=directive_spans(transcript.text),
+        directives=directive_spans(transcript.text) if scope is None else conversation_directive_spans(transcript.text),
         letters=frozenset(clean(transcript.text).casefold()),
         terms=terms,
         cues=cues,
         taken_back=taken_back,
         superseded=superseded,
-        qualified=_qualifiers(transcript.text, words),
+        qualified=_qualifiers(transcript.text, words, kinds),
         expressions=_expressions(terms, words),
+        kinds=kinds,
     )
-    checked = {name: _check_field(name, fields[name]["value"], fields[name]["sources"], context) for name in FIELDS}
-    _warn_of_whole_dictation(checked, context)
+    checked = {name: _check_field(name, fields[name]["value"], fields[name]["sources"], context, scope) for name in FIELDS}
+    if scope is None:
+        _warn_of_whole_dictation(checked, context)
+    else:
+        _warn_of_speakers(checked)
     return Checks(checked, list(unknown))
 
 
@@ -333,10 +349,13 @@ def _warn_of_whole_dictation(checked: dict[str, Checked], transcript: _Transcrip
         field.warnings.append((ONE_FIELD_HOLDS_DICTATION, min(s for s, _ in field.spans), max(e for _, e in field.spans)))
 
 
-def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _Transcript) -> Checked:
+def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _Transcript,
+                 scope: Scope | None = None) -> Checked:
     raw_value = raw_value.strip()
     value = clean(raw_value)
     quotes = [clean(quote).strip() for quote in raw_quotes if clean(quote).strip()]
+    if scope is not None:
+        quotes = [ROLE_MARK.sub("", quote) for quote in quotes]
     if not value:
         return Checked(name, value, quotes, ["not_dictated"])
 
@@ -349,7 +368,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         or any(c not in transcript.letters and c not in NEUTRAL_CHARACTERS for c in value.casefold())
     ):
         reasons.add("bad_format")
-    value, _ = _without_instructions(value)
+    value, _ = _without_instructions(value, directives if scope is None else conversation_directives)
     if not value:
         return Checked(name, value, quotes, [r for r in REASONS if r in reasons | {"order_or_allergy_change"}])
     if not quotes:
@@ -357,6 +376,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
 
     spans: list[tuple[int, int]] = []
     kept: list[str] = []
+    speakers: list[str] = []
     for quote in quotes:
         quote_words = tokens(quote)
         if UNCLEAR_QUOTE.search(quote):
@@ -365,7 +385,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         if len(quote_words) < 2 and not any(word.text[0].isdigit() for word in quote_words):
             reasons.add("source_too_short")
             continue
-        found = _locate(quote_words, transcript, spans)
+        found = _locate(quote_words, transcript, spans, scope, name)
         if isinstance(found, str):
             reasons.add(found)
             continue
@@ -374,7 +394,10 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         for piece in _outside_instructions(found, transcript):
             spans.append(piece)
             kept.append(transcript.text[piece[0] : piece[1]])
-    if quotes and not kept and not reasons & {"source_too_short", "source_not_in_transcript", "source_in_unclear_passage"}:
+            if scope is not None:
+                speakers.append(scope.speaker(found))
+    if quotes and not kept and not reasons & {"source_too_short", "source_not_in_transcript", "source_in_unclear_passage",
+                                              WRONG_SPEAKER}:
         reasons.add("order_or_allergy_change")
     quotes = kept
 
@@ -402,7 +425,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         return Checked(name, value, quotes, ordered)
     warnings = [(POSSIBLE_CORRECTION, start, end) for start, end in _possible_corrections(value, spans, transcript)]
     warnings += [(NEAR_UNCLEAR_PASSAGE, start, end) for start, end in _near_unclear(spans, transcript.unclear, transcript.words)]
-    return Checked(name, value, quotes, ordered, spans, warnings)
+    return Checked(name, value, quotes, ordered, spans, warnings, speakers)
 
 
 # ---- Quotes --------------------------------------------------------------------------------------------------------
@@ -410,10 +433,12 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
 UNCLEAR_QUOTE = re.compile(r"\[\s*unclear\s*\]", re.IGNORECASE)
 
 
-def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int, int]]) -> tuple[int, int] | str:
+def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int, int]], scope: Scope | None = None,
+            name: str = "") -> tuple[int, int] | str:
     """The quote's place in the transcript, word for word, outside unclear passages. A passage said more than once
     goes to the first occurrence after the field's previous source that no earlier source took, so each is highlighted
-    where it was said (FR-08)."""
+    where it was said (FR-08). In a conversation's window (scope), only within the window, and in one turn of someone
+    the field may quote."""
     size, words = len(quote), transcript.words
     wanted = [token.text for token in quote]
     found = [
@@ -421,11 +446,17 @@ def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int
         for i in range(len(words) - size + 1)
         if [token.text for token in words[i : i + size]] == wanted
     ]
+    if scope is not None:
+        found = [span for span in found if scope.window[0] <= span[0] and span[1] <= scope.window[1]]
     if not found:
         return "source_not_in_transcript"
     clear = [span for span in found if not any(_overlaps(span, passage) for passage in transcript.unclear)]
     if not clear:
         return "source_in_unclear_passage"
+    if scope is not None:
+        clear = [span for span in clear if scope.speaker(span) in SPEAKERS[name]]
+        if not clear:
+            return WRONG_SPEAKER
     unused = [span for span in clear if span not in earlier]
     after = earlier[-1][1] if earlier else 0
     return next((span for span in unused if span[0] >= after), unused[0] if unused else clear[0])
@@ -946,14 +977,14 @@ DANGLING = frozenset(
 )
 
 
-def _without_instructions(value: str) -> tuple[str, int]:
+def _without_instructions(value: str, find=None) -> tuple[str, int]:  # noqa: ANN001
     """The value with each instruction cut out: a sentence is cut where its instruction starts ("Start metformin, and
     order an A1c." keeps "Start metformin."), and dropped if the instruction is all it holds or what is left would end
     on a word that needs it (DANGLING). Also how many were cut."""
     kept: list[str] = []
     cut = 0
     for sentence in SENTENCE.split(value):
-        found = directives(sentence)
+        found = (find or directives)(sentence)
         if not found:
             kept.append(sentence)
             continue
@@ -1260,9 +1291,9 @@ def _object_of_a_preposition(text: str, start: int) -> bool:
     return bool(before) and before[-1] in NOT_EXPERIENCER_AFTER
 
 
-def _qualifiers(text: str, words: list[Token]) -> dict[str, set[int]]:
+def _qualifiers(text: str, words: list[Token], kinds: tuple = QUALIFIERS) -> dict[str, set[int]]:
     """For each kind of qualifier, by its reason code, the words its cues reach in the text."""
-    return {reason: _reach(text, words, *row)[0] for reason, *row in QUALIFIERS}
+    return {reason: _reach(text, words, *row)[0] for reason, *row in kinds}
 
 
 def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) -> set[str]:
@@ -1271,7 +1302,7 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
     in the transcript, so a source can't leave its qualifier out ("chest pain" quoted from "no chest pain")."""
     words = tokens(value)
     found = set()
-    for reason, before, after, closing, ends in QUALIFIERS:
+    for reason, before, after, closing, ends in transcript.kinds:
         reached, cues = _reach(value, words, before, after, closing, ends)
         plain = {stem(word.text) for i, word in enumerate(words) if _is_content(word.text) and i not in reached | cues}
         plain -= {stem(words[i].text) for i in reached if _is_content(words[i].text)}
@@ -1632,3 +1663,278 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
         warnings.append((POSSIBLE_CORRECTION, cue.start, max(cue.end, min(reach[-1].end, _sentence_end(text, cue.start)))))
     warnings += [(NEAR_UNCLEAR_PASSAGE, first, last) for first, last in _near_unclear([(start, end)], unclear, words)]
     return tuple(warnings)
+
+
+# ---- Conversations (the expansion plan's step 16) ------------------------------------------------------------------
+#
+# A recorded visit is drafted a window at a time (conversation.py), each window's proposal checked by check() with its
+# Scope: the window, and who said each passage. On top of every rule above:
+#
+# - wrong_speaker (decision D15): a source must be in one turn of someone the field may quote (SPEAKERS): Subjective
+#   what the patient or someone with them said, Objective, Assessment and Plan what the clinician said, and any of them
+#   a passage whose speaker couldn't be told. A role written before a source ("Patient: ...") is taken off first. A
+#   source outside the window is source_not_in_transcript.
+# - Conversation hedges as well as dictation's: "could be", "might be", "maybe", "I think", "I wonder", "not sure"
+#   (CONVERSATION_CERTAINTY), so "could be gout" isn't offered as "gout"; and a hedge or a denial said to the patient,
+#   with the "you" and its verb in the cue ("I think you have gout", "I don't think you have pneumonia", "you might have
+#   gout"), so its reach starts at what it hedges rather than stopping at "you" as TERMINATORS would.
+# - Instructions said to the patient as well as dictated ones (conversation_directives(), beside directives()): talk of
+#   an ordering act or of the prescription itself is cut from every value and listed, as dictation's instructions are;
+#   care described without one stays in the Plan. What dictation's rules don't already find ("write you a
+#   prescription", "sort out the refill", "get that refilled", "note that you're allergic", "add it to your allergies"
+#   are theirs): a prescription or script printed, done or put through; sent electronically, or to a pharmacy or chemist
+#   named or "your usual", ready or waiting there, to pick up there, or the pharmacy called; a medicine topped up or got
+#   for the patient anew, and "I'll sort that out" when a refill or a prescription was spoken of in the REFILL_LOOKBACK
+#   characters before; a test requested, arranged or booked, the patient sent for or to one, a referral put in, unless
+#   only as a possibility ("if it's no better, we can arrange an ultrasound" stays in the Plan); and a change to the
+#   chart's allergies said as people say it ("put that in your chart as an allergy", "change your codeine allergy to an
+#   intolerance", "take that off your list" when an allergy was spoken of in the ALLERGY_LOOKBACK characters before).
+#   Kept: "we'll get some bloods today", "let's get an x-ray of that knee", "I want you to have a chest x-ray", "I'll
+#   refer you to the physio", "the nurse will give you the flu jab", "I'm going to put you on amoxicillin". Where that
+#   line falls needs a clinician's reading.
+# - No one_field_holds_dictation: a conversation isn't dictated into one section.
+# - Warnings on a value that passes, each pointing at a source: speaker_unsure, from a passage whose speaker couldn't be
+#   told; other_speaker, from someone else in the room, who may be speaking of themselves.
+#
+# merge() puts the windows' fields together in the order they were said (decision D16): each field's passing values,
+# each a sentence, and their sources and warnings. A field that failed in some window while another window's value
+# passed carries part_not_offered, pointing at the window it failed in; one that passed nowhere is empty, with every
+# reason it failed for. Each Subjective value offered carries patients_own_words (amendment A4): it is the patient's own
+# words, in the first person, to be reworded as the clinician's note before it is accepted.
+#
+# conversation_not_carried_over() lists the instructions said in the clinician's passages (decision D18): a patient
+# asking for a refill is no instruction of the clinician's. One in a passage whose speaker couldn't be told is listed
+# too, marked as such (speaker "unsure"), so the screen can say it may still need placing; every item says who said it.
+# An instruction is cut from every value, whoever said it, by the rules above.
+
+SPEAKER_UNSURE = "speaker_unsure"
+OTHER_SPEAKER = "other_speaker"
+PATIENTS_OWN_WORDS = "patients_own_words"
+PART_NOT_OFFERED = "part_not_offered"
+WRONG_SPEAKER = "wrong_speaker"
+
+SPEAKERS = {
+    "subjective": frozenset({"patient", "other", "unsure"}),
+    "objective": frozenset({"clinician", "unsure"}),
+    "assessment": frozenset({"clinician", "unsure"}),
+    "plan": frozenset({"clinician", "unsure"}),
+}
+ROLE_MARK = re.compile(r"\A\s*(?:clinician|patient|other|unsure)\s*:\s*", re.IGNORECASE)
+# A hedge or a denial said to the patient, its "you" and verb part of the cue (see above): subject_cues("you"), the
+# common cues dictation reads "she", "he" and "the patient" with, and then a few more said to someone's face. They come
+# first, so they win where a shorter cue starts at the same word ("I don't think you have" over "don't").
+YOU_NEGATION, YOU_CERTAINTY = subject_cues("you")
+_YOU = r"you(?:['’](?:re|ve)|\s+(?:are|have|had|were|got))?"
+CONVERSATION_DENIALS = (
+    rf"i\s+(?:didn['’]t|did\s+not)\s+(?:think|believe)(?:\s+that)?\s+{_YOU}",
+    rf"i\s+(?:don['’]t|do\s+not|didn['’]t|did\s+not)\s+(?:suspect|feel)(?:\s+that)?\s+{_YOU}",
+)
+CONVERSATION_HEDGES = (
+    rf"i\s+(?:believe|suspect|guess|reckon|imagine)(?:\s+that)?\s+{_YOU}",
+    rf"probably\s+{_YOU}",
+    r"you\s+(?:probably|possibly|likely)\s+(?:have|had|are|were)",
+    rf"it\s+(?:might|may)\s+be(?:\s+that)?\s+{_YOU}",
+    rf"i['’]d\s+be\s+surprised\s+if\s+{_YOU}",
+)
+CONVERSATION_NEGATION = re.compile(
+    rf"\b(?:{YOU_NEGATION}|{'|'.join(CONVERSATION_DENIALS)})\b|{NEGATION.pattern}", re.IGNORECASE
+)
+CONVERSATION_CERTAINTY = re.compile(
+    rf"\b(?:{YOU_CERTAINTY}|{'|'.join(CONVERSATION_HEDGES)})\b|{CERTAINTY.pattern}"
+    r"|\b(?:could be|might be|maybe|i think|i wonder|not sure)\b",
+    re.IGNORECASE,
+)
+CONVERSATION_QUALIFIERS = tuple(
+    (reason, {id(NEGATION): CONVERSATION_NEGATION, id(CERTAINTY): CONVERSATION_CERTAINTY}.get(id(before), before), after,
+     closing, ends)
+    for reason, before, after, closing, ends in QUALIFIERS
+)
+# A merged value's length at most, under the note's own limit on a field (16,000 characters, NoteContent in Ehr.Domain).
+MERGED_LIMIT = 12_000
+
+
+@dataclass(frozen=True)
+class Scope:
+    """Where a conversation's window may quote: the window (code points in the transcript), and every passage's place and
+    who said it (clinician, patient, other or unsure), in order."""
+
+    window: tuple[int, int]
+    passages: tuple[tuple[int, int, str], ...]
+
+    def speaker(self, span: tuple[int, int]) -> str | None:
+        """Who said the span: the speaker of the turn it lies in, or None if it runs across two speakers' turns."""
+        inside = [who for start, end, who in self.passages if start < span[1] and span[0] < end]
+        return inside[0] if inside and len(set(inside)) == 1 else None
+
+
+def _warn_of_speakers(checked: dict[str, Checked]) -> None:
+    for field in checked.values():
+        if field.pending:
+            field.warnings += [
+                (SPEAKER_UNSURE if who == "unsure" else OTHER_SPEAKER, start, end)
+                for (start, end), who in zip(field.spans, field.speakers, strict=True) if who in ("unsure", "other")
+            ]
+
+
+def merge(parts: list[tuple[Scope, Checks]]) -> Checks:
+    """A conversation's fields from its windows' checked fields, in the order the windows were said (see above)."""
+    fields: dict[str, Checked] = {}
+    for name in FIELDS:
+        offered: list[tuple[Scope, Checked]] = []
+        failed: list[tuple[int, int]] = []
+        reasons: set[str] = set()
+        for scope, checks in parts:
+            checked = checks.fields[name]
+            if checked.pending:
+                offered.append((scope, checked))
+            elif checked.reasons != ["not_dictated"]:
+                failed.append(scope.window)
+                reasons.update(checked.reasons)
+        merged = Checked(name, "", [], [])
+        for scope, checked in offered:
+            part = checked.value if checked.value.endswith((".", "!", "?")) else f"{checked.value}."
+            if len(merged.value) + 1 + len(part) > MERGED_LIMIT:
+                failed.append(scope.window)
+                continue
+            merged.value = f"{merged.value} {part}".strip()
+            merged.quotes += checked.quotes
+            merged.spans += checked.spans
+            merged.speakers += checked.speakers
+            merged.warnings += checked.warnings
+        if not merged.value:
+            fields[name] = Checked(name, "", [], [r for r in REASONS if r in reasons] or ["not_dictated"])
+            continue
+        merged.warnings += [(PART_NOT_OFFERED, start, end) for start, end in sorted(failed)]
+        if name == "subjective":
+            own = (PATIENTS_OWN_WORDS, min(s for s, _ in merged.spans), max(e for _, e in merged.spans))
+            merged.warnings.insert(0, own)
+        fields[name] = merged
+    unknown = list(dict.fromkeys(name for _, checks in parts for name in checks.unknown))
+    return Checks(fields, unknown)
+
+
+def conversation_not_carried_over(transcript: Transcript, passages: tuple[tuple[int, int, str], ...]) -> list[dict]:
+    """not_carried_over() for a conversation: the instructions said in the clinician's passages, and in those whose speaker
+    couldn't be told, each with who said it (see above)."""
+    said = [(start, end, who) for start, end, who in passages if who in ("clinician", "unsure")]
+    return [
+        {"reason": kind, "start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end),
+         "speaker": who}
+        for start, end, kind in conversation_directives(transcript.text)
+        for low, high, who in said
+        if low <= start < high
+    ]
+
+
+# Instructions said to the patient (see above), beside directives(): each pattern an ordering act or the prescription
+# itself, or a change to the allergy list. A span starts at its lead-in, and one negated in its clause ("I won't send it
+# to the pharmacy") is no instruction. It ends at most SPOKEN_REACH words on, at the end of its line, or before a word
+# that starts another sentence or step (SPOKEN_STARTS, CLAUSE_STARTS, NEW_CLAUSE but "you"): nobody says the full stop,
+# so "I'll sort that out before you go I've got your questionnaire" ends before "I've", and "I'm sending it to your
+# pharmacy take it twice a day" before "take".
+_PHARMACY = (
+    r"(?:(?:your|the|a)\s+)?(?:usual\s+|local\s+|regular\s+|nearest\s+)?(?:pharmacy|pharmacist|chemist'?s?|drugstore|drug\s+store"
+    r"|walgreens|cvs|rite\s?aid|walmart|costco|kroger|duane\s+reade|boots|lloyds|superdrug)"
+)
+_TESTS = (
+    r"(?:scans?|x-?rays?|mri|ct|ultrasound|ecg|ekg|echo(?:cardiogram)?|tests?|bloods|blood\s+(?:work|tests?|count)|panel"
+    r"|cultures?|swabs?|colonoscopy|endoscopy|biopsy|mammogram|smear|referral|count)"
+)
+# The prescription, the pharmacy, a refill.
+CONVERSATION_ORDERS = [re.compile(pattern, re.IGNORECASE) for pattern in (
+    r"\b(?:print|printing|do|doing)\s+you\s+(?:a\s+|another\s+|the\s+|your\s+)?(?:new\s+|repeat\s+|paper\s+)?"
+    r"(?:prescription|script|rx)\b",
+    r"\bput(?:ting)?\s+(?:a|the|your)\s+(?:new\s+|repeat\s+)?(?:prescription|script)\s+through\b",
+    r"\bsent\s+(?:it|that|this|them|the\s+prescription|your\s+prescription)\s+(?:off\s+|over\s+)?electronically\b",
+    rf"\b(?:send|sending|sent)\b(?:(?![.\n]).){{0,40}}?\b(?:to|over\s+to|off\s+to)\s+{_PHARMACY}\b",
+    rf"\b(?:get|getting)\s+(?:that|it|this|them|those)\s+sent\s+(?:over\s+|off\s+)?to\s+{_PHARMACY}\b",
+    rf"\b(?:you'll|you will)\s+have\s+(?:a\s+)?(?:new\s+)?(?:one|prescription|supply|refill|inhaler|it|them)\b(?:(?![.\n]).){{0,30}}?"
+    rf"\bat\s+{_PHARMACY}\b",
+    rf"\b(?:it'll|it will|that'll|that will|they'll|they will)\s+be\s+(?:ready|waiting)\b(?:(?![.\n]).){{0,20}}?\b(?:at|in)\s+"
+    rf"{_PHARMACY}\b",
+    rf"\bpick\s+(?:it|that|them|this|those)\s+up\s+(?:from|at)\s+{_PHARMACY}\b",
+    rf"\bcall(?:ing)?\s+{_PHARMACY}\b",
+    r"\bget\s+you\s+(?:a\s+|an\s+|some\s+)?(?:new|fresh|another|more)\b",
+    r"\btop(?:ping)?\s+up\s+(?:your|the|that|this|it)\b",
+)]
+# A test or a referral: not when spoken of only as a possibility (_ONLY_POSSIBLY).
+CONVERSATION_TEST_ORDERS = [re.compile(pattern, re.IGNORECASE) for pattern in (
+    rf"\brequest(?:ing)?\s+(?:a\s+|an\s+|some\s+|the\s+|your\s+)?(?:\w+\s+){{0,2}}?{_TESTS}\b",
+    rf"\barrang(?:e|ing)\s+(?:a\s+|an\s+|some\s+|the\s+|your\s+|for\s+)?(?:\w+\s+){{0,2}}?{_TESTS}\b",
+    r"\bbook(?:ing)?\s+you\s+(?:in\s+)?(?:for|with|into)\b",
+    r"\bget(?:ting)?\s+you\s+booked\b",
+    r"\bsend(?:ing)?\s+you\s+(?:off\s+|over\s+|down\s+)?(?:for|to)\b",
+    r"\bput(?:ting)?\s+(?:in\s+)?(?:a|the|your)\s+referral\b",
+)]
+CONVERSATION_ALLERGY_CHANGES = [re.compile(pattern, re.IGNORECASE) for pattern in (
+    r"\bput\s+(?:that|it|this)\s+(?:in|on|into)\s+(?:your|the)\s+(?:chart|record|notes?|file)\s+as\s+(?:an\s+)?allerg",
+    r"\b(?:write|put|mark|note|record|list)\s+(?:that|it|this)\s+(?:down\s+)?as\s+(?:an\s+)?allerg",
+    r"\b(?:remove|delete|take)\b(?:(?![.\n]).){0,40}?\b(?:from|off)\s+(?:your|the)\s+(?:chart(?:'s)?|record(?:'s)?|notes?)\s+allerg",
+    r"\bchange\s+(?:your|the|that)\s+(?:\w+\s+)?allerg\w*\s+to\b",
+    r"\bget\s+rid\s+of\s+(?:your|the|that)\s+(?:\w+\s+)?allerg",
+)]
+# "We'll take that off your list" is an allergy change when an allergy was spoken of this many characters before, and
+# "I'll sort that out" an order when a refill or a prescription was.
+ALLERGY_LOOKBACK = 300
+REFILL_LOOKBACK = 300
+_OFF_THE_LIST = re.compile(r"\b(?:take|get|remove|cross)\s+(?:that|it|this|those|them)\s+off\s+(?:your|the)\s+list\b",
+                           re.IGNORECASE)
+_SORTED = re.compile(r"\b(?:sort|sorting)\s+(?:that|it|this|those|them)\s+out\b|\bget\s+(?:that|it|this)\s+sorted\b",
+                     re.IGNORECASE)
+_REFILL_SPOKEN = re.compile(r"\b(?:refill|prescription|script|repeat|running out|run out|last few)", re.IGNORECASE)
+# A test or a referral spoken of only as a possibility ("we can arrange", "we could book you in"): no ordering act.
+_ONLY_POSSIBLY = re.compile(r"\b(?:can|could|might|may|would)\s*\Z", re.IGNORECASE)
+
+
+SPOKEN_REACH = 6
+SPOKEN_STARTS = frozenset("i i'm i've i'll i'd we we'll we're we've let let's how what why now okay ok right well anyway".split())
+
+
+def _spoken_end(text: str, words: list[Token], end: int) -> int:
+    stop = _sentence_end(text, end)
+    end += len(re.match(r"[\w'’]*", text[end:]).group())
+    for word in [word for word in words if word.start >= end and word.end <= stop][:SPOKEN_REACH]:
+        if word.text in SPOKEN_STARTS or word.text in CLAUSE_STARTS or word.text in NEW_CLAUSE and word.text != "you":
+            break
+        end = word.end
+    return end
+
+
+def conversation_directive_spans(text: str) -> list[tuple[int, int]]:
+    return [(start, end) for start, end, _ in conversation_directives(text)]
+
+
+def conversation_directives(text: str) -> list[tuple[int, int, str]]:
+    """directives(), and the instructions said to the patient (see above), merged as directives() merges them."""
+    words = tokens(text)
+    matches = [(match, "order") for pattern in CONVERSATION_ORDERS for match in pattern.finditer(text)]
+    matches += [(match, "order") for pattern in CONVERSATION_TEST_ORDERS for match in pattern.finditer(text)
+                if not _ONLY_POSSIBLY.search(text[max(0, match.start() - 12) : match.start()])]
+    matches += [(match, "order") for match in _SORTED.finditer(text)
+                if _REFILL_SPOKEN.search(text[max(0, match.start() - REFILL_LOOKBACK) : match.start()])]
+    matches += [(match, "allergy_change") for pattern in CONVERSATION_ALLERGY_CHANGES for match in pattern.finditer(text)]
+    matches += [(match, "allergy_change") for match in _OFF_THE_LIST.finditer(text)
+                if "allerg" in text[max(0, match.start() - ALLERGY_LOOKBACK) : match.start()].lower()]
+    found = list(directives(text))
+    for match, kind in matches:
+        clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, match.start())), default=0)
+        negated = NEGATED_INSTRUCTION.search(text[clause : match.start()])
+        before = text[clause : clause + negated.start()] if negated else ""
+        if negated and not NO_REASON.search(before) and not any(
+            ANY_NEGATION.search(token.text) for token in tokens(before)[-UNDOES_REACH:]
+        ):
+            continue
+        start = match.start()
+        for token in reversed([token for token in words if token.end <= match.start()][-LEAD_IN_REACH:]):
+            if token.start < clause or token.text not in LEAD_IN:
+                break
+            start = token.start
+        found.append((start, _spoken_end(text, words, match.end()), kind))
+    merged: list[tuple[int, int, str]] = []
+    for start, end, kind in sorted(found):
+        if merged and start < merged[-1][1]:
+            last = merged[-1]
+            merged[-1] = (last[0], max(last[1], end), "allergy_change" if "allergy_change" in (kind, last[2]) else kind)
+        else:
+            merged.append((start, end, kind))
+    return merged
