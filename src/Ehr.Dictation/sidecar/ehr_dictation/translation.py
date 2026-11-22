@@ -20,19 +20,20 @@ each field as a list of statements, each the Spanish passages it rests on, copie
    correction cue and what it took back.
 4. The English is compared with that Spanish, class by class. "No more" means the English may leave something out, as
    an English value may, but may not add or change it; "the same" means both ways.
-   - numbers, as digits (Spanish decimal commas, number words, and both readings of "1.000"): no more
-     (number_not_in_sources), and none the clinician took back (source_superseded);
+   - numbers, as digits (Spanish decimal commas, number words, both readings of "1.000", and 1 for "un", "una" or
+     "uno" even as an article): no more (number_not_in_sources), and none the clinician took back (source_superseded);
    - a dose unit with its number ("50 mcg" is not "50 mg"): no more (unit_not_in_sources). A unit of measurement
      (mmHg, beats a minute, degrees, percent) may be added to a number said without one, never changed;
    - how often (times a day, a week, as needed, at bedtime): no more (frequency_not_in_sources);
-   - dates: no more (date_not_in_sources); drug names, each an English name the Spanish names give (spanish.py's
-     endings and exceptions): no more (drug_not_in_sources);
+   - dates ("hace una semana" is a week ago, or the past week): no more (date_not_in_sources); drug names, each an
+     English name the Spanish names give (spanish.py's endings and exceptions): no more (drug_not_in_sources);
    - sides, routes, severity and abbreviations: no more (side_, route_, severity_ and abbreviation_not_in_sources);
    - medication changes (start, stop, hold, continue, increase, decrease, switch), each said of a drug, a dose or a
      number: the same (action_changed);
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
-     validation.py reads them in English: the same (negation_dropped or negation_added, and so on), and the relatives
-     named the same (experiencer_changed);
+     validation.py reads them in English, with an English word that negates itself ("uncontrolled") a negation and a
+     relative told something ("the mother is explained") not someone having it: the same (negation_dropped or
+     negation_added, and so on), and the relatives named the same (experiencer_changed);
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
      model added ("continue metformin and check kidney function" from "continuar metformina").
 5. If any statement fails, the whole field is discarded, as an English value is.
@@ -419,6 +420,8 @@ ACTIONS = {
     "decrease": "decrease", "decreased": "decrease", "decreasing": "decrease", "reduce": "decrease",
     "reduced": "decrease", "lower": "decrease", "lowered": "decrease", "taper": "decrease", "tapered": "decrease",
     "switch": "switch", "switched": "switch", "switching": "switch",
+    # "Suspender" said, "suspend" written: a stop, as the prompt asks it written.
+    "suspend": "stop", "suspended": "stop", "suspending": "stop",
 }
 SPANISH_ACTIONS = {
     "start": "inicia iniciar inicio iniciamos inicie inicien iniciare iniciaremos iniciando empezar empieza empiece "
@@ -498,14 +501,41 @@ MORE_ENGLISH = {
 }
 
 
+# English words that are a negation of their own, as Spanish says "no" and the word: "no controlada" is
+# "uncontrolled", "tos no productiva" a "nonproductive cough". Read so here only; validation.py reads English dictation
+# as it did.
+NEGATED_WORDS = frozenset(
+    """uncontrolled uncomplicated untreated unvaccinated unimmunized nonproductive nontender nonradiating nonpitting
+    nonpalpable nondistended nonreactive nonsmoker""".split()
+)
+# A relative told something isn't someone having it, as a relative reporting it isn't (validation.REPORTING): "Mother
+# is explained about feeding", "the father was advised to", "explained to the mother". Spanish reads "se explica a la
+# madre" so already (spanish.NOT_EXPERIENCER_AFTER).
+TOLD = r"(?:told|tells?|explained|explains?|advised|advises?|counsell?ed|counsels?|instructed|instructs?|informed|informs?)"
+TOLD_RELATIVES = (
+    re.compile(rf"\b({validation.FAMILY})\s+(?:(?:is|was|were|are|has been|have been|had been)\s+)?{TOLD}\b",
+               re.IGNORECASE),
+    re.compile(rf"\b{TOLD}\s+(?:to\s+)?(?:(?:the|her|his|their)\s+)?({validation.FAMILY})\b", re.IGNORECASE),
+)
+
+
+def _without_told_relatives(text: str) -> str:
+    for pattern in TOLD_RELATIVES:
+        text = pattern.sub(lambda m: m.group()[: m.start(1) - m.start()] + " " * len(m.group(1))
+                           + m.group()[m.end(1) - m.start():], text)
+    return text
+
+
 def _english_qualified(text: str) -> dict[str, bool]:
-    words = tokens(text)
     names = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", "certainty_dropped": "certainty",
              "history_dropped": "history"}
-    found = {names[reason]: bool(validation._reach(text, words, before, after, closing, ends)[0])
-             for reason, before, after, closing, ends in validation.QUALIFIERS}
+    found = {}
+    for reason, before, after, closing, ends in validation.QUALIFIERS:
+        read = _without_told_relatives(text) if reason == "experiencer_dropped" else text
+        found[names[reason]] = bool(validation._reach(read, tokens(read), before, after, closing, ends)[0])
     for kind, pattern in MORE_ENGLISH.items():
         found[kind] = found[kind] or bool(pattern.search(text))
+    found["negation"] = found["negation"] or any(t.text in NEGATED_WORDS for t in tokens(text))
     return found
 
 
@@ -519,6 +549,13 @@ class _Statement:
     reasons: set[str] = field(default_factory=set)
     dropped: bool = False  # only an instruction, in English or in the Spanish it cites
     warnings: list[tuple[str, int, int]] = field(default_factory=list)
+
+
+def said_numbers(said: list[spanish.Token], terms: list[_Term]) -> set[str]:
+    """The numbers the Spanish says, as the number check reads them: every reading of each number, and 1 wherever it
+    says "un", "una" or "uno", an article as often as a number ("un piso de escaleras", one flight of stairs)."""
+    found = {value for term in terms if term.kind == "number" for value in term.values}
+    return found | {"1"} if any(t.key in spanish.ARTICLE_NUMBERS for t in said) else found
 
 
 def _locate(quote: list[spanish.Token], ctx: _Context, earlier: list[tuple[int, int]]) -> tuple[int, int] | str:
@@ -615,7 +652,7 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         return {value for term in group if term.kind == kind for value in term.values}
 
     english_nums = set(english_numbers(english))
-    missing = english_nums - values("number", terms)
+    missing = english_nums - said_numbers(said, terms)
     if missing & values("number", back):
         reasons.add("source_superseded")
     elif missing:

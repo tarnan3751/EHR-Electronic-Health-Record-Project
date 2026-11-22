@@ -366,12 +366,17 @@ WEEKDAYS = {"lunes": "monday", "martes": "tuesday", "miercoles": "wednesday", "j
 # "mañana" is tomorrow, unless it is the morning: after one of these.
 MORNING_AFTER = frozenset("la esta por de en cada una toda".split())
 PERIOD_NAMES = {"semana": "week", "mes": "month", "ano": "year", "noche": "night", "manana": "morning"}
+# "Hace un mes", "desde hace tres semanas": a time up to now, "a month ago" or "for the past 3 weeks".
+SINCE_PERIODS = {"semana": "week", "semanas": "week", "mes": "month", "meses": "month", "ano": "year", "anos": "year"}
+SOME = frozenset("unos unas varios varias algunos algunas".split())
 
 
 def date_terms(toks: list[Token]) -> set[str]:
     """The dates the words name, as the English checks name them (validation._date_terms): months, weekdays, today,
-    yesterday, tomorrow, "last week", "next month", "this morning", and "ago" for "hace"."""
+    yesterday, tomorrow, "last week", "next month", "this morning", "ago" for "hace", and "past week" (or weeks) for
+    "hace una semana" and "hace dos semanas", as "for the past week" says it. "La semana pasada" is "last week" only."""
     keys = [t.key for t in toks]
+    said = {number.first: number.last for number in numbers(toks)}
     found: set[str] = set()
     for i, key in enumerate(keys):
         before = keys[i - 1] if i else ""
@@ -394,6 +399,9 @@ def date_terms(toks: list[Token]) -> set[str]:
             found.add("tomorrow")
         elif key == "hace":
             found.add("ago")
+            j = said[i + 1] + 1 if i + 1 in said else i + 2 if after in SOME else i + 1
+            if j < len(keys) and keys[j] in SINCE_PERIODS:
+                found |= {f"past {SINCE_PERIODS[keys[j]]}", f"past {SINCE_PERIODS[keys[j]]}s"}
         if key in PERIOD_NAMES:
             period = PERIOD_NAMES[key]
             if after in ("pasado", "pasada") or before in ("ultimo", "ultima", "pasado", "pasada"):

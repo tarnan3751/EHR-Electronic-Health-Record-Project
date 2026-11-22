@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from ehr_dictation import translation
+from ehr_dictation import spanish, translation
 from ehr_dictation.transcript import Placed, Segment, Transcript, utf16_offset
 
 
@@ -199,3 +199,76 @@ def test_statements_are_joined_into_the_value_in_order():
     field = checks.fields["subjective"]
     assert field.value == "Denies fever. Denies shortness of breath."
     assert [(start, end) for start, end, _ in field.statements] == [(0, 13), (14, 41)]
+
+
+# ---- Words read as said (run A's discards) --------------------------------------------------------------------------
+# Each rule loosened for a right translation, with the wrong one it must still refuse beside it. None of these sentences
+# is in the Spanish test set (eval/scripts-es), so the lists aren't fitted to it.
+
+
+@pytest.mark.parametrize(("text", "english", "expected"), [
+    # "No" and an adjective, written as one English word that negates itself.
+    ("Diabetes mellitus no controlada.", "Uncontrolled diabetes mellitus.", []),
+    ("Tos no productiva.", "Nonproductive cough.", []),
+    ("Abdomen no doloroso a la palpación.", "Nontender abdomen on palpation.", []),
+    ("Edema sin fóvea en ambos tobillos.", "Nonpitting edema in both ankles.", []),
+    ("Diabetes mellitus no controlada.", "Controlled diabetes mellitus.", ["negation_dropped"]),
+    ("Diabetes mellitus controlada.", "Uncontrolled diabetes mellitus.", ["negation_added"]),
+])
+def test_an_english_word_that_negates_itself_is_a_negation(text, english, expected):
+    assert reasons(text, [text], english) == expected
+
+
+@pytest.mark.parametrize(("english", "expected"), [
+    ("Suspend lisinopril.", []),
+    ("Suspended lisinopril.", []),
+    ("Continue lisinopril.", ["action_changed"]),
+])
+def test_suspend_is_a_stop(english, expected):
+    assert reasons("Suspender lisinopril.", ["Suspender lisinopril."], english) == expected
+
+
+@pytest.mark.parametrize(("text", "english", "expected"), [
+    ("Mareo desde hace una semana.", "Dizziness for the past week.", []),
+    ("Mareo desde hace una semana.", "Dizziness for 1 week.", []),
+    ("Mareo desde hace tres meses.", "Dizziness for the past 3 months.", []),
+    ("Mareo desde hace unos meses.", "Dizziness for the past months.", []),
+    ("Caída hace 3 días.", "Fall 3 days ago.", []),
+    ("Mareo desde hace una semana.", "Dizziness since last week.", ["date_not_in_sources"]),
+    ("Caída hace 3 días.", "Fall 5 days ago.", ["number_not_in_sources"]),
+    ("Caída hace 3 días.", "Fall in the past 3 days, since yesterday.", ["date_not_in_sources"]),
+])
+def test_hace_is_a_time_up_to_now(text, english, expected):
+    assert reasons(text, [text], english) == expected
+
+
+def test_last_week_is_still_last_week_only():
+    assert spanish_dates("Empezó la semana pasada.") == {"last week"}
+    assert spanish_dates("Empezó hace una semana.") == {"ago", "past week", "past weeks"}
+
+
+def spanish_dates(text: str) -> set[str]:
+    return spanish.date_terms(spanish.tokens(text))
+
+
+@pytest.mark.parametrize(("text", "english", "expected"), [
+    ("Disnea al caminar una cuadra.", "Dyspnea walking one block.", []),
+    ("Disnea al caminar una cuadra.", "Dyspnea walking 1 block.", []),
+    ("Tomar un comprimido de ibuprofeno.", "Take 1 tablet of ibuprofen.", []),
+    ("Tomar un comprimido de ibuprofeno.", "Take 2 tablets of ibuprofen.", ["number_not_in_sources"]),
+    ("Disnea al caminar una cuadra.", "Dyspnea walking 2 blocks.", ["number_not_in_sources"]),
+])
+def test_un_una_and_uno_are_one(text, english, expected):
+    assert reasons(text, [text], english) == expected
+
+
+@pytest.mark.parametrize(("text", "english", "expected"), [
+    ("Se le explica a la madre la dieta.", "Mother is explained the diet.", []),
+    ("Se explica a la madre la dieta.", "The diet is explained to the mother.", []),
+    ("Se informa a la hija del diagnóstico.", "The daughter is informed of the diagnosis.", []),
+    ("Se aconseja a su esposo la vacuna.", "Her husband was advised about the vaccine.", []),
+    ("La madre tiene asma.", "Asthma is explained to the mother.", ["experiencer_dropped"]),
+    ("La madre tiene asma.", "Mother has asthma.", []),
+])
+def test_a_relative_told_something_has_nothing(text, english, expected):
+    assert reasons(text, [text], english) == expected
