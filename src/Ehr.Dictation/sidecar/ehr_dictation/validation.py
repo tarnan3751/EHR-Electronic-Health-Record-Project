@@ -77,9 +77,10 @@ and every check reads the cleaned text. The checks, each with the reason code re
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
   its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one
   is being placed now ("I'm ordering"), to write, send, refill or renew a prescription, to call in anything ("call in
-  something for her nausea", not "call in sick"), to send something to the pharmacy, to make an orders section, or to
-  change the allergy list (add, remove, record, clear, update), whoever's list it is called ("her", "his", "their",
-  "my", "your": "I'll add penicillin to your allergies", as said to the patient); hyphens are ignored ("re-fill"). A word
+  something for her nausea", not "call in sick"), to send something to the pharmacy (anywhere on in the sentence: "send
+  amoxicillin 500 mg by mouth three times a day for 7 days to her pharmacy"), to make an orders section, or to change
+  the allergy list (add, remove, record, clear, update), whoever's list it is called ("her", "his", "their", "my",
+  "your": "I'll add penicillin to your allergies", as said to the patient); hyphens are ignored ("re-fill"). A word
   before the verb makes it a noun only right before it ("no order", "the lab order"): after a comma or a full stop the
   verb starts an instruction ("No, order a chest X-ray", "Check the lab. Order a CBC"). A plan stays a plan:
   "start", "continue", "increase" or "stop" a drug, orders in the past or by someone else ("her cardiologist ordered an
@@ -654,6 +655,10 @@ ORDERS_SECTION = "orders_section"
 ALLERGY_ADDITION = "allergy_addition"
 REASON = {"order": "order", ORDERS_SECTION: "order", "allergy_change": "allergy_change", ALLERGY_ADDITION: "allergy_change"}
 _SAME_SENTENCE = r"(?:(?![.\n]).)"
+# Sent to the pharmacy, said however far on in the sentence (not past what ends it, as SENTENCE_MARK reads it: "2.5 mg"
+# doesn't): "send amoxicillin 500 mg by mouth three times a day for 7 days to her pharmacy". Within a few words, the
+# pharmacy is enough without "to".
+_TO_THE_PHARMACY = rf"(?:[^.!?\n]|(?<=\d)\.(?=\d))*?\b(?:to|into)\s+(?:{_DET}\s+)?(?:\w+\s+){{0,2}}pharmacy\b"
 # Placing an order, or a prescription, now: the verb as an instruction ("order", "renew") or under way ("ordering").
 _ORDER_VERB = re.compile(
     r"\b(?:order|ordering|e-?prescribe|prescribe|prescribing|refill|refilling|renew|renewing|e-?rx)\b", re.IGNORECASE
@@ -672,7 +677,7 @@ _ORDERS = [
     re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
     # "In to" as speech recognition often writes it: "call that into his usual pharmacy".
     re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in(?:to)?\b", re.IGNORECASE),
-    re.compile(rf"\b(?:send|sending)\b{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b", re.IGNORECASE),
+    re.compile(rf"\b(?:send|sending)\b(?:{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b|{_TO_THE_PHARMACY})", re.IGNORECASE),
 ]
 # The model told to make an orders section: "add an orders field with an MRI". Never proposed.
 _ORDERS_SECTION = re.compile(
@@ -770,7 +775,7 @@ _PASSIVE = [
     ("allergy_change", re.compile(
         rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,40}}?\b(?:come|comes|coming|go|goes|be taken|be removed)\s+off\b", re.I
     )),
-    ("order", re.compile(rf"\bsent\b{_SAME_SENTENCE}{{0,40}}?\bpharmacy\b", re.IGNORECASE)),
+    ("order", re.compile(rf"\bsent\b(?:{_SAME_SENTENCE}{{0,40}}?\bpharmacy\b|{_TO_THE_PHARMACY})", re.IGNORECASE)),
 ]
 _PASSIVE_PLACES = {"order": _not_in_the_past}
 # What can lead up to an instruction ("go ahead and", "please", "I'll"); anything else ends its span, so the plan said

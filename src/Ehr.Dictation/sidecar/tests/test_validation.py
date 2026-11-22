@@ -812,6 +812,38 @@ def test_a_noun_order_or_refill_is_not_an_instruction(said):
     assert not_carried_over(transcript(said)) == []
 
 
+# "Send ... to the pharmacy" is found however far on in the sentence the pharmacy is said, when "to" (or "into") comes
+# before it; the whole of it is listed and cut from a field.
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Send amoxicillin 500 mg by mouth three times a day for 7 days to her pharmacy.",
+        "Send metformin 2.5 mg twice daily before breakfast and dinner for ninety days to his usual pharmacy.",
+        "Please send the prescription for amoxicillin 500 mg three times a day for 10 days over to her usual pharmacy.",
+        "Send that into his usual local pharmacy.",
+    ],
+)
+def test_sending_to_the_pharmacy_is_found_however_long_the_sentence(said):
+    text = transcript(f"Continue lisinopril. {said}")
+
+    (listed,) = not_carried_over(text)
+
+    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".")
+    assert own(text.text, "Continue lisinopril. " + said).value == "Continue lisinopril."
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Send her home with written instructions and the phone number of the pharmacy.",
+        "Send amoxicillin 500 mg three times a day. Her pharmacy is closed on Sundays.",
+        "Her prescriptions for amoxicillin 500 mg three times a day for 7 days were sent to the pharmacy last week.",
+    ],
+)
+def test_a_pharmacy_mentioned_without_sending_something_to_it_is_not_an_instruction(said):
+    assert not_carried_over(transcript(said)) == []
+
+
 # Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
 @pytest.mark.parametrize(
     ("said", "reason"),
