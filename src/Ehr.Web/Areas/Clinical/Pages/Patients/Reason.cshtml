@@ -14,12 +14,16 @@
 }
 else
 {
-    <p class="sc-prose">This patient is not on your panel. To open the chart, say why you need it, in @BreakGlass.MinimumReasonLength to @BreakGlass.MaximumReasonLength characters. Your access and the reason are recorded and reviewed, and the chart stays open to you for @BreakGlass.Duration.TotalHours hours.</p>
-    @* No action: the form posts to this page's own address, the search's criteria included. *@
+    <p class="sc-prose">This patient is not on your panel. To open the chart, say why you need it. Your access and the reason are recorded and reviewed, and the chart stays open to you for @BreakGlass.Duration.TotalHours hours.</p>
+    @* No action: the form posts to this page's own address, the search's criteria included. maxlength stops typing at
+       the limit; the minimum is left to the server, whose message is clearer than the browser's and counts the reason
+       without the spaces around it. *@
     <form method="post" class="sc-form">
-        <div class="sc-field">
+        <div class="sc-field sc-field--wide">
             <label asp-for="Reason" class="sc-field__label">Reason</label>
-            <textarea asp-for="Reason" class="sc-field__input" rows="3" required autofocus></textarea>
+            <textarea asp-for="Reason" class="sc-field__input" rows="4" maxlength="@BreakGlass.MaximumReasonLength"
+                      aria-describedby="reason-hint" required autofocus></textarea>
+            <p class="sc-field__hint" id="reason-hint">@BreakGlass.MinimumReasonLength to @BreakGlass.MaximumReasonLength characters, such as "Covering the night shift".</p>
             <span asp-validation-for="Reason" class="sc-field__error"></span>
         </div>
         <button class="sc-btn sc-btn--primary">Open the chart</button>

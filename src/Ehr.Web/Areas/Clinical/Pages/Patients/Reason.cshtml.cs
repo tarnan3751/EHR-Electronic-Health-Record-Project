@@ -14,28 +14,38 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 // unreachable, the reason typed is shown again on the "Not saved" page (UC 2). The reason is kept trimmed, and its
 // length is checked again once trimmed: model binding checks the value as posted, so spaces around a short reason would
 // otherwise make it long enough.
+//
+// A chart the clinician may already open (on their panel, or under a grant that hasn't ended) goes straight to the
+// chart, on a post as on a get: a reason sent twice, by a double click or by Back and resend, records one grant, not two.
 [ShownIfNotSaved(nameof(Reason))]
 public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) : PageModel
 {
+    // The length messages, once each: model binding and the trimmed check below say the same thing.
+    const string TooShort = "Use at least 10 characters.";
+    const string TooLong = "Use 500 characters or fewer.";
+
     [BindProperty(SupportsGet = true)]
     public SearchQuery Search { get; set; } = SearchQuery.None;
 
     [BindProperty]
     [Required(ErrorMessage = "Say why you need this chart.")]
-    [MinLength(BreakGlass.MinimumReasonLength, ErrorMessage = "Use at least 10 characters.")]
-    [StringLength(BreakGlass.MaximumReasonLength, ErrorMessage = "Use 500 characters or fewer.")]
+    [MinLength(BreakGlass.MinimumReasonLength, ErrorMessage = TooShort)]
+    [StringLength(BreakGlass.MaximumReasonLength, ErrorMessage = TooLong)]
     public string? Reason { get; set => field = value?.Trim(); }
 
     public async Task<IActionResult> OnGetAsync(Guid id) =>
-        await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted) || await breakGlass.ActiveUntilAsync(id, HttpContext.RequestAborted) is not null
-            ? RedirectToPage("Chart", Search.ChartRouteValues(id))
-            : Page();
+        await MayOpenAsync(id) ? RedirectToPage("Chart", Search.ChartRouteValues(id)) : Page();
 
     public async Task<IActionResult> OnPostAsync(Guid id)
     {
+        if (await MayOpenAsync(id))
+        {
+            return RedirectToPage("Chart", Search.ChartRouteValues(id));
+        }
+
         if (ModelState.IsValid && Reason!.Length < BreakGlass.MinimumReasonLength)
         {
-            ModelState.AddModelError(nameof(Reason), "Use at least 10 characters.");
+            ModelState.AddModelError(nameof(Reason), TooShort);
         }
 
         if (!ModelState.IsValid)
@@ -55,4 +65,10 @@ public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) 
 
         return RedirectToPage("Chart", Search.ChartRouteValues(id));
     }
+
+    // On the panel, or under emergency access that hasn't ended. The panel is checked first: it is the usual case, and
+    // the grant's query is only needed off the panel.
+    async Task<bool> MayOpenAsync(Guid id) =>
+        await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted)
+        || await breakGlass.ActiveUntilAsync(id, HttpContext.RequestAborted) is not null;
 }

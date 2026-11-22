@@ -47,6 +47,23 @@ public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["Covering the night shift"], await apps.ReasonsAsync(AuditActions.BreakGlass, clinician.Id, patient));
     }
 
+    // A reason sent twice, by a double click or by Back and resend, records one grant: the second post finds the chart
+    // already open to the clinician and goes straight to it.
+    [Fact]
+    public async Task A_reason_sent_twice_records_one_grant()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Double Click", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Dana", "Twice");
+        var session = await SignInAsync(apps.OnPrem, clinician);
+
+        using var first = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));
+        using var second = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));
+
+        Assert.Equal($"/patients/{patient}", PathOf(first));
+        Assert.Equal($"/patients/{patient}", PathOf(second));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.BreakGlass, actorId: clinician.Id, patientId: patient));
+    }
+
     [Fact]
     public async Task A_chart_on_the_panel_opens_without_a_reason()
     {

@@ -36,7 +36,9 @@ public class CodeModel(StaffSignIn signIn) : PageModel
 
         if (!await signIn.VerifyCodeAsync(user, Code!, HttpContext.RequestAborted))
         {
-            ModelState.AddModelError("", "That code did not match. Try the current code from your app, or a recovery code.");
+            ModelState.AddModelError("", await signIn.IsLockedOutAsync(user)
+                ? "This account is locked after too many failed attempts. Try again in 15 minutes."
+                : "That code did not match. Try the current code from your app, or a recovery code.");
             return Page();
         }
 

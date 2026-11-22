@@ -215,6 +215,53 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, patients.StatusCode);
     }
 
+    // A wrong code counts towards the lockout like a wrong password, and once the account is locked even the right code
+    // is refused: the pending step allows no more guesses than the password step does.
+    [Fact]
+    public async Task Five_wrong_codes_lock_the_account_and_then_the_right_code_is_refused()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Guessing", StaffRoles.Clinician);
+        var client = Client(apps.OnPrem, new CookieContainer());
+        using var codePage = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            using var wrong = await PostFormAsync(client, "/sign-in/code", "/sign-in/code", ("Code", Totp.WrongCode(account.AuthenticatorKey)));
+        }
+
+        using var right = await PostFormAsync(client, "/sign-in/code", "/sign-in/code", ("Code", Totp.Code(account.AuthenticatorKey)));
+
+        Assert.Equal("/sign-in/code", PathOf(right));
+        Assert.Contains("This account is locked", await ReadAsync(right));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+    }
+
+    // Recovery codes are shown as "XXXXX-XXXXX"; one typed without its dash signs in too, and is then spent.
+    [Fact]
+    public async Task A_recovery_code_signs_in_with_or_without_its_dash_and_works_once()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Lost Phone", StaffRoles.Clinician);
+        List<string> codes;
+        await using (var scope = apps.OnPrem.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+            var user = (await users.FindByIdAsync(account.Id.ToString()))!;
+            codes = [.. (await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 8))!];
+        }
+
+        var typed = codes[0].Replace("-", "");
+        var client = Client(apps.OnPrem, new CookieContainer());
+        using var codePage = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
+        using var signedIn = await PostFormAsync(client, "/sign-in/code", codePage, ("Code", typed));
+        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
+        Assert.DoesNotContain("/sign-in", PathOf(signedIn));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RecoveryCodeUsed, actorId: account.Id));
+
+        var again = Client(apps.OnPrem, new CookieContainer());
+        using var secondCodePage = await PostFormAsync(again, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
+        using var spent = await PostFormAsync(again, "/sign-in/code", secondCodePage, ("Code", codes[0]));
+        Assert.Contains("That code did not match.", await ReadAsync(spent));
+    }
+
     [GeneratedRegex("secret=([A-Z2-7]+)")]
     private static partial Regex AuthenticatorSecret();
 

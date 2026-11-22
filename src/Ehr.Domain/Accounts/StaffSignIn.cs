@@ -116,17 +116,26 @@ public sealed class StaffSignIn(
     }
 
     // The second factor: a code from the authenticator app, or one of the recovery codes when the app is lost. A wrong
-    // code counts towards the lockout like a wrong password.
+    // code counts towards the lockout like a wrong password, and a locked account (or one an admin disabled, which is a
+    // lockout that never ends) is refused before any code is tried: otherwise the ten minutes the StaffPending cookie
+    // lasts would allow unlimited guesses at a six-digit code. A right code clears the failures, as a right password does.
     public async Task<bool> VerifyCodeAsync(StaffUser user, string code, CancellationToken cancellationToken)
     {
-        var normalized = Normalize(code);
-        if (await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, normalized))
+        if (await users.IsLockedOutAsync(user))
         {
+            await RecordAsync(AuditActions.SignInFailed, user, "locked out", cancellationToken);
+            return false;
+        }
+
+        if (await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, Normalize(code)))
+        {
+            await users.ResetAccessFailedCountAsync(user);
             return true;
         }
 
-        if ((await users.RedeemTwoFactorRecoveryCodeAsync(user, normalized)).Succeeded)
+        if ((await users.RedeemTwoFactorRecoveryCodeAsync(user, RecoveryCode(code))).Succeeded)
         {
+            await users.ResetAccessFailedCountAsync(user);
             await RecordAsync(AuditActions.RecoveryCodeUsed, user, null, cancellationToken);
             return true;
         }
@@ -135,6 +144,9 @@ public sealed class StaffSignIn(
         await RecordAsync(AuditActions.SignInFailed, user, "wrong code", cancellationToken);
         return false;
     }
+
+    // Whether the account is locked out now, after too many wrong passwords or codes, or disabled by an admin.
+    public Task<bool> IsLockedOutAsync(StaffUser user) => users.IsLockedOutAsync(user);
 
     public async Task CompleteAsync(HttpContext context, StaffUser user, CancellationToken cancellationToken)
     {
@@ -153,8 +165,16 @@ public sealed class StaffSignIn(
         }
     }
 
-    // Codes are typed with the spaces or dashes apps show them with.
+    // Authenticator codes are typed with the spaces or dashes apps show them with.
     static string Normalize(string code) => code.Replace(" ", "").Replace("-", "");
+
+    // Identity issues recovery codes as two groups of five, "XXXXX-XXXXX", and matches them exactly, dash included, so
+    // the dash Normalize drops is put back: the code is accepted with or without the dash, and with spaces.
+    static string RecoveryCode(string code)
+    {
+        var bare = Normalize(code);
+        return bare.Length == 10 ? $"{bare[..5]}-{bare[5..]}" : bare;
+    }
 
     async Task RecordAsync(string action, StaffUser user, string? reason, CancellationToken cancellationToken)
     {

@@ -9,7 +9,10 @@
     <input type="hidden" asp-for="ReturnUrl">
     <div class="sc-field">
         <label asp-for="Code" class="sc-field__label">Code</label>
-        <input asp-for="Code" class="sc-field__input sc-field__input--mono" autocomplete="one-time-code" required autofocus>
+        @* Not inputmode="numeric": recovery codes have letters. No spellcheck or capitals, which only get in a code's way. *@
+        <input asp-for="Code" class="sc-field__input sc-field__input--mono" autocomplete="one-time-code" autocapitalize="off"
+               spellcheck="false" maxlength="20" aria-describedby="code-hint" required autofocus>
+        <p class="sc-field__hint" id="code-hint">A new code shows in your app every 30 seconds. A recovery code works once.</p>
         <span asp-validation-for="Code" class="sc-field__error"></span>
     </div>
     <div asp-validation-summary="ModelOnly" class="sc-notice sc-notice--danger"></div>
