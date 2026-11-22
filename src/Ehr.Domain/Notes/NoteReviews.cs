@@ -267,7 +267,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         catch (DbUpdateConcurrencyException)
         {
             // Decided in another tab since it was read. Not tracked any more, so the page's reads after this save nothing.
-            db.Entry(proposal).State = EntityState.Detached;
+            db.Entry((object)proposal).State = EntityState.Detached;
             return ReviewResult.Decided;
         }
         return new(200, [], review);

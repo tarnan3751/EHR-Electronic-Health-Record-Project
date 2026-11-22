@@ -396,6 +396,81 @@ public class AiChartProposalSecurityTests(MigratedDatabase database) : IClassFix
             $"SELECT id FROM ehr.{table} WHERE patient_id = @patient", ("patient", row.Patient)));
     }
 
+    // A medication order for lisinopril 10 mg, as the order form signs one, and a refill request approved with it.
+    const string SignLisinopril = "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @patient, 'medication', '314076', '{}', 'active');";
+
+    const string Approve = "UPDATE ehr.refill_requests SET order_id = @order WHERE id = @request;";
+
+    // The patient's portal account asks to renew a lisinopril 10 mg on their chart, as the portal asks (step 13d).
+    async Task<Guid> RefillRequestAsync(Staged row)
+    {
+        var (medication, request) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "INSERT INTO ehr.medication_statements (id, patient_id, code, display, dosage, status, sensitive) VALUES (@id, @patient, '314076', 'lisinopril 10 MG Oral Tablet', '1 tablet by mouth daily', 'active', false)",
+            ("id", medication), ("patient", row.Patient));
+        await Accounts.ExecuteAsync(App, await Accounts.PatientAccountAsync(database, row.Patient), """
+            INSERT INTO ehr.refill_requests (id, patient_id, medication_statement_id, medication_display, note, requested_by, requested_at, status, sensitive)
+            VALUES (@id, @patient, @medication, 'Synthetic', NULL, gen_random_uuid(), now(), 'requested', false)
+            """, ("id", request), ("patient", row.Patient), ("medication", medication));
+        return request;
+    }
+
+    // D7 in the database (the expansion plan's step 15): one order answers a refill request or decides a proposal, never
+    // both, whichever is linked first, in one transaction or in two at once: the second waits on the order's lock until
+    // the first commits, then finds the first's link. Only in READ COMMITTED, where it can.
+    [Fact]
+    public async Task An_order_answers_a_refill_request_or_decides_a_proposal_never_both()
+    {
+        var row = await StagedAsync();
+        var request = await RefillRequestAsync(row);
+
+        await Refused(() => Run(row, SignLisinopril + Approve + Ordered, ("request", request)), constraint: "ai_chart_proposals_order_refill");
+        await Refused(() => Run(row, SignLisinopril + Ordered + Approve, ("request", request)), constraint: "refill_requests_order_proposal");
+        Assert.Equal("pending - -", await StateOf(row, row.OrderProposal));
+        Assert.Equal(["requested"], await Accounts.QueryAsync(App, row.Clinician, "SELECT status FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+
+        await using var repeatable = await BeginAsync(row.Clinician, System.Data.IsolationLevel.RepeatableRead);
+        var order = Guid.CreateVersion7();
+        await Run(row, SignLisinopril, ("order", order));
+        await Refused(() => RunOnAsync(repeatable, Ordered, row.Patient, order, row.OrderProposal, "314076", "1191"), PostgresErrorCodes.FeatureNotSupported);
+    }
+
+    [Theory]
+    [InlineData("proposal first")]
+    [InlineData("refill first")]
+    public async Task Two_transactions_linking_one_order_to_a_refill_request_and_a_proposal_leave_one_link(string first)
+    {
+        var row = await StagedAsync();
+        var request = await RefillRequestAsync(row);
+        await using var deciding = await BeginAsync(row.Clinician);
+        await using var approving = await BeginAsync(row.Clinician);
+
+        // Signed by the clinician in a transaction of theirs committed after both began: "now" to both.
+        var order = Guid.CreateVersion7();
+        await Run(row, SignLisinopril, ("order", order));
+
+        async Task Link(Tab tab)
+        {
+            await using var command = new NpgsqlCommand(tab == deciding ? Ordered : Approve, tab.Connection, tab.Transaction);
+            command.Parameters.AddWithValue("order", order);
+            command.Parameters.AddWithValue("proposal", row.OrderProposal);
+            command.Parameters.AddWithValue("request", request);
+            await command.ExecuteNonQueryAsync(Cancel);
+        }
+
+        var (ahead, behind) = first == "proposal first" ? (deciding, approving) : (approving, deciding);
+        await Link(ahead);
+        var waiting = Task.Run(() => Assert.ThrowsAsync<PostgresException>(() => Link(behind)), Cancel);
+        await WaitForLockAsync(behind.Pid);
+        await ahead.Transaction.CommitAsync(Cancel);
+        var error = await waiting;
+
+        Assert.Equal(first == "proposal first" ? "refill_requests_order_proposal" : "ai_chart_proposals_order_refill", error.ConstraintName);
+        Assert.Equal(first == "proposal first" ? $"ordered {order} -" : "pending - -", await StateOf(row, row.OrderProposal));
+        Assert.Equal([first == "proposal first" ? "requested" : "completed"], await Accounts.QueryAsync(App, row.Clinician,
+            "SELECT status FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+    }
+
     sealed record Tab(NpgsqlConnection Connection, NpgsqlTransaction Transaction, int Pid) : IAsyncDisposable
     {
         public async ValueTask DisposeAsync()
@@ -405,11 +480,11 @@ public class AiChartProposalSecurityTests(MigratedDatabase database) : IClassFix
         }
     }
 
-    async Task<Tab> BeginAsync(Guid user)
+    async Task<Tab> BeginAsync(Guid user, System.Data.IsolationLevel isolation = System.Data.IsolationLevel.ReadCommitted)
     {
         var connection = new NpgsqlConnection(App);
         await connection.OpenAsync(Cancel);
-        var transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, Cancel);
+        var transaction = await connection.BeginTransactionAsync(isolation, Cancel);
         await using var set = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true), pg_backend_pid()", connection, transaction);
         set.Parameters.AddWithValue("user", user.ToString());
         await using var reader = await set.ExecuteReaderAsync(Cancel);

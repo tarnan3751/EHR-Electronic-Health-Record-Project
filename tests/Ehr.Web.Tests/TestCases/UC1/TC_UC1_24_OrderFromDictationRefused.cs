@@ -10,8 +10,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Purpose / scenario: An order a dictation proposed (step 15) is decided once. Opened in two tabs, the second "Sign
 //   order" saves nothing, the order included, and says so.
 //   A proposal decided already sends the form back to the review; one that is an allergy's, another clinician's, or
-//   combined with a refill or a change doesn't open the form. (One dismissed on the review while its form was open is
-//   TC-UC13-11's.)
+//   combined with a refill or a change doesn't open the form; nor one named on the form of another patient on the same
+//   clinician's panel. (One dismissed on the review while its form was open is TC-UC13-11's.)
 // Type: Functional (exceptional condition)
 // Requirements: FR-14 (reworded), FR-05
 // Use case: UC 1, Place an order
@@ -24,10 +24,14 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   1. Open the lab form from the order's proposal in two tabs; sign Lipid panel in the first, Hemoglobin A1c in the second.
 //   2. Open the form from the order's proposal again; from the allergy's, and sign from it; with a refill; with a change.
 //   3. As the colleague, open the form from a second dictation's order proposal.
+//   4. As Dr. Test, open another patient's order form, of their panel too, with the second dictation's order proposal;
+//      sign from it, the proposal in the address and then in the form.
 // Expected result: Step 1: the first signs and goes back to the review; the second is 409, "Not saved: this proposal was
 //   decided first, in another tab or window. Nothing was ordered.", and the patient has the first order alone. Step 2: back
-//   to the review; to the chart, and 404 with nothing signed; 400; 400. Step 3: the colleague is sent to the chart, shown nothing of it, and the
-//   proposal still waits.
+//   to the review; to the chart, and 404 with nothing signed; 400; 400. Step 3: the colleague is sent to the chart,
+//   shown nothing of it, and the proposal still waits. Step 4: to that patient's chart, then 404 twice; nothing is
+//   ordered for either patient, the proposal still waits, and no read of it or its review is recorded against the other
+//   patient.
 // Creator: Tahseen Arnan
 public class TC_UC1_24_OrderFromDictationRefused(WebApps apps) : IClassFixture<WebApps>
 {
@@ -98,5 +102,30 @@ public class TC_UC1_24_OrderFromDictationRefused(WebApps apps) : IClassFixture<W
 
         Assert.Equal(["SYN-LAB-004"], await QueryAsync(apps, "SELECT catalog_code FROM ehr.orders WHERE patient_id = @id", dictated.Patient));
         Assert.Equal("pending|-|-", await StateAsync(apps, again.Order));
+
+        // Named on the form of another patient on Dr. Test's panel: not that patient's proposal.
+        var other = await apps.InsertPatientAsync("Synthetic", "Elsewhere");
+        await apps.AssignAsync(await apps.ClinicianAsync(), other);
+        using (var form = await dictated.Session.Client.GetAsync(OrderFormPath(other, again.Order, "lab"), Cancel))
+        {
+            Assert.Equal($"/patients/{other}", PathOf(form));
+        }
+
+        using (var inAddress = await SignOnAsync(dictated, OrderFormPath(other, again.Order, "lab"), first, "Hemoglobin A1c"))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, inAddress.StatusCode);
+        }
+
+        using (var inForm = await dictated.Session.Client.PostAsync($"/patients/{other}/orders/new?type=lab", Form([("__RequestVerificationToken", first),
+            ("Proposal", again.Order), ("Item", "Hemoglobin A1c"), ("SafetySeen", "true"), .. OrderTests.Cbc.Select(d => ($"Details[{d.Item1}]", (object)d.Item2))]), Cancel))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, inForm.StatusCode);
+        }
+
+        Assert.Equal("0 orders, 0 allergies", await ChartAsync(apps, other));
+        Assert.Equal(["SYN-LAB-004"], await QueryAsync(apps, "SELECT catalog_code FROM ehr.orders WHERE patient_id = @id", dictated.Patient));
+        Assert.Equal("pending|-|-", await StateAsync(apps, again.Order));
+        Assert.Equal(["0"], await QueryAsync(apps,
+            "SELECT count(*) FROM ehr.audit_events WHERE patient_id = @id AND table_name IN ('ai_chart_proposals', 'ai_note_reviews')", other));
     }
 }

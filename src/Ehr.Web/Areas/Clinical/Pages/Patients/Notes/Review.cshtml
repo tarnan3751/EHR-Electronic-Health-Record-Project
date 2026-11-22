@@ -64,7 +64,11 @@
             </form>
         </div>
     }
-    @if (Model.Signed) { <p class="sc-notice sc-notice--info">The note is signed. This review evidence is read-only.</p> }
+    @* Signing ends the fields' review, not the proposals' (step 15): those still waiting are opened or dismissed below. *@
+    @if (Model.Signed)
+    {
+        <p class="sc-notice sc-notice--info">The note is signed. The review of its fields is read-only.@(Model.ChartProposals.Any(p => p.Waiting) ? " The proposed orders and allergies below can still be opened in their forms or dismissed." : "")</p>
+    }
     <div class="sc-review">
         <section>
             <section class="sc-transcript" aria-labelledby="review-transcript">
