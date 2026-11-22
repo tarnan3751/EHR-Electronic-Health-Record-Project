@@ -187,8 +187,9 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
         // Pre-visit forms (step 13e), always sensitive items. A view that showed them is a view of sensitive items; a
         // plain read is a forms page that showed none of them (the clinician's with them hidden, which shows how many,
         // or the portal's for a session that may not see them, which shows none), worded as that page. Counted as views,
-        // never as forms. A read of a form's own rows (RecordViewParts.Form, the same key) shows the form, so it is a view
-        // of sensitive items, worded as the forms.
+        // never as forms. Nothing records a read of a form's own rows (they share this key, by their tables): if one
+        // ever did as a plain read, it would be worded as the page with the forms hidden, since only a read of sensitive
+        // items is marked sensitive (42-record-views.sql).
         [AuditParts.Forms] = Counted("Your pre-visit forms page, with the forms hidden", "The pre-visit forms page, with the forms hidden",
             Counted("Your pre-visit forms", "The pre-visit forms")),
         [RecordViewParts.Record] = new("Your record", "The record", "Your record, {0} times", "The record, {0} times"),
