@@ -13,7 +13,9 @@ namespace Ehr.Web.Tests;
 // made-up conversation of two or three voices, awaiting the clinician's word on who each is; a mapping that leaves a
 // voice out, or doesn't name one clinician and one patient, refused with 422 speakers_incomplete; and then the note's
 // fields drafted from it by who said what: Subjective from the patient's words, with the warning that they are the
-// patient's own, and Objective, Assessment and Plan from the clinician's, each source with its speaker.
+// patient's own, and Objective, Assessment and Plan from the clinician's, each source with its speaker. Once the voices
+// are named, every segment says who said it, whether or not the fields could be sorted: the app stages nothing else
+// (DictationApi.TrustedResult), and the service must send the same.
 public sealed partial class DictationSidecarStub
 {
     // How long nobody has spoken, as the service measures it, in every audio answer.

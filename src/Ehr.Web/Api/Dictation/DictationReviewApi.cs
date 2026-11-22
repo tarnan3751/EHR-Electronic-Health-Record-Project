@@ -39,7 +39,9 @@ public static partial class DictationApi
             {
                 await transaction.CommitAsync(cancel);
                 await ReportReviewWalAsync(context, db);
-                return existing.PatientId == input.PatientId && (input.DraftId is null || input.DraftId == existing.DraftId)
+                // A visit's binding (step 16) is never handed to a dictation, as AmbientApi's start never hands one a dictation's.
+                return existing.PatientId == input.PatientId && existing.Mode == AiReviewModes.Dictation
+                    && (input.DraftId is null || input.DraftId == existing.DraftId)
                     ? BoundSession(context, existing) : ReviewAnswer(context, ReviewResult.Missing);
             }
             if (input.DraftId is { } draftId)
@@ -176,9 +178,9 @@ public static partial class DictationApi
 
     // Keep exactly UC 9/10's sanitized contract and half-open UTF-16 ranges. Grounding/clinical checks remain in
     // the trusted sidecar pipeline; malformed spans/results are never promoted into reviewable records here.
-    // A recorded visit's (step 16, `ambient`) proposes nothing beyond its note, says who said every passage and source once
-    // drafted, and is stored with its transcript's text apart (TrustedReviewResult.Transcript); a dictation's says nothing
-    // of speakers.
+    // A recorded visit's (step 16, `ambient`) proposes nothing beyond its note, says who said every passage and source,
+    // marks a Subjective value as the patient's own words, and is stored with its transcript's text apart
+    // (TrustedReviewResult.Transcript); a dictation's says nothing of speakers.
     internal static TrustedReviewResult? TrustedResult(DictationResult result, bool ambient = false)
     {
         var text = result.Transcript.Text;
@@ -200,7 +202,9 @@ public static partial class DictationApi
         var spoken = result.Transcript.Segments.Any(s => s.Speaker is not null || s.SpeakerGroup is not null) || result.Speakers is not null
             || result.Fields is { } said && new[] { said.Subjective, said.Objective, said.Assessment, said.Plan }
                 .OfType<PendingField>().Any(f => f.Sources.Any(s => s.Speaker is not null));
-        if (ambient ? proposals.Count > 0 || result.Sorting == Sorting.Done && result.Transcript.Segments.Any(s => s.Speaker is null) : spoken) return null;
+        // A visit's says who said every passage, whether or not its fields could be sorted: its review shows it a turn at a
+        // time, and a passage with no one's name would read as the turn before's.
+        if (ambient ? proposals.Count > 0 || result.Transcript.Segments.Any(s => s.Speaker is null) : spoken) return null;
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
         if (result.Fields?.History is not null) return null;
@@ -213,7 +217,9 @@ public static partial class DictationApi
                 if (result.Sorting != Sorting.Done || string.IsNullOrWhiteSpace(pending.Value) || pending.Value.Contains('\0')
                     || pending.Value.Length > NoteContent.MaximumFieldLength || pending.Sources.Count == 0
                     || pending.Sources.Any(s => !Range(s.Start, s.End) || ambient && s.Speaker is null)
-                    || pending.Warnings.Any(w => !Range(w.Start, w.End))) return null;
+                    || pending.Warnings.Any(w => !Range(w.Start, w.End))
+                    // A visit's Subjective is the patient's own words, and says so (UC 23).
+                    || ambient && name == "subjective" && !pending.Warnings.Any(w => w.Code == WarningCode.PatientsOwnWords)) return null;
                 suggestions.Add(name, pending.Value);
             }
         }

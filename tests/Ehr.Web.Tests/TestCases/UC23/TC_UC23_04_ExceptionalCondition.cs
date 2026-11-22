@@ -1,5 +1,12 @@
+using System.Data.Common;
 using System.Net;
+using Ehr.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.AmbientFlows;
 using static Ehr.Web.Tests.Browser;
@@ -26,7 +33,8 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //      all at the clinic, and finish the review through the cloud app.
 //   2a. Send the chart, a draft, the Listen page and the review, a decision, finishing and rejecting everything to the
 //      on-prem app with the forwarding header, under each of the three proofs.
-//   3. With the service unreachable, start listening.
+//   3. With the service unreachable, start listening; and with the service there, start listening while the database
+//      times out saving the consent.
 //   4. Draft a visit, purge its transcript, open its review, and accept a proposal, edit it back to its own words, and
 //      edit it into others.
 // Expected result: Step 1: "Listen to the visit" on the clinic's chart only; off-site, the page's "Unavailable:" notice
@@ -34,7 +42,7 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   off-site, "Read-only here:" with the review's proposals, no transcript, no decisions and no finishing; the forwarded
 //   decision and finishing refused with "Finish this review at the clinic…", the review still open with its transcript.
 //   Step 2a: each answered as off-site, under every proof: no listening offered, no transcript, everything refused.
-//   Step 3: 503, no consent recorded. Step 4: the review says the transcript was deleted after 7 days, offers no Accept,
+//   Step 3: 503, no consent recorded; then 500, the service's session discarded, no consent or review recorded. Step 4: the review says the transcript was deleted after 7 days, offers no Accept,
 //   and leaves the box to edit it empty, saying why; accepting, or editing back to the words offered, even spaced
 //   differently, is refused with that sentence; editing into other words is saved.
 // Creator: Tahseen Arnan
@@ -161,6 +169,42 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.Equal(["pending 1"], await RowsAsync(apps,
             "SELECT r.state || ' ' || (SELECT count(*) FROM ehr.ambient_transcripts t WHERE t.id = r.id) FROM ehr.ai_note_reviews r WHERE r.id = @id", l.Review));
         Assert.Equal(["pending"], await RowsAsync(apps, "SELECT DISTINCT state FROM ehr.ai_field_proposals WHERE review_id = @id", l.Review));
+    }
+
+    // Once the service has begun a visit's session, saving its consent and binding fails with what isn't a refusal (here
+    // a timeout reading the database's answer, as the panel ending meanwhile or the database going away would be): the
+    // service's session is discarded all the same, and nothing is kept.
+    [Fact]
+    public async Task A_start_that_fails_once_the_service_has_begun_leaves_no_session_there()
+    {
+        var sidecar = apps.Dictation.Reset();
+        await using var failing = apps.OnPrem.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.ConfigureDbContext<EhrDbContext>(options => options.AddInterceptors(new ConsentTimesOut()))));
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Synthetic", "Listening interrupted");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(failing, clinician);
+        var token = Token(await session.Client.GetStringAsync($"/patients/{patient}/listen", Cancel));
+
+        using (var started = await Post(session.Client, token, $"{ListenApi}/start", Consent(Guid.NewGuid(), patient)))
+        {
+            Assert.Equal(HttpStatusCode.InternalServerError, started.StatusCode);
+        }
+
+        Assert.Single(sidecar.Received, r => r.Method == "POST" && r.PathAndQuery.StartsWith("/v1/sessions?mode=ambient", StringComparison.Ordinal));
+        var discarded = Assert.Single(sidecar.Received, r => r.Method == "DELETE");
+        Assert.Equal("ambient", discarded.Headers[Ehr.Web.Api.Dictation.DictationSidecar.ModeHeader]);
+        Assert.Equal(["0"], await RowsAsync(apps, "SELECT count(*) FROM ehr.ambient_consents WHERE patient_id = @id", patient));
+        Assert.Equal(["0"], await RowsAsync(apps, "SELECT count(*) FROM ehr.ai_note_reviews WHERE patient_id = @id", patient));
+    }
+
+    sealed class ConsentTimesOut : DbCommandInterceptor
+    {
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default) =>
+            command.CommandText.Contains("INSERT INTO ehr.ambient_consents", StringComparison.Ordinal)
+                ? throw new NpgsqlException("Synthetic: the database didn't answer in time.", new TimeoutException())
+                : ValueTask.FromResult(result);
     }
 
     [Fact]

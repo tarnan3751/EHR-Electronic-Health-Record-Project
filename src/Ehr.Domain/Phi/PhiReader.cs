@@ -1207,10 +1207,14 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
 
     // Ambient listening (step 16). Whether the signed-in clinician is listening to a visit under this session, with its
     // consent recorded and the review neither staged nor ended: the check every chunk of audio passes before it goes to
-    // the dictation service. Like IsAssignedAsync, it shows nothing of the record, so it records no read.
-    public Task<bool> AmbientCaptureOpenAsync(string sessionId, CancellationToken cancel) =>
-        db.AiNoteReviews.AnyAsync(r => r.SessionId == sessionId && r.ClinicianId == user.UserId
-            && r.Mode == AiReviewModes.Ambient && r.ConsentId != null && r.State == AiReviewStates.Recording, cancel);
+    // the dictation service. How many people its consent said would speak, or null when it isn't. Like IsAssignedAsync,
+    // it shows nothing of the record, so it records no read: the count only holds the voices named to it.
+    public Task<short?> AmbientCaptureAsync(string sessionId, CancellationToken cancel) =>
+        (from r in db.AiNoteReviews
+         join c in db.AmbientConsents on r.ConsentId equals (Guid?)c.Id
+         where r.SessionId == sessionId && r.ClinicianId == user.UserId && r.Mode == AiReviewModes.Ambient
+             && r.State == AiReviewStates.Recording
+         select (short?)c.Speakers).FirstOrDefaultAsync(cancel);
 
     // Whether a review's conversation is still kept (only while the review is open, and for at most 7 days): what decides
     // where its proposals may be decided and how. Shows nothing of the transcript, which the cloud app can't read, so it

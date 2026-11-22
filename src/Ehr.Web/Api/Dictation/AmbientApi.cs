@@ -31,11 +31,14 @@ namespace Ehr.Web.Api.Dictation;
 //                                    transcribed and its voices told apart, with speakers: [{group, seconds}] and each
 //                                    segment's speakerGroup
 //   POST /ambient/{id}/speakers      {speakers: {"1": "clinician", "2": "patient", "3": "other"}}: who each voice is,
-//                                    every one of them, one clinician and one patient; then the note is drafted, and the
-//                                    result follows as result's. 422 speakers_incomplete otherwise
+//                                    every one of them, one clinician and one patient, and no more voices than the
+//                                    consent said would speak; then the note is drafted, and the result follows as
+//                                    result's. 422 speakers_incomplete otherwise
 //   POST /ambient/{id}/result        the result, as the dictation's result route
 // DELETE /ambient/{id}: 204, and the service discards the session at once, whatever its state; the page also discards the
-// review (/review/{reviewId}/discard). Staging, deciding and finishing are the review's routes (DictationReviewApi).
+// review (/review/{reviewId}/discard). Staging, deciding and finishing are the review's routes (DictationReviewApi). A
+// start that the service has begun but whose consent and binding aren't saved, refused or failed, discards the service's
+// session there and then.
 //
 // Every call to the service for these sessions carries DictationSidecar.ModeHeader: the service answers a dictation's
 // call for a visit's session, or the reverse, as it would for no session at all.
@@ -125,34 +128,41 @@ public static partial class DictationApi
                         "Listening to a visit isn't available: the dictation service doesn't support it yet.");
                 }
 
+                // Whatever stops the consent and the binding from being saved, a refusal or an exception (the panel ending
+                // meanwhile, a timeout), the service's session goes.
                 var begun = false;
-                var answer = await ReviewWriteAsync(async () =>
+                try
                 {
-                    await using var transaction = await db.Database.BeginTransactionAsync(token);
-                    var result = await reviews.BeginAsync(input.ReviewId, input.PatientId, input.DraftId, input.Version,
-                        session.SessionId, session.MaxSeconds, Math.Min(session.MaxChunkBytes, MaxChunkBytes), token,
-                        new AmbientStart((short)input.Speakers, input.GivenBy));
-                    await transaction.CommitAsync(CancellationToken.None);
-                    begun = result.Status == StatusCodes.Status201Created;
-                    await ReportReviewWalAsync(context, db);
-                    return result.Review is { } review ? BoundSession(context, review) : ReviewAnswer(context, result);
-                });
-                if (!begun)
-                {
-                    await DeleteServiceSessionAsync(context, sidecar, session.SessionId, ambient: true);
+                    return await ReviewWriteAsync(async () =>
+                    {
+                        await using var transaction = await db.Database.BeginTransactionAsync(token);
+                        var result = await reviews.BeginAsync(input.ReviewId, input.PatientId, input.DraftId, input.Version,
+                            session.SessionId, session.MaxSeconds, Math.Min(session.MaxChunkBytes, MaxChunkBytes), token,
+                            new AmbientStart((short)input.Speakers, input.GivenBy));
+                        await transaction.CommitAsync(CancellationToken.None);
+                        begun = result.Status == StatusCodes.Status201Created;
+                        await ReportReviewWalAsync(context, db);
+                        return result.Review is { } review ? BoundSession(context, review) : ReviewAnswer(context, result);
+                    });
                 }
-
-                return answer;
+                finally
+                {
+                    if (!begun)
+                    {
+                        await DeleteServiceSessionAsync(context, sidecar, session.SessionId, ambient: true);
+                    }
+                }
             }, ambient: true);
     }
 
     // Who each voice is: a role for every voice the clinician was shown, one clinician and one patient among them, and
-    // someone else at most once. The service also refuses a mapping that leaves out a voice it told apart.
+    // someone else at most once; no more voices than the consent said would speak (RequireOpenCaptureAsync read it). The
+    // service also refuses a mapping that leaves out a voice it told apart.
     static Task<IResult> SpeakersAsync(string id, SpeakersRequest input, HttpContext context, DictationSidecar sidecar)
     {
         var speakers = input.Speakers ?? new Dictionary<string, string>();
         var roles = speakers.Values.ToList();
-        var complete = speakers.Count is 2 or 3
+        var complete = speakers.Count is 2 or 3 && context.Items[ConsentedSpeakers] is short consented && speakers.Count <= consented
             && speakers.Keys.All(group => group is "1" or "2" or "3")
             && roles.All(role => Roles.Contains(role))
             && roles.Count(role => role == "clinician") == 1 && roles.Count(role => role == "patient") == 1
@@ -182,6 +192,7 @@ public static partial class DictationApi
 
     // Every call for a listening session but its start and its discard: the session must be the clinician's own, of a
     // visit, with its consent recorded, and still recording. The audio route above sends nothing to the service otherwise.
+    // How many people the consent said would speak is kept for the request, under ConsentedSpeakers.
     static async ValueTask<object?> RequireOpenCaptureAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
@@ -193,16 +204,22 @@ public static partial class DictationApi
         IdentifyReviewUser(http);
         var services = http.RequestServices;
         var db = services.GetRequiredService<EhrDbContext>();
-        bool open;
+        short? speakers;
         await using (var transaction = await db.Database.BeginTransactionAsync(http.RequestAborted))
         {
-            open = await services.GetRequiredService<PhiReader>().AmbientCaptureOpenAsync(id, http.RequestAborted);
+            speakers = await services.GetRequiredService<PhiReader>().AmbientCaptureAsync(id, http.RequestAborted);
             await transaction.CommitAsync(http.RequestAborted);
         }
 
-        return open
-            ? await next(context)
-            : Refuse(StatusCodes.Status409Conflict, "not_listening",
+        if (speakers is not { } consented)
+        {
+            return Refuse(StatusCodes.Status409Conflict, "not_listening",
                 "This listening has ended, or has no recorded consent, so it takes nothing more.");
+        }
+
+        http.Items[ConsentedSpeakers] = consented;
+        return await next(context);
     }
+
+    static readonly object ConsentedSpeakers = new();
 }
