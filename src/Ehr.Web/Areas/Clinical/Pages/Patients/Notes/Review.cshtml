@@ -3,8 +3,9 @@
 @using Ehr.Data.Patients
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ReviewModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@inject AmbientTranscriptKeep Keep
 @{
-    ViewData["Title"] = "Review AI-proposed fields";
+    ViewData["Title"] = Model.Ambient ? "Review the note drafted from the visit" : "Review AI-proposed fields";
 }
 @* The patient, in the banner under the app bar. The note pages read no allergies, so the banner shows none. *@
 @section Banner {
@@ -75,7 +76,7 @@
                 <div class="sc-transcript__head"><h2 class="sc-transcript__title" id="review-transcript">Original transcript</h2></div>
                 @if (Model.Ambient && !Model.TranscriptKept)
                 {
-                    <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder" data-ambient-transcript-gone>@(Model.Review.State == AiReviewStates.Pending ? NoteReviews.TranscriptGone : "This visit's transcript was deleted when its review was finished. Each proposal shows who said the words it came from.")</p></div>
+                    <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder" data-ambient-transcript-gone>@(Model.Review.State == AiReviewStates.Pending ? NoteReviews.TranscriptGone(Keep) : "This visit's transcript was deleted when its review was finished. Each proposal shows who said the words it came from.")</p></div>
                 }
                 else if (Model.Ambient && Model.DecideAtTheClinic)
                 {

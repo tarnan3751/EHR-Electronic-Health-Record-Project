@@ -1,3 +1,4 @@
+using Ehr.Domain.Notes;
 using Ehr.Web.Ambient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,11 +20,13 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   long a transcript of a review left open is kept (Ehr:Ambient:KeepTranscriptDays).
 // Test data: The stub's conversation, whose words are known.
 // Steps:
-//   1. Listen to a visit, draft it and stage its review.
+//   1. Listen to a visit, draft it and stage its review; open the Listen page again.
 //   2. Finish the review.
 //   3. Set how long a transcript is kept: left out, 1, 7, 0, a half, 2.5 and 8 days.
-// Expected result: Step 1: the review's stored result has no transcript text; the transcript is kept apart, and the audit
-//   log holds only its hash and length; the service was told to discard the session. Step 2: no transcript kept; no log
+// Expected result: Step 1: the consent statement says the text is deleted once checked or after a week at the latest,
+//   and the guidance beneath it that backups keep it up to 7 days; the review's stored result has no transcript text;
+//   the transcript is kept apart, and the audit log holds only its hash and length; the service was told to discard the
+//   session. Step 2: no transcript kept; no log
 //   line from the visit holds any word said in it. Step 3: 7 days when left out, and whole days from 1 to 7 as set;
 //   anything else stops the app from starting. (The database's rules for all three: AmbientSecurityTests.)
 // Creator: Tahseen Arnan
@@ -37,6 +40,9 @@ public class TC_UC23_05_Nfr07_ConversationNotKept(WebApps apps) : IClassFixture<
         var sidecar = apps.Dictation.Reset();
         var d = await DraftAsync(apps);
         var l = d.Listening;
+        var consent = Browser.Words(await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/listen", TestContext.Current.CancellationToken));
+        Assert.Contains("I check everything before it goes in your record. The text is deleted once I've checked it, or after a week at the latest, except what it suggested for the note.", consent);
+        Assert.Contains("Backups keep the clinic's database, this text included, for up to 7 days.", consent);
 
         Assert.Equal([""], await RowsAsync(apps, "SELECT result_json #>> '{transcript,text}' FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
         Assert.Equal(["1"], await RowsAsync(apps, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @id", l.Review));
@@ -66,7 +72,7 @@ public class TC_UC23_05_Nfr07_ConversationNotKept(WebApps apps) : IClassFixture<
             .AddInMemoryCollection([new(AmbientTranscriptPurgeService.Setting, setting)]).Build();
         if (days is { } kept)
         {
-            Assert.Equal(TimeSpan.FromDays(kept), AmbientTranscriptPurgeService.KeepFrom(configuration));
+            Assert.Equal(new AmbientTranscriptKeep(kept), AmbientTranscriptPurgeService.KeepFrom(configuration));
         }
         else
         {

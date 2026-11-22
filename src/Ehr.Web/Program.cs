@@ -35,6 +35,8 @@ builder.Services.AddScoped<Ehr.Domain.Accounts.PortalNotices>();
 // Refill requests (Ehr.Domain.Refills).
 builder.Services.AddScoped<Ehr.Domain.Refills.RefillRequests>();
 builder.Services.AddScoped<Ehr.Domain.Notes.NoteReviews>();
+// Listening to a visit (step 16): how long a transcript of a review nobody finished is kept, which both apps' reviews say.
+builder.Services.AddSingleton(Ehr.Web.Ambient.AmbientTranscriptPurgeService.KeepFrom(builder.Configuration));
 builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Site.OnPrem));
 // Which of the two apps this is, for the few pages that write as part of a read (marking a message read) and so must
 // know whether their database takes writes.
@@ -127,8 +129,7 @@ if (site == Site.OnPrem)
     // The dictation service runs beside the models, on-prem only (Api/Dictation).
     builder.Services.AddSingleton(DictationSidecar.FromConfiguration(builder.Configuration));
     // Listening to a visit (step 16): transcripts of reviews nobody finished go after 7 days at most (Ambient/).
-    var keepTranscripts = Ehr.Web.Ambient.AmbientTranscriptPurgeService.KeepFrom(builder.Configuration);
-    builder.Services.AddHostedService(services => ActivatorUtilities.CreateInstance<Ehr.Web.Ambient.AmbientTranscriptPurgeService>(services, keepTranscripts));
+    builder.Services.AddHostedService<Ehr.Web.Ambient.AmbientTranscriptPurgeService>();
 
     // A lab's key, when there is one (Api/Lab): the door, and its rate limit, check what a request presents against it.
     if (builder.Configuration[LabApiKey.Setting] is { Length: > 0 })

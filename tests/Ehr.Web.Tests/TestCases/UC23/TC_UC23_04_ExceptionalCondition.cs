@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Net;
 using Ehr.Data;
+using Ehr.Web.Ambient;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,7 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   3. With the service unreachable, start listening; and with the service there, start listening while the database
 //      times out saving the consent.
 //   4. Draft a visit, purge its transcript, open its review, and accept a proposal, edit it back to its own words, and
-//      edit it into others.
+//      edit it into others; open the review on an on-site app set to keep transcripts 3 days.
 // Expected result: Step 1: "Listen to the visit" on the clinic's chart only; off-site, the page's "Unavailable:" notice
 //   and no listening controls; the start refused by the cloud app, nothing forwarded, nothing sent to the service. Step 2:
 //   off-site, "Read-only here:" with the review's proposals, no transcript, no decisions and no finishing; the forwarded
@@ -44,7 +45,7 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   Step 2a: each answered as off-site, under every proof: no listening offered, no transcript, everything refused.
 //   Step 3: 503, no consent recorded; then 500, the service's session discarded, no consent or review recorded. Step 4: the review says the transcript was deleted after 7 days, offers no Accept,
 //   and leaves the box to edit it empty, saying why; accepting, or editing back to the words offered, even spaced
-//   differently, is refused with that sentence; editing into other words is saved.
+//   differently, is refused with that sentence; editing into other words is saved; the app set to 3 days says 3 days.
 // Creator: Tahseen Arnan
 public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -239,6 +240,13 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             using var refused = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals["objective"].Id, d.Version, decision, words);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             Assert.Contains("transcript was deleted after 7 days, so its proposals can", await refused.Content.ReadAsStringAsync(Cancel));
+        }
+
+        // The days it says are the clinic's setting.
+        await using (var shorter = apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting(AmbientTranscriptPurgeService.Setting, "3")))
+        {
+            var session = await SignInAsync(shorter, await apps.ClinicianAsync());
+            Assert.Contains("transcript was deleted after 3 days, so its proposals can", await session.Client.GetStringAsync(d.ReviewUrl, Cancel));
         }
 
         using var edited = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals["objective"].Id, d.Version, "edited", "Synthetic: chest clear.");

@@ -9,7 +9,7 @@ namespace Ehr.Domain.Notes;
 
 // Call within the primary transaction. Every mutation shares UC 14's draft row lock and optimistic version.
 public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes notes, UserContext user,
-    AuditRecorder audit, NoteWriteAuthority authority)
+    AuditRecorder audit, NoteWriteAuthority authority, AmbientTranscriptKeep keep)
 {
     // With `ambient`, the review of a recorded visit's conversation (step 16): its consent is written first, in the same
     // transaction, and the database holds the two together (db/policies/56-ambient-listening.sql).
@@ -153,7 +153,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         if (review.Mode == AiReviewModes.Ambient
             && (decision == AiProposalStates.Accepted || decision == AiProposalStates.Edited && Words(approved!) == Words(proposal.OriginalValue))
             && !await phi.AmbientTranscriptKeptAsync(review.Id, cancel))
-            return ReviewResult.Invalid(TranscriptGone);
+            return ReviewResult.Invalid(TranscriptGone(keep));
         var values = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         if (approved is not null) values[proposal.Field] = approved;
         if (Merge(NoteContent.From(draft), values).Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors)
@@ -221,8 +221,9 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         return new(200, [], review, draft.Version);
     }
 
-    public const string TranscriptGone =
-        "This visit's transcript was deleted after 7 days, so its proposals can't be accepted as offered: reject each, or edit it into your own words.";
+    // What a visit's review says once its transcript has gone while it was open: after the days the clinic keeps one.
+    public static string TranscriptGone(AmbientTranscriptKeep keep) =>
+        $"This visit's transcript was deleted after {(keep.Days == 1 ? "a day" : $"{keep.Days} days")}, so its proposals can't be accepted as offered: reject each, or edit it into your own words.";
 
     // The review is complete at the draft's version; a recorded visit's transcript goes with it, in the same transaction
     // (the database refuses a finished review that still has one).
@@ -322,6 +323,11 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
 // What a clinician confirmed before listening to a visit: how many people would speak (2 or 3) and who agreed for the
 // patient (AmbientConsentGivers). Checked by the API before the consent is written, and again by the database.
 public sealed record AmbientStart(short Speakers, string GivenBy);
+
+// How many days the clinic keeps a visit's transcript whose review nobody has finished (Ehr:Ambient:KeepTranscriptDays,
+// 1 to 7, read by Ehr.Web's AmbientTranscriptPurgeService on both apps): what the purge is asked for, and what a review
+// says once it has gone.
+public sealed record AmbientTranscriptKeep(int Days);
 
 // Only constructed from the server's sanitized, owner-checked sidecar result. Never an HTTP input model. ChartProposals are
 // the kinds of the result's proposals, in its order (AiChartProposalKinds).

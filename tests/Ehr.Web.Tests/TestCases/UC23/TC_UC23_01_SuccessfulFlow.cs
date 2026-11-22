@@ -22,9 +22,9 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   3. Edit Subjective into the clinician's words, accept the other three, and finish the review.
 // Expected result: Step 1: one consent row (2 speakers, the patient) with its write audit under the clinician; the review
 //   bound to it; the service asked for a visit's session, told so on every call, and the session discarded at the service
-//   once staged; the transcript kept apart. Step 2: the transcript a turn at a time, "Clinician" and "Patient"; the
-//   notice and the warning that Subjective is the patient's own words; "Said by: Patient." on Subjective; one recorded
-//   read of the transcript. Step 3: the note editor has the edited Subjective and the three accepted values; the review is
+//   once staged; the transcript kept apart. Step 2: the page titled "Review the note drafted from the visit", and the
+//   transcript a turn at a time, "Clinician" and "Patient"; the notice and the warning that Subjective is the patient's
+//   own words; "Said by: Patient." on Subjective; one recorded read of the transcript. Step 3: the note editor has the edited Subjective and the three accepted values; the review is
 //   completed and no transcript is kept.
 // Creator: Tahseen Arnan
 public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
@@ -51,7 +51,7 @@ public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([""], await RowsAsync(apps, "SELECT result_json #>> '{transcript,text}' FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
 
         var html = await l.Session.Client.GetStringAsync(d.ReviewUrl, Cancel);
-        Assert.Contains("Review the note drafted from the visit", html);
+        Assert.Contains("<title>Review the note drafted from the visit</title>", html);
         Assert.Contains("What brings you in today?", html);
         Assert.Contains("data-ambient-own-words", html);
         Assert.Contains("patients_own_words", html);
