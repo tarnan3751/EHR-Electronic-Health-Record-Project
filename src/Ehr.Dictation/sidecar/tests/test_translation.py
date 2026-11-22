@@ -129,6 +129,20 @@ def test_a_statement_too_long_or_too_many_is_too_long():
     assert "too_long" in translation.check({"plan": many}, [], transcript(text)).fields["plan"].reasons
 
 
+def test_a_statement_citing_more_than_400_characters_of_spanish_is_too_long():
+    # The schema allows two quotes of 200; the on-prem app refuses a sentence citing more (TrustedResult).
+    def cited(first: int, second: int) -> list[str]:
+        text = "Refiere cansancio por las tardes. " * first + "Niega dolor torácico al caminar. " * second
+        statement = {"spanish": [("Refiere cansancio por las tardes. " * first).strip(" ."),
+                                 ("Niega dolor torácico al caminar. " * second).strip(" .")],
+                     "english": "Tired in the afternoons, denies chest pain walking."}
+        assert sum(len(quote) for quote in statement["spanish"]) == 34 * first + 33 * second - 4
+        return translation.check({"plan": [statement]}, [], transcript(text)).fields["plan"].reasons
+
+    assert "too_long" not in cited(6, 6)  # 398 characters
+    assert "too_long" in cited(6, 7)  # 431
+
+
 def test_one_failing_statement_discards_the_whole_field():
     text = "Niega dolor torácico. Suspender metformina."
     checks = translation.check({"plan": [

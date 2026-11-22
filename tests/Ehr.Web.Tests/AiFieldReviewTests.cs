@@ -698,9 +698,10 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     // accent (combining) or in a passage not heard as Spanish (other-language), and a sentence citing, besides its own,
     // a span past the transcript's end (extra-outside: the sources' own range check and the rule that the sentences cite
     // the field's sources each refuse it, so that weakening the second to "at least the field's sources" alone still
-    // stores nothing, while with both gone it would be stored and the review fail on every load), a field from Spanish
-    // with no sentences (no-statements), sentences on a field from English (english-statements), a language the contract
-    // doesn't have,
+    // stores nothing, while with both gone it would be stored and the review fail on every load), a sentence citing 401
+    // characters of the transcript, more than the 400 the Spanish note schema's two quotes of 200 allow (over-400), a
+    // field from Spanish with no sentences (no-statements), sentences on a field from English (english-statements), a
+    // language the contract doesn't have,
     // with no sentences anywhere (unknown-language: the read fails), a language that isn't exactly "en" or "es", each in
     // the shape that a lenient read would stage (5 with no sentences, as an English result; 1, "1", " es", "es " and
     // "en, es", which a lenient read takes for Spanish, with them), and an order proposed from Spanish, otherwise one the
@@ -734,6 +735,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("uncited-source")]
     [InlineData("combining")]
     [InlineData("other-language")]
+    [InlineData("over-400")]
     public async Task TC_UC13_17_a_result_from_spanish_whose_sentences_dont_hold_is_refused_and_nothing_is_staged(string kind)
     {
         sidecar.Spanish = kind != "english-statements";
@@ -837,6 +839,15 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
                 var notSpanish = new System.Text.Json.Nodes.JsonObject { ["start"] = passage["start"]!.DeepClone(), ["end"] = passage["end"]!.DeepClone() };
                 objective["sources"] = new System.Text.Json.Nodes.JsonArray(notSpanish);
                 objective["statements"]![0]!["sources"] = new System.Text.Json.Nodes.JsonArray(notSpanish.DeepClone());
+                break;
+            case "over-400":
+                var said = json["transcript"]!["text"]!.GetValue<string>();
+                var own = second!["sources"]![0]!;
+                var more = 401 - (own["end"]!.GetValue<int>() - own["start"]!.GetValue<int>());
+                json["transcript"]!["text"] = said + " " + string.Concat(Enumerable.Repeat("Refiere cansancio por las tardes. ", more / 30 + 1))[..more];
+                var further = new System.Text.Json.Nodes.JsonObject { ["start"] = said.Length + 1, ["end"] = said.Length + 1 + more };
+                second["sources"]!.AsArray().Add(further);
+                subjective["sources"]!.AsArray().Add(further.DeepClone());
                 break;
             case "proposal":
                 var order = json["notCarriedOver"]![0]!;

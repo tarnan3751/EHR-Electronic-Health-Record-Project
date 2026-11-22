@@ -202,7 +202,12 @@ public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Source
 // One sentence of a value proposed from Spanish: its place in the value (half-open UTF-16 offsets into Value), and the
 // Spanish words of the transcript it was translated from (offsets as in TranscriptSegment). The statements follow each
 // other through the value, one space between, and cite every source the field has and no other (TrustedResult).
-public sealed record TranslatedStatement(int Start, int End, IReadOnlyList<SourceSpan> Sources);
+public sealed record TranslatedStatement(int Start, int End, IReadOnlyList<SourceSpan> Sources)
+{
+    // The most of the transcript one sentence may cite, in UTF-16 code units: the Spanish note schema allows a sentence
+    // two quotes of 200 characters (note-fields-es.schema.json), and the dictation service refuses more (translation.py).
+    public const int MaxSpanishLength = 400;
+}
 
 // Nothing dictated, or what was proposed failed validation: the reasons' codes, never the text.
 public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField;

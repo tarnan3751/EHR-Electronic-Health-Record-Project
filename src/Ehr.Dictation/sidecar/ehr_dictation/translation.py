@@ -19,7 +19,9 @@ statement:
    (source_not_in_transcript), not in a passage marked unclear, and two words or more unless it holds a number. Every
    check below reads the transcript's own words where the passage was found, never the model's copy. No word may be
    cited by two statements of the answer: one citing a word an earlier statement (in the answer's order) cites outside
-   an instruction fails (source_repeated), so no passage is shown twice, in one field or two.
+   an instruction fails (source_repeated), so no passage is shown twice, in one field or two. What a statement cites
+   is at most MAX_SPANISH characters of the transcript (too_long), the most the schema's two quotes of 200 allow and
+   the most the on-prem app takes for a sentence (TrustedResult).
 3. Only the words outside a Spanish instruction to order something or change the allergy list count (spanish.py,
    FR-14). A statement whose passages are all inside one is that instruction translated: it is dropped, and the field
    is empty (order_or_allergy_change) when nothing is left of it. The Spanish is read as corrected: without a
@@ -83,6 +85,7 @@ MAX_STATEMENTS = 30
 MAX_QUOTES = 4
 MAX_QUOTE = validation.MAX_QUOTE
 MAX_ENGLISH = 600
+MAX_SPANISH = 400  # UTF-16 code units of the transcript a statement's sources cover, as the on-prem app counts them
 EXTRA_WORDS = 2  # content words the English of a statement may have beyond its Spanish
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
 WARNING_REACH = validation.WARNING_REACH
@@ -698,6 +701,8 @@ def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]], ci
         return result
     if any(validation._overlaps(span, other) for span in result.spans for other in cited):
         result.reasons.add("source_repeated")
+    if sum(utf16_offset(ctx.text, end) - utf16_offset(ctx.text, start) for start, end in result.spans) > MAX_SPANISH:
+        result.reasons.add("too_long")
     _compare(result, ctx)
     return result
 

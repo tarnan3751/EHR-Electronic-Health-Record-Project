@@ -203,9 +203,10 @@ public static partial class DictationApi
         bool InPassageNotSpanish(SourceSpan source) => notSpanish.Any(s => source.Start < s.End && s.Start < source.End);
         // A value proposed from Spanish (step 17) is English sentences, each with the Spanish words it was translated from.
         // The sentences follow each other through the value with exactly one space between them, none at either end and
-        // none doubled; each cites, in order and without overlap, sources of its own that are whole (Source); and between
-        // them they cite every source the field has and no other. So the review can put each sentence beside what the
-        // clinician said. A value proposed from English has none.
+        // none doubled; each cites, in order and without overlap, sources of its own that are whole (Source), at most
+        // TranslatedStatement.MaxSpanishLength of the transcript in all; and between them they cite every source the field
+        // has and no other. So the review can put each sentence beside what the clinician said, and a sentence can't cite
+        // more Spanish than the schema lets it quote. A value proposed from English has none.
         bool Translated(PendingField field)
         {
             if (field.Statements is not { } statements) return false;
@@ -217,7 +218,8 @@ public static partial class DictationApi
                     || statement.End < field.Value.Length && field.Value[statement.End] != ' '
                     || statement.Sources.Count == 0
                     || statement.Sources.Zip(statement.Sources.Skip(1)).Any(pair => pair.Second.Start < pair.First.End)
-                    || !statement.Sources.All(Source)) return false;
+                    || !statement.Sources.All(Source)
+                    || statement.Sources.Sum(s => s.End - s.Start) > TranslatedStatement.MaxSpanishLength) return false;
                 at = statement.End + 1;
             }
 
