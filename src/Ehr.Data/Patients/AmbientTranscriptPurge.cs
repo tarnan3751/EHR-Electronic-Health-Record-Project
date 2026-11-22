@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Ehr.Data.Patients;
 
 // Deletes the transcripts of recorded visits whose reviews nobody finished within `keep` (the expansion plan's step 16):
-// ehr.purge_ambient_transcripts, which holds `keep` to at most 7 days, runs as the database's system act and refuses
+// ehr.purge_ambient_transcripts, which holds `keep` between 1 and 7 days, runs as the database's system act and refuses
 // anyone signed in (db/policies/56-ambient-listening.sql). Only the on-site app's timer calls this, in a transaction of
 // its own with nobody signed in. It reads nothing of a record: the count of transcripts deleted comes back.
 public static class AmbientTranscriptPurge

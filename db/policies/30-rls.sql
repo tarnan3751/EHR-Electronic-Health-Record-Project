@@ -1018,7 +1018,10 @@ CREATE POLICY ai_chart_proposals_own ON ehr.ai_chart_proposals FOR ALL
 -- their active panel, and sees only their own. A transcript is its review's: the review's clinician, of their own draft
 -- (the review's own policy, through the subquery). The cloud app can see that a transcript exists but not read it (a
 -- column grant, 10-grants.sql). Its owner reads and deletes transcripts only through ehr.purge_ambient_transcripts, the
--- one way one goes while its review is open. Admins, patients and nobody see none.
+-- one way one goes while its review is open: the owner's two policies ask for app.ambient_purge to be 'open', which that
+-- function sets for its delete and clears before it returns, as the lab's door does with app.lab_door (above), and for
+-- the same reasons: they are the owner's alone, so a runtime role that sets it gains nothing, and outside the function
+-- the owner sees none. Admins, patients and nobody see none.
 ALTER TABLE ehr.ambient_consents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.ambient_consents FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS ambient_consents_own_select ON ehr.ambient_consents;
@@ -1043,6 +1046,8 @@ CREATE POLICY ambient_transcripts_own ON ehr.ambient_transcripts FOR ALL
     USING ((SELECT ehr.is_clinician()) AND EXISTS (SELECT 1 FROM ehr.ai_note_reviews r
         WHERE r.id = ambient_transcripts.id AND r.patient_id = ambient_transcripts.patient_id));
 DROP POLICY IF EXISTS ambient_transcripts_owner_select ON ehr.ambient_transcripts;
-CREATE POLICY ambient_transcripts_owner_select ON ehr.ambient_transcripts FOR SELECT TO ehr_owner USING (true);
+CREATE POLICY ambient_transcripts_owner_select ON ehr.ambient_transcripts FOR SELECT TO ehr_owner
+    USING ((SELECT current_setting('app.ambient_purge', true)) = 'open');
 DROP POLICY IF EXISTS ambient_transcripts_owner_purge ON ehr.ambient_transcripts;
-CREATE POLICY ambient_transcripts_owner_purge ON ehr.ambient_transcripts FOR DELETE TO ehr_owner USING (true);
+CREATE POLICY ambient_transcripts_owner_purge ON ehr.ambient_transcripts FOR DELETE TO ehr_owner
+    USING ((SELECT current_setting('app.ambient_purge', true)) = 'open');

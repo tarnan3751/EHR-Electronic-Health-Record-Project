@@ -126,6 +126,25 @@ static class AmbientFlows
         return rows;
     }
 
+    // A review left open past its transcript's time: the transcript aged 8 days, as the database's owner ages a row with
+    // the triggers held, then the purge as the on-site app's timer runs it, keeping 7 days. Answers how many it deleted.
+    public static async Task<long> PurgeAsync(WebApps apps, Guid review)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using (var transaction = await connection.BeginTransactionAsync(Cancel))
+        await using (var aged = new NpgsqlCommand(
+            "SET LOCAL session_replication_role = replica; UPDATE ehr.ambient_transcripts SET created_at = created_at - interval '8 days' WHERE id = @id",
+            connection, transaction))
+        {
+            aged.Parameters.AddWithValue("id", review);
+            await aged.ExecuteNonQueryAsync(Cancel);
+            await transaction.CommitAsync(Cancel);
+        }
+
+        await using var purge = new NpgsqlCommand("SELECT deleted FROM ehr.purge_ambient_transcripts(interval '7 days')", connection);
+        return (long)(await purge.ExecuteScalarAsync(Cancel))!;
+    }
+
     // The review's proposals, by field: id and state.
     public static async Task<Dictionary<string, (Guid Id, string State)>> ProposalsAsync(WebApps apps, Guid review)
     {

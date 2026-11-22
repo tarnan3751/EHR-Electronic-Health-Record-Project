@@ -1,3 +1,5 @@
+using Ehr.Web.Ambient;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -13,14 +15,17 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 // Use case: UC 23, Draft a note from a recorded visit
 // Preconditions: The clinician has the patient on their panel; the on-site app, with the stub dictation service; the
 //   app's logs captured.
-// Inputs and system conditions: The whole visit, from consent to the review finished.
+// Inputs and system conditions: The whole visit, from consent to the review finished; the on-site app's setting for how
+//   long a transcript of a review left open is kept (Ehr:Ambient:KeepTranscriptDays).
 // Test data: The stub's conversation, whose words are known.
 // Steps:
 //   1. Listen to a visit, draft it and stage its review.
 //   2. Finish the review.
+//   3. Set how long a transcript is kept: left out, 1, 7, 0, a half, 2.5 and 8 days.
 // Expected result: Step 1: the review's stored result has no transcript text; the transcript is kept apart, and the audit
 //   log holds only its hash and length; the service was told to discard the session. Step 2: no transcript kept; no log
-//   line from the visit holds any word said in it. (The database's rules for both: AmbientSecurityTests.)
+//   line from the visit holds any word said in it. Step 3: 7 days when left out, and whole days from 1 to 7 as set;
+//   anything else stops the app from starting. (The database's rules for all three: AmbientSecurityTests.)
 // Creator: Tahseen Arnan
 public class TC_UC23_05_Nfr07_ConversationNotKept(WebApps apps) : IClassFixture<WebApps>
 {
@@ -45,5 +50,27 @@ public class TC_UC23_05_Nfr07_ConversationNotKept(WebApps apps) : IClassFixture<
         Assert.NotEmpty(proposals);
         Assert.DoesNotContain(logs.Messages, message => message.Contains("brings you in", StringComparison.Ordinal)
             || message.Contains("cough", StringComparison.OrdinalIgnoreCase) || message.Contains("chest", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData(null, 7)]
+    [InlineData("1", 1)]
+    [InlineData("7", 7)]
+    [InlineData("0", null)]
+    [InlineData("0.5", null)]
+    [InlineData("2.5", null)]
+    [InlineData("8", null)]
+    public void A_transcript_of_a_review_left_open_is_kept_whole_days_from_1_to_7(string? setting, int? days)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection([new(AmbientTranscriptPurgeService.Setting, setting)]).Build();
+        if (days is { } kept)
+        {
+            Assert.Equal(TimeSpan.FromDays(kept), AmbientTranscriptPurgeService.KeepFrom(configuration));
+        }
+        else
+        {
+            Assert.Throws<InvalidOperationException>(() => AmbientTranscriptPurgeService.KeepFrom(configuration));
+        }
     }
 }

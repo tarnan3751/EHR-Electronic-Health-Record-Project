@@ -158,12 +158,15 @@ CREATE CONSTRAINT TRIGGER ai_note_reviews_transcript_kept
     FOR EACH ROW WHEN (NEW.mode = 'ambient') EXECUTE FUNCTION ehr.check_ambient_transcript_kept();
 
 -- Deletes the transcripts written before `keep` ago, which are those of reviews nobody finished: a review finished or
--- ended has none. `keep` is at most 7 days whatever is asked, and less only if asked; it answers how many it deleted and
--- the time it deleted them before, on this database's clock. The on-site app calls it on a timer with nobody signed in,
--- so the write audit records each delete as the system's act (with the transcript's hash and length): it refuses to run
--- for anyone signed in, and borrows no one's rights. Runs as its owner, the one role whose policies (30-rls.sql) and
--- guard let it read and delete transcripts of reviews still open; its search_path is pinned, and only the on-site app's
--- role may call it.
+-- ended has none. `keep` is held between 1 and 7 days whatever is asked: less only if asked, and never less than a day,
+-- so no call deletes every open review's transcript at once. It answers how many it deleted and the time it deleted
+-- them before, on this database's clock. The on-site app calls it on a timer with nobody signed in, so the write audit
+-- records each delete as the system's act (with the transcript's hash and length): it refuses to run for anyone signed
+-- in, which only keeps its caller honest, since the on-site app's role sets app.user_id itself; and it borrows no one's
+-- rights. Runs as its owner, the one role whose guard lets it delete transcripts of reviews still open, and whose
+-- policies (30-rls.sql) let it read and delete them only while app.ambient_purge is open: this opens it for its delete
+-- and clears it before it returns (its transaction, or the savepoint around the call, takes it back when it fails). Its
+-- search_path is pinned, and only the on-site app's role may call it.
 CREATE OR REPLACE FUNCTION ehr.purge_ambient_transcripts(keep interval)
     RETURNS TABLE (deleted bigint, older_than timestamptz)
     LANGUAGE plpgsql
@@ -174,9 +177,11 @@ BEGIN
     IF NULLIF(current_setting('app.user_id', true), '') IS NOT NULL THEN
         RAISE EXCEPTION 'Transcripts are purged by the system, with nobody signed in' USING ERRCODE = '42501';
     END IF;
-    older_than := clock_timestamp() - LEAST(GREATEST(coalesce(keep, interval '7 days'), interval '0'), interval '7 days');
+    older_than := clock_timestamp() - LEAST(GREATEST(coalesce(keep, interval '7 days'), interval '1 day'), interval '7 days');
+    PERFORM set_config('app.ambient_purge', 'open', true);
     DELETE FROM ehr.ambient_transcripts t WHERE t.created_at < older_than;
     GET DIAGNOSTICS deleted = ROW_COUNT;
+    PERFORM set_config('app.ambient_purge', '', true);
     RETURN NEXT;
 END
 $$;

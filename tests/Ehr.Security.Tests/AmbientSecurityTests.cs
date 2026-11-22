@@ -279,20 +279,44 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         await Refused("42501", () => Accounts.QueryAsync(Read, null, Purge, [.. Parameters(visit), ("keep", "7 days")]));
         await Refused("42501", () => Accounts.QueryAsync(App, visit.Actor, Purge, [.. Parameters(visit), ("keep", "7 days")]));
 
-        // 7 days keeps a transcript written just now; asking for longer still means 7 days, on this database's clock.
-        foreach (var keep in new[] { "7 days", "30 days", "1 year" })
+        // Its owner reads and deletes transcripts only inside it: outside, it sees none and deletes none, and a runtime
+        // role that opens the purge's switch itself gains nothing.
+        Assert.Equal(["0"], await Accounts.QueryAsync(database.OwnerConnectionString, null, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @review", Parameters(visit)));
+        await Accounts.ExecuteAsync(database.OwnerConnectionString, null, "DELETE FROM ehr.ambient_transcripts WHERE id = @review", Parameters(visit));
+        await using (var connection = new NpgsqlConnection(App))
+        {
+            await connection.OpenAsync(Cancel);
+            await using var transaction = await connection.BeginTransactionAsync(Cancel);
+            await using var command = new NpgsqlCommand(
+                "SELECT set_config('app.user_id', '', true), set_config('app.ambient_purge', 'open', true)", connection, transaction);
+            await command.ExecuteNonQueryAsync(Cancel);
+            command.CommandText = "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @review";
+            command.Parameters.AddWithValue("review", visit.Review);
+            Assert.Equal(0L, (long)(await command.ExecuteScalarAsync(Cancel))!);
+        }
+
+        Assert.Equal(["1"], await Query(visit, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @review"));
+
+        // 7 days keeps a transcript written just now; asking for longer still means 7 days, and for less than a day (none,
+        // or less than none) means a day, on this database's clock.
+        foreach (var (keep, days) in new[] { ("7 days", 7), ("30 days", 7), ("1 year", 7), ("0", 1), ("-1 day", 1), ("1 hour", 1) })
         {
             var before = await ClockAsync();
             var (deleted, olderThan) = await PurgeAsync(keep);
             var after = await ClockAsync();
             Assert.Equal(0, deleted);
-            Assert.InRange(olderThan, before.AddDays(-7), after.AddDays(-7));
+            Assert.InRange(olderThan, before.AddDays(-days), after.AddDays(-days));
         }
 
         Assert.Equal(["1"], await Query(visit, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @review"));
 
-        // Asked for less, it goes, with nobody's name on the delete and only the hash in the log.
-        var (gone, _) = await PurgeAsync("0");
+        // Written two days ago (as the database's owner ages it, holding the triggers): 7 days keeps it, and 1 day, asked
+        // for, deletes it, with nobody's name on the delete and only the hash in the log.
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "SET LOCAL session_replication_role = replica; UPDATE ehr.ambient_transcripts SET created_at = created_at - interval '2 days' WHERE id = @review",
+            Parameters(visit));
+        Assert.Equal(0, (await PurgeAsync("7 days")).Deleted);
+        var (gone, _) = await PurgeAsync("1 day");
         Assert.True(gone >= 1);
         Assert.Equal(["0"], await Query(visit, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @review"));
         Assert.Equal(["delete  true"], await Accounts.QueryAsync(database.SuperuserConnectionString, null,

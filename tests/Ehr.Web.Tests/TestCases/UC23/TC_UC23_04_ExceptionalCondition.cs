@@ -1,5 +1,4 @@
 using System.Net;
-using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.AmbientFlows;
 using static Ehr.Web.Tests.Browser;
@@ -16,8 +15,8 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 // Preconditions: The clinician has the patient on their panel; the on-site and the cloud app, with the stub dictation
 //   service.
 // Inputs and system conditions: GET the chart, the Listen page and a review on each site; POST the start off-site; POST a
-//   decision through the cloud app, which forwards it; the stub unreachable at start; ehr.purge_ambient_transcripts with
-//   nothing kept, as the on-site app's timer runs it after 7 days.
+//   decision through the cloud app, which forwards it; the stub unreachable at start; ehr.purge_ambient_transcripts as
+//   the on-site app's timer runs it, on a transcript written 8 days ago.
 // Test data: Synthetic patients and the stub's conversation.
 // Steps:
 //   1. Open the chart and the Listen page on each site; start listening through the cloud app.
@@ -96,11 +95,7 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         apps.Dictation.Reset();
         var d = await DraftAsync(apps);
         var l = d.Listening;
-        await using (var connection = await apps.OpenDatabaseAsync())
-        await using (var purge = new NpgsqlCommand("SELECT deleted FROM ehr.purge_ambient_transcripts(interval '0')", connection))
-        {
-            Assert.True((long)(await purge.ExecuteScalarAsync(Cancel))! >= 1);
-        }
+        Assert.True(await PurgeAsync(apps, l.Review) >= 1);
 
         var html = await l.Session.Client.GetStringAsync(d.ReviewUrl, Cancel);
         Assert.Contains("transcript was deleted after 7 days, so its proposals can", html);
