@@ -43,7 +43,11 @@ statement:
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
      validation.py reads them in English, with an English word that negates itself ("uncontrolled") a negation and a
      relative told something ("the mother is explained") not someone having it: the same (negation_dropped or
-     negation_added, and so on), and the relatives named the same (experiencer_changed);
+     negation_added, and so on), and the relatives named the same (experiencer_changed). A doubt is the clinician's
+     whether it comes before what it doubts ("creo que", "quizá", "tal vez", "a lo mejor", "puede que", "podría
+     tener") or closes its clause (", creo", ", probablemente"), as validation.py hears one in English ("I think she
+     has", "maybe", "she might have", "probably", a closing ", I think"); and "no creo que tenga" is a negation, as
+     validation.py reads "I don't think she has";
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
      model added ("continue metformin and check kidney function" from "continuar metformina").
 5. If any statement fails, the whole field is discarded, as an English value is.

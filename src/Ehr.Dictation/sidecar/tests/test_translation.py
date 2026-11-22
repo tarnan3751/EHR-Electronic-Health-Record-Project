@@ -409,3 +409,40 @@ def test_a_quote_cut_inside_a_word_at_the_schemas_limit_is_not_found():
 def test_a_quote_ending_between_words_is_found():
     assert reasons(LONG, [LONG[:QUOTE_LIMIT].rsplit(" ", 1)[0]], LONG_ENGLISH) == []
     assert reasons(LONG, [LONG], LONG_ENGLISH) == []
+
+
+# ---- A doubt, said before what it doubts or after it (sentences outside the test set) -------------------------------
+
+
+DOUBTS = [
+    ("No creo que tenga neumonía.", "I don't think she has pneumonia.", ["negation_dropped"]),
+    ("Creo que tiene neumonía.", "I think she has pneumonia.", ["certainty_dropped"]),
+    ("Quizá tiene neumonía.", "Maybe she has pneumonia.", ["certainty_dropped"]),
+    ("Quizás tiene neumonía.", "Perhaps she has pneumonia.", ["certainty_dropped"]),
+    ("Tal vez tiene neumonía.", "Maybe she has pneumonia.", ["certainty_dropped"]),
+    ("A lo mejor tiene neumonía.", "Maybe she has pneumonia.", ["certainty_dropped"]),
+    ("Puede que tenga neumonía.", "She may have pneumonia.", ["certainty_dropped"]),
+    ("Podría tener neumonía.", "She might have pneumonia.", ["certainty_dropped"]),
+    ("Tiene neumonía, creo.", "She has pneumonia, I think.", ["certainty_dropped"]),
+    ("Tiene neumonía, probablemente.", "She has pneumonia, probably.", ["certainty_dropped"]),
+    ("Tiene neumonía, probablemente.", "She probably has pneumonia.", ["certainty_dropped"]),
+]
+
+
+@pytest.mark.parametrize(("text", "english", "dropped"), DOUBTS)
+def test_a_doubt_said_in_spanish_is_kept_and_never_dropped(text, english, dropped):
+    assert reasons(text, [text], english) == []
+    assert reasons(text, [text], "She has pneumonia.") == dropped
+
+
+@pytest.mark.parametrize(("text", "english", "dropped"), DOUBTS)
+def test_a_doubt_the_spanish_doesnt_say_is_never_added(text, english, dropped):
+    assert reasons("Tiene neumonía.", ["Tiene neumonía."], english) == [r.replace("dropped", "added") for r in dropped]
+
+
+def test_a_word_of_doubt_inside_a_clause_doesnt_close_it():
+    # "creo" before more of its clause is no closing doubt, and "podría" before something to do is no doubt about
+    # what the patient has.
+    assert reasons("Tiene neumonía, creo que es leve.", ["Tiene neumonía, creo que es leve."],
+                   "She has pneumonia, I think it is mild.") == []
+    assert reasons("Podría iniciar amoxicilina.", ["Podría iniciar amoxicilina."], "Could start amoxicillin.") == []

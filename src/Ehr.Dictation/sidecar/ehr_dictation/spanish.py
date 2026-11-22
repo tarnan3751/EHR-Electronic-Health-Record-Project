@@ -517,9 +517,15 @@ NEGATION_AFTER = _phrases("negativo; negativa; negativos; negativas; ausente; au
 CERTAINTY_BEFORE = _phrases(
     """posible; posibles; posiblemente; probable; probables; probablemente; sospecha de; se sospecha; sospechoso de;
     sospechosa de; sospecho; a descartar; descartar; dudoso; dudosa; en estudio; impresiona de; presunto; presunta;
-    no se puede descartar; no se descarta; riesgo de"""
+    no se puede descartar; no se descarta; riesgo de; creo que; creemos que; pienso que; pensamos que; me parece que;
+    quiza; quizas; tal vez; a lo mejor; puede que; podria tener; podria ser; podria haber; podria tratarse de"""
 )
 CERTAINTY_AFTER = _phrases("probable; posible; a descartar; en estudio; dudoso; dudosa")
+# "No creo que tenga neumonía" is a negation, as validation.py reads "I don't think she has pneumonia": after "no",
+# these aren't a doubt.
+DENIED_DOUBTS = frozenset(_phrases("creo que; creemos que; pienso que; pensamos que; me parece que"))
+# A doubt said once what it qualifies is said, set off by a comma at the end of its clause: "tiene neumonía, creo."
+CERTAINTY_CLOSING = _phrases("creo; creemos; me parece; supongo; probablemente; posiblemente; quiza; quizas; tal vez")
 HISTORY_BEFORE = _phrases(
     """antecedente de; antecedentes de; antecedentes personales de; historia de; historial de; con antecedente de;
     operado de; operada de; postoperado de; postoperada de; intervenido de; intervenida de"""
@@ -588,9 +594,10 @@ def _stops(text: str, toks: list[Token], i: int, edge: int, k: int, ends: frozen
 
 
 def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: list[tuple[int, int]],
-           ends: frozenset[str] = TERMINATORS) -> tuple[set[int], set[int]]:
+           ends: frozenset[str] = TERMINATORS, closing: list[tuple[int, int]] = ()) -> tuple[set[int], set[int]]:
     """The words the cues reach, and the cues' own words: SCOPE words on from a cue before what it qualifies, POST_SCOPE
-    back from one after it, each stopping at its clause."""
+    back from one after it, each stopping at its clause; and back from a closing cue, over the comma before it, through
+    the clause it closes."""
     reached: set[int] = set()
     cues: set[int] = set()
     for first, last in before:
@@ -601,15 +608,26 @@ def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: l
                 break
             reached.add(i)
             edge = toks[i].end
-    for first, last in after:
+    for first, last in [*after, *closing]:
         cues |= set(range(first, last + 1))
-        edge = toks[first].start
+        edge = toks[first - 1].end if (first, last) in closing else toks[first].start
         for i in range(first - 1, max(-1, first - 1 - POST_SCOPE), -1):
             if toks[i].key in ends or any(mark in text[toks[i].end : edge] for mark in ".,;:?!\n"):
                 break
             reached.add(i)
             edge = toks[i].start
     return reached - cues, cues
+
+
+def _closing(text: str, toks: list[Token], phrases: list[tuple[str, ...]]) -> list[tuple[int, int]]:
+    """Where the phrases close a clause: after a comma and before its end (a full stop, a semicolon, a question or an
+    exclamation mark, a line break, or the end of the text)."""
+    found = []
+    for first, last in _matches([t.key for t in toks], phrases):
+        after = text[toks[last].end :].lstrip(" ")
+        if first and text[toks[first - 1].end : toks[first].start].strip() == "," and (not after or after[0] in ".;?!\n"):
+            found.append((first, last))
+    return found
 
 
 def _is_content(token: Token) -> bool:
@@ -619,7 +637,8 @@ def _is_content(token: Token) -> bool:
 def qualified(text: str, toks: list[Token]) -> dict[str, set[int]]:
     """For each kind of qualifier (negation, certainty, history, experiencer), the content words its cues reach."""
     keys = [t.key for t in toks]
-    certainty_before = _matches(keys, CERTAINTY_BEFORE)
+    certainty_before = [(first, last) for first, last in _matches(keys, CERTAINTY_BEFORE)
+                        if not (first and keys[first - 1] == "no" and tuple(keys[first : last + 1]) in DENIED_DOUBTS)]
     taken = {i for first, last in certainty_before for i in range(first, last + 1)}
     corrections = {i for first, last in correction_cues(text, toks) for i in range(first, last + 1)}
 
@@ -643,6 +662,7 @@ def qualified(text: str, toks: list[Token]) -> dict[str, set[int]]:
         if not relative and j >= 0 and toks[j].key in NOT_EXPERIENCER_AFTER:
             continue
         relatives.append((i, i))
+    closing = {"certainty": _closing(text, toks, CERTAINTY_CLOSING)}
     out: dict[str, set[int]] = {}
     for kind, before, after, ends in (
         ("negation", free(_matches(keys, NEGATION_BEFORE)), free(_matches(keys, NEGATION_AFTER)), TERMINATORS),
@@ -650,7 +670,7 @@ def qualified(text: str, toks: list[Token]) -> dict[str, set[int]]:
         ("history", history, _matches(keys, HISTORY_AFTER), TERMINATORS),
         ("experiencer", sorted(_matches(keys, EXPERIENCER_BEFORE) + relatives), relatives_after, TERMINATORS | REPORTING),
     ):
-        reached, _ = _reach(text, toks, before, after, ends)
+        reached, _ = _reach(text, toks, before, after, ends, closing.get(kind, []))
         out[kind] = {i for i in reached if _is_content(toks[i])}
     return out
 
