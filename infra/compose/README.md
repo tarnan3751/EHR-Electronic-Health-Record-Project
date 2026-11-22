@@ -159,7 +159,7 @@ Barman takes a base backup about a minute after its first start, streams WAL con
 
 ## AI profile
 
-1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/`, MedASR in `infra/compose/models/medasr/`, and prints the `LLAMA_MODEL_FILE` value. Set that, `LLAMA_API_KEY` and `DICTATION_API_KEY` in `.env`. The models folder is gitignored; `llama` refuses to start without its key, and `dictation` without both keys or with a MedASR that isn't the one `models-manifest.json` records.
+1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/`, MedASR in `infra/compose/models/medasr/`, the speaker model in `infra/compose/models/speaker/`, and prints the `LLAMA_MODEL_FILE` value. Set that, `LLAMA_API_KEY` and `DICTATION_API_KEY` in `.env`. The models folder is gitignored; `llama` refuses to start without its key, and `dictation` without both keys or with a MedASR or speaker model that isn't the one `models-manifest.json` records. Without the speaker model, or with recorded weights it can't load, dictation works and listening to a visit is refused.
 2. Start with `docker compose --profile ai up -d --build`. `dictation` is healthy once MedASR has loaded; the on-prem app's dictation API answers that dictation is unavailable until then, and whenever the profile isn't running.
 3. On a machine with an NVIDIA GPU, add the override file:
    `docker compose -f compose.yaml -f compose.nvidia.yaml --profile ai up -d --build`
