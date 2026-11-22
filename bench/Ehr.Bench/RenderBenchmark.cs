@@ -199,7 +199,7 @@ internal static partial class RenderBenchmark
                 // Who viewed my record (step 13c): a year of views of each record in the audit log beyond the run's own, and a
                 // panels' table of a clinic's size, which a proxy's page reads.
                 await FillViewsAsync(database, clinicianId, portalPatient, panel[0]);
-                await FillPanelHistoryAsync(database, portalPatient, panel[0]);
+                await FillPanelHistoryAsync(database, clinicianId, portalPatient, panel[0]);
                 // Refill requests (step 13d): the portal patient's own, and the record they are a proxy for, asked as the
                 // portal asks; the first of each declined. A request's page, and the order form that approves a waiting
                 // one. A generator of its own, so the rows after them pick as they did.
@@ -1637,13 +1637,19 @@ internal static partial class RenderBenchmark
 
     const int EndedAssignments = 5_000;
 
+    // Step 13c2: the benchmark's clinician's ended assignments.
+    const int ClinicianAssignments = 60_000;
+
     // Step 13c: the panels' table as a clinic's would be after a year or two, which a page of a proxy without sensitive
-    // items reads whole for the patient's history (42-record-views.sql): 5,000 ended assignments of seeded patients, with
+    // items reads for the patient's history (42-record-views.sql): 5,000 ended assignments of seeded patients, with
     // twenty colleagues of the benchmark's clinician (disabled accounts, so nobody signs in as them), three of them for
     // each record given, by colleagues, ended two years ago: they change no line the pages show. Without these the table
-    // held the run's hundred, and a page that read it badly looked fast. As the database's superuser, in the benchmark's own
-    // database only: with --stack the table is the stack's.
-    static async Task FillPanelHistoryAsync(MigratedDatabase? database, params Guid[] records)
+    // held the run's hundred, and a page that read it badly looked fast. And step 13c2's: the benchmark's clinician with
+    // 60,000 ended assignments of seeded patients, a long career's, and an emergency-access window on each record given
+    // for four hours of every day of the year of views (FillViewsAsync), so a page asks, for each of the clinician's views
+    // in a window, whether the record was on their panel then, which read all 60,000 before the history's index. As the
+    // database's superuser, in the benchmark's own database only: with --stack the tables are the stack's.
+    static async Task FillPanelHistoryAsync(MigratedDatabase? database, Guid clinicianId, params Guid[] records)
     {
         if (database is null)
         {
@@ -1670,15 +1676,27 @@ internal static partial class RenderBenchmark
             UNION ALL
             SELECT gen_random_uuid(), r.patient, c.id, now() - interval '3 years', now() - interval '2 years'
             FROM unnest(@records) AS r(patient) CROSS JOIN (SELECT id FROM numbered WHERE k < 3) c
+            UNION ALL
+            SELECT gen_random_uuid(), p.id, @clinician, now() - make_interval(days => 800 + t.round), now() - make_interval(days => 799 + t.round)
+            FROM seeded p CROSS JOIN generate_series(1, @careers) AS t(round);
+            INSERT INTO ehr.break_glass_accesses (id, patient_id, clinician_id, reason, granted_at, expires_at)
+            SELECT gen_random_uuid(), r.patient, @clinician, 'Synthetic reason for the benchmark.', now() - make_interval(days => d, hours => 4), now() - make_interval(days => d)
+            FROM unnest(@records) AS r(patient) CROSS JOIN generate_series(0, 365) AS d;
+            ANALYZE ehr.patient_assignments;
+            ANALYZE ehr.break_glass_accesses;
             """, connection);
         command.Parameters.AddWithValue("count", EndedAssignments);
         command.Parameters.AddWithValue("records", records);
+        command.Parameters.AddWithValue("clinician", clinicianId);
+        command.Parameters.AddWithValue("careers", ClinicianAssignments / EndedAssignments);
         await command.ExecuteNonQueryAsync();
     }
 
     // Step 13c: a year of views of each record in the audit log, 26 minutes apart, beyond those the run's own pages make.
     // One in twenty is the clinician's read of the record; the rest are views of sensitive items, of a note, of a
     // summary marked sensitive, or by another portal account, and events that are no view at all (a sign-in, writes).
+    // Half the views have the part they were for (step 13c2): the chart, with the notes it lists, a note's page, the
+    // visit summaries, the portal's home; half have none, as before that step.
     // The first record's patient is shown all the views. The proxy of the second, who has no sensitive items, is shown
     // none of them, not even the clinician's, made before the run put the record on the clinician's panel: so a page of
     // theirs reads past the whole year, the most a page can read. As the database's superuser,
@@ -1694,8 +1712,13 @@ internal static partial class RenderBenchmark
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
-            SELECT uuidv7(), now() - make_interval(mins => n * 26), v.actor, v.action, v.table_name, r.patient, r.patient, 'onprem', v.sensitive
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, part)
+            SELECT uuidv7(), now() - make_interval(mins => n * 26), v.actor, v.action, v.table_name, r.patient, r.patient, 'onprem', v.sensitive,
+                   CASE WHEN v.action NOT IN ('read', 'read_sensitive') OR n % 40 >= 20 THEN NULL
+                        WHEN v.table_name = 'clinical_notes' THEN CASE WHEN n % 20 = 19 THEN 'visit-note' ELSE 'chart' END
+                        WHEN v.table_name = 'visit_summaries' THEN 'summaries'
+                        WHEN v.actor = @other THEN 'home'
+                        ELSE 'chart' END
             FROM unnest(@records) AS r(patient)
             CROSS JOIN generate_series(1, @count) AS n
             CROSS JOIN LATERAL (SELECT
