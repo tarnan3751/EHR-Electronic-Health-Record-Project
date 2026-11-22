@@ -304,6 +304,35 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         Assert.Equal(["pending"], await Query(visit, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
     }
 
+    // Two rules step 16 widened for a visit's review (db/policies/55-ai-review.sql) and no further: a review is staged
+    // pending with nothing proposed only if it is a visit's, so its transcript can be read; and a visit's review holds no
+    // proposal beyond its note, even with one planted in its stored result (as by the database's owner).
+    [Fact]
+    public async Task Only_a_visits_review_is_staged_with_nothing_proposed_and_none_holds_a_proposed_order_or_allergy()
+    {
+        var dictation = await NewVisitAsync();
+        await Execute(dictation, Draft + Begin.Replace("'ambient', @consent, true", "'dictation', NULL, false", StringComparison.Ordinal));
+        const string Nothing = """
+            {"transcript":{"text":"Synthetic words","final":true,"segments":[]},"sorting":"done",
+             "fields":{"subjective":{"status":"empty","reasons":["not_dictated"]}},"notCarriedOver":[]}
+            """;
+        await Refused("23514", () => Accounts.ExecuteAsync(App, dictation.Actor,
+            "UPDATE ehr.ai_note_reviews SET state = 'pending', result_json = @nothing::jsonb WHERE id = @review", [.. Parameters(dictation), ("nothing", Nothing)]));
+        await Accounts.ExecuteAsync(App, dictation.Actor,
+            "UPDATE ehr.ai_note_reviews SET state = 'completed', imported_version = 1, result_json = @nothing::jsonb WHERE id = @review",
+            [.. Parameters(dictation), ("nothing", Nothing)]);
+        Assert.Equal(["completed"], await Query(dictation, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
+
+        var visit = await PendingAsync();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, """
+            SET LOCAL session_replication_role = replica;
+            UPDATE ehr.ai_note_reviews SET result_json = result_json || '{"proposals":[{"kind":"order","start":0,"end":9,"warnings":[]}]}' WHERE id = @review
+            """, Parameters(visit));
+        await Refused("23514", () => Execute(visit,
+            "INSERT INTO ehr.ai_chart_proposals (id, review_id, patient_id, ordinal, kind, state) VALUES (gen_random_uuid(), @review, @patient, 0, 'order', 'pending')"));
+        Assert.Equal(["0"], await Query(visit, "SELECT count(*) FROM ehr.ai_chart_proposals WHERE review_id = @review"));
+    }
+
     // The writes of listening to a visit, among a patient's events: the consent, the review, its proposals, the transcript.
     const string Ours = "action IN ('insert', 'update', 'delete') AND table_name IN ('ambient_consents', 'ai_note_reviews', 'ai_field_proposals', 'ambient_transcripts')";
 
