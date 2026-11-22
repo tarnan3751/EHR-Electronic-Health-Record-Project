@@ -58,9 +58,17 @@ else
                             {
                                 @* Step 13e: a pre-visit form has an answer to review; these come before everything else. *@
                                 <span class="sc-tag sc-tag--danger" data-inbox-review>Needs review</span>
-                                @if (clinician && item.SourceTable == "questionnaire_responses" && item.PatientId is not null)
+                                @if (clinician && item.SourceTable == "questionnaire_responses" && item.PatientId is { } formPatient)
                                 {
-                                    <a asp-page="/Patients/Forms/Response" asp-route-patientId="@item.PatientId" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
+                                    if (item.DoneAt is null)
+                                    {
+                                        <a asp-page="/Patients/Forms/Response" asp-route-patientId="@formPatient" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
+                                    }
+                                    else if (Model.ChartOpens.Contains(formPatient))
+                                    {
+                                        @* Done: the item no longer opens the answers; the chart does, for a patient on the panel. *@
+                                        <span class="sc-muted" data-inbox-chart-note>Open from the patient's chart.</span>
+                                    }
                                 }
                             }
                             @if (clinician && item.Kind == InboxItemKind.Result && item.SourceTable == "orders" && item.PatientId is not null)
@@ -112,8 +120,14 @@ else
                                      && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests"))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
-                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary">Mark done</button>
+                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary"
+                                                aria-describedby="@(item.Kind == InboxItemKind.FormAlert ? $"done-{item.Id}" : null)">Mark done</button>
                                     </form>
+                                    @if (item.Kind == InboxItemKind.FormAlert)
+                                    {
+                                        @* Step 13e: the item is the way to the answers only while it is open (PhiReader.FormAnswersAsync). *@
+                                        <p class="sc-muted" id="done-@item.Id" data-inbox-done-note>After you mark this done, the answers open from the patient's chart, which needs the patient on your panel or emergency access.</p>
+                                    }
                                 }
                             </td>
                         }

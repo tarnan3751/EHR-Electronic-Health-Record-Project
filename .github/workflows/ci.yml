@@ -23,8 +23,10 @@ jobs:
   web:
     name: Web app
     runs-on: ubuntu-latest
-    # The test step alone takes about 13 minutes on a runner (step 9 of the expansion plan reached the old limit of 15).
-    timeout-minutes: 30
+    # The test step alone takes 17 to 25 minutes on a runner, with the tests of the expansion plan's phase 4 (step 9
+    # reached the first limit of 15; step 13e's last run took 27 minutes 41 seconds of the 30, and step 13c2's was
+    # cancelled at them).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

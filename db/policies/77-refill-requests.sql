@@ -40,9 +40,13 @@
 -- medication's advisory lock, and answering, after the request's row (ehr.deliver_refill_request); a clinician joining
 -- or leaving the panel, alone (ehr.follow_refill_care_team). So of two at once, one waits for the other and then sees
 -- what it wrote. Nothing that holds it waits for a medication's lock or a request's row, so it closes no circle with an
--- approval or a marking. One lock for each patient whose panel a transaction joins: a panel of a hundred at once (the
--- benchmark's) is a hundred, well within the lock table. The lock is held until the transaction ends, so two
--- transactions that each join or leave several patients' panels must take them in the same order (by patient ID), or
+-- approval or a marking. A join takes step 13e's pre-visit forms lock ('form-alert holders', 85-pre-visit-forms.sql)
+-- shared just before this one, that step's trigger firing first by name; the two close no circle, since that lock's
+-- only taker alone (an account being disabled) takes no care-team lock and waits for nothing while it holds it, and its
+-- shared holders don't wait for each other. One lock for each patient whose panel a transaction joins: a panel of a
+-- hundred at once (the benchmark's) is a hundred, well within the lock table. The lock is held until the transaction
+-- ends, so two transactions that each join or leave several patients' panels must take them in the same order (by
+-- patient ID), or
 -- they can deadlock; the app joins and leaves one patient's panel in a request.
 CREATE OR REPLACE FUNCTION ehr.guard_refill_request() RETURNS trigger
     LANGUAGE plpgsql

@@ -1,4 +1,6 @@
+using Ehr.Data.Inbox;
 using Ehr.Domain.Inbox;
+using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -9,7 +11,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Inbox;
 // its patient; and, on request, what they have done. For any staff account, clinician or admin: the area's policy. The
 // database returns only the signed-in person's own items. "Mark done" is the one change, and off-site it is forwarded
 // to the clinic's server like any other save. The inbox starts empty: each kind of item arrives with its own feature.
-public class IndexModel(PhiReader phi, StaffInbox inbox) : PageModel
+public class IndexModel(PhiReader phi, StaffInbox inbox, PatientAssignments assignments) : PageModel
 {
     public const int Limit = 50;
 
@@ -19,6 +21,11 @@ public class IndexModel(PhiReader phi, StaffInbox inbox) : PageModel
 
     public InboxPage Items { get; private set; } = null!;
 
+    // Step 13e: a done pre-visit form item no longer opens the answers (PhiReader.FormAnswersAsync); among the done
+    // ones, the patients whose charts open for this clinician without a reason, their panel, where the item says the
+    // answers open from the chart. Read only when the done items include one. IDs only.
+    public IReadOnlySet<Guid> ChartOpens { get; private set; } = new HashSet<Guid>();
+
     // Set when "Mark done" found nothing to mark: the item was done already, in another tab perhaps, or isn't in this
     // person's inbox. The page says the same either way, so it gives nothing away about anyone else's items.
     public bool AlreadyDone { get; private set; }
@@ -27,6 +34,10 @@ public class IndexModel(PhiReader phi, StaffInbox inbox) : PageModel
     {
         Response.Headers.CacheControl = "no-store";
         Items = await phi.InboxAsync(Done, Limit, HttpContext.RequestAborted);
+        if (Done && Items.Items.Any(item => item.Kind == InboxItemKind.FormAlert))
+        {
+            ChartOpens = await assignments.PanelIdsAsync(HttpContext.RequestAborted);
+        }
     }
 
     public async Task<IActionResult> OnPostDoneAsync(Guid id)
