@@ -2,11 +2,11 @@
 
 Written by `uv run --project eval python -m ehr_eval.goldreport` (`ehr_eval/goldreport.py`); don't edit it. Each script's display text is read as its transcript, and its clinical gold (`[gold.*]`), what a careful clinician would accept, is checked by the dictation service's own checks (`validation.py` in the sidecar). These are the values they would discard, with why, and the rule-following gold (`[gold_rules.*]`) that the eval measures the pipeline against instead. See README.md, Two gold sets.
 
-63 of 188 clinical gold values would be discarded. By reason (a value can have more than one):
+64 of 195 clinical gold values would be discarded. By reason (a value can have more than one):
 
 | Reason | Values |
 |---|---|
-| `words_out_of_order` | 36 |
+| `words_out_of_order` | 37 |
 | `unsupported_content` | 26 |
 | `negation_dropped` | 4 |
 | `drug_not_in_sources` | 1 |
@@ -452,3 +452,10 @@ Reasons: `unsupported_content`
 
 - Clinical gold: Blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today: sinus rhythm with no ischemic changes.
 - Rule-following gold: Examination: blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today shows sinus rhythm with no ischemic changes.
+
+## d51-hives-allergies-said-plainly-or-not: subjective
+
+Reasons: `words_out_of_order`
+
+- Clinical gold: A 41-year-old woman with a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year.
+- Rule-following gold: A 41-year-old woman about a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year.
