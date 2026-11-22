@@ -10,7 +10,8 @@ namespace Ehr.Security.Tests;
 // The expansion plan's step 13e: what the database lets each account do with pre-visit forms, as the runtime roles, in
 // SQL of its own (db/policies/10-grants.sql, 30-rls.sql, 40-audit.sql and 85-pre-visit-forms.sql). A clinician asks,
 // for a patient on their panel, before a booked appointment ends; the patient, or a proxy allowed sensitive items,
-// answers once, from 7 days before the appointment until its end; the database scores the answers whatever the client
+// answers once, from 7 days before the appointment until its scheduled end, or, checked in, while its visit is in
+// progress, up to 12 hours after; the database scores the answers whatever the client
 // sent, and a refusal never says why; a proxy without sensitive items finds no forms at all; nothing changes a form;
 // an answer that needs review reaches the care team's inbox and no one else, and no admin sees a form's values.
 public partial class PreVisitFormSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
@@ -330,7 +331,7 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
     }
 
     [Fact]
-    public async Task A_form_opens_seven_days_before_the_appointment_and_closes_at_its_scheduled_end_on_the_databases_clock()
+    public async Task A_form_opens_seven_days_before_the_appointment_and_closes_at_its_scheduled_end_or_a_late_visits_on_the_databases_clock()
     {
         var booking = await BookedAsync(TimeSpan.FromDays(7).Subtract(TimeSpan.FromMinutes(2)));
         var answers = Phq(0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -355,6 +356,40 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
         await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.appointments SET status = 'fulfilled', encounter_id = @visit WHERE id = @id",
             ("id", now), ("visit", visit));
         await AnswerAsync(booking.Account, nowRequest, answers);
+
+        // Checked in, and its scheduled end passed while the visit is still in progress: open for 12 hours after the
+        // scheduled end, and closed after them; and closed once the visit has ended. (The scheduled end is moved back as
+        // the superuser, with the appointment's guard off for the statement, since nothing changes an appointment once it
+        // is checked in.)
+        async Task<(Guid First, Guid Second, Guid Visit)> CheckedInAsync(TimeSpan endedAgo)
+        {
+            var appointment = await BookAsync(booking.Clinician, booking.Patient, await With(), TimeSpan.FromMinutes(-5));
+            var first = await AskAsync(booking.Clinician, appointment);
+            var second = await AskAsync(booking.Clinician, appointment, Gad7);
+            var started = Guid.CreateVersion7();
+            await Accounts.ExecuteAsync(App, booking.Clinician,
+                "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (@id, @patient, 'in-progress', 'AMB', now())",
+                ("id", started), ("patient", booking.Patient));
+            await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.appointments SET status = 'fulfilled', encounter_id = @visit WHERE id = @id",
+                ("id", appointment), ("visit", started));
+            await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+                "ALTER TABLE ehr.appointments DISABLE TRIGGER appointments_guard; "
+                + "UPDATE ehr.appointments SET starts_at = now() - @ago - make_interval(mins => minutes) WHERE id = @id; "
+                + "ALTER TABLE ehr.appointments ENABLE TRIGGER appointments_guard",
+                ("id", appointment), ("ago", endedAgo));
+            return (first, second, started);
+        }
+
+        var late = await CheckedInAsync(TimeSpan.FromHours(2));
+        await AnswerAsync(booking.Account, late.First, answers);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "UPDATE ehr.encounters SET status = 'finished', period_end = now() WHERE id = @id",
+            ("id", late.Visit));
+        await NotAnswerableAsync(() => AnswerAsync(booking.Account, late.Second, Answers(GadItems, [0, 0, 0, 0, 0, 0, 0])));
+
+        // Still in progress: open just inside 12 hours after the scheduled end, closed just outside.
+        await AnswerAsync(booking.Account, (await CheckedInAsync(TimeSpan.FromHours(12).Subtract(TimeSpan.FromMinutes(5)))).First, answers);
+        var over = await CheckedInAsync(TimeSpan.FromHours(12).Add(TimeSpan.FromMinutes(5)));
+        await NotAnswerableAsync(() => AnswerAsync(booking.Account, over.First, answers));
 
         // Rescheduled so that it has ended; cancelled; a no-show: closed.
         foreach (var change in new[]
@@ -504,6 +539,10 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
         // Not a clinician, and a clinician with nothing to do with the patient: nothing.
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
         var outsider = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        // Once on the panel, and no longer: nothing.
+        var left = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, left, booking.Patient);
+        await Accounts.ExecuteAsync(App, left, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @me AND ended_at IS NULL", ("me", left));
 
         // No alert: no item.
         await AnswerAsync(booking.Account, await AskAsync(booking.Clinician, booking.Appointment, Gad7), Answers(GadItems, [3, 3, 3, 3, 3, 3, 3]));
@@ -519,7 +558,7 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
             FROM ehr.inbox_items WHERE patient_id = @patient ORDER BY 1
             """, ("patient", booking.Patient)));
         Assert.DoesNotContain(await AsSuperuserAsync("SELECT recipient_id FROM ehr.inbox_items WHERE patient_id = @patient", ("patient", booking.Patient)),
-            recipient => recipient == disabled.ToString() || recipient == admin.ToString() || recipient == outsider.ToString());
+            recipient => recipient == disabled.ToString() || recipient == admin.ToString() || recipient == outsider.ToString() || recipient == left.ToString());
 
         // Each recipient sees their own item and marks it done; the others' stay.
         Assert.Equal(["1"], await AsAsync(App, colleague, "SELECT count(*) FROM ehr.inbox_items"));
@@ -562,17 +601,159 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
     [GeneratedRegex("PHQ|GAD|27|Severe|severe|Nearly|Several|dead|hurt", RegexOptions.CultureInvariant)]
     private static partial Regex Words();
 
+    // An answer that needs review is never stored with nobody told (the step's review). The reviewer's case: the clinician
+    // who asked has left the patient's panel, nobody else is on it, and the appointment's clinician's account is disabled.
+    // Then every clinician whose account isn't disabled gets the item, and no admin or disabled account does.
+    [Fact]
+    public async Task With_nobody_on_the_team_an_answer_to_review_goes_to_every_clinician_who_can_act()
+    {
+        var booking = await BookedAsync(TimeSpan.FromDays(2));
+        var request = await AskAsync(booking.Clinician, booking.Appointment);
+        await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @me AND ended_at IS NULL",
+            ("me", booking.Clinician));
+        await Accounts.LockOutAsync(database, booking.AppointmentClinician);
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+
+        var response = await AnswerAsync(booking.Account, request, Phq(0, 0, 0, 0, 0, 0, 0, 0, 2));
+
+        var everyone = await AsSuperuserAsync(
+            "SELECT id::text FROM ehr.staff_users WHERE roles @> ARRAY['Clinician'] AND (lockout_end IS NULL OR lockout_end < now() + interval '10 years') ORDER BY 1");
+        Assert.Contains(booking.Clinician.ToString(), everyone);
+        Assert.Equal(everyone, await AsSuperuserAsync(
+            "SELECT recipient_id::text FROM ehr.inbox_items WHERE source_id = @response AND kind = 'form-alert' ORDER BY 1", ("response", response)));
+        Assert.DoesNotContain(booking.AppointmentClinician.ToString(), everyone);
+        Assert.DoesNotContain(admin.ToString(), everyone);
+        Assert.Equal(["A pre-visit form has an answer that needs review"], await AsSuperuserAsync(
+            "SELECT DISTINCT summary FROM ehr.inbox_items WHERE source_id = @response", ("response", response)));
+    }
+
+    // A clinician who joins the patient's panel while an answer to review has no item open with anyone on the team (the
+    // panel now, or the appointment's clinician) gets one; while one is open, nobody new does.
+    [Fact]
+    public async Task A_clinician_joining_the_panel_gets_an_answer_to_review_that_nobody_on_the_team_holds_open()
+    {
+        var booking = await BookedAsync(TimeSpan.FromDays(2));
+        var response = await AnswerAsync(booking.Account, await AskAsync(booking.Clinician, booking.Appointment), Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+        Task<List<string>> HoldersAsync() => AsSuperuserAsync(
+            "SELECT recipient_id::text || ' ' || (done_at IS NULL)::text FROM ehr.inbox_items WHERE source_id = @response ORDER BY created_at, recipient_id",
+            ("response", response));
+
+        // Open with the asking clinician and the appointment's: a new member of the team gets nothing.
+        var early = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, early, booking.Patient);
+        Assert.DoesNotContain(await HoldersAsync(), holder => holder.StartsWith(early.ToString(), StringComparison.Ordinal));
+
+        // Both mark theirs done; the next clinician to join is given it, and theirs is the one open.
+        foreach (var holder in new[] { booking.Clinician, booking.AppointmentClinician })
+        {
+            await Accounts.ExecuteAsync(App, holder, "UPDATE ehr.inbox_items SET done_at = now() WHERE kind = 'form-alert'");
+        }
+
+        var later = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, later, booking.Patient);
+        Assert.Equal([$"{later} true"], (await HoldersAsync()).Where(holder => holder.EndsWith("true", StringComparison.Ordinal)));
+        Assert.Equal(["true"], await AsSuperuserAsync(
+            "SELECT sensitive::text FROM ehr.inbox_items WHERE source_id = @response AND recipient_id = @later", ("response", response), ("later", later)));
+    }
+
+    // A clinician joining a patient's panel fires two owner-run triggers (this step's, then step 13d's for refill
+    // requests: AFTER triggers fire in name order), after step 13c's guard has set the assignment's time to the
+    // database's clock: each delivers what is
+    // waiting, exactly once. The join takes one advisory lock, step 13d's care-team lock for the patient: this step's
+    // trigger takes none, so it adds no lock that could wait in a circle with 13d's. And marking done still goes as
+    // before: a form-alert item by its recipient, never a refill item.
+    [Fact]
+    public async Task A_clinician_joining_the_panel_gets_a_waiting_refill_and_an_unreceived_form_alert_once_each_under_one_lock()
+    {
+        var booking = await BookedAsync(TimeSpan.FromDays(2));
+        var medication = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "INSERT INTO ehr.medication_statements (id, patient_id, code, display, dosage, status, sensitive) "
+            + "VALUES (@id, @patient, '314076', 'lisinopril 10 MG Oral Tablet', '1 tablet by mouth daily', 'active', false)",
+            ("id", medication), ("patient", booking.Patient));
+        var refill = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, booking.Account,
+            """
+            INSERT INTO ehr.refill_requests (id, patient_id, medication_statement_id, medication_display, requested_by, requested_at, status, sensitive)
+            VALUES (@id, @patient, @medication, '', gen_random_uuid(), now(), 'requested', false)
+            """, ("id", refill), ("patient", booking.Patient), ("medication", medication));
+        var response = await AnswerAsync(booking.Account, await AskAsync(booking.Clinician, booking.Appointment), Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+
+        // The care team leaves (closing its refill item; its form alert stays its own), and the appointment's clinician
+        // marks theirs done: nobody on the team holds either.
+        await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @me AND ended_at IS NULL",
+            ("me", booking.Clinician));
+        await Accounts.ExecuteAsync(App, booking.AppointmentClinician, "UPDATE ehr.inbox_items SET done_at = now() WHERE kind = 'form-alert'");
+
+        // A clinician joins, with a time far from the database's clock, which 13c's guard replaces.
+        var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await using (var connection = new NpgsqlConnection(App))
+        {
+            await connection.OpenAsync(Cancel);
+            await using var transaction = await connection.BeginTransactionAsync(Cancel);
+            async Task<object?> RunAsync(string sql)
+            {
+                await using var command = new NpgsqlCommand(sql, connection, transaction);
+                command.Parameters.AddWithValue("me", joining.ToString());
+                command.Parameters.AddWithValue("patient", booking.Patient);
+                return await command.ExecuteScalarAsync(Cancel);
+            }
+
+            await RunAsync("SELECT set_config('app.user_id', @me, true)");
+            await RunAsync("INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (gen_random_uuid(), @patient, @me::uuid, '2000-01-01')");
+            Assert.Equal(1L, await RunAsync("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()"));
+            Assert.Equal(1L, await RunAsync(
+                """
+                SELECT count(*) FROM pg_locks
+                WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND objsubid = 1
+                  AND ((classid::bigint << 32) | objid::bigint) = hashtextextended('ehr.refill_care_team:' || @patient::text, 0)
+                """));
+            await transaction.CommitAsync(Cancel);
+        }
+
+        Assert.Equal(["true"], await AsSuperuserAsync(
+            "SELECT (assigned_at > now() - interval '1 minute')::text FROM ehr.patient_assignments WHERE clinician_id = @joining", ("joining", joining)));
+        Assert.Equal([$"form-alert {response} true", $"refill-request {refill} true"], await AsSuperuserAsync(
+            "SELECT kind || ' ' || source_id || ' ' || (done_at IS NULL) FROM ehr.inbox_items WHERE recipient_id = @joining ORDER BY kind", ("joining", joining)));
+
+        // Their form alert they mark done themselves; the refill item only an answer closes.
+        await RefusedAsync(PostgresErrorCodes.CheckViolation,
+            () => Accounts.ExecuteAsync(App, joining, "UPDATE ehr.inbox_items SET done_at = now() WHERE kind = 'refill-request'"));
+        await Accounts.ExecuteAsync(App, joining, "UPDATE ehr.inbox_items SET done_at = now() WHERE kind = 'form-alert'");
+        Assert.Equal(["form-alert false", "refill-request true"], await AsSuperuserAsync(
+            "SELECT kind || ' ' || (done_at IS NULL) FROM ehr.inbox_items WHERE recipient_id = @joining ORDER BY kind", ("joining", joining)));
+    }
+
+    // Every form-alert item is a sensitive item's, whoever writes it: the check holds the tables' owner too.
+    [Fact]
+    public async Task A_form_alert_item_is_sensitive_whoever_writes_it()
+    {
+        var booking = await BookedAsync(TimeSpan.FromDays(2));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => Accounts.ExecuteAsync(database.OwnerConnectionString, null,
+            "INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at, sensitive) "
+            + "VALUES (gen_random_uuid(), @clinician, 'form-alert', @patient, 'A pre-visit form has an answer that needs review', now(), false)",
+            ("clinician", booking.Clinician), ("patient", booking.Patient)));
+    }
+
     // The alert's delivery runs as the tables' owner, as the inbox's other deliveries do: it names only what it must
     // (the inbox it writes, the panels and the staff accounts it reads), and its search_path is pinned.
     [Fact]
     public async Task The_alert_delivery_names_only_the_inbox_the_panels_and_the_staff()
     {
-        var definition = Assert.Single(await AsSuperuserAsync(
-            "SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname = 'deliver_questionnaire_alert' AND p.prosecdef AND p.proowner = 'ehr_owner'::regrole"));
-
-        Assert.Equal(["inbox_items", "patient_assignments", "staff_users"],
-            Tables().Matches(definition).Select(match => match.Groups[1].Value).Distinct().Order(StringComparer.Ordinal));
-        Assert.Contains("SET search_path TO 'pg_catalog', 'pg_temp'", definition, StringComparison.Ordinal);
+        foreach (var (function, tables) in new[]
+                 {
+                     ("deliver_questionnaire_alert", new[] { "inbox_items", "patient_assignments", "staff_users" }),
+                     // Following the care team reads the answers too.
+                     ("follow_questionnaire_alert_care_team", ["inbox_items", "patient_assignments", "questionnaire_responses", "staff_users"]),
+                 })
+        {
+            var definition = Assert.Single(await AsSuperuserAsync(
+                "SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname = @name AND p.prosecdef AND p.proowner = 'ehr_owner'::regrole", ("name", function)));
+            Assert.Equal(tables, Tables().Matches(definition).Select(match => match.Groups[1].Value).Distinct().Order(StringComparer.Ordinal));
+            Assert.Contains("SET search_path TO 'pg_catalog', 'pg_temp'", definition, StringComparison.Ordinal);
+            Assert.Equal(["false"], await AsSuperuserAsync(
+                "SELECT has_function_privilege('public', p.oid, 'EXECUTE')::text FROM pg_proc p WHERE p.proname = @name", ("name", function)));
+        }
     }
 
     [GeneratedRegex(@"\behr\.(\w+)\b(?!\()", RegexOptions.CultureInvariant)]

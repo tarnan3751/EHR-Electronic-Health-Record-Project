@@ -680,6 +680,11 @@ CREATE POLICY questionnaire_responses_own_insert ON ehr.questionnaire_responses 
         AND answered_by = (SELECT ehr.current_user_id())
         AND proxy_grant_id IS NOT DISTINCT FROM (SELECT ehr.acting_grant_id())
     );
+-- An answer that needs review follows the care team (ehr.follow_questionnaire_alert_care_team, 85-pre-visit-forms.sql),
+-- which runs as the tables' owner: forced row-level security binds the owner too, and this lets it read the answers.
+-- The owner's alone; no runtime role is or can become it. Nothing changes an answer.
+DROP POLICY IF EXISTS questionnaire_responses_owner_select ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_owner_select ON ehr.questionnaire_responses FOR SELECT TO ehr_owner USING (true);
 
 -- The staff inbox (PHI). An item is its recipient's alone: they read it and mark it done, while their account is a
 -- staff account that may sign in (a clinician or an admin). Nobody else sees it: not another clinician, not an admin

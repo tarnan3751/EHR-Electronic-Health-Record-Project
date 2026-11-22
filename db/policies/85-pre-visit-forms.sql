@@ -119,8 +119,14 @@ CREATE OR REPLACE TRIGGER questionnaire_requests_guard
     FOR EACH ROW EXECUTE FUNCTION ehr.guard_questionnaire_request();
 
 -- Before a response is inserted. The request must be one the session can read (row-level security: the record it is
--- looking at, and only with sensitive items allowed) whose appointment is booked or checked in, from 7 days before its
--- start until its scheduled end, on the database's clock. A request that doesn't exist, another patient's, one a proxy
+-- looking at, and only with sensitive items allowed), from 7 days before its appointment's start, on the database's
+-- clock, while the appointment is booked and hasn't reached its scheduled end, or is checked in and either hasn't
+-- reached it or its visit is still in progress, up to 12 hours after the scheduled end (from the step's review: a late
+-- visit doesn't close the form under the patient, and a checked-in appointment's form still has an end). The 12 hours
+-- are the window the vital-signs rule gives a visit (75-results.sql); the coordinator's alternative, the end of the
+-- clinic's day, can't be held here, since the clinic's time zone is the app's setting (Ehr:Clinic:TimeZone), which the
+-- database is never given, and a session's TimeZone is the client's to set. A cancellation or a no-show closes it, and
+-- so does the visit's end (no page ends a visit yet: nothing updates one, 10-grants.sql). A request that doesn't exist, another patient's, one a proxy
 -- without sensitive items may not see, one not open yet and one closed are all refused alike, with one error, before
 -- anything else is looked at, so a refusal says nothing of which it was. The answers are scored against the request's
 -- copy of the questionnaire; the patient, the questionnaire, the clinician, the score, its band, follow-up and alert,
@@ -139,8 +145,11 @@ BEGIN
     SELECT r.patient_id, r.questionnaire_code, r.clinician_id, r.definition INTO asked
     FROM ehr.questionnaire_requests r
     JOIN ehr.appointments a ON a.id = r.appointment_id
-    WHERE r.id = NEW.request_id AND a.status IN ('booked', 'fulfilled')
-      AND now() >= a.starts_at - interval '7 days' AND now() < a.starts_at + make_interval(mins => a.minutes);
+    WHERE r.id = NEW.request_id AND now() >= a.starts_at - interval '7 days'
+      AND (a.status = 'booked' AND now() < a.starts_at + make_interval(mins => a.minutes)
+           OR a.status = 'fulfilled' AND (now() < a.starts_at + make_interval(mins => a.minutes)
+               OR now() < a.starts_at + make_interval(mins => a.minutes) + interval '12 hours'
+                  AND EXISTS (SELECT 1 FROM ehr.encounters e WHERE e.id = a.encounter_id AND e.patient_id = a.patient_id AND e.status = 'in-progress')));
     IF NOT FOUND THEN
         RAISE EXCEPTION 'The form can''t be answered' USING ERRCODE = '42501';
     END IF;
@@ -165,8 +174,9 @@ CREATE OR REPLACE TRIGGER questionnaire_responses_guard
     BEFORE INSERT ON ehr.questionnaire_responses
     FOR EACH ROW EXECUTE FUNCTION ehr.guard_questionnaire_response();
 
--- A form is a record: a request and its answers never change and are never deleted, whoever tries, the tables' owner
--- included. The runtime roles have no UPDATE or DELETE on either (10-grants.sql); this holds for everyone else.
+-- A form is a record: no row of a request or its answers is ever updated or deleted, whoever tries, the tables' owner
+-- included. The runtime roles have no UPDATE or DELETE on either (10-grants.sql); this holds for everyone else. A row
+-- trigger can't stop TRUNCATE, which is the tables' owner's alone, as for every table, and which nothing here runs.
 CREATE OR REPLACE FUNCTION ehr.reject_questionnaire_change() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -183,19 +193,24 @@ CREATE OR REPLACE TRIGGER questionnaire_responses_immutable
     BEFORE UPDATE OR DELETE ON ehr.questionnaire_responses
     FOR EACH ROW EXECUTE FUNCTION ehr.reject_questionnaire_change();
 
--- An answer that needs review (the PHQ-9's question 9 answered other than "Not at all"): one inbox item, in the same
--- statement, for the clinician the appointment is with and for every clinician with the patient on their active panel,
--- each once, whose account isn't disabled (one locked for a few minutes after wrong passwords still gets it). The item
--- is marked sensitive, so the write audit marks its events and the admin audit view shows none of their values; its
--- summary names no questionnaire, answer or score, and it links to the answers. Each recipient marks their own done.
--- Nobody is emailed. Runs as its owner, to write the inbox, which no runtime role may (10-grants.sql): through the owner's
--- policies on inbox_items and patient_assignments (30-rls.sql), and staff_users, which has none; it reads no other
--- table. Its search_path is pinned, and nobody may call it: only the trigger runs it.
+-- An answer that needs review (an alert question, the PHQ-9's question 9, answered other than "Not at all"): one inbox
+-- item, in the same statement, for the clinician the appointment is with and for every clinician with the patient on
+-- their active panel (an assignment that has ended doesn't count), each once, whose account isn't disabled (one locked
+-- for a few minutes after wrong passwords still gets it). When that finds nobody, the item goes to every clinician
+-- whose account isn't disabled, so an alert is never stored with nobody told (from the step's review). The item is
+-- marked sensitive (and a check on inbox_items holds every form-alert item to that), so the write audit marks its
+-- events and the admin audit view shows none of their values; its summary names no questionnaire, answer or score,
+-- and it links to the answers. Each recipient marks their own done. Nobody is emailed. Runs as its owner, to write the
+-- inbox, which no runtime role may (10-grants.sql): through the owner's policies on inbox_items and
+-- patient_assignments (30-rls.sql), and staff_users, which has none; it reads no other table. Its search_path is
+-- pinned, and nobody may call it: only the trigger runs it.
 CREATE OR REPLACE FUNCTION ehr.deliver_questionnaire_alert() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
 AS $$
+DECLARE
+    told integer;
 BEGIN
     INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at, sensitive)
     SELECT uuidv7(), s.id, 'form-alert', NEW.patient_id, 'questionnaire_responses', NEW.id,
@@ -204,6 +219,14 @@ BEGIN
     WHERE s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end < now() + interval '10 years')
       AND (s.id = NEW.clinician_id
            OR s.id IN (SELECT a.clinician_id FROM ehr.patient_assignments a WHERE a.patient_id = NEW.patient_id AND a.ended_at IS NULL));
+    GET DIAGNOSTICS told = ROW_COUNT;
+    IF told = 0 THEN
+        INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at, sensitive)
+        SELECT uuidv7(), s.id, 'form-alert', NEW.patient_id, 'questionnaire_responses', NEW.id,
+               'A pre-visit form has an answer that needs review', clock_timestamp(), true
+        FROM ehr.staff_users s
+        WHERE s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end < now() + interval '10 years');
+    END IF;
     RETURN NULL;
 END
 $$;
@@ -212,3 +235,43 @@ CREATE OR REPLACE TRIGGER questionnaire_responses_deliver_alert
     AFTER INSERT ON ehr.questionnaire_responses
     FOR EACH ROW WHEN (NEW.alert)
     EXECUTE FUNCTION ehr.deliver_questionnaire_alert();
+
+-- An answer that needs review follows the care team, so it never sits where none of them is looking (from the step's
+-- review, in the manner of ehr.follow_refill_care_team, 77-refill-requests.sql). When a clinician joins a patient's
+-- panel, they get an item for each of that patient's answers to review that has no item still open in the inbox of a
+-- clinician now on the panel or of the appointment's clinician; one they hold open already counts. Their account must
+-- not be disabled. Runs as its owner (SECURITY DEFINER), which alone may add inbox items: it reads the answers (the
+-- owner's policy, 30-rls.sql), the panels, the staff account and the inbox, and writes the inbox; nothing else. Its
+-- search_path is pinned, and nobody but its owner may call it directly. It takes no lock, unlike step 13d's care-team
+-- lock for refills: an answer arriving while a clinician joins is delivered by its own trigger, above, to the team it
+-- sees, or, seeing nobody, to every clinician, the one joining among them; so the two at once can only give someone an
+-- extra item, never leave an answer with nobody told. And nothing closes another's form-alert item, so none is left
+-- open that its holder can't act on. So it adds nothing to 13d's lock order (77-refill-requests.sql), and it fires
+-- before 13d's trigger on the same insert (AFTER triggers fire in name order).
+CREATE OR REPLACE FUNCTION ehr.follow_questionnaire_alert_care_team() RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at, sensitive)
+    SELECT uuidv7(), s.id, 'form-alert', r.patient_id, 'questionnaire_responses', r.id,
+           'A pre-visit form has an answer that needs review', clock_timestamp(), true
+    FROM ehr.questionnaire_responses r
+    JOIN ehr.staff_users s ON s.id = NEW.clinician_id
+    WHERE r.patient_id = NEW.patient_id AND r.alert
+      AND s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end < now() + interval '10 years')
+      AND NOT EXISTS (
+          SELECT 1 FROM ehr.inbox_items i
+          WHERE i.source_table = 'questionnaire_responses' AND i.source_id = r.id AND i.done_at IS NULL
+            AND (i.recipient_id = r.clinician_id
+                 OR EXISTS (SELECT 1 FROM ehr.patient_assignments a
+                            WHERE a.clinician_id = i.recipient_id AND a.patient_id = r.patient_id AND a.ended_at IS NULL)));
+    RETURN NULL;
+END
+$$;
+REVOKE ALL ON FUNCTION ehr.follow_questionnaire_alert_care_team() FROM PUBLIC;
+CREATE OR REPLACE TRIGGER patient_assignments_join_form_alerts
+    AFTER INSERT ON ehr.patient_assignments
+    FOR EACH ROW WHEN (NEW.ended_at IS NULL)
+    EXECUTE FUNCTION ehr.follow_questionnaire_alert_care_team();
