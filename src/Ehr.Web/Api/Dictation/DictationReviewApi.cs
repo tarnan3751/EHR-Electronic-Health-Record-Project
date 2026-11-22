@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using Ehr.Data;
 using Ehr.Data.Patients;
@@ -190,20 +192,32 @@ public static partial class DictationApi
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
         if (result.Fields?.History is not null) return null;
-        // A value proposed from Spanish (the expansion plan's step 17) is English sentences, each with the Spanish words it
-        // was translated from: they follow each other through the value, one space between, and between them cite every
-        // source the field has and no other (whose ranges are checked below), so the review can put each sentence beside
-        // what the clinician said. A value proposed from English has none.
+        // A source never starts or ends inside a letter and its combining marks ("año" written as n and U+0303, cut after the
+        // n, would show "an"): the surrogate rule above guards only a character in two halves (the expansion plan's step 17).
+        bool Joined(int at) => at > 0 && at < text.Length && Rune.TryGetRuneAt(text, at, out var rune)
+            && Rune.GetUnicodeCategory(rune) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark;
+        bool Source(SourceSpan source) => Range(source.Start, source.End) && !Joined(source.Start) && !Joined(source.End);
+        // A passage speech recognition didn't hear as Spanish was left out of what the model sorts, as the review says: no
+        // source may cite it (step 17). The web checks no other kind of unclear passage here; the dictation service does.
+        var notSpanish = result.Transcript.Segments.Where(s => s.Unclear == Unclear.OtherLanguage).ToList();
+        bool InPassageNotSpanish(SourceSpan source) => notSpanish.Any(s => source.Start < s.End && s.Start < source.End);
+        // A value proposed from Spanish (step 17) is English sentences, each with the Spanish words it was translated from.
+        // The sentences follow each other through the value with exactly one space between them, none at either end and
+        // none doubled; each cites, in order and without overlap, sources of its own that are whole (Source); and between
+        // them they cite every source the field has and no other. So the review can put each sentence beside what the
+        // clinician said. A value proposed from English has none.
         bool Translated(PendingField field)
         {
-            if (field.Statements is not { Count: > 0 } statements) return false;
+            if (field.Statements is not { } statements) return false;
             var at = 0;
             foreach (var statement in statements)
             {
                 if (statement.Start != at || statement.End <= statement.Start || statement.End > field.Value.Length
-                    || string.IsNullOrWhiteSpace(field.Value[statement.Start..statement.End])
+                    || char.IsWhiteSpace(field.Value[statement.Start]) || char.IsWhiteSpace(field.Value[statement.End - 1])
                     || statement.End < field.Value.Length && field.Value[statement.End] != ' '
-                    || statement.Sources.Count == 0) return false;
+                    || statement.Sources.Count == 0
+                    || statement.Sources.Zip(statement.Sources.Skip(1)).Any(pair => pair.Second.Start < pair.First.End)
+                    || !statement.Sources.All(Source)) return false;
                 at = statement.End + 1;
             }
 
@@ -218,7 +232,7 @@ public static partial class DictationApi
                 if (field is not PendingField pending) continue;
                 if (result.Sorting != Sorting.Done || string.IsNullOrWhiteSpace(pending.Value) || pending.Value.Contains('\0')
                     || pending.Value.Length > NoteContent.MaximumFieldLength || pending.Sources.Count == 0
-                    || pending.Sources.Any(s => !Range(s.Start, s.End)) || pending.Warnings.Any(w => !Range(w.Start, w.End))
+                    || !pending.Sources.All(Source) || pending.Sources.Any(InPassageNotSpanish) || pending.Warnings.Any(w => !Range(w.Start, w.End))
                     || (result.SpokenLanguage == SpokenLanguage.Spanish ? !Translated(pending) : pending.Statements is not null)) return null;
                 suggestions.Add(name, pending.Value);
             }

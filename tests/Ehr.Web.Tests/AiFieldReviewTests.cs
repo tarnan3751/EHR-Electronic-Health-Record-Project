@@ -686,11 +686,21 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // TC-UC13-17 (invalid input; step 17): a result from Spanish whose sentences don't hold is refused at staging and
-    // nothing is stored, so the review never shows a sentence beside Spanish it didn't come from. Each case is caught by
-    // one rule of TrustedResult alone: a sentence that doesn't start where the last one ended (gap), sentences that don't
-    // reach the value's end (uncovered), a sentence ending inside a word (mid-word), a sentence citing nothing (uncited),
-    // one citing words that aren't among the field's sources (foreign, outside), a field from Spanish with no sentences
-    // (no-statements), sentences on a field from English (english-statements), a language the contract doesn't have,
+    // nothing is stored, so the review never shows a sentence beside Spanish it didn't come from, and no load of it can
+    // fail. Each case but outside is caught by one rule of TrustedResult alone (removing that rule turns that case red
+    // and no other; empty and past-value then fail with an error, not a refusal): a sentence that doesn't start where
+    // the last one ended (gap), sentences that don't reach the value's end (uncovered), a sentence ending inside a word
+    // (mid-word), a sentence of no length (empty) or past the value's end (past-value), a space at the value's start
+    // (leading-space) or end (trailing-space) or two between sentences (double-space), a sentence citing nothing
+    // (uncited), its sources out of order (reversed) or one cited twice (repeated-span), a sentence citing a span the
+    // field doesn't have (extra), a field source no sentence cites (uncited-source), both at once (foreign, and outside,
+    // where the one a sentence cites is past the transcript's end), a source cut between a letter and its combining
+    // accent (combining) or in a passage not heard as Spanish (other-language), and a sentence citing, besides its own,
+    // a span past the transcript's end (extra-outside: the sources' own range check and the rule that the sentences cite
+    // the field's sources each refuse it, so that weakening the second to "at least the field's sources" alone still
+    // stores nothing, while with both gone it would be stored and the review fail on every load), a field from Spanish
+    // with no sentences (no-statements), sentences on a field from English (english-statements), a language the contract
+    // doesn't have,
     // with no sentences anywhere (unknown-language: the read fails), a language that isn't exactly "en" or "es", each in
     // the shape that a lenient read would stage (5 with no sentences, as an English result; 1, "1", " es", "es " and
     // "en, es", which a lenient read takes for Spanish, with them), and an order proposed from Spanish, otherwise one the
@@ -712,6 +722,18 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("language-trailing")]
     [InlineData("language-list")]
     [InlineData("proposal")]
+    [InlineData("empty")]
+    [InlineData("past-value")]
+    [InlineData("leading-space")]
+    [InlineData("trailing-space")]
+    [InlineData("double-space")]
+    [InlineData("reversed")]
+    [InlineData("repeated-span")]
+    [InlineData("extra")]
+    [InlineData("extra-outside")]
+    [InlineData("uncited-source")]
+    [InlineData("combining")]
+    [InlineData("other-language")]
     public async Task TC_UC13_17_a_result_from_spanish_whose_sentences_dont_hold_is_refused_and_nothing_is_staged(string kind)
     {
         sidecar.Spanish = kind != "english-statements";
@@ -736,7 +758,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
                 second!["start"] = first["end"]!.GetValue<int>() + 1;
                 break;
             case "uncited":
-                second!["sources"]!.AsArray().Add(first!["sources"]![0]!.DeepClone());
+                second!["sources"]!.AsArray().Insert(0, first!["sources"]![0]!.DeepClone());
                 first["sources"] = new System.Text.Json.Nodes.JsonArray();
                 break;
             case "foreign":
@@ -755,6 +777,66 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
                     ["end"] = subjective["value"]!.GetValue<string>().Length,
                     ["sources"] = subjective["sources"]!.DeepClone(),
                 });
+                break;
+            case "empty":
+                subjective["statements"]!.AsArray().Insert(0, new System.Text.Json.Nodes.JsonObject
+                {
+                    ["start"] = 0,
+                    ["end"] = 0,
+                    ["sources"] = first!["sources"]!.DeepClone(),
+                });
+                break;
+            case "past-value":
+                second!["end"] = subjective["value"]!.GetValue<string>().Length + 1;
+                break;
+            case "leading-space":
+                subjective["value"] = " " + subjective["value"]!.GetValue<string>();
+                first!["end"] = first["end"]!.GetValue<int>() + 1;
+                second!["start"] = second["start"]!.GetValue<int>() + 1;
+                second["end"] = second["end"]!.GetValue<int>() + 1;
+                break;
+            case "trailing-space":
+                subjective["value"] = subjective["value"]!.GetValue<string>() + " ";
+                second!["end"] = second["end"]!.GetValue<int>() + 1;
+                break;
+            case "double-space":
+                var words = subjective["value"]!.GetValue<string>();
+                subjective["value"] = words.Insert(first!["end"]!.GetValue<int>(), " ");
+                second!["end"] = second["end"]!.GetValue<int>() + 1;
+                break;
+            case "reversed":
+                second!["sources"]!.AsArray().Add(first!["sources"]![0]!.DeepClone());
+                break;
+            case "repeated-span":
+                second!["sources"]!.AsArray().Add(second["sources"]![0]!.DeepClone());
+                break;
+            case "extra":
+                second!["sources"]!.AsArray().Add(json["fields"]!["objective"]!["sources"]![0]!.DeepClone());
+                break;
+            case "extra-outside":
+                var last = second!["sources"]![0]!["end"]!.GetValue<int>();
+                second["sources"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject { ["start"] = last + 1, ["end"] = 1000000 });
+                break;
+            case "uncited-source":
+                subjective["sources"]!.AsArray().Add(json["fields"]!["objective"]!["sources"]![0]!.DeepClone());
+                break;
+            case "combining":
+                var assessment = json["fields"]!["assessment"]!;
+                var text = json["transcript"]!["text"]!.GetValue<string>();
+                var cut = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["start"] = assessment["sources"]![0]!["start"]!.GetValue<int>(),
+                    ["end"] = text.IndexOf('\u0301', StringComparison.Ordinal),
+                };
+                assessment["sources"] = new System.Text.Json.Nodes.JsonArray(cut);
+                assessment["statements"]![0]!["sources"] = new System.Text.Json.Nodes.JsonArray(cut.DeepClone());
+                break;
+            case "other-language":
+                var objective = json["fields"]!["objective"]!;
+                var passage = json["transcript"]!["segments"]![2]!;
+                var notSpanish = new System.Text.Json.Nodes.JsonObject { ["start"] = passage["start"]!.DeepClone(), ["end"] = passage["end"]!.DeepClone() };
+                objective["sources"] = new System.Text.Json.Nodes.JsonArray(notSpanish);
+                objective["statements"]![0]!["sources"] = new System.Text.Json.Nodes.JsonArray(notSpanish.DeepClone());
                 break;
             case "proposal":
                 var order = json["notCarriedOver"]![0]!;

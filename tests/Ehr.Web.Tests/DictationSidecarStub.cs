@@ -28,13 +28,14 @@ public sealed class DictationSidecarStub : HttpMessageHandler
     static readonly string[] Sentences = ["Cough for three days.", "No fever.", "Chest is clear.", "Likely viral.", "Fluids and rest."];
 
     // The Spanish mode's dictation, a sentence a chunk: the third spoken in English, which the service marks as not
-    // Spanish, the fourth with an order in it, and the last long, so a quote of it has to wrap.
+    // Spanish, the fourth with an order in it, whose "í" is written as an i and a combining accent (U+0301), so a source
+    // can be cut between the two, and the last long, so a quote of it has to wrap.
     public static readonly string[] SpanishSentences =
     [
         "Tos desde hace tres días y niega fiebre.",
         "Pulmones limpios.",
         "Patient was counseled on diet.",
-        "Probable cuadro viral, pido una radiografía de tórax.",
+        "Probable cuadro viral, pido una radiografi\u0301a de tórax.",
         "Líquidos abundantes y reposo relativo durante los próximos tres a cinco días, paracetamol 1.000 mg cada ocho horas si tiene dolor o malestar general, y regresar a consulta si aparece dificultad para respirar o fiebre que no cede.",
     ];
 
@@ -400,7 +401,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             structuring = "structuring-es-1",
             code = "sha256:" + new string('c', 64),
         };
-        const string Order = "pido una radiografía de tórax";
+        const string Order = "pido una radiografi\u0301a de tórax";
         var order = text.IndexOf(Order, StringComparison.Ordinal);
         var notCarriedOver = new[] { new { reason = "order", start = order, end = order + Order.Length } }.Where(item => item.start >= 0).ToArray();
         if (sorting == StubSorting.Pending)
