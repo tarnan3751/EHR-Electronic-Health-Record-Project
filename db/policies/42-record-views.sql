@@ -85,11 +85,20 @@ REVOKE ALL ON FUNCTION ehr.record_view_part(text, text) FROM PUBLIC;
 -- Runs as its owner, reading the log, the emergency-access windows, the panels and the proxy grants through the owner's
 -- policies (30-rls.sql), and the account tables, which no policy covers; its search_path is pinned, and only the runtime
 -- roles may call it.
--- Dropped first, in the same transaction as the rest, so no page finds it missing: its result gained a column (step
--- 13c2), which CREATE OR REPLACE can't change.
+-- Replaced in place on every run, so it keeps its identity and a page calling it as the file runs is never refused. Once,
+-- on the upgrade to step 13c2, it is dropped first, since its result gained a column (sensitive), which CREATE OR
+-- REPLACE can't change: in the same transaction as the rest, so no page finds it missing, though a call made in that
+-- one moment can fail, once (docs/UC2.md says so for a deploy). A function already of this shape is never dropped.
 BEGIN;
-DROP FUNCTION IF EXISTS ehr.record_views(timestamptz, timestamptz);
-CREATE FUNCTION ehr.record_views(older_than timestamptz, newer_than timestamptz)
+DO $drop$
+BEGIN
+    IF EXISTS (SELECT FROM pg_proc p
+               WHERE p.oid = to_regprocedure('ehr.record_views(timestamptz, timestamptz)') AND NOT 'sensitive' = ANY (p.proargnames)) THEN
+        DROP FUNCTION ehr.record_views(timestamptz, timestamptz);
+    END IF;
+END
+$drop$;
+CREATE OR REPLACE FUNCTION ehr.record_views(older_than timestamptz, newer_than timestamptz)
     RETURNS TABLE (occurred_at timestamptz, who text, name text, role text, part text, sensitive boolean, emergency boolean, more boolean)
     LANGUAGE sql
     STABLE

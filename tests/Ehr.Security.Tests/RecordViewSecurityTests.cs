@@ -471,7 +471,8 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         // page: the patient's own, another proxy's, sensitive ones, note reads, addenda and conversations, writes, a
         // staff member who never had the patient on their panel, and one through emergency access; with no part, and
         // with the parts they were recorded for (step 13c2): a part never shows a view the rest would hide, a chart's
-        // listed notes and a pre-visit form among them.
+        // listed notes among them; and a pre-visit form's, which is hidden for its part alone, whatever its action, so
+        // also as a plain read and a download, which the rest would show.
         var offPanel = await StaffAsync("Dr. Ivy", StaffRoles.Clinician);
         var emergency = await StaffAsync("Dr. Juniper", StaffRoles.Clinician);
         await WindowAsync(emergency, patient, fromMinutesAgo: 60 * 24, untilMinutesAgo: -60);
@@ -479,14 +480,15 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
             """
             INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, part)
             SELECT uuidv7(), now() - make_interval(secs => n * 13), k.actor, k.action, k.table_name, gen_random_uuid(), @patient, 'onprem', k.sensitive,
-                   CASE WHEN n % 2 = 0 THEN k.part END
+                   CASE WHEN n % 2 = 0 OR k.part = 'forms' THEN k.part END
             FROM generate_series(1, 700) AS n
             CROSS JOIN LATERAL (VALUES
                 (@own, 'read', 'patients', false, 'home'), (@other, 'read', 'patients', false, 'results'), (@clinician, 'read_sensitive', 'patients', false, 'chart'),
                 (@clinician, 'read', 'clinical_notes', false, 'chart'), (@clinician, 'read', 'note_addenda', false, 'visit-note'),
                 (@clinician, 'read', 'message_threads', false, 'conversations'), (@clinician, 'read', 'messages', false, 'conversations'),
                 (@clinician, 'read', 'visit_summaries', true, 'summaries'), (@clinician, 'insert', 'conditions', false, NULL),
-                (@clinician, 'read_sensitive', 'patients', false, 'forms'), (@clinician, 'read_sensitive', 'patients', false, 'lists'),
+                (@clinician, 'read_sensitive', 'patients', false, 'forms'), (@clinician, 'read', 'patients', false, 'forms'),
+                (@clinician, 'download', 'patients', false, 'forms'), (@clinician, 'read_sensitive', 'patients', false, 'lists'),
                 (@offPanel, 'read', 'patients', false, 'search'), (@emergency, 'read', 'patients', false, 'chart')) AS k(actor, action, table_name, sensitive, part)
             WHERE n % 7 = (CASE k.action WHEN 'insert' THEN 6 ELSE 0 END) OR k.actor IN (@own, @offPanel, @emergency)
             """, ("patient", patient), ("own", own), ("other", other.Account), ("clinician", clinician), ("offPanel", offPanel), ("emergency", emergency));
@@ -845,7 +847,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
     // Every part the log takes, recorded with a care-team member's view of the kind each is recorded with, named to each
     // kind of viewer as they may be told it: the patient, and a proxy with sensitive items and messages, every part; a
     // proxy without messages, a conversation or a refill request as the record; a proxy without sensitive items the parts
-    // above, the rest as the record, and never the view of a pre-visit form, which is a view of sensitive items.
+    // above, the rest as the record, and never the view of a pre-visit form, as a plain read or as one of sensitive items.
     [Fact]
     public async Task Every_part_is_named_to_each_viewer_as_they_may_be_told_it()
     {
@@ -854,19 +856,20 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         var noMessages = await ProxyAsync(own, patient, includeSensitive: true, scope: "record");
         var restricted = await ProxyAsync(own, patient, includeSensitive: false);
         var restrictedNoMessages = await ProxyAsync(own, patient, includeSensitive: false, scope: "record");
-        string Action(string part) => part switch { AuditParts.Download => "download", AuditParts.Forms => "read_sensitive", _ => "read" };
+        // Each part as a read, or a download for the download's, and a pre-visit form's also as a read of sensitive items:
+        // the first the newest.
+        (string Part, string Action)[] views = [.. AuditParts.All.Select(part => (part, part == AuditParts.Download ? "download" : "read")),
+            (AuditParts.Forms, "read_sensitive")];
         var minute = 0;
-        foreach (var part in AuditParts.All)
+        foreach (var (part, action) in views)
         {
-            await EventAsync(patient, clinician, Action(part), part == AuditParts.Views ? "audit_events" : "patients", ++minute, part: part);
+            await EventAsync(patient, clinician, action, part == AuditParts.Views ? "audit_events" : "patients", ++minute, part: part);
         }
 
-        string Line(string part, string told) => told + "|" + (part == AuditParts.Forms ? "true" : "false");
-        List<string> Expected(bool sensitive, bool messages) => [.. AuditParts.All
-            .Where(part => sensitive || part != AuditParts.Forms)
-            .Select(part => Line(part,
-                part is AuditParts.Conversations or AuditParts.Refills && !messages ? "record"
-                : sensitive || ToldWithoutSensitive.Contains(part) ? part : "record"))];
+        List<string> Expected(bool sensitive, bool messages) => [.. views
+            .Where(view => sensitive || view.Part != AuditParts.Forms)
+            .Select(view => (view.Part is AuditParts.Conversations or AuditParts.Refills && !messages ? "record"
+                : sensitive || ToldWithoutSensitive.Contains(view.Part) ? view.Part : "record") + "|" + (view.Action == "read_sensitive" ? "true" : "false"))];
 
         foreach (var connection in new[] { App, Read })
         {
@@ -904,6 +907,69 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         Assert.Equal(["conversations|false", "conversations|false", "search|false", "chart|true", "chart|false", "chart|false", "chart|false", "chart|false"],
             await ViewsAsync(App, own, null, sql: Parts));
         Assert.Equal(["record|false", "chart|false"], await ViewsAsync(App, restricted.Account, restricted.Grant, sql: Parts));
+    }
+
+    // The policy file runs on every start of the migration job, while pages call the function: it replaces the function in
+    // place, so a call made as it runs is never refused (dropping and creating it again on each run failed calls with
+    // "cache lookup failed for function"). Twenty runs of the file as the migration role, while the patient's page is read
+    // from four connections of each runtime role, over and over until the runs end (at least 200 times each, never more
+    // than 5,000): not one call fails, and the function is the same one after, which is what keeps a call from failing.
+    [Fact]
+    public async Task Running_the_policy_file_again_never_fails_a_page_reading_the_function()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        await EventAsync(patient, clinician, "read", "patients", 1, part: AuditParts.Chart);
+        const string Oid = "SELECT 'ehr.record_views(timestamptz, timestamptz)'::regprocedure::oid::text";
+        var before = await AsSuperuserAsync(Oid);
+        var policy = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/42-record-views.sql"), Cancel);
+        var rerunning = true;
+
+        // Each call as a page makes it: a pooled connection, one transaction with the user context, the function read.
+        async Task<List<string>> CallAsync(string connectionString)
+        {
+            var errors = new List<string>();
+            for (var call = 0; call < 5_000 && (rerunning || call < 200); call++)
+            {
+                try
+                {
+                    await using var connection = new Npgsql.NpgsqlConnection(connectionString);
+                    await connection.OpenAsync(Cancel);
+                    await using var transaction = await connection.BeginTransactionAsync(Cancel);
+                    await using var command = new Npgsql.NpgsqlCommand(
+                        "SELECT set_config('app.user_id', @user, true); SELECT count(*) FROM ehr.record_views(NULL, NULL)", connection, transaction);
+                    command.Parameters.AddWithValue("user", own.ToString());
+                    await command.ExecuteNonQueryAsync(Cancel);
+                    await transaction.CommitAsync(Cancel);
+                }
+                catch (Npgsql.NpgsqlException error)
+                {
+                    errors.Add((error as Npgsql.PostgresException)?.SqlState + " " + error.Message);
+                }
+            }
+
+            return errors;
+        }
+
+        async Task RerunAsync()
+        {
+            try
+            {
+                for (var run = 0; run < 20; run++)
+                {
+                    await MigratedDatabase.ExecuteAsync(database.OwnerConnectionString, policy);
+                }
+            }
+            finally
+            {
+                rerunning = false;
+            }
+        }
+
+        var calls = Enumerable.Range(0, 4).SelectMany(_ => new[] { CallAsync(App), CallAsync(Read) }).ToList();
+        await Task.WhenAll([RerunAsync(), .. calls]);
+
+        Assert.Empty(calls.SelectMany(call => call.Result));
+        Assert.Equal(before, await AsSuperuserAsync(Oid));
     }
 
     // The twelve months bound what a page reads before it is cut: a record with more than a page of views from before
