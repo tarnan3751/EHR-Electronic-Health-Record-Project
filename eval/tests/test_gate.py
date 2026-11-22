@@ -33,7 +33,7 @@ def results(eval_dir, **overrides) -> dict:
                                       "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0,
                                       "unflagged": []},
                     "warnings": {"shown": 3, "possible_correction": {"flagged": 1}, "near_unclear_passage": {"flagged": 0},
-                                 "any": {"flagged": 1}},
+                                 "one_field_holds_dictation": {"flagged": 0}, "any": {"flagged": 1}},
                     "sorting": {"done": 2, "unavailable": {}}},
         "items": [{"script": "d01"}, {"script": "d02"}],
     }
@@ -137,7 +137,8 @@ def test_results_that_dont_say_what_was_shown_fail(eval_dir):
     assert "don't say what was offered" in problem
 
 
-@pytest.mark.parametrize("missing", [None, "shown", "possible_correction", "near_unclear_passage", "any"])
+@pytest.mark.parametrize(
+    "missing", [None, "shown", "possible_correction", "near_unclear_passage", "one_field_holds_dictation", "any"])
 def test_results_that_dont_say_which_values_carry_a_warning_fail(eval_dir, missing):
     silent = results(eval_dir)
     if missing:

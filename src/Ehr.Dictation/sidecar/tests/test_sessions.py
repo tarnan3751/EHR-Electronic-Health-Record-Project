@@ -185,7 +185,7 @@ def test_stop_returns_the_final_transcript_and_the_checked_fields(settings):
 
     assert result["transcript"]["final"] and all(s["final"] for s in result["transcript"]["segments"])
     assert result["sorting"] == "done" and result["reason"] is None
-    assert result["fields"]["history"]["status"] == "pending"
+    assert result["fields"]["subjective"]["status"] == "pending"
     assert result["fields"]["plan"] == {"status": "empty", "reasons": ["not_dictated"]}
 
 
@@ -202,7 +202,7 @@ def test_the_result_waits_for_fields_that_take_longer_than_stop(settings):
     stopped, waited = asyncio.run(run())
 
     assert stopped["sorting"] == "pending" and stopped["fields"] is None and stopped["transcript"]["final"]
-    assert waited["sorting"] == "done" and waited["fields"]["history"]["status"] == "pending"
+    assert waited["sorting"] == "done" and waited["fields"]["subjective"]["status"] == "pending"
 
 
 # Also TC-UC10-04 (FR-11, FR-13): with the language model down, slow or answering nonsense, the transcript stays

@@ -14,7 +14,7 @@
 </div>
 <h1>Confirm signature</h1>
 <p class="sc-prose">Review the saved note below. Signing makes it a permanent, read-only clinical record.</p>
-<partial name="_NoteContent" model="NoteContent.From(Model.Draft)" />
+<partial name="_NoteContent" model="NoteSections.AsSaved(Model.Draft)" />
 <div id="note-errors" class="sc-notice sc-notice--danger" role="alert" hidden="@(Model.Errors.Count == 0)">
     @foreach (var error in Model.Errors) { <p>@error</p> }
 </div>

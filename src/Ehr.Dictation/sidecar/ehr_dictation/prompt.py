@@ -23,7 +23,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-FIELDS = ("history", "assessment", "plan")
+FIELDS = ("subjective", "objective", "assessment", "plan")
 
 SCHEMA_DIRECTORY = Path(__file__).resolve().parents[2] / "schema"
 PROMPT_FILE = "structuring-prompt.md"

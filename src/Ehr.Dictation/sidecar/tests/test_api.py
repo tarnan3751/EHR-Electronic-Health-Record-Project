@@ -73,7 +73,7 @@ def test_a_whole_dictation_in_the_containers_browsers_record(settings, container
     assert stopped.status_code == 200 and again.json() == result
     assert result["transcript"]["final"] and result["transcript"]["text"].startswith("speech")
     assert result["sorting"] == "done"
-    assert result["fields"]["history"]["status"] == "pending" and result["fields"]["history"]["sources"]
+    assert result["fields"]["subjective"]["status"] == "pending" and result["fields"]["subjective"]["sources"]
     assert result["provenance"]["structuring"].startswith("sha256:")
 
 

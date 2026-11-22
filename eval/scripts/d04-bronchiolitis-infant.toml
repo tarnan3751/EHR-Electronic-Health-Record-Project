@@ -22,14 +22,19 @@ feeds {period} Saline drops {period} Target saturation above [[92%|ninety-two pe
 fever if he is uncomfortable {period} Explained the expected course to mum {period}
 """
 
-[gold.history]
-value = "7-month-old boy with 3 days of runny nose and cough, and wheeze since last night. Taking about half his usual feeds, 4 wet nappies in the last 24 hours. Had nirsevimab before his first winter; immunizations up to date. No apneas, no vomiting, no rash. Born at term, no previous chest problems. Temperature 38.2, heart rate 148, respiratory rate 52, oxygen saturation 93% in air. Mild subcostal recession, widespread fine crackles and some wheeze. Alert and well perfused, capillary refill under 2 seconds."
+[gold.subjective]
+value = "7-month-old boy with 3 days of runny nose and cough, and wheeze since last night. Taking about half his usual feeds, 4 wet nappies in the last 24 hours. Had nirsevimab before his first winter; immunizations up to date. No apneas, no vomiting, no rash. Born at term, no previous chest problems."
 sources = [
     "7-month-old boy with 3 days of runny nose and cough, and wheeze since last night.",
     "Mum says he is taking about half his usual feeds, with 4 wet nappies in the last 24 hours.",
     "He had nirsevimab before his first winter, and his immunizations are up to date.",
     "No apneas, no vomiting and no rash.",
     "Born at term, no previous chest problems.",
+]
+
+[gold.objective]
+value = "Temperature 38.2, heart rate 148, respiratory rate 52, oxygen saturation 93% in air. Mild subcostal recession, widespread fine crackles and some wheeze. Alert and well perfused, capillary refill under 2 seconds."
+sources = [
     "On examination temperature 38.2, heart rate 148, respiratory rate 52, oxygen saturation 93% in air.",
     "Mild subcostal recession, widespread fine crackles and some wheeze.",
     "He is alert and well perfused, capillary refill under 2 seconds.",

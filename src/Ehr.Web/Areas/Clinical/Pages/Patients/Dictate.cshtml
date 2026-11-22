@@ -68,7 +68,7 @@ else
         <h2>Proposed fields</h2>
         <p class="sc-status" data-dictation-sort-message>The fields are proposed once you stop.</p>
         <dl class="sc-proposals">
-            @foreach (var (key, label) in new[] { ("history", "History"), ("assessment", "Assessment"), ("plan", "Plan") })
+            @foreach (var (key, label) in new[] { ("subjective", "Subjective"), ("objective", "Objective"), ("assessment", "Assessment"), ("plan", "Plan") })
             {
                 <div class="sc-proposal" data-dictation-field="@key">
                     <dt class="sc-proposal__head"><span class="sc-proposal__field">@label</span> <span class="sc-tag" data-field-status>Not dictated yet</span></dt>

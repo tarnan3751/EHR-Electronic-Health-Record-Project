@@ -79,7 +79,9 @@ BEGIN
         RAISE EXCEPTION 'Proposal requires an owned pending review' USING ERRCODE = '23514';
     END IF;
     IF TG_OP = 'INSERT' THEN
-        IF NEW.field NOT IN ('history', 'assessment', 'plan') OR NEW.state <> 'pending'
+        -- The note's four fields (the expansion plan's step 14). A History proposal staged before then is still decided
+        -- below, and its approved value goes into Subjective (NoteReviews); no new one is staged.
+        IF NEW.field NOT IN ('subjective', 'objective', 'assessment', 'plan') OR NEW.state <> 'pending'
            OR NEW.original_value !~ '[^[:space:]]' OR char_length(NEW.original_value) > 16000
            OR octet_length(NEW.original_value) > 65536
            OR NEW.original_value IS DISTINCT FROM review.result_json #>> ARRAY['fields', NEW.field, 'value']

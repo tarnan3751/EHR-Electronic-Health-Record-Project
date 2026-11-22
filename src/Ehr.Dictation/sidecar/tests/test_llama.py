@@ -33,7 +33,7 @@ def test_every_request_carries_the_api_key_and_the_model_is_checked_first():
 
     assert [r.url.path for r in llama.requests] == ["/props", "/tokenize", "/tokenize", "/v1/chat/completions"]
     assert all(r.headers["authorization"] == "Bearer llama-key" for r in llama.requests)
-    assert proposal.fields["history"] == {"value": "Cough for three days.", "sources": ["Cough for three days"]}
+    assert proposal.fields["subjective"] == {"value": "Cough for three days.", "sources": ["Cough for three days"]}
     body = json.loads(llama.requests[3].content)
     assert body["messages"][1]["content"].endswith("Cough for three days.\n</transcript>")
 
@@ -78,8 +78,8 @@ def test_an_answer_cut_off_or_not_json_is_invalid():
         propose(FakeLlama("Here are the fields you asked for"))
 
 
-@pytest.mark.parametrize("content", ["[]", '{"history": "a string"}', json.dumps({
-    "history": {"value": "x", "sources": [1]}, "assessment": {"value": "", "sources": []},
+@pytest.mark.parametrize("content", ["[]", '{"subjective": "a string"}', json.dumps({
+    "subjective": {"value": "x", "sources": [1]}, "objective": {"value": "", "sources": []}, "assessment": {"value": "", "sources": []},
     "plan": {"value": "", "sources": []}})])
 def test_shapes_other_than_the_schemas_are_invalid(content):
     with pytest.raises(ModelOutputInvalid):

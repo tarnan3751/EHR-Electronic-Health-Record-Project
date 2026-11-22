@@ -25,14 +25,19 @@ waking {comma} at midday and mid afternoon {comma} never within [[4 hours|four h
 Recheck in [[6 weeks|six weeks]] {period}
 """
 
-[gold.history]
-value = "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year. Lightheaded with her heart racing within a few minutes of standing, worse in the heat and after hot showers. Nearly fainted twice but has not fainted. Drinking about 2.5 liters a day and taking salt tablets. Fludrocortisone 0.1 mg helped a little but gave her headaches. Lying heart rate 68, blood pressure 108/70. After 10 minutes standing heart rate 118, blood pressure 104/72. Hands a little mottled on standing. Otherwise normal exam."
+[gold.subjective]
+value = "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year. Lightheaded with her heart racing within a few minutes of standing, worse in the heat and after hot showers. Nearly fainted twice but has not fainted. Drinking about 2.5 liters a day and taking salt tablets. Fludrocortisone 0.1 mg helped a little but gave her headaches."
 sources = [
     "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year.",
     "She gets lightheaded and her heart races within a few minutes of standing, worse in the heat and after hot showers.",
     "She has nearly fainted twice but has not fainted.",
     "She is drinking about 2.5 liters a day and taking salt tablets.",
     "Fludrocortisone 0.1 mg helped a little but gave her headaches.",
+]
+
+[gold.objective]
+value = "Lying heart rate 68, blood pressure 108/70. After 10 minutes standing heart rate 118, blood pressure 104/72. Hands a little mottled on standing. Otherwise normal exam."
+sources = [
     "Orthostatic vitals: lying heart rate 68, blood pressure 108/70.",
     "After 10 minutes standing heart rate 124 wait no 118, blood pressure 104/72.",
     "Hands a little mottled on standing.",
@@ -53,14 +58,19 @@ sources = [
     "Recheck in 6 weeks.",
 ]
 
-[gold_rules.history]
-value = "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year. She gets lightheaded and her heart races within a few minutes of standing, worse in the heat and after hot showers. She has nearly fainted twice but has not fainted. She is drinking about 2.5 liters a day and taking salt tablets. Fludrocortisone 0.1 mg helped a little but gave her headaches. Orthostatic vitals: lying heart rate 68, blood pressure 108/70. After 10 minutes standing heart rate 118, blood pressure 104/72. Hands a little mottled on standing. Otherwise normal exam."
+[gold_rules.subjective]
+value = "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year. She gets lightheaded and her heart races within a few minutes of standing, worse in the heat and after hot showers. She has nearly fainted twice but has not fainted. She is drinking about 2.5 liters a day and taking salt tablets. Fludrocortisone 0.1 mg helped a little but gave her headaches."
 sources = [
     "24-year-old woman with postural orthostatic tachycardia syndrome since a viral illness last year.",
     "She gets lightheaded and her heart races within a few minutes of standing, worse in the heat and after hot showers.",
     "She has nearly fainted twice but has not fainted.",
     "She is drinking about 2.5 liters a day and taking salt tablets.",
     "Fludrocortisone 0.1 mg helped a little but gave her headaches.",
+]
+
+[gold_rules.objective]
+value = "Orthostatic vitals: lying heart rate 68, blood pressure 108/70. After 10 minutes standing heart rate 118, blood pressure 104/72. Hands a little mottled on standing. Otherwise normal exam."
+sources = [
     "Orthostatic vitals: lying heart rate 68, blood pressure 108/70.",
     "After 10 minutes standing heart rate 124 wait no 118, blood pressure 104/72.",
     "Hands a little mottled on standing.",

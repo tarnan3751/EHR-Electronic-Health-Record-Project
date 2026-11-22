@@ -150,7 +150,7 @@ class Structurer:
 
 
 def parse_answer(content: object) -> tuple[dict[str, dict], list[str]]:
-    """The three fields, checked against the schema's shape, and the names of any other keys."""
+    """The four fields, checked against the schema's shape, and the names of any other keys."""
     try:
         data = json.loads(content) if isinstance(content, str) else None
     except json.JSONDecodeError:

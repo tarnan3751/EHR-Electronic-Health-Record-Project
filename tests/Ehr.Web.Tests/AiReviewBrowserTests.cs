@@ -69,7 +69,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
-    static async Task StartAndReviewAsync(IPage page, string url)
+    static async Task StartAndReviewAsync(IPage page, string url, int proposals = 3)
     {
         await page.GotoAsync(url);
         await page.Keyboard.PressAsync("Alt+Shift+D");
@@ -87,7 +87,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Fail($"The dictation never reached its review. Page: {page.Url}. Status: \"{status}\". Transcript: \"{transcript}\".");
         }
 
-        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('0 of 3')");
+        await page.WaitForFunctionAsync($"document.querySelector('[data-review-progress]').textContent.includes('0 of {proposals}')");
     }
 
     internal static async Task TabToAsync(IPage page, string selector)
@@ -100,10 +100,14 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Fail("Keyboard could not reach " + selector);
     }
 
+    // TC-UC13-05 and TC-UC13-09 (the expansion plan's step 14), and TC-UC14-05 through dictation (NFR-12): with the
+    // keyboard only, a dictation's four proposed fields are decided (Subjective and Objective accepted, Assessment
+    // edited, Plan rejected), the review completed into the editor, the rest typed, and the note signed.
     [Fact]
-    public async Task TC_UC13_05_UC14_05_entire_dictation_review_manual_completion_and_signature_work_from_the_keyboard()
+    public async Task TC_UC13_05_UC13_09_UC14_05_a_dictation_reviewed_in_four_fields_completed_and_signed_from_the_keyboard()
     {
         var (patient, session) = await AccountAsync();
+        apps.Dictation.IncludeObjective = true;
         await using var server = await ClinicalBrowserHost.StartAsync(apps);
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await LaunchAsync(playwright);
@@ -111,13 +115,16 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         var page = await context.NewPageAsync();
         var errors = new List<string>();
         page.PageError += (_, error) => errors.Add(error);
-        await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-dictation-field=history] [value=accepted]')"));
+        await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate", proposals: 4);
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-dictation-field=subjective] [value=accepted]')"));
         Assert.Contains("Cough", await page.Locator("mark.sc-transcript__source").First.TextContentAsync());
         // The app bar's logo is drawn here too, on the second page that shows it, where the browser only checks it again.
         Assert.True(await page.EvaluateAsync<bool>("document.querySelector('.sc-appbar__logo').naturalWidth > 0"));
         await page.Keyboard.PressAsync("Enter");
-        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('1 of 3')");
+        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('1 of 4')");
+        await TabToAsync(page, "[data-dictation-field=objective] [value=accepted]");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('2 of 4')");
         await TabToAsync(page, "[data-dictation-field=assessment] summary");
         await page.Keyboard.PressAsync("Enter");
         await page.Keyboard.PressAsync("Tab");
@@ -126,14 +133,16 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.InsertTextAsync("Synthetic clinician-corrected assessment");
         await page.Keyboard.PressAsync("Tab");
         await page.Keyboard.PressAsync("Enter");
-        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('2 of 3')");
+        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('3 of 4')");
         await TabToAsync(page, "[data-dictation-field=plan] [value=rejected]");
         await page.Keyboard.PressAsync("Enter");
-        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('3 of 3')");
+        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('4 of 4')");
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-review-complete] button')"));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => !url.Contains("/review/", StringComparison.Ordinal) && url.Contains("/notes/drafts/", StringComparison.Ordinal));
-        Assert.Equal("Cough for three days.", await page.Locator("#History").InputValueAsync());
+        // Each accepted value in its own section; the rejected Plan is the clinician's to write.
+        Assert.Equal("Cough for three days.", await page.Locator("#Subjective").InputValueAsync());
+        Assert.Equal("Chest is clear.", await page.Locator("#Objective").InputValueAsync());
         Assert.Equal("Synthetic clinician-corrected assessment", await page.Locator("#Assessment").InputValueAsync());
         Assert.Equal("", await page.Locator("#Plan").InputValueAsync());
         await TabToAsync(page, "#Plan");
@@ -148,6 +157,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/notes/*?signed=True");
         Assert.Contains("Signed · read-only", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Chest is clear.", await page.Locator("main").TextContentAsync());
         Assert.Contains("Synthetic manual follow-up plan", await page.Locator("main").TextContentAsync());
         Assert.Equal(0, await page.Locator("textarea").CountAsync());
         var storage = await page.EvaluateAsync<string>("JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)])");
@@ -157,9 +167,34 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignNote, patientId: patient));
     }
 
+    // The whole dictation sorted into one field (the expansion plan's step 14; the eval's d39): the review shows the
+    // field's warning in words beside it, and accepting it is still the clinician's choice.
+    [Fact]
+    public async Task A_field_holding_the_whole_dictation_is_shown_with_its_warning_and_can_still_be_accepted()
+    {
+        var (patient, session) = await AccountAsync();
+        apps.Dictation.WholeDictation = true;
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await LaunchAsync(playwright);
+        await using var context = await ContextAsync(browser, session);
+        var page = await context.NewPageAsync();
+        var errors = new List<string>();
+        page.PageError += (_, error) => errors.Add(error);
+        await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate", proposals: 1);
+
+        Assert.Equal(["This section holds the whole dictation. Sort it into the sections it belongs to before accepting it."],
+            await page.Locator("[data-dictation-field=subjective] .sc-proposal__warning").AllTextContentsAsync());
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-dictation-field=subjective] [value=accepted]')"));
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('1 of 1')");
+        Assert.Equal("Accepted", await page.Locator("[data-dictation-field=subjective] [data-field-status]").TextContentAsync());
+        Assert.Empty(errors);
+    }
+
     // TC-UC14-05 (NFR-12) in the SE document (Satwik Yash Padhy): write and sign a note with the keyboard only, typed
-    // from scratch with no dictation. From the chart, the keyboard reaches "New note", fills History, Assessment and
-    // Plan in the editor, which saves them, then reviews, confirms and signs. The test above is TC-UC14-05 through
+    // from scratch with no dictation. From the chart, the keyboard reaches "New note", fills Subjective, Objective,
+    // Assessment and Plan in the editor (step 14), which saves them, then reviews, confirms and signs. The test above is TC-UC14-05 through
     // dictation review.
     [Fact]
     public async Task TC_UC14_05_a_note_typed_from_scratch_is_written_and_signed_from_the_keyboard()
@@ -177,8 +212,10 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await TabToAsync(page, "form[action*='handler=NewNote'] button");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/notes/drafts/**");
-        await TabToAsync(page, "#History");
-        await page.Keyboard.InsertTextAsync("Synthetic keyboard history");
+        await TabToAsync(page, "#Subjective");
+        await page.Keyboard.InsertTextAsync("Synthetic keyboard subjective");
+        await TabToAsync(page, "#Objective");
+        await page.Keyboard.InsertTextAsync("Synthetic keyboard objective");
         await TabToAsync(page, "#Assessment");
         await page.Keyboard.InsertTextAsync("Synthetic keyboard assessment");
         await TabToAsync(page, "#Plan");
@@ -195,7 +232,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
         var signed = await page.Locator("main").TextContentAsync();
         Assert.Contains("Signed · read-only", signed);
-        Assert.Contains("Synthetic keyboard history", signed);
+        Assert.Contains("Synthetic keyboard subjective", signed);
+        Assert.Contains("Synthetic keyboard objective", signed);
         Assert.Contains("Synthetic keyboard assessment", signed);
         Assert.Contains("Synthetic keyboard plan", signed);
         Assert.Equal(0, await page.Locator("textarea").CountAsync());
@@ -213,18 +251,18 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await using var context = await ContextAsync(browser, session);
         var page = await context.NewPageAsync();
         await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate");
-        await page.Locator("[data-dictation-field=history] summary").PressAsync("Enter");
-        await page.Locator("#edited-history").FillAsync("Synthetic corrected text retained after failure");
+        await page.Locator("[data-dictation-field=subjective] summary").PressAsync("Enter");
+        await page.Locator("#edited-subjective").FillAsync("Synthetic corrected text retained after failure");
         await page.RouteAsync("**/*handler=Decide", route => route.AbortAsync("connectionrefused"));
-        await page.Locator("[data-dictation-field=history] [value=edited]").PressAsync("Enter");
+        await page.Locator("[data-dictation-field=subjective] [value=edited]").PressAsync("Enter");
         await page.WaitForFunctionAsync("document.getElementById('note-save-status').textContent === 'Save failed'");
-        Assert.Equal("Synthetic corrected text retained after failure", await page.Locator("#edited-history").InputValueAsync());
+        Assert.Equal("Synthetic corrected text retained after failure", await page.Locator("#edited-subjective").InputValueAsync());
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.id === 'note-errors'"));
         Assert.Contains("0 of 3", await page.Locator("[data-review-progress]").TextContentAsync());
         await page.UnrouteAsync("**/*handler=Decide");
-        await page.Locator("[data-dictation-field=history] [value=edited]").PressAsync("Enter");
+        await page.Locator("[data-dictation-field=subjective] [value=edited]").PressAsync("Enter");
         await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('1 of 3')");
-        Assert.Contains("Synthetic corrected text retained after failure", await page.Locator("[data-dictation-field=history] [data-approved-value]").TextContentAsync());
+        Assert.Contains("Synthetic corrected text retained after failure", await page.Locator("[data-dictation-field=subjective] [data-approved-value]").TextContentAsync());
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.AiFieldReviewed, patientId: patient));
     }
 

@@ -1810,6 +1810,15 @@ namespace Ehr.Migrations
                         .HasColumnType("text")
                         .HasColumnName("history");
 
+                    b.Property<string>("NoteTemplateCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("note_template_code");
+
+                    b.Property<string>("Objective")
+                        .HasColumnType("text")
+                        .HasColumnName("objective");
+
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
@@ -1822,6 +1831,10 @@ namespace Ehr.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("structured_version");
 
+                    b.Property<string>("Subjective")
+                        .HasColumnType("text")
+                        .HasColumnName("subjective");
+
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint")
@@ -1833,10 +1846,16 @@ namespace Ehr.Migrations
                     b.HasIndex("ClinicianId")
                         .HasDatabaseName("ix_clinical_drafts_clinician_id");
 
+                    b.HasIndex("NoteTemplateCode")
+                        .HasDatabaseName("ix_clinical_drafts_note_template_code");
+
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_clinical_drafts_patient_id");
 
-                    b.ToTable("clinical_drafts", "ehr");
+                    b.ToTable("clinical_drafts", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_clinical_drafts_sections", "history IS NULL OR (subjective IS NULL AND objective IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.ClinicalNote", b =>
@@ -1860,9 +1879,12 @@ namespace Ehr.Migrations
                         .HasColumnName("draft_version");
 
                     b.Property<string>("History")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("history");
+
+                    b.Property<string>("Objective")
+                        .HasColumnType("text")
+                        .HasColumnName("objective");
 
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
@@ -1902,6 +1924,10 @@ namespace Ehr.Migrations
                         .HasColumnName("signer_id")
                         .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
 
+                    b.Property<string>("Subjective")
+                        .HasColumnType("text")
+                        .HasColumnName("subjective");
+
                     b.HasKey("Id")
                         .HasName("pk_clinical_notes");
 
@@ -1921,7 +1947,10 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "SignedAt")
                         .HasDatabaseName("ix_clinical_notes_patient_id_signed_at");
 
-                    b.ToTable("clinical_notes", "ehr");
+                    b.ToTable("clinical_notes", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_clinical_notes_sections", "(history IS NULL AND subjective IS NOT NULL AND objective IS NOT NULL) OR (history IS NOT NULL AND subjective IS NULL AND objective IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>
@@ -2982,6 +3011,76 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Reference.NoteTemplate", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("AssessmentPrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("assessment_prompt");
+
+                    b.Property<string>("ObjectivePrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("objective_prompt");
+
+                    b.Property<string>("PlanPrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("plan_prompt");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("SubjectivePrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("subjective_prompt");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Code")
+                        .HasName("pk_note_templates");
+
+                    b.HasIndex("Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_note_templates_position");
+
+                    b.HasIndex("Title")
+                        .IsUnique()
+                        .HasDatabaseName("ix_note_templates_title");
+
+                    b.ToTable("note_templates", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_note_templates_assessment_prompt", "assessment_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_code", "code ~ '^[a-z][a-z0-9-]{1,39}$'");
+
+                            t.HasCheckConstraint("ck_note_templates_objective_prompt", "objective_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_plan_prompt", "plan_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_position", "position > 0");
+
+                            t.HasCheckConstraint("ck_note_templates_subjective_prompt", "subjective_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_title", "title ~ '[^[:space:]]'");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Reference.ObservationCode", b =>
                 {
                     b.Property<string>("Code")
@@ -3639,6 +3738,12 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_clinical_drafts_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Reference.NoteTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("NoteTemplateCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_clinical_drafts_note_templates_note_template_code");
 
                     b.HasOne("Ehr.Data.Patients.Patient", null)
                         .WithMany()

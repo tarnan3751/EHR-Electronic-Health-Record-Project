@@ -24,8 +24,9 @@ never anything the model wrote. provenance is {speech, language, llamaServer, pr
 language and llamaServer are null while unknown. Each field is {status: "pending", value, sources: [{start, end}],
 warnings: [{code, start, end}]} or {status: "empty", reasons: [...]}: a value that failed a check is never sent, only
 why; a warning is possible_correction, pointing at a later number, date or drug in the transcript that may be a
-correction the checks didn't hear, or near_unclear_passage, pointing at a passage marked unclear beside one of the
-value's sources (validation.py).
+correction the checks didn't hear, near_unclear_passage, pointing at a passage marked unclear beside one of the
+value's sources, or one_field_holds_dictation, on the only value offered when it quotes nearly the whole transcript,
+pointing at what it quotes (validation.py).
 
 The limits on all of it (sizes, sessions at once, how long things are kept and waited for) are in settings.py.
 

@@ -27,10 +27,14 @@ public sealed record CachedChart(
     // The clinic's time zone, an IANA name (step 10d): the desktop shows this copy's times in it, labeled.
     string? ClinicTimeZone = null);
 
+// History: the note's History as signed or, for a note signed in Subjective, Objective, Assessment and Plan (step 14),
+// its Subjective and Objective, each under its heading, so a build that knows only History shows all of it.
 // SensitiveAddendaNotKept: how many sensitive addenda the note has that aren't in this copy.
+// Subjective and Objective: a note signed in four sections has them, which a build that knows them shows in place of
+// History (step 14); null for a note signed before then.
 public sealed record CachedNote(
     DateTimeOffset SignedAt, string Signer, string History, string Assessment, string Plan, IReadOnlyList<CachedAddendum> Addenda,
-    int SensitiveAddendaNotKept = 0);
+    int SensitiveAddendaNotKept = 0, string? Subjective = null, string? Objective = null);
 
 // NotNoteAuthor: written by someone other than the note's signer (step 10b); the desktop labels it so.
 public sealed record CachedAddendum(DateTimeOffset SignedAt, string Author, string Text, bool NotNoteAuthor = false);

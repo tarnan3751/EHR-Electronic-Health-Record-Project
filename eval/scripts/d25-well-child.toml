@@ -18,8 +18,8 @@ without visible decay {period} {new paragraph}
 Assessment {colon} healthy [[4-year-old|four-year-old]] {comma} growing and developing normally {period}
 """
 
-[gold.history]
-value = "4-year-old girl here with her mother for her yearly check. Varied diet, about two cups of milk a day, sleeps 11 hours a night. Toilet trained day and night. Speaks in full sentences, counts to ten, hops on one foot and draws a person with several body parts. Preschool three mornings a week; plays well with other children. No concerns about hearing or vision. No wheeze, no snoring. No regular medicines and no allergies. Weight 16.4 kg, 50th percentile. Height 103 cm, 55th percentile. Blood pressure 96/58. Vision screen passed in both eyes. Normal exam, teeth without visible decay."
+[gold.subjective]
+value = "4-year-old girl here with her mother for her yearly check. Varied diet, about two cups of milk a day, sleeps 11 hours a night. Toilet trained day and night. Speaks in full sentences, counts to ten, hops on one foot and draws a person with several body parts. Preschool three mornings a week; plays well with other children. No concerns about hearing or vision. No wheeze, no snoring. No regular medicines and no allergies."
 sources = [
     "4-year-old girl here with her mother for her yearly check.",
     "She eats a varied diet, drinks about two cups of milk a day and sleeps 11 hours a night.",
@@ -29,6 +29,11 @@ sources = [
     "No concerns about hearing or vision.",
     "No wheeze, no snoring.",
     "No regular medicines and no allergies.",
+]
+
+[gold.objective]
+value = "Weight 16.4 kg, 50th percentile. Height 103 cm, 55th percentile. Blood pressure 96/58. Vision screen passed in both eyes. Normal exam, teeth without visible decay."
+sources = [
     "Weight 16.4 kg, 50th percentile.",
     "Height 103 cm, 55th percentile.",
     "Blood pressure 96/58.",

@@ -24,6 +24,7 @@ None of these tables is patient data. Both apps read them and nothing at runtime
 | `order_catalog_items` | Medication orders | The same RxNorm release: clinical drugs (SCD) | 11,971 |
 | `observation_codes` | Results, vital signs, survey scores | LOINC 2.83: 33 terms chosen by this project, with UCUM units | 33 |
 | `order_result_codes` | Which results a common lab order produces | Curated by this project | 47 |
+| `note_templates` | The visit types a note is written for, and what to cover in each of its sections | Written for this project: hand-written in `db/reference/37-note-templates.sql` (below, "Note templates") | 5 |
 | `questionnaires` | PHQ-9 and GAD-7, for pre-visit forms | The authors' English forms and instruction manual (phqscreeners.com), with LOINC 2.83's codes: hand-written in `db/reference/36-questionnaires.sql` (below, "Pre-visit questionnaires") | 2 |
 | `drug_ingredients` | What each drug product is made of | The same RxNorm release (RXNREL) | 25,490 |
 | `drug_classes` | The class an ingredient belongs to | FDA pharmacologic class indexing files, and DailyMed's mapping files, downloaded 18 November 2026 | 2,105 |
@@ -108,6 +109,10 @@ Each form was read as text and as its page rendered, and the two agree. The prom
 **A request keeps its wording.** Each request for a form stores the definition it was asked with, and the patient answers, the database scores and every page shows that copy, so a later change here never rewrites what someone answered. A questionnaire that has been asked for can't be removed.
 
 They are for a demonstration system's synthetic patients and **are not validated for clinical use**.
+
+### Note templates
+
+Added in the plan's step 14. The visit types a clinician can write a note for, each with a prompt for what to cover in Subjective, Objective, Assessment and Plan: guidance for writing a note of that kind, which the note editor shows under each section's own definition when the clinician picks the visit type (`docs/UC14.md`). They are hand-written in `db/reference/37-note-templates.sql`, for this project and from no published source: follow-up, new patient, acute, well-child and telephone visits. Nothing of a template is put into a note. **Not validated for clinical use:** each needs a clinician's reading before a clinic relies on it. A template a draft was written with can't be taken out of the file: the database refuses it.
 
 ### Units
 

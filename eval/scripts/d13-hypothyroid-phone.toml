@@ -13,13 +13,19 @@ said we would revisit that only if she still feels unwell once her [[TSH|T S H]]
 to [[112 mcg|one hundred twelve micrograms]] daily and repeat the [[TSH|T S H]] in [[6 weeks|six weeks]]
 """
 
-[gold.history]
-value = "45-year-old woman with hypothyroidism after thyroid surgery. TSH 7.8 on levothyroxine 100 mcg. Has been taking it with her coffee and calcium tablets in the morning. Still feels tired and cold."
+[gold.subjective]
+value = "45-year-old woman with hypothyroidism after thyroid surgery. On levothyroxine 100 mcg. Has been taking it with her coffee and calcium tablets in the morning. Still feels tired and cold."
 sources = [
     "45-year-old woman with hypothyroidism after thyroid surgery",
-    "her TSH came back at 7.8 on levothyroxine 100 mcg",
+    "on levothyroxine 100 mcg",
     "she has been taking it with her coffee and calcium tablets in the morning",
     "she still feels tired and cold",
+]
+
+[gold.objective]
+value = "TSH 7.8."
+sources = [
+    "her TSH came back at 7.8",
 ]
 
 [gold.assessment]
@@ -34,13 +40,19 @@ sources = [
     "she asked about liothyronine and I said we would revisit that only if she still feels unwell once her TSH is normal",
 ]
 
-[gold_rules.history]
-value = "45-year-old woman with hypothyroidism after thyroid surgery. Her TSH came back at 7.8 on levothyroxine 100 mcg. She has been taking it with her coffee and calcium tablets in the morning. She still feels tired and cold."
+[gold_rules.subjective]
+value = "45-year-old woman with hypothyroidism after thyroid surgery. On levothyroxine 100 mcg. She has been taking it with her coffee and calcium tablets in the morning. She still feels tired and cold."
 sources = [
     "45-year-old woman with hypothyroidism after thyroid surgery",
-    "her TSH came back at 7.8 on levothyroxine 100 mcg",
+    "on levothyroxine 100 mcg",
     "she has been taking it with her coffee and calcium tablets in the morning",
     "she still feels tired and cold",
+]
+
+[gold_rules.objective]
+value = "Her TSH came back at 7.8."
+sources = [
+    "her TSH came back at 7.8",
 ]
 
 [gold_rules.plan]

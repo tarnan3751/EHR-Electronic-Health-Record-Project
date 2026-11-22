@@ -21,7 +21,8 @@ allergy list.
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
 
-- unknown_field: a key outside history, assessment and plan (the schema allows none; this is the backstop).
+- unknown_field: a key outside subjective, objective, assessment and plan (the schema allows none; this is the
+  backstop), such as the history of the three fields before the expansion plan's step 14.
 - not_dictated: an empty value. Not a failure: the transcript said nothing for that field.
 - too_long: over the field's length limit (LIMITS), over 30 sources, or a source over 600 characters.
 - bad_format: control or format characters, characters NFKC would change, a non-ASCII letter the transcript never uses
@@ -67,6 +68,11 @@ another expression, within WARNING_REACH words after it, past the end of the sou
 word between them (no, wait, sorry, scratch, mean, correction, actually, rather, make, change); it points at the later
 item. near_unclear_passage, for each passage marked unclear within NEAR_UNCLEAR words of one of the value's sources: the
 value was sorted from words right beside something speech recognition couldn't hear; it points at that passage.
+one_field_holds_dictation, on the only value offered, whatever became of the other fields (not dictated, or proposed and
+discarded), if its sources cover at least WHOLE_DICTATION of the transcript's words: the whole dictation, whatever it
+says, has gone into one field, plan and findings alike, to be sorted into the sections it belongs to before it is
+accepted; it points at what the sources cover. A short dictation that is all one field, such as an addendum to a plan, covers less once its lead-in and sign-off
+are left out.
 
 The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of these
 checks, so a change to any rule asks for the stored answers to be scored again (eval/ehr_eval/rescore.py).
@@ -86,7 +92,7 @@ from .transcript import Transcript, utf16_offset
 
 # As the schema says (a test checks): a field can hold all a three-minute dictation says, which is about 2,500
 # characters, and a source per sentence of it.
-LIMITS = {"history": 3000, "assessment": 2000, "plan": 2000}
+LIMITS = {"subjective": 3000, "objective": 3000, "assessment": 2000, "plan": 2000}
 MAX_SOURCES = 30
 MAX_QUOTE = 600
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
@@ -94,6 +100,7 @@ CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected
 # kind may be a correction, and the words one of which must come between them (None: any gap).
 WARNING_REACH = 8
 NEAR_UNCLEAR = 5  # words between a source and an unclear passage that put a near_unclear_passage warning on the value
+WHOLE_DICTATION = 0.9  # the share of the transcript's words the only value offered may quote before it is warned of
 WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
     "no wait sorry scratch mean correction actually rather make change".split()
 )
@@ -245,7 +252,20 @@ def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript) -
         expressions=_expressions(terms, words),
     )
     checked = {name: _check_field(name, fields[name]["value"], fields[name]["sources"], context) for name in FIELDS}
+    _warn_of_whole_dictation(checked, context)
     return Checks(checked, list(unknown))
+
+
+def _warn_of_whole_dictation(checked: dict[str, Checked], transcript: _Transcript) -> None:
+    """one_field_holds_dictation (see the module's header), on the only value offered, whatever became of the others,
+    when its sources cover at least WHOLE_DICTATION of the transcript's words."""
+    offered = [field for field in checked.values() if field.pending]
+    if len(offered) != 1:
+        return
+    field = offered[0]
+    covered = sum(any(start <= word.start and word.end <= end for start, end in field.spans) for word in transcript.words)
+    if transcript.words and covered >= WHOLE_DICTATION * len(transcript.words):
+        field.warnings.append((ONE_FIELD_HOLDS_DICTATION, min(s for s, _ in field.spans), max(e for _, e in field.spans)))
 
 
 def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _Transcript) -> Checked:
@@ -384,6 +404,7 @@ MEASURES = DOSE_WORDS | frozenset(
 WARNED_KINDS = ("number", "date", "drug")
 POSSIBLE_CORRECTION = "possible_correction"
 NEAR_UNCLEAR_PASSAGE = "near_unclear_passage"
+ONE_FIELD_HOLDS_DICTATION = "one_field_holds_dictation"
 SIDES = frozenset({"left", "right"})
 # What can sit inside one expression of a kind: "150 over 90", "10 mg", "the 20".
 RUN_GLUE = FREE_WORDS | DOSE_WORDS | {"over"}

@@ -32,15 +32,19 @@ public class VisitSummaryPlanTests(MigratedDatabase database) : IClassFixture<Mi
         await Accounts.AssignAsync(database, clinician, patient);
         var (draft, note) = (Guid.CreateVersion7(), Guid.CreateVersion7());
         var app = database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
+        // The note's sections are as long as a summary's parts, Subjective and Objective (step 14) of words of a code's
+        // shape too: the rule compares a summary with them whole, and looks none of their words up.
         await Accounts.ExecuteAsync(app, clinician,
             """
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, 'Synthetic history.', 'Synthetic assessment.', 'Synthetic plan.', 1, false)
-            """, ("id", draft), ("patient", patient), ("owner", clinician));
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, @subjective, @objective, 'Synthetic assessment.', 'Synthetic plan.', 1, false)
+            """, ("id", draft), ("patient", patient), ("owner", clinician), ("subjective", Worst(3)), ("objective", Worst(4)));
         await Accounts.ExecuteAsync(app, clinician,
-            "INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan) VALUES (@note, @draft, @patient, 1, 'Synthetic history.', 'Synthetic assessment.', 'Synthetic plan.')",
-            ("note", note), ("draft", draft), ("patient", patient));
+            "INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan) VALUES (@note, @draft, @patient, 1, @subjective, @objective, 'Synthetic assessment.', 'Synthetic plan.')",
+            ("note", note), ("draft", draft), ("patient", patient), ("subjective", Worst(3)), ("objective", Worst(4)));
+        // And a note signed before step 14, with its History.
+        var (_, earlier) = await EarlierNotes.SignedAsync(database, clinician, patient, Worst(5));
         string[] parts = [Worst(0), Worst(1), Worst(2)];
         Assert.All(parts, part => Assert.Equal(4000, part.Length));
 
@@ -54,9 +58,11 @@ public class VisitSummaryPlanTests(MigratedDatabase database) : IClassFixture<Mi
             WHERE c.relnamespace = 'ehr'::regnamespace AND c.relname = ANY (ARRAY[{tables}]) AND a.attnum > 0 AND NOT a.attisdropped;
             """);
         await AssertProbedAsync(clinician, patient, note, parts, "with the statistics cleared");
+        await AssertProbedAsync(clinician, patient, earlier, parts, "with the statistics cleared, for a note with a History");
 
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, $"ANALYZE {string.Join(", ", CodeTables.Select(table => $"ehr.{table}"))}");
         await AssertProbedAsync(clinician, patient, note, parts, "analyzed");
+        await AssertProbedAsync(clinician, patient, earlier, parts, "analyzed, for a note with a History");
     }
 
     // The rule's lab codes are the observation codes and the catalog's codes: every LOINC code a catalog item stands

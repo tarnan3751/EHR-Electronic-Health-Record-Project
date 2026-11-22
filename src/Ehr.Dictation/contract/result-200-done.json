@@ -36,7 +36,7 @@
     "sorting": "done",
     "reason": null,
     "fields": {
-      "history": {
+      "subjective": {
         "status": "pending",
         "value": "Speech speech.",
         "sources": [
@@ -51,6 +51,12 @@
             "start": 28,
             "end": 69
           }
+        ]
+      },
+      "objective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
         ]
       },
       "assessment": {

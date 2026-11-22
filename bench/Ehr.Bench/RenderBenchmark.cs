@@ -174,6 +174,21 @@ internal static partial class RenderBenchmark
                     var (patient, note) = noted[noteRandom.Next(noted.Count)];
                     return $"/patients/{patient}/notes/{note}/addendum";
                 }));
+                // The note editor (step 14), with its visit types and their prompts: a draft for each of those patients, in
+                // four sections for a follow-up visit. A generator of its own, so the rows after it pick as they did.
+                var drafted = await WriteDraftsAsync(app, clinicianId, noted);
+                var draftRandom = new Random(20261126);
+                results.Add(await MeasureAsync(client, times, "Note editor, a draft of a patient on the panel", typing: false, () =>
+                {
+                    var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                    return $"/patients/{patient}/notes/drafts/{draft}";
+                }));
+                // The vital signs the editor offers for Objective when asked (step 14): the latest day's of the seeded patient.
+                results.Add(await MeasureAsync(client, times, "Vital signs for a note's Objective, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                    return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
+                }));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -264,7 +279,7 @@ internal static partial class RenderBenchmark
                     {
                         await SettleAsync(database);
                         results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills, forms));
+                            refills, forms, drafted));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -456,7 +471,8 @@ internal static partial class RenderBenchmark
     static async Task<List<Result>> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
-        CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms)
+        CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms,
+        List<(Guid Patient, Guid Draft)> drafted)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -496,6 +512,19 @@ internal static partial class RenderBenchmark
             {
                 var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
                 return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
+            }));
+            // The note editor (step 14), with the same generator's draws as on-site: during an outage, the draft as last
+            // saved, read-only; and the vital signs it offers for Objective, read from the replica.
+            var draftRandom = new Random(20261126);
+            results.Add(await MeasureAsync(client, times, "Off-site, Note editor, a draft of a patient on the panel", typing: false, () =>
+            {
+                var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                return $"/patients/{patient}/notes/drafts/{draft}";
+            }));
+            results.Add(await MeasureAsync(client, times, "Off-site, Vital signs for a note's Objective, a patient on the panel", typing: false, () =>
+            {
+                var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
             }));
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
             // Pre-visit forms (step 13e): the clinician's pages, read from the cloud copy; asking says why it can't.
@@ -1213,7 +1242,8 @@ internal static partial class RenderBenchmark
                 ClinicianId = clinicianId,
                 Body = "Synthetic note",
                 Version = 1,
-                History = "Synthetic history: cough for two days.",
+                Subjective = "Synthetic subjective: cough for two days.",
+                Objective = "Synthetic objective: chest clear.",
                 Assessment = "Synthetic assessment: viral illness.",
                 Plan = "Synthetic plan: rest and follow-up.",
                 StructuredVersion = 1,
@@ -1226,7 +1256,8 @@ internal static partial class RenderBenchmark
                 DraftId = draft.Id,
                 PatientId = patient,
                 DraftVersion = 1,
-                History = draft.History,
+                Subjective = draft.Subjective,
+                Objective = draft.Objective,
                 Assessment = draft.Assessment,
                 Plan = draft.Plan,
             };
@@ -1245,6 +1276,33 @@ internal static partial class RenderBenchmark
 
         await transaction.CommitAsync();
         return noted;
+    }
+
+    // Step 14: a draft for each patient with a signed note, written in four sections for a follow-up visit, through the
+    // app's own service and the database's rules.
+    static async Task<List<(Guid Patient, Guid Draft)>> WriteDraftsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        var drafted = new List<(Guid, Guid)>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var notes = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.ClinicalNotes>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, _) in noted)
+        {
+            var draft = await notes.CreateAsync(patient, CancellationToken.None) ?? throw new InvalidOperationException("The benchmark's draft was refused.");
+            var content = new Ehr.Domain.Notes.NoteContent("Synthetic subjective: no new symptoms.", "Synthetic objective: blood pressure 128/78.",
+                "Synthetic assessment: hypertension controlled.", "Synthetic plan: same dose, review in three months.");
+            if ((await notes.SaveAsync(patient, draft.Id, draft.Version, content, CancellationToken.None, "follow-up")).Status != 200)
+            {
+                throw new InvalidOperationException("The benchmark's draft was not saved.");
+            }
+
+            drafted.Add((patient, draft.Id));
+        }
+
+        await transaction.CommitAsync();
+        return drafted;
     }
 
     // Step 13a: for each patient, six signed notes and a visit summary of each, through the app's own service and the
@@ -1269,7 +1327,8 @@ internal static partial class RenderBenchmark
                     ClinicianId = clinicianId,
                     Body = "Synthetic note",
                     Version = 1,
-                    History = "Synthetic history: a check-up.",
+                    Subjective = "Synthetic subjective: a check-up.",
+                    Objective = "Synthetic objective: nothing abnormal found.",
                     Assessment = "Synthetic assessment: well.",
                     Plan = "Synthetic plan: see you in a year.",
                     StructuredVersion = 1,
@@ -1282,7 +1341,8 @@ internal static partial class RenderBenchmark
                     DraftId = draft.Id,
                     PatientId = patient,
                     DraftVersion = 1,
-                    History = draft.History,
+                    Subjective = draft.Subjective,
+                    Objective = draft.Objective,
                     Assessment = draft.Assessment,
                     Plan = draft.Plan,
                 };

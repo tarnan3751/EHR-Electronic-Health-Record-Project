@@ -6,7 +6,9 @@ window.SwiftChartDictationView = class {
         const part = name => root.querySelector(`[data-dictation-${name}]`);
         const transcriptArea = part("transcript"), unclearNotice = part("unclear");
         const sortMessage = part("sort-message"), notCarried = part("not-carried"), notCarriedList = part("not-carried-list");
-        const fieldNames = ["history", "assessment", "plan"];
+        // The fields the page shows: four since the expansion plan's step 14, and on the review of a dictation sorted
+        // before then, its History, Assessment and Plan, as it was saved.
+        const fieldNames = [...root.querySelectorAll("[data-dictation-field]")].map((field) => field.dataset.dictationField);
         const state = { transcript: null };
         // Words for the clinician beside each marked passage and each code the API sends.
         const unclearWords = {
@@ -17,6 +19,7 @@ window.SwiftChartDictationView = class {
         const warningWords = {
             possible_correction: "You may have corrected this later in the dictation: check the highlighted words.",
             near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
+            one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
         };
         const instructionWords = { order: "Order", allergy_change: "Allergy change" };
 

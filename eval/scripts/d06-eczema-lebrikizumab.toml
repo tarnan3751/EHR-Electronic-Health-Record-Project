@@ -23,14 +23,19 @@ be added to her allergies {period} Moisturize twice a day {period} Recheck
 in [[16 weeks|sixteen weeks]] {period}
 """
 
-[gold.history]
-value = "29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. Itches most nights and wakes 2 or 3 times. No recent skin infections, no eye symptoms. Tried dupilumab last year, stopped after 4 months because of conjunctivitis. Reports hives from cephalexin last month. Lichenified plaques in both elbow creases and behind the knees, with excoriations. EASI score 18."
+[gold.subjective]
+value = "29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. Itches most nights and wakes 2 or 3 times. No recent skin infections, no eye symptoms. Tried dupilumab last year, stopped after 4 months because of conjunctivitis. Reports hives from cephalexin last month."
 sources = [
     "29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face.",
     "She itches most nights and wakes 2 or 3 times.",
     "No skin infections recently and no eye symptoms.",
     "She tried dupilumab last year and stopped after 4 months because of conjunctivitis.",
     "she told the nurse she got hives from cephalexin last month",
+]
+
+[gold.objective]
+value = "Lichenified plaques in both elbow creases and behind the knees, with excoriations. EASI score 18."
+sources = [
     "Exam shows lichenified plaques in both elbow creases and behind the knees, with excoriations.",
     "EASI score is 18.",
 ]
@@ -48,14 +53,19 @@ sources = [
     "Recheck in 16 weeks.",
 ]
 
-[gold_rules.history]
-value = "29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. She itches most nights and wakes 2 or 3 times. No skin infections recently and no eye symptoms. She tried dupilumab last year and stopped after 4 months because of conjunctivitis. She told the nurse she got hives from cephalexin last month. Exam shows lichenified plaques in both elbow creases and behind the knees, with excoriations. EASI score is 18."
+[gold_rules.subjective]
+value = "29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. She itches most nights and wakes 2 or 3 times. No skin infections recently and no eye symptoms. She tried dupilumab last year and stopped after 4 months because of conjunctivitis. She told the nurse she got hives from cephalexin last month."
 sources = [
     "29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face.",
     "She itches most nights and wakes 2 or 3 times.",
     "No skin infections recently and no eye symptoms.",
     "She tried dupilumab last year and stopped after 4 months because of conjunctivitis.",
     "she told the nurse she got hives from cephalexin last month",
+]
+
+[gold_rules.objective]
+value = "Exam shows lichenified plaques in both elbow creases and behind the knees, with excoriations. EASI score is 18."
+sources = [
     "Exam shows lichenified plaques in both elbow creases and behind the knees, with excoriations.",
     "EASI score is 18.",
 ]

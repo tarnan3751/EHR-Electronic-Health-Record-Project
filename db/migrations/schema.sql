@@ -2253,3 +2253,60 @@ VALUES ('20261122064253_AuditEventParts', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.clinical_notes ALTER COLUMN history DROP NOT NULL;
+
+ALTER TABLE ehr.clinical_notes ADD objective text;
+
+ALTER TABLE ehr.clinical_notes ADD subjective text;
+
+ALTER TABLE ehr.clinical_drafts ADD note_template_code character varying(40);
+
+ALTER TABLE ehr.clinical_drafts ADD objective text;
+
+ALTER TABLE ehr.clinical_drafts ADD subjective text;
+
+CREATE TABLE ehr.note_templates (
+    code character varying(40) NOT NULL,
+    title character varying(80) NOT NULL,
+    position integer NOT NULL,
+    subjective_prompt character varying(500) NOT NULL,
+    objective_prompt character varying(500) NOT NULL,
+    assessment_prompt character varying(500) NOT NULL,
+    plan_prompt character varying(500) NOT NULL,
+    CONSTRAINT pk_note_templates PRIMARY KEY (code),
+    CONSTRAINT ck_note_templates_assessment_prompt CHECK (assessment_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_code CHECK (code ~ '^[a-z][a-z0-9-]{1,39}$'),
+    CONSTRAINT ck_note_templates_objective_prompt CHECK (objective_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_plan_prompt CHECK (plan_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_position CHECK (position > 0),
+    CONSTRAINT ck_note_templates_subjective_prompt CHECK (subjective_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_title CHECK (title ~ '[^[:space:]]')
+);
+
+ALTER TABLE ehr.clinical_notes ADD CONSTRAINT ck_clinical_notes_sections CHECK ((history IS NULL AND subjective IS NOT NULL AND objective IS NOT NULL) OR (history IS NOT NULL AND subjective IS NULL AND objective IS NULL));
+
+CREATE INDEX ix_clinical_drafts_note_template_code ON ehr.clinical_drafts (note_template_code);
+
+ALTER TABLE ehr.clinical_drafts ADD CONSTRAINT ck_clinical_drafts_sections CHECK (history IS NULL OR (subjective IS NULL AND objective IS NULL));
+
+CREATE UNIQUE INDEX ix_note_templates_position ON ehr.note_templates (position);
+
+CREATE UNIQUE INDEX ix_note_templates_title ON ehr.note_templates (title);
+
+ALTER TABLE ehr.clinical_drafts ADD CONSTRAINT fk_clinical_drafts_note_templates_note_template_code FOREIGN KEY (note_template_code) REFERENCES ehr.note_templates (code) ON DELETE RESTRICT;
+
+DO $$
+DECLARE
+    kept bigint := (SELECT count(*) FROM ehr.clinical_notes);
+BEGIN
+    RAISE NOTICE 'Migration 14: % signed notes keep their History, Assessment and Plan as signed; no row was changed', kept;
+    RAISE NOTICE 'Migration 14: unsigned drafts were not read; each opens in the editor with its History in Subjective, and changes only when its author saves it';
+END
+$$;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261122105343_SoapNotes', '10.0.13');
+
+COMMIT;
+

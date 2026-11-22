@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   2. As the colleague, do the same with the second text.
 //   3. Download the offline copy as the clinician.
 // Expected result: Step 1: the note page says "Signed:" and lists the addendum under "Addenda" with the clinician's
-//   name and the time; the note's History, Assessment and Plan are unchanged, and the page still has nothing to type
+//   name and the time; the note's Subjective, Objective, Assessment and Plan are unchanged, and the page still has nothing to type
 //   into; the write is in the audit log under the clinician. Step 2: both addenda, the clinician's first, each under
 //   its own author. Step 3: the patient's copy has the note with its signer and both addenda in order.
 // Creator: Tahseen Arnan
@@ -45,13 +45,13 @@ public class TC_UC14_07_AddendumSuccessfulFlow(WebApps apps) : IClassFixture<Web
         Assert.Matches($"<a [^>]*href=\"{AddendumPath(patient, note)}\"[^>]*>Add an addendum</a>", page);
         var form = await session.Client.GetStringAsync(AddendumPath(patient, note), Cancel);
         Assert.Contains("can't be changed. An addendum is a new text shown after it", Words(form));
-        Assert.Contains(History, form);
+        Assert.Contains(Subjective, form);
 
         using var first = await AddAsync(session.Client, patient, note, "Synthetic addendum: culture negative.");
         page = await ReadAsync(first);
         Assert.Contains("Signed: the addendum is part of the record, after the note.", Words(page));
         Assert.Matches("(?s)<ol class=\"sc-list\" data-addenda>.*?<strong>Dr. Test</strong>.*?signed <time[^>]*>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC</time>.*?Synthetic addendum: culture negative\\.", page);
-        Assert.Contains(History, page);
+        Assert.Contains(Subjective, page);
         Assert.DoesNotContain("textarea", page);
 
         using var second = await AddAsync(other.Client, patient, note, "Synthetic addendum: seen in follow-up.");
@@ -66,7 +66,8 @@ public class TC_UC14_07_AddendumSuccessfulFlow(WebApps apps) : IClassFixture<Web
         var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);
         var copy = await offline.Content.ReadAsStringAsync(Cancel);
-        Assert.Matches("\"notes\":\\[\\{\"signedAt\":\"[^\"]+\",\"signer\":\"Dr. Test\",\"history\":\"Synthetic history: cough for two days.\"", copy);
+        // Signed in four sections (step 14): a desktop build that knows only History is given Subjective and Objective there.
+        Assert.Matches("\"notes\":\\[\\{\"signedAt\":\"[^\"]+\",\"signer\":\"Dr. Test\",\"history\":\"Subjective\\\\nSynthetic subjective: cough for two days.\\\\n\\\\nObjective\\\\nSynthetic objective: chest clear.\"", copy);
         Assert.Matches("\"addenda\":\\[\\{[^\\]]*\"author\":\"Dr. Test\",\"text\":\"Synthetic addendum: culture negative.\"[^}]*\\},\\{[^\\]]*\"author\":\"Dr. Colleague\",\"text\":\"Synthetic addendum: seen in follow-up.\"[^}]*\\}\\]", copy);
     }
 }

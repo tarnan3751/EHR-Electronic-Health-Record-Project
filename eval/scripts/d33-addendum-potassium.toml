@@ -14,9 +14,15 @@ medicines unchanged {comma} including the ramipril {period} He mentioned on the 
 co-trimoxazole last year {comma} so make sure sulfa is on his allergy list {period} End of addendum {period}
 """
 
-[gold.history]
+[gold.subjective]
 value = "Rash with co-trimoxazole last year, mentioned on the phone."
-sources = ["He mentioned on the phone that he had a rash with co-trimoxazole last year"]
+sources = [
+    "He mentioned on the phone that he had a rash with co-trimoxazole last year",
+]
+
+[gold.objective]
+value = ""
+sources = []
 
 [gold.assessment]
 value = ""

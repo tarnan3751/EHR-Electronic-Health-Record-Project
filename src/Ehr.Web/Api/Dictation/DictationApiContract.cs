@@ -102,7 +102,12 @@ public enum Instruction
     AllergyChange,
 }
 
-public sealed record NoteFields(NoteField History, NoteField Assessment, NoteField Plan);
+// The four fields (the expansion plan's step 14). History is the first of the three a dictation was sorted into before
+// then: the service never sends it now, a live result that has one is refused at staging (TrustedResult), and it is
+// read only from a review saved then (Notes/Review), where its approved value goes into Subjective (NoteReviews). Never
+// written when it is null.
+public sealed record NoteFields(NoteField Subjective, NoteField Objective, NoteField Assessment, NoteField Plan,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] NoteField? History = null);
 
 // Each field is pending clinician approval, or empty. This result alone never approves clinical content (FR-13).
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "status")]
@@ -136,6 +141,12 @@ public enum WarningCode
     // right next to what the value was sorted from.
     [JsonStringEnumMemberName("near_unclear_passage")]
     NearUnclearPassage,
+
+    // The only field proposed, whatever became of the others (not dictated, or discarded by the checks), quotes nearly
+    // all of the transcript (nine words in ten): the whole dictation, plan and findings alike, went into one section, for
+    // the clinician to sort before accepting it.
+    [JsonStringEnumMemberName("one_field_holds_dictation")]
+    OneFieldHoldsDictation,
 }
 
 // What produced the transcript and the fields, for the note to store with them. Language is null when the service's

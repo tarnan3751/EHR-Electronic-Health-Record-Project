@@ -176,10 +176,13 @@ public static partial class DictationApi
             && !(end < text.Length && char.IsLowSurrogate(text[end]) && char.IsHighSurrogate(text[end - 1]));
         if (result.Transcript.Segments.Any(s => !Range(s.Start, s.End))
             || result.NotCarriedOver.Any(s => !Range(s.Start, s.End))) return null;
+        // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
+        // fields before then, which only a review stored then holds, read from the database and never through here.
+        if (result.Fields?.History is not null) return null;
         var suggestions = new Dictionary<string, string>();
         if (result.Fields is { } fields)
         {
-            foreach (var (name, field) in new[] { ("history", fields.History), ("assessment", fields.Assessment), ("plan", fields.Plan) })
+            foreach (var (name, field) in new[] { ("subjective", fields.Subjective), ("objective", fields.Objective), ("assessment", fields.Assessment), ("plan", fields.Plan) })
             {
                 if (field is not PendingField pending) continue;
                 if (result.Sorting != Sorting.Done || string.IsNullOrWhiteSpace(pending.Value) || pending.Value.Contains('\0')

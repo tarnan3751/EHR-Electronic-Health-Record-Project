@@ -87,6 +87,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<Reference.Questionnaire> Questionnaires => Set<Reference.Questionnaire>();
 
+    public DbSet<Reference.NoteTemplate> NoteTemplates => Set<Reference.NoteTemplate>();
+
     public DbSet<Reference.DrugIngredient> DrugIngredients => Set<Reference.DrugIngredient>();
 
     public DbSet<Reference.DrugClass> DrugClasses => Set<Reference.DrugClass>();
@@ -159,9 +161,15 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
         modelBuilder.Entity<ClinicalDraft>(draft =>
         {
+            // A History (written before the expansion plan's step 14) or the new sections, never both.
+            draft.ToTable(table => table.HasCheckConstraint("ck_clinical_drafts_sections",
+                "history IS NULL OR (subjective IS NULL AND objective IS NULL)"));
             draft.HasOne<Patient>().WithMany().HasForeignKey(d => d.PatientId);
             draft.HasOne<StaffUser>().WithMany().HasForeignKey(d => d.ClinicianId);
             draft.Property(d => d.Version).IsConcurrencyToken();
+            // A template in use can't be taken out of the reference data (db/reference/37-note-templates.sql).
+            draft.Property(d => d.NoteTemplateCode).HasMaxLength(Reference.NoteTemplateConfiguration.CodeLength);
+            draft.HasOne<Reference.NoteTemplate>().WithMany().HasForeignKey(d => d.NoteTemplateCode).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<SyncOperation>().HasKey(o => o.IdempotencyKey);

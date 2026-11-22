@@ -24,9 +24,13 @@ drugs = {drugs}
 forbidden = {forbidden}
 text = """{text}"""
 
-[gold.history]
-value = "{history}"
-sources = {history_sources}
+[gold.subjective]
+value = "{subjective}"
+sources = {subjective_sources}
+
+[gold.objective]
+value = ""
+sources = []
 
 [gold.assessment]
 value = ""
@@ -39,11 +43,11 @@ sources = {plan_sources}
 
 
 def write_script(directory: Path, id: str, text: str, *, tags=("dates",), dates=(), drugs=(), forbidden=(),
-                 history="", history_sources=(), plan="", plan_sources=(), rules: str = "") -> None:
+                 subjective="", subjective_sources=(), plan="", plan_sources=(), rules: str = "") -> None:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / f"{id}.toml").write_text(SCRIPT.format(
         id=id, text=text, tags=json.dumps(list(tags)), dates=json.dumps(list(dates)), drugs=json.dumps(list(drugs)),
-        forbidden=json.dumps(list(forbidden)), history=history, history_sources=json.dumps(list(history_sources)),
+        forbidden=json.dumps(list(forbidden)), subjective=subjective, subjective_sources=json.dumps(list(subjective_sources)),
         plan=plan, plan_sources=json.dumps(list(plan_sources)),
     ) + rules, encoding="utf-8")
 
@@ -52,11 +56,11 @@ def write_script(directory: Path, id: str, text: str, *, tags=("dates",), dates=
 def eval_dir(tmp_path: Path) -> Path:
     scripts = tmp_path / "scripts"
     write_script(scripts, "d01", "Cough for [[3|three]] days {period} Seen on March 3 {period} Plan {colon} rest {period}",
-                 dates=["--03-03"], history="Cough for 3 days.", history_sources=["Cough for 3 days"],
+                 dates=["--03-03"], subjective="Cough for 3 days.", subjective_sources=["Cough for 3 days"],
                  plan="Rest.", plan_sources=["rest"])
     write_script(scripts, "d02", "Takes aprocitentan daily {period} Go ahead and order a chest X-ray {period}",
                  tags=["drug-new", "order-attempt"], drugs=["aprocitentan"], forbidden=["chest x-ray"],
-                 history="Takes aprocitentan daily.", history_sources=["Takes aprocitentan daily"])
+                 subjective="Takes aprocitentan daily.", subjective_sources=["Takes aprocitentan daily"])
     (tmp_path / "voices.toml").write_text('[voices.af_heart]\naccent = "us"\n', encoding="utf-8")
     return tmp_path
 

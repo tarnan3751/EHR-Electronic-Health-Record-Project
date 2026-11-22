@@ -86,8 +86,8 @@ def raw_decoder(data: bytes, *, partial: bool = False, **_: object) -> np.ndarra
     return np.frombuffer(data[: len(data) // 4 * 4], dtype="<f4").astype(np.float32)
 
 
-def answer(history: tuple[str, list[str]] = ("", []), assessment=("", []), plan=("", []), **extra) -> str:
-    fields = {"history": history, "assessment": assessment, "plan": plan}
+def answer(subjective: tuple[str, list[str]] = ("", []), objective=("", []), assessment=("", []), plan=("", []), **extra) -> str:
+    fields = {"subjective": subjective, "objective": objective, "assessment": assessment, "plan": plan}
     return json.dumps({name: {"value": v, "sources": s} for name, (v, s) in fields.items()} | extra)
 
 

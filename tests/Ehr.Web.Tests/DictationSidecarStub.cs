@@ -14,8 +14,8 @@ namespace Ehr.Web.Tests;
 // The dictation service in memory, where the on-prem app's DictationSidecar sends its calls: sessions bound to the
 // owner that started them, chunks taken in order, a transcript of one made-up sentence per chunk, and note fields
 // sorted from it. It answers as the service does, error bodies with their detail included, and records every request
-// it gets. The switches make it fail the ways the service can. Only DictationApiTests drives it; the tests in that
-// class run one at a time, and each starts it afresh.
+// it gets. The switches make it fail the ways the service can, or propose more of the note's fields. The tests that
+// drive it run one at a time, and each starts it afresh.
 public sealed class DictationSidecarStub : HttpMessageHandler
 {
     public const string Url = "https://dictation.test";
@@ -32,6 +32,15 @@ public sealed class DictationSidecarStub : HttpMessageHandler
     public ConcurrentQueue<ReceivedRequest> Received { get; } = new();
 
     public bool IncludePlan { get; set; }
+
+    // An Objective too ("Chest is clear.", from the third chunk), so every one of the four fields is proposed.
+    public bool IncludeObjective { get; set; }
+
+    // A History beside the four fields, as no service since the expansion plan's step 14 sends.
+    public bool LiveHistory { get; set; }
+
+    // The whole transcript sorted into Subjective, the other three not dictated, with the warning the service puts on it.
+    public bool WholeDictation { get; set; }
 
     public StubSorting Sorting { get; set; }
 
@@ -53,6 +62,9 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         Received.Clear();
         Sorting = StubSorting.Done;
         IncludePlan = false;
+        IncludeObjective = false;
+        LiveHistory = false;
+        WholeDictation = false;
         Unreachable = false;
         Slow = false;
         Undecodable = false;
@@ -143,6 +155,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         }
     }
 
+    static string Text(StubSession session) => string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => Sentences[chunk % Sentences.Length]));
+
     static object Transcript(StubSession session)
     {
         var text = new StringBuilder();
@@ -166,6 +180,19 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     object Result(StubSession session, StubSorting sorting)
     {
+        var result = Sorted(session, sorting);
+        if (!LiveHistory || sorting != StubSorting.Done)
+        {
+            return result;
+        }
+
+        var withHistory = JsonSerializer.SerializeToNode(result, JsonSerializerOptions.Web)!;
+        withHistory["fields"]!["history"] = JsonSerializer.SerializeToNode(Offered(0), JsonSerializerOptions.Web);
+        return withHistory;
+    }
+
+    object Sorted(StubSession session, StubSorting sorting)
+    {
         var transcript = Transcript(session);
         var provenance = new
         {
@@ -182,13 +209,34 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         return sorting switch
         {
             StubSorting.Pending => new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver, provenance },
+            StubSorting.Done when WholeDictation => new
+            {
+                transcript,
+                sorting = "done",
+                fields = (object?)new
+                {
+                    subjective = new
+                    {
+                        status = "pending",
+                        value = Text(session),
+                        sources = new[] { new { start = 0, end = Text(session).Length } },
+                        warnings = new[] { new { code = "one_field_holds_dictation", start = 0, end = Text(session).Length } },
+                    },
+                    objective = new { status = "empty", reasons = new[] { "not_dictated" } },
+                    assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
+                    plan = new { status = "empty", reasons = new[] { "not_dictated" } },
+                },
+                notCarriedOver,
+                provenance,
+            },
             StubSorting.Done => new
             {
                 transcript,
                 sorting = "done",
                 fields = (object?)new
                 {
-                    history = new { status = "pending", value = Sentences[0], sources = new[] { new { start = 0, end = 21 } }, warnings = Array.Empty<object>() },
+                    subjective = new { status = "pending", value = Sentences[0], sources = new[] { new { start = 0, end = 21 } }, warnings = Array.Empty<object>() },
+                    objective = IncludeObjective ? Offered(2) : new { status = "empty", reasons = new[] { "not_dictated" } },
                     assessment = new
                     {
                         status = "pending",
@@ -200,9 +248,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                             new { code = "near_unclear_passage", start = 6, end = 9 },
                         },
                     },
-                    plan = IncludePlan
-                        ? (object)new { status = "pending", value = Sentences[4], sources = new[] { new { start = Sentences.Take(4).Sum(s => s.Length + 1), end = Sentences.Take(4).Sum(s => s.Length + 1) + Sentences[4].Length } }, warnings = Array.Empty<object>() }
-                        : new { status = "empty", reasons = new[] { "not_dictated" } },
+                    plan = IncludePlan ? Offered(4) : new { status = "empty", reasons = new[] { "not_dictated" } },
                 },
                 notCarriedOver,
                 provenance,
@@ -225,7 +271,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 reason = "model_unavailable",
                 fields = (object?)new
                 {
-                    history = new { status = "empty", reasons = new[] { "model_unavailable" } },
+                    subjective = new { status = "empty", reasons = new[] { "model_unavailable" } },
+                    objective = new { status = "empty", reasons = new[] { "model_unavailable" } },
                     assessment = new { status = "empty", reasons = new[] { "model_unavailable" } },
                     plan = new { status = "empty", reasons = new[] { "model_unavailable" } },
                 },
@@ -240,7 +287,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 sorting = "done",
                 fields = (object?)new
                 {
-                    history = new
+                    subjective = new
                     {
                         value = Sentences[0],
                         sources = new[] { new { start = 0, end = 21 } },
@@ -248,6 +295,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                         status = "pending",
                         note = DiscardedText,
                     },
+                    objective = new { status = "empty", reasons = new[] { "not_dictated" } },
                     assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
                     plan = new { status = "empty", reasons = new[] { "not_in_transcript" }, value = DiscardedText, discarded = new[] { DiscardedText } },
                 },
@@ -256,6 +304,13 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 debug = new { modelOutput = DiscardedText },
             },
         };
+    }
+
+    // One chunk's sentence, proposed as a field's value, with its place in the transcript as its source.
+    static object Offered(int sentence)
+    {
+        var start = Sentences.Take(sentence).Sum(s => s.Length + 1);
+        return new { status = "pending", value = Sentences[sentence], sources = new[] { new { start, end = start + Sentences[sentence].Length } }, warnings = Array.Empty<object>() };
     }
 
     static HttpResponseMessage Json(HttpStatusCode status, object body) =>

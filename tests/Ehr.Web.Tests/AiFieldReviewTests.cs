@@ -35,9 +35,10 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
             token, json.GetProperty("editorUrl").GetString()!, json.GetProperty("url").GetString()!);
     }
 
-    async Task<Flow> StageAsync(bool plan = true)
+    async Task<Flow> StageAsync(bool plan = true, bool objective = false)
     {
         sidecar.IncludePlan = plan;
+        sidecar.IncludeObjective = objective;
         var flow = await BeginAsync();
         await DictateAsync(flow, 5);
         using var staged = await Stage(flow, 1);
@@ -110,16 +111,16 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC13_01_02_03_trusted_result_accept_edit_reject_then_manual_complete_and_sign()
     {
         var f = await StageAsync();
-        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history = '' AND assessment = '' AND plan = '' AND has_unreviewed_proposals", f.Draft));
+        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND subjective = '' AND objective = '' AND assessment = '' AND plan = '' AND has_unreviewed_proposals", f.Draft));
         var proposals = await Proposals(f);
         foreach (var proposal in proposals)
         {
-            var decision = proposal.Field == "history" ? "accepted" : proposal.Field == "assessment" ? "edited" : "rejected";
+            var decision = proposal.Field == "subjective" ? "accepted" : proposal.Field == "assessment" ? "edited" : "rejected";
             using var response = await Decide(f, proposal.Id, 2 + Array.IndexOf(proposals, proposal), decision, "Synthetic corrected assessment");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
         // Decisions alone never populate clinical content or permit signing before explicit transfer.
-        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history = '' AND has_unreviewed_proposals", f.Draft));
+        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND subjective = '' AND has_unreviewed_proposals", f.Draft));
         using var completed = await ReviewPost(f, "Complete", ("Version", 5));
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         var html = await f.Session.Client.GetStringAsync(f.Editor, Cancel);
@@ -145,11 +146,11 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     static async Task<HttpResponseMessage> EditorPost(Flow f, string handler, long version,
-        string history = "Synthetic history", string assessment = "Synthetic assessment", string plan = "Synthetic plan",
+        string subjective = "Synthetic subjective", string assessment = "Synthetic assessment", string plan = "Synthetic plan",
         params (string Name, object Value)[] extra)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, f.Editor + (handler == "Sign" ? "/confirm" : "?handler=" + handler))
-        { Content = Form([("__RequestVerificationToken", f.Token), ("Version", version), ("History", history), ("Assessment", assessment), ("Plan", plan), .. extra]) };
+        { Content = Form([("__RequestVerificationToken", f.Token), ("Version", version), ("Subjective", subjective), ("Objective", "Synthetic objective"), ("Assessment", assessment), ("Plan", plan), .. extra]) };
         request.Headers.Add("HX-Request", "true");
         return await f.Session.Client.SendAsync(request, Cancel);
     }
@@ -160,7 +161,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         var f = await StageAsync();
         using var finish = await ReviewPost(f, "Complete", ("Version", 2));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, finish.StatusCode);
-        Assert.Contains("history", await finish.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("subjective", await finish.Content.ReadAsStringAsync(Cancel));
         // Supply complete manual content, then maliciously clear only the old cached flag at the database boundary.
         using var save = await EditorPost(f, "Save", 2);
         await using var db = await apps.OpenDatabaseAsync();
@@ -237,6 +238,116 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.AiReviewCompleted, patientId: f.Patient));
     }
 
+    // TC-UC13-08 (successful flow; the expansion plan's step 14): a dictation is reviewed in the note's four fields, in
+    // their order: each proposed one staged, shown with the transcript passage it came from, and once accepted put into
+    // its own section of the draft, Objective too. A field the model proposed nothing for says so.
+    [Fact]
+    public async Task TC_UC13_08_a_dictation_is_reviewed_in_the_four_fields_and_each_goes_into_its_section()
+    {
+        var f = await StageAsync(objective: true);
+        var review = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
+        Assert.Equal(["subjective", "objective", "assessment", "plan"],
+            System.Text.RegularExpressions.Regex.Matches(review, "data-dictation-field=\"([a-z]+)\"").Select(m => m.Groups[1].Value));
+        var snapshot = JsonDocument.Parse(System.Net.WebUtility.HtmlDecode(
+            System.Text.RegularExpressions.Regex.Match(review, "<script type=\"application/json\" data-review-snapshot>(.*?)</script>").Groups[1].Value)).RootElement;
+        var transcript = snapshot.GetProperty("result").GetProperty("transcript").GetProperty("text").GetString()!;
+        var fields = snapshot.GetProperty("result").GetProperty("fields");
+        foreach (var (field, value) in new[] { ("subjective", "Cough for three days."), ("objective", "Chest is clear."), ("assessment", "No fever."), ("plan", "Fluids and rest.") })
+        {
+            var proposed = fields.GetProperty(field);
+            Assert.Equal(value, proposed.GetProperty("value").GetString());
+            var source = Assert.Single(proposed.GetProperty("sources").EnumerateArray().ToArray());
+            Assert.Equal(value, transcript[source.GetProperty("start").GetInt32()..source.GetProperty("end").GetInt32()]);
+            Assert.Matches($"(?s)data-dictation-field=\"{field}\"[^>]*data-review-state=\"pending\".*?<dd data-field-value>{System.Text.RegularExpressions.Regex.Escape(value)}</dd>", review);
+        }
+
+        var proposals = await Proposals(f);
+        Assert.Equal(["assessment", "objective", "plan", "subjective"], proposals.Select(p => p.Field));
+        var version = 2L;
+        foreach (var proposal in proposals)
+        {
+            using var accepted = await Decide(f, proposal.Id, version++, "accepted");
+            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        }
+
+        using var complete = await ReviewPost(f, "Complete", ("Version", version));
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        Assert.Equal(1, await Scalar(
+            "SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND subjective = 'Cough for three days.' AND objective = 'Chest is clear.' AND assessment = 'No fever.' AND plan = 'Fluids and rest.'",
+            f.Draft));
+
+        // Nothing proposed for a field: the review says so, and nothing is staged for it.
+        var without = await StageAsync(plan: false);
+        Assert.Matches("(?s)data-dictation-field=\"plan\".*?No usable suggestion", await without.Session.Client.GetStringAsync(without.ReviewUrl, Cancel));
+        Assert.DoesNotContain("plan", (await Proposals(without)).Select(p => p.Field));
+    }
+
+    // A live result has the note's four fields only (the expansion plan's step 14): one that carries a History beside
+    // them, which only a review stored before then has, is refused at staging and nothing is stored, so the review can't
+    // be shown in the earlier layout with its Subjective proposal hidden.
+    [Fact]
+    public async Task A_live_result_with_a_history_beside_the_four_fields_is_refused_and_nothing_is_staged()
+    {
+        sidecar.LiveHistory = true;
+        var f = await BeginAsync();
+        await DictateAsync(f, 5);
+        using var staged = await Stage(f, 1);
+        Assert.Equal(HttpStatusCode.BadGateway, staged.StatusCode);
+        Assert.Empty(await Proposals(f));
+        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.ai_note_reviews WHERE id = @id AND state = 'recording' AND result_json IS NULL", f.Review));
+    }
+
+    // TC-UC13-07 (alternative flow; the expansion plan's step 14): a review saved before step 14, of a dictation sorted
+    // into History, Assessment and Plan, is shown in those fields, its History labeled as going into Subjective, and once
+    // approved the History goes there; into a Subjective with text only when appending is allowed, after that text. The
+    // draft has no History afterwards. The review is made as one saved then would be: a review staged now, its result
+    // and proposals given the earlier names with every trigger held, since the database stages no History any more.
+    [Fact]
+    public async Task TC_UC13_07_an_approved_history_goes_into_subjective_after_any_text_there()
+    {
+        var f = await StageAsync(plan: false);
+        await using (var connection = new NpgsqlConnection(apps.Database.SuperuserConnectionString))
+        {
+            await connection.OpenAsync(Cancel);
+            await using var earlier = new NpgsqlCommand(
+                """
+                BEGIN;
+                SET LOCAL session_replication_role = replica;
+                UPDATE ehr.ai_note_reviews
+                SET result_json = jsonb_set(result_json #- '{fields,subjective}' #- '{fields,objective}', '{fields,history}', result_json #> '{fields,subjective}')
+                WHERE id = @id;
+                UPDATE ehr.ai_field_proposals SET field = 'history' WHERE review_id = @id AND field = 'subjective';
+                COMMIT;
+                """, connection);
+            earlier.Parameters.AddWithValue("id", f.Review);
+            await earlier.ExecuteNonQueryAsync(Cancel);
+        }
+
+        var review = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
+        Assert.Contains("History (goes into Subjective)", review);
+        Assert.Equal(["history", "assessment", "plan"], System.Text.RegularExpressions.Regex.Matches(review, "data-dictation-field=\"([a-z]+)\"").Select(m => m.Groups[1].Value));
+        using var manual = await EditorPost(f, "Save", 2, "Synthetic typed subjective", "", "");
+        Assert.Equal(HttpStatusCode.OK, manual.StatusCode);
+        var proposals = await Proposals(f);
+        using (var accept = await Decide(f, proposals.Single(p => p.Field == "history").Id, 3, "accepted"))
+        {
+            Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+        }
+
+        using (var reject = await Decide(f, proposals.Single(p => p.Field != "history").Id, 4, "rejected"))
+        {
+            Assert.Equal(HttpStatusCode.OK, reject.StatusCode);
+        }
+
+        using var withoutConsent = await ReviewPost(f, "Complete", ("Version", 5));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, withoutConsent.StatusCode);
+        using var complete = await ReviewPost(f, "Complete", ("Version", 5), ("Append", true));
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        Assert.Equal(1, await Scalar(
+            "SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND objective = 'Synthetic objective' AND subjective = 'Synthetic typed subjective' || E'\n\n' || 'Cough for three days.'",
+            f.Draft));
+    }
+
     [Fact]
     public async Task Changed_drafts_preserve_manual_text_and_require_current_version_and_append_consent()
     {
@@ -260,7 +371,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     {
         var f = await BeginAsync();
         await DictateAsync(f, 3);
-        using var staged = await Stage(f, 1, new { version = 1, sessionId = "fabricated-session-12345", fields = new { history = "FORGED" }, reviewed = true });
+        using var staged = await Stage(f, 1, new { version = 1, sessionId = "fabricated-session-12345", fields = new { subjective = "FORGED" }, reviewed = true });
         Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
         var html = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
         Assert.Contains("Cough for three days.", html);
@@ -350,7 +461,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         using var stage = await Stage(f, 1);
         Assert.Equal(HttpStatusCode.OK, stage.StatusCode);
         var proposal = Assert.Single(await Proposals(f));
-        Assert.Equal("history", proposal.Field);
+        Assert.Equal("subjective", proposal.Field);
         var html = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
         Assert.Contains("possible_correction", html);
         Assert.Contains("notCarriedOver", html);
@@ -397,7 +508,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         await DictateAsync(f, 3);
         using var result = await JsonPost(f.Session.Client, f.Token, $"{Api}/{f.SessionId}/result", new { });
         var json = System.Text.Json.Nodes.JsonNode.Parse(await result.Content.ReadAsStringAsync(Cancel))!;
-        if (kind == "source") json["fields"]!["history"]!["sources"]![0]!["end"] = 1000000;
+        if (kind == "source") json["fields"]!["subjective"]!["sources"]![0]!["end"] = 1000000;
         if (kind == "not-final") json["transcript"]!["final"] = false;
         if (kind == "unavailable-pending") json["sorting"] = "unavailable";
         sidecar.Answer = (HttpStatusCode.OK, json.ToJsonString());
@@ -405,7 +516,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.BadGateway, stage.StatusCode);
         Assert.Empty(await Proposals(f));
         Assert.Equal(1, await Scalar("SELECT version FROM ehr.clinical_drafts WHERE id = @id", f.Draft));
-        Assert.Contains("History", await f.Session.Client.GetStringAsync(f.Editor, Cancel));
+        Assert.Contains("Subjective", await f.Session.Client.GetStringAsync(f.Editor, Cancel));
     }
 
     [Fact]

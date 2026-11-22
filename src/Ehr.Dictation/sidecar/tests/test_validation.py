@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from ehr_dictation.prompt import FIELDS
 from ehr_dictation.transcript import Segment, assemble
 from ehr_dictation.validation import FREE_WORDS, REASONS, check, directive_spans, directives, not_carried_over
 
@@ -25,8 +26,8 @@ def transcript(*passages: str | tuple[str, str]):
     return assemble(segments, final=True)
 
 
-def field(value: str, *sources: str, name: str = "history", text=None):
-    fields = {n: {"value": "", "sources": []} for n in ("history", "assessment", "plan")}
+def field(value: str, *sources: str, name: str = "subjective", text=None):
+    fields = {n: {"value": "", "sources": []} for n in ("subjective", "objective", "assessment", "plan")}
     fields[name] = {"value": value, "sources": list(sources)}
     return check(fields, [], text or transcript(DICTATION)).fields[name]
 
@@ -62,11 +63,12 @@ def test_a_failed_value_goes_out_as_reason_codes_only():
 
 
 def test_keys_outside_the_schema_are_reported_and_never_a_field():
-    fields = {n: {"value": "", "sources": []} for n in ("history", "assessment", "plan")}
+    fields = {n: {"value": "", "sources": []} for n in ("subjective", "objective", "assessment", "plan")}
 
-    checks = check(fields, ["orders"], transcript(DICTATION))
+    # Among them the History of the three fields before the expansion plan's step 14 (TC-UC10-08).
+    checks = check(fields, ["orders", "history"], transcript(DICTATION))
 
-    assert checks.unknown == ["orders"] and list(checks.fields) == ["history", "assessment", "plan"]
+    assert checks.unknown == ["orders", "history"] and list(checks.fields) == ["subjective", "objective", "assessment", "plan"]
 
 
 def test_an_empty_value_was_not_dictated():
@@ -703,11 +705,13 @@ def test_an_instruction_not_to_must_keep_its_negation():
     assert own(said, "An MRI.", "don't order an MRI").reasons == ["negation_dropped"]
 
 
-def test_an_order_sentence_is_cut_and_the_rest_of_the_plan_kept():
+# In whichever of the four fields the model put it (FR-14).
+@pytest.mark.parametrize("name", FIELDS)
+def test_an_order_sentence_is_cut_and_the_rest_of_the_field_kept(name):
     text = transcript("Start metformin 500 mg daily. I'm ordering an A1c.")
 
     checked = field("Start metformin 500 mg daily. I'm ordering an A1c.", "Start metformin 500 mg daily",
-                    "I'm ordering an A1c", name="plan", text=text)
+                    "I'm ordering an A1c", name=name, text=text)
 
     assert checked.pending and checked.value == "Start metformin 500 mg daily."
     assert [text.text[s:e] for s, e in checked.spans] == ["Start metformin 500 mg daily"]
@@ -913,3 +917,62 @@ def test_a_value_far_from_an_unclear_passage_is_not_flagged():
     earlier = transcript(("Fever since Tuesday.", "too_noisy"), "She says it is worse at night and lying flat. Cough for "
                                                                  "three days.")
     assert field("Cough for three days.", "Cough for three days", text=earlier).warnings == []
+
+
+# ---- One field holding the whole dictation ---------------------------------------------------------------------------
+
+# A quick dictation, as eval's d39 is: all of it findings and plan, with nothing said to be history.
+QUICK = ("Quick dictation. Left acute otitis media, his third this year. Start amoxicillin 90 mg per kg a day split "
+         "twice daily for 10 days. Ibuprofen for pain and fever. Review in 48 to 72 hours if he is not better.")
+QUICK_SENTENCES = [s.strip() for s in QUICK.split(".")[1:] if s.strip()]
+
+
+# The whole dictation sorted into one field, the others not dictated: still offered, since every word is grounded, but
+# with a warning pointing at all that its sources cover, so the clinician sorts it before accepting it.
+def test_a_dictation_sorted_whole_into_one_field_is_offered_with_a_warning():
+    text = transcript(QUICK)
+
+    checked = field(". ".join(QUICK_SENTENCES) + ".", *QUICK_SENTENCES, text=text)
+
+    assert checked.pending
+    assert [(code, text.text[start:end]) for code, start, end in checked.warnings] == [
+        ("one_field_holds_dictation", QUICK[len("Quick dictation. "):-1])]
+    assert checked.to_json(text)["warnings"][0]["code"] == "one_field_holds_dictation"
+
+
+# A short dictation that is one field, such as an addendum to a plan (eval's d33, whose plan covers 78 of every 100
+# words): its lead-in and sign-off aren't quoted, so it isn't warned of.
+def test_an_addendum_that_is_all_plan_is_not_flagged():
+    said = ("Addendum. Plan: hold the spironolactone for now and repeat potassium and kidney function on Thursday at the "
+            "surgery. Continue the rest of his medicines unchanged. End of addendum.")
+    sources = ["hold the spironolactone for now and repeat potassium and kidney function on Thursday at the surgery",
+               "Continue the rest of his medicines unchanged"]
+
+    checked = field("Hold the spironolactone for now and repeat potassium and kidney function on Thursday at the "
+                    "surgery. Continue the rest of his medicines unchanged.", *sources, name="plan", text=transcript(said))
+
+    assert checked.pending and checked.warnings == []
+
+
+def quick(**others: dict) -> dict:
+    """QUICK checked with all of it in Subjective, and these other fields as the model proposed them."""
+    fields = {name: {"value": "", "sources": []} for name in FIELDS}
+    fields["subjective"] = {"value": ". ".join(QUICK_SENTENCES) + ".", "sources": QUICK_SENTENCES}
+    return check(fields | others, [], transcript(QUICK)).fields
+
+
+def test_a_field_quoting_the_whole_dictation_is_not_flagged_when_another_is_offered_too():
+    checked = quick(assessment={"value": "Left acute otitis media, his third this year.", "sources": [QUICK_SENTENCES[0]]})
+
+    assert checked["subjective"].pending and checked["assessment"].pending
+    assert checked["subjective"].warnings == [] and checked["assessment"].warnings == []
+
+
+# As d39 came back in the three-field run: a Plan proposed too, and discarded by the checks. The one value offered still
+# holds the whole dictation, beside fields the review shows with no usable suggestion.
+def test_a_field_quoting_the_whole_dictation_is_flagged_when_the_others_were_discarded():
+    checked = quick(plan={"value": "Amoxicillin 500 mg for a week.", "sources": ["amoxicillin 500 mg for a week"]})
+
+    assert not checked["plan"].pending and "source_not_in_transcript" in checked["plan"].reasons
+    assert checked["subjective"].pending
+    assert [code for code, _, _ in checked["subjective"].warnings] == ["one_field_holds_dictation"]

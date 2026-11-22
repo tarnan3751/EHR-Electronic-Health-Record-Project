@@ -53,13 +53,12 @@ weights {comma} and call the heart failure nurse if she gains more than [[1 kg|o
 up on [[December 10|December tenth]] {period}
 """
 
-[gold.history]
-value = "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes and chronic kidney disease stage 3b. Admitted on October 24 with fluid overload; went home on October 30. Started on sotagliflozin 200 mg daily in hospital, and furosemide increased to 40 mg twice a day. Weight down from 69.8 to 68.4 kg since discharge. Some ankle swelling by the evening, but no swelling in her thighs or abdomen. No orthopnea, no chest pain, no bleeding on apixaban. Two low sugars in the low 60s early in the morning last week. Insulin glargine 16 units at bedtime and metformin 500 mg twice a day. Left knee swollen and painful after walking; right knee fine. Has been taking ibuprofen for the knee. Also apixaban 5 mg twice a day and metoprolol succinate 50 mg daily. Allergic to codeine. Blood pressure 128/74, heart rate 78 and irregular, oxygen saturation 95% on room air. JVP not raised. A few crackles at the right base and none on the left. Trace pitting edema at both ankles. Small effusion in the left knee. Potassium 4.6, creatinine 1.4 with an eGFR of 38. NT-proBNP 1450, down from 2800 at discharge. A1c 7.6. Urine albumin to creatinine ratio 210 mg/g."
+[gold.subjective]
+value = "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes and chronic kidney disease stage 3b. Admitted on October 24 with fluid overload; went home on October 30. Started on sotagliflozin 200 mg daily in hospital, and furosemide increased to 40 mg twice a day. Some ankle swelling by the evening, but no swelling in her thighs or abdomen. No orthopnea, no chest pain, no bleeding on apixaban. Two low sugars in the low 60s early in the morning last week. Insulin glargine 16 units at bedtime and metformin 500 mg twice a day. Left knee swollen and painful after walking; right knee fine. Has been taking ibuprofen for the knee. Also apixaban 5 mg twice a day and metoprolol succinate 50 mg daily. Allergic to codeine."
 sources = [
     "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes and chronic kidney disease stage 3b.",
     "She was admitted on October 22 correction October 24 with fluid overload and went home on October 30.",
     "In hospital she was started on sotagliflozin 200 mg daily and her furosemide was increased to 40 mg twice a day.",
-    "Her weight has come down from 69.8 to 68.4 kg since discharge.",
     "She still has some ankle swelling by the evening but no swelling in her thighs or abdomen.",
     "No orthopnea, no chest pain and no bleeding on apixaban.",
     "She had two low sugars in the low 60s early in the morning last week.",
@@ -67,6 +66,12 @@ sources = [
     "Her left knee is swollen and painful after walking but the right knee is fine, and she has been taking ibuprofen for it.",
     "Her other medicines are apixaban 5 mg twice a day and metoprolol succinate 50 mg daily.",
     "She is allergic to codeine.",
+]
+
+[gold.objective]
+value = "Weight down from 69.8 to 68.4 kg since discharge. Blood pressure 128/74, heart rate 78 and irregular, oxygen saturation 95% on room air. JVP not raised. A few crackles at the right base and none on the left. Trace pitting edema at both ankles. Small effusion in the left knee. Potassium 4.6, creatinine 1.4 with an eGFR of 38. NT-proBNP 1450, down from 2800 at discharge. A1c 7.6. Urine albumin to creatinine ratio 210 mg/g."
+sources = [
+    "Her weight has come down from 69.8 to 68.4 kg since discharge.",
     "blood pressure 128/74, heart rate 78 and irregular, oxygen saturation 95% on room air.",
     "JVP not raised.",
     "A few crackles at the right base and none on the left.",
@@ -101,13 +106,12 @@ sources = [
     "Follow up on December 10.",
 ]
 
-[gold_rules.history]
-value = "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes and chronic kidney disease stage 3b. She was admitted on October 24 with fluid overload and went home on October 30. In hospital she was started on sotagliflozin 200 mg daily and her furosemide was increased to 40 mg twice a day. Her weight has come down from 69.8 to 68.4 kg since discharge. She still has some ankle swelling by the evening but no swelling in her thighs or abdomen. No orthopnea, no chest pain and no bleeding on apixaban. She had two low sugars in the low 60s early in the morning last week. She takes insulin glargine 16 units at bedtime and metformin 500 mg twice a day. Her left knee is swollen and painful after walking but the right knee is fine, and she has been taking ibuprofen for it. Her other medicines are apixaban 5 mg twice a day and metoprolol succinate 50 mg daily. She is allergic to codeine. Blood pressure 128/74, heart rate 78 and irregular, oxygen saturation 95% on room air. JVP not raised. A few crackles at the right base and none on the left. Trace pitting edema at both ankles. Small effusion in the left knee. Potassium 4.6, creatinine 1.4 with an eGFR of 38. NT-proBNP 1450, down from 2800 at discharge. Her A1c is 7.6. Urine albumin to creatinine ratio 210 mg/g."
+[gold_rules.subjective]
+value = "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes and chronic kidney disease stage 3b. She was admitted on October 24 with fluid overload and went home on October 30. In hospital she was started on sotagliflozin 200 mg daily and her furosemide was increased to 40 mg twice a day. She still has some ankle swelling by the evening but no swelling in her thighs or abdomen. No orthopnea, no chest pain and no bleeding on apixaban. She had two low sugars in the low 60s early in the morning last week. She takes insulin glargine 16 units at bedtime and metformin 500 mg twice a day. Her left knee is swollen and painful after walking but the right knee is fine, and she has been taking ibuprofen for it. Her other medicines are apixaban 5 mg twice a day and metoprolol succinate 50 mg daily. She is allergic to codeine."
 sources = [
     "74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type 2 diabetes and chronic kidney disease stage 3b.",
     "She was admitted on October 22 correction October 24 with fluid overload and went home on October 30.",
     "In hospital she was started on sotagliflozin 200 mg daily and her furosemide was increased to 40 mg twice a day.",
-    "Her weight has come down from 69.8 to 68.4 kg since discharge.",
     "She still has some ankle swelling by the evening but no swelling in her thighs or abdomen.",
     "No orthopnea, no chest pain and no bleeding on apixaban.",
     "She had two low sugars in the low 60s early in the morning last week.",
@@ -115,6 +119,12 @@ sources = [
     "Her left knee is swollen and painful after walking but the right knee is fine, and she has been taking ibuprofen for it.",
     "Her other medicines are apixaban 5 mg twice a day and metoprolol succinate 50 mg daily.",
     "She is allergic to codeine.",
+]
+
+[gold_rules.objective]
+value = "Her weight has come down from 69.8 to 68.4 kg since discharge. Blood pressure 128/74, heart rate 78 and irregular, oxygen saturation 95% on room air. JVP not raised. A few crackles at the right base and none on the left. Trace pitting edema at both ankles. Small effusion in the left knee. Potassium 4.6, creatinine 1.4 with an eGFR of 38. NT-proBNP 1450, down from 2800 at discharge. Her A1c is 7.6. Urine albumin to creatinine ratio 210 mg/g."
+sources = [
+    "Her weight has come down from 69.8 to 68.4 kg since discharge.",
     "blood pressure 128/74, heart rate 78 and irregular, oxygen saturation 95% on room air.",
     "JVP not raised.",
     "A few crackles at the right base and none on the left.",

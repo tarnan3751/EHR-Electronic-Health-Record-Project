@@ -1,8 +1,9 @@
 // Dictating a note (UC 9 Transcribe dictated audio, UC 10 Structure and validate note fields; Samir Mukshe). The script
 // for Areas/Clinical/Pages/Patients/Dictate: it records the microphone, sends the recording to the clinician dictation
 // API (Ehr.Web, Api/Dictation/DictationApi.cs, whose header is the contract) in numbered chunks, and shows the
-// transcript as the clinician speaks. After Stop it asks for the result and shows the History, Assessment and Plan the
-// model proposed and validation let through, each awaiting review, or says why the fields couldn't be sorted.
+// transcript as the clinician speaks. After Stop it asks for the result and shows the Subjective, Objective, Assessment
+// and Plan the model proposed and validation let through, each awaiting review, or says why the fields couldn't be
+// sorted.
 //
 // What it handles, from UC 9 and UC 10's alternative courses:
 // - no microphone, or one the browser blocks: says how to fix it, and the page stays usable;
@@ -36,7 +37,8 @@
     const sortMessage = part("sort-message");
     const notCarried = part("not-carried");
     const notCarriedList = part("not-carried-list");
-    const fieldNames = ["history", "assessment", "plan"];
+    // The fields the page shows (the expansion plan's step 14: subjective, objective, assessment and plan).
+    const fieldNames = [...root.querySelectorAll("[data-dictation-field]")].map((field) => field.dataset.dictationField);
 
     const view = new window.SwiftChartDictationView(root);
     const renderTranscript = (...args) => view.renderTranscript(...args);

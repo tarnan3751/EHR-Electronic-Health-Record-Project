@@ -107,7 +107,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
             return ReviewResult.Invalid("Enter the corrected value, or reject the proposal.");
         var values = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         if (approved is not null) values[proposal.Field] = approved;
-        if (Merge(NoteContent.From(draft), values).Validate(false) is { Count: > 0 } errors)
+        if (Merge(NoteContent.From(draft), values).Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors)
             return new(422, errors);
 
         proposal.State = decision;
@@ -134,12 +134,10 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         if (await phi.SignedDraftAsync(draft.Id, draft.PatientId, cancel) is not null) return ReviewResult.Signed;
         var approved = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         var current = NoteContent.From(draft);
-        if (!append && ((approved.ContainsKey("history") && current.History.Length > 0)
-            || (approved.ContainsKey("assessment") && current.Assessment.Length > 0)
-            || (approved.ContainsKey("plan") && current.Plan.Length > 0)))
+        if (!append && approved.Keys.Any(field => current.Sections[Section(field)].Text.Length > 0))
             return ReviewResult.Invalid("The draft already contains text. Compare it below and explicitly allow appending approved values; existing text will be preserved.");
         var merged = Merge(current, approved);
-        if (merged.Validate(false) is { Count: > 0 } errors) return new(422, errors);
+        if (merged.Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors) return new(422, errors);
         merged.ApplyTo(draft);
         draft.HasUnreviewedProposals = false;
         await db.SaveChangesAsync(cancel);
@@ -178,11 +176,28 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         if (structured) draft.StructuredVersion = draft.Version;
     }
 
+    // Which of the note's sections (NoteContent.Sections) a proposed field goes into. A dictation sorted before the
+    // expansion plan's step 14, whose review may still be waiting, proposes a History, which goes into Subjective, where
+    // the editor asks for what belongs in Objective to be moved there (the same as an earlier draft's History).
+    static int Section(string field) => field switch
+    {
+        "history" or "subjective" => 0,
+        "objective" => 1,
+        "assessment" => 2,
+        "plan" => 3,
+        _ => throw new InvalidOperationException("A proposal names a field the note doesn't have."),
+    };
+
     static NoteContent Merge(NoteContent current, IReadOnlyDictionary<string, string> values)
     {
-        string Field(string name, string original) => !values.TryGetValue(name, out var value) ? original
-            : original.Length == 0 ? value : original + "\n\n" + value;
-        return new(Field("history", current.History), Field("assessment", current.Assessment), Field("plan", current.Plan));
+        var texts = current.Sections.Select(section => section.Text).ToArray();
+        foreach (var (field, value) in values)
+        {
+            var section = Section(field);
+            texts[section] = texts[section].Length == 0 ? value : texts[section] + "\n\n" + value;
+        }
+
+        return new(texts[0], texts[1], texts[2], texts[3]);
     }
 }
 

@@ -34,9 +34,12 @@ milligrams]] weekly for the first month and then increase as tolerated {period} 
 bexagliflozin {comma} and I'm ordering a urine albumin to creatinine ratio for today {period} ...
 """
 
-[gold.history]
+[gold.subjective]
 value = "54-year-old man with type 2 diabetes for about 8 years. ..."
 sources = ["54-year-old man with type 2 diabetes for about 8 years.", "..."]
+[gold.objective]
+value = "A1c 8.4, down from 9.1 in the spring. Weight 96 kg, down 2 kg."
+sources = ["His A1c today is 8.4, down from 9.1 in the spring.", "Weight is 96 kg, down 2 kg."]
 [gold.assessment]
 value = "Type 2 diabetes, better but not at goal."
 sources = ["type 2 diabetes, better but not at goal."]
@@ -69,8 +72,9 @@ Written forms are the same in every script, whoever is speaking: numerals with u
 
 **Gold fields.** `value` is what a careful clinician would accept in that field; `sources` quote the display text it comes from, a phrase or a sentence each, word for word. A field the dictation says nothing about has `value = ""` and `sources = []`.
 
-What each field holds is defined once, by its `description` in the note schema (`src/Ehr.Dictation/schema/note-fields.schema.json`), which the structuring prompt repeats word for word. `history` holds more than its name says: today's vital signs and examination findings, and the results the clinician has already reviewed (labs, ECG, imaging), go there too, since the note has only these three fields. Where the neighbouring cases go:
+What each field holds is defined once, by its `description` in the note schema (`src/Ehr.Dictation/schema/note-fields.schema.json`), which the structuring prompt repeats word for word. `subjective` holds what the patient, or someone with them, reports, readings taken at home included; `objective` holds what the clinician found: today's vital signs and examination findings, and the results the clinician has already reviewed (labs, ECG, imaging), however long ago they were taken. Where the neighbouring cases go:
 
+- A score recorded at the visit (EPDS, PHQ-9, MoCA, EASI, SALT) is `objective`, though the patient answers some of them; a sentence holding both sides is split at a clause ("her pregnancy test today is negative" is `objective`, the contraception before it `subjective`).
 - The clinician's reading of a result ("consistent with ...", "so this is ...") is `assessment`.
 - A medicine change ("start lisinopril 10 mg daily") is `plan`, and is not an order; so are the tests and imaging the clinician says they will get.
 - A statement that they are ordering a test now is a directive: it is left out, and listed in `forbidden` (below).
@@ -86,8 +90,8 @@ Values copy numbers, units, dates, drug names and doses as the display text writ
 
 Where the rules let the rule-following gold say only less well what the clinical gold says, for the owner to weigh:
 
-- d30 history keeps "does not drink alcohol olezarsen 80 mg by monthly injection was started on June 15, 2026" as one run-on: without punctuation the negation reaches the olezarsen, and a value that split the sentence would drop it.
-- d31 history keeps "with meals" before the corrected dose: "crinecerfont twice daily with meals, 50 mg twice daily".
+- d30 subjective keeps "does not drink alcohol olezarsen 80 mg by monthly injection was started on June 15, 2026" as one run-on: without punctuation the negation reaches the olezarsen, and a value that split the sentence would drop it.
+- d31 subjective keeps "with meals" before the corrected dose: "crinecerfont twice daily with meals, 50 mg twice daily".
 - d39 assessment leaves out "3-year-old", said only to name the patient at the start of the dictation.
 
 `drugs` lists medicine names (generic or brand) as written in the display text, including any named only in a forbidden directive; not drug classes ("statins"), vitamins and supplements, or vaccines named by disease.

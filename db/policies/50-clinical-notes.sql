@@ -1,6 +1,7 @@
 -- UC 14: signing and edits serialize on the SAME draft row. These invoker functions respect RLS and grants.
 -- No runtime DELETE grant on signed notes, and UPDATE on their sensitivity alone (step 10b), with triggers as an
--- additional immutability boundary: a signed note's text never changes.
+-- additional immutability boundary: a signed note's text never changes. Notes are signed in Subjective, Objective,
+-- Assessment and Plan (step 14); one signed before then keeps its History, Assessment and Plan.
 CREATE OR REPLACE FUNCTION ehr.guard_clinical_draft() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -24,6 +25,23 @@ CREATE OR REPLACE TRIGGER clinical_drafts_guard
     BEFORE UPDATE ON ehr.clinical_drafts
     FOR EACH ROW EXECUTE FUNCTION ehr.guard_clinical_draft();
 
+-- Whether a note's section shows nothing (the expansion plan's step 14): nothing is left once whitespace of every kind
+-- Unicode counts as such, and the characters that show nothing which step 13a's summary rule strips (the same list as
+-- 52-visit-summaries.sql's, which Ehr.Security.Tests holds equal), are taken out. A blank section isn't signed. The
+-- app's rule is the same (NoteContent.IsBlank in Ehr.Domain), code point for code point (NoteBlankTests). It only
+-- checks: what is stored is what was written.
+CREATE OR REPLACE FUNCTION ehr.note_section_is_blank(section text) RETURNS boolean
+    LANGUAGE sql
+    IMMUTABLE PARALLEL SAFE
+    SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT regexp_replace(regexp_replace(section,
+        '[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFF8\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0000-\U000E0FFF]',
+        '', 'g'), '[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]', '', 'g') = ''
+$$;
+REVOKE ALL ON FUNCTION ehr.note_section_is_blank(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ehr.note_section_is_blank(text) TO ehr_app;
+
 CREATE OR REPLACE FUNCTION ehr.finalize_clinical_note() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -36,10 +54,16 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'The draft is unavailable' USING ERRCODE = '23514';
     END IF;
+    -- Notes are signed in Subjective, Objective, Assessment and Plan (the expansion plan's step 14). A draft written
+    -- before then keeps its History until its author saves it in the four sections, and isn't signed until then; nor is
+    -- a note sent with a History, whatever the draft holds.
+    IF NEW.history IS NOT NULL OR draft.history IS NOT NULL THEN
+        RAISE EXCEPTION 'Save the draft in Subjective, Objective, Assessment and Plan before signing' USING ERRCODE = '23514';
+    END IF;
     IF NEW.patient_id <> draft.patient_id OR NEW.draft_version <> draft.version
        OR draft.structured_version IS DISTINCT FROM draft.version
-       OR NEW.history IS DISTINCT FROM draft.history OR NEW.assessment IS DISTINCT FROM draft.assessment
-       OR NEW.plan IS DISTINCT FROM draft.plan THEN
+       OR NEW.subjective IS DISTINCT FROM draft.subjective OR NEW.objective IS DISTINCT FROM draft.objective
+       OR NEW.assessment IS DISTINCT FROM draft.assessment OR NEW.plan IS DISTINCT FROM draft.plan THEN
         RAISE EXCEPTION 'The draft changed; review the saved version before signing' USING ERRCODE = '23514';
     END IF;
     -- The cached flag is never sufficient proof. Consult immutable bindings and authoritative decisions too.
@@ -51,11 +75,12 @@ BEGIN
                   AND (r.imported_version IS NULL OR r.imported_version > draft.version)) THEN
         RAISE EXCEPTION 'Associated AI proposals require server-side review' USING ERRCODE = '23514';
     END IF;
-    IF draft.history IS NULL OR draft.assessment IS NULL OR draft.plan IS NULL
-       OR draft.history !~ '[^[:space:]]' OR draft.assessment !~ '[^[:space:]]' OR draft.plan !~ '[^[:space:]]'
-       OR char_length(draft.history) > 16000 OR char_length(draft.assessment) > 16000
-       OR char_length(draft.plan) > 16000 OR octet_length(draft.body) > 65536 THEN
-        RAISE EXCEPTION 'Complete History, Assessment and Plan within note limits before signing' USING ERRCODE = '23514';
+    IF draft.subjective IS NULL OR draft.objective IS NULL OR draft.assessment IS NULL OR draft.plan IS NULL
+       OR ehr.note_section_is_blank(draft.subjective) OR ehr.note_section_is_blank(draft.objective)
+       OR ehr.note_section_is_blank(draft.assessment) OR ehr.note_section_is_blank(draft.plan)
+       OR char_length(draft.subjective) > 16000 OR char_length(draft.objective) > 16000
+       OR char_length(draft.assessment) > 16000 OR char_length(draft.plan) > 16000 OR octet_length(draft.body) > 65536 THEN
+        RAISE EXCEPTION 'Complete Subjective, Objective, Assessment and Plan within note limits before signing' USING ERRCODE = '23514';
     END IF;
     -- Never trust client identity or time. The signed snapshot retains the version the clinician confirmed.
     NEW.signer_id := ehr.current_user_id();

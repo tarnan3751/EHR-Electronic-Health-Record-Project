@@ -44,7 +44,7 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Dictation supports English only", html);
         Assert.Contains("Nothing is saved", html);
         Assert.Contains("orders and allergy changes are never filled in from dictation", html);
-        foreach (var field in new[] { "history", "assessment", "plan" })
+        foreach (var field in new[] { "subjective", "objective", "assessment", "plan" })
         {
             Assert.Contains($"data-dictation-field=\"{field}\"", html);
         }
@@ -79,8 +79,8 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, stopped.StatusCode);
         var json = await JsonAsync(result);
         Assert.Equal("done", (string?)json["sorting"]);
-        Assert.Equal("pending", (string?)json["fields"]!["history"]!["status"]);
-        Assert.Equal("Cough for three days.", (string?)json["fields"]!["history"]!["value"]);
+        Assert.Equal("pending", (string?)json["fields"]!["subjective"]!["status"]);
+        Assert.Equal("Cough for three days.", (string?)json["fields"]!["subjective"]!["value"]);
         Assert.Equal("empty", (string?)json["fields"]!["plan"]!["status"]);
         Assert.Equal("order", (string?)json["notCarriedOver"]![0]!["reason"]);
         // The audio reached the service for this clinician, in the type the browser recorded.

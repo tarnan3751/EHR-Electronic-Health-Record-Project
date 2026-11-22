@@ -60,6 +60,7 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["vital_reference_ranges"] = Protection.Internal,
         ["order_result_codes"] = Protection.Internal,
         ["questionnaires"] = Protection.Internal,
+        ["note_templates"] = Protection.Internal,
         ["drug_ingredients"] = Protection.Internal,
         ["drug_classes"] = Protection.Internal,
         ["drug_class_cross_reactions"] = Protection.Internal,

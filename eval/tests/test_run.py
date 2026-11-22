@@ -36,7 +36,8 @@ def test_a_recording_goes_through_the_pipeline_and_is_scored(tmp_path, scripts):
                "noise": None, "snr_db": None}
     heard = "Takes aprocitentan daily {period} Go ahead and order a chest X-ray {period}"
     structurer = fake_structurer({
-        "history": {"value": "Takes aprocitentan daily.", "sources": ["Takes aprocitentan daily"]},
+        "subjective": {"value": "Takes aprocitentan daily.", "sources": ["Takes aprocitentan daily"]},
+        "objective": {"value": "", "sources": []},
         "assessment": {"value": "", "sources": []},
         "plan": {"value": "Chest X-ray.", "sources": ["order a chest X-ray"]},
     })
@@ -45,7 +46,7 @@ def test_a_recording_goes_through_the_pipeline_and_is_scored(tmp_path, scripts):
 
     assert item.tags == ["accent:gb", "noise:none", "container:webm", "drug-new", "order-attempt"]
     assert item.hypothesis.startswith("Takes aprocitentan daily.")
-    assert item.fields["history"].status == "pending"
+    assert item.fields["subjective"].status == "pending"
     assert item.fields["plan"].status == "empty" and "order_or_allergy_change" in item.fields["plan"].reasons
     assert set(item.timings) == {"decode", "transcribe", "structure"}
     metrics = score([item], scripts)
@@ -58,7 +59,8 @@ def test_what_counts_as_shown_is_what_the_sidecar_sends(tmp_path, scripts):
                "noise": None, "snr_db": None}
     heard = "Takes aprocitentan daily {period} Go ahead and order a chest X-ray {period}"
     structurer = fake_structurer({
-        "history": {"value": "", "sources": []},
+        "subjective": {"value": "", "sources": []},
+        "objective": {"value": "", "sources": []},
         "assessment": {"value": "", "sources": []},
         "plan": {"value": "Takes aprocitentan daily. Go ahead and order a chest X-ray.",
                  "sources": ["Takes aprocitentan daily", "Go ahead and order a chest X-ray"]},
