@@ -757,8 +757,10 @@ DOCUMENTATION = [
 def test_an_order_or_allergy_list_change_is_never_carried(value):
     checked = own(value.replace("О", "O").replace("​", ""), value)
 
-    assert not checked.pending
-    assert {"order_or_allergy_change", "bad_format"} & set(checked.reasons)
+    if checked.pending:  # what the instruction leaves of its sentence ("she asked about the cost") goes on alone
+        assert directive_spans(checked.value) == [] and directive_spans(value)
+    else:
+        assert {"order_or_allergy_change", "bad_format"} & set(checked.reasons)
 
 
 @pytest.mark.parametrize("value", DOCUMENTATION)
@@ -837,10 +839,15 @@ def test_an_instruction_inside_a_source_splits_it_in_two():
     assert own(said, "MRI, recheck in 3 months.").reasons == ["unsupported_content"]
 
 
-@pytest.mark.parametrize("said", ["Do not start metformin until we order an A1c.",
-                                  "There's no reason not to order an MRI of the knee."])
-def test_a_sentence_whose_rest_needs_the_instruction_goes_whole(said):
-    assert own(said, said).reasons == ["order_or_allergy_change"]
+# What is cut is what is listed, never more: a sentence whose rest needs the instruction keeps its rest, ending on the
+# word that shows it is unfinished, and the instruction is listed.
+@pytest.mark.parametrize(("said", "rest"), [("Do not start metformin until we order an A1c.", "Do not start metformin until."),
+                                            ("There's no reason not to order an MRI of the knee.", "There's no reason not to.")])
+def test_a_sentence_whose_rest_needs_the_instruction_keeps_its_rest_unfinished(said, rest):
+    checked = own(said, said)
+
+    assert checked.value == rest
+    assert [said[s:e] for s, e in directive_spans(said)] == [said[len(rest) - 1 :].strip().rstrip(".")]
 
 
 def test_an_instruction_after_and_is_cut_where_it_starts():
@@ -1021,6 +1028,71 @@ def test_noting_that_the_patient_is_allergic_is_an_allergy_list_instruction(said
 def test_that_the_patient_is_allergic_said_alone_or_noted_by_someone_is_documentation(said):
     assert not_carried_over(transcript(said)) == []
     assert own(said, said).pending
+
+
+# Documentation the review found cut as instructions: none of it is listed, and the value keeps it whole.
+@pytest.mark.parametrize(
+    "said",
+    [
+        # The pharmacy: past a comma or a new subject, or the patient sent home or to it, is no order.
+        "The urgent care sent her home with a diagnosis of a viral illness and she went straight to the pharmacy.",
+        "Urgent care sent her home with instructions to return if worse, and she went to the pharmacy for ibuprofen.",
+        "Send her home, she can pick up ibuprofen at the pharmacy.",
+        "Send her to the pharmacy for a flu shot.",
+        "Send her home with return precautions, she will stop at the pharmacy for acetaminophen on the way.",
+        # Having it refilled only at the start of its clause.
+        "She is trying to get her inhaler refilled but insurance denied it.",
+        "She has been unable to get her metformin refilled since March.",
+        "She forgot to have her levothyroxine refilled and ran out a week ago.",
+        # Noting that she is allergic only when that is all the sentence says.
+        "Note that her allergic rhinitis is worse in spring.",
+        "Document that she has no known drug allergies.",
+        "Note that she is allergic to penicillin, so we avoided amoxicillin.",
+        "Note that she is not allergic to anything.",
+        "Please note that she is allergic to penicillin and tolerated cephalexin.",
+        "Note that the patient reacted to the contrast last year.",
+        # After "No," a noun compound is no instruction.
+        "No, refill history shows she picks up every month.",
+        # An exam finding, unpunctuated: before, the reach ran on into the assessment.
+        "He is alert and well perfused capillary refill under 2 seconds Likely bronchiolitis mild to moderate",
+    ],
+)
+def test_documentation_the_review_found_cut_is_neither_listed_nor_cut(said):
+    assert not_carried_over(transcript(said)) == []
+    assert own(said, said).pending
+
+
+# Unpunctuated speech: an instruction stops at a heading, a new subject or a step of the plan.
+@pytest.mark.parametrize(("said", "instruction"), [
+    ("order a cbc and a bmp assessment viral illness plan rest", "order a cbc and a bmp"),
+    ("refill her lisinopril she takes it daily and her cough is better", "refill her lisinopril"),
+    ("refill her lisinopril continue the amlodipine", "refill her lisinopril"),
+])
+def test_an_unpunctuated_instruction_stops_at_a_heading_or_a_new_subject(said, instruction):
+    text = transcript(said)
+
+    (listed,) = not_carried_over(text)
+    assert text.text[listed["start"] : listed["end"]] == instruction
+
+
+@pytest.mark.parametrize(
+    "said",
+    ["Send her prescription to the pharmacy.", "No, refill her lisinopril.", "Please record that she reacts to sulfa.",
+     "We need to record the new codeine allergy."],
+)
+def test_the_instructions_next_to_them_are_still_listed_whole(said):
+    text = transcript(said)
+
+    (listed,) = not_carried_over(text)
+    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".").removeprefix("No, ")
+
+
+# What is cut from a value is what is listed, never the rest of its sentence.
+def test_a_value_keeps_the_rest_of_a_sentence_an_instruction_is_cut_from():
+    said = "Order a CBC and recheck in 3 months, she prefers mornings."
+    checked = own(said, said)
+
+    assert checked.pending and checked.value == "recheck in 3 months, she prefers mornings."
 
 
 # Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
@@ -1315,7 +1387,6 @@ def test_an_instruction_said_as_one_is_proposed(said):
         ("We already put an order in last week.", "in_the_past"),
         ("Can you order an MRI?", "question"),
         ("She asked, can you order an MRI.", "quoted"),
-        ("He is alert and well perfused, capillary refill under 2 seconds.", "not_imperative"),
         ("Her mother asked whether we could order an MRI.", "hedged"),
     ],
 )

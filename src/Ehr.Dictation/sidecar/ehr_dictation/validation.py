@@ -173,6 +173,8 @@ WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
 UNDOES_REACH = 3  # words before an instruction not to within which another negation makes it an instruction again
+DIRECTIVE_REACH = 14  # at most, words an instruction reaches past its verb when nothing ends it sooner...
+MARKED_REACH = 30  # ...unless a full stop, question mark, semicolon or line break ends it within this many
 LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and"), or its subject ("penicillin
 # should be added to her allergies")
 MAX_GAP = 1  # a source's own words allowed between two of a value's words (articles and doses are free)
@@ -669,19 +671,31 @@ ORDERS_SECTION = "orders_section"
 ALLERGY_ADDITION = "allergy_addition"
 REASON = {"order": "order", ORDERS_SECTION: "order", "allergy_change": "allergy_change", ALLERGY_ADDITION: "allergy_change"}
 _SAME_SENTENCE = r"(?:(?![.\n]).)"
-# Sent to the pharmacy, said however far on in the sentence (not past what ends it, as SENTENCE_MARK reads it: "2.5 mg"
-# doesn't): "send amoxicillin 500 mg by mouth three times a day for 7 days to her pharmacy". Within a few words, the
-# pharmacy is enough without "to".
-_TO_THE_PHARMACY = rf"(?:[^.!?\n]|(?<=\d)\.(?=\d))*?\b(?:to|into)\s+(?:{_DET}\s+)?(?:\w+\s+){{0,2}}pharmacy\b"
+# Sent to the pharmacy, said however far on in its clause (not past what ends its sentence, as SENTENCE_MARK reads it:
+# "2.5 mg" doesn't; nor past a comma or a new subject, "she went straight to the pharmacy"): "send amoxicillin 500 mg by
+# mouth three times a day for 7 days to her pharmacy". Within a few words, the pharmacy is enough without "to".
+_NO_NEW_SUBJECT = r"(?!\b(?:she|he|they|i|we|you)\b)"
+_TO_THE_PHARMACY = (
+    rf"(?:{_NO_NEW_SUBJECT}[^.,;!?\n]|(?<=\d)\.(?=\d))*?\b(?:to|into)\s+(?:{_DET}\s+)?(?:\w+\s+){{0,2}}pharmacy\b"
+)
+# Within a few words, as before, but not past a comma or a new subject either.
+_NEAR_THE_PHARMACY = rf"(?:{_NO_NEW_SUBJECT}[^.,;!?\n]){{0,60}}?\bpharmacy\b"
+# Sending the patient somewhere is not an order: "send her home", "send her to the pharmacy for a flu shot".
+_NOT_THE_PATIENT = r"(?!\s+(?:her|him|them|me|us|the\s+patient|patient)\s+(?:home|to|back|down|over|away|out|off|up|in)\b)"
 # Placing an order, or a prescription, now: the verb as an instruction ("order", "renew") or under way ("ordering").
 _ORDER_VERB = re.compile(
     r"\b(?:order|ordering|e-?prescribe|prescribe|prescribing|refill|refilling|renew|renewing|e-?rx)\b", re.IGNORECASE
 )
-# Words that make the verb a noun or an adjective ("the order", "a refill", "the ordering physician"), or "in order to",
-# when nothing but a space comes between: "No, order a chest X-ray" and "...the lab. Order a CBC" are instructions.
+# Words that make the verb a noun or an adjective ("the order", "a refill", "the ordering physician", "capillary refill
+# under 2 seconds"), or "in order to", when nothing but a space comes between: "No, order a chest X-ray" and "...the
+# lab. Order a CBC" are instructions.
 _NOUN_BEFORE = frozenset(
-    "a an the this that her his their its my our your no any standing verbal written phone telephone in of lab".split()
+    "a an the this that her his their its my our your no any standing verbal written phone telephone in of lab capillary"
+    .split()
 )
+# After such a word and a comma or a full stop, the verb is still a noun when one of these follows it: "No, refill
+# history shows she picks up every month".
+_COMPOUND_AFTER = frozenset("history number entry request requests status".split())
 _ORDERS = [
     re.compile(
         rf"\b(?:place|put in|putting in|enter|send in|send over|send|call in|phone in|fax|write|writing|give|giving|"
@@ -690,11 +704,9 @@ _ORDERS = [
         re.IGNORECASE,
     ),
     re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
-    # Having it refilled, not that it was: "have her lisinopril refilled", "get that refilled".
-    re.compile(rf"\b(?:have|get|getting)\s+(?:(?:{_DET}|him|them|it)\s+)?(?:\w+\s+){{0,3}}?refilled\b", re.IGNORECASE),
     # "In to" as speech recognition often writes it: "call that into his usual pharmacy".
     re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in(?:to)?\b", re.IGNORECASE),
-    re.compile(rf"\b(?:send|sending)\b(?:{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b|{_TO_THE_PHARMACY})", re.IGNORECASE),
+    re.compile(rf"\b(?:send|sending)\b{_NOT_THE_PATIENT}(?:{_NEAR_THE_PHARMACY}|{_TO_THE_PHARMACY})", re.IGNORECASE),
 ]
 # The model told to make an orders section: "add an orders field with an MRI". Never proposed.
 _ORDERS_SECTION = re.compile(
@@ -745,11 +757,24 @@ _NOT_AN_ORDER = re.compile(
 )
 _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|was|were|had been)\s+$", re.IGNORECASE)
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
-_NOTE_ALLERGY = re.compile(
-    rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg"
-    r"|\b(?:note|record|document|flag|make\s+a\s+note)\s+that\b[^.,;:!?\n]{0,40}?\b(?:allerg|react)",
+# "Note" or "record" an allergy, not "note that" (a conjunction, not a determiner: "note that her allergic rhinitis...").
+_NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?!that\b)(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
+# Noting that the patient is allergic or reacts to something, with nothing after it but the reaction: "note that she's
+# allergic to penicillin", "record that she reacts to sulfa with hives". Not her allergic rhinitis, no known allergies,
+# a negation ("she is not allergic"), or a sentence that goes on ("..., so we avoided amoxicillin").
+# A word that would say more than the substance and its reaction: a joined clause, or when.
+_NOT_MORE = (
+    r"(?!(?:and|but|or|so|which|because|since|while|when|before|after|during|last|ago|yesterday|previously|years?|months?|"
+    r"weeks?|days?)\b)"
+)
+_NOTED_ALLERGIC = re.compile(
+    r"\b(?:note|record|document|flag|make\s+a\s+note)\s+that\s+(?:she|he|they|the\s+patient)"
+    r"(?:['’]s\s+allergic|\s+(?:is|are|was|were)\s+allergic|\s+(?:reacts|reacted|(?:has\s+)?had\s+a\s+reaction))\s+to"
+    rf"(?:\s+{_NOT_MORE}[\w'’-]+){{1,4}}?(?:\s+with(?:\s+{_NOT_MORE}[\w'’-]+){{1,4}})?\s*(?=[.;!?\n]|$)",
     re.IGNORECASE,
 )
+# Having it refilled, not that it was or someone is trying to: "have her lisinopril refilled", "get that refilled".
+_REFILLED = re.compile(rf"\b(?:have|get|getting)\s+(?:(?:{_DET}|him|them|it)\s+)?(?:\w+\s+){{0,3}}?refilled\b", re.I)
 _ASKING = re.compile(r"\b(?:need to|make sure(?: to)?|remember to|be sure to|don't forget to|do not forget to)\b", re.I)
 _NOTING = frozenset({"i", "we"})
 
@@ -783,7 +808,9 @@ def _not_in_the_past(text: str, match: re.Match, clause: int) -> bool:
 
 _PLACED = [
     ("order", _CALL_IN, _calls_in_an_order),
+    ("order", _REFILLED, _at_clause_start),
     (ALLERGY_ADDITION, _NOTE_ALLERGY, _at_clause_start),
+    (ALLERGY_ADDITION, _NOTED_ALLERGIC, _at_clause_start),
 ]
 # Instructions whose subject comes first ("penicillin should be added to her allergies"): their span starts with it.
 _PASSIVE = [
@@ -798,7 +825,7 @@ _PASSIVE = [
     ("allergy_change", re.compile(
         rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,40}}?\b(?:come|comes|coming|go|goes|be taken|be removed)\s+off\b", re.I
     )),
-    ("order", re.compile(rf"\bsent\b(?:{_SAME_SENTENCE}{{0,40}}?\bpharmacy\b|{_TO_THE_PHARMACY})", re.IGNORECASE)),
+    ("order", re.compile(rf"\bsent\b{_NOT_THE_PATIENT}(?:{_NEAR_THE_PHARMACY}|{_TO_THE_PHARMACY})", re.IGNORECASE)),
 ]
 _PASSIVE_PLACES = {"order": _not_in_the_past}
 # What can lead up to an instruction ("go ahead and", "please", "I'll"); anything else ends its span, so the plan said
@@ -844,7 +871,11 @@ def _directives(text: str) -> list[tuple[int, int, str, int]]:
     for match in _ORDER_VERB.finditer(text):
         before = [token for token in words if token.end <= match.start()][-1:]
         after = text[match.end() : match.end() + 4].lower()
-        if (before and before[0].text in _NOUN_BEFORE and not text[before[0].end : match.start()].strip()) or after.startswith(" of"):
+        following = next((token.text for token in words if token.start >= match.end()), "")
+        if (
+            before and before[0].text in _NOUN_BEFORE
+            and (not text[before[0].end : match.start()].strip() or following in _COMPOUND_AFTER)
+        ) or after.startswith(" of"):
             continue
         matches.append((match.start(), match.end(), "order"))
     for kind, patterns in (("order", _ORDERS), (ORDERS_SECTION, [_ORDERS_SECTION]), (ALLERGY_ADDITION, _ALLERGY_ADDITIONS),
@@ -879,6 +910,14 @@ def _directives(text: str) -> list[tuple[int, int, str, int]]:
             if token.start < clause or (token.text in CLAUSE_STARTS | {"and"} if subject else token.text not in LEAD_IN):
                 break
             span_start = token.start
+        # Asking for it is part of it, so it is listed and cut together: "we need to record the new codeine allergy".
+        asking = None if subject else re.search(rf"(?:{_ASKING.pattern})\s*$", text[clause:span_start], re.IGNORECASE)
+        if asking:
+            span_start = clause + asking.start()
+            for token in reversed([token for token in words if clause <= token.start and token.end <= span_start]):
+                if token.text not in LEAD_IN:
+                    break
+                span_start = token.start
         spans.append((span_start, _directive_end(text, words, end), kind, start))
     return spans
 
@@ -912,13 +951,18 @@ CARRIES_ON = frozenset("to for of include includes including with as".split())
 TARGET = re.compile(r"(?:allerg\w*|list|record|pharmacy)$", re.IGNORECASE)
 # What can follow "allergy" and still name the list: "allergy list", "allergy record".
 LIST_WORDS = frozenset("list record".split())
+# A note's headings, which end an instruction said without punctuation before them.
+HEADINGS = frozenset("assessment plan impression exam examination observations vitals subjective objective".split())
 
 
 def _directive_end(text: str, words: list[Token], end: int) -> int:
-    """Where an instruction matched up to `end` stops: at the end of its sentence or a semicolon, or at a word that
-    starts another clause, however long it is, so the whole of it is cut from a field and listed ("Order a CBC and a BMP
-    and a lipid panel and a TSH and a urinalysis and a chest x-ray"). One that already names the allergy list or the
-    pharmacy it goes to stops there ("take amoxicillin off her allergy list"), unless a word carries it on."""
+    """Where an instruction matched up to `end` stops: at the end of its sentence or a semicolon; at a word that starts
+    another clause, a new subject or step of the plan (NEXT_CLAUSE), or a heading (HEADINGS); so a long one is cut and
+    listed whole when punctuation ends it ("Order a CBC and a BMP and a lipid panel and a TSH and a urinalysis and a
+    chest x-ray."). It reaches at most DIRECTIVE_REACH words past its verb, unless its sentence's punctuation ends it
+    within MARKED_REACH: speech recognition that wrote no punctuation never makes a paragraph one instruction. One that
+    already names the allergy list or the pharmacy it goes to stops there ("take amoxicillin off her allergy list"),
+    unless a word carries it on."""
     stop = min(_sentence_end(text, end), (text.find(";", end) + 1 or len(text) + 1) - 1)
     end += len(re.match(r"[\w'’]*", text[end:]).group())  # the whole of the word the match ended in ("allergies")
     following = [word for word in words if word.start >= end and word.end <= stop]
@@ -926,9 +970,16 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
         end, following = following[0].end, following[1:]
     if TARGET.search(text[:end]) and not (following and following[0].text in CARRIES_ON):
         return end
+    if not (stop < len(text) and len(following) <= MARKED_REACH):
+        following = following[:DIRECTIVE_REACH]
     joined = False
     for word in following:
-        if word.text in CLAUSE_STARTS or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start])):
+        if (
+            word.text in CLAUSE_STARTS
+            or word.text in HEADINGS
+            or (word.text in NEXT_CLAUSE and (joined or word is not following[0]))
+            or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start]))
+        ):
             break
         joined = word.text == "and"
         if not joined:
@@ -938,18 +989,14 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
 
 SENTENCE = re.compile(r"(?<=[.!?;\n])\s+")
 TRAILING_CONNECTOR = re.compile(r"(?:[\s,;:-]|\b(?:and|or|then|also|so)\b)+$", re.IGNORECASE)
-# Words a cut sentence can't end on: what came before them depends on the instruction cut after them ("Do not start
-# metformin until we order an A1c" is not "Do not start metformin"), so the whole sentence goes.
-DANGLING = frozenset(
-    """until till before after unless if when whenever once because since while as that which who whom whose where to
-    for of with without by from than about not no never""".split()
-)
+LEADING_CONNECTOR = re.compile(r"^(?:[\s,;:-]|\b(?:and|or|then|also|so)\b)+", re.IGNORECASE)
 
 
 def _without_instructions(value: str) -> tuple[str, int]:
-    """The value with each instruction cut out: a sentence is cut where its instruction starts ("Start metformin, and
-    order an A1c." keeps "Start metformin."), and dropped if the instruction is all it holds or what is left would end
-    on a word that needs it (DANGLING). Also how many were cut."""
+    """The value with exactly its instructions cut out, each as not_carried_over() lists it (directives()): what is cut
+    is what is listed, never the rest of its sentence ("Order a CBC and recheck in 3 months." keeps "recheck in 3
+    months."). A joining word or comma left at a cut ("and", "then") goes with it, and a sentence left with no word that
+    says anything (only stopwords and lead-ins) goes too. Also how many were cut."""
     kept: list[str] = []
     cut = 0
     for sentence in SENTENCE.split(value):
@@ -958,12 +1005,16 @@ def _without_instructions(value: str) -> tuple[str, int]:
             kept.append(sentence)
             continue
         cut += len(found)
-        head = TRAILING_CONNECTOR.sub("", sentence[: found[0][0]])
-        words = tokens(head)
-        if words and words[-1].text not in DANGLING and any(
-            token.text not in LEAD_IN and token.text not in STOPWORDS for token in words
-        ):
-            kept.append(head + ".")
+        bounds = [0, *(edge for start, end, _ in found for edge in (start, end)), len(sentence)]
+        pieces = [sentence[bounds[i] : bounds[i + 1]] for i in range(0, len(bounds), 2)]
+        rest = ""
+        for i, piece in enumerate(pieces):
+            piece = TRAILING_CONNECTOR.sub("", piece) if i < len(pieces) - 1 else piece
+            piece = (LEADING_CONNECTOR.sub("", piece) if i else piece).strip()
+            if piece:
+                rest += (" " if rest and piece[0].isalnum() else "") + piece
+        if any(token.text not in LEAD_IN and token.text not in STOPWORDS for token in tokens(rest)):
+            kept.append(rest if rest[-1] in ".!?;" else rest + ".")
     return " ".join(kept).strip(), cut
 
 
