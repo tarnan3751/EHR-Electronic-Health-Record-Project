@@ -67,7 +67,7 @@ static class FhirRequests
             VALUES (@id, @patient, @code, @display, 'active', '2021-05-01')
             """;
 
-        var taken = DateTime.UtcNow.AddMinutes(-30);
+        var taken = (await apps.Database.NowAsync()).AddMinutes(-30);
         using (var recorded = await VitalTests.RecordAtAsync(session.Client, patient, taken.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),
             (VitalSign.Systolic, "128"), (VitalSign.Diastolic, "82"), (VitalSign.HeartRate, "72"), (VitalSign.Temperature, "36.8"),
             (VitalSign.RespiratoryRate, "16"), (VitalSign.OxygenSaturation, "97"), (VitalSign.Weight, "70.5"), (VitalSign.Height, "172")))
