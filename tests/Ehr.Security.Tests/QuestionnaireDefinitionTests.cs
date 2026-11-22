@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Ehr.Data.Reference;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
@@ -33,7 +34,7 @@ public class QuestionnaireDefinitionTests(MigratedDatabase database) : IClassFix
         "44258-2 | Feeling bad about yourself — or that you are a failure or have let yourself or your family down | frequency | scored",
         "44252-5 | Trouble concentrating on things, such as reading the newspaper or watching television | frequency | scored",
         "44253-3 | Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual | frequency | scored",
-        "44260-8 | Thoughts that you would be better off dead or of hurting yourself in some way | frequency | scored alert",
+        "44260-8 | Thoughts that you would be better off dead or of hurting yourself in some way | frequency | scored alert help=self-harm",
         "69722-7 | If you checked off any problems, how difficult have these problems made it for you to do your work, take care of things at home, or get along with other people? | difficulty | optional",
     ];
 
@@ -144,6 +145,21 @@ public class QuestionnaireDefinitionTests(MigratedDatabase database) : IClassFix
         }
     }
 
+    // An alert question names a notice the portal words (QuestionnaireHelp), or the patient would be told nothing about
+    // getting help.
+    [Fact]
+    public async Task Every_alert_question_names_a_notice_the_portal_knows()
+    {
+        foreach (var (code, lines) in await HeldAsync())
+        {
+            foreach (var alert in lines.Where(line => line.StartsWith("item ", StringComparison.Ordinal) && line.Contains(" alert", StringComparison.Ordinal)))
+            {
+                var help = alert.Split(' ').FirstOrDefault(mark => mark.StartsWith("help=", StringComparison.Ordinal))?["help=".Length..];
+                Assert.True(help is not null && QuestionnaireHelp.All.Contains(help), $"{code}: an alert question names no notice the portal knows: {alert}");
+            }
+        }
+    }
+
     // The rows as the app's role reads them (reference data: grants only), each turned into the lines above.
     async Task<Dictionary<string, List<string>>> HeldAsync()
     {
@@ -159,7 +175,8 @@ public class QuestionnaireDefinitionTests(MigratedDatabase database) : IClassFix
             var lines = new List<string> { "title " + reader.GetString(1), "prompt " + root.GetProperty("prompt").GetString() };
             foreach (var item in root.GetProperty("items").EnumerateArray())
             {
-                var marks = string.Join(' ', new[] { "scored", "optional", "alert" }.Where(mark => item.TryGetProperty(mark, out var value) && value.GetBoolean()));
+                var marks = string.Join(' ', new[] { "scored", "optional", "alert" }.Where(mark => item.TryGetProperty(mark, out var value) && value.GetBoolean())
+                    .Concat(item.TryGetProperty("help", out var help) ? [$"help={help.GetString()}"] : []));
                 lines.Add($"item {item.GetProperty("code").GetString()} | {item.GetProperty("text").GetString()} | {item.GetProperty("answers").GetString()} | {marks}");
             }
 

@@ -74,6 +74,17 @@ public class Questionnaire
     public string? Copyright { get; set; }
 }
 
+// The notices a questionnaire's alert question may name (its definition's help): the portal words each (FormNotices in
+// the web app) and shows it with an answer to that question that needs review. A definition naming any other fails
+// QuestionnaireDefinitionTests, and FormNotices lacking words for one fails the web tests.
+public static class QuestionnaireHelp
+{
+    // Thoughts of self-harm: what to do now, and the crisis line.
+    public const string SelfHarm = "self-harm";
+
+    public static readonly string[] All = [SelfHarm];
+}
+
 // An ingredient of a drug product, both by RxNorm code: what a medication is made of, for checking it against
 // allergies and other medications.
 public class DrugIngredient

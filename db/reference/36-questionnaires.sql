@@ -7,7 +7,9 @@
 --   prompt        the sentence above the questions
 --   items         the questions in order: code (LOINC), text, answers (the name of a list in answerLists), and
 --                 scored (its answer's score counts in the total), optional (it may be left unanswered) and alert
---                 (any answer that scores more than 0 is put in the care team's inbox), each false when left out
+--                 (any answer that scores more than 0 is put in the care team's inbox), each false when left out; and,
+--                 for an alert question, help: the name of the notice the portal shows with such an answer
+--                 (FormNotices in the web app words each; a test fails for a name it doesn't know)
 --   answerLists   the lists of answers: code (LOINC), text and, for a scored list, score
 --   total         the total's code (LOINC) and the most it can be
 --   bands         the severity band each total falls in: from and to, both included, and its words
@@ -57,7 +59,7 @@ INSERT INTO incoming_questionnaires (code, title, definition, copyright) VALUES
             -- Question 9 counts "if present at all" (Kroenke 2001, Methods), and "a final decision about the actual risk
             -- of self-harm requires a clinical interview" (instructions.pdf, page 2): any answer but "Not at all" alerts.
             jsonb_build_object('code', '44260-8', 'text', 'Thoughts that you would be better off dead or of hurting yourself in some way',
-                'answers', 'frequency', 'scored', true, 'alert', true),
+                'answers', 'frequency', 'scored', true, 'alert', true, 'help', 'self-harm'),
             -- Under the questions on the form; "not used in calculating any PHQ score" (instructions.pdf, page 2).
             jsonb_build_object('code', '69722-7',
                 'text', 'If you checked off any problems, how difficult have these problems made it for you to do your work, take care of things at home, or get along with other people?',
