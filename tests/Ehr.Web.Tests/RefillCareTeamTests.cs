@@ -33,7 +33,10 @@ public class RefillCareTeamTests(WebApps apps) : IClassFixture<WebApps>
             Assert.True(removed.IsSuccessStatusCode);
         }
 
-        Assert.DoesNotContain("A patient asked to renew a medication", Said(await session.Client.GetStringAsync("/inbox", Cancel)));
+        // Their item for this request is done and gone from their inbox. By this request's own link and rows, not by the
+        // item's words: the fixture's clinician is shared, and another test's waiting request may sit in the same inbox.
+        Assert.Equal([$"{clinician.Id} true"], await ItemsAsync(apps, patient.Patient, request));
+        Assert.DoesNotContain($"href=\"{ReviewPath(patient.Patient, request)}\"", await session.Client.GetStringAsync("/inbox", Cancel));
         // On the patient's page nothing changes: the request waits.
         Assert.Contains("Waiting for the care team to answer.", Said(await patient.Client.GetStringAsync(PortalPath, Cancel)));
 
