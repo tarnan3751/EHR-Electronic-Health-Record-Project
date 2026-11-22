@@ -8,7 +8,8 @@
 --   which patient, when on this database's clock, how many people would speak, who agreed). Never changed or deleted.
 -- - ehr.ai_note_reviews: a review of a conversation (mode 'ambient') names its consent, which allows no other review and
 --   was given to the same clinician for the same patient at most 10 minutes before. It and its proposals are sensitive
---   items from the start, and its mode, consent and sensitivity never change.
+--   items from the start, and its mode, consent and sensitivity never change. Its stored result keeps no word of the
+--   conversation, only where each passage was and who said it.
 -- - ehr.ambient_transcripts: the conversation's transcript, kept only while its review is open: written as the review
 --   is staged, which leaves it pending; deleted in the transaction that finishes or ends the review; and deleted by
 --   ehr.purge_ambient_transcripts, as the system's act, 7 days after it was written if nobody has. Once it is gone from a
@@ -37,16 +38,80 @@ CREATE OR REPLACE TRIGGER ambient_consents_guard
 -- A review of a conversation needs a consent of its own, fresh and given to its clinician for its patient (the foreign
 -- key holds the patient); its mode, consent and sensitivity never change. Runs as the caller, whose row-level security
 -- shows only their own consents. Beside 55-ai-review.sql's guard, which holds the rest of a review's rules.
+-- Its stored result, set once as it is staged (or finished straight from recording), keeps no word of the conversation,
+-- which is kept apart in ehr.ambient_transcripts and only while the review is open; it would otherwise stay for good, in
+-- the review and in its write's audit event. Exactly what it may hold, as DictationApi.TrustedResult writes it:
+--   transcript: {text: "" or none, final, segments: [{start, end, startMs, endMs, speakerGroup: numbers; final: a
+--     boolean; unclear: null or a code; speaker: a code}]};
+--   sorting (55-ai-review.sql holds it) and reason, a code;
+--   fields: null, or the note's fields (and an earlier review's history), each {status: "pending", value, sources: [{start,
+--     end, speaker}], warnings: [{code, start, end}]} or {status: "empty", reasons: [codes]};
+--   notCarriedOver: [{reason, start, end}]; proposals: none (a list that is empty, at most);
+--   provenance and message.
+-- Every place is numbers and every code one of the contract's (DictationApiContract.cs: Speaker, Unclear, WarningCode,
+-- Instruction, SortingFailure; an empty field's reasons are the service's, held to the form of a code), so a word of the
+-- conversation has nowhere to sit but the three that are text by design: a pending field's value, the words a proposal
+-- offers, kept as a dictation's are; provenance, the service's names for its models and code; and message, the app's
+-- own sentence for a result that couldn't be sorted. Those are held to their types only.
 CREATE OR REPLACE FUNCTION ehr.guard_ambient_review() RETURNS trigger
     LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     consent ehr.ambient_consents%ROWTYPE;
+    result jsonb := NEW.result_json;
+    fields jsonb := CASE WHEN jsonb_typeof(NEW.result_json -> 'fields') = 'object' THEN NEW.result_json -> 'fields' ELSE '{}' END;
 BEGIN
     IF TG_OP = 'UPDATE' THEN
         IF NEW.mode IS DISTINCT FROM OLD.mode OR NEW.consent_id IS DISTINCT FROM OLD.consent_id
            OR NEW.sensitive IS DISTINCT FROM OLD.sensitive THEN
             RAISE EXCEPTION 'A review''s mode, consent and sensitivity never change' USING ERRCODE = '23514';
+        END IF;
+        IF NEW.mode = 'ambient' AND result IS DISTINCT FROM OLD.result_json AND result IS NOT NULL AND (
+            jsonb_typeof(result) <> 'object'
+            OR EXISTS (SELECT 1 FROM jsonb_object_keys(result) k
+                       WHERE k NOT IN ('transcript', 'sorting', 'reason', 'fields', 'notCarriedOver', 'proposals', 'provenance', 'message'))
+            OR jsonb_typeof(result -> 'transcript') IS DISTINCT FROM 'object'
+            OR EXISTS (SELECT 1 FROM jsonb_object_keys(result -> 'transcript') k WHERE k NOT IN ('text', 'final', 'segments'))
+            OR coalesce(result -> 'transcript' -> 'text', '""') <> '""'
+            OR jsonb_typeof(result -> 'transcript' -> 'segments') IS DISTINCT FROM 'array'
+            OR EXISTS (SELECT 1 FROM jsonb_array_elements(result -> 'transcript' -> 'segments') x
+                       WHERE jsonb_typeof(x) <> 'object' OR EXISTS (SELECT 1 FROM jsonb_each(x) e WHERE NOT (
+                           e.key IN ('start', 'end', 'startMs', 'endMs', 'speakerGroup') AND jsonb_typeof(e.value) = 'number'
+                           OR e.key = 'final' AND jsonb_typeof(e.value) = 'boolean'
+                           OR e.key = 'unclear' AND e.value IN ('null', '"too_quiet"', '"too_noisy"', '"low_confidence"')
+                           OR e.key = 'speaker' AND e.value IN ('"clinician"', '"patient"', '"other"', '"unsure"'))))
+            OR result -> 'reason' IS NOT NULL AND result -> 'reason' NOT IN ('"model_unavailable"', '"model_timeout"',
+                   '"model_output_invalid"', '"transcript_too_long"', '"transcription_failed"')
+            OR jsonb_typeof(result -> 'fields') NOT IN ('object', 'null')
+            OR EXISTS (SELECT 1 FROM jsonb_each(fields) f
+                       WHERE f.key NOT IN ('subjective', 'objective', 'assessment', 'plan', 'history')
+                          OR jsonb_typeof(f.value) <> 'object'
+                          OR EXISTS (SELECT 1 FROM jsonb_each(f.value) e WHERE NOT (
+                               e.key = 'status' AND e.value IN ('"pending"', '"empty"')
+                               OR e.key = 'value' AND f.value -> 'status' = '"pending"' AND jsonb_typeof(e.value) = 'string'
+                               OR e.key IN ('sources', 'warnings') AND f.value -> 'status' = '"pending"' AND jsonb_typeof(e.value) = 'array'
+                               OR e.key = 'reasons' AND f.value -> 'status' = '"empty"' AND jsonb_typeof(e.value) = 'array'
+                                  AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(e.value) r
+                                                  WHERE jsonb_typeof(r) <> 'string' OR r #>> '{}' !~ '^[a-z_]{1,64}$')))
+                          OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(f.value -> 'sources') = 'array' THEN f.value -> 'sources' ELSE '[]' END) x
+                                     WHERE jsonb_typeof(x) <> 'object' OR EXISTS (SELECT 1 FROM jsonb_each(x) e WHERE NOT (
+                                         e.key IN ('start', 'end') AND jsonb_typeof(e.value) = 'number'
+                                         OR e.key = 'speaker' AND e.value IN ('"clinician"', '"patient"', '"other"', '"unsure"'))))
+                          OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(f.value -> 'warnings') = 'array' THEN f.value -> 'warnings' ELSE '[]' END) x
+                                     WHERE jsonb_typeof(x) <> 'object' OR EXISTS (SELECT 1 FROM jsonb_each(x) e WHERE NOT (
+                                         e.key IN ('start', 'end') AND jsonb_typeof(e.value) = 'number'
+                                         OR e.key = 'code' AND e.value IN ('"possible_correction"', '"near_unclear_passage"',
+                                             '"one_field_holds_dictation"', '"speaker_unsure"', '"other_speaker"', '"patients_own_words"',
+                                             '"part_not_offered"')))))
+            OR result -> 'notCarriedOver' IS NOT NULL AND jsonb_typeof(result -> 'notCarriedOver') <> 'array'
+            OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(result -> 'notCarriedOver') = 'array' THEN result -> 'notCarriedOver' ELSE '[]' END) x
+                       WHERE jsonb_typeof(x) <> 'object' OR EXISTS (SELECT 1 FROM jsonb_each(x) e WHERE NOT (
+                           e.key IN ('start', 'end') AND jsonb_typeof(e.value) = 'number'
+                           OR e.key = 'reason' AND e.value IN ('"order"', '"allergy_change"'))))
+            OR result -> 'proposals' NOT IN ('null', '[]')
+            OR jsonb_typeof(result -> 'provenance') NOT IN ('object', 'null')
+            OR jsonb_typeof(result -> 'message') NOT IN ('string', 'null')) THEN
+            RAISE EXCEPTION 'A review of a conversation keeps no word of it in its stored result' USING ERRCODE = '23514';
         END IF;
         RETURN NEW;
     END IF;

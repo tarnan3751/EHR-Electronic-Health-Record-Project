@@ -225,6 +225,85 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
             "SELECT r.state || ' ' || (SELECT count(*) FROM ehr.ambient_transcripts t WHERE t.id = r.id) FROM ehr.ai_note_reviews r WHERE r.id = @review"));
     }
 
+    [Fact]
+    public async Task A_conversations_review_keeps_no_word_of_it_in_its_stored_result()
+    {
+        // Every place words of the conversation could sit beside where each passage was and who said it: the transcript's
+        // text, a segment, a field's source or warning, an instruction not carried over, an empty field's reasons, a part
+        // of the result the contract doesn't have, or a code that isn't one. Staged, or finished straight from recording.
+        var visit = await RecordingAsync();
+        const string Said = "Synthetic words about a cough";
+        const string Source = """{"start":0,"end":9,"speaker":"patient"}""";
+        const string Segment = """{"start":0,"end":9,"startMs":0,"endMs":900,"final":true""";
+        string Put(string what, string with) => Result.Replace(what, with, StringComparison.Ordinal);
+        string[] variants =
+        [
+            Put("\"text\":\"\"", $"\"text\":\"{Said}\""),
+            Put("\"segments\":[]", $$"""
+                "segments":[{{Segment}},"speaker":"patient","text":"{{Said}}"}]
+                """),
+            Put("\"segments\":[]", $$"""
+                "segments":[{{Segment}},"speaker":"{{Said}}"}]
+                """),
+            Put("\"segments\":[]", $$"""
+                "segments":[{{Segment}},"unclear":"{{Said}}"}]
+                """),
+            Put("\"segments\":[]", $$"""
+                "segments":["{{Said}}"]
+                """),
+            Put(Source, $$"""
+                {"start":0,"end":9,"speaker":"patient","said":"{{Said}}"}
+                """),
+            Put("\"warnings\":[]", $$"""
+                "warnings":[{"code":"speaker_unsure","start":0,"end":9,"said":"{{Said}}"}]
+                """),
+            Put("\"warnings\":[]", $$"""
+                "warnings":[{"code":"{{Said}}","start":0,"end":9}]
+                """),
+            Put("\"sorting\":\"done\",", $$"""
+                "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":9,"text":"{{Said}}"}],
+                """),
+            Put("\"sorting\":\"done\",", $$"""
+                "sorting":"done","transcriptText":"{{Said}}",
+                """),
+            Put("\"fields\":{", $$"""
+                "fields":{"objective":{"status":"empty","reasons":["{{Said}}"]},
+                """),
+            Put("\"fields\":{", $$"""
+                "fields":{"objective":{"status":"empty","reasons":[],"value":"{{Said}}"},
+                """),
+        ];
+        var staged = Stage.Replace("@result", "@variant", StringComparison.Ordinal);
+        foreach (var variant in variants)
+        {
+            Assert.NotEqual(Result, variant);
+            await Refused("23514", () => Accounts.ExecuteAsync(App, visit.Actor, staged, [.. Parameters(visit), ("variant", variant)]));
+        }
+
+        // Finished straight from recording, with nothing proposed.
+        await Refused("23514", () => Accounts.ExecuteAsync(App, visit.Actor,
+            "UPDATE ehr.ai_note_reviews SET state = 'completed', imported_version = 1, result_json = @variant::jsonb WHERE id = @review",
+            [.. Parameters(visit), ("variant", $$"""
+                {"transcript":{"text":"{{Said}}","final":true,"segments":[]},"sorting":"done","fields":null,"notCarriedOver":[]}
+                """)]));
+
+        // As the app stores one: places, codes, an empty field's reasons, provenance.
+        var stored = Put("\"segments\":[]", $$"""
+                "segments":[{{Segment}},"unclear":null,"speakerGroup":2,"speaker":"patient"}]
+                """)
+            .Replace("\"warnings\":[]", """
+                "warnings":[{"code":"patients_own_words","start":0,"end":9}]
+                """, StringComparison.Ordinal)
+            .Replace("\"fields\":{", """
+                "fields":{"objective":{"status":"empty","reasons":["not_dictated"]},
+                """, StringComparison.Ordinal)
+            .Replace("\"sorting\":\"done\",", """
+                "sorting":"done","notCarriedOver":[{"reason":"order","start":0,"end":9}],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null},
+                """, StringComparison.Ordinal);
+        await Accounts.ExecuteAsync(App, visit.Actor, staged, [.. Parameters(visit), ("variant", stored)]);
+        Assert.Equal(["pending"], await Query(visit, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
+    }
+
     // The writes of listening to a visit, among a patient's events: the consent, the review, its proposals, the transcript.
     const string Ours = "action IN ('insert', 'update', 'delete') AND table_name IN ('ambient_consents', 'ai_note_reviews', 'ai_field_proposals', 'ambient_transcripts')";
 
