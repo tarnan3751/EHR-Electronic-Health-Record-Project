@@ -53,7 +53,10 @@ and every check reads the cleaned text. The checks, each with the reason code re
   its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one
   is being placed now ("I'm ordering"), to write, send, refill or renew a prescription, to call in anything ("call in
   something for her nausea", not "call in sick"), to send something to the pharmacy, to make an orders section, or to
-  change the allergy list (add, remove, record, clear, update); hyphens are ignored ("re-fill"). A plan stays a plan:
+  change the allergy list (add, remove, record, clear, update), whoever's list it is called ("her", "his", "their",
+  "my", "your": "I'll add penicillin to your allergies", as said to the patient); hyphens are ignored ("re-fill"). A word
+  before the verb makes it a noun only right before it ("no order", "the lab order"): after a comma or a full stop the
+  verb starts an instruction ("No, order a chest X-ray", "Check the lab. Order a CBC"). A plan stays a plan:
   "start", "continue", "increase" or "stop" a drug, orders in the past or by someone else ("her cardiologist ordered an
   echo last year"), and an instruction not to ("don't order an A1c", "no need to order labs"), pass.
 - no_sources, source_too_short (under two words, without a number), source_not_in_transcript (compared word by word,
@@ -619,7 +622,7 @@ def _sentence_end(text: str, start: int) -> int:
 
 # ---- Orders and allergy-list changes (FR-14) ----------------------------------------------------------------------
 
-_DET = r"(?:an?|the|her|his|their|this|that|my|our|its)"
+_DET = r"(?:an?|the|her|his|their|this|that|my|our|its|your)"
 # Each instruction is an order or an allergy change (its reason in notCarriedOver), and, finer, which a dictation may
 # propose: an order, unless it asks the software for an orders section, and an allergy added (ALLERGY_ADDITION).
 ORDERS_SECTION = "orders_section"
@@ -630,7 +633,8 @@ _SAME_SENTENCE = r"(?:(?![.\n]).)"
 _ORDER_VERB = re.compile(
     r"\b(?:order|ordering|e-?prescribe|prescribe|prescribing|refill|refilling|renew|renewing|e-?rx)\b", re.IGNORECASE
 )
-# Words that make the verb a noun or an adjective ("the order", "a refill", "the ordering physician"), or "in order to".
+# Words that make the verb a noun or an adjective ("the order", "a refill", "the ordering physician"), or "in order to",
+# when nothing but a space comes between: "No, order a chest X-ray" and "...the lab. Order a CBC" are instructions.
 _NOUN_BEFORE = frozenset(
     "a an the this that her his their its my our your no any standing verbal written phone telephone in of lab".split()
 )
@@ -785,9 +789,9 @@ def _directives(text: str) -> list[tuple[int, int, str, int]]:
     words = tokens(text)
     matches: list[tuple[int, int, str]] = []
     for match in _ORDER_VERB.finditer(text):
-        before = [token.text for token in words if token.end <= match.start()][-1:]
+        before = [token for token in words if token.end <= match.start()][-1:]
         after = text[match.end() : match.end() + 4].lower()
-        if (before and before[0] in _NOUN_BEFORE) or after.startswith(" of"):
+        if (before and before[0].text in _NOUN_BEFORE and not text[before[0].end : match.start()].strip()) or after.startswith(" of"):
             continue
         matches.append((match.start(), match.end(), "order"))
     for kind, patterns in (("order", _ORDERS), (ORDERS_SECTION, [_ORDERS_SECTION]), (ALLERGY_ADDITION, _ALLERGY_ADDITIONS),

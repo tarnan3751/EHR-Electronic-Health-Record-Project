@@ -791,6 +791,53 @@ def test_every_instruction_in_the_transcript_is_reported_as_not_carried_over():
     ]
 
 
+# A word that makes the verb a noun ("no order", "the lab order") does so only right before it: after a comma or a full
+# stop the verb starts an instruction, which is cut from the field and listed (the expansion plan's step 15 fixed this
+# gap, which step 14's rule had).
+@pytest.mark.parametrize(
+    "said",
+    ["No, order a chest X-ray today.", "The plan: no, refill her lisinopril.", "No. Order a chest X-ray.", "Check the lab. Order a CBC."],
+)
+def test_an_instruction_after_a_word_that_could_make_it_a_noun_is_cut_and_listed(said):
+    text = transcript(f"Continue lisinopril. {said}")
+
+    plan = own(text.text, "Continue lisinopril. " + said)
+
+    assert len(not_carried_over(text)) == 1
+    assert "chest" not in plan.value.lower() and "refill" not in plan.value.lower() and "cbc" not in plan.value.lower()
+
+
+@pytest.mark.parametrize("said", ["No order today.", "There's no refill needed.", "Your refill is ready.", "Your order is in.", "Check the lab order."])
+def test_a_noun_order_or_refill_is_not_an_instruction(said):
+    assert not_carried_over(transcript(said)) == []
+
+
+# Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
+@pytest.mark.parametrize(
+    ("said", "reason"),
+    [
+        ("I'll add penicillin to your allergies.", "allergy_change"),
+        ("I'll add penicillin to your allergy list.", "allergy_change"),
+        ("Take amoxicillin off your allergy list.", "allergy_change"),
+        ("Remove the penicillin from your allergies.", "allergy_change"),
+        ("Make sure sulfa is on your allergy list.", "allergy_change"),
+        ("Penicillin should be added to your allergies.", "allergy_change"),
+        ("I'll update your allergy list.", "allergy_change"),
+        ("I'll send your prescription to the pharmacy.", "order"),
+        ("I'll send that to your pharmacy.", "order"),
+        ("I'll refill your lisinopril.", "order"),
+        ("I'll put your order in today.", "order"),
+        ("Please add penicillin to my allergies.", "allergy_change"),
+        ("Put sulfa on their allergy list.", "allergy_change"),
+    ],
+)
+def test_an_instruction_about_your_allergies_or_prescription_is_listed(said, reason):
+    text = transcript(f"Continue lisinopril. {said}")
+
+    assert [r["reason"] for r in not_carried_over(text)] == [reason]
+    assert own(text.text, "Continue lisinopril. " + said).value == "Continue lisinopril."
+
+
 def test_an_instruction_without_punctuation_reaches_only_its_own_words():
     text = transcript("start lisinopril 10 mg daily and go ahead and order a basic metabolic panel")
 
