@@ -254,15 +254,30 @@ REVOKE ALL ON FUNCTION ehr.tell_care_team_of_answer(uuid, uuid, uuid) FROM PUBLI
 -- When an answer is stored: told at once, in the same statement. First a shared hold on the alerts' lock (an advisory
 -- lock on 'form-alert holders'), which an account being disabled takes alone (below): so an answer told to someone
 -- at the moment their account is disabled is either seen by the disable, which tells it again, or waits for it and
--- leaves that account out. Answers don't wait for each other. Runs as its owner, to write the inbox, which no runtime
--- role may (10-grants.sql); its search_path is pinned, and nobody may call it: only the trigger runs it.
+-- leaves that account out. Answers don't wait for each other. A disable holds the lock only while its transaction is
+-- open, which from the Staff page is one request; but an admin's open SQL session could hold it for as long as it
+-- stays open, so the wait is bounded here, by the patient's side (from the step's third check): at most 5 seconds,
+-- with lock_timeout set for that one step and put back after. If the lock isn't got by then, the answer is stored and
+-- told by the rule just the same, without it: for that one answer the race the lock closes is open again (an account
+-- being disabled at that moment could be the only one told; a clinician joining the panel later still is), which is
+-- better than refusing or losing the patient's answer for an admin's slow transaction. Runs as its owner, to write the
+-- inbox, which no runtime role may (10-grants.sql); its search_path is pinned, and nobody may call it: only the trigger
+-- runs it.
 CREATE OR REPLACE FUNCTION ehr.deliver_questionnaire_alert() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
 AS $$
+DECLARE
+    previous text := current_setting('lock_timeout');
 BEGIN
-    PERFORM pg_advisory_xact_lock_shared(hashtextextended('form-alert holders', 0));
+    PERFORM set_config('lock_timeout', '5s', true);
+    BEGIN
+        PERFORM pg_advisory_xact_lock_shared(hashtextextended('form-alert holders', 0));
+    EXCEPTION WHEN lock_not_available THEN
+        NULL;
+    END;
+    PERFORM set_config('lock_timeout', previous, true);
     PERFORM ehr.tell_care_team_of_answer(NEW.id, NEW.patient_id, NEW.clinician_id);
     RETURN NULL;
 END
@@ -278,8 +293,9 @@ CREATE OR REPLACE TRIGGER questionnaire_responses_deliver_alert
 -- in reaches the team, or everyone (from the step's review). The disabled account keeps its items. Whatever disables
 -- an account is seen here, since the database watches the column, not the page; a lockout of a few minutes after wrong
 -- passwords isn't a disable, and enabling an account again does nothing. Under the alerts' lock, alone (above): two
--- accounts disabled at once are told in turn, the second seeing the first, and an answer being stored waits or is
--- waited for. A transaction disabling several accounts holds it once. Runs as its owner, to read the answers (the
+-- accounts disabled at once are told in turn, the second seeing the first, and an answer being stored, or a clinician
+-- joining a panel, waits or is waited for. While it holds the lock it waits for nothing (it reads, and adds inbox
+-- items), so it can be in no circle of waits. A transaction disabling several accounts holds it once. Runs as its owner, to read the answers (the
 -- owner's policy, 30-rls.sql) and the inbox and to write the inbox; its search_path is pinned, and nobody may call it:
 -- only the trigger runs it.
 CREATE OR REPLACE FUNCTION ehr.follow_disabled_form_alert_holder() RETURNS trigger
@@ -317,19 +333,23 @@ CREATE OR REPLACE TRIGGER staff_users_disabled_form_alerts
 -- tells nobody); one they hold open already counts. Their account must not be disabled. Runs as its owner (SECURITY
 -- DEFINER), which alone may add inbox items: it reads the answers (the owner's policy, 30-rls.sql), the panels, the
 -- staff accounts and the inbox, and writes the inbox; nothing else. Its search_path is pinned, and nobody but its owner
--- may call it directly. It takes no lock, unlike step 13d's care-team lock for refills: an answer arriving while a
--- clinician joins is told by its own trigger, above, to the team it sees, or, seeing nobody, to every clinician, the
--- one joining among them; so the two at once can only give someone an extra item, never leave an answer with nobody
--- told; and an account disabled while a clinician joins is followed by its own trigger, above, the same way. And
--- nothing closes another's form-alert item, so none is left open that its holder can't act on. So it adds nothing to
--- 13d's lock order (77-refill-requests.sql), and it fires before 13d's trigger on the same insert (AFTER triggers fire
--- in name order).
+-- may call it directly. Before it reads, it takes the alerts' lock shared (above; from the step's third check), so a
+-- clinician whose own account is disabled at the moment they join can't be left holding an answer's only open item:
+-- the disable waits for the join and tells it again, or the join waits for the disable and gives them nothing. An
+-- answer arriving while a clinician joins needs no lock: it is told by its own trigger, above, to the team it sees,
+-- or, seeing nobody, to every clinician, the one joining among them; and nothing closes another's form-alert item, so
+-- none is left open that its holder can't act on. Lock order with step 13d (77-refill-requests.sql): this trigger
+-- fires before 13d's on the same insert (AFTER triggers fire in name order), so a join takes this lock, shared, and
+-- then the patient's care-team lock. Nothing takes them the other way round to wait: a disable, the only taker of this
+-- lock alone, takes no care-team lock and waits for nothing while it holds it; answers and joins hold it shared, and
+-- shared holds don't wait for each other. So the two locks close no circle.
 CREATE OR REPLACE FUNCTION ehr.follow_questionnaire_alert_care_team() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
+    PERFORM pg_advisory_xact_lock_shared(hashtextextended('form-alert holders', 0));
     INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at, sensitive)
     SELECT uuidv7(), s.id, 'form-alert', r.patient_id, 'questionnaire_responses', r.id,
            'A pre-visit form has an answer that needs review', clock_timestamp(), true

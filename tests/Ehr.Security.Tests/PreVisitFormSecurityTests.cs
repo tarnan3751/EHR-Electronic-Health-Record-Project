@@ -659,12 +659,11 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
 
     // A clinician joining a patient's panel fires two owner-run triggers (this step's, then step 13d's for refill
     // requests: AFTER triggers fire in name order), after step 13c's guard has set the assignment's time to the
-    // database's clock: each delivers what is
-    // waiting, exactly once. The join takes one advisory lock, step 13d's care-team lock for the patient: this step's
-    // trigger takes none, so it adds no lock that could wait in a circle with 13d's. And marking done still goes as
-    // before: a form-alert item by its recipient, never a refill item.
+    // database's clock: each delivers what is waiting, exactly once. The join takes two advisory locks: this step's
+    // alerts' lock, shared, and step 13d's care-team lock for the patient (85-pre-visit-forms.sql says why they close no
+    // circle). And marking done still goes as before: a form-alert item by its recipient, never a refill item.
     [Fact]
-    public async Task A_clinician_joining_the_panel_gets_a_waiting_refill_and_an_unreceived_form_alert_once_each_under_one_lock()
+    public async Task A_clinician_joining_the_panel_gets_a_waiting_refill_and_an_unreceived_form_alert_once_each_under_two_locks()
     {
         var booking = await BookedAsync(TimeSpan.FromDays(2));
         var medication = Guid.CreateVersion7();
@@ -702,7 +701,8 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
 
             await RunAsync("SELECT set_config('app.user_id', @me, true)");
             await RunAsync("INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (gen_random_uuid(), @patient, @me::uuid, '2000-01-01')");
-            Assert.Equal(1L, await RunAsync("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()"));
+            Assert.Equal(2L, await RunAsync("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()"));
+            Assert.Equal("ShareLock", await RunAsync(AlertsLock));
             Assert.Equal(1L, await RunAsync(
                 """
                 SELECT count(*) FROM pg_locks
@@ -893,6 +893,188 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
             {
                 Assert.DoesNotContain(booking.AppointmentClinician.ToString(), holders);
             }
+        }
+    }
+
+    // How this transaction holds the alerts' lock ('form-alert holders', 85-pre-visit-forms.sql): "ShareLock",
+    // "ExclusiveLock" or "none".
+    const string AlertsLock = """
+        SELECT coalesce(string_agg(mode, ',' ORDER BY mode), 'none') FROM pg_locks
+        WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND objsubid = 1
+          AND ((classid::bigint << 32) | objid::bigint) = hashtextextended('form-alert holders', 0)
+        """;
+
+    static async Task<object?> ScalarAsync(Open open, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = new NpgsqlCommand(sql, open.Connection, open.Transaction);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        return await command.ExecuteScalarAsync(Cancel);
+    }
+
+    // A lockout of minutes after wrong passwords takes no clinic-wide lock: answers with an alert never wait behind it.
+    // A real disable takes the alerts' lock alone, until its transaction ends.
+    [Fact]
+    public async Task A_lockout_of_minutes_takes_no_clinic_wide_lock_and_a_disable_takes_the_alerts_lock_alone()
+    {
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        foreach (var (until, held) in new[] { ("now() + interval '15 minutes'", "none"), ("'infinity'", "ExclusiveLock") })
+        {
+            await using var open = await BeginAsync(admin);
+            await ScalarAsync(open, $"UPDATE ehr.staff_users SET lockout_end = {until} WHERE id = @id", ("id", clinician));
+            Assert.Equal(held, await ScalarAsync(open, AlertsLock));
+            await open.Transaction.RollbackAsync(Cancel);
+        }
+    }
+
+    // An admin's disable left open doesn't hold up a patient's answer for longer than five seconds: the answer is then
+    // stored and told by the rule without the lock, and the answering transaction's lock_timeout is as it was.
+    [Fact]
+    public async Task An_answer_waits_at_most_five_seconds_behind_an_open_disable_and_is_still_stored_and_told()
+    {
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var idle = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var booking = await BookedAsync(TimeSpan.FromDays(2));
+        var request = await AskAsync(booking.Clinician, booking.Appointment);
+
+        await using var disabling = await BeginAsync(admin);
+        await ScalarAsync(disabling, "UPDATE ehr.staff_users SET lockout_end = 'infinity' WHERE id = @id", ("id", idle));
+        Assert.Equal("ExclusiveLock", await ScalarAsync(disabling, AlertsLock));
+
+        var response = Guid.CreateVersion7();
+        await using (var answering = await BeginAsync(booking.Account))
+        {
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            await ScalarAsync(answering,
+                """
+                INSERT INTO ehr.questionnaire_responses (id, request_id, patient_id, questionnaire_code, clinician_id, answers)
+                VALUES (@id, @request, gen_random_uuid(), 'forged', gen_random_uuid(), @answers::jsonb)
+                """, ("id", response), ("request", request), ("answers", Phq(0, 0, 0, 0, 0, 0, 0, 0, 1)));
+            started.Stop();
+            Assert.InRange(started.Elapsed, TimeSpan.FromSeconds(4.5), TimeSpan.FromSeconds(30));
+            Assert.Equal("0", await ScalarAsync(answering, "SELECT current_setting('lock_timeout')"));
+            Assert.Equal("none", await ScalarAsync(answering, AlertsLock));
+            await answering.Transaction.CommitAsync(Cancel);
+        }
+
+        await disabling.Transaction.RollbackAsync(Cancel);
+        Assert.Equal(new[] { booking.Clinician, booking.AppointmentClinician }.Select(id => id.ToString()).Order(StringComparer.Ordinal),
+            await OpenHoldersAsync(response));
+    }
+
+    // A clinician whose own account is disabled at the moment they join a panel, for an answer nobody on the team holds
+    // open: in either order, they don't end up holding its only open item. Join first: the disable waits, then tells it
+    // again to the team. Disable first: the join waits, then gives them nothing.
+    [Fact]
+    public async Task A_clinician_disabled_as_they_join_never_holds_an_answers_only_open_item()
+    {
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        foreach (var joinFirst in new[] { true, false })
+        {
+            var booking = await BookedAsync(TimeSpan.FromDays(2));
+            var response = await AnswerAsync(booking.Account, await AskAsync(booking.Clinician, booking.Appointment), Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+            foreach (var holder in new[] { booking.Clinician, booking.AppointmentClinician })
+            {
+                await Accounts.ExecuteAsync(App, holder, "UPDATE ehr.inbox_items SET done_at = now() WHERE kind = 'form-alert' AND source_id = @response",
+                    ("response", response));
+            }
+
+            var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+            await using var join = await BeginAsync(joining);
+            await using var disable = await BeginAsync(admin);
+            const string Join = "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (gen_random_uuid(), @patient, @joining, now())";
+            const string Disable = "UPDATE ehr.staff_users SET lockout_end = 'infinity' WHERE id = @joining";
+            var (first, firstSql, second, secondSql) = joinFirst ? (join, Join, disable, Disable) : (disable, Disable, join, Join);
+            (string, object)[] parameters = [("patient", booking.Patient), ("joining", joining)];
+
+            await ScalarAsync(first, firstSql, firstSql == Join ? parameters : parameters[1..]);
+            var waiting = ScalarAsync(second, secondSql, secondSql == Join ? parameters : parameters[1..]);
+            await Task.Delay(TimeSpan.FromMilliseconds(500), Cancel);
+            Assert.False(waiting.IsCompleted, "The second waits for the first.");
+            await first.Transaction.CommitAsync(Cancel);
+            await waiting;
+            await second.Transaction.CommitAsync(Cancel);
+
+            var holders = await OpenHoldersAsync(response);
+            if (joinFirst)
+            {
+                // They were given it, and their disable told it again to the team, who can act.
+                Assert.Contains(joining.ToString(), holders);
+                Assert.Contains(booking.Clinician.ToString(), holders);
+                Assert.Contains(booking.AppointmentClinician.ToString(), holders);
+            }
+            else
+            {
+                Assert.Empty(holders);
+            }
+        }
+    }
+
+    // Joining, asking for a refill, answering a form, disabling the appointment's clinician and leaving the panel, all at
+    // once for one patient, round after round: never a deadlock, and the answer always held open by someone who can
+    // act. (Asking may be refused when the leave and the join leave nobody on the panel at that moment.)
+    [Fact]
+    public async Task Joining_asking_answering_disabling_and_leaving_at_once_never_deadlock()
+    {
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        for (var round = 0; round < 10; round++)
+        {
+            var booking = await BookedAsync(TimeSpan.FromDays(2));
+            var request = await AskAsync(booking.Clinician, booking.Appointment);
+            var medication = Guid.CreateVersion7();
+            await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+                "INSERT INTO ehr.medication_statements (id, patient_id, code, display, dosage, status, sensitive) "
+                + "VALUES (@id, @patient, '314076', 'lisinopril 10 MG Oral Tablet', '1 tablet by mouth daily', 'active', false)",
+                ("id", medication), ("patient", booking.Patient));
+            var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+            var response = Guid.CreateVersion7();
+            (Guid User, string Sql, (string Name, object Value)[] Parameters)[] steps =
+            [
+                (joining, "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (gen_random_uuid(), @patient, @joining, now())",
+                    [("patient", booking.Patient), ("joining", joining)]),
+                (booking.Account, "INSERT INTO ehr.refill_requests (id, patient_id, medication_statement_id, medication_display, requested_by, requested_at, status, sensitive) "
+                    + "VALUES (gen_random_uuid(), @patient, @medication, '', gen_random_uuid(), now(), 'requested', false)",
+                    [("patient", booking.Patient), ("medication", medication)]),
+                (booking.Account, "INSERT INTO ehr.questionnaire_responses (id, request_id, patient_id, questionnaire_code, clinician_id, answers) "
+                    + "VALUES (@response, @request, gen_random_uuid(), 'forged', gen_random_uuid(), @answers::jsonb)",
+                    [("response", response), ("request", request), ("answers", Phq(0, 0, 0, 0, 0, 0, 0, 0, 1))]),
+                (admin, "UPDATE ehr.staff_users SET lockout_end = 'infinity' WHERE id = @disabled", [("disabled", booking.AppointmentClinician)]),
+                (booking.Clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @leaving AND ended_at IS NULL",
+                    [("leaving", booking.Clinician)]),
+            ];
+            var opened = new List<Open>();
+            foreach (var step in steps)
+            {
+                opened.Add(await BeginAsync(step.User));
+            }
+
+            var outcomes = await Task.WhenAll(steps.Select(async (step, i) =>
+            {
+                try
+                {
+                    await ScalarAsync(opened[i], step.Sql, step.Parameters);
+                    await opened[i].Transaction.CommitAsync(Cancel);
+                    return "ok";
+                }
+                catch (PostgresException e)
+                {
+                    return $"{e.SqlState} {e.ConstraintName}";
+                }
+            }));
+            foreach (var open in opened)
+            {
+                await open.DisposeAsync();
+            }
+
+            Assert.DoesNotContain(outcomes, outcome => outcome.StartsWith(PostgresErrorCodes.DeadlockDetected, StringComparison.Ordinal));
+            Assert.All(outcomes.Where((_, i) => i != 1), outcome => Assert.Equal("ok", outcome));
+            Assert.Contains(outcomes[1], new[] { "ok", $"{PostgresErrorCodes.CheckViolation} refill_requests_care_team" });
+            var enabled = await EnabledCliniciansAsync();
+            Assert.Contains(await OpenHoldersAsync(response), holder => enabled.Contains(holder));
         }
     }
 
