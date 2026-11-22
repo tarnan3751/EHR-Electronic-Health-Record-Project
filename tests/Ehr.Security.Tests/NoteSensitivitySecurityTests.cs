@@ -27,11 +27,11 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         await Accounts.ExecuteAsync(App, clinician,
             """
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', 1, false)
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', 1, false)
             """, ("id", draft), ("patient", patient), ("owner", clinician));
         await Accounts.ExecuteAsync(App, clinician,
-            "INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan) VALUES (@note, @draft, @patient, 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan')",
+            "INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan) VALUES (@note, @draft, @patient, 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan')",
             ("note", note), ("draft", draft), ("patient", patient));
         return (clinician, patient, note, draft);
     }
@@ -74,7 +74,7 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         var colleague = await ColleagueAsync(patient);
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
         var addendum = await AddendumAsync(signer, patient, note);
-        var text = await AsSuperuserAsync("SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE id = @id", ("id", note));
+        var text = await AsSuperuserAsync("SELECT subjective || objective || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE id = @id", ("id", note));
         var logged = await AsSuperuserAsync("SELECT count(*)::text FROM ehr.change_log WHERE table_name = 'clinical_drafts' AND row_id = @id", ("id", draft));
         const string shown = """
             SELECT e.table_name || ' ' || e.action || ' ' || e.sensitive || ' ' || CASE WHEN (SELECT d.details FROM ehr.shown_audit_details(ARRAY[e.id]) d) IS NULL THEN 'hidden' ELSE 'shown' END
@@ -86,7 +86,7 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         await ChangeAsync(colleague, "clinical_notes", note, sensitive: true);
 
         Assert.Equal([$"true {colleague} Patient asked for it. true"], await StateAsync("clinical_notes", note));
-        Assert.Equal(text, await AsSuperuserAsync("SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE id = @id", ("id", note)));
+        Assert.Equal(text, await AsSuperuserAsync("SELECT subjective || objective || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE id = @id", ("id", note)));
         // Its addendum is sensitive with it, with the same reason: inherited from the note, marked by nobody itself.
         Assert.Equal(["true none Patient asked for it. true"], await StateAsync("note_addenda", addendum));
         Assert.Equal(["true"], await InheritedAsync(addendum));

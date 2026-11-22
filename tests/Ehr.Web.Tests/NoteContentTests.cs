@@ -9,19 +9,29 @@ public class NoteContentTests
     [Fact]
     public void Incomplete_drafts_are_allowed_but_signatures_name_every_missing_field()
     {
-        var content = new NoteContent("", " \t\n", "");
+        var content = new NoteContent("", " \t\n", "", "");
         Assert.Empty(content.Validate(signing: false));
-        Assert.Equal(["Enter History before signing.", "Enter Assessment before signing.", "Enter Plan before signing."], content.Validate(signing: true));
+        Assert.Equal(["Enter Subjective before signing.", "Enter Objective before signing.", "Enter Assessment before signing.", "Enter Plan before signing."],
+            content.Validate(signing: true));
     }
 
     [Fact]
     public void Field_length_null_characters_and_utf8_bytes_are_bounded()
     {
-        Assert.Empty(new NoteContent(new string('a', 16000), "Assessment", "Plan").Validate(true));
-        Assert.Contains("Shorten History", Assert.Single(new NoteContent(new string('a', 16001), "Assessment", "Plan").Validate(true)));
-        Assert.Contains("null character", Assert.Single(new NoteContent("History\0", "Assessment", "Plan").Validate(true)));
-        var unicode = new NoteContent(new string('界', 16000), new string('界', 16000), "Plan");
+        Assert.Empty(new NoteContent(new string('a', 16000), "Objective", "Assessment", "Plan").Validate(true));
+        Assert.Contains("Shorten Subjective", Assert.Single(new NoteContent(new string('a', 16001), "Objective", "Assessment", "Plan").Validate(true)));
+        Assert.Contains("Shorten Objective", Assert.Single(new NoteContent("Subjective", new string('a', 16001), "Assessment", "Plan").Validate(true)));
+        Assert.Contains("null character", Assert.Single(new NoteContent("Subjective", "Objective\0", "Assessment", "Plan").Validate(true)));
+        var unicode = new NoteContent(new string('界', 16000), new string('界', 16000), "Assessment", "Plan");
         Assert.Contains("64 KiB", Assert.Single(unicode.Validate(true)));
+    }
+
+    // The draft's Body, which the desktop app keeps and shows as plain text (UC 8): each section under its heading.
+    [Fact]
+    public void The_body_is_plain_text_with_the_four_headings()
+    {
+        Assert.Equal("Subjective\nS text\n\nObjective\nO text\n\nAssessment\nA text\n\nPlan\nP text",
+            new NoteContent("S text", "O text", "A text", "P text").Body);
     }
 
     [Fact]
@@ -32,16 +42,61 @@ public class NoteContentTests
             Body = "Synthetic plain text",
             Version = 3,
             StructuredVersion = 2,
+            Subjective = "Old subjective",
+            Objective = "Old objective",
+            Assessment = "Old assessment",
+            Plan = "Old plan",
+        };
+        Assert.Equal(NoteOrigin.Body, NoteContent.OriginOf(draft));
+        Assert.Equal(new NoteContent(draft.Body, "", "", ""), NoteContent.From(draft));
+        Assert.Equal([new NoteSection(NoteSections.DraftText, draft.Body)], NoteSections.AsSaved(draft));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("another client", StringComparison.Ordinal));
+        draft.StructuredVersion = 3;
+        Assert.Equal(new NoteContent("Old subjective", "Old objective", "Old assessment", "Old plan"), NoteContent.From(draft));
+        Assert.Empty(ClinicalNotes.SigningProblems(draft));
+        draft.HasUnreviewedProposals = true;
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("AI proposal", StringComparison.Ordinal));
+    }
+
+    // Step 14: a draft written before notes had four sections opens with its History in Subjective, and nothing about the
+    // draft changes until it is saved, which writes the four sections and clears the History together.
+    [Fact]
+    public void An_earlier_draft_opens_with_its_history_in_subjective_and_changes_only_when_saved()
+    {
+        var draft = new ClinicalDraft
+        {
+            Body = "History\nOld history\n\nAssessment\nOld assessment\n\nPlan\nOld plan",
+            Version = 4,
+            StructuredVersion = 4,
             History = "Old history",
             Assessment = "Old assessment",
             Plan = "Old plan",
         };
-        Assert.Equal(new NoteContent(draft.Body, "", ""), NoteContent.From(draft));
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("another client", StringComparison.Ordinal));
-        draft.StructuredVersion = 3;
-        Assert.Equal(new NoteContent("Old history", "Old assessment", "Old plan"), NoteContent.From(draft));
+        Assert.Equal(NoteOrigin.History, NoteContent.OriginOf(draft));
+        var opened = NoteContent.From(draft);
+        Assert.Equal(new NoteContent("Old history", "", "Old assessment", "Old plan"), opened);
+        Assert.Equal([new(NoteSections.History, "Old history"), new(NoteSections.Assessment, "Old assessment"), new NoteSection(NoteSections.Plan, "Old plan")],
+            NoteSections.AsSaved(draft));
+        Assert.Equal(("Old history", (string?)null, (string?)null, 4L), (draft.History, draft.Subjective, draft.Objective, draft.Version));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("History section", StringComparison.Ordinal));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p == "Enter Objective before signing.");
+
+        (opened with { Objective = "Blood pressure 126/80." }).ApplyTo(draft);
+        Assert.Equal((null, "Old history", "Blood pressure 126/80.", 5L, 5L), (draft.History, draft.Subjective, draft.Objective, draft.Version, draft.StructuredVersion));
+        Assert.Equal(NoteOrigin.Sections, NoteContent.OriginOf(draft));
         Assert.Empty(ClinicalNotes.SigningProblems(draft));
-        draft.HasUnreviewedProposals = true;
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("AI proposal", StringComparison.Ordinal));
+    }
+
+    // A note signed before step 14 is shown as it was signed; one signed in four sections gives an older desktop build
+    // its Subjective and Objective under History, so nothing of it is left out there.
+    [Fact]
+    public void A_signed_note_is_shown_under_the_headings_it_was_signed_with()
+    {
+        var earlier = new ClinicalNote { History = "H", Assessment = "A", Plan = "P" };
+        Assert.Equal(["History", "Assessment", "Plan"], NoteSections.Of(earlier).Select(s => s.Title));
+        Assert.Equal("H", NoteSections.HistoryForOlderReaders(earlier));
+        var soap = new ClinicalNote { Subjective = "S", Objective = "O", Assessment = "A", Plan = "P" };
+        Assert.Equal(["Subjective", "Objective", "Assessment", "Plan"], NoteSections.Of(soap).Select(s => s.Title));
+        Assert.Equal("Subjective\nS\n\nObjective\nO", NoteSections.HistoryForOlderReaders(soap));
     }
 }

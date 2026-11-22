@@ -1,6 +1,7 @@
 -- UC 14: signing and edits serialize on the SAME draft row. These invoker functions respect RLS and grants.
 -- No runtime DELETE grant on signed notes, and UPDATE on their sensitivity alone (step 10b), with triggers as an
--- additional immutability boundary: a signed note's text never changes.
+-- additional immutability boundary: a signed note's text never changes. Notes are signed in Subjective, Objective,
+-- Assessment and Plan (step 14); one signed before then keeps its History, Assessment and Plan.
 CREATE OR REPLACE FUNCTION ehr.guard_clinical_draft() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -36,10 +37,16 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'The draft is unavailable' USING ERRCODE = '23514';
     END IF;
+    -- Notes are signed in Subjective, Objective, Assessment and Plan (the expansion plan's step 14). A draft written
+    -- before then keeps its History until its author saves it in the four sections, and isn't signed until then; nor is
+    -- a note sent with a History, whatever the draft holds.
+    IF NEW.history IS NOT NULL OR draft.history IS NOT NULL THEN
+        RAISE EXCEPTION 'Save the draft in Subjective, Objective, Assessment and Plan before signing' USING ERRCODE = '23514';
+    END IF;
     IF NEW.patient_id <> draft.patient_id OR NEW.draft_version <> draft.version
        OR draft.structured_version IS DISTINCT FROM draft.version
-       OR NEW.history IS DISTINCT FROM draft.history OR NEW.assessment IS DISTINCT FROM draft.assessment
-       OR NEW.plan IS DISTINCT FROM draft.plan THEN
+       OR NEW.subjective IS DISTINCT FROM draft.subjective OR NEW.objective IS DISTINCT FROM draft.objective
+       OR NEW.assessment IS DISTINCT FROM draft.assessment OR NEW.plan IS DISTINCT FROM draft.plan THEN
         RAISE EXCEPTION 'The draft changed; review the saved version before signing' USING ERRCODE = '23514';
     END IF;
     -- The cached flag is never sufficient proof. Consult immutable bindings and authoritative decisions too.
@@ -51,11 +58,12 @@ BEGIN
                   AND (r.imported_version IS NULL OR r.imported_version > draft.version)) THEN
         RAISE EXCEPTION 'Associated AI proposals require server-side review' USING ERRCODE = '23514';
     END IF;
-    IF draft.history IS NULL OR draft.assessment IS NULL OR draft.plan IS NULL
-       OR draft.history !~ '[^[:space:]]' OR draft.assessment !~ '[^[:space:]]' OR draft.plan !~ '[^[:space:]]'
-       OR char_length(draft.history) > 16000 OR char_length(draft.assessment) > 16000
-       OR char_length(draft.plan) > 16000 OR octet_length(draft.body) > 65536 THEN
-        RAISE EXCEPTION 'Complete History, Assessment and Plan within note limits before signing' USING ERRCODE = '23514';
+    IF draft.subjective IS NULL OR draft.objective IS NULL OR draft.assessment IS NULL OR draft.plan IS NULL
+       OR draft.subjective !~ '[^[:space:]]' OR draft.objective !~ '[^[:space:]]'
+       OR draft.assessment !~ '[^[:space:]]' OR draft.plan !~ '[^[:space:]]'
+       OR char_length(draft.subjective) > 16000 OR char_length(draft.objective) > 16000
+       OR char_length(draft.assessment) > 16000 OR char_length(draft.plan) > 16000 OR octet_length(draft.body) > 65536 THEN
+        RAISE EXCEPTION 'Complete Subjective, Objective, Assessment and Plan within note limits before signing' USING ERRCODE = '23514';
     END IF;
     -- Never trust client identity or time. The signed snapshot retains the version the clinician confirmed.
     NEW.signer_id := ehr.current_user_id();

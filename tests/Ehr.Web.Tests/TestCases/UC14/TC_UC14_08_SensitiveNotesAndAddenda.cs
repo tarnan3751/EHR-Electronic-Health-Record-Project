@@ -41,8 +41,8 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
     public async Task A_sensitive_note_and_a_sensitive_addendum_are_left_out_until_asked_for_and_never_kept_offline()
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
-        const string secret = "Synthetic sensitive history: low mood for three weeks.";
-        var sensitive = await SignedNoteAsync(session.Client, patient, sensitive: true, history: secret);
+        const string secret = "Synthetic sensitive subjective: low mood for three weeks.";
+        var sensitive = await SignedNoteAsync(session.Client, patient, sensitive: true, subjective: secret);
         // With only a sensitive note, the chart doesn't say there are none.
         var only = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
         Assert.Contains("No other signed notes.", only);
@@ -107,7 +107,7 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
             new { Since = "0", Patients = new[] { patient } }, System.Text.Json.JsonSerializerOptions.Web, Cancel);
         var drafts = await pulled.Content.ReadAsStringAsync(Cancel);
         Assert.Equal(System.Net.HttpStatusCode.OK, pulled.StatusCode);
-        Assert.Contains(History, drafts);
+        Assert.Contains(Subjective, drafts);
         Assert.DoesNotContain("low mood", drafts);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(drafts, "\"body\":\"\",\"version\":\\d+,\"withheld\":true"));
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(drafts, "\"withheld\":false"));

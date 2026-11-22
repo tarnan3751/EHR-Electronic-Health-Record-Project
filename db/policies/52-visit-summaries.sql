@@ -22,8 +22,9 @@
 --                   VisitSummaryPlanTests in Ehr.Security.Tests checks this of the catalog
 --   substance-code  a UNII of the reference data: 10 letters and digits
 --   order-code      the clinic's own order codes ("SYN-LAB-001")
---   note-section    the note's whole History, Assessment or Plan, when it is 40 characters or more, copied in
---                   (compared with case and runs of white space ignored)
+--   note-section    the note's whole Subjective, Objective, Assessment or Plan, or the History of a note signed
+--                   before step 14, when it is 40 characters or more, copied in (compared with case and runs of white
+--                   space ignored; a section the note doesn't have is empty, and never matches)
 -- The rule reads the summary, and the note's sections, as they would look: with the characters that show nothing taken
 -- out (Unicode's default ignorable code points: zero-width spaces and joiners, the soft hyphen, direction marks,
 -- variation selectors), compatibility forms folded to their plain ones (NFKC: fullwidth letters and digits, ligatures,
@@ -56,7 +57,8 @@ AS $$
             UNION ALL
             SELECT NULL, s.name, coalesce(s.body, '')
             FROM ehr.clinical_notes n,
-                LATERAL (VALUES ('History', n.history), ('Assessment', n.assessment), ('Plan', n.plan)) AS s(name, body)
+                LATERAL (VALUES ('Subjective', n.subjective), ('Objective', n.objective), ('History', n.history),
+                                ('Assessment', n.assessment), ('Plan', n.plan)) AS s(name, body)
             WHERE n.id = summary_note AND n.patient_id = summary_patient
         ) AS t
     ),

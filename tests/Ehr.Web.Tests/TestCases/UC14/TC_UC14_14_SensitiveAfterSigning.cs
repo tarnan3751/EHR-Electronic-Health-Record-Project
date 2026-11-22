@@ -51,11 +51,11 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         await apps.AssignAsync(first, patient);
         await apps.AssignAsync(second, patient);
         var (marker, bystander) = (await SignInAsync(apps.OnPrem, first), await SignInAsync(apps.OnPrem, second));
-        var text = await ProxyTests.QueryAsync(apps, "SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient);
+        var text = await ProxyTests.QueryAsync(apps, "SELECT subjective || objective || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient);
 
         // Before anyone marks it: the second colleague opens the note, which the app records; and the desktop syncs,
         // which gives the watermark a later pull starts from.
-        Assert.Contains(History, await bystander.Client.GetStringAsync(NotePath(patient, note), Cancel));
+        Assert.Contains(Subjective, await bystander.Client.GetStringAsync(NotePath(patient, note), Cancel));
         var token = await apps.DesktopSignInAsync(apps.OnPrem, signer);
         using var desktop = apps.OnPrem.CreateClient();
         desktop.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -89,7 +89,7 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         Assert.Contains("It is already marked sensitive. Nothing was changed.", Words(await twice.Content.ReadAsStringAsync(Cancel)));
         // The addendum's mark is inherited from the note's: nobody marked it itself.
         Assert.Equal([$"note true {first.Id} Patient asked for it.", "addendum true none Patient asked for it."], await SensitivityAsync(apps, patient));
-        Assert.Equal(text, await ProxyTests.QueryAsync(apps, "SELECT history || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
+        Assert.Equal(text, await ProxyTests.QueryAsync(apps, "SELECT subjective || objective || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
 
         var chart = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
         Assert.Contains("Sensitive items hidden: 1 signed note is not shown.", chart);

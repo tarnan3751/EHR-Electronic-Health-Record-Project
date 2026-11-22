@@ -91,7 +91,9 @@ public static class DesktopApi
             // "No known allergies" is its own state, not an allergy in the list.
             chart.Allergies.Any(a => a.Code != AllergyIntolerance.NoKnownAllergy) ? "listed" : chart.Allergies.Count > 0 ? "none-known" : "not-recorded",
             // Signed notes and their addenda (step 10); sensitive ones were left out by the read, and are counted above.
-            chart.OfflineNotes.Select(n => new CachedNote(n.Note.SignedAt, n.SignerName, n.Note.History, n.Note.Assessment, n.Note.Plan,
+            // A note signed in four sections (step 14) gives its Subjective and Objective as its History, each under its
+            // heading, for a desktop build that knows only History, Assessment and Plan.
+            chart.OfflineNotes.Select(n => new CachedNote(n.Note.SignedAt, n.SignerName, Ehr.Domain.Notes.NoteSections.HistoryForOlderReaders(n.Note), n.Note.Assessment, n.Note.Plan,
                 n.Addenda.Select(a => new CachedAddendum(a.SignedAt, a.AuthorName, a.Text, !a.ByNoteAuthor)).ToList(), n.SensitiveAddendaNotKept)).ToList(),
             // The zone the desktop shows these times in (step 10d).
             clinic.Id)).ToList());

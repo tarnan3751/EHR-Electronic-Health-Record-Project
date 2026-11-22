@@ -8,7 +8,13 @@ public sealed class ClinicalNote
     public Guid DraftId { get; set; }
     public Guid PatientId { get; set; }
     public long DraftVersion { get; set; }
-    public required string History { get; set; }
+
+    // Signed in four sections, Subjective, Objective, Assessment and Plan (the expansion plan's step 14); or, signed
+    // before then, in History, Assessment and Plan, which it keeps exactly as signed. One shape or the other, never
+    // both (ck_clinical_notes_sections).
+    public string? Subjective { get; set; }
+    public string? Objective { get; set; }
+    public string? History { get; set; }
     public required string Assessment { get; set; }
     public required string Plan { get; set; }
     public Guid SignerId { get; set; }

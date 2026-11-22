@@ -133,9 +133,13 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-review-complete] button')"));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => !url.Contains("/review/", StringComparison.Ordinal) && url.Contains("/notes/drafts/", StringComparison.Ordinal));
-        Assert.Equal("Cough for three days.", await page.Locator("#History").InputValueAsync());
+        // A dictation sorted into History goes into Subjective (step 14); Objective is the clinician's to write.
+        Assert.Equal("Cough for three days.", await page.Locator("#Subjective").InputValueAsync());
+        Assert.Equal("", await page.Locator("#Objective").InputValueAsync());
         Assert.Equal("Synthetic clinician-corrected assessment", await page.Locator("#Assessment").InputValueAsync());
         Assert.Equal("", await page.Locator("#Plan").InputValueAsync());
+        await TabToAsync(page, "#Objective");
+        await page.Keyboard.InsertTextAsync("Synthetic manual examination");
         await TabToAsync(page, "#Plan");
         await page.Keyboard.InsertTextAsync("Synthetic manual follow-up plan");
         await page.WaitForFunctionAsync("document.getElementById('note-save-status').textContent === 'Saved'");
@@ -158,8 +162,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // TC-UC14-05 (NFR-12) in the SE document (Satwik Yash Padhy): write and sign a note with the keyboard only, typed
-    // from scratch with no dictation. From the chart, the keyboard reaches "New note", fills History, Assessment and
-    // Plan in the editor, which saves them, then reviews, confirms and signs. The test above is TC-UC14-05 through
+    // from scratch with no dictation. From the chart, the keyboard reaches "New note", fills Subjective, Objective,
+    // Assessment and Plan in the editor (step 14), which saves them, then reviews, confirms and signs. The test above is TC-UC14-05 through
     // dictation review.
     [Fact]
     public async Task TC_UC14_05_a_note_typed_from_scratch_is_written_and_signed_from_the_keyboard()
@@ -177,8 +181,10 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await TabToAsync(page, "form[action*='handler=NewNote'] button");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/notes/drafts/**");
-        await TabToAsync(page, "#History");
-        await page.Keyboard.InsertTextAsync("Synthetic keyboard history");
+        await TabToAsync(page, "#Subjective");
+        await page.Keyboard.InsertTextAsync("Synthetic keyboard subjective");
+        await TabToAsync(page, "#Objective");
+        await page.Keyboard.InsertTextAsync("Synthetic keyboard objective");
         await TabToAsync(page, "#Assessment");
         await page.Keyboard.InsertTextAsync("Synthetic keyboard assessment");
         await TabToAsync(page, "#Plan");
@@ -195,7 +201,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
         var signed = await page.Locator("main").TextContentAsync();
         Assert.Contains("Signed · read-only", signed);
-        Assert.Contains("Synthetic keyboard history", signed);
+        Assert.Contains("Synthetic keyboard subjective", signed);
+        Assert.Contains("Synthetic keyboard objective", signed);
         Assert.Contains("Synthetic keyboard assessment", signed);
         Assert.Contains("Synthetic keyboard plan", signed);
         Assert.Equal(0, await page.Locator("textarea").CountAsync());

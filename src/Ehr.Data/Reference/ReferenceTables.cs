@@ -74,6 +74,30 @@ public class Questionnaire
     public string? Copyright { get; set; }
 }
 
+// A visit type a note can be written for (the expansion plan's step 14), and what to cover in each section of it: the
+// prompts the note editor shows beside Subjective, Objective, Assessment and Plan. Guidance, never text of the note:
+// nothing here is put into a note, and nothing here is about a patient. Hand-written in
+// db/reference/37-note-templates.sql, which a clinic changes as a reviewed change.
+public class NoteTemplate
+{
+    // Short and stable, such as "follow-up": a draft names the template it was written with.
+    public required string Code { get; set; }
+
+    // What the editor's visit-type list says, such as "Follow-up visit".
+    public required string Title { get; set; }
+
+    // Where it comes in that list, from 1.
+    public int Position { get; set; }
+
+    public required string SubjectivePrompt { get; set; }
+
+    public required string ObjectivePrompt { get; set; }
+
+    public required string AssessmentPrompt { get; set; }
+
+    public required string PlanPrompt { get; set; }
+}
+
 // The notices a questionnaire's alert question may name (its definition's help): the portal words each (FormNotices in
 // the web app) and shows it with an answer to that question that needs review. A definition naming any other fails
 // QuestionnaireDefinitionTests, and FormNotices lacking words for one fails the web tests.
@@ -378,6 +402,36 @@ public sealed class QuestionnaireConfiguration : IEntityTypeConfiguration<Questi
         questionnaire.Property(q => q.Code).HasMaxLength(20);
         questionnaire.Property(q => q.Title).HasMaxLength(200);
         questionnaire.Property(q => q.Definition).HasColumnType("jsonb");
+    }
+}
+
+public sealed class NoteTemplateConfiguration : IEntityTypeConfiguration<NoteTemplate>
+{
+    public const int CodeLength = 40;
+
+    public const int PromptLength = 500;
+
+    public void Configure(EntityTypeBuilder<NoteTemplate> template)
+    {
+        template.ToTable("note_templates", table =>
+        {
+            table.HasCheckConstraint("ck_note_templates_code", "code ~ '^[a-z][a-z0-9-]{1,39}$'");
+            table.HasCheckConstraint("ck_note_templates_title", "title ~ '[^[:space:]]'");
+            table.HasCheckConstraint("ck_note_templates_position", "position > 0");
+            foreach (var section in new[] { "subjective", "objective", "assessment", "plan" })
+            {
+                table.HasCheckConstraint($"ck_note_templates_{section}_prompt", $"{section}_prompt ~ '[^[:space:]]'");
+            }
+        });
+        template.HasKey(t => t.Code);
+        template.Property(t => t.Code).HasMaxLength(CodeLength);
+        template.Property(t => t.Title).HasMaxLength(80);
+        template.HasIndex(t => t.Title).IsUnique();
+        template.HasIndex(t => t.Position).IsUnique();
+        template.Property(t => t.SubjectivePrompt).HasMaxLength(PromptLength);
+        template.Property(t => t.ObjectivePrompt).HasMaxLength(PromptLength);
+        template.Property(t => t.AssessmentPrompt).HasMaxLength(PromptLength);
+        template.Property(t => t.PlanPrompt).HasMaxLength(PromptLength);
     }
 }
 

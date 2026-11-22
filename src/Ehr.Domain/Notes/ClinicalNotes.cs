@@ -30,7 +30,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             PatientId = patient,
             ClinicianId = user.UserId!.Value,
             Body = "",
-            History = "",
+            Subjective = "",
+            Objective = "",
             Assessment = "",
             Plan = "",
             Version = 1,
@@ -79,7 +80,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         var errors = NoteContent.From(draft).Validate(signing: true).ToList();
         if (draft.StructuredVersion != draft.Version)
         {
-            errors.Add("This draft changed in another client. Reopen it, check all three fields, and save before signing.");
+            errors.Add("This draft changed in another client. Reopen it, check all four sections, and save before signing.");
+        }
+        else if (draft.History is not null)
+        {
+            // Written before notes had four sections (step 14): the database signs it only once its author has saved it so.
+            errors.Add("This draft was written with a History section. Open it, move what belongs in Objective, and save before signing.");
         }
 
         if (draft.HasUnreviewedProposals)
@@ -166,7 +172,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             DraftId = id,
             PatientId = patient,
             DraftVersion = version,
-            History = draft.History!,
+            Subjective = draft.Subjective!,
+            Objective = draft.Objective!,
             Assessment = draft.Assessment!,
             Plan = draft.Plan!,
             Sensitive = sensitive,
@@ -211,7 +218,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         {
             ({ } id, _) => new NoteAddendum { Id = id, NoteId = note, PatientId = patient, Text = "", Sensitive = sensitive, SensitiveReason = reason },
             (_, { } id) => new VisitSummary { Id = id, NoteId = note, PatientId = patient, TalkedAbout = "", Found = "", NextSteps = "", Sensitive = sensitive, SensitiveReason = reason },
-            _ => new ClinicalNote { Id = note, PatientId = patient, History = "", Assessment = "", Plan = "", Sensitive = sensitive, SensitiveReason = reason },
+            _ => new ClinicalNote { Id = note, PatientId = patient, Assessment = "", Plan = "", Sensitive = sensitive, SensitiveReason = reason },
         };
         const string savepoint = "note_sensitivity";
         var transaction = db.Database.CurrentTransaction!;

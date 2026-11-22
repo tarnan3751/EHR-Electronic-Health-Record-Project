@@ -110,7 +110,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC13_01_02_03_trusted_result_accept_edit_reject_then_manual_complete_and_sign()
     {
         var f = await StageAsync();
-        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history = '' AND assessment = '' AND plan = '' AND has_unreviewed_proposals", f.Draft));
+        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND subjective = '' AND objective = '' AND assessment = '' AND plan = '' AND has_unreviewed_proposals", f.Draft));
         var proposals = await Proposals(f);
         foreach (var proposal in proposals)
         {
@@ -119,7 +119,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
         // Decisions alone never populate clinical content or permit signing before explicit transfer.
-        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history = '' AND has_unreviewed_proposals", f.Draft));
+        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND subjective = '' AND has_unreviewed_proposals", f.Draft));
         using var completed = await ReviewPost(f, "Complete", ("Version", 5));
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         var html = await f.Session.Client.GetStringAsync(f.Editor, Cancel);
@@ -145,11 +145,11 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     static async Task<HttpResponseMessage> EditorPost(Flow f, string handler, long version,
-        string history = "Synthetic history", string assessment = "Synthetic assessment", string plan = "Synthetic plan",
+        string subjective = "Synthetic subjective", string assessment = "Synthetic assessment", string plan = "Synthetic plan",
         params (string Name, object Value)[] extra)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, f.Editor + (handler == "Sign" ? "/confirm" : "?handler=" + handler))
-        { Content = Form([("__RequestVerificationToken", f.Token), ("Version", version), ("History", history), ("Assessment", assessment), ("Plan", plan), .. extra]) };
+        { Content = Form([("__RequestVerificationToken", f.Token), ("Version", version), ("Subjective", subjective), ("Objective", "Synthetic objective"), ("Assessment", assessment), ("Plan", plan), .. extra]) };
         request.Headers.Add("HX-Request", "true");
         return await f.Session.Client.SendAsync(request, Cancel);
     }
@@ -235,6 +235,37 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.AiReviewCompleted, patientId: f.Patient));
+    }
+
+    // TC-UC13-07 (alternative flow; the expansion plan's step 14): a dictation sorted into History, as the dictation
+    // service still sorts one and as reviews saved before step 14 were, is labeled as going into Subjective, and once
+    // approved goes there; into a Subjective with text only when appending is allowed, after that text. The draft has
+    // no History afterwards.
+    [Fact]
+    public async Task TC_UC13_07_an_approved_history_goes_into_subjective_after_any_text_there()
+    {
+        var f = await StageAsync(plan: false);
+        Assert.Contains("History (goes into Subjective)", await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
+        using var manual = await EditorPost(f, "Save", 2, "Synthetic typed subjective", "", "");
+        Assert.Equal(HttpStatusCode.OK, manual.StatusCode);
+        var proposals = await Proposals(f);
+        using (var accept = await Decide(f, proposals.Single(p => p.Field == "history").Id, 3, "accepted"))
+        {
+            Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+        }
+
+        using (var reject = await Decide(f, proposals.Single(p => p.Field != "history").Id, 4, "rejected"))
+        {
+            Assert.Equal(HttpStatusCode.OK, reject.StatusCode);
+        }
+
+        using var withoutConsent = await ReviewPost(f, "Complete", ("Version", 5));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, withoutConsent.StatusCode);
+        using var complete = await ReviewPost(f, "Complete", ("Version", 5), ("Append", true));
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        Assert.Equal(1, await Scalar(
+            "SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND objective = 'Synthetic objective' AND subjective = 'Synthetic typed subjective' || E'\n\n' || 'Cough for three days.'",
+            f.Draft));
     }
 
     [Fact]
@@ -405,7 +436,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.BadGateway, stage.StatusCode);
         Assert.Empty(await Proposals(f));
         Assert.Equal(1, await Scalar("SELECT version FROM ehr.clinical_drafts WHERE id = @id", f.Draft));
-        Assert.Contains("History", await f.Session.Client.GetStringAsync(f.Editor, Cancel));
+        Assert.Contains("Subjective", await f.Session.Client.GetStringAsync(f.Editor, Cancel));
     }
 
     [Fact]

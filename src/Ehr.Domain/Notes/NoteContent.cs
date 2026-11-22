@@ -3,23 +3,55 @@ using Ehr.Data.Patients;
 
 namespace Ehr.Domain.Notes;
 
+// Where a draft's text came from when it is opened in the editor (the expansion plan's step 14).
+public enum NoteOrigin
+{
+    // Saved in Subjective, Objective, Assessment and Plan.
+    Sections,
+
+    // Saved before step 14, in History, Assessment and Plan: its History comes into Subjective, to be sorted.
+    History,
+
+    // Last saved by the desktop app, as plain text (UC 8): all of it comes into Subjective, to be sorted.
+    Body,
+}
+
 // The editor and UC 13 transfer share this structured-content boundary. No review flags come from clients.
-public sealed record NoteContent(string History, string Assessment, string Plan)
+public sealed record NoteContent(string Subjective, string Objective, string Assessment, string Plan)
 {
     public const int MaximumFieldLength = 16_000;
     public const int MaximumBodyBytes = 65_536;
 
-    public string Body => $"History\n{History}\n\nAssessment\n{Assessment}\n\nPlan\n{Plan}";
+    public IReadOnlyList<NoteSection> Sections =>
+    [
+        new(NoteSections.Subjective, Subjective), new(NoteSections.Objective, Objective),
+        new(NoteSections.Assessment, Assessment), new(NoteSections.Plan, Plan),
+    ];
 
-    public static NoteContent From(ClinicalDraft draft) => draft.StructuredVersion == draft.Version
-        ? new(draft.History ?? "", draft.Assessment ?? "", draft.Plan ?? "")
-        : new(draft.Body, "", "");
+    public string Body => NoteSections.Render(Sections);
 
+    public static NoteOrigin OriginOf(ClinicalDraft draft) =>
+        draft.StructuredVersion != draft.Version ? NoteOrigin.Body
+        : draft.History is not null ? NoteOrigin.History
+        : NoteOrigin.Sections;
+
+    // The draft as the editor opens it. Reading it changes nothing: an earlier draft's History, or text the desktop app
+    // saved, is put in Subjective here only, and the draft keeps it as it was until its author saves (ApplyTo).
+    public static NoteContent From(ClinicalDraft draft) => OriginOf(draft) switch
+    {
+        NoteOrigin.Body => new(draft.Body, "", "", ""),
+        NoteOrigin.History => new(draft.History ?? "", "", draft.Assessment ?? "", draft.Plan ?? ""),
+        _ => new(draft.Subjective ?? "", draft.Objective ?? "", draft.Assessment ?? "", draft.Plan ?? ""),
+    };
+
+    // Saves the four sections, and clears an earlier draft's History, in the one update of the draft that follows.
     public void ApplyTo(ClinicalDraft draft)
     {
-        draft.History = History;
+        draft.Subjective = Subjective;
+        draft.Objective = Objective;
         draft.Assessment = Assessment;
         draft.Plan = Plan;
+        draft.History = null;
         draft.Body = Body;
         draft.StructuredVersion = ++draft.Version;
     }
@@ -27,7 +59,7 @@ public sealed record NoteContent(string History, string Assessment, string Plan)
     public IReadOnlyList<string> Validate(bool signing)
     {
         var problems = new List<string>();
-        foreach (var (name, value) in new[] { ("History", History), ("Assessment", Assessment), ("Plan", Plan) })
+        foreach (var (name, value) in Sections.Select(section => (section.Title, section.Text)))
         {
             if (signing && string.IsNullOrWhiteSpace(value))
             {

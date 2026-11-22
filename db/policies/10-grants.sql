@@ -77,10 +77,11 @@ GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
 
 -- The rest of the reference data, none of it about a patient: what a result or vital sign is and this clinic's range
 -- for it, which results an order produces, the PHQ-9 and GAD-7 questionnaires, what each drug product is made of, the
--- classes its ingredients belong to and which of those cross-react, and known interactions between ingredients. Read
--- by both apps; nothing at runtime changes any of it. Its rows are db/reference's generated SQL.
+-- classes its ingredients belong to and which of those cross-react, known interactions between ingredients, and the
+-- visit types a note is written for with what to cover in each section (step 14). Read by both apps; nothing at
+-- runtime changes any of it. Its rows are db/reference's SQL.
 GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
-    ehr.drug_class_cross_reactions, ehr.drug_interactions, ehr.vital_reference_ranges TO ehr_app, ehr_read;
+    ehr.drug_class_cross_reactions, ehr.drug_interactions, ehr.vital_reference_ranges, ehr.note_templates TO ehr_app, ehr_read;
 
 -- Test results and vital signs (observations). PHI, like the chart: row-level security and the write-audit trigger
 -- follow. A clinician files the results of a lab order, or records vital signs: INSERT, which a trigger holds to a

@@ -27,6 +27,8 @@ public sealed record CachedChart(
     // The clinic's time zone, an IANA name (step 10d): the desktop shows this copy's times in it, labeled.
     string? ClinicTimeZone = null);
 
+// History: the note's History as signed or, for a note signed in Subjective, Objective, Assessment and Plan (step 14),
+// its Subjective and Objective, each under its heading, so a build that knows only History shows all of it.
 // SensitiveAddendaNotKept: how many sensitive addenda the note has that aren't in this copy.
 public sealed record CachedNote(
     DateTimeOffset SignedAt, string Signer, string History, string Assessment, string Plan, IReadOnlyList<CachedAddendum> Addenda,

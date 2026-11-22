@@ -12,8 +12,8 @@ public class ClinicalNoteSecurityTests(MigratedDatabase database) : IClassFixtur
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
 
     const string InsertNote = """
-        INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan, signer_id, signed_at)
-        VALUES (@note, @id, @patient, @version, @history, 'Synthetic assessment', 'Synthetic plan', @spoofed, '2000-01-01')
+        INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan, signer_id, signed_at)
+        VALUES (@note, @id, @patient, @version, @subjective, 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', @spoofed, '2000-01-01')
         """;
 
     async Task<(Guid Clinician, Guid Patient, Guid Draft)> DraftAsync()
@@ -25,15 +25,15 @@ public class ClinicalNoteSecurityTests(MigratedDatabase database) : IClassFixtur
         await Accounts.ExecuteAsync(App, clinician,
             """
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', 1, false)
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', 1, false)
             """, ("id", draft), ("patient", patient), ("owner", clinician));
         return (clinician, patient, draft);
     }
 
-    Task SignAsync(Guid clinician, Guid patient, Guid draft, long version = 1, string history = "Synthetic history", Guid? spoofed = null) =>
+    Task SignAsync(Guid clinician, Guid patient, Guid draft, long version = 1, string subjective = "Synthetic subjective", Guid? spoofed = null) =>
         Accounts.ExecuteAsync(App, clinician, InsertNote, ("note", Guid.CreateVersion7()), ("id", draft), ("patient", patient),
-            ("version", version), ("history", history), ("spoofed", spoofed ?? clinician));
+            ("version", version), ("subjective", subjective), ("spoofed", spoofed ?? clinician));
 
     [Fact]
     public async Task Drafts_are_private_in_both_runtime_roles_and_cannot_be_reassigned()
@@ -74,12 +74,12 @@ public class ClinicalNoteSecurityTests(MigratedDatabase database) : IClassFixtur
         await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
             "UPDATE ehr.clinical_drafts SET body = 'Refused', version = version + 1 WHERE id = @id", ("id", draft)));
         await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
-            "UPDATE ehr.clinical_notes SET history = 'Refused' WHERE draft_id = @id", ("id", draft)));
+            "UPDATE ehr.clinical_notes SET subjective = 'Refused' WHERE draft_id = @id", ("id", draft)));
         await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
             "DELETE FROM ehr.clinical_notes WHERE draft_id = @id", ("id", draft)));
         // Even a privileged maintenance write cannot silently alter a signed clinical record.
         await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
-            "UPDATE ehr.clinical_notes SET history = 'Refused' WHERE draft_id = @id", ("id", draft)));
+            "UPDATE ehr.clinical_notes SET subjective = 'Refused' WHERE draft_id = @id", ("id", draft)));
         await Assert.ThrowsAsync<PostgresException>(() => SignAsync(clinician, patient, draft, version: 2));
         Assert.Equal(["1"], await Accounts.QueryAsync(App, clinician,
             "SELECT count(*) FROM ehr.clinical_notes WHERE draft_id = @id", ("id", draft)));
@@ -107,7 +107,7 @@ public class ClinicalNoteSecurityTests(MigratedDatabase database) : IClassFixtur
         sign.Parameters.AddWithValue("id", draft);
         sign.Parameters.AddWithValue("patient", patient);
         sign.Parameters.AddWithValue("version", 1L);
-        sign.Parameters.AddWithValue("history", "Synthetic history");
+        sign.Parameters.AddWithValue("subjective", "Synthetic subjective");
         sign.Parameters.AddWithValue("spoofed", clinician);
         await sign.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         await using var update = new NpgsqlCommand(
@@ -149,10 +149,89 @@ public class ClinicalNoteSecurityTests(MigratedDatabase database) : IClassFixtur
         var targetPatient = kind == "wrong patient" ? await Accounts.PatientAsync(database, clinician) : patient;
         var error = await Assert.ThrowsAsync<PostgresException>(() => SignAsync(clinician, targetPatient, draft,
             version: kind is "pending" or "incomplete" or "stale" ? 2 : 1,
-            history: kind == "tampered" ? "Fabricated" : "Synthetic history"));
+            subjective: kind == "tampered" ? "Fabricated" : "Synthetic subjective"));
         Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
         Assert.Equal(["0"], await Accounts.QueryAsync(App, clinician,
             "SELECT count(*) FROM ehr.clinical_notes WHERE draft_id = @id", ("id", draft)));
+    }
+
+    // The expansion plan's step 14: a note is signed in Subjective, Objective, Assessment and Plan, each as the draft saved
+    // it; a note is never sent with a History, nor signed from a draft that still has one; and no note or draft holds both
+    // shapes, or a note neither, whoever writes it.
+    [Fact]
+    public async Task Notes_are_signed_only_in_the_four_sections_the_draft_saved()
+    {
+        var (clinician, patient, draft) = await DraftAsync();
+        var tampered = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            InsertNote.Replace("'Synthetic objective'", "'Fabricated objective'", StringComparison.Ordinal), ("note", Guid.CreateVersion7()), ("id", draft),
+            ("patient", patient), ("version", 1L), ("subjective", "Synthetic subjective"), ("spoofed", clinician)));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, tampered.SqlState);
+        var withHistory = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            """
+            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan)
+            VALUES (@note, @id, @patient, 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan')
+            """, ("note", Guid.CreateVersion7()), ("id", draft), ("patient", patient)));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, withHistory.SqlState);
+        await Accounts.ExecuteAsync(App, clinician,
+            "UPDATE ehr.clinical_drafts SET objective = ' ', version = 2, structured_version = 2 WHERE id = @id", ("id", draft));
+        var blank = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            InsertNote.Replace("'Synthetic objective'", "' '", StringComparison.Ordinal), ("note", Guid.CreateVersion7()), ("id", draft),
+            ("patient", patient), ("version", 2L), ("subjective", "Synthetic subjective"), ("spoofed", clinician)));
+        Assert.Contains("Subjective, Objective, Assessment and Plan", blank.MessageText, StringComparison.Ordinal);
+        // A draft that holds a History and the new sections: refused, as the app or the superuser.
+        var both = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            "UPDATE ehr.clinical_drafts SET history = 'Synthetic history', version = 3, structured_version = 3 WHERE id = @id", ("id", draft)));
+        Assert.Equal("ck_clinical_drafts_sections", both.ConstraintName);
+        Assert.Equal(["0"], await Accounts.QueryAsync(App, clinician, "SELECT count(*) FROM ehr.clinical_notes WHERE draft_id = @id", ("id", draft)));
+
+        // Written before step 14: its History stays until its author saves the four sections, and it isn't signed until then.
+        var earlier = await EarlierNotes.DraftAsync(database, clinician, patient, "Synthetic history: written before four sections.");
+        var unsorted = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician,
+            """
+            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan)
+            VALUES (@note, @id, @patient, 1, 'Synthetic history: written before four sections.', 'x', 'Synthetic assessment: earlier.', 'Synthetic plan: earlier.')
+            """, ("note", Guid.CreateVersion7()), ("id", earlier), ("patient", patient)));
+        Assert.Contains("Save the draft in Subjective, Objective, Assessment and Plan", unsorted.MessageText, StringComparison.Ordinal);
+
+        // No note in both shapes or neither, even with every trigger held.
+        foreach (var (columns, values) in new[]
+        {
+            ("history, subjective, objective", "'H', 'S', 'O'"),
+            ("subjective", "'S'"),
+            ("history, objective", "'H', 'O'"),
+        })
+        {
+            var shape = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+                $"""
+                SET LOCAL session_replication_role = replica;
+                INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, {columns}, assessment, plan, signer_id, signed_at)
+                VALUES (gen_random_uuid(), @id, @patient, 1, {values}, 'A', 'P', @clinician, now())
+                """, ("id", earlier), ("patient", patient), ("clinician", clinician)));
+            Assert.Equal("ck_clinical_notes_sections", shape.ConstraintName);
+        }
+    }
+
+    // A note signed before step 14 keeps its History, Assessment and Plan as signed: it is still marked sensitive and
+    // unmarked, and nothing turns it into a note of four sections, the superuser included.
+    [Fact]
+    public async Task A_note_signed_before_four_sections_keeps_its_history_and_still_changes_only_its_sensitivity()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        await Accounts.AssignAsync(database, clinician, patient);
+        var (_, note) = await EarlierNotes.SignedAsync(database, clinician, patient, "Synthetic history: signed before four sections.");
+        const string read = "SELECT coalesce(history, '-') || '|' || coalesce(subjective, '-') || '|' || coalesce(objective, '-') || '|' || sensitive FROM ehr.clinical_notes WHERE id = @id";
+        Assert.Equal(["Synthetic history: signed before four sections.|-|-|false"], await Accounts.QueryAsync(App, clinician, read, ("id", note)));
+
+        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.clinical_notes SET sensitive = true, sensitive_reason = 'Synthetic reason' WHERE id = @id", ("id", note));
+        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.clinical_notes SET sensitive = false, sensitive_reason = 'Synthetic reason again' WHERE id = @id", ("id", note));
+        foreach (var change in new[] { "subjective = history, objective = 'O', history = NULL", "history = 'Rewritten'", "objective = 'O'" })
+        {
+            await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician, $"UPDATE ehr.clinical_notes SET {change} WHERE id = @id", ("id", note)));
+            await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(database.SuperuserConnectionString, null, $"UPDATE ehr.clinical_notes SET {change} WHERE id = @id", ("id", note)));
+        }
+
+        Assert.Equal(["Synthetic history: signed before four sections.|-|-|false"], await Accounts.QueryAsync(App, clinician, read, ("id", note)));
     }
 
     [Fact]
@@ -180,11 +259,11 @@ public class ClinicalNoteSecurityTests(MigratedDatabase database) : IClassFixtur
         var (clinician, patient, draft) = await DraftAsync();
         var readOnly = new NpgsqlConnectionStringBuilder(App) { Options = "-c default_transaction_read_only=on" }.ConnectionString;
         var error = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(readOnly, clinician, InsertNote,
-            ("note", Guid.CreateVersion7()), ("id", draft), ("patient", patient), ("version", 1L), ("history", "Synthetic history"), ("spoofed", clinician)));
+            ("note", Guid.CreateVersion7()), ("id", draft), ("patient", patient), ("version", 1L), ("subjective", "Synthetic subjective"), ("spoofed", clinician)));
         Assert.Equal(PostgresErrorCodes.ReadOnlySqlTransaction, error.SqlState);
         Assert.Equal(["0"], await Accounts.QueryAsync(App, clinician,
             "SELECT count(*) FROM ehr.clinical_notes WHERE draft_id = @id", ("id", draft)));
         await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(Read, clinician, InsertNote,
-            ("note", Guid.CreateVersion7()), ("id", draft), ("patient", patient), ("version", 1L), ("history", "Synthetic history"), ("spoofed", clinician)));
+            ("note", Guid.CreateVersion7()), ("id", draft), ("patient", patient), ("version", 1L), ("subjective", "Synthetic subjective"), ("spoofed", clinician)));
     }
 }

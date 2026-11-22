@@ -21,8 +21,9 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
 
-    // A note's sections, the first two long enough for the whole-section rule (40 characters), the plan not.
-    const string History = "Synthetic history: a dry cough for two days, worse at night.";
+    // A note's sections, all but the plan long enough for the whole-section rule (40 characters).
+    const string Subjective = "Synthetic subjective: a dry cough for two days, worse at night.";
+    const string Objective = "Synthetic objective: temperature 37.9, a few crackles at the left base.";
     const string Assessment = "Synthetic assessment: a viral chest infection, no pneumonia found.";
     const string Plan = "Synthetic plan: rest and fluids.";
 
@@ -40,12 +41,12 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         await Accounts.ExecuteAsync(App, clinician,
             """
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, @history, @assessment, @plan, 1, false)
-            """, ("id", draft), ("patient", patient), ("owner", clinician), ("history", History), ("assessment", Assessment), ("plan", Plan));
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, @subjective, @objective, @assessment, @plan, 1, false)
+            """, ("id", draft), ("patient", patient), ("owner", clinician), ("subjective", Subjective), ("objective", Objective), ("assessment", Assessment), ("plan", Plan));
         await Accounts.ExecuteAsync(App, clinician,
-            "INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan, sensitive) VALUES (@note, @draft, @patient, 1, @history, @assessment, @plan, @sensitive)",
-            ("note", note), ("draft", draft), ("patient", patient), ("history", History), ("assessment", Assessment), ("plan", Plan), ("sensitive", sensitive));
+            "INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan, sensitive) VALUES (@note, @draft, @patient, 1, @subjective, @objective, @assessment, @plan, @sensitive)",
+            ("note", note), ("draft", draft), ("patient", patient), ("subjective", Subjective), ("objective", Objective), ("assessment", Assessment), ("plan", Plan), ("sensitive", sensitive));
         return note;
     }
 
@@ -223,13 +224,32 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         // Another patient's isn't looked for (decided: this patient's only), nor one inside a longer word.
         Assert.Empty(await ProblemsAsync(clinician, patient, note, $"Not {otherMrn}, nor x{mrn}x.", "Found.", "Next."));
 
-        // The note's whole Assessment pasted in, in other case and spacing; History likewise. Its plan is too short to
-        // count (under 40 characters), and a fragment of a section passes: the rule's known limit (docs/UC14.md).
-        Assert.Equal(["3 Assessment note-section", "3 History note-section"], await ProblemsAsync(clinician, patient, note, "Talked.", "Found.",
-            "Here is what I wrote:\n" + Assessment.ToUpperInvariant().Replace(" ", "  \n", StringComparison.Ordinal) + " And " + History));
+        // The note's whole Assessment pasted in, in other case and spacing; Subjective likewise, and Objective (step 14).
+        // Its plan is too short to count (under 40 characters), and a fragment of a section passes: the rule's known limit
+        // (docs/UC14.md).
+        Assert.Equal(["2 Objective note-section", "3 Assessment note-section", "3 Subjective note-section"], await ProblemsAsync(clinician, patient, note, "Talked.",
+            Objective.ToLowerInvariant(),
+            "Here is what I wrote:\n" + Assessment.ToUpperInvariant().Replace(" ", "  \n", StringComparison.Ordinal) + " And " + Subjective));
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ReleaseAsync(clinician, patient, note, found: Assessment));
         Assert.Empty(await ProblemsAsync(clinician, patient, note, Plan, "a viral chest infection, no pneumonia found", "Next."));
         Assert.Empty(await SummariesAsync(patient));
+    }
+
+    // A note signed before the expansion plan's step 14 is compared by the sections it was signed with: its History too.
+    [Fact]
+    public async Task A_note_signed_before_four_sections_is_compared_by_its_history()
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        await Accounts.AssignAsync(database, clinician, patient);
+        const string history = "Synthetic history: a dry cough for two days, worse at night, and a temperature of 37.9.";
+        var (_, note) = await EarlierNotes.SignedAsync(database, clinician, patient, history, assessment: Assessment);
+
+        Assert.Equal(["2 History note-section", "3 Assessment note-section"], await ProblemsAsync(clinician, patient, note, "Talked.",
+            "We found: " + history.Replace("37.9", "\uFF13\uFF17.9", StringComparison.Ordinal), Assessment.ToUpperInvariant()));
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => ReleaseAsync(clinician, patient, note, found: history));
+        await ReleaseAsync(clinician, patient, note, "We talked about your cough.", "Your chest sounded a little noisy.", "Rest and drink fluids.");
+        Assert.Single(await SummariesAsync(patient));
     }
 
     // The patient's MRN and a section of the note are looked for as they look too, and what is stored is what was typed:
@@ -246,6 +266,11 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.Equal([$"1 {mrn} record-number"], await ProblemsAsync(clinician, patient, note, $"Your number is {mrn[..6]}\u200B{mrn[6..]}.", "Found.", "Next."));
         Assert.Equal(["2 Assessment note-section"], await ProblemsAsync(clinician, patient, note, "Talked.",
             Assessment.Replace(" ", " \u200B", StringComparison.Ordinal).Replace("no pneumonia", "no \uFF50neumonia", StringComparison.Ordinal), "Next."));
+        // The sections step 14 added are read the same way: Objective with characters that show nothing, a fullwidth
+        // digit and a non-breaking hyphen's look-alike; Subjective with a soft hyphen and a direction mark.
+        Assert.Equal(["1 Objective note-section", "3 Subjective note-section"], await ProblemsAsync(clinician, patient, note,
+            Objective.Replace("37.9", "\uFF13\uFF17.9", StringComparison.Ordinal).Replace(" a few", "\u2060 a\u200C few", StringComparison.Ordinal), "Found.",
+            Subjective.Replace("dry", "d\u00ADry", StringComparison.Ordinal).Replace("night", "\u200Enight", StringComparison.Ordinal)));
 
         const string typed = "Rest \u2014 and drink fluids.\u200D Your \uFF22\uFF30 is fine: check it 1\u20132 times a day.";
         Assert.Empty(await ProblemsAsync(clinician, patient, note, typed, typed, typed));

@@ -20,6 +20,10 @@
         _ => "No usable suggestion",
     };
 
+    // A proposed field's heading. A dictation sorted into History (before the expansion plan's step 14) is added to
+    // Subjective, where the editor asks for what belongs in Objective to be moved there (NoteReviews).
+    static string FieldLabel(string field) => field == "history" ? "History (goes into Subjective)" : char.ToUpperInvariant(field[0]) + field[1..];
+
     static string StateTone(string? state) => state switch
     {
         AiProposalStates.Pending => "sc-tag sc-tag--warning",
@@ -72,7 +76,7 @@
                 {
                     var proposal = Model.Proposals.SingleOrDefault(p => p.Field == field);
                     <div class="sc-proposal" data-dictation-field="@field" data-proposal-id="@proposal?.Id" data-review-state="@proposal?.State">
-                        <dt class="sc-proposal__head"><span class="sc-proposal__field">@(char.ToUpperInvariant(field[0]) + field[1..])</span> <span class="@StateTone(proposal?.State)" data-field-status>@StateWords(proposal?.State)</span></dt>
+                        <dt class="sc-proposal__head"><span class="sc-proposal__field">@FieldLabel(field)</span> <span class="@StateTone(proposal?.State)" data-field-status>@StateWords(proposal?.State)</span></dt>
                         <dd data-field-value>@proposal?.OriginalValue</dd>
                         @if (proposal is { State: AiProposalStates.Pending } && !Model.Signed)
                         {
@@ -106,7 +110,7 @@
     </div>
     <details>
         <summary>Current saved note — compare before adding approved values</summary>
-        <partial name="_NoteContent" model="NoteContent.From(Model.Draft)" />
+        <partial name="_NoteContent" model="NoteSections.AsSaved(Model.Draft)" />
     </details>
     @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed)
     {

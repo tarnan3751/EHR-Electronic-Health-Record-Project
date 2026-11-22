@@ -21,8 +21,8 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
         VALUES (@proposal, @review, @patient, 'history', 'Synthetic proposal', 'pending');
         """;
     const string Sign = """
-        INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan, signer_id, signed_at)
-        VALUES (@note, @draft, @patient, 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', @actor, now())
+        INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan, signer_id, signed_at)
+        VALUES (@note, @draft, @patient, 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', @actor, now())
         """;
 
     async Task<Review> RecordingAsync()
@@ -33,8 +33,8 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
         var row = new Review(actor, patient, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
         await Accounts.ExecuteAsync(App, actor, """
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@draft, @patient, @actor, 'Synthetic note', 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', 1, false);
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@draft, @patient, @actor, 'Synthetic note', 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', 1, false);
             INSERT INTO ehr.ai_note_reviews
                 (id, patient_id, draft_id, clinician_id, session_id, max_seconds, max_chunk_bytes, state, started_version, created_at)
             VALUES (@review, @patient, @draft, @actor, @session, 900, 100000, 'recording', 1, now());
@@ -197,6 +197,6 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
         await Refused(row, Sign);
         await Execute(row, "UPDATE ehr.ai_note_reviews SET state = 'cancelled' WHERE id = @review");
         await Execute(row, Sign);
-        Assert.Equal(["Synthetic history"], await Query(row, "SELECT history FROM ehr.clinical_notes WHERE draft_id = @draft"));
+        Assert.Equal(["Synthetic subjective"], await Query(row, "SELECT subjective FROM ehr.clinical_notes WHERE draft_id = @draft"));
     }
 }

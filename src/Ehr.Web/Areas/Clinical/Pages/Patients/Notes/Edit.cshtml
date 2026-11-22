@@ -17,7 +17,7 @@
     @* UC 2 (Tahseen Arnan): off-site with the clinic's server unreachable, the draft as last saved, and no editor, since
        nothing could be saved. *@
     <p class="sc-muted">This draft can't be changed or signed while the clinic's server can't be reached. It is shown as last saved.</p>
-    <partial name="_NoteContent" model="new Ehr.Domain.Notes.NoteContent(Model.History, Model.Assessment, Model.Plan)" />
+    <partial name="_NoteContent" model="Model.Saved" />
 }
 else
 {
@@ -30,15 +30,29 @@ else
     {
         <p><a asp-page="/Patients/Dictate" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Dictate into this draft</a></p>
     }
+    @* Step 14: the text of an earlier draft, or of one last saved on the desktop, is in Subjective until its author sorts
+       and saves it. Nothing has changed in the saved draft. *@
+    @if (Model.Origin == Ehr.Domain.Notes.NoteOrigin.History)
+    {
+        <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="history"><span class="sc-notice__state">Check:</span> this draft was written before notes had four sections. Its History is now in Subjective: move today's vital signs, examination findings and the results you reviewed to Objective before signing.</p>
+    }
+    else if (Model.Origin == Ehr.Domain.Notes.NoteOrigin.Body)
+    {
+        <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="body"><span class="sc-notice__state">Check:</span> this draft was last saved on the desktop app, and all its text is in Subjective. Sort it into the four sections before signing.</p>
+    }
     <div id="note-errors" class="sc-notice sc-notice--danger" role="alert" hidden="@(Model.Errors.Count == 0)">
         @foreach (var error in Model.Errors) { <p>@error</p> }
     </div>
     <form method="post" asp-page-handler="Save" class="sc-form sc-form--wide" data-note-editor>
         <input type="hidden" asp-for="Version" />
-        <p id="note-help" class="sc-field__hint">Drafts save to the clinic server as you type. Complete all three fields before signing.</p>
+        <p id="note-help" class="sc-field__hint">Drafts save to the clinic server as you type. Complete all four sections before signing.</p>
         <div class="sc-field sc-field--wide">
-            <label asp-for="History" class="sc-field__label">History</label>
-            <textarea asp-for="History" class="sc-field__input" rows="7" autofocus aria-describedby="note-help"></textarea>
+            <label asp-for="Subjective" class="sc-field__label">Subjective</label>
+            <textarea asp-for="Subjective" class="sc-field__input" rows="7" autofocus aria-describedby="@(Model.Origin == Ehr.Domain.Notes.NoteOrigin.Sections ? "note-help" : "note-help note-origin")"></textarea>
+        </div>
+        <div class="sc-field sc-field--wide">
+            <label asp-for="Objective" class="sc-field__label">Objective</label>
+            <textarea asp-for="Objective" class="sc-field__input" rows="5"></textarea>
         </div>
         <div class="sc-field sc-field--wide">
             <label asp-for="Assessment" class="sc-field__label">Assessment</label>

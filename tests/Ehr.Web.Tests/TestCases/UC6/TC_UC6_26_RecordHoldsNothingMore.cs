@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   one.
 // Inputs and system conditions: GET /portal/record?handler=File&sensitive=true and /portal/record/print?sensitive=true,
 //   on the on-site app.
-// Test data: The note's history "Synthetic history: dry cough, quartzwing pattern, nocturnal."; the addendum "Synthetic
+// Test data: The note's Subjective "Synthetic subjective: dry cough, quartzwing pattern, nocturnal."; the addendum "Synthetic
 //   addendum: zebrafinch follow-up."; the draft "Synthetic draft: kingfisher"; the withdrawn summary "We talked about the
 //   wrong visit."; the reading's reason "Synthetic: wrong cuff size"; "Synthetic retracted medication"; "Synthetic
 //   unreleased test"; "Synthetic preliminary test"; the cancellation reason "Synthetic: the patient asked to move it".
@@ -44,7 +44,7 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
     {
         var (chart, patient) = await PortalChartAsync(apps, "Dr. Nothingmore");
         var client = chart.Session.Client;
-        var note = await SignedNoteAsync(client, chart.Patient, history: NoteHistory);
+        var note = await SignedNoteAsync(client, chart.Patient, subjective: NoteSubjective);
         using (var added = await AddAsync(client, chart.Patient, note, "Synthetic addendum: zebrafinch follow-up."))
         {
             Assert.Equal(System.Net.HttpStatusCode.OK, added.StatusCode);
@@ -52,8 +52,8 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
 
         await FhirRequests.InsertAsync(apps,
             """
-            INSERT INTO ehr.clinical_drafts (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@id, @patient, @clinician, 'Synthetic draft: kingfisher', 1, 'Synthetic draft: kingfisher', 'Synthetic draft: kingfisher', 'Synthetic draft: kingfisher', 1, false)
+            INSERT INTO ehr.clinical_drafts (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@id, @patient, @clinician, 'Synthetic draft: kingfisher', 1, 'Synthetic draft: kingfisher', 'Synthetic draft: kingfisher', 'Synthetic draft: kingfisher', 'Synthetic draft: kingfisher', 1, false)
             """, chart.Patient, ("clinician", chart.Clinician.Id));
         using (var released = await ReleaseAsync(client, chart.Patient, note, "We talked about the wrong visit."))
         {
