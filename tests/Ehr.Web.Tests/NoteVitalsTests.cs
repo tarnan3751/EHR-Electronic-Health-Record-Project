@@ -1,8 +1,16 @@
+using System.Data.Common;
 using System.Net;
 using System.Text.Json;
+using Ehr.Data;
 using Ehr.Data.Accounts;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
+using Ehr.Domain.Audit;
+using Ehr.Domain.Phi;
 using Ehr.Domain.Time;
+using Ehr.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
@@ -133,6 +141,49 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal($"Vital signs, {Clinic.Format(new DateTimeOffset(day.AddDays(-1).AddHours(9), TimeSpan.Zero))}: temperature 37.4 °C.",
             await OfferAsync(session.Client, await DraftAsync(session.Client, patient)));
+    }
+
+    // The value the first statement found as the newest is marked in error, on another connection, before the second reads
+    // its day: that day then has none standing, and the reader asks both once more, so the offer is the day before's.
+    [Fact]
+    public async Task A_value_marked_in_error_between_the_two_statements_leaves_the_day_before_offered()
+    {
+        var (clinician, patient, _) = await ChartListTests.OnPanelAsync(apps, "Raced");
+        var day = await DayAsync();
+        await InsertAsync(patient, day.AddDays(-1).AddHours(9), (VitalSign.Temperature, 37.4m));
+        await InsertAsync(patient, day.AddHours(9), (VitalSign.HeartRate, 140));
+        var between = new BetweenStatements(() => MarkInErrorAsync(patient, day.AddHours(9), clinician.Id));
+        var user = new UserContext { UserId = clinician.Id };
+        var options = new DbContextOptionsBuilder<EhrDbContext>();
+        EhrDbContext.Configure(options, apps.Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+        options.AddInterceptors(new UserContextInterceptor(user), between);
+        await using var db = new EhrDbContext(options.Options);
+        var reader = new PhiReader(db, new AuditRecorder(db, user, new AuditSource(AuditSources.OnPrem)), user);
+        await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+
+        var signs = await reader.ObjectiveVitalsAsync(patient, Clinic, Cancel);
+
+        Assert.True(between.Marked);
+        Assert.Equal([(VitalSign.Temperature, 37.4m)], signs.Select(sign => (sign.Code!, sign.Value!.Value)));
+    }
+
+    // Runs `between` once, on its own connection, after the statement that finds the newest standing moment.
+    sealed class BetweenStatements(Func<Task> between) : DbCommandInterceptor
+    {
+        public bool Marked { get; private set; }
+
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!Marked && command.CommandText.Contains("FROM ehr.observations", StringComparison.Ordinal)
+                && command.CommandText.Contains("ORDER BY o.effective_at DESC", StringComparison.Ordinal))
+            {
+                Marked = true;
+                await between();
+            }
+
+            return result;
+        }
     }
 
     // The offer is for the clinician's own unsigned draft of the route's patient. A draft that doesn't exist, another

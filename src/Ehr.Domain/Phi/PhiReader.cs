@@ -665,16 +665,23 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     // in error, step 9b) taken on the clinic's day of the patient's newest standing one, however many there are, so each
     // sign taken that day is among them and a blood pressure's two values come together (Notes.ObjectiveVitals takes the
     // newest of each). Two statements, each a range of the index on the patient and the time taken: the newest moment,
-    // then that day's bounds on the clinic's clock (a day the clocks change on is 23 or 25 hours). Read only when the
-    // clinician asks, for their own draft of the patient, and recorded as the vital signs page's read is, with its part.
+    // then that day's bounds on the clinic's clock (a day the clocks change on is 23 or 25 hours). A value marked in error
+    // between the two can leave that day with none standing: then both are asked once more, so the offer is the latest
+    // day that still has one, not none. Read only when the clinician asks, for their own draft of the patient, and
+    // recorded once as the vital signs page's read is, with its part.
     public async Task<IReadOnlyList<Observation>> ObjectiveVitalsAsync(Guid patientId, ClinicTime clinic, CancellationToken cancellationToken)
     {
         var standing = db.Observations.AsNoTracking()
             .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.VitalSigns && o.Value != null && ObservationStatus.Released.Contains(o.Status));
-        var newest = await standing.OrderByDescending(o => o.EffectiveAt).Select(o => (DateTimeOffset?)o.EffectiveAt).FirstOrDefaultAsync(cancellationToken);
         IReadOnlyList<Observation> signs = [];
-        if (newest is { } moment)
+        for (var asked = 0; asked < 2 && signs.Count == 0; asked++)
         {
+            var newest = await standing.OrderByDescending(o => o.EffectiveAt).Select(o => (DateTimeOffset?)o.EffectiveAt).FirstOrDefaultAsync(cancellationToken);
+            if (newest is not { } moment)
+            {
+                break;
+            }
+
             var (from, to) = clinic.DayBounds(DateOnly.FromDateTime(clinic.At(moment).DateTime));
             signs = await standing.Where(o => o.EffectiveAt >= from && o.EffectiveAt < to).ToListAsync(cancellationToken);
         }
