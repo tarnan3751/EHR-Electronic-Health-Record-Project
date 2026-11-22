@@ -141,7 +141,8 @@ window.SwiftChartDictationView = class {
             const items = (result.notCarriedOver ?? []).filter((item) => !(listedApart && proposed.has(`${item.start}:${item.end}`)));
             notCarried.hidden = items.length === 0;
             notCarriedList.replaceChildren(...items.map((item) => {
-                const text = (result.transcript?.text ?? "").slice(item.start, item.end);
+                // A recorded visit's review answers a decision without its transcript: the one shown stays.
+                const text = ((result.transcript ?? state.transcript)?.text ?? "").slice(item.start, item.end);
                 const kind = proposed.get(`${item.start}:${item.end}`);
                 const li = element("li");
                 li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), document.createTextNode(`“${text}”`));

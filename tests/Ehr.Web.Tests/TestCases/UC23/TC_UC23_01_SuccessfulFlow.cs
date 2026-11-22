@@ -24,7 +24,8 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   bound to it; the service asked for a visit's session, told so on every call, and the session discarded at the service
 //   once staged; the transcript kept apart. Step 2: the page titled "Review the note drafted from the visit", and the
 //   transcript a turn at a time, "Clinician" and "Patient"; the notice and the warning that Subjective is the patient's
-//   own words; "Said by: Patient." on Subjective; one recorded read of the transcript. Step 3: the note editor has the edited Subjective and the three accepted values; the review is
+//   own words; "Said by: Patient." on Subjective; one recorded read of the transcript, and none more for the decisions,
+//   whose answers carry no transcript. Step 3: the note editor has the edited Subjective and the three accepted values; the review is
 //   completed and no transcript is kept.
 // Creator: Tahseen Arnan
 public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
@@ -56,9 +57,10 @@ public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("data-ambient-own-words", html);
         Assert.Contains("patients_own_words", html);
         Assert.Contains("\"speaker\":\"patient\"", html);
-        Assert.Equal(["note-draft"], await RowsAsync(apps,
-            "SELECT DISTINCT part FROM ehr.audit_events WHERE table_name = 'ambient_transcripts' AND action = 'read' AND row_id = @id", l.Review));
+        const string Reads = "SELECT part || ' ' || count(*) FROM ehr.audit_events WHERE table_name = 'ambient_transcripts' AND action = 'read' AND row_id = @id GROUP BY part";
+        Assert.Equal(["note-draft 1"], await RowsAsync(apps, Reads, l.Review));
 
+        // Each decision, as the page's script posts it, reads no transcript and answers without one: the page keeps it.
         var proposals = await ProposalsAsync(apps, l.Review);
         var version = d.Version;
         foreach (var (field, decision) in new[] { ("subjective", "edited"), ("objective", "accepted"), ("assessment", "accepted"), ("plan", "accepted") })
@@ -66,8 +68,13 @@ public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
             using var decided = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals[field].Id, version, decision,
                 field == "subjective" ? "Synthetic: cough for three days." : "");
             Assert.Equal(HttpStatusCode.OK, decided.StatusCode);
+            var answer = await Json(decided);
+            Assert.Equal(System.Text.Json.JsonValueKind.Null, answer.GetProperty("snapshot").GetProperty("result").GetProperty("transcript").ValueKind);
+            Assert.DoesNotContain("What brings you in today?", answer.GetRawText(), StringComparison.Ordinal);
             version++;
         }
+
+        Assert.Equal(["note-draft 1"], await RowsAsync(apps, Reads, l.Review));
 
         using var finished = await ReviewPost(l.Session.Client, l.Token, d.ReviewUrl, "Complete", ("Version", version));
         Assert.Equal(HttpStatusCode.OK, finished.StatusCode);

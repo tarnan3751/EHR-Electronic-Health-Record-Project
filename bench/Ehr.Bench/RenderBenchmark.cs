@@ -1379,26 +1379,31 @@ internal static partial class RenderBenchmark
     sealed record Listened(Guid Patient, Guid Draft, Guid Review);
 
     // Step 16: for each patient, a new draft from a 20-minute recorded visit, begun with its consent and staged through the
-    // app's own service and the database's rules, as the Listen page does: 300 turns between the clinician and the patient,
-    // about 3,000 words, kept apart, and a value proposed for each of the four fields from who said it.
+    // app's own service and the database's rules, as the Listen page does: 3,000 words or so (150 a minute), kept apart,
+    // and a value proposed for each of the four fields from who said it. The dictation service cuts its transcript into a
+    // segment at the first pause of at least 0.4 seconds after at least a second (segmenter.py), and a conversation pauses
+    // that long every couple of seconds, between phrases and at each turn: 20 minutes is about 600 segments of 2 seconds,
+    // here in 200 turns of three, five words each.
     static async Task<List<Listened>> ListenToVisitsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
     {
         var text = new StringBuilder();
         var segments = new List<Ehr.Web.Api.Dictation.TranscriptSegment>();
-        for (var turn = 0; turn < 300; turn++)
+        for (var passage = 0; passage < 600; passage++)
         {
+            var turn = passage / 3;
             var (speaker, words) = turn % 2 == 0
-                ? (Ehr.Web.Api.Dictation.Speaker.Clinician, $"Synthetic question {turn} about how the last week has been at home.")
-                : (Ehr.Web.Api.Dictation.Speaker.Patient, $"Synthetic answer {turn}: about the same as before, a little better.");
-            text.Append(turn == 0 ? "" : "\n");
-            segments.Add(new(text.Length, text.Length + words.Length, turn * 4000L, turn * 4000L + 3800, true, null, 1 + turn % 2, speaker));
+                ? (Ehr.Web.Api.Dictation.Speaker.Clinician, $"Synthetic question {turn}, part {passage % 3}.")
+                : (Ehr.Web.Api.Dictation.Speaker.Patient, $"Synthetic answer {turn}, part {passage % 3}.");
+            text.Append(passage == 0 ? "" : passage % 3 == 0 ? "\n" : " ");
+            segments.Add(new(text.Length, text.Length + words.Length, passage * 2000L, passage * 2000L + 1800, true, null, 1 + turn % 2, speaker));
             text.Append(words);
         }
 
-        Ehr.Web.Api.Dictation.PendingField Field(int turn) => new(
-            text.ToString(segments[turn].Start, segments[turn].End - segments[turn].Start),
-            [new(segments[turn].Start, segments[turn].End, segments[turn].Speaker)], []);
-        var fields = new Ehr.Web.Api.Dictation.NoteFields(Field(1), Field(2), Field(4), Field(6));
+        // From the patient's first passage, and the clinician's.
+        Ehr.Web.Api.Dictation.PendingField Field(int passage) => new(
+            text.ToString(segments[passage].Start, segments[passage].End - segments[passage].Start),
+            [new(segments[passage].Start, segments[passage].End, segments[passage].Speaker)], []);
+        var fields = new Ehr.Web.Api.Dictation.NoteFields(Field(3), Field(0), Field(6), Field(12));
         var transcript = new Ehr.Web.Api.Dictation.Transcript(text.ToString(), true, segments);
         var result = new Ehr.Web.Api.Dictation.DictationResult(transcript with { Text = "" }, Ehr.Web.Api.Dictation.Sorting.Done, fields, [],
             new Ehr.Web.Api.Dictation.Provenance(new("synthetic", "0", "0"), null, null, "synthetic", "synthetic", "synthetic", "synthetic"));

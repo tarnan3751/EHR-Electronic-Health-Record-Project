@@ -84,7 +84,7 @@
                 }
                 else
                 {
-                    <div class="sc-transcript__body" data-dictation-transcript><p>@Model.Result?.Transcript.Text</p></div>
+                    <div class="sc-transcript__body" data-dictation-transcript><p>@Model.Result?.Transcript?.Text</p></div>
                 }
                 <p class="sc-transcript__note" data-dictation-unclear hidden>Marked passages were unclear. Check them before approving.</p>
             </section>

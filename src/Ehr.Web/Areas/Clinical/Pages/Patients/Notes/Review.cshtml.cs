@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
@@ -41,7 +40,9 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     public Guid? NextProposal => Decided is not { } decided ? null
         : (ChartProposals.SkipWhile(p => p.Row.Id != decided).FirstOrDefault(p => p.Waiting) ?? ChartProposals.FirstOrDefault(p => p.Waiting))?.Row.Id;
 
-    public object Snapshot => new { Review.State, version = Draft.Version, result = Ambient ? Shown : (object?)Result, proposals = Proposals };
+    // A recorded visit's result has the transcript this page read, or none (null), which the page's script then leaves
+    // as it is shown: the stored result keeps no word of it.
+    public object Snapshot => new { Review.State, version = Draft.Version, result = Result, proposals = Proposals };
 
     // A recorded visit's review (the expansion plan's step 16). Its transcript is kept apart, only while it is open and for
     // 7 days at most, and read only at the clinic: the review shows it from there, or says where it went. While it is kept,
@@ -58,9 +59,6 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 
     // Gone from a review still open: rejected, or edited into the clinician's words, never accepted as offered.
     public bool TranscriptGone => Ambient && !TranscriptKept && Review.State == AiReviewStates.Pending;
-
-    // A recorded visit's result as the page's script renders it: with the transcript kept apart, or none.
-    JsonNode? Shown { get; set; }
 
     // The fields the review shows: Subjective, Objective, Assessment and Plan (the expansion plan's step 14), or, for a
     // dictation sorted before then, its History, Assessment and Plan, as it was saved.
@@ -98,7 +96,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     // Step 15: dismissing a proposed order or allergy. Back to the review, the cursor on the next one waiting.
     public async Task<IActionResult> OnPostDismissProposalAsync(Guid patientId, Guid draftId, Guid reviewId)
     {
-        if (await LoadAsync(patientId, draftId, reviewId) is { } denied) return denied;
+        if (await LoadAsync(patientId, draftId, reviewId, read: false) is { } denied) return denied;
         var result = await reviews.DismissAsync(reviewId, ChartProposalId, HttpContext.RequestAborted);
         if (result.Status == 200)
             return Redirect(Url.Page("Review", new { patientId, draftId, reviewId, decided = ChartProposalId })!);
@@ -108,16 +106,19 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
         return Page();
     }
 
+    // A decision, as the page's script posts it, reads where the review stands before and after, never a visit's transcript:
+    // it answers with the review's state, the draft's version, the proposals and the stored result, with no transcript
+    // (the page keeps the one it shows). Only a page rendered again, without the script, reads the transcript, once.
     async Task<IActionResult> ChangeAsync(Guid patientId, Guid draftId, Guid reviewId, Func<Task<ReviewResult>> action, bool complete)
     {
-        if (await LoadAsync(patientId, draftId, reviewId) is { } denied) return denied;
+        if (await LoadAsync(patientId, draftId, reviewId, read: false) is { } denied) return denied;
         // Route identity is checked before invoking the domain operation; extra form metadata is never authoritative.
         var result = ModelState.IsValid ? await action() : ReviewResult.Invalid("Supply a valid draft version and decision.");
         var url = complete && result.Status == 200 ? Url.Page("Edit", new { patientId, draftId }) : null;
         if (Request.Headers.ContainsKey("HX-Request"))
         {
             if (result.Status != 200) return new JsonResult(new { result.Errors }) { StatusCode = result.Status };
-            await LoadAsync(patientId, draftId, reviewId);
+            await LoadAsync(patientId, draftId, reviewId, read: false);
             return new JsonResult(new { result.Errors, snapshot = Snapshot, url });
         }
         if (url is not null) return Redirect(url);
@@ -127,7 +128,8 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
         return Page();
     }
 
-    async Task<IActionResult?> LoadAsync(Guid patientId, Guid draftId, Guid reviewId)
+    // `read`: whether this request shows a visit's transcript, which is then read once, a recorded read, at the clinic.
+    async Task<IActionResult?> LoadAsync(Guid patientId, Guid draftId, Guid reviewId, bool read = true)
     {
         if (await LoadPatientAsync(patientId, AuditParts.NoteDraft) is { } denied) return denied;
         var review = await Phi.AiReviewAsync(reviewId, HttpContext.RequestAborted);
@@ -137,16 +139,15 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
         Review = review;
         Draft = draft;
         Result = review.ResultJson is null ? null : JsonSerializer.Deserialize<DictationResult>(review.ResultJson, Json);
-        Shown = review.Mode == AiReviewModes.Ambient && review.ResultJson is not null ? JsonNode.Parse(review.ResultJson) : null;
-        if (Shown is not null)
+        if (Ambient && Result is not null)
         {
-            // At the clinic the transcript itself, a recorded read; off-site, and for what the cloud app forwards here, only
-            // whether it is still kept, so it never leaves the clinic's network.
-            var transcript = AtTheClinic ? await Phi.AmbientTranscriptAsync(reviewId, HttpContext.RequestAborted) : null;
-            TranscriptKept = transcript is not null || !AtTheClinic && await Phi.AmbientTranscriptKeptAsync(reviewId, HttpContext.RequestAborted);
-            Shown["transcript"] = transcript is null ? null : JsonNode.Parse(transcript.Transcript);
-            if (transcript is not null && Result is not null)
-                Result = Result with { Transcript = JsonSerializer.Deserialize<Transcript>(transcript.Transcript, Json)! };
+            // At the clinic, for a page that shows it, the transcript itself, a recorded read, its JSON read once; otherwise,
+            // and for what the cloud app forwards here, only whether it is still kept, so it never leaves the clinic's
+            // network. The stored result's own transcript has no words: this one replaces it, or none does.
+            var transcript = AtTheClinic && read ? await Phi.AmbientTranscriptAsync(reviewId, HttpContext.RequestAborted) : null;
+            TranscriptKept = transcript is not null
+                || !(AtTheClinic && read) && await Phi.AmbientTranscriptKeptAsync(reviewId, HttpContext.RequestAborted);
+            Result = Result with { Transcript = transcript is null ? null! : JsonSerializer.Deserialize<Transcript>(transcript.Transcript, Json)! };
         }
 
         var proposals = await Phi.AiProposalsAsync(reviewId, HttpContext.RequestAborted);
