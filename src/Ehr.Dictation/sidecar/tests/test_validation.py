@@ -954,13 +954,25 @@ def test_an_addendum_that_is_all_plan_is_not_flagged():
     assert checked.pending and checked.warnings == []
 
 
-def test_a_field_quoting_the_whole_dictation_is_not_flagged_when_another_is_offered_too():
-    text = transcript(QUICK)
+def quick(**others: dict) -> dict:
+    """QUICK checked with all of it in Subjective, and these other fields as the model proposed them."""
     fields = {name: {"value": "", "sources": []} for name in FIELDS}
     fields["subjective"] = {"value": ". ".join(QUICK_SENTENCES) + ".", "sources": QUICK_SENTENCES}
-    fields["assessment"] = {"value": "Left acute otitis media, his third this year.", "sources": [QUICK_SENTENCES[0]]}
+    return check(fields | others, [], transcript(QUICK)).fields
 
-    checked = check(fields, [], text).fields
+
+def test_a_field_quoting_the_whole_dictation_is_not_flagged_when_another_is_offered_too():
+    checked = quick(assessment={"value": "Left acute otitis media, his third this year.", "sources": [QUICK_SENTENCES[0]]})
 
     assert checked["subjective"].pending and checked["assessment"].pending
     assert checked["subjective"].warnings == [] and checked["assessment"].warnings == []
+
+
+# As d39 came back in the three-field run: a Plan proposed too, and discarded by the checks. The one value offered still
+# holds the whole dictation, beside fields the review shows with no usable suggestion.
+def test_a_field_quoting_the_whole_dictation_is_flagged_when_the_others_were_discarded():
+    checked = quick(plan={"value": "Amoxicillin 500 mg for a week.", "sources": ["amoxicillin 500 mg for a week"]})
+
+    assert not checked["plan"].pending and "source_not_in_transcript" in checked["plan"].reasons
+    assert checked["subjective"].pending
+    assert [code for code, _, _ in checked["subjective"].warnings] == ["one_field_holds_dictation"]

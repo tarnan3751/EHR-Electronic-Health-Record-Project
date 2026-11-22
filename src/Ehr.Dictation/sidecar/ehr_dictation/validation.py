@@ -68,10 +68,10 @@ another expression, within WARNING_REACH words after it, past the end of the sou
 word between them (no, wait, sorry, scratch, mean, correction, actually, rather, make, change); it points at the later
 item. near_unclear_passage, for each passage marked unclear within NEAR_UNCLEAR words of one of the value's sources: the
 value was sorted from words right beside something speech recognition couldn't hear; it points at that passage.
-one_field_holds_dictation, on the only value offered when every other field is not_dictated, if its sources cover at
-least WHOLE_DICTATION of the transcript's words: the whole dictation, whatever it says, has gone into one field, plan
-and findings alike, to be sorted into the sections it belongs to before it is accepted; it points at what the sources
-cover. A short dictation that is all one field, such as an addendum to a plan, covers less once its lead-in and sign-off
+one_field_holds_dictation, on the only value offered, whatever became of the other fields (not dictated, or proposed and
+discarded), if its sources cover at least WHOLE_DICTATION of the transcript's words: the whole dictation, whatever it
+says, has gone into one field, plan and findings alike, to be sorted into the sections it belongs to before it is
+accepted; it points at what the sources cover. A short dictation that is all one field, such as an addendum to a plan, covers less once its lead-in and sign-off
 are left out.
 
 The eval (eval/) measures what these let through and what they throw away; its gate ties results to a hash of these
@@ -257,10 +257,10 @@ def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript) -
 
 
 def _warn_of_whole_dictation(checked: dict[str, Checked], transcript: _Transcript) -> None:
-    """one_field_holds_dictation (see the module's header), on the only value offered, when every other field is
-    not_dictated and its sources cover at least WHOLE_DICTATION of the transcript's words."""
+    """one_field_holds_dictation (see the module's header), on the only value offered, whatever became of the others,
+    when its sources cover at least WHOLE_DICTATION of the transcript's words."""
     offered = [field for field in checked.values() if field.pending]
-    if len(offered) != 1 or any(field.reasons != ["not_dictated"] for field in checked.values() if not field.pending):
+    if len(offered) != 1:
         return
     field = offered[0]
     covered = sum(any(start <= word.start and word.end <= end for start, end in field.spans) for word in transcript.words)

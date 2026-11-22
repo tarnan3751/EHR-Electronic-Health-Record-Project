@@ -142,8 +142,9 @@ public enum WarningCode
     [JsonStringEnumMemberName("near_unclear_passage")]
     NearUnclearPassage,
 
-    // The only field proposed, every other not dictated, quotes nearly all of the transcript (nine words in ten): the
-    // whole dictation, plan and findings alike, went into one section, for the clinician to sort before accepting it.
+    // The only field proposed, whatever became of the others (not dictated, or discarded by the checks), quotes nearly
+    // all of the transcript (nine words in ten): the whole dictation, plan and findings alike, went into one section, for
+    // the clinician to sort before accepting it.
     [JsonStringEnumMemberName("one_field_holds_dictation")]
     OneFieldHoldsDictation,
 }
