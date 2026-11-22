@@ -11,12 +11,12 @@ import json
 import httpx2
 import pytest
 
-from dictation_scripts_es import load_scripts
+from dictation_scripts_es import HOLDOUT_DIR, load_scripts
 from ehr_dictation import prompt
 from ehr_dictation.llama import LlamaServer, Structurer
 from ehr_eval import run_a, scoring_es
 
-SCRIPTS = {script.id: script for script in load_scripts()}
+SCRIPTS = {script.id: script for script in load_scripts() + load_scripts(HOLDOUT_DIR)}  # the held-out ones too
 
 
 def structurer(content: dict | str, finish_reason: str = "stop") -> Structurer:
@@ -116,6 +116,7 @@ def test_the_order_the_model_wrote_each_statements_keys_in_is_counted():
 
 
 def test_every_scripts_gold_answer_changes_nothing_and_misfiles_nothing():
+    # The held-out scripts' too: their gold is an answer the scoring must count as right.
     items = [run(script_id, gold_answer(script_id)) for script_id in SCRIPTS]
     mistranslations = scoring_es.score(items, SCRIPTS)["mistranslations"]
     assert mistranslations["listed"] == [] and mistranslations["misfiled"]["listed"] == []
@@ -239,3 +240,8 @@ def test_scoring_again_needs_somewhere_to_write(tmp_path):
     assert run_a.main(["--rescore", str(stored)]) == 2
     assert run_a.main(["--rescore", str(stored), "--out", str(tmp_path / "again.json")]) == 0
     assert json.loads((tmp_path / "again.json").read_text(encoding="utf-8"))["rescored"]
+
+
+def test_a_run_of_the_held_out_scripts_is_scored_again_against_them():
+    assert run_a.stored_scripts_dir({"dataset": {"holdout": True}}) == HOLDOUT_DIR
+    assert run_a.stored_scripts_dir({"dataset": {"scripts": 16}}) != HOLDOUT_DIR

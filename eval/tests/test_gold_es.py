@@ -1,5 +1,5 @@
-"""The Spanish test set's gold against the sidecar's Spanish checks (translation.py): every script's gold, its display
-text read as a transcript, passes them, so it is an answer the pipeline could give, carrying only the warnings it is
+"""The Spanish test set's gold against the sidecar's Spanish checks (translation.py): every script's gold, held-out ones
+included, its display text read as a transcript, passes them, so it is an answer the pipeline could give, carrying only the warnings it is
 meant to show (a number written two ways, "cada tercer día"); and the English prompt and schema are still the ones the
 committed English results were made with."""
 
@@ -9,16 +9,17 @@ import json
 
 import pytest
 
-from dictation_scripts_es import load_scripts
+from dictation_scripts_es import HOLDOUT_DIR, load_scripts
 from ehr_dictation import prompt, translation
 from ehr_eval import goldreport
 from ehr_eval.scripts import EVAL_DIR
 
 SCRIPTS = load_scripts()
+HOLDOUT = load_scripts(HOLDOUT_DIR)
 MEANT = {translation.AMBIGUOUS_NUMBER, translation.AMBIGUOUS_FREQUENCY}
 
 
-@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
+@pytest.mark.parametrize("script", SCRIPTS + HOLDOUT, ids=lambda s: s.id)
 def test_every_gold_statement_passes_the_spanish_checks(script):
     fields = {name: [{"spanish": list(s.spanish), "english": s.english} for s in statements]
               for name, statements in script.statements.items()}

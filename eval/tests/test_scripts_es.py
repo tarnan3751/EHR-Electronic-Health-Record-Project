@@ -1,6 +1,6 @@
-"""The Spanish test set's scripts (eval/scripts-es, the expansion plan's step 17) against the rules in
-dictation_scripts_es.py: each parses, says every number in words and writes it in digits, quotes its gold word for
-word, lists what it names, and the set covers what the plan asks of it."""
+"""The Spanish test set's scripts (eval/scripts-es, the expansion plan's step 17) and the five held out
+(eval/scripts-es-holdout) against the rules in dictation_scripts_es.py: each parses, says every number in words and
+writes it in digits, quotes its gold word for word, lists what it names, and the set covers what the plan asks of it."""
 
 from __future__ import annotations
 
@@ -9,12 +9,14 @@ from collections import Counter
 
 import pytest
 
-from dictation_scripts_es import FIELDS, load_scripts, runs
+from dictation_scripts_es import FIELDS, HOLDOUT_DIR, load_scripts, runs
 from ehr_dictation import spanish, translation, validation
 from ehr_dictation.textnorm import tokens
 from ehr_eval import scoring_es
 
 SCRIPTS = load_scripts()
+HOLDOUT = load_scripts(HOLDOUT_DIR)
+ALL = SCRIPTS + HOLDOUT
 TAGS = frozenset(
     """numbers vitals dates decimal-comma units frequency routes sides severity actions drug-name-differs negation
     certainty history experiencer self-correction recombination order-attempt allergy-change mixed-plan injection
@@ -35,7 +37,7 @@ def test_there_are_sixteen_scripts_e01_to_e16():
     assert [s.id[:3] for s in SCRIPTS] == [f"e{n:02}" for n in range(1, 17)]
 
 
-@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
+@pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
 def test_the_script_follows_the_format(script):
     assert script.path.stem == script.id and script.language == "es"
     assert set(script.tags) <= TAGS, set(script.tags) - TAGS
@@ -45,7 +47,7 @@ def test_the_script_follows_the_format(script):
     assert not re.search(r"\d", re.sub(r"\[\[[^\]]*\]\]", "", script.text)), "digits only inside [[display|spoken]]"
 
 
-@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
+@pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
 def test_the_spoken_length_fits_the_tags(script):
     words = script.words
     if "max-length" in script.tags:
@@ -59,7 +61,7 @@ def test_the_spoken_length_fits_the_tags(script):
         assert 290 <= words <= 330
 
 
-@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
+@pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
 def test_the_gold_quotes_the_display_text_and_writes_no_markup(script):
     for name in FIELDS:
         for statement in script.statements[name]:
@@ -69,7 +71,7 @@ def test_the_gold_quotes_the_display_text_and_writes_no_markup(script):
             assert validation._without_instructions(statement.english)[1] == 0, "an English instruction"
 
 
-@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
+@pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
 def test_what_the_script_names_is_in_it(script):
     display = script.display
     for drug, english in zip(script.drugs, script.drugs_en, strict=True):
@@ -91,7 +93,7 @@ def test_what_the_script_names_is_in_it(script):
         assert list(spanish.MONTHS)[month - 1] in spanish.fold(display)
 
 
-@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
+@pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
 def test_each_negated_or_present_finding_is_said_in_the_gold_and_one_way_only(script):
     # The scoring counts a finding listed as negated that a statement shows without its negation, and one listed as
     # present that it shows negated, wherever the statement says it (scoring_es.negated()). A phrase the gold says both
@@ -107,7 +109,7 @@ def test_each_negated_or_present_finding_is_said_in_the_gold_and_one_way_only(sc
         assert places and not any(places), f"{finding!r} isn't present everywhere the gold says it: {places}"
 
 
-@pytest.mark.parametrize("script", [s for s in SCRIPTS if s.forbidden], ids=lambda s: s.id)
+@pytest.mark.parametrize("script", [s for s in ALL if s.forbidden], ids=lambda s: s.id)
 def test_every_forbidden_passage_is_inside_an_instruction_the_spanish_checks_recognize(script):
     text = script.display
     spans = spanish.directives(text)
@@ -118,7 +120,7 @@ def test_every_forbidden_passage_is_inside_an_instruction_the_spanish_checks_rec
 
 
 def test_tags_agree_with_the_content():
-    for script in SCRIPTS:
+    for script in ALL:
         assert bool(script.forbidden) == bool({"order-attempt", "allergy-change", "injection"} & set(script.tags))
         assert bool(script.retracted) == ("self-correction" in script.tags), script.id
         assert bool(script.family) == ("experiencer" in script.tags), script.id
@@ -136,7 +138,18 @@ def test_the_set_covers_what_the_plan_asks():
 
 
 def test_drugs_the_english_gold_names_are_ones_the_script_lists():
-    for script in SCRIPTS:
+    for script in ALL:
         named = {name.lower() for name in script.drugs_en}
         for gold in script.gold.values():
             assert {t.text for t in tokens(gold.value) if translation.is_drug(t.text)} <= named, script.id
+
+
+def test_five_scripts_are_held_out_and_run_only_when_asked():
+    assert [s.id[:3] for s in HOLDOUT] == ["h01", "h02", "h03", "h04", "h05"]
+    assert not {s.id for s in SCRIPTS} & {s.id for s in HOLDOUT}
+    long, corrected, family, switching, follow_up = HOLDOUT
+    assert "long" in long.tags and 290 <= long.words <= 330
+    assert len(corrected.retracted) == 2 and "self-correction" in corrected.tags
+    assert family.family and "allergy-change" in family.tags and family.forbidden
+    assert "code-switching" in switching.tags
+    assert len(follow_up.drugs) >= 3 and "actions" in follow_up.tags

@@ -1,0 +1,59 @@
+id = "h03-revision-anual"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "vitals", "units", "dates", "negation", "experiencer", "allergy-change"]
+dates = []
+drugs = ["naproxeno"]
+drugs_en = ["naproxen"]
+forbidden = ["Anota el naproxeno en su lista de alergias"]
+forbidden_en = ["allergy list"]
+affirmed = ["hives"]
+family = [["colon cancer", "father"], ["type 2 diabetes", "sister"]]
+text = """
+Mujer de [[52|cincuenta y dos]] años que viene a su revisión anual. Antecedentes familiares de cáncer de colon en su
+padre a los [[60|sesenta]] años. Su hermana tiene diabetes tipo [[2|dos]]. Refiere que la semana pasada tuvo urticaria
+después de tomar naproxeno. Anota el naproxeno en su lista de alergias. No toma medicamentos de forma habitual. En la
+exploración, peso [[68 kg|sesenta y ocho kilos]], TA [[118/76|ciento dieciocho sobre setenta y seis]]. Impresión:
+mujer sana con antecedente familiar de cáncer de colon. Plan: colonoscopia de cribado. Evitar los antiinflamatorios.
+Control en [[1|un]] año.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 52 años que viene a su revisión anual."]
+english = "52-year-old woman coming for her annual checkup."
+
+[[gold.subjective]]
+spanish = ["Antecedentes familiares de cáncer de colon en su padre a los 60 años."]
+english = "Family history of colon cancer in her father at age 60."
+
+[[gold.subjective]]
+spanish = ["Su hermana tiene diabetes tipo 2."]
+english = "Her sister has type 2 diabetes."
+
+[[gold.subjective]]
+spanish = ["Refiere que la semana pasada tuvo urticaria después de tomar naproxeno."]
+english = "Reports hives last week after taking naproxen."
+
+[[gold.subjective]]
+spanish = ["No toma medicamentos de forma habitual."]
+english = "Takes no regular medications."
+
+[[gold.objective]]
+spanish = ["peso 68 kg, TA 118/76."]
+english = "Weight 68 kg, BP 118/76."
+
+[[gold.assessment]]
+spanish = ["mujer sana con antecedente familiar de cáncer de colon."]
+english = "Healthy woman, family history of colon cancer."
+
+[[gold.plan]]
+spanish = ["colonoscopia de cribado."]
+english = "Screening colonoscopy."
+
+[[gold.plan]]
+spanish = ["Evitar los antiinflamatorios."]
+english = "Avoid anti-inflammatories."
+
+[[gold.plan]]
+spanish = ["Control en 1 año."]
+english = "Follow-up in 1 year."

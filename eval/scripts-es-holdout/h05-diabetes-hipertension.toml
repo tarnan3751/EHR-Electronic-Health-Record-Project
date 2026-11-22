@@ -1,0 +1,66 @@
+id = "h05-diabetes-hipertension"
+language = "es"
+voice = "em_alex"
+tags = ["numbers", "vitals", "decimal-comma", "units", "frequency", "negation", "certainty", "actions"]
+dates = []
+drugs = ["metformina", "enalapril", "simvastatina", "losartán"]
+drugs_en = ["metformin", "enalapril", "simvastatin", "losartan"]
+negated = ["chest pain"]
+affirmed = ["dry cough"]
+text = """
+Control de diabetes e hipertensión. Hombre de [[67|sesenta y siete]] años. Toma metformina [[850 mg|ochocientos
+cincuenta miligramos]] dos veces al día, enalapril [[10 mg|diez miligramos]] al día y simvastatina [[20 mg|veinte
+miligramos]] por la noche. Refiere tos seca desde que empezó el enalapril. Niega dolor torácico. Hemoglobina
+glucosilada de [[7,9|siete coma nueve]] por ciento. TA [[134/80|ciento treinta y cuatro sobre ochenta]]. Impresión:
+diabetes tipo [[2|dos]] con control insuficiente. Tos probablemente por el enalapril. Plan: aumentar metformina a
+[[1000 mg|mil miligramos]] dos veces al día. Suspender enalapril e iniciar losartán [[50 mg|cincuenta miligramos]] al
+día. Continuar simvastatina [[20 mg|veinte miligramos]] por la noche. Control en [[3|tres]] meses.
+"""
+
+[[gold.subjective]]
+spanish = ["Hombre de 67 años."]
+english = "67-year-old man."
+
+[[gold.subjective]]
+spanish = ["Toma metformina 850 mg dos veces al día, enalapril 10 mg al día y simvastatina 20 mg por la noche."]
+english = "Takes metformin 850 mg twice a day, enalapril 10 mg daily and simvastatin 20 mg at night."
+
+[[gold.subjective]]
+spanish = ["Refiere tos seca desde que empezó el enalapril."]
+english = "Reports a dry cough since enalapril was started."
+
+[[gold.subjective]]
+spanish = ["Niega dolor torácico."]
+english = "Denies chest pain."
+
+[[gold.objective]]
+spanish = ["Hemoglobina glucosilada de 7,9 por ciento."]
+english = "Hemoglobin A1c of 7.9 percent."
+
+[[gold.objective]]
+spanish = ["TA 134/80."]
+english = "BP 134/80."
+
+[[gold.assessment]]
+spanish = ["diabetes tipo 2 con control insuficiente."]
+english = "Type 2 diabetes with insufficient control."
+
+[[gold.assessment]]
+spanish = ["Tos probablemente por el enalapril."]
+english = "Cough probably due to enalapril."
+
+[[gold.plan]]
+spanish = ["aumentar metformina a 1000 mg dos veces al día."]
+english = "Increase metformin to 1000 mg twice a day."
+
+[[gold.plan]]
+spanish = ["Suspender enalapril e iniciar losartán 50 mg al día."]
+english = "Stop enalapril and start losartan 50 mg daily."
+
+[[gold.plan]]
+spanish = ["Continuar simvastatina 20 mg por la noche."]
+english = "Continue simvastatin 20 mg at night."
+
+[[gold.plan]]
+spanish = ["Control en 3 meses."]
+english = "Follow-up in 3 months."

@@ -16,14 +16,19 @@ punctuation as marks, and marked up only where speech and writing differ:
   paragraph break or a full stop.
 - `<<en|...>>`: words said in English, in a Spanish dictation; the audio generator reads them with an English voice.
 
-The gold is a list of statements per field, as the Spanish note schema has the model answer: the passages of the
-display text a statement comes from, word for word, and the English a careful clinician would accept, which must pass
-the sidecar's Spanish checks (translation.py; eval/tests/test_gold_es.py). All of it is synthetic and needs a
-Spanish-speaking clinician's reading before any real use.
+The gold is a list of statements per field: the passages of the display text a statement comes from, word for word,
+and the English a careful clinician would accept, which must pass the sidecar's Spanish checks (translation.py;
+eval/tests/test_gold_es.py). All of it is synthetic and needs a Spanish-speaking clinician's reading before any real
+use.
+
+Five more scripts, eval/scripts-es-holdout/h01 to h05, in the same format, are held out: written once the checks of run
+A's first round were settled and never used to tune them, they are run only when asked (run_a.py --holdout), so the
+checks can be measured on dictations they weren't fitted to.
 
     uv run eval/dictation_scripts_es.py            # every script: id, voice, spoken words, tags
     uv run eval/dictation_scripts_es.py e07        # e07's spoken text, to read aloud
     uv run eval/dictation_scripts_es.py e07 --display
+    uv run eval/dictation_scripts_es.py --holdout          # the held-out scripts instead
 """
 
 from __future__ import annotations
@@ -36,6 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts-es"
+HOLDOUT_DIR = Path(__file__).resolve().parent / "scripts-es-holdout"
 FIELDS = ("subjective", "objective", "assessment", "plan")
 
 PUNCTUATION = {"punto y aparte": ("\n\n", "."), "nuevo párrafo": ("\n\n", "."), "punto y seguido": (".", ",")}
@@ -237,9 +243,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("ids", nargs="*", help="script ids or prefixes, such as e07; none lists every script")
     parser.add_argument("--display", action="store_true", help="print the display text instead of the spoken text")
+    parser.add_argument("--holdout", action="store_true", help="the held-out scripts (scripts-es-holdout) instead")
     args = parser.parse_args(argv)
     try:
-        scripts = load_scripts()
+        scripts = load_scripts(HOLDOUT_DIR if args.holdout else SCRIPTS_DIR)
         if not args.ids:
             for script in scripts:
                 print(f"{script.id:32} {script.voice:11} {script.words:4} words  {' '.join(script.tags)}")

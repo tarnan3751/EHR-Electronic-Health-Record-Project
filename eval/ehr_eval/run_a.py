@@ -3,14 +3,15 @@ downloaded, to see whether it translates clinical Spanish well enough for the st
 
     uv run --project eval python -m ehr_eval.run_a --llama-url http://127.0.0.1:8080 --models-dir <models folder>
         [--only e01 e02] [--machine "..."] [--out eval/results/run-a-es-text.json]
-        [--timeout <seconds>] [--keep-answers]
+        [--timeout <seconds>] [--keep-answers] [--holdout]
 
 with llama-server's key in LLAMA_API_KEY and the K2 Horizon file models-manifest.json names (the models folder is only
 read). Each script's display text is the transcript, as speech recognition that made no mistake would write it, with
 the passages said in English marked unclear, as the Spanish pipeline will mark a passage that isn't in Spanish. K2
 Horizon sorts it with the Spanish prompt and schema (prompt.load(language="es")), the sidecar's own code, as the
 sidecar ships it (reasoning off), and the Spanish checks (translation.py) decide what would be offered. Nothing reaches
-the network but llama-server, and nothing is written but the results file, which the CI gate doesn't check.
+the network but llama-server, and nothing is written but the results file, which the CI gate doesn't check. The five
+held-out scripts (eval/scripts-es-holdout) are left out unless --holdout is given, which runs only them.
 
 It prints each stop threshold of the plan (scoring_es.thresholds()) and whether it was crossed: any crossed stops the
 step until the owner decides.
@@ -43,7 +44,7 @@ from pathlib import Path
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
-from dictation_scripts_es import SCRIPTS_DIR, Script, load_scripts, runs  # noqa: E402
+from dictation_scripts_es import HOLDOUT_DIR, SCRIPTS_DIR, Script, load_scripts, runs  # noqa: E402
 from ehr_dictation import prompt, provenance, spanish, translation  # noqa: E402
 from ehr_dictation.llama import LlamaServer, StructuringFailed, Structurer  # noqa: E402
 from ehr_dictation.provenance import CHECKS_CODE_SHA256, PIPELINE_CODE_SHA256  # noqa: E402
@@ -212,7 +213,8 @@ async def main_async(args: argparse.Namespace) -> int:
     llama = (KeptAnswers if args.keep_answers else LlamaServer)(args.llama_url, api_key)
     structurer = Structurer(llama, structuring, models.language_file, timeout=args.timeout)
     diagnosed = diagnostic(args.timeout, args.keep_answers)
-    scripts = {s.id: s for s in load_scripts()}
+    scripts_dir = HOLDOUT_DIR if args.holdout else SCRIPTS_DIR
+    scripts = {s.id: s for s in load_scripts(scripts_dir)}
     chosen = [s for s in scripts.values() if not args.only or any(s.id == w or s.id.startswith(f"{w}-") for w in args.only)]
     started_at = datetime.now(UTC).isoformat(timespec="seconds")
     items = []
@@ -235,7 +237,8 @@ async def main_async(args: argparse.Namespace) -> int:
         "provenance": {"language": models.language, "prompt": structuring.prompt_sha256,
                        "schema": structuring.schema_sha256, "structuring": structuring.structuring_sha256,
                        "checks": CHECKS_CODE_SHA256, "pipeline": PIPELINE_CODE_SHA256},
-        "dataset": {"scripts_sha256": scripts_sha256(), "scripts": len(chosen), "complete": not args.only},
+        "dataset": {"scripts_sha256": scripts_sha256(scripts_dir), "scripts": len(chosen), "complete": not args.only,
+                    "holdout": args.holdout},
         "metrics": metrics,
         "thresholds": [{"threshold": name, "crossed": over, "measured": measured}
                        for name, over, measured in scoring_es.thresholds(metrics)],
@@ -249,6 +252,11 @@ async def main_async(args: argparse.Namespace) -> int:
 
 
 # ---- A run's stored answers, checked and scored again ---------------------------------------------------------------
+
+
+def stored_scripts_dir(stored: dict) -> Path:
+    """Where the scripts of a stored run are: the held-out ones, or the test set."""
+    return HOLDOUT_DIR if stored.get("dataset", {}).get("holdout") else SCRIPTS_DIR
 
 
 def stored_item(entry: dict) -> scoring_es.SpanishItem:
@@ -278,7 +286,7 @@ def rescore(stored: dict, scripts: dict[str, Script]) -> tuple[dict, list[scorin
     results = {
         **stored,
         "provenance": {**stored["provenance"], "checks": CHECKS_CODE_SHA256},
-        "dataset": {**stored["dataset"], "scripts_sha256": scripts_sha256()},
+        "dataset": {**stored["dataset"], "scripts_sha256": scripts_sha256(stored_scripts_dir(stored))},
         "metrics": metrics,
         "thresholds": [{"threshold": name, "crossed": over, "measured": measured}
                        for name, over, measured in scoring_es.thresholds(metrics)],
@@ -334,7 +342,7 @@ def main_rescore(args: argparse.Namespace) -> int:
         print("Say where the new results go: --out <file>.", file=sys.stderr)
         return 2
     stored = json.loads(args.rescore.read_text(encoding="utf-8"))
-    scripts = {s.id: s for s in load_scripts()}
+    scripts = {s.id: s for s in load_scripts(stored_scripts_dir(stored))}
     results, _ = rescore(stored, scripts)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -355,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="seconds K2 Horizon has to answer; any but the sidecar's makes the run a diagnostic one")
     parser.add_argument("--keep-answers", action="store_true",
                         help="store each answer as the model wrote it; makes the run a diagnostic one")
+    parser.add_argument("--holdout", action="store_true",
+                        help="run only the five held-out scripts (eval/scripts-es-holdout), never used to tune the checks")
     parser.add_argument("--rescore", type=Path, help="a results file whose stored answers to check and score again")
     parser.add_argument("--out", type=Path, help=f"where the results go (a run's default: {OUT.relative_to(REPO_ROOT)})")
     args = parser.parse_args(argv)
