@@ -47,18 +47,22 @@ def test_the_script_follows_the_format(script):
     assert not re.search(r"\d", re.sub(r"\[\[[^\]]*\]\]", "", script.text)), "digits only inside [[display|spoken]]"
 
 
-@pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
+# A Spanish dictation is up to 2 minutes (the decision log's step 17, decision 20), about 300 words: "max-length" is
+# close to it, "long" the plan's long items, well under it, and "short" the shortest.
+MAX_LENGTH_WORDS, LONG_WORDS, MAX_WORDS, SHORT_WORDS = (270, 300), (200, 240), 240, 110
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
 def test_the_spoken_length_fits_the_tags(script):
     words = script.words
     if "max-length" in script.tags:
-        assert 420 <= words <= 540
+        assert MAX_LENGTH_WORDS[0] <= words <= MAX_LENGTH_WORDS[1]
     else:
-        assert 75 <= words <= 330
-    # Most of the set is shorter than the English set's two minutes; "short" marks the shortest, "long" the longest.
+        assert 75 <= words <= MAX_WORDS
     if "short" in script.tags:
-        assert words <= 110
+        assert words <= SHORT_WORDS
     if "long" in script.tags:
-        assert 290 <= words <= 330
+        assert LONG_WORDS[0] <= words <= LONG_WORDS[1]
 
 
 @pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
@@ -148,6 +152,9 @@ def test_five_scripts_are_held_out_and_run_only_when_asked():
     assert [s.id[:3] for s in HOLDOUT] == ["h01", "h02", "h03", "h04", "h05"]
     assert not {s.id for s in SCRIPTS} & {s.id for s in HOLDOUT}
     long, corrected, family, switching, follow_up = HOLDOUT
+    # Sealed before Spanish was limited to 2 minutes (decision 20), they keep the lengths they were written to; they
+    # are read as text only (run_a.py), never recorded.
+    assert all(75 <= s.words <= 330 for s in HOLDOUT)
     assert "long" in long.tags and 290 <= long.words <= 330
     assert len(corrected.retracted) == 2 and "self-correction" in corrected.tags
     assert family.family and "allergy-change" in family.tags and family.forbidden

@@ -1,7 +1,7 @@
 id = "e06-rodilla-izquierda"
 language = "es"
 voice = "em_alex"
-tags = ["numbers", "units", "frequency", "sides", "recombination", "severity", "negation", "actions", "drug-name-differs", "code-switching"]
+tags = ["numbers", "units", "frequency", "sides", "recombination", "severity", "negation", "actions", "drug-name-differs", "code-switching", "long"]
 noise = ["monitor"]
 dates = []
 drugs = ["paracetamol", "ibuprofeno"]
@@ -10,11 +10,18 @@ negated = ["trauma"]
 affirmed = ["knee pain", "mild effusion"]
 text = """
 Varón de [[67|sesenta y siete]] años con artrosis de ambas rodillas. Refiere dolor en la rodilla izquierda desde hace
-un mes, peor al subir escaleras en el gym. La rodilla derecha está bien. Niega traumatismo. Toma paracetamol
-[[1 g|un gramo]] cada [[8|ocho]] horas. En la exploración, rodilla izquierda con derrame leve y crepitación, rodilla
-derecha sin derrame. Impresión: artrosis de rodilla izquierda con brote inflamatorio. Plan: añadir ibuprofeno
-[[400 mg|cuatrocientos miligramos]] cada [[8|ocho]] horas con comida durante [[5|cinco]] días. Continuar paracetamol.
-Derivar a fisioterapia. Control en [[6|seis]] semanas.
+un mes, peor al subir escaleras en el gym. El dolor es de [[6|seis]] sobre [[10|diez]] y le despierta por la noche
+[[2|dos]] veces por semana. Tiene rigidez por la mañana de unos [[15|quince]] minutos. No ha notado bloqueos ni fallos
+de la rodilla. Ha probado una rodillera sin mucha mejoría. La rodilla derecha está bien. Niega traumatismo. Niega
+fiebre. Toma paracetamol [[1 g|un gramo]] cada [[8|ocho]] horas. No toma otros medicamentos. Trabaja de pie como
+camarero [[8|ocho]] horas al día. En la exploración, peso [[94 kg|noventa y cuatro kilos]], rodilla izquierda con
+derrame leve y crepitación, rodilla derecha sin derrame. Flexión de la rodilla izquierda hasta [[110|ciento diez]]
+grados, sin calor ni enrojecimiento. Sin dolor en la cadera izquierda. Marcha sin cojera. Impresión: artrosis de
+rodilla izquierda con brote inflamatorio. Plan: añadir ibuprofeno [[400 mg|cuatrocientos miligramos]] cada [[8|ocho]]
+horas con comida durante [[5|cinco]] días. Continuar paracetamol. Hielo local [[20|veinte]] minutos [[3|tres]] veces
+al día. Derivar a fisioterapia. Ejercicios para fortalecer el cuádriceps en casa todos los días. Bajar de peso con
+dieta y caminar en llano. Control en [[6|seis]] semanas. Si aparece fiebre o la rodilla se pone roja y caliente, que
+vuelva antes.
 """
 
 [[gold.subjective]]
@@ -26,6 +33,22 @@ spanish = ["Refiere dolor en la rodilla izquierda desde hace un mes, peor al sub
 english = "Reports left knee pain for a month, worse climbing stairs at the gym."
 
 [[gold.subjective]]
+spanish = ["El dolor es de 6 sobre 10 y le despierta por la noche 2 veces por semana."]
+english = "The pain is 6 out of 10 and wakes him at night 2 times a week."
+
+[[gold.subjective]]
+spanish = ["Tiene rigidez por la mañana de unos 15 minutos."]
+english = "Has morning stiffness of about 15 minutes."
+
+[[gold.subjective]]
+spanish = ["No ha notado bloqueos ni fallos de la rodilla."]
+english = "Has not noticed locking or giving way of the knee."
+
+[[gold.subjective]]
+spanish = ["Ha probado una rodillera sin mucha mejoría."]
+english = "Has tried a knee brace without much improvement."
+
+[[gold.subjective]]
 spanish = ["La rodilla derecha está bien."]
 english = "The right knee is fine."
 
@@ -34,12 +57,36 @@ spanish = ["Niega traumatismo."]
 english = "Denies trauma."
 
 [[gold.subjective]]
+spanish = ["Niega fiebre."]
+english = "Denies fever."
+
+[[gold.subjective]]
 spanish = ["Toma paracetamol 1 g cada 8 horas."]
 english = "Takes acetaminophen 1 g every 8 hours."
 
+[[gold.subjective]]
+spanish = ["No toma otros medicamentos."]
+english = "Takes no other medications."
+
+[[gold.subjective]]
+spanish = ["Trabaja de pie como camarero 8 horas al día."]
+english = "Works standing as a waiter 8 hours a day."
+
 [[gold.objective]]
-spanish = ["rodilla izquierda con derrame leve y crepitación, rodilla derecha sin derrame."]
-english = "Left knee with mild effusion and crepitus, right knee without effusion."
+spanish = ["peso 94 kg, rodilla izquierda con derrame leve y crepitación, rodilla derecha sin derrame."]
+english = "Weight 94 kg, left knee with mild effusion and crepitus, right knee without effusion."
+
+[[gold.objective]]
+spanish = ["Flexión de la rodilla izquierda hasta 110 grados, sin calor ni enrojecimiento."]
+english = "Left knee flexion to 110 degrees, without warmth or redness."
+
+[[gold.objective]]
+spanish = ["Sin dolor en la cadera izquierda."]
+english = "No pain in the left hip."
+
+[[gold.objective]]
+spanish = ["Marcha sin cojera."]
+english = "Walks without a limp."
 
 [[gold.assessment]]
 spanish = ["artrosis de rodilla izquierda con brote inflamatorio."]
@@ -54,9 +101,25 @@ spanish = ["Continuar paracetamol."]
 english = "Continue acetaminophen."
 
 [[gold.plan]]
+spanish = ["Hielo local 20 minutos 3 veces al día."]
+english = "Local ice 20 minutes 3 times a day."
+
+[[gold.plan]]
 spanish = ["Derivar a fisioterapia."]
 english = "Refer to physical therapy."
 
 [[gold.plan]]
+spanish = ["Ejercicios para fortalecer el cuádriceps en casa todos los días."]
+english = "Quadriceps strengthening exercises at home every day."
+
+[[gold.plan]]
+spanish = ["Bajar de peso con dieta y caminar en llano."]
+english = "Lose weight with diet and walk on flat ground."
+
+[[gold.plan]]
 spanish = ["Control en 6 semanas."]
 english = "Follow-up in 6 weeks."
+
+[[gold.plan]]
+spanish = ["Si aparece fiebre o la rodilla se pone roja y caliente, que vuelva antes."]
+english = "If fever appears or the knee turns red and hot, return sooner."
