@@ -107,7 +107,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
             return ReviewResult.Invalid("Enter the corrected value, or reject the proposal.");
         var values = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         if (approved is not null) values[proposal.Field] = approved;
-        if (Merge(NoteContent.From(draft), values).Validate(false) is { Count: > 0 } errors)
+        if (Merge(NoteContent.From(draft), values).Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors)
             return new(422, errors);
 
         proposal.State = decision;
@@ -137,7 +137,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         if (!append && approved.Keys.Any(field => current.Sections[Section(field)].Text.Length > 0))
             return ReviewResult.Invalid("The draft already contains text. Compare it below and explicitly allow appending approved values; existing text will be preserved.");
         var merged = Merge(current, approved);
-        if (merged.Validate(false) is { Count: > 0 } errors) return new(422, errors);
+        if (merged.Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors) return new(422, errors);
         merged.ApplyTo(draft);
         draft.HasUnreviewedProposals = false;
         await db.SaveChangesAsync(cancel);

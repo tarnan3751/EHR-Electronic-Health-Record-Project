@@ -56,7 +56,10 @@ public sealed record NoteContent(string Subjective, string Objective, string Ass
         draft.StructuredVersion = ++draft.Version;
     }
 
-    public IReadOnlyList<string> Validate(bool signing)
+    // `from` is where the draft being saved came from (OriginOf). Saved in four sections, a draft's plain text has longer
+    // headings than one written before step 14 (History, Assessment and Plan) or saved by the desktop app (none), so one
+    // at the size limit can go over it with no text added: then the clinician is told that, not to shorten the note.
+    public IReadOnlyList<string> Validate(bool signing, NoteOrigin from = NoteOrigin.Sections)
     {
         var problems = new List<string>();
         foreach (var (name, value) in Sections.Select(section => (section.Title, section.Text)))
@@ -77,11 +80,25 @@ public sealed record NoteContent(string Subjective, string Objective, string Ass
             }
         }
 
-        if (Encoding.UTF8.GetByteCount(Body) > MaximumBodyBytes)
+        var bytes = Encoding.UTF8.GetByteCount(Body);
+        if (bytes > MaximumBodyBytes)
         {
-            problems.Add("Shorten the note to 64 KiB of UTF-8 text or less.");
+            var fourHeadings = HeadingBytes(NoteSections.Subjective, NoteSections.Objective, NoteSections.Assessment, NoteSections.Plan);
+            var savedHeadings = from switch
+            {
+                NoteOrigin.History => HeadingBytes(NoteSections.History, NoteSections.Assessment, NoteSections.Plan),
+                NoteOrigin.Body => 0,
+                _ => fourHeadings,
+            };
+            problems.Add(bytes - fourHeadings + savedHeadings <= MaximumBodyBytes
+                ? "This draft is at the size limit: shorten it by a few words to save it in four sections."
+                : "Shorten the note to 64 KiB of UTF-8 text or less.");
         }
 
         return problems;
     }
+
+    // The bytes the headings, and the lines around them, take in the plain text of sections with these titles.
+    static int HeadingBytes(params string[] titles) =>
+        Encoding.UTF8.GetByteCount(NoteSections.Render(titles.Select(title => new NoteSection(title, ""))));
 }

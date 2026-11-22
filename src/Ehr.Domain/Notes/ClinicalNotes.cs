@@ -70,7 +70,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             return NoteResult.Conflict;
         }
 
-        if (content.Validate(signing: false) is { Count: > 0 } errors)
+        if (content.Validate(signing: false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors)
         {
             return new(422, errors);
         }

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
@@ -87,6 +88,26 @@ public class NoteContentTests
         Assert.Equal((null, "Old history", "Blood pressure 126/80.", 5L, 5L), (draft.History, draft.Subjective, draft.Objective, draft.Version, draft.StructuredVersion));
         Assert.Equal(NoteOrigin.Sections, NoteContent.OriginOf(draft));
         Assert.Empty(ClinicalNotes.SigningProblems(draft));
+    }
+
+    // Saved in four sections, a draft's plain text has 43 bytes of headings: 15 more than a draft written before step 14
+    // (History, Assessment and Plan), and 43 more than the desktop app's plain text. Such a draft at the limit goes over
+    // it with no text added, and is told so; one whose text wouldn't fit as it was saved is told to shorten the note.
+    [Fact]
+    public void An_earlier_draft_over_the_limit_only_by_the_four_headings_is_told_so()
+    {
+        const string AtLimit = "This draft is at the size limit: shorten it by a few words to save it in four sections.";
+        const string Shorten = "Shorten the note to 64 KiB of UTF-8 text or less.";
+        // 65,508 bytes of text: under History, Assessment and Plan, with their 28 bytes of headings, exactly 64 KiB.
+        var history = new NoteContent(new string('界', 16_000), "", new string('界', 5_836), "");
+        Assert.Equal(65_551, Encoding.UTF8.GetByteCount(history.Body));
+        Assert.Equal([AtLimit], history.Validate(false, NoteOrigin.History));
+        Assert.Equal([Shorten], history.Validate(false));
+        Assert.Equal([Shorten], (history with { Plan = "x" }).Validate(false, NoteOrigin.History));
+        // 65,536 bytes of text, saved by the desktop app with no headings, sorted into sections before it is saved.
+        var body = new NoteContent(new string('界', 16_000), new string('界', 5_845), "x", "");
+        Assert.Equal([AtLimit], body.Validate(false, NoteOrigin.Body));
+        Assert.Equal([Shorten], (body with { Plan = "x" }).Validate(false, NoteOrigin.Body));
     }
 
     // What the editor says each section holds (step 14): Assessment's and Plan's are the dictation note schema's

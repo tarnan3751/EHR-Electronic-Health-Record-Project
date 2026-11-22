@@ -23,7 +23,8 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   clinic; POST it with handler Save as the form posts without JavaScript, and with handler Review (save, then the
 //   signing checks).
 // Test data: the signed note's History "Synthetic history: signed as History, temperature 37.9."; the draft's History
-//   "Synthetic history: drafted as History, chest clear."
+//   "Synthetic history: drafted as History, chest clear."; another draft written then at the size limit: a History of
+//   16,000 "界" and an Assessment of 5,836, which with its headings is exactly 64 KiB.
 // Steps:
 //   1. Open the signed note, its addendum page and its summary page; download the offline copy.
 //   2. Open the draft in the editor, and look at the saved draft.
@@ -31,6 +32,8 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   4. Without JavaScript, save it with a visit type that isn't on the list ("general-surgery").
 //   5. Choose "Sign note…" with Objective left empty.
 //   6. Type Objective, and sign.
+//   7. Open the draft at the size limit and save it unchanged, with and without JavaScript.
+//   8. Shorten its Assessment by five characters (15 bytes), and save.
 // Expected result: Step 1: each page shows History, Assessment and Plan, with "Written as History, Assessment and Plan,
 //   before notes had four sections.", and no Subjective; the offline copy gives the note's History as signed. Step 2:
 //   Subjective holds the History, Objective is empty, and a notice starting "Check:" says to move today's vital signs,
@@ -39,7 +42,9 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   saved ("Choose a visit type from the list."), and the page shows the History in Subjective with the "Check:" notice
 //   again; the saved draft is exactly as it was. Step 5: the draft is saved, in one update that writes the four sections
 //   and clears the History, and signing is refused with "Enter Objective before signing." Step 6: the note is signed in
-//   four sections.
+//   four sections. Step 7: nothing is saved: the four sections' headings are 15 bytes longer, and the page says "This
+//   draft is at the size limit: shorten it by a few words to save it in four sections.", with the "Check:" notice
+//   without JavaScript. Step 8: the draft is saved in four sections, at exactly 64 KiB.
 // Creator: Tahseen Arnan
 public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFixture<WebApps>
 {
@@ -138,5 +143,43 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
 
         Assert.Equal([$"-|{DraftHistory}|Synthetic objective: chest clear."], await ProxyTests.QueryAsync(apps,
             $"SELECT coalesce(history, '-') || '|' || subjective || '|' || objective FROM ehr.clinical_notes WHERE patient_id = @patient AND draft_id = '{draft}'", patient));
+    }
+
+    [Fact]
+    public async Task A_draft_written_before_four_sections_at_the_size_limit_is_told_to_shorten_it_by_a_few_words()
+    {
+        const string AtLimit = "This draft is at the size limit: shorten it by a few words to save it in four sections.";
+        var (clinician, patient, session) = await OnPanelAsync(apps);
+        var (history, assessment) = (new string('界', 16_000), new string('界', 5_836));
+        var draft = await EarlierNotes.DraftAsync(apps.Database, clinician.Id, patient, history, assessment, "");
+        var path = $"/patients/{patient}/notes/drafts/{draft}";
+        Assert.Equal(["65536"], await ProxyTests.QueryAsync(apps, $"SELECT octet_length(body)::text FROM ehr.clinical_drafts WHERE id = '{draft}'", patient));
+        var token = Token(await session.Client.GetStringAsync(path, Cancel));
+        (string, object)[] Fields(string text) => [("Version", 1), ("Subjective", history), ("Objective", ""), ("Assessment", text), ("Plan", "")];
+
+        using (var request = new HttpRequestMessage(HttpMethod.Post, path + "?handler=Save"))
+        {
+            request.Headers.Add("HX-Request", "true");
+            request.Content = Form([("__RequestVerificationToken", token), .. Fields(assessment)]);
+            using var refused = await session.Client.SendAsync(request, Cancel);
+            Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+            Assert.Equal([AtLimit], JsonDocument.Parse(await refused.Content.ReadAsStringAsync(Cancel)).RootElement.GetProperty("errors").EnumerateArray().Select(e => e.GetString()));
+        }
+
+        using (var refused = await PostFormAsync(session.Client, path + "?handler=Save", path, Fields(assessment)))
+        {
+            Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+            var page = Words(await refused.Content.ReadAsStringAsync(Cancel));
+            Assert.Contains(AtLimit, page);
+            Assert.Contains("Check: this draft was written before notes had four sections.", page);
+        }
+
+        using (var saved = await PostFormAsync(session.Client, path + "?handler=Save", path, Fields(assessment[5..])))
+        {
+            Assert.Equal(System.Net.HttpStatusCode.OK, saved.StatusCode);
+        }
+
+        Assert.Equal(["null 65536"], await ProxyTests.QueryAsync(apps,
+            $"SELECT coalesce(history, 'null') || ' ' || octet_length(body) FROM ehr.clinical_drafts WHERE id = '{draft}'", patient));
     }
 }
