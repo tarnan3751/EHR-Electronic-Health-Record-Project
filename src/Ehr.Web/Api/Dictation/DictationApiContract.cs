@@ -64,26 +64,51 @@ public sealed record DictationResult(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message => Sorting == Sorting.Unavailable ? UnsortedMessage : null;
 
-    // The language a stored review's dictation was in, from its saved result: English when it has none.
+    // Whether a stored review's dictation was in Spanish, from its saved result, for its line among the saved reviews.
+    // Never throws, whatever the stored evidence holds: only a result whose spokenLanguage is exactly "es" is Spanish, and
+    // anything else, a result saved before Spanish, none, or one that can't be read, isn't called Spanish, so the line
+    // says nothing of a language rather than something false.
     public static SpokenLanguage SpokenLanguageOf(string? resultJson)
     {
         if (resultJson is null) return SpokenLanguage.English;
-        using var json = JsonDocument.Parse(resultJson);
-        return json.RootElement.TryGetProperty("spokenLanguage", out var language) && language.ValueEquals("es")
-            ? SpokenLanguage.Spanish : SpokenLanguage.English;
+        try
+        {
+            using var json = JsonDocument.Parse(resultJson);
+            return json.RootElement.ValueKind == JsonValueKind.Object
+                && json.RootElement.TryGetProperty("spokenLanguage", out var language)
+                && language.ValueKind == JsonValueKind.String && language.ValueEquals("es")
+                ? SpokenLanguage.Spanish : SpokenLanguage.English;
+        }
+        catch (JsonException)
+        {
+            return SpokenLanguage.English;
+        }
     }
 }
 
 // The language of a dictation (the expansion plan's step 17). A dictation in Spanish has a Spanish transcript, and its
-// fields are proposed in English, each sentence with the Spanish it was translated from (TranslatedStatement).
-[JsonConverter(typeof(JsonStringEnumConverter<SpokenLanguage>))]
+// fields are proposed in English, each sentence with the Spanish it was translated from (TranslatedStatement). Read
+// only from the exact strings "en" and "es" (SpokenLanguageConverter).
+[JsonConverter(typeof(SpokenLanguageConverter))]
 public enum SpokenLanguage
 {
-    [JsonStringEnumMemberName("en")]
     English,
 
-    [JsonStringEnumMemberName("es")]
     Spanish,
+}
+
+// "en" or "es", exactly: a number, another spelling, a padded name or a list of names fails the read, where the
+// framework's enum reading would take 1, "1", " es" and "en, es" for a language.
+public sealed class SpokenLanguageConverter : JsonConverter<SpokenLanguage>
+{
+    public override SpokenLanguage Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType != JsonTokenType.String ? throw new JsonException("A dictation's language is a string.")
+        : reader.ValueTextEquals("en") ? SpokenLanguage.English
+        : reader.ValueTextEquals("es") ? SpokenLanguage.Spanish
+        : throw new JsonException("A dictation's language is \"en\" or \"es\".");
+
+    public override void Write(Utf8JsonWriter writer, SpokenLanguage value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value == SpokenLanguage.Spanish ? "es" : "en");
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<Sorting>))]

@@ -691,8 +691,10 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     // reach the value's end (uncovered), a sentence ending inside a word (mid-word), a sentence citing nothing (uncited),
     // one citing words that aren't among the field's sources (foreign, outside), a field from Spanish with no sentences
     // (no-statements), sentences on a field from English (english-statements), a language the contract doesn't have,
-    // with no sentences anywhere (unknown-language: the read fails), and an order proposed from Spanish, otherwise one
-    // the expansion plan's step 15 would stage (proposal: nothing is proposed from a dictation in Spanish).
+    // with no sentences anywhere (unknown-language: the read fails), a language that isn't exactly "en" or "es", each in
+    // the shape that a lenient read would stage (5 with no sentences, as an English result; 1, "1", " es", "es " and
+    // "en, es", which a lenient read takes for Spanish, with them), and an order proposed from Spanish, otherwise one the
+    // expansion plan's step 15 would stage (proposal: nothing is proposed from a dictation in Spanish).
     [Theory]
     [InlineData("gap")]
     [InlineData("uncovered")]
@@ -703,6 +705,12 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("no-statements")]
     [InlineData("english-statements")]
     [InlineData("unknown-language")]
+    [InlineData("language-5")]
+    [InlineData("language-1")]
+    [InlineData("language-1-string")]
+    [InlineData("language-padded")]
+    [InlineData("language-trailing")]
+    [InlineData("language-list")]
     [InlineData("proposal")]
     public async Task TC_UC13_17_a_result_from_spanish_whose_sentences_dont_hold_is_refused_and_nothing_is_staged(string kind)
     {
@@ -758,6 +766,29 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
                     ["warnings"] = new System.Text.Json.Nodes.JsonArray(),
                 });
                 break;
+            case "language-5":
+                json["spokenLanguage"] = 5;
+                foreach (var field in json["fields"]!.AsObject())
+                {
+                    field.Value!.AsObject().Remove("statements");
+                }
+
+                break;
+            case "language-1":
+                json["spokenLanguage"] = 1;
+                break;
+            case "language-1-string":
+                json["spokenLanguage"] = "1";
+                break;
+            case "language-padded":
+                json["spokenLanguage"] = " es";
+                break;
+            case "language-trailing":
+                json["spokenLanguage"] = "es ";
+                break;
+            case "language-list":
+                json["spokenLanguage"] = "en, es";
+                break;
             case "unknown-language":
                 json["spokenLanguage"] = "fr";
                 foreach (var field in json["fields"]!.AsObject())
@@ -775,6 +806,25 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.ai_note_reviews WHERE id = @id AND state = 'recording' AND result_json IS NULL", f.Review));
         Assert.Equal(1, await Scalar("SELECT version FROM ehr.clinical_drafts WHERE id = @id", f.Draft));
     }
+
+    // Step 17: a stored review's line among the saved reviews says "in Spanish" only when its result's spokenLanguage is
+    // exactly "es", and reading it never throws, whatever the stored evidence holds.
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("{}", false)]
+    [InlineData("[]", false)]
+    [InlineData("5", false)]
+    [InlineData("not JSON", false)]
+    [InlineData("{\"spokenLanguage\":5}", false)]
+    [InlineData("{\"spokenLanguage\":1}", false)]
+    [InlineData("{\"spokenLanguage\":\"1\"}", false)]
+    [InlineData("{\"spokenLanguage\":\" es\"}", false)]
+    [InlineData("{\"spokenLanguage\":\"en, es\"}", false)]
+    [InlineData("{\"spokenLanguage\":[\"es\"]}", false)]
+    [InlineData("{\"spokenLanguage\":\"en\"}", false)]
+    [InlineData("{\"spokenLanguage\":\"es\"}", true)]
+    public void A_stored_reviews_language_is_spanish_only_when_it_says_exactly_es_and_reading_it_never_throws(string? json, bool spanish) =>
+        Assert.Equal(spanish ? SpokenLanguage.Spanish : SpokenLanguage.English, DictationResult.SpokenLanguageOf(json));
 
     // Step 17: a review of a dictation in English shows nothing of translation, and its result is stored with no language
     // and no statements, as every review was before Spanish, so one saved before then reads the same.
