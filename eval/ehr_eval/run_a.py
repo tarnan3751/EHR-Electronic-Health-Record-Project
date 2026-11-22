@@ -3,6 +3,7 @@ downloaded, to see whether it translates clinical Spanish well enough for the st
 
     uv run --project eval python -m ehr_eval.run_a --llama-url http://127.0.0.1:8080 --models-dir <models folder>
         [--only e01 e02] [--machine "..."] [--out eval/results/run-a-es-text.json]
+        [--timeout <seconds>] [--keep-answers]
 
 with llama-server's key in LLAMA_API_KEY and the K2 Horizon file models-manifest.json names (the models folder is only
 read). Each script's display text is the transcript, as speech recognition that made no mistake would write it, with
@@ -13,6 +14,11 @@ the network but llama-server, and nothing is written but the results file, which
 
 It prints each stop threshold of the plan (scoring_es.thresholds()) and whether it was crossed: any crossed stops the
 step until the owner decides.
+
+Two options are for diagnosing a run, never for the run itself: --timeout gives K2 Horizon longer (or less) than the
+sidecar's 90 seconds, so an answer the sidecar would cancel can be seen to its end, and --keep-answers stores each
+item's answer as the model wrote it in the results file. Either marks the file "diagnostic", and the printed summary
+says so in its first line, so it can't be taken for the run.
 
     uv run --project eval python -m ehr_eval.run_a --rescore <results file> --out <new results file>
 
@@ -90,23 +96,42 @@ def spanish_first(content: str | None) -> tuple[int, int]:
     return len(orders), sum(1 for keys in orders if keys == ["spanish", "field", "english"])
 
 
-async def run_script(script: Script, structurer: Structurer) -> scoring_es.SpanishItem:
+class KeptAnswers(LlamaServer):
+    """llama-server, keeping its last answer as the model wrote it, even one the sidecar refuses (cut off at the token
+    limit, or not the schema's shape), for --keep-answers. Nothing is kept of an answer cancelled at the timeout."""
+
+    answer: str | None = None
+
+    async def chat(self, body: dict) -> dict:
+        answer = await super().chat(body)
+        try:
+            self.answer = answer["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError):
+            self.answer = None
+        return answer
+
+
+async def run_script(script: Script, structurer: Structurer, kept: KeptAnswers | None = None) -> scoring_es.SpanishItem:
     transcript, sent = text_transcript(script)
     item = scoring_es.SpanishItem(
         variant=f"{script.id}--text", script=script.id, tags=list(script.tags), hypothesis=transcript.text,
         sorting="done", not_carried_over=[(kind, s, e) for s, e, kind in spanish.directives(transcript.text)],
     )
+    if kept:
+        kept.answer = None
     started = time.perf_counter()
     try:
         proposal = await structurer.propose(sent)
     except StructuringFailed as error:
         item.timings["structure"] = time.perf_counter() - started
         item.sorting, item.reason, item.detail = "unavailable", error.reason, str(error)
+        item.answer = kept.answer if kept else None
         return item
     item.timings["structure"] = time.perf_counter() - started
     item.tokens = {key: int(proposal.timings[key]) for key in ("prompt_n", "cache_n", "predicted_n")
                    if proposal.timings and isinstance(proposal.timings.get(key), int)}
     item.statements_written, item.statements_in_order = spanish_first(proposal.content)
+    item.answer = kept.answer if kept else None
     check(item, proposal.fields, proposal.unknown, transcript)
     return item
 
@@ -138,8 +163,16 @@ def scripts_sha256(directory: Path = SCRIPTS_DIR) -> str:
     return digest.hexdigest()
 
 
-def summary(metrics: dict) -> str:
-    lines = ["", "Run A against the stop thresholds (any crossed stops the step for the owner):"]
+def diagnostic(timeout: float, keep_answers: bool) -> list[str]:
+    """Why a run is a diagnostic one, not run A: empty for the run itself."""
+    reasons = [f"timeout {timeout:g} s, not the sidecar's {Settings.structuring_seconds:g} s"] if (
+        timeout != Settings.structuring_seconds) else []
+    return reasons + (["the model's answers kept"] if keep_answers else [])
+
+
+def summary(metrics: dict, diagnosed: list[str] | None = None) -> str:
+    lines = [f"DIAGNOSTIC, not run A ({'; '.join(diagnosed)}): its thresholds decide nothing."] if diagnosed else []
+    lines += ["", "Run A against the stop thresholds (any crossed stops the step for the owner):"]
     crossed = False
     for name, over, measured in scoring_es.thresholds(metrics):
         crossed |= over
@@ -176,14 +209,15 @@ async def main_async(args: argparse.Namespace) -> int:
         return 2
     models = provenance.load(args.models_dir, verify=False)
     structuring = prompt.load(language="es")
-    llama = LlamaServer(args.llama_url, api_key)
-    structurer = Structurer(llama, structuring, models.language_file, timeout=Settings.structuring_seconds)
+    llama = (KeptAnswers if args.keep_answers else LlamaServer)(args.llama_url, api_key)
+    structurer = Structurer(llama, structuring, models.language_file, timeout=args.timeout)
+    diagnosed = diagnostic(args.timeout, args.keep_answers)
     scripts = {s.id: s for s in load_scripts()}
     chosen = [s for s in scripts.values() if not args.only or any(s.id == w or s.id.startswith(f"{w}-") for w in args.only)]
     started_at = datetime.now(UTC).isoformat(timespec="seconds")
     items = []
     for number, script in enumerate(chosen, 1):
-        item = await run_script(script, structurer)
+        item = await run_script(script, structurer, llama if args.keep_answers else None)
         items.append(item)
         print(f"[{number}/{len(chosen)}] {script.id}: {item.sorting}{f' ({item.reason})' if item.reason else ''}, "
               f"{item.timings.get('structure', 0):.1f} s", flush=True)
@@ -191,11 +225,13 @@ async def main_async(args: argparse.Namespace) -> int:
     metrics = scoring_es.score(items, scripts)
     results = {
         "run": "A: K2 Horizon on the Spanish test set's text, no speech recognition (the expansion plan's step 17)",
+        "diagnostic": diagnosed,
         "started_at": started_at,
         "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "machine": machine(args.machine, "none"),
         "llama_server": structurer.build,
         "parameters": structuring.parameters,
+        "timeout_seconds": args.timeout,
         "provenance": {"language": models.language, "prompt": structuring.prompt_sha256,
                        "schema": structuring.schema_sha256, "structuring": structuring.structuring_sha256,
                        "checks": CHECKS_CODE_SHA256, "pipeline": PIPELINE_CODE_SHA256},
@@ -207,7 +243,7 @@ async def main_async(args: argparse.Namespace) -> int:
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(summary(metrics))
+    print(summary(metrics, diagnosed))
     print(f"Wrote {args.out}")
     return 0
 
@@ -303,7 +339,7 @@ def main_rescore(args: argparse.Namespace) -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print(rescore_table(stored, results, scripts))
-    print(summary(results["metrics"]))
+    print(summary(results["metrics"], results.get("diagnostic")))
     print(f"Wrote {args.out}")
     return 0
 
@@ -315,6 +351,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="where models-manifest.json is; only read")
     parser.add_argument("--machine", help="a name for this machine in the results")
     parser.add_argument("--only", nargs="*", help="script ids to run, for a quick look")
+    parser.add_argument("--timeout", type=float, default=Settings.structuring_seconds,
+                        help="seconds K2 Horizon has to answer; any but the sidecar's makes the run a diagnostic one")
+    parser.add_argument("--keep-answers", action="store_true",
+                        help="store each answer as the model wrote it; makes the run a diagnostic one")
     parser.add_argument("--rescore", type=Path, help="a results file whose stored answers to check and score again")
     parser.add_argument("--out", type=Path, help=f"where the results go (a run's default: {OUT.relative_to(REPO_ROOT)})")
     args = parser.parse_args(argv)

@@ -20,6 +20,11 @@ SCRIPTS = {script.id: script for script in load_scripts()}
 
 
 def structurer(content: dict | str, finish_reason: str = "stop") -> Structurer:
+    return Structurer(llama_server(content, finish_reason), prompt.load(language="es"), "K2.gguf", timeout=5)
+
+
+def llama_server(content: dict | str, finish_reason: str = "stop",
+                 server: type[LlamaServer] = LlamaServer) -> LlamaServer:
     async def handle(request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/props":
             return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
@@ -30,8 +35,7 @@ def structurer(content: dict | str, finish_reason: str = "stop") -> Structurer:
         return httpx2.Response(200, json={"choices": [{"finish_reason": finish_reason, "message": {"content": text}}],
                                           "timings": {"prompt_n": 900, "predicted_n": 700}})
 
-    server = LlamaServer("http://llama.test", "key", transport=httpx2.MockTransport(handle))
-    return Structurer(server, prompt.load(language="es"), "K2.gguf", timeout=5)
+    return server("http://llama.test", "key", transport=httpx2.MockTransport(handle))
 
 
 def gold_answer(script_id: str, **changes: list[dict]) -> dict:
@@ -201,3 +205,37 @@ def test_a_script_whose_text_changed_since_the_run_is_refused():
     stored["items"][0]["hypothesis"] += " Otra frase."
     with pytest.raises(ValueError, match="text has changed"):
         run_a.rescore(stored, SCRIPTS)
+
+
+# ---- Diagnostic runs ------------------------------------------------------------------------------------------------
+
+
+def test_another_timeout_or_kept_answers_make_a_diagnostic_run_that_says_so_first():
+    assert run_a.diagnostic(90.0, False) == []
+    assert run_a.diagnostic(300.0, False) == ["timeout 300 s, not the sidecar's 90 s"]
+    assert run_a.diagnostic(90.0, True) == ["the model's answers kept"]
+    metrics = scoring_es.score([run("e01-hta-control", gold_answer("e01-hta-control"))], SCRIPTS)
+    assert run_a.summary(metrics, run_a.diagnostic(300.0, True)).splitlines()[0].startswith("DIAGNOSTIC, not run A")
+    assert not run_a.summary(metrics).startswith("DIAGNOSTIC")
+
+
+def keeping(content: dict | str, finish_reason: str = "stop") -> scoring_es.SpanishItem:
+    kept = llama_server(content, finish_reason, run_a.KeptAnswers)
+    keeping = Structurer(kept, prompt.load(language="es"), "K2.gguf", timeout=5)
+    return asyncio.run(run_a.run_script(SCRIPTS["e16-anadido-corto"], keeping, kept))
+
+
+def test_the_answer_as_written_is_kept_only_when_asked_even_one_the_sidecar_refuses():
+    content = gold_answer("e16-anadido-corto")
+    assert json.loads(keeping(content).answer) == content and run("e16-anadido-corto", content).answer is None
+    cut_off = keeping(content, finish_reason="length")
+    assert cut_off.sorting == "unavailable" and json.loads(cut_off.answer) == content
+    assert keeping("not json").answer == "not json"
+
+
+def test_scoring_again_needs_somewhere_to_write(tmp_path):
+    stored = tmp_path / "run.json"
+    stored.write_text(json.dumps(stored_run("e01-hta-control")), encoding="utf-8")
+    assert run_a.main(["--rescore", str(stored)]) == 2
+    assert run_a.main(["--rescore", str(stored), "--out", str(tmp_path / "again.json")]) == 0
+    assert json.loads((tmp_path / "again.json").read_text(encoding="utf-8"))["rescored"]

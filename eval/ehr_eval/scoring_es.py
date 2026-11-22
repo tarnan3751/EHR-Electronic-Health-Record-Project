@@ -73,6 +73,7 @@ class SpanishItem:
     tokens: dict[str, int] = field(default_factory=dict)
     statements_in_order: int = 0  # statements whose keys came "spanish", "field", "english"
     statements_written: int = 0
+    answer: str | None = None  # the model's answer as written, only when kept for a diagnostic run (run_a.py)
 
 
 def score(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
