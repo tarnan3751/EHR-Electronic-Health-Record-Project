@@ -931,18 +931,22 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
         }
     }
 
-    // An admin's disable left open doesn't hold up a patient's answer for longer than five seconds: the answer is then
-    // stored and told by the rule without the lock, and the answering transaction's lock_timeout is as it was.
+    // An admin's disable left open doesn't hold up a patient's answer for longer than five seconds, and the answer is
+    // then stored, with the answering transaction's lock_timeout as it was. Without the lock, it is told by the rule and
+    // to every clinician who can sign in: here its only recipient by the rule is the very account being disabled, and
+    // once that disable commits, clinicians who can act still hold it.
     [Fact]
-    public async Task An_answer_waits_at_most_five_seconds_behind_an_open_disable_and_is_still_stored_and_told()
+    public async Task An_answer_waits_at_most_five_seconds_behind_an_open_disable_and_is_still_stored_and_told_to_everyone()
     {
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
-        var idle = await Accounts.StaffAsync(database, StaffRoles.Clinician);
         var booking = await BookedAsync(TimeSpan.FromDays(2));
         var request = await AskAsync(booking.Clinician, booking.Appointment);
+        await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @me AND ended_at IS NULL",
+            ("me", booking.Clinician));
 
+        var before = await EnabledCliniciansAsync();
         await using var disabling = await BeginAsync(admin);
-        await ScalarAsync(disabling, "UPDATE ehr.staff_users SET lockout_end = 'infinity' WHERE id = @id", ("id", idle));
+        await ScalarAsync(disabling, "UPDATE ehr.staff_users SET lockout_end = 'infinity' WHERE id = @id", ("id", booking.AppointmentClinician));
         Assert.Equal("ExclusiveLock", await ScalarAsync(disabling, AlertsLock));
 
         var response = Guid.CreateVersion7();
@@ -961,9 +965,13 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
             await answering.Transaction.CommitAsync(Cancel);
         }
 
-        await disabling.Transaction.RollbackAsync(Cancel);
-        Assert.Equal(new[] { booking.Clinician, booking.AppointmentClinician }.Select(id => id.ToString()).Order(StringComparer.Ordinal),
-            await OpenHoldersAsync(response));
+        await disabling.Transaction.CommitAsync(Cancel);
+        var after = await EnabledCliniciansAsync();
+        var holders = await OpenHoldersAsync(response);
+        Assert.Contains(booking.AppointmentClinician.ToString(), holders);
+        Assert.DoesNotContain(booking.AppointmentClinician.ToString(), after);
+        ToldEveryone(before, after, holders);
+        Assert.Contains(holders, holder => after.Contains(holder));
     }
 
     // A clinician whose own account is disabled at the moment they join a panel, for an answer nobody on the team holds
@@ -1109,7 +1117,8 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
         foreach (var (function, definer, tables) in new[]
                  {
                      ("tell_care_team_of_answer", false, new[] { "inbox_items", "patient_assignments", "staff_users" }),
-                     ("deliver_questionnaire_alert", true, []),
+                     // Telling everyone too, when the alerts' lock wasn't got in time.
+                     ("deliver_questionnaire_alert", true, ["inbox_items", "staff_users"]),
                      // Following the care team, and a disabled account, read the answers too.
                      ("follow_questionnaire_alert_care_team", true, ["inbox_items", "patient_assignments", "questionnaire_responses", "staff_users"]),
                      ("follow_disabled_form_alert_holder", true, ["inbox_items", "questionnaire_responses"]),

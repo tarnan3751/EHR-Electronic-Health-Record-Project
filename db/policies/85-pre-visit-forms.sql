@@ -257,12 +257,15 @@ REVOKE ALL ON FUNCTION ehr.tell_care_team_of_answer(uuid, uuid, uuid) FROM PUBLI
 -- leaves that account out. Answers don't wait for each other. A disable holds the lock only while its transaction is
 -- open, which from the Staff page is one request; but an admin's open SQL session could hold it for as long as it
 -- stays open, so the wait is bounded here, by the patient's side (from the step's third check): at most 5 seconds,
--- with lock_timeout set for that one step and put back after. If the lock isn't got by then, the answer is stored and
--- told by the rule just the same, without it: for that one answer the race the lock closes is open again (an account
--- being disabled at that moment could be the only one told; a clinician joining the panel later still is), which is
--- better than refusing or losing the patient's answer for an admin's slow transaction. Runs as its owner, to write the
--- inbox, which no runtime role may (10-grants.sql); its search_path is pinned, and nobody may call it: only the trigger
--- runs it.
+-- with lock_timeout set for that one step and put back after. If the lock isn't got by then, the answer is stored
+-- all the same, never refused or lost for an admin's slow transaction, and, without the lock to keep the race closed,
+-- it is told more widely (from the step's last check): by the rule, and also to every clinician whose account isn't
+-- disabled who doesn't hold an open item for it, so it can't rest with an account being disabled at that moment alone.
+-- What remains is a transaction that is disabling every clinician account the answer sees, all at once: then, as when
+-- no clinician account is enabled, nobody who can sign in holds it (a clinician enabled or joining later is given it).
+-- A rare path, a disable held open past 5 seconds, so the extra items are a fair price. Runs as its owner, to write the
+-- inbox, which no runtime role may (10-grants.sql): it reads the staff accounts and the inbox itself only on that path.
+-- Its search_path is pinned, and nobody may call it: only the trigger runs it.
 CREATE OR REPLACE FUNCTION ehr.deliver_questionnaire_alert() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -270,15 +273,25 @@ CREATE OR REPLACE FUNCTION ehr.deliver_questionnaire_alert() RETURNS trigger
 AS $$
 DECLARE
     previous text := current_setting('lock_timeout');
+    locked boolean := true;
 BEGIN
     PERFORM set_config('lock_timeout', '5s', true);
     BEGIN
         PERFORM pg_advisory_xact_lock_shared(hashtextextended('form-alert holders', 0));
     EXCEPTION WHEN lock_not_available THEN
-        NULL;
+        locked := false;
     END;
     PERFORM set_config('lock_timeout', previous, true);
     PERFORM ehr.tell_care_team_of_answer(NEW.id, NEW.patient_id, NEW.clinician_id);
+    IF NOT locked THEN
+        INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at, sensitive)
+        SELECT uuidv7(), s.id, 'form-alert', NEW.patient_id, 'questionnaire_responses', NEW.id,
+               'A pre-visit form has an answer that needs review', clock_timestamp(), true
+        FROM ehr.staff_users s
+        WHERE s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end < now() + interval '10 years')
+          AND NOT EXISTS (SELECT 1 FROM ehr.inbox_items i
+                          WHERE i.recipient_id = s.id AND i.source_table = 'questionnaire_responses' AND i.source_id = NEW.id AND i.done_at IS NULL);
+    END IF;
     RETURN NULL;
 END
 $$;
