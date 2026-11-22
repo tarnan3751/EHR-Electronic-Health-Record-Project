@@ -58,9 +58,17 @@ else
                             {
                                 @* Step 13e: a pre-visit form has an answer to review; these come before everything else. *@
                                 <span class="sc-tag sc-tag--danger" data-inbox-review>Needs review</span>
-                                @if (clinician && item.SourceTable == "questionnaire_responses" && item.PatientId is not null)
+                                @if (clinician && item.SourceTable == "questionnaire_responses" && item.PatientId is { } formPatient)
                                 {
-                                    <a asp-page="/Patients/Forms/Response" asp-route-patientId="@item.PatientId" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
+                                    if (item.DoneAt is null)
+                                    {
+                                        <a asp-page="/Patients/Forms/Response" asp-route-patientId="@formPatient" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
+                                    }
+                                    else if (Model.ChartOpens.Contains(formPatient))
+                                    {
+                                        @* Done: the item no longer opens the answers; the chart does, for a patient on the panel. *@
+                                        <span class="sc-muted" data-inbox-chart-note>Open from the patient's chart.</span>
+                                    }
                                 }
                             }
                             @if (clinician && item.Kind == InboxItemKind.Result && item.SourceTable == "orders" && item.PatientId is not null)

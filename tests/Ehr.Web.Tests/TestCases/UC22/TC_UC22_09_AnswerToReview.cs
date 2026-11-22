@@ -36,7 +36,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   4. Mark the clinician's item done, and open the chart again.
 //   5. A third clinician, "Dr. Forms Covering", joins the patient's panel and leaves it; they open the inbox's link,
 //      then the chart, the forms page and the GAD-7's answers. "Dr. Forms Bystander", with no item, opens the link.
-//      The covering clinician marks their item done and opens the link again.
+//      The covering clinician marks their item done and opens the link again; they and the clinician open the inbox's
+//      Done tab.
 //   6. (A second patient.) "Dr. Forms Nine Leaving" and "Dr. Forms Nine Staying" both receive an answer to review; the
 //      second marks theirs done; an admin disables the first on the Staff page.
 // Expected result: Step 1: the GAD-7, though it scores 21, puts nothing in any inbox; the PHQ-9 puts one item in each
@@ -50,7 +51,9 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   hurting yourself in some way"."; one recorded view of sensitive items and no emergency access; the chart, the
 //   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander;
 //   the inbox says beside "Mark done": "After you mark this done, the answers open from the patient's chart, which needs
-//   the patient on your panel or emergency access."; once it is done, the link sends them to the reason page too. Step
+//   the patient on your panel or emergency access."; once it is done, the link sends them to the reason page too, and
+//   their Done tab keeps the item's line with no link to the answers and nothing more; the clinician's Done tab, the
+//   patient on their panel, says "Open from the patient's chart." as plain words, with no link to the answers. Step
 //   6: the staying clinician's inbox links to the answers again, with a new open item beside the done one; the
 //   disabled clinician keeps theirs.
 // Creator: Tahseen Arnan
@@ -168,6 +171,18 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal($"/patients/{visit.Patient}/reason", PathOf(closed));
         }
+
+        // The Done tab keeps the item's line but no link to the answers: off the panel it says nothing more; on it, that
+        // the answers open from the chart, as plain words.
+        const string FromChart = "Open from the patient's chart.";
+        var coveringDoneTab = await covering.Client.GetStringAsync("/inbox?done=true", Cancel);
+        Assert.Contains("Pre-visit form to review A pre-visit form has an answer that needs review", Text(coveringDoneTab));
+        Assert.DoesNotContain($"href=\"{link}\"", coveringDoneTab);
+        Assert.DoesNotContain(FromChart, Text(coveringDoneTab));
+        var panelDoneTab = await visit.Session.Client.GetStringAsync("/inbox?done=true", Cancel);
+        Assert.DoesNotContain($"href=\"{link}\"", panelDoneTab);
+        Assert.Contains($"A pre-visit form has an answer that needs review Needs review {FromChart}", Text(panelDoneTab));
+        Assert.DoesNotMatch("<a[^>]*>Open from the patient", panelDoneTab);
     }
 
     // An admin disables, on the Staff page, the one clinician still holding an answer's item open: the answer is told
