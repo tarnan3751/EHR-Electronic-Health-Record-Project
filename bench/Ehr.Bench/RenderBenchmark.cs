@@ -195,6 +195,10 @@ internal static partial class RenderBenchmark
                 // allergy form opened from them; and its editor, which says they wait. A generator of its own.
                 var proposed = await DictateProposalsAsync(app, clinicianId, noted);
                 results.AddRange(await MeasureProposalsAsync(client, times, "", proposed));
+                // The review of a dictation (UC 13), in English and, since the expansion plan's step 17, in Spanish, each
+                // English sentence beside the Spanish it was translated from. A generator of its own, as above.
+                var reviewed = await StageReviewsAsync(app, clinicianId, noted);
+                results.AddRange(await MeasureReviewsAsync(client, times, "", reviewed));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -285,7 +289,7 @@ internal static partial class RenderBenchmark
                     {
                         await SettleAsync(database);
                         results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills, forms, drafted, proposed));
+                            refills, forms, drafted, proposed, reviewed));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -478,7 +482,7 @@ internal static partial class RenderBenchmark
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
         CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms,
-        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed)
+        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, List<Reviewed> reviewed)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -532,6 +536,7 @@ internal static partial class RenderBenchmark
                 var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
                 return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
             }));
+            results.AddRange(await MeasureReviewsAsync(client, times, "Off-site, ", reviewed));
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
             // A dictation's proposals (step 15), read from the cloud copy: opening or dismissing one says why it can't.
             results.AddRange(await MeasureProposalsAsync(client, times, "Off-site, ", proposed));
@@ -1392,6 +1397,94 @@ internal static partial class RenderBenchmark
                 return $"/patients/{one.Patient}/notes/drafts/{one.Draft}";
             }),
         ];
+    }
+
+    // A dictation's review (UC 13) on a new draft of each noted patient, in English and in Spanish (the expansion plan's step
+    // 17), staged through the app's own services as the dictation API stages a result the service sent: all four fields
+    // proposed, those from Spanish as English sentences each beside the Spanish it was translated from.
+    sealed record Reviewed(Guid Patient, Guid Draft, Guid Review, bool Spanish);
+
+    static async Task<List<Reviewed>> StageReviewsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        var reviewed = new List<Reviewed>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var reviews = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.NoteReviews>();
+        foreach (var (patient, _) in noted)
+        {
+            foreach (var spanish in new[] { false, true })
+            {
+                await using var transaction = await db.Database.BeginTransactionAsync();
+                var id = Guid.NewGuid();
+                var begun = await reviews.BeginAsync(id, patient, null, null, Convert.ToBase64String(RandomNumberGenerator.GetBytes(24)).Replace('+', '-').Replace('/', '_'),
+                    180, 1024 * 1024, CancellationToken.None);
+                var (result, suggestions) = DictationReviewResult(spanish);
+                var staged = begun.Review is not null
+                    ? await reviews.StageAsync(id, begun.Version!.Value, new Ehr.Domain.Notes.TrustedReviewResult(JsonSerializer.Serialize(result, JsonSerializerOptions.Web), suggestions, []), CancellationToken.None)
+                    : begun;
+                if (staged.Status != 200)
+                {
+                    throw new InvalidOperationException("The benchmark's dictation review was refused.");
+                }
+
+                await transaction.CommitAsync();
+                reviewed.Add(new(patient, begun.Review!.DraftId, id, spanish));
+            }
+        }
+
+        return reviewed;
+    }
+
+    // A dictation's result as the service sends it: four sentences, one a field, in English or, in Spanish, each field's
+    // English beside the Spanish it was translated from.
+    static (Ehr.Web.Api.Dictation.DictationResult Result, Dictionary<string, string> Suggestions) DictationReviewResult(bool spanish)
+    {
+        string[] said = spanish
+            ? ["Tos desde hace tres días y niega fiebre.", "Pulmones limpios.", "Probable cuadro viral.", "Líquidos abundantes y reposo durante cinco días."]
+            : ["Cough for three days, no fever.", "Chest is clear.", "Likely viral.", "Fluids and rest for five days."];
+        string[] english = ["Cough for three days. Denies fever.", "Lungs clear.", "Likely viral illness.", "Plenty of fluids and rest for five days."];
+        var text = string.Join(' ', said);
+        var segments = new List<Ehr.Web.Api.Dictation.TranscriptSegment>();
+        var fields = new List<Ehr.Web.Api.Dictation.NoteField>();
+        var suggestions = new Dictionary<string, string>();
+        string[] names = ["subjective", "objective", "assessment", "plan"];
+        for (var i = 0; i < said.Length; i++)
+        {
+            var start = text.IndexOf(said[i], StringComparison.Ordinal);
+            var source = new Ehr.Web.Api.Dictation.SourceSpan(start, start + said[i].Length);
+            segments.Add(new(source.Start, source.End, i * 4000, i * 4000 + 3800, true));
+            var value = spanish ? english[i] : said[i];
+            fields.Add(new Ehr.Web.Api.Dictation.PendingField(value, [source], [],
+                spanish ? [new Ehr.Web.Api.Dictation.TranslatedStatement(0, value.Length, [source])] : null));
+            suggestions[names[i]] = value;
+        }
+
+        var provenance = new Ehr.Web.Api.Dictation.Provenance(
+            new(spanish ? "openai/whisper-large-v3-turbo" : "google/medasr", "bench", new string('a', 64)),
+            new("IFM/K2-Horizon-7B-GGUF", "bench", "K2-Horizon-7B-Q4_K_M.gguf", new string('b', 64)),
+            "bench", "sha256:bench", "sha256:bench", "sha256:bench", "sha256:bench");
+        var result = new Ehr.Web.Api.Dictation.DictationResult(new(text, true, segments), Ehr.Web.Api.Dictation.Sorting.Done,
+            new(fields[0], fields[1], fields[2], fields[3]), [], provenance,
+            SpokenLanguage: spanish ? Ehr.Web.Api.Dictation.SpokenLanguage.Spanish : Ehr.Web.Api.Dictation.SpokenLanguage.English);
+        return (result, suggestions);
+    }
+
+    static async Task<List<Result>> MeasureReviewsAsync(HttpClient client, DatabaseTimes times, string prefix, List<Reviewed> reviewed)
+    {
+        var results = new List<Result>();
+        var random = new Random(20261127);
+        foreach (var (spanish, name) in new[] { (false, "AI review of a dictation, a patient on the panel"), (true, "AI review of a dictation in Spanish, a patient on the panel") })
+        {
+            var mine = reviewed.Where(r => r.Spanish == spanish).ToList();
+            results.Add(await MeasureAsync(client, times, prefix + name, typing: false, () =>
+            {
+                var review = mine[random.Next(mine.Count)];
+                return $"/patients/{review.Patient}/notes/drafts/{review.Draft}/review/{review.Review}";
+            }));
+        }
+
+        return results;
     }
 
     // Step 13a: for each patient, six signed notes and a visit summary of each, through the app's own service and the
