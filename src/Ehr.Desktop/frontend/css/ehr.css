@@ -1740,6 +1740,51 @@
         box-shadow: inset 2px 0 0 var(--line-strong);
     }
 
+    /* Translated sentences: a field proposed from a dictation in Spanish, each English sentence beside the Spanish it was
+       translated from, side by side where both fit and the Spanish under the English where they don't. Hovering or
+       focusing a sentence highlights its Spanish in the transcript and tints the pair. */
+    .sc-translation {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .sc-translation__pair {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+        gap: var(--space-1) var(--space-4);
+        padding: var(--space-2) 0;
+        border-radius: var(--radius-xs);
+    }
+
+    .sc-translation__pair + .sc-translation__pair {
+        border-top: 1px solid var(--line);
+    }
+
+    .sc-translation__pair:hover,
+    .sc-translation__pair:focus {
+        background: var(--highlight-source);
+    }
+
+    /* On the tint the Spanish is ink, which keeps its contrast there (tokens.json: highlight-source). */
+    .sc-translation__pair:hover .sc-translation__spanish,
+    .sc-translation__pair:focus .sc-translation__spanish {
+        color: var(--ink);
+    }
+
+    .sc-translation__english,
+    .sc-translation__spanish {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .sc-translation__spanish {
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
+    }
+
     /* Two versions side by side, such as "Theirs (saved)" and "Mine (not saved)". Never merged silently. */
     .sc-versions {
         display: grid;

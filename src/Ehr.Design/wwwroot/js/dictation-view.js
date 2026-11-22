@@ -15,11 +15,14 @@ window.SwiftChartDictationView = class {
             too_quiet: "too quiet to hear clearly",
             too_noisy: "too much background noise",
             low_confidence: "the speech model wasn't sure",
+            other_language: "it wasn't heard as Spanish, so it was left out of the proposals",
         };
         const warningWords = {
             possible_correction: "You may have corrected this later in the dictation: check the highlighted words.",
             near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
+            ambiguous_number: "This number can be read two ways, with a decimal point or a thousands separator: check the highlighted words.",
+            ambiguous_frequency: "“Cada tercer día” can mean every other day or every third day: check which you meant.",
         };
         const instructionWords = { order: "Order", allergy_change: "Allergy change" };
         // Those the dictation proposes (the expansion plan's step 15). The review lists them apart, with their actions, and
@@ -99,6 +102,14 @@ window.SwiftChartDictationView = class {
         }
 
         function renderResult(result) {
+            // A dictation in Spanish (the expansion plan's step 17): its transcript, and the words quoted from it, are Spanish.
+            const spanish = result.spokenLanguage === "es";
+            if (spanish) {
+                transcriptArea.lang = "es";
+            } else {
+                transcriptArea.removeAttribute("lang");
+            }
+
             renderTranscript(result.transcript);
             if (result.sorting === "pending") {
                 sortMessage.textContent = "Proposing the fields…";
@@ -119,7 +130,13 @@ window.SwiftChartDictationView = class {
                 const text = (result.transcript?.text ?? "").slice(item.start, item.end);
                 const kind = proposed.get(`${item.start}:${item.end}`);
                 const li = element("li");
-                li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), document.createTextNode(`“${text}”`));
+                // In a dictation in Spanish, the words quoted are Spanish (step 17).
+                const quote = spanish ? element("span", `“${text}”`) : document.createTextNode(`“${text}”`);
+                if (spanish) {
+                    quote.lang = "es";
+                }
+
+                li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), quote);
                 highlightOnFocus(li, [item]);
                 return li;
             }));
@@ -135,9 +152,14 @@ window.SwiftChartDictationView = class {
             value.replaceChildren();
             if (field?.status === "pending") {
                 setStatus(status, "Awaiting review", "warning");
-                const text = element("p", field.value, "sc-proposal__value");
-                highlightOnFocus(text, field.sources ?? []);
-                value.append(text);
+                if (field.statements?.length) {
+                    value.append(renderStatements(field));
+                } else {
+                    const text = element("p", field.value, "sc-proposal__value");
+                    highlightOnFocus(text, field.sources ?? []);
+                    value.append(text);
+                }
+
                 for (const control of container.querySelectorAll("button, textarea, summary")) {
                     control.onfocus = () => renderTranscript(state.transcript, field.sources ?? []);
                     control.onblur = () => renderTranscript(state.transcript);
@@ -158,6 +180,26 @@ window.SwiftChartDictationView = class {
             } else {
                 setStatus(status, sorting === "unavailable" ? "Not sorted" : "Not dictated yet");
             }
+        }
+
+        // A value proposed from Spanish (step 17): each English sentence beside the Spanish words it was translated from,
+        // which hovering or focusing the sentence highlights in the transcript (docs/brand: Translated sentences). The
+        // page renders the same list before this script runs (Notes/Review).
+        function renderStatements(field) {
+            const list = element("ol", undefined, "sc-translation");
+            const transcriptText = state.transcript?.text ?? "";
+            for (const statement of field.statements) {
+                const pair = element("li", undefined, "sc-translation__pair");
+                const said = element("span", `“${statement.sources.map((s) => transcriptText.slice(s.start, s.end)).join(" … ")}”`);
+                said.lang = "es";
+                const spanish = element("p", "You said: ", "sc-translation__spanish");
+                spanish.append(said);
+                pair.append(element("p", field.value.slice(statement.start, statement.end), "sc-translation__english"), spanish);
+                highlightOnFocus(pair, statement.sources);
+                list.append(pair);
+            }
+
+            return list;
         }
 
         // Hovering or focusing the element highlights its ranges in the transcript; the keyboard reaches it with Tab.

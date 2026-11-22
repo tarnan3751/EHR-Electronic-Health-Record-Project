@@ -27,6 +27,27 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     static readonly string[] Sentences = ["Cough for three days.", "No fever.", "Chest is clear.", "Likely viral.", "Fluids and rest."];
 
+    // The Spanish mode's dictation, a sentence a chunk: the third spoken in English, which the service marks as not
+    // Spanish, the fourth with an order in it, and the last long, so a quote of it has to wrap.
+    public static readonly string[] SpanishSentences =
+    [
+        "Tos desde hace tres días y niega fiebre.",
+        "Pulmones limpios.",
+        "Patient was counseled on diet.",
+        "Probable cuadro viral, pido una radiografía de tórax.",
+        "Líquidos abundantes y reposo relativo durante los próximos tres a cinco días, paracetamol 1.000 mg cada ocho horas si tiene dolor o malestar general, y regresar a consulta si aparece dificultad para respirar o fiebre que no cede.",
+    ];
+
+    // What the Spanish mode proposes from those five chunks: for each field, each English sentence with the Spanish words
+    // of the transcript it was translated from.
+    public static readonly (string Field, (string English, string Spanish)[] Statements)[] SpanishFields =
+    [
+        ("subjective", [("Cough for three days.", "Tos desde hace tres días"), ("Denies fever.", "niega fiebre")]),
+        ("objective", [("Lungs clear.", "Pulmones limpios.")]),
+        ("assessment", [("Likely viral illness.", "Probable cuadro viral")]),
+        ("plan", [("Plenty of fluids and relative rest for the next three to five days, acetaminophen 1000 mg every 8 hours if there is pain or general malaise, and return to clinic if difficulty breathing or a fever that does not go away appears.", SpanishSentences[4])]),
+    ];
+
     readonly ConcurrentDictionary<string, StubSession> sessions = new();
 
     public ConcurrentQueue<ReceivedRequest> Received { get; } = new();
@@ -58,6 +79,11 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     public StubSorting Sorting { get; set; }
 
+    // A dictation in Spanish (the expansion plan's step 17): SpanishSentences, a chunk each, and when it is sorted, every
+    // one of the four fields proposed in English with its statements (SpanishFields), from the five chunks. Whatever the
+    // session was started with: the service's own choice of language comes with its next series.
+    public bool Spanish { get; set; }
+
     // Every request fails to connect.
     public bool Unreachable { get; set; }
 
@@ -81,6 +107,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         WholeDictation = false;
         Proposals = false;
         ProposalLead = null;
+        Spanish = false;
         Unreachable = false;
         Slow = false;
         Undecodable = false;
@@ -146,7 +173,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     }
 
                     session.Chunks++;
-                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, audioSeconds = session.Chunks * 2.0, transcript = Transcript(session) });
+                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, audioSeconds = session.Chunks * 2.0, transcript = Transcript(session, Spoken) });
 
                 case ([_, _, _, "stop"], "POST"):
                     if (Undecodable)
@@ -171,9 +198,12 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         }
     }
 
-    static string Text(StubSession session) => string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => Sentences[chunk % Sentences.Length]));
+    string[] Spoken => Spanish ? SpanishSentences : Sentences;
 
-    object Transcript(StubSession session)
+    static string Text(StubSession session, string[] sentences) =>
+        string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => sentences[chunk % sentences.Length]));
+
+    object Transcript(StubSession session, string[] sentences)
     {
         var text = new StringBuilder();
         var segments = new List<object>();
@@ -185,10 +215,11 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             }
 
             var start = text.Length;
-            text.Append(Sentences[chunk % Sentences.Length]);
+            text.Append(sentences[chunk % sentences.Length]);
             // The last chunk's words may still change until the dictation stops.
             var final = session.Stopped || chunk < session.Chunks - 1;
-            segments.Add(new { start, end = text.Length, startMs = chunk * 2000, endMs = chunk * 2000 + 1800, final, unclear = chunk == 2 ? "too_noisy" : null, confidence = 0.42 });
+            var unclear = chunk != 2 ? null : sentences == SpanishSentences ? "other_language" : "too_noisy";
+            segments.Add(new { start, end = text.Length, startMs = chunk * 2000, endMs = chunk * 2000 + 1800, final, unclear, confidence = 0.42 });
         }
 
         if (Proposals && session.Stopped)
@@ -216,7 +247,12 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     object Sorted(StubSession session, StubSorting sorting)
     {
-        var transcript = Transcript(session);
+        if (Spanish && sorting is StubSorting.Done or StubSorting.Pending)
+        {
+            return SortedSpanish(session, sorting);
+        }
+
+        var transcript = Transcript(session, Sentences);
         var provenance = new
         {
             speech = new { repository = "google/medasr", commit = "1111111", sha256 = new string('a', 64) },
@@ -232,7 +268,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         object? proposals = null;
         if (Proposals && session.Stopped)
         {
-            var at = Text(session).Length + 1 + (ProposalLead is null ? 0 : ProposalLead.Length + 1);
+            var at = Text(session, Sentences).Length + 1 + (ProposalLead is null ? 0 : ProposalLead.Length + 1);
             var (order, allergy) = ((Start: at, End: at + OrderSaid.Length), (Start: at + OrderSaid.Length + 2, End: at + OrderSaid.Length + 2 + AllergySaid.Length));
             notCarriedOver = [new { reason = "order", start = order.Start, end = order.End }, new { reason = "allergy_change", start = allergy.Start, end = allergy.End }];
             proposals = new object[]
@@ -254,9 +290,9 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     subjective = new
                     {
                         status = "pending",
-                        value = Text(session),
-                        sources = new[] { new { start = 0, end = Text(session).Length } },
-                        warnings = new[] { new { code = "one_field_holds_dictation", start = 0, end = Text(session).Length } },
+                        value = Text(session, Sentences),
+                        sources = new[] { new { start = 0, end = Text(session, Sentences).Length } },
+                        warnings = new[] { new { code = "one_field_holds_dictation", start = 0, end = Text(session, Sentences).Length } },
                     },
                     objective = new { status = "empty", reasons = new[] { "not_dictated" } },
                     assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
@@ -345,6 +381,74 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 debug = new { modelOutput = DiscardedText },
             },
         };
+    }
+
+    // The Spanish mode's answer: the transcript in Spanish, the order it holds not carried over, and from five chunks or
+    // more, each field's English sentences, joined by a space as the value, each citing the Spanish words it was
+    // translated from; the plan's 1.000 mg carries the warning that it reads two ways.
+    object SortedSpanish(StubSession session, StubSorting sorting)
+    {
+        var transcript = Transcript(session, SpanishSentences);
+        var text = Text(session, SpanishSentences);
+        var provenance = new
+        {
+            speech = new { repository = "openai/whisper-large-v3-turbo", commit = "3333333", sha256 = new string('d', 64) },
+            language = new { repository = "IFM/K2-Horizon-7B-GGUF", commit = "2222222", file = "K2-Horizon-7B-Q4_K_M.gguf", sha256 = new string('b', 64) },
+            llamaServer = "b11669",
+            prompt = "note-prompt-es-1",
+            schema = "note-schema-es-1",
+            structuring = "structuring-es-1",
+            code = "sha256:" + new string('c', 64),
+        };
+        const string Order = "pido una radiografía de tórax";
+        var order = text.IndexOf(Order, StringComparison.Ordinal);
+        var notCarriedOver = new[] { new { reason = "order", start = order, end = order + Order.Length } }.Where(item => item.start >= 0).ToArray();
+        if (sorting == StubSorting.Pending)
+        {
+            return new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver, provenance, spokenLanguage = "es" };
+        }
+
+        var fields = new Dictionary<string, object>();
+        if (session.Chunks < SpanishSentences.Length)
+        {
+            foreach (var (field, _) in SpanishFields)
+            {
+                fields[field] = new { status = "empty", reasons = new[] { "not_dictated" } };
+            }
+
+            return new { transcript, sorting = "done", fields, notCarriedOver, provenance, spokenLanguage = "es" };
+        }
+
+        foreach (var (field, statements) in SpanishFields)
+        {
+            var value = new StringBuilder();
+            var translated = new List<object>();
+            var sources = new List<object>();
+            foreach (var (english, spanish) in statements)
+            {
+                if (value.Length > 0)
+                {
+                    value.Append(' ');
+                }
+
+                var at = text.IndexOf(spanish, StringComparison.Ordinal);
+                var source = new { start = at, end = at + spanish.Length };
+                translated.Add(new { start = value.Length, end = value.Length + english.Length, sources = new[] { source } });
+                sources.Add(source);
+                value.Append(english);
+            }
+
+            var warnings = new List<object>();
+            if (field == "plan")
+            {
+                var number = text.IndexOf("1.000 mg", StringComparison.Ordinal);
+                warnings.Add(new { code = "ambiguous_number", start = number, end = number + "1.000 mg".Length });
+            }
+
+            fields[field] = new { status = "pending", value = value.ToString(), sources, warnings, statements = translated };
+        }
+
+        return new { transcript, sorting = "done", fields, notCarriedOver, provenance, spokenLanguage = "es" };
     }
 
     // One chunk's sentence, proposed as a field's value, with its place in the transcript as its source.

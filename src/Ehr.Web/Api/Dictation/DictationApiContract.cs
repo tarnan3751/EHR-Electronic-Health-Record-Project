@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Ehr.Web.Api.Dictation;
@@ -32,6 +33,11 @@ public enum Unclear
 
     [JsonStringEnumMemberName("low_confidence")]
     LowConfidence,
+
+    // In a dictation in Spanish, a passage speech recognition didn't hear as Spanish (the expansion plan's step 17): left
+    // out of what the model sorts, for the clinician to dictate again in Spanish or type.
+    [JsonStringEnumMemberName("other_language")]
+    OtherLanguage,
 }
 
 // After stop, and from result. Fields is null until the model has sorted the transcript, or when it couldn't.
@@ -39,7 +45,9 @@ public enum Unclear
 // carries (FR-14), so the screen can say what still has to be placed in Orders or the allergy list. Proposals are those of
 // them the dictation proposes (the expansion plan's step 15; FR-14 as reworded): each an order or an allergy to add,
 // dictated plainly, at the place of its listed instruction. Null from a service older than step 15, and in a result
-// stored before it: none. Never written when it is null.
+// stored before it: none. Never written when it is null. SpokenLanguage is the language the clinician dictated in (the
+// expansion plan's step 17), never written for English, so a result in English, and every one saved before Spanish,
+// reads and is stored as it was. Nothing is proposed from a dictation in Spanish (TrustedResult).
 public sealed record DictationResult(
     Transcript Transcript,
     Sorting Sorting,
@@ -47,13 +55,35 @@ public sealed record DictationResult(
     IReadOnlyList<NotCarriedOver> NotCarriedOver,
     Provenance Provenance,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SortingFailure? Reason = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ChartProposal>? Proposals = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ChartProposal>? Proposals = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] SpokenLanguage SpokenLanguage = SpokenLanguage.English)
 {
     public const string UnsortedMessage = "The fields couldn't be sorted, so the transcript is kept as plain text.";
 
     // Ours, never the service's, and only when the fields couldn't be sorted (UC 10).
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message => Sorting == Sorting.Unavailable ? UnsortedMessage : null;
+
+    // The language a stored review's dictation was in, from its saved result: English when it has none.
+    public static SpokenLanguage SpokenLanguageOf(string? resultJson)
+    {
+        if (resultJson is null) return SpokenLanguage.English;
+        using var json = JsonDocument.Parse(resultJson);
+        return json.RootElement.TryGetProperty("spokenLanguage", out var language) && language.ValueEquals("es")
+            ? SpokenLanguage.Spanish : SpokenLanguage.English;
+    }
+}
+
+// The language of a dictation (the expansion plan's step 17). A dictation in Spanish has a Spanish transcript, and its
+// fields are proposed in English, each sentence with the Spanish it was translated from (TranslatedStatement).
+[JsonConverter(typeof(JsonStringEnumConverter<SpokenLanguage>))]
+public enum SpokenLanguage
+{
+    [JsonStringEnumMemberName("en")]
+    English,
+
+    [JsonStringEnumMemberName("es")]
+    Spanish,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<Sorting>))]
@@ -139,8 +169,15 @@ public sealed record NoteFields(NoteField Subjective, NoteField Objective, NoteF
 public abstract record NoteField;
 
 // The model's proposal, with the parts of the transcript it came from (offsets as in TranscriptSegment), and where the
-// clinician may have corrected what it says.
-public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Sources, IReadOnlyList<FieldWarning> Warnings) : NoteField;
+// clinician may have corrected what it says. From a dictation in Spanish (step 17), Statements says which sentence of the
+// English value was translated from which Spanish words; never written for English.
+public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Sources, IReadOnlyList<FieldWarning> Warnings,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<TranslatedStatement>? Statements = null) : NoteField;
+
+// One sentence of a value proposed from Spanish: its place in the value (half-open UTF-16 offsets into Value), and the
+// Spanish words of the transcript it was translated from (offsets as in TranscriptSegment). The statements follow each
+// other through the value, one space between, and cite every source the field has and no other (TrustedResult).
+public sealed record TranslatedStatement(int Start, int End, IReadOnlyList<SourceSpan> Sources);
 
 // Nothing dictated, or what was proposed failed validation: the reasons' codes, never the text.
 public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField;
@@ -170,6 +207,16 @@ public enum WarningCode
     // the clinician to sort before accepting it.
     [JsonStringEnumMemberName("one_field_holds_dictation")]
     OneFieldHoldsDictation,
+
+    // From a dictation in Spanish (step 17): a number the value uses was said with a separator that reads two ways, a
+    // decimal point or a thousands separator ("1.000 mg"); it points at that number.
+    [JsonStringEnumMemberName("ambiguous_number")]
+    AmbiguousNumber,
+
+    // From a dictation in Spanish: a frequency that reads two ways ("cada tercer día", every other day or every third
+    // day); it points at those words.
+    [JsonStringEnumMemberName("ambiguous_frequency")]
+    AmbiguousFrequency,
 }
 
 // What produced the transcript and the fields, for the note to store with them. Language is null when the service's

@@ -40,6 +40,30 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 
     public object Snapshot => new { Review.State, version = Draft.Version, result = Result, proposals = Proposals };
 
+    // A dictation in Spanish (the expansion plan's step 17): its transcript is Spanish, and each proposed field English,
+    // shown a sentence at a time beside the Spanish it was translated from.
+    public bool Translated => Result?.SpokenLanguage == SpokenLanguage.Spanish;
+
+    // A field's sentences, each with the Spanish words it was translated from, when the dictation was in Spanish.
+    public IEnumerable<(string English, string Spanish)> Statements(string field)
+    {
+        if (!Translated || Result?.Fields is not { } fields) yield break;
+        var proposed = field switch
+        {
+            "subjective" => fields.Subjective,
+            "objective" => fields.Objective,
+            "assessment" => fields.Assessment,
+            "plan" => fields.Plan,
+            _ => null,
+        };
+        if (proposed is not PendingField { Statements: { } statements } pending) yield break;
+        foreach (var statement in statements)
+        {
+            yield return (pending.Value[statement.Start..statement.End],
+                string.Join(" … ", statement.Sources.Select(source => Result.Transcript.Text[source.Start..source.End])));
+        }
+    }
+
     // The fields the review shows: Subjective, Objective, Assessment and Plan (the expansion plan's step 14), or, for a
     // dictation sorted before then, its History, Assessment and Plan, as it was saved.
     public IReadOnlyList<string> FieldNames { get; private set; } = Fields;

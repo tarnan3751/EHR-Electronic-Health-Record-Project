@@ -179,6 +179,9 @@ public static partial class DictationApi
         // What a dictation proposes (the expansion plan's step 15) is one of its listed instructions, of the same kind, each
         // once, at most AiChartProposal.MaxPerReview, from a final transcript, with a proposal's warnings only.
         var proposals = result.Proposals ?? [];
+        // Nothing is proposed from a dictation in Spanish (the expansion plan's step 17): its instructions are listed for the
+        // clinician to place, and a result from Spanish that proposes any is refused whole.
+        if (result.SpokenLanguage == SpokenLanguage.Spanish && proposals.Count > 0) return null;
         if (proposals.Count > AiChartProposal.MaxPerReview || proposals.Count > 0 && !result.Transcript.Final
             || proposals.DistinctBy(p => (p.Start, p.End)).Count() != proposals.Count
             || proposals.Any(p => !result.NotCarriedOver.Any(i => i.Start == p.Start && i.End == p.End
@@ -187,6 +190,26 @@ public static partial class DictationApi
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
         if (result.Fields?.History is not null) return null;
+        // A value proposed from Spanish (the expansion plan's step 17) is English sentences, each with the Spanish words it
+        // was translated from: they follow each other through the value, one space between, and between them cite every
+        // source the field has and no other (whose ranges are checked below), so the review can put each sentence beside
+        // what the clinician said. A value proposed from English has none.
+        bool Translated(PendingField field)
+        {
+            if (field.Statements is not { Count: > 0 } statements) return false;
+            var at = 0;
+            foreach (var statement in statements)
+            {
+                if (statement.Start != at || statement.End <= statement.Start || statement.End > field.Value.Length
+                    || string.IsNullOrWhiteSpace(field.Value[statement.Start..statement.End])
+                    || statement.End < field.Value.Length && field.Value[statement.End] != ' '
+                    || statement.Sources.Count == 0) return false;
+                at = statement.End + 1;
+            }
+
+            return at == field.Value.Length + 1 && statements.SelectMany(s => s.Sources).ToHashSet().SetEquals(field.Sources);
+        }
+
         var suggestions = new Dictionary<string, string>();
         if (result.Fields is { } fields)
         {
@@ -195,7 +218,8 @@ public static partial class DictationApi
                 if (field is not PendingField pending) continue;
                 if (result.Sorting != Sorting.Done || string.IsNullOrWhiteSpace(pending.Value) || pending.Value.Contains('\0')
                     || pending.Value.Length > NoteContent.MaximumFieldLength || pending.Sources.Count == 0
-                    || pending.Sources.Any(s => !Range(s.Start, s.End)) || pending.Warnings.Any(w => !Range(w.Start, w.End))) return null;
+                    || pending.Sources.Any(s => !Range(s.Start, s.End)) || pending.Warnings.Any(w => !Range(w.Start, w.End))
+                    || (result.SpokenLanguage == SpokenLanguage.Spanish ? !Translated(pending) : pending.Statements is not null)) return null;
                 suggestions.Add(name, pending.Value);
             }
         }
