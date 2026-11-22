@@ -666,8 +666,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     // sign taken that day is among them and a blood pressure's two values come together (Notes.ObjectiveVitals takes the
     // newest of each). Two statements, each a range of the index on the patient and the time taken: the newest moment,
     // then that day's bounds on the clinic's clock (a day the clocks change on is 23 or 25 hours). Read only when the
-    // clinician asks, for a patient on their panel (the page checks), and recorded as the vital signs page's read is,
-    // with its part.
+    // clinician asks, for their own draft of the patient, and recorded as the vital signs page's read is, with its part.
     public async Task<IReadOnlyList<Observation>> ObjectiveVitalsAsync(Guid patientId, ClinicTime clinic, CancellationToken cancellationToken)
     {
         var standing = db.Observations.AsNoTracking()
@@ -684,6 +683,12 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         await db.SaveChangesAsync(cancellationToken);
         return signs;
     }
+
+    // Whether a draft is the reader's own, unsigned, and for this patient (row-level security adds: with the patient on
+    // their panel). A yes or no, with nothing of the draft, so nothing is recorded here: what follows records its own read.
+    public Task<bool> OwnsUnsignedDraftAsync(Guid draft, Guid patient, CancellationToken cancel) =>
+        db.ClinicalDrafts.AnyAsync(d => d.Id == draft && d.PatientId == patient && d.ClinicianId == user.UserId
+            && !db.ClinicalNotes.Any(n => n.DraftId == d.Id), cancel);
 
     // Proxy access (FR-19).
 
