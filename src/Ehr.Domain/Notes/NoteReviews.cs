@@ -71,6 +71,20 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
                 State = AiProposalStates.Pending,
             });
         }
+        // The orders and allergies to add it proposes (the expansion plan's step 15), each at its place in the stored result,
+        // to be decided through the order and allergy forms or dismissed. They hold up neither this review nor signing.
+        for (var place = 0; place < result.ChartProposals.Count; place++)
+        {
+            db.AddRange(new AiChartProposal
+            {
+                Id = Guid.CreateVersion7(),
+                ReviewId = review.Id,
+                PatientId = review.PatientId,
+                Ordinal = (short)place,
+                Kind = result.ChartProposals[place],
+                State = AiChartProposalStates.Pending,
+            });
+        }
         await db.SaveChangesAsync(cancel);
         draft.HasUnreviewedProposals = result.Suggestions.Count > 0;
         Advance(draft);
@@ -201,8 +215,9 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
     }
 }
 
-// Only constructed from the server's sanitized, owner-checked sidecar result. Never an HTTP input model.
-public sealed record TrustedReviewResult(string Json, IReadOnlyDictionary<string, string> Suggestions);
+// Only constructed from the server's sanitized, owner-checked sidecar result. Never an HTTP input model. ChartProposals are
+// the kinds of the result's proposals, in its order (AiChartProposalKinds).
+public sealed record TrustedReviewResult(string Json, IReadOnlyDictionary<string, string> Suggestions, IReadOnlyList<string> ChartProposals);
 
 public sealed record ReviewResult(int Status, IReadOnlyList<string> Errors, AiNoteReview? Review = null, long? Version = null)
 {
