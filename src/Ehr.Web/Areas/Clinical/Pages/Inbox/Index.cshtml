@@ -112,8 +112,14 @@ else
                                      && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests"))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
-                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary">Mark done</button>
+                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary"
+                                                aria-describedby="@(item.Kind == InboxItemKind.FormAlert ? $"done-{item.Id}" : null)">Mark done</button>
                                     </form>
+                                    @if (item.Kind == InboxItemKind.FormAlert)
+                                    {
+                                        @* Step 13e: the item is the way to the answers only while it is open (PhiReader.FormAnswersAsync). *@
+                                        <p class="sc-muted" id="done-@item.Id" data-inbox-done-note>After you mark this done, the answers open from the patient's chart, which needs the patient on your panel or emergency access.</p>
+                                    }
                                 }
                             </td>
                         }

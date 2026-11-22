@@ -15,9 +15,10 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   for each of them until they mark their own item done. A form with no such answer puts nothing in anyone's inbox.
 //   A clinician given the item who doesn't have the patient on their panel (here, one who joined the panel when nobody
 //   on the team still held it open, then left) reads that form's answers from the inbox without emergency access, told
-//   whose patient it is and how to reach the chart; the chart, the forms page and the patient's other forms stay behind
-//   emergency access, and a clinician with no item is sent there for this form too. An answer whose only open item is
-//   held by a clinician an admin then disables is told again to the care team.
+//   whose patient it is and how to reach the chart, while the item is open; the chart, the forms page and the patient's
+//   other forms stay behind emergency access, and a clinician with no item, or whose item is done, is sent there for
+//   this form too. An answer whose only open item is held by a clinician an admin then disables is told again to the
+//   care team.
 // Type: Functional (exceptional condition: an answer that needs review)
 // Requirements: proposed FR-59, FR-41
 // Use case: UC 22, Answer a pre-visit form; UC 15, Work through the inbox
@@ -35,6 +36,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   4. Mark the clinician's item done, and open the chart again.
 //   5. A third clinician, "Dr. Forms Covering", joins the patient's panel and leaves it; they open the inbox's link,
 //      then the chart, the forms page and the GAD-7's answers. "Dr. Forms Bystander", with no item, opens the link.
+//      The covering clinician marks their item done and opens the link again.
 //   6. (A second patient.) "Dr. Forms Nine Leaving" and "Dr. Forms Nine Staying" both receive an answer to review; the
 //      second marks theirs done; an admin disables the first on the Staff page.
 // Expected result: Step 1: the GAD-7, though it scores 21, puts nothing in any inbox; the PHQ-9 puts one item in each
@@ -46,8 +48,10 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   Synthetic Booked is on the panel of Dr. Forms Colleague, Dr. Forms Nine, and the chart opens to you only under emergency access, which
 //   the chart asks you for." and "An answer needs review: question 9, "Thoughts that you would be better off dead or of
 //   hurting yourself in some way"."; one recorded view of sensitive items and no emergency access; the chart, the
-//   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander.
-//   Step 6: the staying clinician's inbox links to the answers again, with a new open item beside the done one; the
+//   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander;
+//   the inbox says beside "Mark done": "After you mark this done, the answers open from the patient's chart, which needs
+//   the patient on your panel or emergency access."; once it is done, the link sends them to the reason page too. Step
+//   6: the staying clinician's inbox links to the answers again, with a new open item beside the done one; the
 //   disabled clinician keeps theirs.
 // Creator: Tahseen Arnan
 public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
@@ -147,6 +151,22 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         using (var gated = await bystander.Client.GetAsync(link, Cancel))
         {
             Assert.Equal($"/patients/{visit.Patient}/reason", PathOf(gated));
+        }
+
+        // The inbox says, beside "Mark done", that the item is the way to the answers only while it is open; once the
+        // covering clinician marks it done, they are sent to the chart's reason page like anyone else.
+        Assert.Contains("Mark done After you mark this done, the answers open from the patient's chart, which needs the patient on your panel or emergency access.",
+            Text(await covering.Client.GetStringAsync("/inbox", Cancel)));
+        var coveringItem = (await QueryAsync(apps, "SELECT id::text FROM ehr.inbox_items WHERE recipient_id = @covering AND kind = 'form-alert'",
+            ("covering", coveringAccount.Id))).Single();
+        using (var coveringDone = await PostFormAsync(covering.Client, $"/inbox?handler=Done&id={coveringItem}", "/inbox"))
+        {
+            Assert.Equal(HttpStatusCode.OK, coveringDone.StatusCode);
+        }
+
+        using (var closed = await covering.Client.GetAsync(link, Cancel))
+        {
+            Assert.Equal($"/patients/{visit.Patient}/reason", PathOf(closed));
         }
     }
 

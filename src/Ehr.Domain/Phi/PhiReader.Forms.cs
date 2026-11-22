@@ -51,16 +51,17 @@ public sealed partial class PhiReader
     }
 
     // One form's answers for the clinician: always a view of sensitive items. Behind the chart's gate, or, with
-    // heldInInbox, for a clinician who holds an inbox item for this answer to review, open or done, whoever's patient it
-    // is: the item must be the reader's own (and row-level security shows a recipient no one else's), and then the
-    // patient's care team is named too, for the page to say whose patient this is. Null when it isn't this patient's,
-    // the reader can't see it, or, with heldInInbox, holds no such item.
+    // heldInInbox, for a clinician who holds an open inbox item for this answer to review, whoever's patient it is: the
+    // item must be the reader's own (and row-level security shows a recipient no one else's) and not yet marked done,
+    // after which they reach it as anyone else does, and then the patient's care team is named too, for the page to say
+    // whose patient this is. Null when it isn't this patient's, the reader can't see it, or, with heldInInbox, holds no
+    // such open item.
     public async Task<FormAnswers?> FormAnswersAsync(Guid patientId, Guid responseId, bool heldInInbox, CancellationToken cancellationToken)
     {
         var request = await db.QuestionnaireResponses.AsNoTracking()
             .Where(r => r.Id == responseId && r.PatientId == patientId
                 && (!heldInInbox || db.InboxItems.Any(i => i.RecipientId == user.UserId && i.Kind == InboxItemKind.FormAlert && i.PatientId == patientId
-                    && i.SourceTable == FormResponsesTable && i.SourceId == r.Id)))
+                    && i.SourceTable == FormResponsesTable && i.SourceId == r.Id && i.DoneAt == null)))
             .Select(r => (Guid?)r.RequestId).SingleOrDefaultAsync(cancellationToken);
         var patient = request is null ? null : await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
         if (request is null || patient is null
