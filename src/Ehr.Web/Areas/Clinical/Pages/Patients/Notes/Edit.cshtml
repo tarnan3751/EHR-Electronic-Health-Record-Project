@@ -31,8 +31,8 @@ else
     else
     {
         <p><a asp-page="/Patients/Dictate" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Dictate into this draft</a></p>
-        @* Step 16: listening to a visit into this draft, at the clinic only. *@
-        @if (NoteWrites.IsPrimaryHost)
+        @* Step 16: listening to a visit into this draft, at the clinic only, and not in what the cloud app forwards here. *@
+        @if (Ehr.Web.Forwarding.ClinicNetwork.AtTheClinic(HttpContext.Request, NoteWrites))
         {
             <p><a asp-page="/Patients/Listen" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Listen to the visit into this draft</a></p>
         }

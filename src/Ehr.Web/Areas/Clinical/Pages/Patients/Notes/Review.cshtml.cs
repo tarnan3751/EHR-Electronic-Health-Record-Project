@@ -6,13 +6,14 @@ using Ehr.Domain.Notes;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
 using Ehr.Web.Api.Dictation;
+using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Ehr.Web.Areas.Clinical.Pages.Patients.Notes;
 
 public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, NoteReviews reviews,
-    NoteWriteAuthority authority, IConfiguration configuration)
+    NoteWriteAuthority authority)
     : PatientNotePage(phi, assignments, breakGlass)
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { AllowOutOfOrderMetadataProperties = true };
@@ -49,7 +50,8 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 
     public bool TranscriptKept { get; private set; }
 
-    public bool AtTheClinic => authority.IsPrimaryHost && !ForwardedFromTheCloud;
+    // Served at the clinic and not forwarded by the cloud app, which fails closed (Forwarding/ClinicNetwork).
+    public bool AtTheClinic => ClinicNetwork.AtTheClinic(Request, authority);
 
     // Kept, and here off-site: the decisions wait for the clinic.
     public bool DecideAtTheClinic => Ambient && TranscriptKept && !AtTheClinic;
@@ -59,10 +61,6 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 
     // A recorded visit's result as the page's script renders it: with the transcript kept apart, or none.
     JsonNode? Shown { get; set; }
-
-    // The cloud app forwards decisions here: it says so with the proof both apps derive from their shared key.
-    bool ForwardedFromTheCloud => configuration["Ehr:CloudAudit:Key"] is { Length: > 0 } key
-        && Request.Headers[AccountRateLimits.ForwardedHeader] == AccountRateLimits.ForwardedProof(key);
 
     // The fields the review shows: Subjective, Objective, Assessment and Plan (the expansion plan's step 14), or, for a
     // dictation sorted before then, its History, Assessment and Plan, as it was saved.
@@ -88,8 +86,11 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 
     public const string FinishAtTheClinic = "Finish this review at the clinic: the conversation is read only on the clinic's network.";
 
+    // Finishing a visit's review deletes its transcript: at the clinic too, while it is kept.
     public Task<IActionResult> OnPostCompleteAsync(Guid patientId, Guid draftId, Guid reviewId) =>
-        ChangeAsync(patientId, draftId, reviewId, () => reviews.CompleteAsync(reviewId, Version, Append, HttpContext.RequestAborted), complete: true);
+        ChangeAsync(patientId, draftId, reviewId, () => DecideAtTheClinic
+            ? Task.FromResult(ReviewResult.Invalid(FinishAtTheClinic))
+            : reviews.CompleteAsync(reviewId, Version, Append, HttpContext.RequestAborted), complete: true);
 
     public Task<IActionResult> OnPostDiscardAsync(Guid patientId, Guid draftId, Guid reviewId) =>
         ChangeAsync(patientId, draftId, reviewId, () => reviews.DiscardAsync(reviewId, HttpContext.RequestAborted), complete: true);

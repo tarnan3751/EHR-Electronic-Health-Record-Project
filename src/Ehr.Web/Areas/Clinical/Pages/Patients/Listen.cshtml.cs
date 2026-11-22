@@ -3,6 +3,7 @@ using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
+using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -30,8 +31,10 @@ public class ListenModel(PhiReader phi, PatientAssignments assignments, NoteWrit
 
     public IReadOnlyList<AllergyIntolerance> Allergies { get; private set; } = [];
 
-    // Listening is offered on the on-site app only (Forwarding/CloudForwardingMiddleware never forwards it).
-    public bool AtTheClinic => authority.IsPrimaryHost;
+    // Listening is offered on the on-site app only (Forwarding/CloudForwardingMiddleware never forwards it), and not in
+    // what the cloud app forwards here, such as a page it fetches from here to show its own user's last save
+    // (Forwarding/ClinicNetwork).
+    public bool AtTheClinic => ClinicNetwork.AtTheClinic(Request, authority);
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {

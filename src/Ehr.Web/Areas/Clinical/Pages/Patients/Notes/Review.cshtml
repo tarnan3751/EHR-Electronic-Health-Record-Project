@@ -203,7 +203,7 @@
             <button class="sc-btn sc-btn--danger">Reject every proposal and delete the conversation</button>
         </form>
     }
-    @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed)
+    @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed && !Model.DecideAtTheClinic)
     {
         <form method="post" asp-page-handler="Complete" class="sc-form sc-form--wide" data-review-submit data-review-complete>
             <input type="hidden" name="Version" value="@Model.Draft.Version" />

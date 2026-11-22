@@ -91,8 +91,8 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             <div class="sc-actions">
                 <a asp-page="Dictate" asp-all-route-data="dictateRoute" class="sc-btn" data-dictate-link>Dictate a note</a>
-                @* Step 16: listening to a visit, at the clinic only. *@
-                @if (NoteWrites.IsPrimaryHost)
+                @* Step 16: listening to a visit, at the clinic only, and not in what the cloud app forwards here. *@
+                @if (Ehr.Web.Forwarding.ClinicNetwork.AtTheClinic(HttpContext.Request, NoteWrites))
                 {
                     <a asp-page="Listen" asp-all-route-data="dictateRoute" class="sc-btn" data-listen-link>Listen to the visit</a>
                 }
