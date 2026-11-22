@@ -18,20 +18,21 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   /api/dictation/sessions/{session}/audio, the dictation's route, and /for-note, a dictation's start; the review's
 //   staging, with the service's answer replaced.
 // Test data: Consents without the agreement, with 4 speakers, agreed by a "neighbour", or in Spanish; a visit of three
-//   voices named with one missing, two clinicians, an unknown role, or a voice left out; a visit of two voices, by its
-//   consent, named as three; drafts whose passage has no speaker, as the fields couldn't be sorted, or whose Subjective
+//   voices named with one missing, two clinicians, an unknown role, two others, a voice numbered past a gap, or a voice
+//   left out; a visit of two people, by its consent, and three voices, the third named as a person; drafts whose passage has no speaker, as the fields couldn't be sorted, or whose Subjective
 //   lacks the patient's-own-words warning.
 // Steps:
 //   1. Start listening with each consent that isn't one.
 //   2. Start listening properly, and send a chunk of its audio through the dictation's route.
 //   3. Stop, and name the voices each way that isn't complete.
 //   4. Start a dictation for a visit's review.
-//   5. With a consent for the patient and the clinician, stop and name three voices.
+//   5. With a consent for the patient and the clinician, and three voices told apart, stop and name the third someone
+//      else, the clinician or the patient; then "unsure".
 //   6. Stage each draft that doesn't say who said what.
 // Expected result: Step 1: each refused with 422; no consent row; nothing asked of the service. Step 2: 404, as for no
 //   such session. Step 3: each refused with 422 speakers_incomplete, the last one by the service. Step 4: 404, as for a
-//   review that isn't there, and nothing asked of the service. Step 5: 422 speakers_incomplete, and nothing sent to the
-//   service. Step 6: each refused with 502 invalid_result; the review not staged, and no transcript kept. (The
+//   review that isn't there, and nothing asked of the service. Step 5: 422 speakers_incomplete for each, and nothing sent
+//   to the service; "unsure" is taken. Step 6: each refused with 502 invalid_result; the review not staged, and no transcript kept. (The
 //   database's own refusals: tests/Ehr.Security.Tests/AmbientSecurityTests.cs.)
 // Creator: Tahseen Arnan
 public class TC_UC23_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
@@ -78,6 +79,8 @@ public class TC_UC23_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             new Dictionary<string, string> { ["1"] = "clinician" },
             new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "clinician", ["3"] = "patient" },
             new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient", ["3"] = "doctor" },
+            new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient", ["3"] = "other", ["4"] = "other" },
+            new Dictionary<string, string> { ["1"] = "clinician", ["3"] = "patient", ["4"] = "unsure" },
             new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient" },
         })
         {
@@ -101,21 +104,31 @@ public class TC_UC23_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(asked, sidecar.Received.Count);
     }
 
+    // Under a consent for the patient and the clinician, a third voice told apart (a fragment of someone's) can only be
+    // "unsure": named as anyone, it is refused before the service hears of it.
     [Fact]
-    public async Task No_more_voices_are_named_than_the_consent_said_would_speak()
+    public async Task No_more_people_are_named_than_the_consent_said_would_speak()
     {
         var sidecar = apps.Dictation.Reset();
+        sidecar.ExtraVoice = true;
         var l = await StartAsync(apps, speakers: 2);
         using (var stop = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/stop"))
         {
-            Assert.Equal("awaiting_speakers", (await Json(stop)).GetProperty("sorting").GetString());
+            Assert.Equal(3, (await Json(stop)).GetProperty("speakers").GetArrayLength());
         }
 
-        var three = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient", ["3"] = "other" };
-        using var refused = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/speakers", new { speakers = three });
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
-        Assert.Equal("speakers_incomplete", (await Json(refused)).GetProperty("error").GetString());
+        foreach (var third in new[] { "other", "clinician", "patient" })
+        {
+            var named = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient", ["3"] = third };
+            using var refused = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/speakers", new { speakers = named });
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+            Assert.Equal("speakers_incomplete", (await Json(refused)).GetProperty("error").GetString());
+        }
+
         Assert.DoesNotContain(sidecar.Received, request => request.PathAndQuery.EndsWith("/speakers", StringComparison.Ordinal));
+        var unsure = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient", ["3"] = "unsure" };
+        using var accepted = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/speakers", new { speakers = unsure });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
 
     // A visit's draft as the service sends one, but for what it gets wrong: a passage with no one's name, and the fields

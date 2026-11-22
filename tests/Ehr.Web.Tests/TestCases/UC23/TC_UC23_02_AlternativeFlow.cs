@@ -7,7 +7,8 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 // Test Case ID: TC-UC23-02
 // Purpose / scenario: The patient changes their mind. During the visit, the clinician stops and discards: the listening
 //   takes nothing more and the service discards it. After the draft, the clinician rejects every proposal and deletes the
-//   conversation: nothing goes into the note, and the transcript is gone.
+//   conversation: nothing goes into the note, and the transcript is gone. And a voice the clinician can't tell (a
+//   fragment of someone's, told apart as one more voice) is named so, and its words are shown as "Unsure".
 // Type: Functional (alternative flow)
 // Requirements: proposed FR-62
 // Use case: UC 23, Draft a note from a recorded visit
@@ -19,10 +20,12 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   1. Start listening and send a chunk; discard the review and the session; try to send another chunk, stop, and ask for
 //      the result.
 //   2. Draft another visit to its review, and reject every proposal and delete the conversation.
+//   3. Listen to a visit of two people in which three voices are told apart, name the third "unsure", and draft it.
 // Expected result: Step 1: the review cancelled; each later call refused with 409 not_listening and nothing more sent to
 //   the service; the service told to discard the session, as a visit's. Step 2: every proposal rejected, the review
-//   completed, no transcript kept, and the draft's four sections still empty. (The browser does the same from the
-//   keyboard, switching the microphone off first: AmbientBrowserTests.)
+//   completed, no transcript kept, and the draft's four sections still empty. Step 3: the mapping sent to the service as
+//   named; the review's transcript gives the third voice's words as "unsure". (The browser does the same from the
+//   keyboard, switching the microphone off first, and names a voice "I can't tell": AmbientBrowserTests.)
 // Creator: Tahseen Arnan
 public class TC_UC23_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -64,6 +67,33 @@ public class TC_UC23_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.Equal(("DELETE", "ambient"), (sidecar.Received.Last().Method, sidecar.Received.Last().Headers[Ehr.Web.Api.Dictation.DictationSidecar.ModeHeader]));
         Assert.Equal(["cancelled"], await RowsAsync(apps, "SELECT state FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
+    }
+
+    [Fact]
+    public async Task A_voice_the_clinician_cant_tell_is_named_unsure_and_its_words_shown_so()
+    {
+        var sidecar = apps.Dictation.Reset();
+        sidecar.ExtraVoice = true;
+        var l = await StartAsync(apps, speakers: 2);
+        using (var chunk = await Audio(l, 0))
+        using (var stop = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/stop"))
+        {
+            Assert.Equal(3, (await Json(stop)).GetProperty("speakers").GetArrayLength());
+        }
+
+        var named = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient", ["3"] = "unsure" };
+        using (var speakers = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/speakers", new { speakers = named }))
+        {
+            Assert.Equal(HttpStatusCode.OK, speakers.StatusCode);
+        }
+
+        Assert.Equal("""{"speakers":{"1":"clinician","2":"patient","3":"unsure"}}""",
+            System.Text.Encoding.UTF8.GetString(sidecar.Received.Single(r => r.PathAndQuery.EndsWith("/speakers", StringComparison.Ordinal)).Body));
+        using var staged = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version });
+        Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
+        var html = await l.Session.Client.GetStringAsync((await Json(staged)).GetProperty("url").GetString(), Cancel);
+        Assert.Contains("She has been coughing at night.", html);
+        Assert.Contains("\"speakerGroup\":3,\"speaker\":\"unsure\"", html);
     }
 
     [Fact]

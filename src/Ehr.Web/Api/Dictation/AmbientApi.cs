@@ -30,10 +30,13 @@ namespace Ehr.Web.Api.Dictation;
 //   POST /ambient/{id}/stop          the result, as stop's: its sorting is "awaiting_speakers" once the visit is
 //                                    transcribed and its voices told apart, with speakers: [{group, seconds}] and each
 //                                    segment's speakerGroup
-//   POST /ambient/{id}/speakers      {speakers: {"1": "clinician", "2": "patient", "3": "other"}}: who each voice is,
-//                                    every one of them, one clinician and one patient, and no more voices than the
-//                                    consent said would speak; then the note is drafted, and the result follows as
-//                                    result's. 422 speakers_incomplete otherwise
+//   POST /ambient/{id}/speakers      {speakers: {"1": "clinician", "2": "patient", "3": "unsure"}}: who each voice is,
+//                                    every one of them, numbered from 1 with none left out (at most MaxVoices): one
+//                                    "clinician", one "patient", "other" at most once, and "unsure" ("I can't tell")
+//                                    for any number more, as a voice told apart may be a fragment of someone's; and no
+//                                    more named, all but "unsure", than the consent said would speak. Then the note is
+//                                    drafted, and the result follows as result's, an "unsure" voice's segments with
+//                                    speaker "unsure". 422 speakers_incomplete otherwise
 //   POST /ambient/{id}/result        the result, as the dictation's result route
 // DELETE /ambient/{id}: 204, and the service discards the session at once, whatever its state; the page also discards the
 // review (/review/{reviewId}/discard). Staging, deciding and finishing are the review's routes (DictationReviewApi). A
@@ -51,7 +54,10 @@ public static partial class DictationApi
 
     public sealed record SpeakersRequest(IReadOnlyDictionary<string, string>? Speakers);
 
-    static readonly string[] Roles = ["clinician", "patient", "other"];
+    static readonly string[] Roles = ["clinician", "patient", "other", "unsure"];
+
+    // The most voices a visit's mapping names: three people and a few fragments of them.
+    public const int MaxVoices = 9;
 
     static void MapAmbient(RouteGroupBuilder sessions)
     {
@@ -155,18 +161,20 @@ public static partial class DictationApi
             }, ambient: true);
     }
 
-    // Who each voice is: a role for every voice the clinician was shown, one clinician and one patient among them, and
-    // someone else at most once; no more voices than the consent said would speak (RequireOpenCaptureAsync read it). The
-    // service also refuses a mapping that leaves out a voice it told apart.
+    // Who each voice is: a role for every voice the clinician was shown, numbered 1 to however many with none left out,
+    // one clinician and one patient among them, someone else at most once, and "unsure" for any more; and no more named,
+    // all but "unsure", than the consent said would speak (RequireOpenCaptureAsync read it). The service also refuses a
+    // mapping that leaves out a voice it told apart.
     static Task<IResult> SpeakersAsync(string id, SpeakersRequest input, HttpContext context, DictationSidecar sidecar)
     {
         var speakers = input.Speakers ?? new Dictionary<string, string>();
         var roles = speakers.Values.ToList();
-        var complete = speakers.Count is 2 or 3 && context.Items[ConsentedSpeakers] is short consented && speakers.Count <= consented
-            && speakers.Keys.All(group => group is "1" or "2" or "3")
+        var complete = speakers.Count is >= 2 and <= MaxVoices
+            && Enumerable.Range(1, speakers.Count).All(group => speakers.ContainsKey(group.ToString(CultureInfo.InvariantCulture)))
             && roles.All(role => Roles.Contains(role))
             && roles.Count(role => role == "clinician") == 1 && roles.Count(role => role == "patient") == 1
-            && roles.Count(role => role == "other") <= 1;
+            && roles.Count(role => role == "other") <= 1
+            && context.Items[ConsentedSpeakers] is short consented && roles.Count(role => role != "unsure") <= consented;
         if (!complete)
         {
             return Task.FromResult(SpeakersIncomplete());

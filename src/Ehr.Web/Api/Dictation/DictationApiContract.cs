@@ -31,7 +31,7 @@ public sealed record TranscriptSegment(int Start, int End, long StartMs, long En
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Speaker? Speaker = null);
 
 // Who said a passage of a recorded visit: the clinician, the patient, someone else in the room, or a voice that couldn't be
-// told apart with confidence.
+// told apart with confidence, or that the clinician couldn't tell ("I can't tell": a fragment of someone's, say).
 [JsonConverter(typeof(JsonStringEnumConverter<Speaker>))]
 public enum Speaker
 {

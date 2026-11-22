@@ -86,6 +86,7 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
         Undecodable = false;
         Answer = null;
         QuietSeconds = 0;
+        ExtraVoice = false;
         return this;
     }
 
@@ -398,6 +399,9 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
         public bool Ambient { get; init; }
 
         public int Speakers { get; init; }
+
+        // How many voices it tells apart: Speakers, or one more (ExtraVoice).
+        public int Voices { get; init; }
 
         public IReadOnlyDictionary<int, string>? Roles { get; set; }
     }

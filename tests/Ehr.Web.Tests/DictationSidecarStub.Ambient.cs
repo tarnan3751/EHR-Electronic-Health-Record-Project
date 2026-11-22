@@ -10,8 +10,9 @@ namespace Ehr.Web.Tests;
 // The stub's sessions that listen to a visit (the expansion plan's step 16), answered as the service answers them: started
 // with ?mode=ambient&speakers=N and called with DictationSidecar.ModeHeader every time (a call of the other kind finds no
 // session); audio taken in order with no transcript until stop, and how long nobody has spoken (QuietSeconds); at stop, a
-// made-up conversation of two or three voices, awaiting the clinician's word on who each is; a mapping that leaves a
-// voice out, or doesn't name one clinician and one patient, refused with 422 speakers_incomplete; and then the note's
+// made-up conversation of two or three voices (or one more, ExtraVoice), awaiting the clinician's word on who each is; a
+// mapping that leaves a voice out, doesn't name one clinician and one patient, or names more people, all but "unsure",
+// than the consent did, refused with 422 speakers_incomplete; and then the note's
 // fields drafted from it by who said what: Subjective from the patient's words, with the warning that they are the
 // patient's own, and Objective, Assessment and Plan from the clinician's, each source with its speaker. Once the voices
 // are named, every segment says who said it, whether or not the fields could be sorted: the app stages nothing else
@@ -20,6 +21,10 @@ public sealed partial class DictationSidecarStub
 {
     // How long nobody has spoken, as the service measures it, in every audio answer.
     public double QuietSeconds { get; set; }
+
+    // One voice more than the consent said would speak, as telling voices apart can hand over a fragment of someone's: the
+    // clinician can only name it "unsure" ("I can't tell") under a consent for two. Read as a session starts.
+    public bool ExtraVoice { get; set; }
 
     // The conversation, a turn at a time: who spoke (the voice the service told apart) and what they said.
     static readonly (int Group, string Text)[] Turns =
@@ -30,13 +35,14 @@ public sealed partial class DictationSidecarStub
         (1, "Your chest is clear."),
         (1, "Likely a viral cough."),
         (1, "Fluids and rest."),
+        (4, "Mm-hm."),
     ];
 
     HttpResponseMessage StartAmbient(string owner, string query)
     {
         var speakers = query.Contains("speakers=3", StringComparison.Ordinal) ? 3 : 2;
         var id = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(24));
-        sessions[id] = new StubSession(owner) { Ambient = true, Speakers = speakers };
+        sessions[id] = new StubSession(owner) { Ambient = true, Speakers = speakers, Voices = speakers + (ExtraVoice ? 1 : 0) };
         return Json(HttpStatusCode.Created, new { sessionId = id, mode = "ambient", maxSeconds = 1200, maxChunkBytes = 1024 * 1024 });
     }
 
@@ -78,8 +84,9 @@ public sealed partial class DictationSidecarStub
                 var given = JsonDocument.Parse(body).RootElement.GetProperty("speakers").EnumerateObject()
                     .ToDictionary(voice => int.Parse(voice.Name, CultureInfo.InvariantCulture), voice => voice.Value.GetString()!);
                 var roles = given.Values.ToList();
-                if (!given.Keys.Order().SequenceEqual(Enumerable.Range(1, session.Speakers))
-                    || roles.Count(role => role == "clinician") != 1 || roles.Count(role => role == "patient") != 1)
+                if (!given.Keys.Order().SequenceEqual(Enumerable.Range(1, session.Voices))
+                    || roles.Count(role => role == "clinician") != 1 || roles.Count(role => role == "patient") != 1
+                    || roles.Count(role => role != "unsure") > session.Speakers)
                 {
                     return Error(HttpStatusCode.UnprocessableEntity, "speakers_incomplete");
                 }
@@ -105,7 +112,7 @@ public sealed partial class DictationSidecarStub
     {
         var text = new StringBuilder();
         var segments = new List<(int, int, int, string?)>();
-        foreach (var (group, words) in Turns.Where(turn => turn.Group <= session.Speakers))
+        foreach (var (group, words) in Turns.Where(turn => turn.Group <= session.Voices))
         {
             if (text.Length > 0)
             {
@@ -150,7 +157,7 @@ public sealed partial class DictationSidecarStub
             code = "sha256:" + new string('c', 64),
             speaker = new { repository = "speechbrain/spkrec-ecapa-voxceleb", commit = "3333333", sha256 = new string('d', 64) },
         };
-        var speakers = Enumerable.Range(1, session.Speakers).Select(group => new { group, seconds = 3.5 * spoken.Count(s => s.Group == group) });
+        var speakers = Enumerable.Range(1, session.Voices).Select(group => new { group, seconds = 3.5 * spoken.Count(s => s.Group == group) });
         if (session.Roles is null)
         {
             return new { transcript, sorting = "awaiting_speakers", fields = (object?)null, notCarriedOver = Array.Empty<object>(), provenance, speakers };

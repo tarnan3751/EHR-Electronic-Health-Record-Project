@@ -11,7 +11,8 @@
 //    session's limit or after five minutes with nobody speaking, and at once, keeping nothing, if the clinician is
 //    signed out or the listening is refused.
 // 3. Stop and draft: the server transcribes the visit and tells its voices apart; the clinician says who each voice is,
-//    with no role chosen for them, and the note is drafted and saved for review (UC 13), where the page goes.
+//    with no role chosen for them, or that they can't tell, and the note is drafted and saved for review (UC 13), where
+//    the page goes.
 // Stop and discard, at any point before that, switches the microphone off first, then discards the session and its
 // review: nothing recorded is kept. Leaving the page before the voices are named does the same, and leaving it at all
 // ends listening here for good. A chunk the recorder hands over after its listening is discarded, stopped or ended is
@@ -43,12 +44,12 @@
     const mostRetryMs = 10000;
     const warnQuietSeconds = 240;
     const quietSeconds = 300;
-    const roleWords = { clinician: "Me", patient: "The patient", other: "Someone else in the room" };
+    const roleWords = { clinician: "Me", patient: "The patient", other: "Someone else in the room", unsure: "I can't tell" };
 
     let state = fresh();
 
     function fresh() {
-        return { requestId: null, session: null, stream: null, recorder: null, queue: [], nextSeq: 0, sending: false,
+        return { requestId: null, session: null, consented: 0, stream: null, recorder: null, queue: [], nextSeq: 0, sending: false,
             paused: false, hidden: false, stopping: false, stopped: false, drafting: false, ended: false, left: false,
             persisted: false, warned: false, retrying: false, retryMs: firstRetryMs, retryTimer: 0, clock: 0, recordedMs: 0,
             resumedAt: 0, voices: [] };
@@ -143,7 +144,7 @@
             return;
         }
 
-        state = { ...fresh(), requestId, session: await json(response) };
+        state = { ...fresh(), requestId, session: await json(response), consented: Number(form.get("Speakers")) };
         root.dataset.draftId = state.session.draftId;
         root.dataset.draftVersion = state.session.version;
         if (state.session.state !== "recording") {
@@ -458,7 +459,9 @@
         }
     }
 
-    // Each voice with its first words and how long it spoke, and no role chosen: the clinician chooses every one.
+    // Each voice with its first words and how long it spoke, and no role chosen: the clinician chooses every one. Beyond
+    // the two voices that must be the clinician and the patient, a voice may be someone else, if the consent was for three,
+    // and "I can't tell" (a fragment of someone's, say) for any number; the page says so when the consent was for two.
     function showVoices(result) {
         const text = result.transcript?.text ?? "";
         const segments = result.transcript?.segments ?? [];
@@ -477,8 +480,9 @@
             select.id = id;
             select.dataset.ambientVoice = String(voice.group);
             select.append(new Option("Choose who it is", ""));
+            const beyond = state.voices.length > 2;
             for (const [role, words] of Object.entries(roleWords)) {
-                if (role !== "other" || state.voices.length > 2) {
+                if (role === "other" ? beyond && state.consented > 2 : role !== "unsure" || beyond) {
                     select.append(new Option(words, role));
                 }
             }
@@ -489,6 +493,7 @@
             fieldset.append(field);
             return fieldset;
         }));
+        part("voices-two").hidden = !(state.voices.length > 2 && state.consented < 3);
         speakersArea.hidden = false;
         say("Say who each voice is, then select Draft the note.");
         checkVoices();
@@ -499,11 +504,14 @@
         return [...voicesArea.querySelectorAll("[data-ambient-voice]")].map((select) => [select.dataset.ambientVoice, select.value]);
     }
 
+    // As the API checks it (Api/Dictation/AmbientApi.cs): every voice, one clinician, one patient, someone else at most
+    // once, and no more named, all but "I can't tell", than the consent said would speak.
     function checkVoices() {
         const roles = chosenRoles().map(([, role]) => role);
+        const count = (name) => roles.filter((role) => role === name).length;
         const complete = roles.every((role) => role !== "")
-            && roles.filter((role) => role === "clinician").length === 1 && roles.filter((role) => role === "patient").length === 1
-            && roles.filter((role) => role === "other").length <= 1;
+            && count("clinician") === 1 && count("patient") === 1 && count("other") <= 1
+            && roles.filter((role) => role !== "unsure").length <= state.consented;
         draftButton.disabled = !complete;
         return complete;
     }

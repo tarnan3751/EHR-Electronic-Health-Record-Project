@@ -246,6 +246,44 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.StartsWith("Nobody has spoken for 4 minutes", await page.TextContentAsync("[data-ambient-status]"));
     }
 
+    // TC-UC23-06 in the browser: three voices told apart under a consent for the patient and the clinician. The third can
+    // only be "I can't tell", as the page says, and from the keyboard: typing a choice's first letter, Tab between. Its
+    // words are shown as "Unsure" in the review.
+    [Fact]
+    public async Task TC_UC23_06_a_voice_the_clinician_cant_tell_is_named_from_the_keyboard_and_shown_as_unsure()
+    {
+        var (patient, session) = await AccountAsync(apps);
+        apps.Dictation.ExtraVoice = true;
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-ambient-stop]')"));
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForSelectorAsync("[data-ambient-voice='3']");
+        Assert.True(await page.IsVisibleAsync("[data-ambient-voices-two]"));
+        foreach (var voice in new[] { "1", "2", "3" })
+        {
+            Assert.Equal(["", "clinician", "patient", "unsure"],
+                await page.EvalOnSelectorAllAsync<string[]>($"[data-ambient-voice='{voice}'] option", "options => options.map(o => o.value)"));
+        }
+
+        await page.Keyboard.TypeAsync("M");
+        await page.Keyboard.PressAsync("Tab");
+        await page.Keyboard.TypeAsync("T");
+        Assert.True(await page.IsDisabledAsync("[data-ambient-draft]"));
+        await page.Keyboard.PressAsync("Tab");
+        await page.Keyboard.TypeAsync("I");
+        Assert.True(await page.IsEnabledAsync("[data-ambient-draft]"));
+        await AiReviewBrowserTests.TabToAsync(page, "[data-ambient-draft]");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForURLAsync("**/review/*");
+        await page.WaitForSelectorAsync(".sc-transcript__speaker");
+        Assert.Contains("Unsure", await page.Locator(".sc-transcript__speaker").AllTextContentsAsync());
+    }
+
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
     [Fact]
