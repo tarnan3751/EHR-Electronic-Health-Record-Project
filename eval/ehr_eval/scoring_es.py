@@ -17,7 +17,7 @@ runs to come.
   carried over.
 - sorting and timing: how often the fields couldn't be sorted and why (a timeout, an answer cut off at the token
   limit, or the wrong shape), the time to sort and the tokens read and written, and whether the model wrote each
-  statement's Spanish before its English, as the schema orders them.
+  statement's keys in the schema's order: its Spanish, then its field, then its English.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ class SpanishItem:
     not_carried_over: list[tuple[str, int, int]] = field(default_factory=list)  # code points in the hypothesis
     timings: dict[str, float] = field(default_factory=dict)
     tokens: dict[str, int] = field(default_factory=dict)
-    statements_in_order: int = 0  # statements whose keys came "spanish" then "english"
+    statements_in_order: int = 0  # statements whose keys came "spanish", "field", "english"
     statements_written: int = 0
 
 

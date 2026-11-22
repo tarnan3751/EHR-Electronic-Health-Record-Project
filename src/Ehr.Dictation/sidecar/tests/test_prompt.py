@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import shutil
 
-from ehr_dictation import prompt
+from ehr_dictation import prompt, translation
+from ehr_dictation.transcript import Placed, Segment, Transcript
 
 
 def test_the_transcript_goes_between_the_markers_as_the_user_message():
@@ -110,3 +111,18 @@ def test_the_english_prompt_and_schema_are_what_they_were_before_spanish(tmp_pat
     alone, here = prompt.load(tmp_path), prompt.load()
     assert (alone.prompt_sha256, alone.schema_sha256, alone.structuring_sha256) == (
         here.prompt_sha256, here.schema_sha256, here.structuring_sha256)
+
+
+def test_the_spanish_prompts_example_of_a_correction_is_an_answer_the_checks_offer():
+    # Rule 6's example: what stands once the correction is made, quoted in two passages, translated whole.
+    said = "Repetir función renal en 1 semana, no, perdón, en 2 semanas"
+    system = prompt.load(language="es").system
+    assert f'for "{said}", the "spanish" is "Repetir función renal" and "en 2 semanas"' in system
+    text = said + "."
+    statement = {"spanish": ["Repetir función renal", "en 2 semanas"], "english": "Repeat kidney function in 2 weeks"}
+    checked = translation.check({"plan": [statement]}, [], one_passage(text)).fields["plan"]
+    assert checked.pending and checked.value == "Repeat kidney function in 2 weeks."
+
+
+def one_passage(text: str) -> Transcript:
+    return Transcript(text, (Placed(Segment(0, 0, text, 1.0, None, True), 0, len(text)),), True)

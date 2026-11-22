@@ -5,8 +5,9 @@ until a clinician approves it (FR-13), with each English statement's place in th
 Spanish transcript it was translated from (FR-08).
 
 English words can't be found in a Spanish transcript, so grounding works statement by statement. The model answers
-each field as a list of statements, each the Spanish passages it rests on, copied word for word, and their English
-(note-fields-es.schema.json). For each statement:
+with one list of statements, each the Spanish passages it rests on, copied word for word, the field it belongs in, and
+their English (note-fields-es.schema.json), which llama.parse_statements() sorts into each field's statements. For each
+statement:
 
 1. The English is cleaned as validation.py cleans a value, and bad_format applies the same way. An instruction in it
    to order something or change the allergy list is cut out by validation.py's own rule (the English backstop); a

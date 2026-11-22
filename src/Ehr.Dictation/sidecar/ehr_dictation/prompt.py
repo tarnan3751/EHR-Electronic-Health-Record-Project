@@ -15,9 +15,10 @@ The structuring hash covers everything sent except the transcript, so the eval c
 different prompt, schema or set of parameters (eval/README.md), such as its comparison run with reasoning on.
 
 A transcript dictated in Spanish (the expansion plan's step 17) is sorted with a prompt and schema of its own,
-structuring-prompt-es.md and note-fields-es.schema.json, into the same four fields in English, each a list of
-statements: the Spanish passages it comes from and their English (translation.py checks them). load(language="es")
-reads those; the English files, and what is sent for an English dictation, are unchanged.
+structuring-prompt-es.md and note-fields-es.schema.json, into the same four fields in English: one list of statements,
+each the Spanish passages it comes from, the field it belongs in and their English, which llama.py sorts into the
+fields for translation.py to check. load(language="es") reads those; the English files, and what is sent for an
+English dictation, are unchanged.
 """
 
 from __future__ import annotations

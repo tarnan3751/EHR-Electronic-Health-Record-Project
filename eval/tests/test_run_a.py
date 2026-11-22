@@ -33,10 +33,12 @@ def structurer(content: dict | str, finish_reason: str = "stop") -> Structurer:
 
 
 def gold_answer(script_id: str, **changes: list[dict]) -> dict:
+    """The script's gold as the Spanish schema's answer: one list, each field's statements in turn."""
     script = SCRIPTS[script_id]
     fields = {name: [{"spanish": list(s.spanish), "english": s.english} for s in statements]
               for name, statements in script.statements.items()}
-    return {name: {"statements": changes.get(name, fields[name])} for name in fields}
+    return {"statements": [{"spanish": s["spanish"], "field": name, "english": s["english"]}
+                           for name in fields for s in changes.get(name, fields[name])]}
 
 
 def run(script_id: str, content: dict | str, finish_reason: str = "stop") -> scoring_es.SpanishItem:
@@ -98,7 +100,7 @@ def test_an_answer_cut_off_at_the_token_limit_is_not_sorted_and_crosses_the_last
 
 
 def test_the_order_the_model_wrote_each_statements_keys_in_is_counted():
-    content = '{"subjective": {"statements": [{"english": "No concerns.", "spanish": ["no tiene preocupaciones"]}]}}'
+    content = '{"statements": [{"spanish": ["no tiene preocupaciones"], "english": "No concerns.", "field": "subjective"}]}'
     assert run_a.spanish_first(content) == (1, 0)
     count = sum(len(statements) for statements in SCRIPTS["e14-nino-sano"].statements.values())
     assert run_a.spanish_first(json.dumps(gold_answer("e14-nino-sano"))) == (count, count)

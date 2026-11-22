@@ -64,14 +64,15 @@ def text_transcript(script: Script) -> tuple[Transcript, str]:
 
 
 def spanish_first(content: str | None) -> tuple[int, int]:
-    """How many statements the answer wrote, and how many of them with "spanish" before "english"."""
+    """How many statements the answer wrote, and how many of them with their keys in the schema's order: "spanish",
+    then "field", then "english"."""
     if not content:
         return 0, 0
     orders: list[list[str]] = []
 
     def pairs(items: list[tuple[str, object]]) -> dict:
         keys = [key for key, _ in items]
-        if set(keys) == {"spanish", "english"}:
+        if set(keys) == {"spanish", "field", "english"}:
             orders.append(keys)
         return dict(items)
 
@@ -79,7 +80,7 @@ def spanish_first(content: str | None) -> tuple[int, int]:
         json.loads(content, object_pairs_hook=pairs)
     except json.JSONDecodeError:
         return 0, 0
-    return len(orders), sum(1 for keys in orders if keys == ["spanish", "english"])
+    return len(orders), sum(1 for keys in orders if keys == ["spanish", "field", "english"])
 
 
 async def run_script(script: Script, structurer: Structurer) -> scoring_es.SpanishItem:

@@ -125,9 +125,8 @@ def spanish_structurer(llama: FakeLlama) -> Structurer:
 
 
 def test_a_spanish_dictation_is_sent_the_spanish_prompt_and_its_statements_come_back_with_the_answer_as_written():
-    content = json.dumps({"subjective": {"statements": [{"spanish": ["Niega fiebre."], "english": "Denies fever."}]},
-                          "objective": {"statements": []}, "assessment": {"statements": []},
-                          "plan": {"statements": []}, "orders": {"statements": []}})
+    content = json.dumps({"statements": [{"spanish": ["Niega fiebre."], "field": "subjective", "english": "Denies fever."}],
+                          "orders": []})
     llama = FakeLlama(content)
 
     proposal = asyncio.run(spanish_structurer(llama).propose("Niega fiebre."))
