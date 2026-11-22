@@ -1205,6 +1205,32 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         return review;
     }
 
+    // Ambient listening (step 16). Whether the signed-in clinician is listening to a visit under this session, with its
+    // consent recorded and the review neither staged nor ended: the check every chunk of audio passes before it goes to
+    // the dictation service. Like IsAssignedAsync, it shows nothing of the record, so it records no read.
+    public Task<bool> AmbientCaptureOpenAsync(string sessionId, CancellationToken cancel) =>
+        db.AiNoteReviews.AnyAsync(r => r.SessionId == sessionId && r.ClinicianId == user.UserId
+            && r.Mode == AiReviewModes.Ambient && r.ConsentId != null && r.State == AiReviewStates.Recording, cancel);
+
+    // Whether a review's conversation is still kept (only while the review is open, and for at most 7 days): what decides
+    // where its proposals may be decided and how. Shows nothing of the transcript, which the cloud app can't read, so it
+    // records no read.
+    public Task<bool> AmbientTranscriptKeptAsync(Guid review, CancellationToken cancel) =>
+        db.AmbientTranscripts.Where(t => t.Id == review).Select(t => t.Id).AnyAsync(cancel);
+
+    // The conversation's transcript, for the review screen: a recorded read of the note being written.
+    public async Task<AmbientTranscript?> AmbientTranscriptAsync(Guid review, CancellationToken cancel)
+    {
+        var transcript = await db.AmbientTranscripts.AsNoTracking().SingleOrDefaultAsync(t => t.Id == review, cancel);
+        if (transcript is not null)
+        {
+            audit.Record(AuditActions.Read, transcript.PatientId, "ambient_transcripts", transcript.Id, part: AuditParts.NoteDraft);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return transcript;
+    }
+
     public async Task<IReadOnlyList<AiNoteReview>> AiReviewsAsync(Guid draft, string part, CancellationToken cancel)
     {
         var reviews = await db.AiNoteReviews.AsNoTracking().Where(r => r.DraftId == draft && r.ClinicianId == user.UserId)

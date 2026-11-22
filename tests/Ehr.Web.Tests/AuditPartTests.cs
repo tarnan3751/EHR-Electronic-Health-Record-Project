@@ -73,6 +73,7 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("clinic", "/patients/{0}/messages/new", "patients conversations")]
     [InlineData("clinic", "/patients/{0}/proxies", "patients access")]
     [InlineData("clinic", "/patients/{0}/dictate", "patients note-draft")]
+    [InlineData("clinic", "/patients/{0}/listen", "patients note-draft")]
     [InlineData("clinic", "/patients", "patients panel")]
     [InlineData("clinic", "/patients?name=Parted", "patients search")]
     [InlineData("clinic", "/fhir/Patient/{0}", "patients fhir")]

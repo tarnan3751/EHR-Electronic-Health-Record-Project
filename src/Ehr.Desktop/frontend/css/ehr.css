@@ -1606,6 +1606,17 @@
         margin: 0;
     }
 
+    /* A recorded visit's transcript (step 16): a paragraph a turn, led by who said it, in words. */
+    .sc-transcript__body > .sc-transcript__turn + .sc-transcript__turn {
+        margin-top: var(--space-2);
+    }
+
+    .sc-transcript__speaker {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink-muted);
+    }
+
     .sc-transcript__tentative {
         color: var(--ink-muted);
         font-style: italic;

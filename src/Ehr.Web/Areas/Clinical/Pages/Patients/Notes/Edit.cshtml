@@ -2,6 +2,7 @@
 @using Ehr.Domain.Notes
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.EditModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@inject Ehr.Domain.Notes.NoteWriteAuthority NoteWrites
 @{
     ViewData["Title"] = "Write clinical note";
 }
@@ -30,6 +31,11 @@ else
     else
     {
         <p><a asp-page="/Patients/Dictate" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Dictate into this draft</a></p>
+        @* Step 16: listening to a visit into this draft, at the clinic only. *@
+        @if (NoteWrites.IsPrimaryHost)
+        {
+            <p><a asp-page="/Patients/Listen" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Listen to the visit into this draft</a></p>
+        }
     }
     var waiting = (Guid.Parse(RouteData.Values["draftId"]!.ToString()!), Model.WaitingProposals);
     <partial name="_WaitingProposals" model="waiting" />

@@ -91,24 +91,34 @@ public static partial class DictationApi
         }
         if (binding.State != AiReviewStates.Recording) return ReviewAnswer(context, ReviewResult.Invalid("This dictation was discarded."));
 
-        // The session is read from the persisted binding, and the owner header from the current account.
+        // The session is read from the persisted binding, and the owner header from the current account. A recorded visit's
+        // (step 16) is asked for as one, and discarded at the service once staged: its result isn't needed there any more.
+        var ambient = binding.Mode == AiReviewModes.Ambient;
         return await CallAsync(context, sidecar, "stage-review", HttpMethod.Post,
             $"v1/sessions/{binding.SessionId}/result?wait={ResultWaitSeconds}", null, async (body, token) =>
             {
                 var result = await body.ReadFromJsonAsync<DictationResult>(ServiceJson, token) ?? throw new JsonException();
-                if (result.Sorting == Sorting.Pending)
+                if (result.Sorting is Sorting.Pending or Sorting.AwaitingSpeakers)
                     return Refuse(409, "not_ready", "The dictation result is still being prepared. Try again shortly.");
-                var trusted = TrustedResult(result);
+                var trusted = TrustedResult(result, ambient);
                 if (trusted is null) return Refuse(502, "invalid_result", "This result could not be staged safely. Keep the transcript and continue manually, or retry dictation.");
-                return await ReviewWriteAsync(async () =>
+                var staged = false;
+                var answer = await ReviewWriteAsync(async () =>
                 {
                     await using var transaction = await db.Database.BeginTransactionAsync(token);
-                    var staged = await reviews.StageAsync(reviewId, input.Version, trusted, token);
+                    var outcome = await reviews.StageAsync(reviewId, input.Version, trusted, token);
                     await transaction.CommitAsync(CancellationToken.None);
+                    staged = outcome.Status == StatusCodes.Status200OK;
                     await ReportReviewWalAsync(context, db);
-                    return ReviewAnswer(context, staged);
+                    return ReviewAnswer(context, outcome);
                 });
-            });
+                if (staged && ambient)
+                {
+                    await DeleteServiceSessionAsync(context, sidecar, binding.SessionId, ambient: true);
+                }
+
+                return answer;
+            }, ambient);
     }
 
     static async Task<IResult> DiscardReviewAsync(Guid reviewId, HttpContext context, EhrDbContext db, NoteReviews reviews)
@@ -166,7 +176,10 @@ public static partial class DictationApi
 
     // Keep exactly UC 9/10's sanitized contract and half-open UTF-16 ranges. Grounding/clinical checks remain in
     // the trusted sidecar pipeline; malformed spans/results are never promoted into reviewable records here.
-    internal static TrustedReviewResult? TrustedResult(DictationResult result)
+    // A recorded visit's (step 16, `ambient`) proposes nothing beyond its note, says who said every passage and source once
+    // drafted, and is stored with its transcript's text apart (TrustedReviewResult.Transcript); a dictation's says nothing
+    // of speakers.
+    internal static TrustedReviewResult? TrustedResult(DictationResult result, bool ambient = false)
     {
         var text = result.Transcript.Text;
         if (text.Length > 100_000 || text.Contains('\0') || result.Sorting == Sorting.Done
@@ -184,6 +197,10 @@ public static partial class DictationApi
             || proposals.Any(p => !result.NotCarriedOver.Any(i => i.Start == p.Start && i.End == p.End
                     && i.Reason == (p.Kind == ProposalKind.Order ? Instruction.Order : Instruction.AllergyChange))
                 || p.Warnings.Any(w => w.Code == WarningCode.OneFieldHoldsDictation || !Range(w.Start, w.End)))) return null;
+        var spoken = result.Transcript.Segments.Any(s => s.Speaker is not null || s.SpeakerGroup is not null) || result.Speakers is not null
+            || result.Fields is { } said && new[] { said.Subjective, said.Objective, said.Assessment, said.Plan }
+                .OfType<PendingField>().Any(f => f.Sources.Any(s => s.Speaker is not null));
+        if (ambient ? proposals.Count > 0 || result.Sorting == Sorting.Done && result.Transcript.Segments.Any(s => s.Speaker is null) : spoken) return null;
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
         if (result.Fields?.History is not null) return null;
@@ -195,12 +212,23 @@ public static partial class DictationApi
                 if (field is not PendingField pending) continue;
                 if (result.Sorting != Sorting.Done || string.IsNullOrWhiteSpace(pending.Value) || pending.Value.Contains('\0')
                     || pending.Value.Length > NoteContent.MaximumFieldLength || pending.Sources.Count == 0
-                    || pending.Sources.Any(s => !Range(s.Start, s.End)) || pending.Warnings.Any(w => !Range(w.Start, w.End))) return null;
+                    || pending.Sources.Any(s => !Range(s.Start, s.End) || ambient && s.Speaker is null)
+                    || pending.Warnings.Any(w => !Range(w.Start, w.End))) return null;
                 suggestions.Add(name, pending.Value);
             }
         }
-        var json = JsonSerializer.Serialize(result, ServiceJson);
         var kinds = proposals.Select(p => p.Kind == ProposalKind.Order ? AiChartProposalKinds.Order : AiChartProposalKinds.AllergyAddition).ToList();
+        if (ambient)
+        {
+            // The visit's words go apart, and only while the review is open; the review keeps where each passage was and
+            // who said it, and its proposals.
+            var transcript = text.Length == 0 ? null : JsonSerializer.Serialize(result.Transcript, ServiceJson);
+            var kept = JsonSerializer.Serialize(result with { Transcript = result.Transcript with { Text = "" }, Speakers = null }, ServiceJson);
+            return System.Text.Encoding.UTF8.GetByteCount(kept) > 1_048_576 || transcript is not null && System.Text.Encoding.UTF8.GetByteCount(transcript) > 900_000
+                ? null : new(kept, suggestions, kinds, transcript);
+        }
+
+        var json = JsonSerializer.Serialize(result, ServiceJson);
         return System.Text.Encoding.UTF8.GetByteCount(json) > 1_048_576 ? null : new(json, suggestions, kinds);
     }
 }

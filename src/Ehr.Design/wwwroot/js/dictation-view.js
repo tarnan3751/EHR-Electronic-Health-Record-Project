@@ -20,7 +20,14 @@ window.SwiftChartDictationView = class {
             possible_correction: "You may have corrected this later in the dictation: check the highlighted words.",
             near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
+            // A recorded visit's (the expansion plan's step 16).
+            speaker_unsure: "Who said this couldn't be told with confidence: check the highlighted words.",
+            other_speaker: "Someone else in the room said this: check that it is about the patient.",
+            patients_own_words: "In the patient's own words. Reword it as your note before you accept it.",
+            part_not_offered: "Part of the visit had something for this section that didn't pass the checks: read the highlighted part.",
         };
+        // Who said each passage of a recorded visit, in words beside it, never by colour alone.
+        const speakerWords = { clinician: "Clinician", patient: "Patient", other: "Other person", unsure: "Unsure" };
         const instructionWords = { order: "Order", allergy_change: "Allergy change" };
         // Those the dictation proposes (the expansion plan's step 15). The review lists them apart, with their actions, and
         // its not-carried-over list leaves them out; the dictation page marks them in its list, read-only.
@@ -68,10 +75,28 @@ window.SwiftChartDictationView = class {
             }
 
             const sorted = [...points].sort((a, b) => a - b);
-            const paragraph = element("p");
+            // A recorded visit's transcript is a paragraph a turn, each led by who said it; a dictation's, one paragraph.
+            const turns = segments.some((s) => s.speaker);
+            const paragraphs = [];
+            let paragraph = element("p");
+            let speaker = null;
             for (let i = 0; i + 1 < sorted.length; i++) {
                 const [from, to] = [sorted[i], sorted[i + 1]];
                 const segment = segments.find((s) => s.start <= from && to <= s.end);
+                if (turns && !segment && !text.slice(from, to).trim()) {
+                    continue;
+                }
+
+                if (turns && segment && segment.speaker !== speaker) {
+                    if (paragraph.childNodes.length > 0) {
+                        paragraphs.push(paragraph);
+                    }
+
+                    speaker = segment.speaker;
+                    paragraph = element("p", undefined, "sc-transcript__turn");
+                    paragraph.append(element("span", speakerWords[speaker] ?? "Unsure", "sc-transcript__speaker"), document.createTextNode(" "));
+                }
+
                 const highlighted = highlights.some((h) => h.start <= from && to <= h.end);
                 let node = document.createTextNode(text.slice(from, to));
                 if (segment?.unclear) {
@@ -94,7 +119,7 @@ window.SwiftChartDictationView = class {
                 paragraph.append(node);
             }
 
-            transcriptArea.replaceChildren(paragraph);
+            transcriptArea.replaceChildren(...paragraphs, paragraph);
             unclearNotice.hidden = !segments.some((s) => s.unclear);
         }
 
@@ -142,6 +167,12 @@ window.SwiftChartDictationView = class {
                     control.onfocus = () => renderTranscript(state.transcript, field.sources ?? []);
                     control.onblur = () => renderTranscript(state.transcript);
                 }
+                // A recorded visit's: who said the words it came from, which stays when the transcript has gone.
+                const saidBy = [...new Set((field.sources ?? []).map((source) => source.speaker).filter(Boolean))];
+                if (saidBy.length > 0) {
+                    value.append(element("p", `Said by: ${saidBy.map((speaker) => speakerWords[speaker] ?? "Unsure").join(", ")}.`, "sc-proposal__message"));
+                }
+
                 for (const warning of field.warnings ?? []) {
                     const note = element("p", warningWords[warning.code] ?? "Check this field against the transcript.", "sc-proposal__warning");
                     highlightOnFocus(note, [warning]);

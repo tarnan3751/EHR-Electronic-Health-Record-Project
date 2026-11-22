@@ -1,0 +1,88 @@
+@page "/patients/{id:guid}/listen"
+@model ListenModel
+@{
+    // This page's address carries the patient and the search the clinician came from. Without htmx, nothing keeps it in
+    // the browser's sessionStorage history, as on the chart.
+    ViewData["UseHtmx"] = false;
+    ViewData["Title"] = $"Listen to the visit: {Model.Patient.FamilyName}, {Model.Patient.GivenName}";
+    var chartRoute = Model.Search.RouteData();
+    chartRoute["id"] = Model.Patient.Id.ToString();
+}
+@* UC 23 (the expansion plan's step 16): the screen for listening to a visit. The markup is the page's skeleton, and the
+   consent comes first, before any script has run; js/ambient.js does the rest, finding each part by its data-ambient-*
+   attribute. Nothing here opens the microphone: the script does, once the server has recorded the consent. *@
+@section Scripts {
+    @if (Model.AtTheClinic)
+    {
+        <script src="~/_content/Ehr.Design/js/ambient.js" defer></script>
+    }
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="Chart" asp-all-route-data="chartRoute">Back to the chart</a></p>
+</div>
+<h1>Listen to the visit: @Model.Patient.FamilyName, @Model.Patient.GivenName</h1>
+
+@if (!Model.AtTheClinic)
+{
+    @* A visit is recorded only at the clinic: its conversation never crosses the WAN (Forwarding/CloudForwardingMiddleware). *@
+    <p class="sc-notice sc-notice--warning" data-ambient-offsite><span class="sc-notice__state">Unavailable:</span> listening to a visit works only on the clinic's network. You can dictate or type the note.</p>
+}
+else
+{
+    <section data-ambient data-ambient-api="@Ehr.Web.Api.Dictation.DictationApi.AmbientPath" data-review-api="@Ehr.Web.Api.Dictation.DictationApi.Path" data-patient-id="@Model.Patient.Id" data-draft-id="@Model.DraftId" data-draft-version="@Model.DraftVersion">
+        @Html.AntiForgeryToken()
+        <noscript><p class="sc-notice sc-notice--danger">Listening to a visit needs JavaScript. You can still type the note.</p></noscript>
+
+        <form class="sc-form sc-form--wide" data-ambient-consent>
+            <h2>Before you start</h2>
+            <p>Ask the patient, and anyone else who will speak, whether they agree to this visit being recorded to draft your note. Read them this:</p>
+            <blockquote class="sc-notice sc-notice--info" data-ambient-statement>
+                <p>“I'd like SwiftChart to listen to our conversation to help me write today's note. The recording is deleted as soon as it's turned into text. I check everything before it goes in your record, and then the text is deleted too, except what it suggested for the note. You can say no, or ask me to stop at any time, and your care won't change either way. Is that all right with you?”</p>
+            </blockquote>
+            <ul>
+                <li>For a child, ask a parent or guardian, and the child too if they're old enough to understand. For anyone else who can't agree for themselves, ask the person who decides for them. Someone the patient shares their portal record with can't agree in their place.</li>
+                <li>Listening works in English only: not for a visit in another language or through an interpreter.</li>
+                <li>Nothing is recorded until you select Start listening, and you can pause, stop or discard at any time.</li>
+            </ul>
+            <fieldset class="sc-stack">
+                <legend>Who will speak</legend>
+                <label class="sc-check" for="ambient-speakers-2"><input type="radio" id="ambient-speakers-2" name="Speakers" value="2" required> The patient and me</label>
+                <label class="sc-check" for="ambient-speakers-3"><input type="radio" id="ambient-speakers-3" name="Speakers" value="3"> The patient, me and one other person, such as a relative or carer</label>
+            </fieldset>
+            <fieldset class="sc-stack">
+                <legend>Who agreed for the patient</legend>
+                <label class="sc-check" for="ambient-given-patient"><input type="radio" id="ambient-given-patient" name="GivenBy" value="patient" required> The patient</label>
+                <label class="sc-check" for="ambient-given-representative"><input type="radio" id="ambient-given-representative" name="GivenBy" value="representative"> Someone who decides for the patient: a parent, guardian or legal representative</label>
+            </fieldset>
+            <label class="sc-check" for="ambient-agreed"><input type="checkbox" id="ambient-agreed" name="Agreed" value="true" required> Everyone who will speak has agreed, aloud, to this visit being recorded to draft the note.</label>
+            <div class="sc-actions">
+                <button class="sc-btn sc-btn--primary" data-ambient-start>Start listening</button>
+            </div>
+        </form>
+
+        <p class="sc-status" role="status" aria-live="polite" data-ambient-status></p>
+
+        <section data-ambient-capture hidden aria-labelledby="ambient-capture">
+            <h2 id="ambient-capture">Listening to the visit</h2>
+            <div class="sc-actions">
+                <button type="button" class="sc-btn" data-ambient-pause>Pause listening</button>
+                <button type="button" class="sc-btn sc-btn--primary" data-ambient-stop>Stop and draft the note</button>
+                <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard>Stop and discard</button>
+            </div>
+            <p class="sc-muted">If anyone else comes in, pause until they have agreed or left. If the patient changes their mind, select Stop and discard: nothing recorded is kept.</p>
+        </section>
+
+        <section data-ambient-speakers hidden aria-labelledby="ambient-speakers">
+            <h2 id="ambient-speakers">Who is speaking</h2>
+            <p>These are the voices SwiftChart told apart. Say who each one is before the note is drafted: its Subjective comes only from what the patient or someone with them said, and its Objective, Assessment and Plan only from what you said.</p>
+            <div class="sc-stack" data-ambient-voices></div>
+            <div class="sc-actions">
+                <button type="button" class="sc-btn sc-btn--primary" data-ambient-draft disabled>Draft the note</button>
+                <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard-recording>Discard the recording</button>
+            </div>
+        </section>
+    </section>
+}

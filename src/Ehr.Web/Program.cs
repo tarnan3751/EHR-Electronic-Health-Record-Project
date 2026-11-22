@@ -126,6 +126,9 @@ if (site == Site.OnPrem)
 
     // The dictation service runs beside the models, on-prem only (Api/Dictation).
     builder.Services.AddSingleton(DictationSidecar.FromConfiguration(builder.Configuration));
+    // Listening to a visit (step 16): transcripts of reviews nobody finished go after 7 days at most (Ambient/).
+    var keepTranscripts = Ehr.Web.Ambient.AmbientTranscriptPurgeService.KeepFrom(builder.Configuration);
+    builder.Services.AddHostedService(services => ActivatorUtilities.CreateInstance<Ehr.Web.Ambient.AmbientTranscriptPurgeService>(services, keepTranscripts));
 
     // A lab's key, when there is one (Api/Lab): the door, and its rate limit, check what a request presents against it.
     if (builder.Configuration[LabApiKey.Setting] is { Length: > 0 })

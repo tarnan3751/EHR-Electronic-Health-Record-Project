@@ -16,7 +16,7 @@ namespace Ehr.Web.Tests;
 // sorted from it. It answers as the service does, error bodies with their detail included, and records every request
 // it gets. The switches make it fail the ways the service can, or propose more of the note's fields. The tests that
 // drive it run one at a time, and each starts it afresh.
-public sealed class DictationSidecarStub : HttpMessageHandler
+public sealed partial class DictationSidecarStub : HttpMessageHandler
 {
     public const string Url = "https://dictation.test";
 
@@ -85,6 +85,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         Slow = false;
         Undecodable = false;
         Answer = null;
+        QuietSeconds = 0;
         return this;
     }
 
@@ -117,6 +118,13 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
         var owner = headers[DictationSidecar.OwnerHeader];
         var path = request.RequestUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // Listening to a visit (step 16), with its sessions' own answers: DictationSidecarStub.Ambient.cs.
+        var ambient = headers.TryGetValue(DictationSidecar.ModeHeader, out var mode) && mode == "ambient";
+        if (path is ["v1", "sessions"] && request.Method == HttpMethod.Post && ambient)
+        {
+            return StartAmbient(owner, request.RequestUri.Query);
+        }
+
         if (path is ["v1", "sessions"] && request.Method == HttpMethod.Post)
         {
             var id = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(24));
@@ -124,13 +132,19 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds = 180, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
         }
 
-        if (path is not ["v1", "sessions", var sessionId, ..] || !sessions.TryGetValue(sessionId, out var session) || session.Owner != owner)
+        if (path is not ["v1", "sessions", var sessionId, ..] || !sessions.TryGetValue(sessionId, out var session) || session.Owner != owner
+            || session.Ambient != ambient)
         {
             return Error(HttpStatusCode.NotFound, "not_found");
         }
 
         lock (session)
         {
+            if (session.Ambient)
+            {
+                return AmbientAnswer(sessionId, session, path, request.Method.Method, request.RequestUri.Query, body);
+            }
+
             switch (path, request.Method.Method)
             {
                 case ([_, _, _, "audio"], "POST"):
@@ -379,6 +393,13 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         public int Chunks { get; set; }
 
         public bool Stopped { get; set; }
+
+        // Listening to a visit (step 16): how many voices it was told to expect, and who the clinician said each is.
+        public bool Ambient { get; init; }
+
+        public int Speakers { get; init; }
+
+        public IReadOnlyDictionary<int, string>? Roles { get; set; }
     }
 }
 

@@ -78,6 +78,9 @@ namespace Ehr.Web.Api.Dictation;
 //   504 timed_out: the service didn't answer within DictationSidecar.DefaultTimeout (20 seconds)
 // A model that is unavailable or too slow isn't a refusal: the result says so. What is logged is the operation and
 // the service's status, never a body, a transcript or a field.
+//
+// Listening to a visit (ambient listening, the expansion plan's step 16) has routes of its own under /ambient, in the same
+// group: AmbientApi.cs.
 public static partial class DictationApi
 {
     public const string Path = "/api/dictation/sessions";
@@ -100,6 +103,7 @@ public static partial class DictationApi
         var sessions = endpoints.MapGroup(Path).AddEndpointFilter(RequireCurrentAccountAsync).AddEndpointFilter(RequireFormTokenAsync);
         sessions.MapPost("/", StartAsync);
         MapNoteReview(sessions);
+        MapAmbient(sessions);
         sessions.MapPost("/{id}/audio", SendAudioAsync).WithMetadata(new RequestSizeLimitAttribute(MaxChunkBytes));
         sessions.MapPost("/{id}/stop", StopAsync);
         sessions.MapPost("/{id}/result", ResultAsync);
@@ -172,7 +176,11 @@ public static partial class DictationApi
             session => Results.Json(
                 session with { MaxChunkBytes = Math.Min(session.MaxChunkBytes, MaxChunkBytes) }, statusCode: StatusCodes.Status201Created));
 
-    static async Task<IResult> SendAudioAsync(string id, string? seq, HttpContext context, DictationSidecar sidecar)
+    static Task<IResult> SendAudioAsync(string id, string? seq, HttpContext context, DictationSidecar sidecar) =>
+        ForwardAudioAsync(id, seq, context, sidecar, ambient: false);
+
+    // A chunk of a dictation's audio, or of a visit's (AmbientApi), passed on as it came.
+    static async Task<IResult> ForwardAudioAsync(string id, string? seq, HttpContext context, DictationSidecar sidecar, bool ambient)
     {
         if (!SessionId().IsMatch(id))
         {
@@ -199,8 +207,8 @@ public static partial class DictationApi
         using var audio = new MemoryStream();
         await context.Request.Body.CopyToAsync(audio, context.RequestAborted);
         var content = new ByteArrayContent(audio.ToArray()) { Headers = { ContentType = type } };
-        return await CallAsync<AudioReceived>(context, sidecar, "audio", HttpMethod.Post,
-            $"v1/sessions/{id}/audio?seq={number.ToString(CultureInfo.InvariantCulture)}", content, received => Results.Ok(received));
+        return await CallAsync<AudioReceived>(context, sidecar, ambient ? "audio-ambient" : "audio", HttpMethod.Post,
+            $"v1/sessions/{id}/audio?seq={number.ToString(CultureInfo.InvariantCulture)}", content, received => Results.Ok(received), ambient);
     }
 
     static Task<IResult> StopAsync(string id, HttpContext context, DictationSidecar sidecar) =>
@@ -222,14 +230,14 @@ public static partial class DictationApi
     // Calls the service, and writes its answer out again from the contract's types.
     static Task<IResult> CallAsync<T>(
         HttpContext context, DictationSidecar sidecar, string operation, HttpMethod method, string path, HttpContent? content,
-        Func<T, IResult> answer) =>
+        Func<T, IResult> answer, bool ambient = false) =>
         CallAsync(context, sidecar, operation, method, path, content, async (body, cancellationToken) =>
-            answer(await body.ReadFromJsonAsync<T>(ServiceJson, cancellationToken) ?? throw new JsonException("The answer is null.")));
+            answer(await body.ReadFromJsonAsync<T>(ServiceJson, cancellationToken) ?? throw new JsonException("The answer is null.")), ambient);
 
     // Calls the service for the signed-in clinician, within the timeout, and turns whatever goes wrong into a refusal.
     static async Task<IResult> CallAsync(
         HttpContext context, DictationSidecar sidecar, string operation, HttpMethod method, string path, HttpContent? content,
-        Func<HttpContent, CancellationToken, Task<IResult>> answer)
+        Func<HttpContent, CancellationToken, Task<IResult>> answer, bool ambient = false)
     {
         var log = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DictationApi));
         if (!sidecar.IsConfigured)
@@ -243,7 +251,7 @@ public static partial class DictationApi
         var aborted = context.RequestAborted;
         using var timer = new CancellationTokenSource(sidecar.Timeout);
         using var call = CancellationTokenSource.CreateLinkedTokenSource(aborted, timer.Token);
-        using var request = sidecar.Request(method, path, owner, content);
+        using var request = sidecar.Request(method, path, owner, content, ambient);
         try
         {
             using var response = await sidecar.Client.SendAsync(request, call.Token);
@@ -293,7 +301,10 @@ public static partial class DictationApi
                     ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its 3-minute limit. Stop it and start another.")
                     : Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This chunk of audio, or the dictation as a whole, is too large.");
             case HttpStatusCode.UnprocessableEntity:
-                return Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded.");
+                // Or, for a visit (AmbientApi), a role missing for a voice the service told apart.
+                return await ErrorBodyAsync(response, cancellationToken) is { Error: "speakers_incomplete" }
+                    ? SpeakersIncomplete()
+                    : Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded.");
             case HttpStatusCode.TooManyRequests:
                 return Refuse(StatusCodes.Status429TooManyRequests, "busy", "Dictation is busy. Try again in a moment.");
             case HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden:
