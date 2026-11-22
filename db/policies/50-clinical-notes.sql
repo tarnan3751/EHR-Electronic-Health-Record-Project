@@ -25,6 +25,23 @@ CREATE OR REPLACE TRIGGER clinical_drafts_guard
     BEFORE UPDATE ON ehr.clinical_drafts
     FOR EACH ROW EXECUTE FUNCTION ehr.guard_clinical_draft();
 
+-- Whether a note's section shows nothing (the expansion plan's step 14): nothing is left once whitespace of every kind
+-- Unicode counts as such, and the characters that show nothing which step 13a's summary rule strips (the same list as
+-- 52-visit-summaries.sql's, which Ehr.Security.Tests holds equal), are taken out. A blank section isn't signed. The
+-- app's rule is the same (NoteContent.IsBlank in Ehr.Domain), code point for code point (NoteBlankTests). It only
+-- checks: what is stored is what was written.
+CREATE OR REPLACE FUNCTION ehr.note_section_is_blank(section text) RETURNS boolean
+    LANGUAGE sql
+    IMMUTABLE PARALLEL SAFE
+    SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT regexp_replace(regexp_replace(section,
+        '[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFF8\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0000-\U000E0FFF]',
+        '', 'g'), '[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]', '', 'g') = ''
+$$;
+REVOKE ALL ON FUNCTION ehr.note_section_is_blank(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ehr.note_section_is_blank(text) TO ehr_app;
+
 CREATE OR REPLACE FUNCTION ehr.finalize_clinical_note() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -59,8 +76,8 @@ BEGIN
         RAISE EXCEPTION 'Associated AI proposals require server-side review' USING ERRCODE = '23514';
     END IF;
     IF draft.subjective IS NULL OR draft.objective IS NULL OR draft.assessment IS NULL OR draft.plan IS NULL
-       OR draft.subjective !~ '[^[:space:]]' OR draft.objective !~ '[^[:space:]]'
-       OR draft.assessment !~ '[^[:space:]]' OR draft.plan !~ '[^[:space:]]'
+       OR ehr.note_section_is_blank(draft.subjective) OR ehr.note_section_is_blank(draft.objective)
+       OR ehr.note_section_is_blank(draft.assessment) OR ehr.note_section_is_blank(draft.plan)
        OR char_length(draft.subjective) > 16000 OR char_length(draft.objective) > 16000
        OR char_length(draft.assessment) > 16000 OR char_length(draft.plan) > 16000 OR octet_length(draft.body) > 65536 THEN
         RAISE EXCEPTION 'Complete Subjective, Objective, Assessment and Plan within note limits before signing' USING ERRCODE = '23514';

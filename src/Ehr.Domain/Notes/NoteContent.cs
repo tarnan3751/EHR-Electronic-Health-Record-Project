@@ -64,7 +64,7 @@ public sealed record NoteContent(string Subjective, string Objective, string Ass
         var problems = new List<string>();
         foreach (var (name, value) in Sections.Select(section => (section.Title, section.Text)))
         {
-            if (signing && string.IsNullOrWhiteSpace(value))
+            if (signing && IsBlank(value))
             {
                 problems.Add($"Enter {name} before signing.");
             }
@@ -97,6 +97,17 @@ public sealed record NoteContent(string Subjective, string Objective, string Ass
 
         return problems;
     }
+
+    // Whether a section shows nothing, and so isn't signed (step 14): all it holds is whitespace, of every kind Unicode
+    // counts as such (Rune.IsWhiteSpace), and the characters that show nothing which step 13a's summary rule strips. The
+    // database's signing rule is the same (ehr.note_section_is_blank, db/policies/50-clinical-notes.sql), code point for
+    // code point (NoteBlankTests). It only checks: what is stored is what was written.
+    public static bool IsBlank(string section) => section.EnumerateRunes().All(rune => Rune.IsWhiteSpace(rune) || ShowsNothing(rune.Value));
+
+    static bool ShowsNothing(int c) =>
+        c is 0x00AD or 0x034F or 0x061C or 0x115F or 0x1160 or 0x17B4 or 0x17B5 or (>= 0x180B and <= 0x180F) or (>= 0x200B and <= 0x200F)
+            or (>= 0x202A and <= 0x202E) or (>= 0x2060 and <= 0x206F) or 0x3164 or (>= 0xFE00 and <= 0xFE0F) or 0xFEFF or 0xFFA0
+            or (>= 0xFFF0 and <= 0xFFF8) or (>= 0x1BCA0 and <= 0x1BCA3) or (>= 0x1D173 and <= 0x1D17A) or (>= 0xE0000 and <= 0xE0FFF);
 
     // The bytes the headings, and the lines around them, take in the plain text of sections with these titles.
     static int HeadingBytes(params string[] titles) =>

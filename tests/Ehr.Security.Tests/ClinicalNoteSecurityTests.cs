@@ -211,6 +211,46 @@ public class ClinicalNoteSecurityTests(MigratedDatabase database) : IClassFixtur
         }
     }
 
+    // A section that shows nothing isn't signed (step 14): whitespace of every kind and the characters step 13a's summary
+    // rule strips, alone or together, in any of the four sections. One with anything visible among them is signed, and
+    // kept exactly as written. As the app role signs, copying the draft as saved.
+    [Theory]
+    [InlineData("subjective", "\u200B")]
+    [InlineData("objective", "\u00A0")]
+    [InlineData("assessment", "\u2060\uFEFF\u3000\n")]
+    [InlineData("plan", "\t\u00AD\u202F\U000E0041\u1680\u180E")]
+    public async Task A_section_that_shows_nothing_is_not_signed(string section, string blank)
+    {
+        var (clinician, patient, draft) = await DraftAsync();
+        const string sign = """
+            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan)
+            SELECT gen_random_uuid(), d.id, d.patient_id, d.version, d.subjective, d.objective, d.assessment, d.plan FROM ehr.clinical_drafts d WHERE d.id = @id
+            """;
+        Task SaveAsync(string text, long version) => Accounts.ExecuteAsync(App, clinician,
+            $"UPDATE ehr.clinical_drafts SET {section} = @text, version = @version, structured_version = @version WHERE id = @id",
+            ("id", draft), ("text", text), ("version", version));
+
+        await SaveAsync(blank, 2);
+        var refused = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, clinician, sign, ("id", draft)));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, refused.SqlState);
+        Assert.Contains("Complete Subjective, Objective, Assessment and Plan", refused.MessageText, StringComparison.Ordinal);
+
+        await SaveAsync(blank + "x" + blank, 3);
+        await Accounts.ExecuteAsync(App, clinician, sign, ("id", draft));
+        Assert.Equal([blank + "x" + blank], await Accounts.QueryAsync(App, clinician, $"SELECT {section} FROM ehr.clinical_notes WHERE draft_id = @id", ("id", draft)));
+    }
+
+    // What shows nothing in a section is what the summary rule strips (52-visit-summaries.sql): the signing rule's list
+    // of those characters is the summary rule's, character for character, so neither changes without the other.
+    [Fact]
+    public async Task The_signing_rule_takes_out_what_the_summary_rule_strips()
+    {
+        const string list = """SELECT substring(pg_get_functiondef(@name::regprocedure) FROM '[[][\\]u00AD[^]]*[]]')""";
+        var summary = await Accounts.QueryAsync(database.SuperuserConnectionString, null, list, ("name", "ehr.visit_summary_problems(uuid, uuid, text[])"));
+        Assert.StartsWith("[\u00AD", Assert.Single(summary));
+        Assert.Equal(summary, await Accounts.QueryAsync(database.SuperuserConnectionString, null, list, ("name", "ehr.note_section_is_blank(text)")));
+    }
+
     // A note signed before step 14 keeps its History, Assessment and Plan as signed: it is still marked sensitive and
     // unmarked, and nothing turns it into a note of four sections, the superuser included.
     [Fact]
