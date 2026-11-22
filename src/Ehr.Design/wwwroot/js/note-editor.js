@@ -117,6 +117,46 @@
             setStatus('Unsaved');
             schedule();
         });
+        // The latest day's vital signs for Objective (step 14): fetched only when asked, shown as text, and added to the
+        // end of Objective only by "Add to Objective", which then saves as typing does. Never anything without asking.
+        const vitals = form.querySelector('[data-note-vitals]');
+        const offer = form.querySelector('[data-note-vitals-offer]');
+        const objective = form.querySelector('textarea[name="Objective"]');
+        const vitalsStatus = form.querySelector('[data-note-vitals-status]');
+        if (vitals && offer && objective && vitalsStatus) {
+            const day = offer.querySelector('[data-note-vitals-day]');
+            const text = offer.querySelector('[data-note-vitals-text]');
+            const add = offer.querySelector('[data-note-vitals-add]');
+            vitals.hidden = false;
+            vitals.addEventListener('click', async () => {
+                vitalsStatus.textContent = 'Loading vital signs';
+                try {
+                    const url = new URL(window.location.href);
+                    url.search = '?handler=Vitals';
+                    const response = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+                    if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) throw new Error('Unconfirmed response');
+                    const result = await response.json();
+                    text.textContent = result.text || '';
+                    add.hidden = !result.text;
+                    day.textContent = !result.text ? 'None recorded: this patient has no vital signs to add.'
+                        : result.today ? '' : `Not today: these were taken on ${result.day}.`;
+                    day.hidden = day.textContent === '';
+                    offer.hidden = false;
+                    vitalsStatus.textContent = '';
+                    (result.text ? add : vitals).focus();
+                } catch {
+                    vitalsStatus.textContent = 'The vital signs could not be loaded. Try again.';
+                }
+            });
+            add.addEventListener('click', () => {
+                objective.value = objective.value === '' ? text.textContent : `${objective.value}\n\n${text.textContent}`;
+                objective.dispatchEvent(new Event('input'));
+                offer.hidden = true;
+                objective.focus();
+                objective.setSelectionRange(objective.value.length, objective.value.length);
+                vitalsStatus.textContent = 'Vital signs added to Objective. Check them before signing.';
+            });
+        }
         form.addEventListener('submit', async event => {
             event.preventDefault();
             const review = event.submitter?.hasAttribute('data-review') === true;

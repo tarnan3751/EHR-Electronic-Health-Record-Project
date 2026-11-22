@@ -660,6 +660,25 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         return new PatientVitals(patient, allergies, signs);
     }
 
+    // The patient's newest vital signs that stand (none entered in error, step 9b), up to 120 values, the newest first:
+    // what a note's Objective may be given (the expansion plan's step 14; Notes.ObjectiveVitals takes the latest day's).
+    // Read only when the clinician asks, and recorded as the vital signs page's read is, with its part. Null when the
+    // patient isn't the reader's to see.
+    public async Task<IReadOnlyList<Observation>?> ObjectiveVitalsAsync(Guid patientId, CancellationToken cancellationToken)
+    {
+        if (!await db.Patients.AsNoTracking().AnyAsync(p => p.Id == patientId, cancellationToken))
+        {
+            return null;
+        }
+
+        var signs = await db.Observations.AsNoTracking()
+            .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.VitalSigns && o.Value != null && ObservationStatus.Released.Contains(o.Status))
+            .OrderByDescending(o => o.EffectiveAt).ThenByDescending(o => o.IssuedAt).Take(120).ToListAsync(cancellationToken);
+        audit.Record(AuditActions.Read, patientId, PatientsTable, patientId, part: AuditParts.Vitals);
+        await db.SaveChangesAsync(cancellationToken);
+        return signs;
+    }
+
     // Proxy access (FR-19).
 
     public const string ProxyGrantsTable = "proxy_grants";

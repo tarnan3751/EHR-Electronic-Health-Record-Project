@@ -102,7 +102,7 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
     // The reads of the pages and APIs that need something of the patient's first: an order's results, an appointment's
     // page, the FHIR API's searches of entries, a signed note's sensitivity and addendum pages, the dictation API starting a
-    // note, and the desktop app's draft sync. One row each, so a wrong part on any one of them turns its own row red.
+    // note, the desktop app's draft sync, and a draft's editor and the vital signs it offers (step 14). One row each, so a wrong part on any one of them turns its own row red.
     [Theory]
     [InlineData("order results", "patients results")]
     [InlineData("appointment", "patients appointments")]
@@ -115,6 +115,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("desktop draft sync", "clinical_drafts note-draft")]
     [InlineData("refill review", "patients refills")]
     [InlineData("refill order form", "patients refills")]
+    [InlineData("note editor", "clinical_drafts note-draft", "patients note-draft")]
+    [InlineData("note vital signs", "patients vitals")]
     public async Task Each_api_and_page_that_needs_an_entry_records_its_part(string what, params string[] reads)
     {
         var (clinician, session, patient) = await PatientAsync();
@@ -163,6 +165,15 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
                 var refill = await RefillRequestTests.RequestIdAsync(apps, patient.Patient);
                 var refillPath = what == "refill review" ? RefillRequestTests.ReviewPath(patient.Patient, refill) : RefillRequestTests.ApprovePath(patient.Patient, refill);
                 request = () => session.Client.GetAsync(refillPath, Cancel);
+                break;
+            case "note editor" or "note vital signs":
+                // A draft's editor, and the vital signs it offers for Objective when asked (step 14).
+                using (var created = await PostFormAsync(session.Client, $"{chart}?handler=NewNote", chart))
+                {
+                    var editor = PathOf(created) + (what == "note vital signs" ? "?handler=Vitals" : "");
+                    request = () => session.Client.GetAsync(editor, Cancel);
+                }
+
                 break;
             default:
                 var desktop = CreateClient(apps.OnPrem);

@@ -12,7 +12,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Notes;
 // Off-site with the clinic's server unreachable, a save without JavaScript shows the four sections again on the "Not
 // saved" page (UC 2); with it, note-editor.js keeps them on screen.
 [ShownIfNotSaved(nameof(Subjective), nameof(Objective), nameof(Assessment), nameof(Plan))]
-public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, ClinicalNotes notes)
+public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, ClinicalNotes notes, Ehr.Domain.Time.ClinicTime clinic)
     : PatientNotePage(phi, assignments, breakGlass)
 {
     // Only content, the visit type and an optimistic version are accepted. Identity, timestamps, review status and
@@ -66,6 +66,22 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         (Origin, Saved) = (NoteContent.OriginOf(draft), NoteSections.AsSaved(draft));
         (NoteTemplateCode, Templates) = (draft.NoteTemplateCode, await notes.TemplatesAsync(HttpContext.RequestAborted));
         return Page();
+    }
+
+    // The vital signs the clinician may add to Objective (step 14), when they ask: JSON, for note-editor.js to show. Read
+    // as the vital signs page reads them, with its part; only for a patient on the clinician's panel, as writing a note
+    // is. Nothing about the draft changes here: the text goes into Objective only if the clinician adds it.
+    public async Task<IActionResult> OnGetVitalsAsync(Guid patientId, Guid draftId)
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (!await Phi.IsAssignedAsync(patientId, HttpContext.RequestAborted)
+            || await Phi.ObjectiveVitalsAsync(patientId, HttpContext.RequestAborted) is not { } signs)
+        {
+            return NotFound();
+        }
+
+        var offer = ObjectiveVitals.Of(signs, clinic);
+        return new JsonResult(new { text = offer.Text, day = offer.Day, today = offer.Today });
     }
 
     public Task<IActionResult> OnPostSaveAsync(Guid patientId, Guid draftId) => SaveAsync(patientId, draftId, review: false);

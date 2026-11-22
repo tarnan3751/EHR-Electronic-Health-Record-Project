@@ -183,6 +183,12 @@ internal static partial class RenderBenchmark
                     var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
                     return $"/patients/{patient}/notes/drafts/{draft}";
                 }));
+                // The vital signs the editor offers for Objective when asked (step 14): the latest day's of the seeded patient.
+                results.Add(await MeasureAsync(client, times, "Vital signs for a note's Objective, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                    return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
+                }));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -508,12 +514,17 @@ internal static partial class RenderBenchmark
                 return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
             }));
             // The note editor (step 14), with the same generator's draws as on-site: during an outage, the draft as last
-            // saved, read-only.
+            // saved, read-only; and the vital signs it offers for Objective, read from the replica.
             var draftRandom = new Random(20261126);
             results.Add(await MeasureAsync(client, times, "Off-site, Note editor, a draft of a patient on the panel", typing: false, () =>
             {
                 var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
                 return $"/patients/{patient}/notes/drafts/{draft}";
+            }));
+            results.Add(await MeasureAsync(client, times, "Off-site, Vital signs for a note's Objective, a patient on the panel", typing: false, () =>
+            {
+                var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
             }));
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
             // Pre-visit forms (step 13e): the clinician's pages, read from the cloud copy; asking says why it can't.
