@@ -913,4 +913,90 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         Assert.Equal(1, await DeclineAsync(clinician, request));
         Assert.Equal(["rejected 197361"], await AsSuperuserAsync("SELECT status || ' ' || medication_code FROM ehr.refill_requests WHERE id = @id", ("id", request)));
     }
+
+    // The second review's finding: a request asked while a clinician joined the panel could reach neither of them; the
+    // ask read the panel before the join committed, and the join read the waiting requests before the ask committed, so
+    // once the only other holder left, the request waited with no open item while a clinician was on the panel. Both now
+    // take the patient's care-team lock before they read ("Lock order", 77-refill-requests.sql): the second waits for the
+    // first, then sees what it wrote. Two connections, each starting first.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_clinician_who_joins_while_a_request_is_asked_gets_it_whichever_comes_first(bool askedFirst)
+    {
+        var (clinician, patient, account) = await OnPanelAsync();
+        var medication = await MedicationAsync(patient);
+        var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var request = Guid.CreateVersion7();
+
+        var (asking, askingTransaction) = await BeginAsync(App, account);
+        var (joins, joinsTransaction) = await BeginAsync(App, joining);
+        await using (asking)
+        await using (joins)
+        {
+            Task AskingAsync() => RunOnAsync(asking, askingTransaction, Ask,
+                ("id", request), ("patient", patient), ("medication", medication), ("note", DBNull.Value), ("sensitive", false));
+            Task JoiningAsync() => RunOnAsync(joins, joinsTransaction, JoinPanel, ("patient", patient), ("clinician", joining));
+
+            await (askedFirst ? AskingAsync() : JoiningAsync());
+            var waiting = askedFirst ? JoiningAsync() : AskingAsync();
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), Cancel)));
+            await (askedFirst ? askingTransaction : joinsTransaction).CommitAsync(Cancel);
+            await waiting;
+            await (askedFirst ? joinsTransaction : askingTransaction).CommitAsync(Cancel);
+        }
+
+        Assert.Equal([.. new[] { clinician, joining }.Select(id => id.ToString()).Order(StringComparer.Ordinal)
+            .Select(id => $"{id} refill-request A patient asked to renew a medication true")], await ItemsAsync(request));
+    }
+
+    // The care-team lock closes no circle with the medication's locks: a request being asked holds the medication's
+    // advisory lock and the care-team lock while a colleague marks the medication sensitive and a clinician joins the
+    // panel. Both wait for the ask, then finish: no deadlock, the request sensitive, the joiner given it.
+    [Fact]
+    public async Task Asking_marking_the_medication_sensitive_and_joining_at_once_all_finish()
+    {
+        var (clinician, patient, account) = await OnPanelAsync();
+        var medication = await MedicationAsync(patient);
+        var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var request = Guid.CreateVersion7();
+
+        var (asking, askingTransaction) = await BeginAsync(App, account);
+        var (marking, markingTransaction) = await BeginAsync(App, clinician);
+        var (joins, joinsTransaction) = await BeginAsync(App, joining);
+        await using (asking)
+        await using (marking)
+        await using (joins)
+        {
+            await RunOnAsync(asking, askingTransaction, Ask,
+                ("id", request), ("patient", patient), ("medication", medication), ("note", DBNull.Value), ("sensitive", false));
+            var marked = RunOnAsync(marking, markingTransaction, "UPDATE ehr.medication_statements SET sensitive = true WHERE id = @medication",
+                ("medication", medication));
+            var joined = RunOnAsync(joins, joinsTransaction, JoinPanel, ("patient", patient), ("clinician", joining));
+            var both = Task.WhenAll(marked, joined);
+            Assert.NotSame(both, await Task.WhenAny(both, Task.Delay(TimeSpan.FromMilliseconds(500), Cancel)));
+            await askingTransaction.CommitAsync(Cancel);
+            await both;
+            await markingTransaction.CommitAsync(Cancel);
+            await joinsTransaction.CommitAsync(Cancel);
+        }
+
+        Assert.Equal(["requested true"], await AsSuperuserAsync("SELECT status || ' ' || sensitive FROM ehr.refill_requests WHERE id = @id", ("id", request)));
+        Assert.Equal(2, (await ItemsAsync(request)).Count(item => item.EndsWith(" true", StringComparison.Ordinal)));
+    }
+
+    // A clinician joining a patient's panel, as the chart's "Add to my panel" does.
+    const string JoinPanel = "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (gen_random_uuid(), @patient, @clinician, now())";
+
+    // One statement on a transaction left open.
+    static async Task RunOnAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        await command.ExecuteNonQueryAsync(Cancel);
+    }
 }
