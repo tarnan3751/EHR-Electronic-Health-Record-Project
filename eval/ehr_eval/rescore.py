@@ -4,8 +4,9 @@
 
 A run keeps, for each recording, MedASR's passages as heard and K2 Horizon's proposals as answered (run.py). This
 rebuilds each transcript from those passages exactly, runs validation.py over the proposals and over the transcript for
-the instructions it reports as not carried over, takes each script's tags as they are now, and writes the results
-again, stamped with the current scoring and gold hashes and everything else as the run recorded it: the model outputs
+the instructions it reports as not carried over and those of them it proposes, takes each script's tags as they are
+now, and writes the results again, stamped with the current scoring and gold hashes and everything else as the run
+recorded it: the model outputs
 are the same ones, and only what is checked and scored, and the gold it is scored against, have changed. It is how a change to the rules is measured on the same
 answers (for example strict against relaxed). It refuses a run made with another prompt, schema or parameters, with
 other code making the transcript and the answers (the pipeline hash), or from other recordings (the recordings hash),
@@ -47,6 +48,7 @@ def rescore(results: dict) -> dict:
         item.tags = [*item.tags[:3], *scripts[item.script].tags]
         transcript = assemble([Segment(**segment) for segment in item.segments], final=True)
         item.not_carried_over = [(kind, start, end) for start, end, kind in validation.directives(transcript.text)]
+        scoring.weigh_proposals(item, transcript)
         if item.sorting == "done" and item.fields:
             proposed = {name: {"value": outcome.proposed, "sources": outcome.sources} for name, outcome in item.fields.items()}
             checks = validation.check(proposed, item.unknown, transcript)

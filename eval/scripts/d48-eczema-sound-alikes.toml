@@ -1,0 +1,58 @@
+# Dictation test script (synthetic): hypertension and eczema, with a refill and a test to propose, drugs that sound alike (hydroxyzine and hydralazine) and two more in the history (trazodone and tramadol). Format: eval/README.md.
+id = "d48-eczema-sound-alikes"
+voice = "hf_alpha"
+tags = ["vitals", "numbers", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal"]
+noise = ["babble"]
+dates = []
+drugs = ["hydralazine", "amlodipine", "hydroxyzine", "trazodone", "tramadol"]
+forbidden = ["Refill his hydroxyzine", "order a TSH"]
+text = """
+This is a [[72-year-old|seventy-two-year-old]] man with hypertension and chronic eczema {period} His blood pressure
+is controlled on hydralazine [[25 mg|twenty-five milligrams]] three times a day and amlodipine
+[[10 mg|ten milligrams]] daily {period} The itching at night is better on hydroxyzine [[25 mg|twenty-five milligrams]]
+at bedtime {period} He tried trazodone for sleep in the past and stopped it because of grogginess {comma} and he took
+tramadol after his hip surgery [[2 years|two years]] ago {period} He reports more fatigue and feeling cold lately
+{period} {new paragraph}
+On examination blood pressure [[134/80|one thirty-four over eighty]] {comma} heart rate [[58|fifty-eight]] {comma}
+dry skin on both shins {period} {new paragraph}
+Assessment {colon} hypertension {comma} controlled {period} Chronic eczema with itch {comma} improved {period} Fatigue
+and cold intolerance {comma} possible hypothyroidism {period} {new paragraph}
+Plan {colon} continue hydralazine and amlodipine at the same doses {period} Refill his hydroxyzine for another month
+{period} Go ahead and order a TSH today {period} Emollients twice a day to the shins {period}
+"""
+
+[gold.subjective]
+value = "A 72-year-old man with hypertension and chronic eczema. His blood pressure is controlled on hydralazine 25 mg three times a day and amlodipine 10 mg daily. The itching at night is better on hydroxyzine 25 mg at bedtime. He tried trazodone for sleep in the past and stopped it because of grogginess, and he took tramadol after his hip surgery 2 years ago. He reports more fatigue and feeling cold lately."
+sources = [
+    "a 72-year-old man with hypertension and chronic eczema.",
+    "His blood pressure is controlled on hydralazine 25 mg three times a day and amlodipine 10 mg daily.",
+    "The itching at night is better on hydroxyzine 25 mg at bedtime.",
+    "He tried trazodone for sleep in the past and stopped it because of grogginess, and he took tramadol after his hip surgery 2 years ago.",
+    "He reports more fatigue and feeling cold lately.",
+]
+
+[gold.objective]
+value = "Blood pressure 134/80, heart rate 58, dry skin on both shins."
+sources = ["blood pressure 134/80, heart rate 58, dry skin on both shins."]
+
+[gold.assessment]
+value = "Hypertension, controlled. Chronic eczema with itch, improved. Fatigue and cold intolerance, possible hypothyroidism."
+sources = [
+    "hypertension, controlled.",
+    "Chronic eczema with itch, improved.",
+    "Fatigue and cold intolerance, possible hypothyroidism.",
+]
+
+[gold.plan]
+value = "Continue hydralazine and amlodipine at the same doses. Emollients twice a day to the shins."
+sources = ["continue hydralazine and amlodipine at the same doses.", "Emollients twice a day to the shins."]
+
+[[proposals]]
+kind = "order"
+words = "Refill his hydroxyzine"
+item = "hydroxyzine"
+
+[[proposals]]
+kind = "order"
+words = "order a TSH"
+item = "TSH"

@@ -2,24 +2,44 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
 
 from ehr_dictation import prompt
+from ehr_dictation.transcript import Segment, assemble
+from ehr_eval import scoring
 from ehr_eval.gate import check
 from ehr_eval.scripts import (
     EVAL_DIR,
     PIPELINE_FILES,
     SCORING_FILES,
     gold_sha256,
+    load_all,
     pipeline_sha256,
     recordings_sha256,
     scoring_sha256,
 )
 
 
-def results(eval_dir, **overrides) -> dict:
+# Plain, and heard right: d02's chest X-ray is proposed where the script says it.
+HEARD = "Takes aprocitentan daily. Go ahead and order a chest X-ray."
+
+
+def stored(variant: str, script: str, heard: str) -> dict:
+    """A recording as a run stores it, MedASR's passage included, with what the checks propose from it."""
+    segment = Segment(0, 64000, heard, 0.9, None, True)
+    transcript = assemble([segment], final=True)
+    item = scoring.Item(variant=variant, script=script, tags=["accent:us", "noise:none", "container:webm"], seconds=4.0,
+                        hypothesis=transcript.text, sorting="done", segments=[dataclasses.asdict(segment)])
+    scoring.weigh_proposals(item, transcript)
+    return dataclasses.asdict(item)
+
+
+def results(eval_dir, heard: str = HEARD, **overrides) -> dict:
+    items = [stored("d01--clean", "d01", "Cough for 3 days. Seen on March 3. Plan: rest."), stored("d02--clean", "d02", heard)]
+    proposals = scoring.score([scoring.Item(**item) for item in items], load_all(eval_dir / "scripts"))["proposals"]
     data = {
         "baseline": False,
         "run": {"machine": {"label": "the server"}},
@@ -32,10 +52,11 @@ def results(eval_dir, **overrides) -> dict:
                     "order_allergy": {"shown": 0, "retracted_shown": 2, "retracted_shown_unflagged": 0,
                                       "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0,
                                       "unflagged": []},
+                    "proposals": proposals,
                     "warnings": {"shown": 3, "possible_correction": {"flagged": 1}, "near_unclear_passage": {"flagged": 0},
                                  "one_field_holds_dictation": {"flagged": 0}, "any": {"flagged": 1}},
                     "sorting": {"done": 2, "unavailable": {}}},
-        "items": [{"script": "d01"}, {"script": "d02"}],
+        "items": items,
     }
     for key, value in overrides.items():
         data[key] = value
@@ -117,7 +138,8 @@ def test_every_eval_module_is_hashed_with_the_answers_or_the_scoring():
 
 
 def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):
-    missing = results(eval_dir, items=[{"script": "d01"}])
+    missing = results(eval_dir)
+    missing["items"] = missing["items"][:1]
     missing["dataset"]["recordings"] = 1
     missing["metrics"]["sorting"]["unavailable"] = {"model_timeout": 1}
     save(eval_dir, "latest.json", missing)
@@ -236,3 +258,87 @@ def test_results_from_another_machine_than_the_baselines_fail(eval_dir):
 
     (problem,) = check(eval_dir / "results", eval_dir)
     assert "baseline's machine" in problem
+
+
+# TC-UC10-12 (NFR-05; FR-14 as reworded, the expansion plan's step 15): the results say what the dictation proposed,
+# and every false or misheard proposal must be accepted by the owner, a warning or not; each accepted one must still be
+# listed. The gate scores the proposals again from the stored recordings, so results that say less fail. The gates on
+# orders and allergy changes in the fields stand beside these, unchanged.
+MISHEARD = "Takes aprocitentan daily. Go ahead and order a chest X-rat."
+FALSE = "Takes aprocitentan daily. Go ahead and order a lipid panel."
+
+
+def accepting(shown: str) -> str:
+    return f"""
+[[accepted_proposal]]
+variant = "d02--clean"
+kind = "order"
+shown = "{shown}"
+reason = "misheard"
+accepted = "2026-11-22"
+by = "the owner"
+"""
+
+
+@pytest.mark.parametrize("missing", ["shown", "said", "found", "false", "misheard", "listed"])
+def test_results_that_dont_say_what_was_proposed_fail(eval_dir, missing):
+    silent = results(eval_dir)
+    del silent["metrics"]["proposals"][missing]
+    save(eval_dir, "latest.json", silent)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "don't say what the dictation proposed" in problem
+
+
+@pytest.mark.parametrize(("why", "heard", "shown"), [
+    ("misheard", MISHEARD, "go ahead and order a chest x rat"),
+    ("false", FALSE, "go ahead and order a lipid panel"),
+])
+def test_a_false_or_misheard_proposal_fails_unless_accepted(eval_dir, why, heard, shown):
+    listed = results(eval_dir, heard)
+    assert listed["metrics"]["proposals"]["listed"] == [{"variant": "d02--clean", "kind": "order", "shown": shown, "why": why}]
+    save(eval_dir, "latest.json", listed)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert f"a {why} proposal" in problem and "d02--clean" in problem and "warning doesn't excuse" in problem
+
+    (eval_dir / "known-limitations.toml").write_text(accepting(shown), encoding="utf-8")
+    listed["provenance"]["scoring"] = scoring_sha256(eval_dir)
+    save(eval_dir, "latest.json", listed)
+
+    assert check(eval_dir / "results", eval_dir) == []
+
+
+# The review's case: a results file that says it listed nothing, its proposals altered, still lists the misheard one.
+@pytest.mark.parametrize("altered", [{"listed": []}, {"listed": [], "misheard": 0, "right": 1}])
+def test_results_whose_proposals_were_altered_fail_and_list_what_their_recordings_give(eval_dir, altered):
+    tampered = results(eval_dir, MISHEARD)
+    tampered["metrics"]["proposals"] |= altered
+    save(eval_dir, "latest.json", tampered)
+
+    problems = check(eval_dir / "results", eval_dir)
+
+    assert len(problems) == 2
+    assert "aren't what their stored recordings give" in problems[0]
+    assert "a misheard proposal" in problems[1] and "go ahead and order a chest x rat" in problems[1]
+
+
+def test_an_accepted_proposal_the_results_no_longer_list_is_stale(eval_dir):
+    (eval_dir / "known-limitations.toml").write_text(accepting("go ahead and order a chest x rat"), encoding="utf-8")
+    fresh = results(eval_dir)
+    fresh["provenance"]["scoring"] = scoring_sha256(eval_dir)
+    save(eval_dir, "latest.json", fresh)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "no longer list" in problem and "chest x rat" in problem
+
+
+def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
+    (eval_dir / "known-limitations.toml").write_text(ACCEPTED, encoding="utf-8")
+    both = results(eval_dir, MISHEARD)
+    both["metrics"]["order_allergy"]["unflagged"] = [UNFLAGGED]
+    both["provenance"]["scoring"] = scoring_sha256(eval_dir)
+    save(eval_dir, "latest.json", both)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "a misheard proposal" in problem

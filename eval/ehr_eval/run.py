@@ -49,6 +49,7 @@ OUT = {"off": "latest.json", "low256": "compare-low256.json"}
 
 async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: Structurer, scripts) -> scoring.Item:  # noqa: ANN001
     item, transcript, proposal = await answer(variant, audio_dir, recognizer, structurer, scripts)
+    scoring.weigh_proposals(item, transcript)
     if proposal is None:
         return item
     checks = validation.check(proposal.fields, proposal.unknown, transcript)

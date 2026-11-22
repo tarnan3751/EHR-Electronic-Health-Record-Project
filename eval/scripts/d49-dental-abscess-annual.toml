@@ -1,0 +1,91 @@
+# Dictation test script (synthetic): an annual review with a dental abscess, whose plan proposes four things among its treatment: a prescription to the pharmacy, an allergy, a refill and two blood tests in one order. Format: eval/README.md.
+id = "d49-dental-abscess-annual"
+voice = "ef_dora"
+tags = [
+    "long", "vitals", "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "spoken-punctuation",
+    "proposal",
+]
+noise = ["hvac"]
+dates = []
+drugs = ["budesonide", "formoterol", "albuterol", "losartan", "amoxicillin", "ibuprofen"]
+forbidden = [
+    "send it to her usual pharmacy", "add latex to her allergy list", "Renew her albuterol inhaler",
+    "order a CBC and a CMP",
+]
+text = """
+Annual review for a [[41-year-old|forty-one-year-old]] woman with asthma {comma} hypertension and a painful lower
+molar {period} Her asthma has been well controlled on budesonide formoterol [[160/4.5|one sixty four point five]]
+two puffs twice daily {comma} and she uses albuterol about once a week before exercise {period} She has had no night
+waking and no emergency visits this year {period} Her blood pressure is treated with losartan [[50 mg|fifty milligrams]]
+daily and she checks it at home {period} For [[5 days|five days]] she has had throbbing pain in a lower left molar
+with swelling of the gum and pain on chewing {period} She saw her dentist yesterday {comma} who found an abscess and
+will treat it next week {period} She developed hives on her hands after the dentist used latex gloves {period} She
+drinks alcohol rarely and has never smoked {period} {new paragraph}
+On examination temperature [[37.4|thirty-seven point four]] {comma} blood pressure
+[[132/82|one thirty-two over eighty-two]] {comma} heart rate [[80|eighty]] {comma} oxygen saturation
+[[98%|ninety-eight percent]] {period} There is a tender swollen gum beside the lower left second molar with no
+spreading facial swelling {period} Chest is clear {period} {new paragraph}
+Assessment {colon} dental abscess of the lower left second molar {comma} asthma well controlled {comma} and
+hypertension at goal {period} {new paragraph}
+Plan {colon} start amoxicillin [[500 mg|five hundred milligrams]] three times a day for [[7 days|seven days]] and
+send it to her usual pharmacy {period} Ibuprofen [[400 mg|four hundred milligrams]] with food up to three times a day
+for pain {period} Please add latex to her allergy list {period} Continue budesonide formoterol and losartan {period}
+Renew her albuterol inhaler as well {period} She is due for routine blood work {comma} so go ahead and order a CBC
+and a CMP {period} Salt water rinses after meals {period} Return sooner for fever or facial swelling {period}
+"""
+
+[gold.subjective]
+value = "A 41-year-old woman with asthma, hypertension and a painful lower molar. Her asthma has been well controlled on budesonide formoterol 160/4.5 two puffs twice daily, and she uses albuterol about once a week before exercise. She has had no night waking and no emergency visits this year. Her blood pressure is treated with losartan 50 mg daily and she checks it at home. For 5 days she has had throbbing pain in a lower left molar with swelling of the gum and pain on chewing. She saw her dentist yesterday, who found an abscess and will treat it next week. She developed hives on her hands after the dentist used latex gloves. She drinks alcohol rarely and has never smoked."
+sources = [
+    "a 41-year-old woman with asthma, hypertension and a painful lower molar.",
+    "Her asthma has been well controlled on budesonide formoterol 160/4.5 two puffs twice daily, and she uses albuterol about once a week before exercise.",
+    "She has had no night waking and no emergency visits this year.",
+    "Her blood pressure is treated with losartan 50 mg daily and she checks it at home.",
+    "For 5 days she has had throbbing pain in a lower left molar with swelling of the gum and pain on chewing.",
+    "She saw her dentist yesterday, who found an abscess and will treat it next week.",
+    "She developed hives on her hands after the dentist used latex gloves.",
+    "She drinks alcohol rarely and has never smoked.",
+]
+
+[gold.objective]
+value = "Temperature 37.4, blood pressure 132/82, heart rate 80, oxygen saturation 98%. There is a tender swollen gum beside the lower left second molar with no spreading facial swelling. Chest is clear."
+sources = [
+    "temperature 37.4, blood pressure 132/82, heart rate 80, oxygen saturation 98%.",
+    "There is a tender swollen gum beside the lower left second molar with no spreading facial swelling.",
+    "Chest is clear.",
+]
+
+[gold.assessment]
+value = "Dental abscess of the lower left second molar, asthma well controlled, and hypertension at goal."
+sources = ["dental abscess of the lower left second molar, asthma well controlled, and hypertension at goal."]
+
+[gold.plan]
+value = "Start amoxicillin 500 mg three times a day for 7 days. Ibuprofen 400 mg with food up to three times a day for pain. Continue budesonide formoterol and losartan. She is due for routine blood work. Salt water rinses after meals. Return sooner for fever or facial swelling."
+sources = [
+    "start amoxicillin 500 mg three times a day for 7 days",
+    "Ibuprofen 400 mg with food up to three times a day for pain.",
+    "Continue budesonide formoterol and losartan.",
+    "She is due for routine blood work",
+    "Salt water rinses after meals.",
+    "Return sooner for fever or facial swelling.",
+]
+
+[[proposals]]
+kind = "order"
+words = "send it to her usual pharmacy"
+item = ""
+
+[[proposals]]
+kind = "allergy_addition"
+words = "add latex to her allergy list"
+item = "latex"
+
+[[proposals]]
+kind = "order"
+words = "Renew her albuterol inhaler"
+item = "albuterol"
+
+[[proposals]]
+kind = "order"
+words = "order a CBC and a CMP"
+item = "CBC and a CMP"

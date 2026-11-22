@@ -134,8 +134,12 @@ CREATE OR REPLACE TRIGGER ai_field_proposals_guard
 --       signed, in the same savepoint. In a READ COMMITTED transaction, as signing an order requires: before it looks
 --       for a refill request naming the order, it takes the order's advisory lock ('ehr.orders:' and its ID), as
 --       approving a refill request does before it looks for a proposal naming it, so of two transactions linking one
---       order the second waits for the first and then sees what it wrote. It is the last lock either takes (Lock order
---       in 77-refill-requests.sql); nothing that holds it waits for another, so it adds no deadlock.
+--       order the second waits for the first and then sees what it wrote. The app takes it last (Lock order in
+--       77-refill-requests.sql): it links only the order it has just signed, and waits for no other lock while holding
+--       it. A transaction written otherwise can deadlock on it: one that links an order and then signs another for the
+--       same patient (which locks the patient's row) against one that signs and then approves a refill request with
+--       that order. PostgreSQL then aborts one of them (40P01), and no order is linked wrongly: the other finds the
+--       aborted one's link gone and goes on as if it had come first.
 --     Recorded, by naming the allergy added for it: an active, coded allergy of the patient, not "No known allergies",
 --       added now by the clinician deciding, as its first row in ehr.chart_history says (written only by
 --       65-chart-lists.sql's trigger, as its owner): one that was there before and only changed now isn't. "Now" is

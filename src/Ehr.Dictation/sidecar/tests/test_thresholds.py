@@ -18,7 +18,7 @@ def test_the_values():
     assert (quality.SILENCE_DBFS, quality.MIN_SOUND_FRAMES) == (-60.0, 50)
     assert (segmenter.MIN_PAUSE, segmenter.KEEP, segmenter.MAX_SEGMENT) == (40, 300, 2000)
     assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 30, 600)
-    assert (validation.DIRECTIVE_REACH, validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (14, 5, 3)
+    assert (validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (5, 3)
     assert validation.WHOLE_DICTATION == 0.9
     assert validation.LIMITS == {"subjective": 3000, "objective": 3000, "assessment": 2000, "plan": 2000}
     limits = settings.Settings(api_key="k", llama_api_key="k")
@@ -80,12 +80,14 @@ def test_a_correction_counts_when_its_value_starts_within_three_words_of_the_cue
     assert own("Fever 3 days, sorry, it was only 2 days.", "Fever 3 days.", "Fever 3 days").pending
 
 
-def test_an_instruction_reaches_at_most_14_words_when_nothing_ends_its_clause():
+# No threshold since the expansion plan's step 15: an instruction reaches to the end of its clause however long, so no
+# tail of it is left to ground a value; a word that starts another clause still ends it.
+def test_an_instruction_reaches_to_the_end_of_its_clause_however_long():
     words = " ".join(f"item{chr(97 + i)}" for i in range(20))
-    text = transcript(f"order {words}")
+    text = transcript(f"order {words} then recheck in three months")
 
     (instruction,) = not_carried_over(text)
-    assert text.text[instruction["start"] : instruction["end"]].split() == ["order"] + words.split()[:14]
+    assert text.text[instruction["start"] : instruction["end"]].split() == ["order"] + words.split()
 
 
 def test_a_negation_within_3_words_makes_an_instruction_not_to_one_again():

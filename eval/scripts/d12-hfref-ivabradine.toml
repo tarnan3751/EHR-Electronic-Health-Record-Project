@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): heart failure clinic adding ivabradine, with a prescription order to leave out. Format: eval/README.md.
 id = "d12-hfref-ivabradine"
 voice = "hf_alpha"
-tags = ["long", "vitals", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
+tags = ["long", "vitals", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal"]
 noise = ["hvac"]
 dates = []
 drugs = ["sacubitril", "valsartan", "bisoprolol", "eplerenone", "dapagliflozin", "furosemide", "ivabradine"]
@@ -77,3 +77,8 @@ sources = [
     "He had his flu and pneumonia vaccines this autumn.",
     "Current medications: sacubitril valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozin 10 mg daily and furosemide 40 mg in the morning.",
 ]
+
+[[proposals]]
+kind = "order"
+words = "call that in to his usual pharmacy"
+item = ""

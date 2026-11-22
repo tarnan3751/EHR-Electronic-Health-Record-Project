@@ -1,0 +1,69 @@
+# Dictation test script (synthetic): hypothyroidism on levothyroxine, with a refill to propose beside orders made by someone else, asked about, already placed, quoted and for the next visit. Format: eval/README.md.
+id = "d47-hypothyroid-said-by-others"
+voice = "hm_omega"
+tags = [
+    "vitals", "numbers", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap",
+]
+dates = []
+drugs = ["levothyroxine"]
+forbidden = [
+    "order a sleep study", "put an order in for her mammogram", "order an MRI of her knee", "refill her levothyroxine",
+    "order a repeat lipid panel",
+]
+text = """
+This is a [[58-year-old|fifty-eight-year-old]] woman with hypothyroidism on levothyroxine
+[[75 mcg|seventy-five micrograms]] daily {period} She feels well {comma} her energy is good and her weight is stable
+{period} Her cardiologist ordered an echocardiogram last year {comma} which was normal {period} Her mother asked
+whether we could order a sleep study for her snoring {period} We already put an order in for her mammogram last week
+{period} She asked {comma} can you order an MRI of her knee {period} {new paragraph}
+On examination blood pressure [[126/78|one twenty-six over seventy-eight]] {comma} heart rate [[64|sixty-four]]
+{comma} thyroid not enlarged {period} Her TSH last month was [[2.1|two point one]] {period} {new paragraph}
+Assessment {colon} hypothyroidism {comma} well controlled {period} {new paragraph}
+Plan {colon} please refill her levothyroxine for [[90 days|ninety days]] {period} At the next visit we'll order a
+repeat lipid panel {period} Knee pain to be assessed at a separate appointment {period}
+"""
+
+[gold.subjective]
+value = "A 58-year-old woman with hypothyroidism on levothyroxine 75 mcg daily. She feels well, her energy is good and her weight is stable. Her cardiologist ordered an echocardiogram last year, which was normal."
+sources = [
+    "a 58-year-old woman with hypothyroidism on levothyroxine 75 mcg daily.",
+    "She feels well, her energy is good and her weight is stable.",
+    "Her cardiologist ordered an echocardiogram last year, which was normal.",
+]
+
+[gold.objective]
+value = "Blood pressure 126/78, heart rate 64, thyroid not enlarged. Her TSH last month was 2.1."
+sources = ["blood pressure 126/78, heart rate 64, thyroid not enlarged.", "Her TSH last month was 2.1."]
+
+[gold.assessment]
+value = "Hypothyroidism, well controlled."
+sources = ["hypothyroidism, well controlled."]
+
+[gold.plan]
+value = "Knee pain to be assessed at a separate appointment."
+sources = ["Knee pain to be assessed at a separate appointment."]
+
+[[proposals]]
+kind = "order"
+words = "refill her levothyroxine"
+item = "levothyroxine"
+
+[[not_proposed]]
+words = "ordered an echocardiogram"
+why = "not_an_instruction"
+
+[[not_proposed]]
+words = "order a sleep study"
+why = "hedged"
+
+[[not_proposed]]
+words = "put an order in for her mammogram"
+why = "in_the_past"
+
+[[not_proposed]]
+words = "order an MRI of her knee"
+why = "quoted"
+
+[[not_proposed]]
+words = "order a repeat lipid panel"
+why = "for_later"
