@@ -10,9 +10,11 @@ using static Ehr.Web.Tests.Browser;
 namespace Ehr.Web.Tests;
 
 // The expansion plan's step 15 (FR-14 as reworded): the orders and allergies to add a dictation proposes, through the web
-// app as each site. The service's proposals reach the review only as its listed instructions, staged once, and none of
-// them puts anything on the chart. The stub proposes both kinds (step 14's lesson: a stub that proposes nothing keeps
-// regressions green).
+// app as each site. The service's proposals reach the review only as its listed instructions, staged once; each is opened
+// in the order form or the allergy form, which fill in nothing from it, and decided there once; nothing is ordered or
+// added on the chart by any of it otherwise. The stub proposes both kinds, so each test follows an order and an allergy
+// (step 14's lesson: a stub that proposes nothing keeps regressions green). The forms themselves are UC 1's and UC 4's
+// test cases (TestCases/UC1, TestCases/UC4).
 public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 {
     readonly DictationSidecarStub sidecar = apps.Dictation.Reset();
@@ -130,6 +132,11 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         "SELECT (SELECT count(*) FROM ehr.orders WHERE patient_id = @id) || ' orders, ' || (SELECT count(*) FROM ehr.allergy_intolerances WHERE patient_id = @id) || ' allergies'",
         patient)).Single();
 
+    internal static string OrderFormPath(Guid patient, Guid proposal, string? type = null) =>
+        $"/patients/{patient}/orders/new?{(type is null ? "" : $"type={type}&")}proposal={proposal}";
+
+    internal static string AllergyFormPath(Guid patient, Guid proposal) => $"/patients/{patient}/allergies?proposal={proposal}";
+
     // TC-UC10-09, through the web app: what the service proposes comes back with the result as it sent it, at its listed
     // instructions' places, in no field; staging keeps each as a waiting proposal of its review, in its order, and puts
     // nothing on the chart.
@@ -225,5 +232,79 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             SELECT (SELECT count(*) FROM ehr.ai_chart_proposals WHERE review_id = @id) || ' ' || (SELECT count(*) FROM ehr.ai_field_proposals WHERE review_id = @id)
                 || ' ' || state FROM ehr.ai_note_reviews WHERE id = @id
             """, stopped.Review));
+    }
+
+    // "Sign order" for a lab test on the order form opened from the dictation's order proposal, as the form posts it
+    // without JavaScript, with any reasons it asks for: the page it ends on.
+    internal static async Task<HttpResponseMessage> UC1OrderAsync(Dictated dictated, string item, string type = "lab",
+        (string Name, string Value)[]? details = null, string? duplicateReason = null, string? safetyReason = null, HttpClient? client = null)
+    {
+        client ??= dictated.Session.Client;
+        var path = OrderFormPath(dictated.Patient, dictated.Order, type);
+        var token = Token(await client.GetStringAsync(path, Cancel));
+        (string, object)[] reasons =
+        [
+            .. duplicateReason is null ? [] : new[] { ("DuplicateReason", (object)duplicateReason) },
+            .. safetyReason is null ? [] : new[] { ("SafetyReason", (object)safetyReason) },
+        ];
+        return await client.PostAsync(path, Form([("__RequestVerificationToken", token), ("Item", item), ("SafetySeen", "true"),
+            .. (details ?? OrderTests.Cbc).Select(d => ($"Details[{d.Name}]", (object)d.Value)), .. reasons]), Cancel);
+    }
+
+    // Two tabs signing, or saving, one proposal at once, each having read it waiting: the database holds the second behind
+    // the first on the patient's row, finds the proposal decided when its turn comes, and its form goes back to its
+    // savepoint, so it leaves no order or allergy behind and says so. The test holds the patient's row itself until both
+    // are waiting there, so the two run in that order every time.
+    [Theory]
+    [InlineData("order")]
+    [InlineData("allergy")]
+    public async Task Two_tabs_deciding_one_proposal_at_once_leave_one_decision_and_nothing_else(string kind)
+    {
+        var dictated = await DictateAsync(apps);
+        var (path, proposal, table) = kind == "order"
+            ? (OrderFormPath(dictated.Patient, dictated.Order, "lab"), dictated.Order, "orders")
+            : (AllergyFormPath(dictated.Patient, dictated.Allergy), dictated.Allergy, "allergy_intolerances");
+        (string Name, object Value)[][] posts = kind == "order"
+            ? [[("Item", "Lipid panel"), ("Details[indication]", "Synthetic fatigue")], [("Item", "Hemoglobin A1c"), ("Details[indication]", "Synthetic fatigue")]]
+            : [[("Name", "Penicillin G"), ("Status", "active")], [("Name", "Amoxicillin"), ("Status", "active")]];
+        var tokens = new[] { Token(await dictated.Session.Client.GetStringAsync(path, Cancel)), Token(await dictated.Session.Client.GetStringAsync(path, Cancel)) };
+
+        await using var holding = await apps.OpenDatabaseAsync();
+        await using var held = await holding.BeginTransactionAsync(Cancel);
+        await using (var hold = new NpgsqlCommand("SELECT 1 FROM ehr.patients WHERE id = @id FOR NO KEY UPDATE", holding, held))
+        {
+            hold.Parameters.AddWithValue("id", dictated.Patient);
+            await hold.ExecuteNonQueryAsync(Cancel);
+        }
+
+        var sent = tokens.Select((token, tab) => dictated.Session.Client.PostAsync(path,
+            Form([("__RequestVerificationToken", token), ("SafetySeen", "true"), .. posts[tab]]), Cancel)).ToArray();
+        // Watched from a connection of its own: a transaction sees the server's activity as it was when it first looked.
+        await using var watching = await apps.OpenDatabaseAsync();
+        for (var tries = 0; ; tries++)
+        {
+            await using var count = new NpgsqlCommand(
+                $"SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'INSERT INTO ehr.{table}%'", watching);
+            if ((long)(await count.ExecuteScalarAsync(Cancel))! >= 2)
+            {
+                break;
+            }
+
+            Assert.True(tries < 200, "The two tabs never both waited for the patient's row.");
+            await Task.Delay(50, Cancel);
+        }
+
+        await held.CommitAsync(Cancel);
+        var responses = await Task.WhenAll(sent);
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], responses.Select(r => r.StatusCode).Order());
+        var refused = responses.Single(r => r.StatusCode == HttpStatusCode.Conflict);
+        Assert.Contains("Not saved: this proposal was decided first, in another tab or window.", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        var written = await QueryAsync(apps, $"SELECT id FROM ehr.{table} WHERE patient_id = @id", dictated.Patient);
+        Assert.Single(written);
+        Assert.Equal(kind == "order" ? $"ordered|{written[0]}|-" : $"recorded|-|{written[0]}", await StateAsync(apps, proposal));
+        foreach (var response in responses)
+        {
+            response.Dispose();
+        }
     }
 }

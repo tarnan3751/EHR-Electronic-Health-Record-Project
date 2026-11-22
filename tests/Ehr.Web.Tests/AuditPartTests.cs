@@ -117,6 +117,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("refill order form", "patients refills")]
     [InlineData("note editor", "clinical_drafts note-draft", "patients note-draft")]
     [InlineData("note vital signs", "patients vitals")]
+    [InlineData("proposed order form", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "patients orders")]
+    [InlineData("proposed allergy form", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "patients lists")]
     public async Task Each_api_and_page_that_needs_an_entry_records_its_part(string what, params string[] reads)
     {
         var (clinician, session, patient) = await PatientAsync();
@@ -165,6 +167,14 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
                 var refill = await RefillRequestTests.RequestIdAsync(apps, patient.Patient);
                 var refillPath = what == "refill review" ? RefillRequestTests.ReviewPath(patient.Patient, refill) : RefillRequestTests.ApprovePath(patient.Patient, refill);
                 request = () => session.Client.GetAsync(refillPath, Cancel);
+                break;
+            case "proposed order form" or "proposed allergy form":
+                // Step 15: what a dictation proposes, read on the forms opened from it.
+                var dictated = await DictationProposalTests.DictateAsync(apps, session, patient.Patient);
+                var proposed = what == "proposed order form"
+                    ? DictationProposalTests.OrderFormPath(patient.Patient, dictated.Order)
+                    : DictationProposalTests.AllergyFormPath(patient.Patient, dictated.Allergy);
+                request = () => session.Client.GetAsync(proposed, Cancel);
                 break;
             case "note editor" or "note vital signs":
                 // A draft's editor, and the vital signs it offers for Objective when asked (step 14).

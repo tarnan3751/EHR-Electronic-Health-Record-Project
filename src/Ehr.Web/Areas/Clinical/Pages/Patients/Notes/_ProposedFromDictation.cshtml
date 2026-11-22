@@ -1,0 +1,15 @@
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ProposedFromDictation
+@* The expansion plan's step 15: the order form or the allergy form, opened from what the clinician's dictation proposed.
+   Nothing in the form was filled in from it: the clinician's own words are shown here, marked in what they said around
+   them, to check every field against. *@
+<section class="sc-notice sc-notice--warning" data-proposed-from-dictation="@Model.Row.Id" aria-labelledby="proposed-from-dictation">
+    <p id="proposed-from-dictation"><span class="sc-notice__state">Proposed from dictation:</span> check every field. Nothing here was filled in from it. @(Model.IsOrder
+        ? "It opens one order: order anything else it names from the chart."
+        : "It adds one allergy: add anything else it names from the chart.")</p>
+    <p class="sc-proposal__value" data-proposed-words>@Model.Before<mark class="sc-transcript__source">@Model.Words</mark>@Model.After</p>
+    @foreach (var warning in Model.Warnings)
+    {
+        <p class="sc-proposal__warning">Check: @Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ProposedFromDictation.WarningWords(warning.Code) “@warning.Said”</p>
+    }
+    <p>Dictated @Clinic.Format(Model.DictatedAt). <a asp-page="/Patients/Notes/Review" asp-route-patientId="@Model.Row.PatientId" asp-route-draftId="@Model.DraftId" asp-route-reviewId="@Model.Row.ReviewId">Back to the review</a></p>
+</section>

@@ -90,6 +90,52 @@ public sealed partial class ChartLists(EhrDbContext db)
         SaveAsync(condition, isNew, cancellationToken, nameof(Condition.Code), nameof(Condition.Display), nameof(Condition.ClinicalStatus),
             nameof(Condition.OnsetDate), nameof(Condition.Sensitive));
 
+    // Adds an allergy the clinician's dictation proposed (the expansion plan's step 15) and decides the proposal with it,
+    // in one savepoint: both, or neither. The allergy is added as SaveAsync adds any; the database holds the proposal to a
+    // coded allergy added now by this clinician (55-ai-review.sql). Refused as SaveAsync refuses; Decided when the
+    // proposal was decided first: nothing is saved then, the allergy included.
+    public async Task<ProposedAllergy> AddProposedAsync(AllergyIntolerance allergy, Guid proposal, CancellationToken cancellationToken)
+    {
+        const string savepoint = "proposed_allergy";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+        if (!await SaveAsync(allergy, isNew: true, cancellationToken))
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            return ProposedAllergy.Refused;
+        }
+
+        // A stand-in for the row, with its key and the state it must still be in: only the decision is sent.
+        var row = new AiChartProposal
+        {
+            Id = proposal,
+            PatientId = allergy.PatientId,
+            Kind = AiChartProposalKinds.AllergyAddition,
+            State = AiChartProposalStates.Pending,
+        };
+        var entry = db.Attach((object)row);
+        row.State = AiChartProposalStates.Recorded;
+        row.AllergyId = allergy.Id;
+        entry.Property(nameof(AiChartProposal.State)).IsModified = true;
+        entry.Property(nameof(AiChartProposal.AllergyId)).IsModified = true;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.ReleaseSavepointAsync(savepoint, cancellationToken);
+            return ProposedAllergy.Saved;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // No waiting proposal this clinician may decide: decided first, in another tab.
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            return ProposedAllergy.Decided;
+        }
+        finally
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
     // Records that the patient has no known allergies: an entry of its own, so a chart can tell it from no allergy
     // information at all. The database refuses it for a patient with an active allergy recorded, and makes it inactive
     // when one is added (db/policies/65-chart-lists.sql). False when it was refused.
@@ -150,4 +196,16 @@ public sealed partial class ChartLists(EhrDbContext db)
     // What was typed, with LIKE's own characters taken literally.
     static string Like(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal)
         .Replace("_", "\\_", StringComparison.Ordinal);
+}
+
+// How adding an allergy a dictation proposed went (ChartLists.AddProposedAsync).
+public enum ProposedAllergy
+{
+    Saved,
+
+    // The database refused the allergy: the patient isn't on the clinician's panel. Nothing is saved.
+    Refused,
+
+    // The proposal was decided first, in another tab. Nothing is saved, the allergy included.
+    Decided,
 }

@@ -234,10 +234,15 @@ public sealed record InboxPage(IReadOnlyList<InboxEntry> Items, bool More);
 public sealed record PatientHeader(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies);
 
 // The form that adds or changes one entry of a patient's allergies, medications or diagnoses, already recorded as one
-// read of the patient: the banner's patient and allergies, and the entry being changed, when there is one.
+// read of the patient: the banner's patient and allergies, and the entry being changed, when there is one; or the
+// allergy to add the clinician's dictation proposed, when it was opened from one (the expansion plan's step 15).
 public sealed record ChartEntryForm(
     Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, AllergyIntolerance? Allergy = null, MedicationStatement? Medication = null,
-    Condition? Condition = null);
+    Condition? Condition = null, DictatedProposal? Proposal = null);
+
+// An order or an allergy to add the clinician's dictation proposed (the expansion plan's step 15), for the form opened from
+// it: the proposal, and its review, whose stored result holds its words. Already recorded as read.
+public sealed record DictatedProposal(AiChartProposal Proposal, AiNoteReview Review);
 
 // One change to a patient's allergies, medications or diagnoses, as the history page lists it.
 public sealed record ChartChange(string TableName, Guid RowId, DateTimeOffset ChangedAt, string? ChangedBy, string? Before, string After);
@@ -259,6 +264,9 @@ public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance
     public Ehr.Domain.Refills.RefillReview? Refill { get; init; }
 
     public bool RenewsRefill { get; init; }
+
+    // Step 15: the order the clinician's dictation proposed, when the form was opened from it.
+    public DictatedProposal? Proposal { get; init; }
 }
 
 // UC 1: a patient's discontinued orders as their page lists them, already recorded as one read of the patient. More is

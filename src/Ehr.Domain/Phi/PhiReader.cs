@@ -196,7 +196,9 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     // The form for one entry of a chart list: the patient, their allergies for the banner and, when changing an entry,
     // that entry, which must be this patient's. One recorded read of the patient: of sensitive items, when the entry
     // is sensitive, since the form shows it.
-    public async Task<ChartEntryForm?> ChartEntryAsync(Guid id, string? table, Guid? entry, CancellationToken cancellationToken)
+    // Step 15: `proposal` is an allergy to add that the clinician's dictation proposed: it comes back with the form when it
+    // is this patient's and theirs, its read recorded too.
+    public async Task<ChartEntryForm?> ChartEntryAsync(Guid id, string? table, Guid? entry, CancellationToken cancellationToken, Guid? proposal = null)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (patient is null)
@@ -214,6 +216,11 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
                 "conditions" => form with { Condition = await db.Conditions.AsNoTracking().SingleOrDefaultAsync(c => c.Id == entry && c.PatientId == id, cancellationToken) },
                 _ => form,
             };
+        }
+
+        if (proposal is { } proposed)
+        {
+            form = form with { Proposal = await ReadProposalAsync(id, proposed, AiChartProposalKinds.AllergyAddition, cancellationToken) };
         }
 
         var showsSensitive = form.Medication?.Sensitive == true || form.Condition?.Sensitive == true;
@@ -267,7 +274,10 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     // order being replaced: it comes back when it is an active order of this patient, and isn't counted as a duplicate.
     // Step 13d: `refill` is a refill request the order approves; it comes back when it is this patient's, with whether the
     // chosen item renews its medication, and showing it is a view of sensitive items when the request is sensitive.
-    public async Task<OrderForm?> OrderFormAsync(Guid id, string? catalogCode, Guid? replaces, CancellationToken cancellationToken, Guid? refill = null)
+    // Step 15: `proposal` is an order the clinician's dictation proposed: it comes back when it is this patient's and
+    // theirs, its read recorded too.
+    public async Task<OrderForm?> OrderFormAsync(Guid id, string? catalogCode, Guid? replaces, CancellationToken cancellationToken, Guid? refill = null,
+        Guid? proposal = null)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (patient is null)
@@ -285,12 +295,13 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         var request = refill is { } asked ? await ReadRefillAsync(patient, allergies, asked, cancellationToken) : null;
         // The product that was asked for, which the chart's entry must still have (77-refill-requests.sql).
         var renews = request is not null && catalogCode is not null && catalogCode == request.AskedCode && catalogCode == request.Medication.Code;
+        var proposed = proposal is { } dictated ? await ReadProposalAsync(id, dictated, AiChartProposalKinds.Order, cancellationToken) : null;
 
         // The order form for a refill request (step 13d) is part of answering it: the refill requests'.
         audit.Record(request?.Sensitive == true ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id,
             part: refill is null ? AuditParts.Orders : AuditParts.Refills);
         await db.SaveChangesAsync(cancellationToken);
-        return new OrderForm(patient, allergies, duplicates, replaced) { Warnings = warnings, Refill = request, RenewsRefill = renews };
+        return new OrderForm(patient, allergies, duplicates, replaced) { Warnings = warnings, Refill = request, RenewsRefill = renews, Proposal = proposed };
     }
 
     // UC 1: a patient's discontinued orders, newest first, each with who discontinued it, when and why, and the order
@@ -1218,6 +1229,25 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         }
 
         return proposals;
+    }
+
+    // One proposal of the patient's of the given kind, for the form opened from it (the expansion plan's step 15), with
+    // its review, whose stored result holds its words: both recorded as read, a note being written. Null when it isn't
+    // this patient's, of that kind, or the reader's own.
+    async Task<DictatedProposal?> ReadProposalAsync(Guid patient, Guid proposalId, string kind, CancellationToken cancel)
+    {
+        var row = await (
+            from proposal in db.AiChartProposals.AsNoTracking()
+            join review in db.AiNoteReviews.AsNoTracking() on proposal.ReviewId equals review.Id
+            where proposal.Id == proposalId && proposal.PatientId == patient && proposal.Kind == kind && review.ClinicianId == user.UserId
+            select new DictatedProposal(proposal, review)).SingleOrDefaultAsync(cancel);
+        if (row is not null)
+        {
+            audit.Record(AuditActions.Read, patient, "ai_chart_proposals", row.Proposal.Id, part: AuditParts.NoteDraft);
+            audit.Record(AuditActions.Read, patient, "ai_note_reviews", row.Review.Id, part: AuditParts.NoteDraft);
+        }
+
+        return row;
     }
 
     // The FHIR API (the expansion plan's step 11). Each read of entries below is one view of one patient, so one recorded

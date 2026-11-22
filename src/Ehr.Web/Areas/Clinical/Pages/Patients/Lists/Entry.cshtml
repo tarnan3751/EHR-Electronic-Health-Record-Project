@@ -19,9 +19,18 @@
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to the chart</a></p>
 </div>
 <h1>@heading: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Proposed is { } proposed)
+{
+    <partial name="~/Areas/Clinical/Pages/Patients/Notes/_ProposedFromDictation.cshtml" model="proposed" />
+}
 
 <form method="post" class="sc-form">
-    @if (Model.Errors.Count > 0)
+    @if (Model.ProposalDecided)
+    {
+        @* Step 15: nothing was added, so nothing waits to be undone. *@
+        <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> this proposal was decided first, in another tab or window. Nothing was added. <a href="@Model.ReviewLink">Go back to the review</a>.</p>
+    }
+    else if (Model.Errors.Count > 0)
     {
         <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> fix the highlighted fields and save again.</p>
     }
@@ -72,7 +81,14 @@
     }
     <div class="sc-actions">
         <button type="submit" class="sc-btn sc-btn--primary">Save @Model.About.One</button>
-        <a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Cancel</a>
+        @if (Model.ReviewLink is { } review)
+        {
+            <a href="@review">Cancel</a>
+        }
+        else
+        {
+            <a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Cancel</a>
+        }
     </div>
 </form>
 
