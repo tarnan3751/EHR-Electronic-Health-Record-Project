@@ -177,8 +177,8 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
     }
 
     // Which of the note's sections (NoteContent.Sections) a proposed field goes into. A dictation sorted before the
-    // expansion plan's step 14 proposes a History, which goes into Subjective, where the editor asks for what belongs in
-    // Objective to be moved there (the same as an earlier draft's History).
+    // expansion plan's step 14, whose review may still be waiting, proposes a History, which goes into Subjective, where
+    // the editor asks for what belongs in Objective to be moved there (the same as an earlier draft's History).
     static int Section(string field) => field switch
     {
         "history" or "subjective" => 0,

@@ -13,12 +13,12 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
     sealed record Review(Guid Actor, Guid Patient, Guid Draft, Guid Id, Guid Proposal);
     const string Result = """
-        {"sorting":"done","fields":{"history":{"status":"pending","value":"Synthetic proposal","sources":[{"start":0,"end":18}],"warnings":[]}}}
+        {"sorting":"done","fields":{"subjective":{"status":"pending","value":"Synthetic proposal","sources":[{"start":0,"end":18}],"warnings":[]}}}
         """;
     const string Stage = """
         UPDATE ehr.ai_note_reviews SET state = 'pending', result_json = @result::jsonb WHERE id = @review;
         INSERT INTO ehr.ai_field_proposals (id, review_id, patient_id, field, original_value, state)
-        VALUES (@proposal, @review, @patient, 'history', 'Synthetic proposal', 'pending');
+        VALUES (@proposal, @review, @patient, 'subjective', 'Synthetic proposal', 'pending');
         """;
     const string Sign = """
         INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan, signer_id, signed_at)
@@ -57,6 +57,27 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
     {
         var error = await Assert.ThrowsAsync<PostgresException>(() => Execute(row, sql));
         Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+    }
+
+    // The expansion plan's step 14 (TC-UC10-08): proposals are staged only for the note's four fields, so a History, the
+    // first of the three fields before then, is refused even when the stored result names one. A History proposal staged
+    // before then is still decided, as any proposal is.
+    [Fact]
+    public async Task Only_the_four_fields_are_staged_and_a_history_staged_before_them_is_still_decided()
+    {
+        // A result and a proposal that name a History, matching each other: only the field's name is wrong.
+        var stageHistory = Stage.Replace("'subjective'", "'history'", StringComparison.Ordinal);
+        (string Name, object Value)[] WithHistory(Review review) =>
+            [.. Parameters(review).Where(parameter => parameter.Name != "result"), ("result", Result.Replace("\"subjective\"", "\"history\"", StringComparison.Ordinal))];
+        var row = await RecordingAsync();
+        var refused = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, row.Actor, stageHistory, WithHistory(row)));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, refused.SqlState);
+        Assert.Equal(["0"], await Query(row, "SELECT count(*) FROM ehr.ai_field_proposals WHERE review_id = @review"));
+
+        var earlier = await RecordingAsync();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "SET LOCAL session_replication_role = replica;\n" + stageHistory, WithHistory(earlier));
+        await Execute(earlier, "UPDATE ehr.ai_field_proposals SET state = 'accepted', approved_value = original_value, decision_key = gen_random_uuid() WHERE id = @proposal");
+        Assert.Equal(["history accepted"], await Query(earlier, "SELECT field || ' ' || state FROM ehr.ai_field_proposals WHERE id = @proposal"));
     }
 
     [Fact]

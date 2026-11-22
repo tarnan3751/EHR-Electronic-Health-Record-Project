@@ -21,9 +21,8 @@ public static class NoteSections
     // A draft last saved by the desktop app, whose plain text the web hasn't sorted into sections since (UC 8).
     public const string DraftText = "Draft text";
 
-    // What each section holds, as the editor says under its heading. Assessment's and Plan's are the dictation note
-    // schema's descriptions word for word (src/Ehr.Dictation/schema/note-fields.schema.json, whose $comment asks the
-    // editor to use them; a test checks); Subjective's and Objective's divide what that schema's History holds today.
+    // What each section holds, as the editor says under its heading: the dictation note schema's descriptions word for
+    // word (src/Ehr.Dictation/schema/note-fields.schema.json, whose $comment asks the editor to use them; a test checks).
     public static readonly IReadOnlyDictionary<string, string> Definitions = new Dictionary<string, string>
     {
         [Subjective] = "What the patient reports: the reason for the visit, the symptoms and their timing, the relevant past and family history, medications and allergies, and readings they took at home.",

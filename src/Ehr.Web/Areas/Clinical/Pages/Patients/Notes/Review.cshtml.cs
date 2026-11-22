@@ -29,6 +29,14 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 
     public object Snapshot => new { Review.State, version = Draft.Version, result = Result, proposals = Proposals };
 
+    // The fields the review shows: Subjective, Objective, Assessment and Plan (the expansion plan's step 14), or, for a
+    // dictation sorted before then, its History, Assessment and Plan, as it was saved.
+    public IReadOnlyList<string> FieldNames { get; private set; } = Fields;
+
+    static readonly string[] Fields = ["subjective", "objective", "assessment", "plan"];
+
+    static readonly string[] EarlierFields = ["history", "assessment", "plan"];
+
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid draftId, Guid reviewId) =>
         await LoadAsync(patientId, draftId, reviewId) ?? Page();
 
@@ -70,9 +78,10 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
         if (draft is null) return NotFound();
         Review = review;
         Draft = draft;
-        Proposals = (await Phi.AiProposalsAsync(reviewId, HttpContext.RequestAborted))
-            .OrderBy(p => Array.IndexOf(new[] { "history", "assessment", "plan" }, p.Field)).ToList();
         Result = review.ResultJson is null ? null : JsonSerializer.Deserialize<DictationResult>(review.ResultJson, Json);
+        var proposals = await Phi.AiProposalsAsync(reviewId, HttpContext.RequestAborted);
+        FieldNames = Result?.Fields?.History is not null || proposals.Any(p => p.Field == "history") ? EarlierFields : Fields;
+        Proposals = proposals.OrderBy(p => FieldNames.ToList().IndexOf(p.Field)).ToList();
         Signed = await Phi.SignedDraftAsync(draftId, patientId, HttpContext.RequestAborted) is not null;
         return null;
     }

@@ -47,7 +47,7 @@ namespace Ehr.Web.Api.Dictation;
 // UTF-16 offsets into text; unclear is null, "too_quiet", "too_noisy" or "low_confidence".
 //
 // The result: {transcript, sorting, reason?, message?, fields, notCarriedOver, provenance}, with sorting "pending",
-// "done" or "unavailable". fields is null, or {history, assessment, plan}, each either {status: "pending", value, sources:
+// "done" or "unavailable". fields is null, or {subjective, objective, assessment, plan}, each either {status: "pending", value, sources:
 // [{start, end}], warnings: [{code, start, end}]}, a proposal for the clinician to approve, or {status: "empty",
 // reasons: [code, ...]}: nothing dictated, or discarded by validation, with the reasons' codes and never the discarded
 // text. A warning is "possible_correction", pointing at a later number, date or drug in the transcript that may be a

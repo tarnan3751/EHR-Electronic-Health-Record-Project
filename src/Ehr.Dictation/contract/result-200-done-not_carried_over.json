@@ -36,7 +36,13 @@
     "sorting": "done",
     "reason": null,
     "fields": {
-      "history": {
+      "subjective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "objective": {
         "status": "empty",
         "reasons": [
           "not_dictated"

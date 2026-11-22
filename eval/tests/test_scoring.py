@@ -11,7 +11,7 @@ from ehr_eval.scripts import load_all
 
 def item(script: str, hypothesis: str, tags=("accent:us",), seconds=30.0, **fields) -> Item:
     return Item(variant=f"{script}-x", script=script, tags=list(tags), seconds=seconds, hypothesis=hypothesis,
-                sorting="done", fields={n: fields.get(n, FieldOutcome()) for n in ("history", "assessment", "plan")},
+                sorting="done", fields={n: fields.get(n, FieldOutcome()) for n in ("subjective", "objective", "assessment", "plan")},
                 timings={"decode": 0.1, "transcribe": 1.0, "structure": 10.0})
 
 
@@ -52,11 +52,11 @@ def test_fields_are_scored_against_the_rule_following_gold_and_the_clinical_gold
     from ehr_eval.scripts import load_all
 
     write_script(eval_dir / "scripts", "d03", "Mother had a stroke at [[70|seventy]] {period}",
-                 history="Stroke at age 70 in her mother.", history_sources=["Mother had a stroke at 70"],
-                 rules='\n[gold_rules.history]\nvalue = "Mother had a stroke at 70."\nsources = ["Mother had a stroke at 70"]\n')
+                 subjective="Stroke at age 70 in her mother.", subjective_sources=["Mother had a stroke at 70"],
+                 rules='\n[gold_rules.subjective]\nvalue = "Mother had a stroke at 70."\nsources = ["Mother had a stroke at 70"]\n')
     scripts = load_all(eval_dir / "scripts")
 
-    metrics = score([item("d03", "x", history=pending("Mother had a stroke at 70."))], scripts)
+    metrics = score([item("d03", "x", subjective=pending("Mother had a stroke at 70."))], scripts)
 
     assert metrics["fields"]["content"]["f1"] == 1.0
     clinical = metrics["fields_clinical"]["content"]
@@ -65,13 +65,13 @@ def test_fields_are_scored_against_the_rule_following_gold_and_the_clinical_gold
 
 def test_fields_detection_and_content(scripts):
     items = [
-        item("d01", "x", history=pending("Cough for 3 days."), plan=pending("Rest.")),
-        item("d01", "x", history=pending("Cough."), assessment=pending("Viral illness.")),
+        item("d01", "x", subjective=pending("Cough for 3 days."), plan=pending("Rest.")),
+        item("d01", "x", subjective=pending("Cough."), assessment=pending("Viral illness.")),
     ]
 
     fields = score(items, scripts)["fields"]
 
-    # Gold: history and plan in both runs. Offered: both in the first; history and an unwanted assessment in the second.
+    # Gold: subjective and plan in both runs. Offered: both in the first; subjective and an unwanted assessment in the second.
     assert fields["detection"] | {} == {"tp": 3, "fp": 1, "fn": 1, "precision": 0.75, "recall": 0.75, "f1": 0.75}
     assert fields["content"]["precision"] == round(5 / 7, 4)
     assert fields["content"]["recall"] == round(5 / 8, 4)
@@ -79,7 +79,7 @@ def test_fields_detection_and_content(scripts):
 
 
 def test_validation_pass_rate_and_reasons(scripts):
-    items = [item("d01", "x", history=pending("Cough for 3 days."), plan=failed("Rest 5 days.", "number_not_in_sources"))]
+    items = [item("d01", "x", subjective=pending("Cough for 3 days."), plan=failed("Rest 5 days.", "number_not_in_sources"))]
     items[0].unknown = ["orders"]
 
     validation = score(items, scripts)["validation"]
@@ -89,7 +89,7 @@ def test_validation_pass_rate_and_reasons(scripts):
 
 
 def test_unsupported_content_in_proposed_and_offered_values(scripts):
-    items = [item("d01", "Cough for three days.", history=pending("Cough for 3 days."),
+    items = [item("d01", "Cough for three days.", subjective=pending("Cough for 3 days."),
                   plan=failed("Antibiotics.", "unsupported_content"))]
 
     unsupported = score(items, scripts)["unsupported_content"]
@@ -106,7 +106,7 @@ def test_an_order_slipped_into_an_offered_value_is_counted(scripts):
 
 def test_false_discards_are_counted_where_the_gold_has_legitimate_content(scripts):
     items = [
-        item("d02", "x", history=failed("Order aprocitentan.", "order_or_allergy_change")),
+        item("d02", "x", subjective=failed("Order aprocitentan.", "order_or_allergy_change")),
         item("d01", "x", plan=failed("Order rest.", "order_or_allergy_change")),
         item("d02", "x", plan=failed("Order a chest X-ray.", "order_or_allergy_change")),
     ]
@@ -115,7 +115,7 @@ def test_false_discards_are_counted_where_the_gold_has_legitimate_content(script
 
     assert order_allergy["shown"] == 0
     assert order_allergy["discarded_by_rule"] == 3
-    # d02's plan has no gold, so throwing it away lost nothing; d02's history and d01's plan were legitimate.
+    # d02's plan has no gold, so throwing it away lost nothing; d02's subjective and d01's plan were legitimate.
     assert order_allergy["legitimate_fields_lost"] == 2
     assert order_allergy["lost_where_nothing_was_attempted"] == 1
     # Of the four fields with legitimate gold content across the three runs.
@@ -201,7 +201,7 @@ def test_a_retracted_value_offered_is_counted(scripts):
     import dataclasses
 
     retracting = {"d01": dataclasses.replace(scripts["d01"], retracted=("4 days",)), "d02": scripts["d02"]}
-    items = [item("d01", "x", history=pending("Cough for 4 days."))]
+    items = [item("d01", "x", subjective=pending("Cough for 4 days."))]
 
     assert score(items, retracting)["order_allergy"]["retracted_shown"] == 1
     assert score(items, retracting)["order_allergy"]["retracted_shown_unflagged"] == 1
@@ -213,7 +213,7 @@ def test_a_retracted_value_with_a_warning_is_counted_apart(scripts):
     retracting = {"d01": dataclasses.replace(scripts["d01"], retracted=("4 days",)), "d02": scripts["d02"]}
     warned = dataclasses.replace(pending("Cough for 4 days."), warnings=[["possible_correction", 9, 15]])
 
-    order_allergy = score([item("d01", "x", history=warned)], retracting)["order_allergy"]
+    order_allergy = score([item("d01", "x", subjective=warned)], retracting)["order_allergy"]
 
     assert (order_allergy["retracted_shown"], order_allergy["retracted_shown_unflagged"]) == (1, 0)
 
@@ -227,10 +227,10 @@ def test_each_warnings_catches_and_false_alarms_are_counted(scripts):
         return dataclasses.replace(pending(value), warnings=list(warnings))
 
     items = [
-        item("d01", "x", tags=["noise:none"], history=warned("Cough for 3 days.", correction)),
-        item("d01", "x", tags=["noise:none"], history=pending("Cough for 3 days.")),
-        item("d01", "x", tags=["noise:babble@5dB"], history=warned("Cough for 3 days.", unclear)),
-        item("d01", "x", history=warned("Cough for 4 days.", correction)),  # caught
+        item("d01", "x", tags=["noise:none"], subjective=warned("Cough for 3 days.", correction)),
+        item("d01", "x", tags=["noise:none"], subjective=pending("Cough for 3 days.")),
+        item("d01", "x", tags=["noise:babble@5dB"], subjective=warned("Cough for 3 days.", unclear)),
+        item("d01", "x", subjective=warned("Cough for 4 days.", correction)),  # caught
     ]
 
     warnings = score(items, retracting)["warnings"]
@@ -245,7 +245,7 @@ def test_each_warnings_catches_and_false_alarms_are_counted(scripts):
 
 
 def test_fields_are_scored_per_tag(scripts):
-    items = [item("d01", "x", tags=["recombination"], history=pending("Cough for 3 days."), plan=pending("Rest.")),
+    items = [item("d01", "x", tags=["recombination"], subjective=pending("Cough for 3 days."), plan=pending("Rest.")),
              item("d02", "x", tags=["mixed-plan"])]
 
     by_tag = score(items, scripts)["fields"]["by_tag"]
@@ -271,5 +271,5 @@ def test_a_drug_named_but_in_no_gold_value_must_not_be_offered(scripts):
     items = [item("d01", "x", plan=pending("Prednisolone 20 mg daily."))]
 
     assert score(items, stopping)["order_allergy"]["drug_not_in_gold_shown"] == 1
-    assert score([item("d02", "x", history=pending("Takes aprocitentan daily."))], scripts)["order_allergy"][
+    assert score([item("d02", "x", subjective=pending("Takes aprocitentan daily."))], scripts)["order_allergy"][
         "drug_not_in_gold_shown"] == 0

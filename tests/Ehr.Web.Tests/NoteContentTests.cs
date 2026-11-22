@@ -110,19 +110,18 @@ public class NoteContentTests
         Assert.Equal([Shorten], (body with { Plan = "x" }).Validate(false, NoteOrigin.Body));
     }
 
-    // What the editor says each section holds (step 14): Assessment's and Plan's are the dictation note schema's
-    // descriptions, word for word, as the schema's $comment asks of the editor.
+    // What the editor says each section holds (step 14): the dictation note schema's descriptions of its four fields,
+    // word for word, as the schema's $comment asks of the editor.
     [Fact]
-    public void The_editor_defines_assessment_and_plan_as_the_note_schema_does()
+    public void The_editor_defines_each_section_as_the_note_schema_does()
     {
         using var schema = JsonDocument.Parse(File.ReadAllText(RepositoryRoot.Combine("src/Ehr.Dictation/schema/note-fields.schema.json")));
         var properties = schema.RootElement.GetProperty("properties");
-        foreach (var section in new[] { NoteSections.Assessment, NoteSections.Plan })
+        Assert.Equal([.. NoteSections.Definitions.Keys.Select(section => section.ToLowerInvariant())], properties.EnumerateObject().Select(property => property.Name));
+        foreach (var (section, definition) in NoteSections.Definitions)
         {
-            Assert.Equal(properties.GetProperty(section.ToLowerInvariant()).GetProperty("description").GetString(), NoteSections.Definitions[section]);
+            Assert.Equal(properties.GetProperty(section.ToLowerInvariant()).GetProperty("description").GetString(), definition);
         }
-
-        Assert.Equal([NoteSections.Subjective, NoteSections.Objective, NoteSections.Assessment, NoteSections.Plan], NoteSections.Definitions.Keys);
     }
 
     // A note signed before step 14 is shown as it was signed; one signed in four sections gives an older desktop build

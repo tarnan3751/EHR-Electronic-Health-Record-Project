@@ -23,14 +23,19 @@ at night {comma} and put an order in for a vitamin [[B12|B twelve]] level today 
 discussed with them both {period} Review in [[3 months|three months]] {period}
 """
 
-[gold.history]
-value = "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband. 3 infusions of donanemab, the last on October 21, tolerated without any reaction. About the same per her husband; still managing at home with prompts for appointments and medicines. No headaches, no confusion after the infusions, no falls, no change in vision. APOE4 heterozygous. MoCA 21 out of 30, the same as in the summer. Neurological examination unchanged. MRI last week showed no ARIA."
+[gold.subjective]
+value = "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband. 3 infusions of donanemab, the last on October 21, tolerated without any reaction. About the same per her husband; still managing at home with prompts for appointments and medicines. No headaches, no confusion after the infusions, no falls, no change in vision."
 sources = [
     "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband.",
     "She has had 3 infusions of donanemab, the last on October 21.",
     "She tolerated them without any reaction.",
     "Her husband says she is about the same, still managing at home with prompts for appointments and medicines.",
     "No headaches, no confusion after the infusions, no falls and no change in vision.",
+]
+
+[gold.objective]
+value = "APOE4 heterozygous. MoCA 21 out of 30, the same as in the summer. Neurological examination unchanged. MRI last week showed no ARIA."
+sources = [
     "She is APOE4 heterozygous.",
     "MoCA today 21 out of 30, the same as in the summer.",
     "Neurological examination unchanged.",
@@ -51,14 +56,19 @@ sources = [
     "Review in 3 months.",
 ]
 
-[gold_rules.history]
-value = "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband. She has had 3 infusions of donanemab, the last on October 21. She tolerated them without any reaction. Her husband says she is about the same, still managing at home with prompts for appointments and medicines. No headaches, no confusion after the infusions, no falls and no change in vision. She is APOE4 heterozygous. MoCA today 21 out of 30, the same as in the summer. Neurological examination unchanged. Her MRI last week showed no ARIA."
+[gold_rules.subjective]
+value = "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband. She has had 3 infusions of donanemab, the last on October 21. She tolerated them without any reaction. Her husband says she is about the same, still managing at home with prompts for appointments and medicines. No headaches, no confusion after the infusions, no falls and no change in vision."
 sources = [
     "74-year-old woman with early Alzheimer's disease confirmed on amyloid PET, here with her husband.",
     "She has had 3 infusions of donanemab, the last on October 21.",
     "She tolerated them without any reaction.",
     "Her husband says she is about the same, still managing at home with prompts for appointments and medicines.",
     "No headaches, no confusion after the infusions, no falls and no change in vision.",
+]
+
+[gold_rules.objective]
+value = "She is APOE4 heterozygous. MoCA today 21 out of 30, the same as in the summer. Neurological examination unchanged. Her MRI last week showed no ARIA."
+sources = [
     "She is APOE4 heterozygous.",
     "MoCA today 21 out of 30, the same as in the summer.",
     "Neurological examination unchanged.",

@@ -188,7 +188,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 sorting = "done",
                 fields = (object?)new
                 {
-                    history = new { status = "pending", value = Sentences[0], sources = new[] { new { start = 0, end = 21 } }, warnings = Array.Empty<object>() },
+                    subjective = new { status = "pending", value = Sentences[0], sources = new[] { new { start = 0, end = 21 } }, warnings = Array.Empty<object>() },
+                    objective = new { status = "empty", reasons = new[] { "not_dictated" } },
                     assessment = new
                     {
                         status = "pending",
@@ -225,7 +226,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 reason = "model_unavailable",
                 fields = (object?)new
                 {
-                    history = new { status = "empty", reasons = new[] { "model_unavailable" } },
+                    subjective = new { status = "empty", reasons = new[] { "model_unavailable" } },
+                    objective = new { status = "empty", reasons = new[] { "model_unavailable" } },
                     assessment = new { status = "empty", reasons = new[] { "model_unavailable" } },
                     plan = new { status = "empty", reasons = new[] { "model_unavailable" } },
                 },
@@ -240,7 +242,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 sorting = "done",
                 fields = (object?)new
                 {
-                    history = new
+                    subjective = new
                     {
                         value = Sentences[0],
                         sources = new[] { new { start = 0, end = 21 } },
@@ -248,6 +250,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                         status = "pending",
                         note = DiscardedText,
                     },
+                    objective = new { status = "empty", reasons = new[] { "not_dictated" } },
                     assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
                     plan = new { status = "empty", reasons = new[] { "not_in_transcript" }, value = DiscardedText, discarded = new[] { DiscardedText } },
                 },

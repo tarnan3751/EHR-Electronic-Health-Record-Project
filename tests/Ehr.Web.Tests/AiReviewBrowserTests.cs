@@ -112,7 +112,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         var errors = new List<string>();
         page.PageError += (_, error) => errors.Add(error);
         await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-dictation-field=history] [value=accepted]')"));
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-dictation-field=subjective] [value=accepted]')"));
         Assert.Contains("Cough", await page.Locator("mark.sc-transcript__source").First.TextContentAsync());
         // The app bar's logo is drawn here too, on the second page that shows it, where the browser only checks it again.
         Assert.True(await page.EvaluateAsync<bool>("document.querySelector('.sc-appbar__logo').naturalWidth > 0"));
@@ -133,7 +133,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-review-complete] button')"));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => !url.Contains("/review/", StringComparison.Ordinal) && url.Contains("/notes/drafts/", StringComparison.Ordinal));
-        // A dictation sorted into History goes into Subjective (step 14); Objective is the clinician's to write.
+        // Nothing dictated was sorted into Objective here: the clinician writes it.
         Assert.Equal("Cough for three days.", await page.Locator("#Subjective").InputValueAsync());
         Assert.Equal("", await page.Locator("#Objective").InputValueAsync());
         Assert.Equal("Synthetic clinician-corrected assessment", await page.Locator("#Assessment").InputValueAsync());
@@ -220,18 +220,18 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await using var context = await ContextAsync(browser, session);
         var page = await context.NewPageAsync();
         await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate");
-        await page.Locator("[data-dictation-field=history] summary").PressAsync("Enter");
-        await page.Locator("#edited-history").FillAsync("Synthetic corrected text retained after failure");
+        await page.Locator("[data-dictation-field=subjective] summary").PressAsync("Enter");
+        await page.Locator("#edited-subjective").FillAsync("Synthetic corrected text retained after failure");
         await page.RouteAsync("**/*handler=Decide", route => route.AbortAsync("connectionrefused"));
-        await page.Locator("[data-dictation-field=history] [value=edited]").PressAsync("Enter");
+        await page.Locator("[data-dictation-field=subjective] [value=edited]").PressAsync("Enter");
         await page.WaitForFunctionAsync("document.getElementById('note-save-status').textContent === 'Save failed'");
-        Assert.Equal("Synthetic corrected text retained after failure", await page.Locator("#edited-history").InputValueAsync());
+        Assert.Equal("Synthetic corrected text retained after failure", await page.Locator("#edited-subjective").InputValueAsync());
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.id === 'note-errors'"));
         Assert.Contains("0 of 3", await page.Locator("[data-review-progress]").TextContentAsync());
         await page.UnrouteAsync("**/*handler=Decide");
-        await page.Locator("[data-dictation-field=history] [value=edited]").PressAsync("Enter");
+        await page.Locator("[data-dictation-field=subjective] [value=edited]").PressAsync("Enter");
         await page.WaitForFunctionAsync("document.querySelector('[data-review-progress]').textContent.includes('1 of 3')");
-        Assert.Contains("Synthetic corrected text retained after failure", await page.Locator("[data-dictation-field=history] [data-approved-value]").TextContentAsync());
+        Assert.Contains("Synthetic corrected text retained after failure", await page.Locator("[data-dictation-field=subjective] [data-approved-value]").TextContentAsync());
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.AiFieldReviewed, patientId: patient));
     }
 

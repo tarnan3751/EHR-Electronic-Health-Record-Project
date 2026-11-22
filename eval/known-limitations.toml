@@ -8,7 +8,8 @@
 
 [[accepted]]
 variant = "d22-cellulitis-ed--babble-5db"
-field = "history"
+# Step 14 (2026-11-22, decision D15): the same recording shows the same value, now in Subjective, which replaced History.
+field = "subjective"
 shown = "metoprolol"
 reason = """At 5 dB of babble MedASR heard "on metoprolol I mean metformin" as "on metoprolol and metformin": no \
 correction cue, no correction-like word between the two drug names, and no passage marked unclear beside them, so \

@@ -39,7 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
-FIELDS = ("history", "assessment", "plan")
+FIELDS = ("subjective", "objective", "assessment", "plan")
 
 # Spoken punctuation: the mark it is written as, and the pause after it when read aloud.
 PUNCTUATION = {

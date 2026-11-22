@@ -114,7 +114,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         var proposals = await Proposals(f);
         foreach (var proposal in proposals)
         {
-            var decision = proposal.Field == "history" ? "accepted" : proposal.Field == "assessment" ? "edited" : "rejected";
+            var decision = proposal.Field == "subjective" ? "accepted" : proposal.Field == "assessment" ? "edited" : "rejected";
             using var response = await Decide(f, proposal.Id, 2 + Array.IndexOf(proposals, proposal), decision, "Synthetic corrected assessment");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -160,7 +160,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         var f = await StageAsync();
         using var finish = await ReviewPost(f, "Complete", ("Version", 2));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, finish.StatusCode);
-        Assert.Contains("history", await finish.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("subjective", await finish.Content.ReadAsStringAsync(Cancel));
         // Supply complete manual content, then maliciously clear only the old cached flag at the database boundary.
         using var save = await EditorPost(f, "Save", 2);
         await using var db = await apps.OpenDatabaseAsync();
@@ -237,15 +237,61 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.AiReviewCompleted, patientId: f.Patient));
     }
 
-    // TC-UC13-07 (alternative flow; the expansion plan's step 14): a dictation sorted into History, as the dictation
-    // service still sorts one and as reviews saved before step 14 were, is labeled as going into Subjective, and once
-    // approved goes there; into a Subjective with text only when appending is allowed, after that text. The draft has
-    // no History afterwards.
+    // TC-UC13-08 (successful flow; the expansion plan's step 14): a dictation is reviewed in the note's four fields, in
+    // their order, a field the model proposed nothing for saying so; each approved value goes into its own section.
+    [Fact]
+    public async Task TC_UC13_08_a_dictation_is_reviewed_in_the_four_fields_and_each_goes_into_its_section()
+    {
+        var f = await StageAsync();
+        var review = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
+        Assert.Equal(["subjective", "objective", "assessment", "plan"],
+            System.Text.RegularExpressions.Regex.Matches(review, "data-dictation-field=\"([a-z]+)\"").Select(m => m.Groups[1].Value));
+        Assert.Matches("(?s)data-dictation-field=\"objective\".*?No usable suggestion", review);
+        var proposals = await Proposals(f);
+        Assert.Equal(["assessment", "plan", "subjective"], proposals.Select(p => p.Field).Order(StringComparer.Ordinal));
+        var version = 2L;
+        foreach (var proposal in proposals)
+        {
+            using var accepted = await Decide(f, proposal.Id, version++, "accepted");
+            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        }
+
+        using var complete = await ReviewPost(f, "Complete", ("Version", version));
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        Assert.Equal(1, await Scalar(
+            "SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND history IS NULL AND subjective = 'Cough for three days.' AND objective = '' AND assessment = 'No fever.' AND plan <> ''",
+            f.Draft));
+    }
+
+    // TC-UC13-07 (alternative flow; the expansion plan's step 14): a review saved before step 14, of a dictation sorted
+    // into History, Assessment and Plan, is shown in those fields, its History labeled as going into Subjective, and once
+    // approved the History goes there; into a Subjective with text only when appending is allowed, after that text. The
+    // draft has no History afterwards. The review is made as one saved then would be: a review staged now, its result
+    // and proposals given the earlier names with every trigger held, since the database stages no History any more.
     [Fact]
     public async Task TC_UC13_07_an_approved_history_goes_into_subjective_after_any_text_there()
     {
         var f = await StageAsync(plan: false);
-        Assert.Contains("History (goes into Subjective)", await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
+        await using (var connection = new NpgsqlConnection(apps.Database.SuperuserConnectionString))
+        {
+            await connection.OpenAsync(Cancel);
+            await using var earlier = new NpgsqlCommand(
+                """
+                BEGIN;
+                SET LOCAL session_replication_role = replica;
+                UPDATE ehr.ai_note_reviews
+                SET result_json = jsonb_set(result_json #- '{fields,subjective}' #- '{fields,objective}', '{fields,history}', result_json #> '{fields,subjective}')
+                WHERE id = @id;
+                UPDATE ehr.ai_field_proposals SET field = 'history' WHERE review_id = @id AND field = 'subjective';
+                COMMIT;
+                """, connection);
+            earlier.Parameters.AddWithValue("id", f.Review);
+            await earlier.ExecuteNonQueryAsync(Cancel);
+        }
+
+        var review = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
+        Assert.Contains("History (goes into Subjective)", review);
+        Assert.Equal(["history", "assessment", "plan"], System.Text.RegularExpressions.Regex.Matches(review, "data-dictation-field=\"([a-z]+)\"").Select(m => m.Groups[1].Value));
         using var manual = await EditorPost(f, "Save", 2, "Synthetic typed subjective", "", "");
         Assert.Equal(HttpStatusCode.OK, manual.StatusCode);
         var proposals = await Proposals(f);
@@ -291,7 +337,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     {
         var f = await BeginAsync();
         await DictateAsync(f, 3);
-        using var staged = await Stage(f, 1, new { version = 1, sessionId = "fabricated-session-12345", fields = new { history = "FORGED" }, reviewed = true });
+        using var staged = await Stage(f, 1, new { version = 1, sessionId = "fabricated-session-12345", fields = new { subjective = "FORGED" }, reviewed = true });
         Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
         var html = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
         Assert.Contains("Cough for three days.", html);
@@ -381,7 +427,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         using var stage = await Stage(f, 1);
         Assert.Equal(HttpStatusCode.OK, stage.StatusCode);
         var proposal = Assert.Single(await Proposals(f));
-        Assert.Equal("history", proposal.Field);
+        Assert.Equal("subjective", proposal.Field);
         var html = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
         Assert.Contains("possible_correction", html);
         Assert.Contains("notCarriedOver", html);
@@ -428,7 +474,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         await DictateAsync(f, 3);
         using var result = await JsonPost(f.Session.Client, f.Token, $"{Api}/{f.SessionId}/result", new { });
         var json = System.Text.Json.Nodes.JsonNode.Parse(await result.Content.ReadAsStringAsync(Cancel))!;
-        if (kind == "source") json["fields"]!["history"]!["sources"]![0]!["end"] = 1000000;
+        if (kind == "source") json["fields"]!["subjective"]!["sources"]![0]!["end"] = 1000000;
         if (kind == "not-final") json["transcript"]!["final"] = false;
         if (kind == "unavailable-pending") json["sorting"] = "unavailable";
         sidecar.Answer = (HttpStatusCode.OK, json.ToJsonString());

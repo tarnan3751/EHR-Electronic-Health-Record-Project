@@ -29,8 +29,8 @@ hold the gliclazide if she is not eating {period} Discharge home with her daught
 breathless {comma} drowsy or has chest pain {period}
 """
 
-[gold.history]
-value = "63-year-old woman with 36 hours of fever, aches, dry cough and a sore throat, which started suddenly the day before yesterday. Grandson had flu last week. COPD and type 2 diabetes. More breathless than usual but can still talk in full sentences. No chest pain, no confusion, no vomiting; passing urine normally. Has not had this year's flu vaccine. Regular medicines: tiotropium, a budesonide formoterol inhaler, metformin and gliclazide. No known drug allergies. Temperature 38.6, heart rate 104, blood pressure 138/76, respiratory rate 22, saturations 93% on air, which is her usual. Scattered wheeze, no focal crackles. Chest X-ray clear. Positive for influenza A on the rapid test and negative for COVID. CRP 24, white count 7.1, glucose 13.4, lactate 1.2."
+[gold.subjective]
+value = "63-year-old woman with 36 hours of fever, aches, dry cough and a sore throat, which started suddenly the day before yesterday. Grandson had flu last week. COPD and type 2 diabetes. More breathless than usual but can still talk in full sentences. No chest pain, no confusion, no vomiting; passing urine normally. Has not had this year's flu vaccine. Regular medicines: tiotropium, a budesonide formoterol inhaler, metformin and gliclazide. No known drug allergies."
 sources = [
     "63-year-old woman with 36 hours of fever, aches, dry cough and a sore throat, which started suddenly the day before yesterday.",
     "Her grandson had flu last week.",
@@ -40,6 +40,11 @@ sources = [
     "She has not had this year's flu vaccine.",
     "Her regular medicines are tiotropium, a budesonide formoterol inhaler, metformin and gliclazide.",
     "No known drug allergies.",
+]
+
+[gold.objective]
+value = "Temperature 38.6, heart rate 104, blood pressure 138/76, respiratory rate 22, saturations 93% on air, which is her usual. Scattered wheeze, no focal crackles. Chest X-ray clear. Positive for influenza A on the rapid test and negative for COVID. CRP 24, white count 7.1, glucose 13.4, lactate 1.2."
+sources = [
     "On examination temperature 38.6, heart rate 104, blood pressure 138/76, respiratory rate 22, saturations 93% on air, which is her usual.",
     "Scattered wheeze, no focal crackles.",
     "Chest X-ray clear.",

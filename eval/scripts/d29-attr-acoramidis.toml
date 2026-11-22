@@ -29,8 +29,8 @@ potassium on Friday {period} Daily weights {comma} call the heart failure nurse 
 [[1 kg|one kilogram]] in a day {period} Continue apixaban {period} Clinic review in [[4 weeks|four weeks]] {period}
 """
 
-[gold.history]
-value = "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after presenting with heart failure and bilateral carpal tunnel syndrome. On tafamidis, which his insurance will no longer cover. Short of breath walking about one block; has to rest on the stairs. Sleeps flat. No chest pain, no fainting, no palpitations. Ankles swell by the evening. Furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation. Blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit. JVP up to the angle of the jaw. Bibasal crackles. Pitting edema to the mid shins. NT-proBNP 3400, up from 2100; creatinine 1.5. Echo: ejection fraction 45% with thick walls."
+[gold.subjective]
+value = "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after presenting with heart failure and bilateral carpal tunnel syndrome. On tafamidis, which his insurance will no longer cover. Short of breath walking about one block; has to rest on the stairs. Sleeps flat. No chest pain, no fainting, no palpitations. Ankles swell by the evening. Furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation."
 sources = [
     "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after he presented with heart failure and bilateral carpal tunnel syndrome.",
     "He has been on tafamidis, but his insurance will no longer cover it",
@@ -39,6 +39,11 @@ sources = [
     "No chest pain, no fainting, no palpitations.",
     "His ankles swell by the evening.",
     "He takes furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation.",
+]
+
+[gold.objective]
+value = "Blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit. JVP up to the angle of the jaw. Bibasal crackles. Pitting edema to the mid shins. NT-proBNP 3400, up from 2100; creatinine 1.5. Echo: ejection fraction 45% with thick walls."
+sources = [
     "blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit.",
     "JVP up to the angle of the jaw.",
     "Bibasal crackles.",
@@ -66,8 +71,8 @@ sources = [
     "Clinic review in 4 weeks.",
 ]
 
-[gold_rules.history]
-value = "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after he presented with heart failure and bilateral carpal tunnel syndrome. He has been on tafamidis, but his insurance will no longer cover it. He is short of breath walking about one block and has to rest on the stairs. He sleeps flat. No chest pain, no fainting, no palpitations. His ankles swell by the evening. He takes furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation. Blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit. JVP up to the angle of the jaw. Bibasal crackles. Pitting edema to the mid shins. NT-proBNP is 3400, up from 2100, and creatinine 1.5. His echo showed an ejection fraction of 45% with thick walls."
+[gold_rules.subjective]
+value = "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after he presented with heart failure and bilateral carpal tunnel syndrome. He has been on tafamidis, but his insurance will no longer cover it. He is short of breath walking about one block and has to rest on the stairs. He sleeps flat. No chest pain, no fainting, no palpitations. His ankles swell by the evening. He takes furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation."
 sources = [
     "79-year-old man with wild type transthyretin amyloid cardiomyopathy diagnosed last year on a technetium PYP scan, after he presented with heart failure and bilateral carpal tunnel syndrome.",
     "He has been on tafamidis, but his insurance will no longer cover it",
@@ -76,6 +81,11 @@ sources = [
     "No chest pain, no fainting, no palpitations.",
     "His ankles swell by the evening.",
     "He takes furosemide 40 mg twice daily and apixaban 5 mg twice daily for atrial fibrillation.",
+]
+
+[gold_rules.objective]
+value = "Blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit. JVP up to the angle of the jaw. Bibasal crackles. Pitting edema to the mid shins. NT-proBNP is 3400, up from 2100, and creatinine 1.5. His echo showed an ejection fraction of 45% with thick walls."
+sources = [
     "blood pressure 106/64, heart rate 72 and irregular, weight 74 kg, up 2 kg from last visit.",
     "JVP up to the angle of the jaw.",
     "Bibasal crackles.",

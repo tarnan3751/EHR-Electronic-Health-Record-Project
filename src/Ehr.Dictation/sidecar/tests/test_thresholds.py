@@ -19,7 +19,7 @@ def test_the_values():
     assert (segmenter.MIN_PAUSE, segmenter.KEEP, segmenter.MAX_SEGMENT) == (40, 300, 2000)
     assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 30, 600)
     assert (validation.DIRECTIVE_REACH, validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (14, 5, 3)
-    assert validation.LIMITS == {"history": 3000, "assessment": 2000, "plan": 2000}
+    assert validation.LIMITS == {"subjective": 3000, "objective": 3000, "assessment": 2000, "plan": 2000}
     limits = settings.Settings(api_key="k", llama_api_key="k")
     assert (limits.max_session_seconds, limits.max_session_bytes, limits.max_chunk_bytes) == (180, 10 << 20, 2 << 20)
     assert (limits.call_seconds, limits.stop_wait_seconds, limits.structuring_seconds) == (15.0, 8.0, 90.0)
@@ -116,7 +116,7 @@ def test_an_unclear_passage_within_5_words_flags_the_value():
 def test_field_and_source_limits():
     words = "cough " * 599
     text = transcript(words)
-    for name, limit in (("history", 3000), ("assessment", 2000), ("plan", 2000)):
+    for name, limit in (("subjective", 3000), ("objective", 3000), ("assessment", 2000), ("plan", 2000)):
         assert "too_long" not in field(words.strip()[:limit], words.strip()[:600], name=name, text=text).reasons
         assert "too_long" in field(words.strip()[: limit + 1], words.strip()[:600], name=name, text=text).reasons
     assert "too_long" in own(words, "cough cough", words.strip()[:601]).reasons

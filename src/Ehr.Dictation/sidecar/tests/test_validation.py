@@ -25,8 +25,8 @@ def transcript(*passages: str | tuple[str, str]):
     return assemble(segments, final=True)
 
 
-def field(value: str, *sources: str, name: str = "history", text=None):
-    fields = {n: {"value": "", "sources": []} for n in ("history", "assessment", "plan")}
+def field(value: str, *sources: str, name: str = "subjective", text=None):
+    fields = {n: {"value": "", "sources": []} for n in ("subjective", "objective", "assessment", "plan")}
     fields[name] = {"value": value, "sources": list(sources)}
     return check(fields, [], text or transcript(DICTATION)).fields[name]
 
@@ -62,11 +62,12 @@ def test_a_failed_value_goes_out_as_reason_codes_only():
 
 
 def test_keys_outside_the_schema_are_reported_and_never_a_field():
-    fields = {n: {"value": "", "sources": []} for n in ("history", "assessment", "plan")}
+    fields = {n: {"value": "", "sources": []} for n in ("subjective", "objective", "assessment", "plan")}
 
-    checks = check(fields, ["orders"], transcript(DICTATION))
+    # Among them the History of the three fields before the expansion plan's step 14 (TC-UC10-08).
+    checks = check(fields, ["orders", "history"], transcript(DICTATION))
 
-    assert checks.unknown == ["orders"] and list(checks.fields) == ["history", "assessment", "plan"]
+    assert checks.unknown == ["orders", "history"] and list(checks.fields) == ["subjective", "objective", "assessment", "plan"]
 
 
 def test_an_empty_value_was_not_dictated():

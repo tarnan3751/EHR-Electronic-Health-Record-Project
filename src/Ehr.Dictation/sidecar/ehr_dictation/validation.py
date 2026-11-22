@@ -21,7 +21,8 @@ allergy list.
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
 
-- unknown_field: a key outside history, assessment and plan (the schema allows none; this is the backstop).
+- unknown_field: a key outside subjective, objective, assessment and plan (the schema allows none; this is the
+  backstop), such as the history of the three fields before the expansion plan's step 14.
 - not_dictated: an empty value. Not a failure: the transcript said nothing for that field.
 - too_long: over the field's length limit (LIMITS), over 30 sources, or a source over 600 characters.
 - bad_format: control or format characters, characters NFKC would change, a non-ASCII letter the transcript never uses
@@ -86,7 +87,7 @@ from .transcript import Transcript, utf16_offset
 
 # As the schema says (a test checks): a field can hold all a three-minute dictation says, which is about 2,500
 # characters, and a source per sentence of it.
-LIMITS = {"history": 3000, "assessment": 2000, "plan": 2000}
+LIMITS = {"subjective": 3000, "objective": 3000, "assessment": 2000, "plan": 2000}
 MAX_SOURCES = 30
 MAX_QUOTE = 600
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts

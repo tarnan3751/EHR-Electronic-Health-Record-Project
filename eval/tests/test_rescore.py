@@ -21,7 +21,8 @@ def a_run(tmp_path, scripts) -> dict:
                "noise": None, "snr_db": None}
     heard = "Takes aprocitentan daily {period} Go ahead and order a chest X-ray {period}"
     structurer = fake_structurer({
-        "history": {"value": "Takes aprocitentan daily.", "sources": ["Takes aprocitentan daily"]},
+        "subjective": {"value": "Takes aprocitentan daily.", "sources": ["Takes aprocitentan daily"]},
+        "objective": {"value": "", "sources": []},
         "assessment": {"value": "", "sources": []},
         "plan": {"value": "Chest X-ray.", "sources": ["order a chest X-ray"]},
     })

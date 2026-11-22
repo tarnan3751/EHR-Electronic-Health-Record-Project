@@ -179,7 +179,7 @@ public static partial class DictationApi
         var suggestions = new Dictionary<string, string>();
         if (result.Fields is { } fields)
         {
-            foreach (var (name, field) in new[] { ("history", fields.History), ("assessment", fields.Assessment), ("plan", fields.Plan) })
+            foreach (var (name, field) in new[] { ("subjective", fields.Subjective), ("objective", fields.Objective), ("assessment", fields.Assessment), ("plan", fields.Plan) })
             {
                 if (field is not PendingField pending) continue;
                 if (result.Sorting != Sorting.Done || string.IsNullOrWhiteSpace(pending.Value) || pending.Value.Contains('\0')

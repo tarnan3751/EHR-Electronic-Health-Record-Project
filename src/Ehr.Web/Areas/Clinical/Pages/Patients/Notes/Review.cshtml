@@ -72,7 +72,7 @@
         <section>
             <h2>Proposed fields</h2>
             <dl class="sc-proposals">
-                @foreach (var field in new[] { "history", "assessment", "plan" })
+                @foreach (var field in Model.FieldNames)
                 {
                     var proposal = Model.Proposals.SingleOrDefault(p => p.Field == field);
                     <div class="sc-proposal" data-dictation-field="@field" data-proposal-id="@proposal?.Id" data-review-state="@proposal?.State">

@@ -46,8 +46,8 @@ Continue omeprazole and refill the omeprazole for [[90 days|ninety days]] {perio
 {period} Return on [[December 17|December seventeenth]] with home blood pressure readings {period}
 """
 
-[gold.history]
-value = "58-year-old man who has moved here from out of state and is establishing care. Short of breath walking up hills for about 3 months. Twice felt a tightness across his chest after climbing two flights of stairs, which went away within a few minutes of resting. No chest pain at rest and nothing at night. Heartburn after large meals, but no trouble swallowing and no weight loss. Past history: high blood pressure for 10 years, high cholesterol, prediabetes, gout with two flares in the big toe, and obstructive sleep apnea on CPAP. Colon polyps removed at a colonoscopy on March 3, 2021. Medications: amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily and omeprazole 20 mg before breakfast. Allergies: penicillin gave him hives as a child. Family history: father had a heart attack at 52; mother has type 2 diabetes. Drives a city bus. Smoked a pack a day for 20 years, quit 5 years ago. Blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today: sinus rhythm with no ischemic changes."
+[gold.subjective]
+value = "58-year-old man who has moved here from out of state and is establishing care. Short of breath walking up hills for about 3 months. Twice felt a tightness across his chest after climbing two flights of stairs, which went away within a few minutes of resting. No chest pain at rest and nothing at night. Heartburn after large meals, but no trouble swallowing and no weight loss. Past history: high blood pressure for 10 years, high cholesterol, prediabetes, gout with two flares in the big toe, and obstructive sleep apnea on CPAP. Colon polyps removed at a colonoscopy on March 3, 2021. Medications: amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily and omeprazole 20 mg before breakfast. Allergies: penicillin gave him hives as a child. Family history: father had a heart attack at 52; mother has type 2 diabetes. Drives a city bus. Smoked a pack a day for 20 years, quit 5 years ago."
 sources = [
     "58-year-old man who has moved here from out of state and is establishing care.",
     "For about 3 months he has been short of breath walking up hills.",
@@ -61,6 +61,11 @@ sources = [
     "his father had a heart attack at 62 sorry at 52 and his mother has type 2 diabetes.",
     "He drives a city bus.",
     "He smoked a pack a day for 20 years and quit 5 years ago.",
+]
+
+[gold.objective]
+value = "Blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today: sinus rhythm with no ischemic changes."
+sources = [
     "blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33.",
     "Heart sounds normal with no murmur.",
     "Chest clear.",
@@ -91,8 +96,8 @@ sources = [
     "Return on December 17 with home blood pressure readings.",
 ]
 
-[gold_rules.history]
-value = "58-year-old man who has moved here from out of state and is establishing care. For about 3 months he has been short of breath walking up hills. Twice he has felt a tightness across his chest after climbing two flights of stairs and it went away within a few minutes of resting. He has no chest pain at rest and nothing at night. He has heartburn after large meals but no trouble swallowing and no weight loss. Past history: high blood pressure for 10 years, high cholesterol, prediabetes, gout with two flares in the big toe and obstructive sleep apnea on CPAP. Colon polyps removed at a colonoscopy on March 3, 2021. Medications: amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily and omeprazole 20 mg before breakfast. Allergies: penicillin gave him hives as a child. Family history: his father had a heart attack at 52 and his mother has type 2 diabetes. He drives a city bus. He smoked a pack a day for 20 years and quit 5 years ago. Examination: blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today shows sinus rhythm with no ischemic changes."
+[gold_rules.subjective]
+value = "58-year-old man who has moved here from out of state and is establishing care. For about 3 months he has been short of breath walking up hills. Twice he has felt a tightness across his chest after climbing two flights of stairs and it went away within a few minutes of resting. He has no chest pain at rest and nothing at night. He has heartburn after large meals but no trouble swallowing and no weight loss. Past history: high blood pressure for 10 years, high cholesterol, prediabetes, gout with two flares in the big toe and obstructive sleep apnea on CPAP. Colon polyps removed at a colonoscopy on March 3, 2021. Medications: amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily and omeprazole 20 mg before breakfast. Allergies: penicillin gave him hives as a child. Family history: his father had a heart attack at 52 and his mother has type 2 diabetes. He drives a city bus. He smoked a pack a day for 20 years and quit 5 years ago."
 sources = [
     "58-year-old man who has moved here from out of state and is establishing care.",
     "For about 3 months he has been short of breath walking up hills.",
@@ -106,6 +111,11 @@ sources = [
     "Family history: his father had a heart attack at 62 sorry at 52 and his mother has type 2 diabetes.",
     "He drives a city bus.",
     "He smoked a pack a day for 20 years and quit 5 years ago.",
+]
+
+[gold_rules.objective]
+value = "Examination: blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today shows sinus rhythm with no ischemic changes."
+sources = [
     "Examination: blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33.",
     "Heart sounds normal with no murmur.",
     "Chest clear.",
