@@ -910,10 +910,8 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
     }
 
     // The policy file runs on every start of the migration job, while pages call the function: it replaces the function in
-    // place, so a call made as it runs is never refused (dropping and creating it again on each run failed calls with
-    // "cache lookup failed for function"). Twenty runs of the file as the migration role, while the patient's page is read
-    // from four connections of each runtime role, over and over until the runs end (at least 200 times each, never more
-    // than 5,000): not one call fails, and the function is the same one after, which is what keeps a call from failing.
+    // place, so a call made as it runs is never refused, and the function is the same one after (PolicyRerun). Dropping
+    // and creating it again on each run failed calls with "cache lookup failed for function".
     [Fact]
     public async Task Running_the_policy_file_again_never_fails_a_page_reading_the_function()
     {
@@ -921,54 +919,8 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         await EventAsync(patient, clinician, "read", "patients", 1, part: AuditParts.Chart);
         const string Oid = "SELECT 'ehr.record_views(timestamptz, timestamptz)'::regprocedure::oid::text";
         var before = await AsSuperuserAsync(Oid);
-        var policy = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/42-record-views.sql"), Cancel);
-        var rerunning = true;
 
-        // Each call as a page makes it: a pooled connection, one transaction with the user context, the function read.
-        async Task<List<string>> CallAsync(string connectionString)
-        {
-            var errors = new List<string>();
-            for (var call = 0; call < 5_000 && (rerunning || call < 200); call++)
-            {
-                try
-                {
-                    await using var connection = new Npgsql.NpgsqlConnection(connectionString);
-                    await connection.OpenAsync(Cancel);
-                    await using var transaction = await connection.BeginTransactionAsync(Cancel);
-                    await using var command = new Npgsql.NpgsqlCommand(
-                        "SELECT set_config('app.user_id', @user, true); SELECT count(*) FROM ehr.record_views(NULL, NULL)", connection, transaction);
-                    command.Parameters.AddWithValue("user", own.ToString());
-                    await command.ExecuteNonQueryAsync(Cancel);
-                    await transaction.CommitAsync(Cancel);
-                }
-                catch (Npgsql.NpgsqlException error)
-                {
-                    errors.Add((error as Npgsql.PostgresException)?.SqlState + " " + error.Message);
-                }
-            }
-
-            return errors;
-        }
-
-        async Task RerunAsync()
-        {
-            try
-            {
-                for (var run = 0; run < 20; run++)
-                {
-                    await MigratedDatabase.ExecuteAsync(database.OwnerConnectionString, policy);
-                }
-            }
-            finally
-            {
-                rerunning = false;
-            }
-        }
-
-        var calls = Enumerable.Range(0, 4).SelectMany(_ => new[] { CallAsync(App), CallAsync(Read) }).ToList();
-        await Task.WhenAll([RerunAsync(), .. calls]);
-
-        Assert.Empty(calls.SelectMany(call => call.Result));
+        Assert.Empty(await PolicyRerun.RunAsync(database, "42-record-views.sql", own, "SELECT count(*) FROM ehr.record_views(NULL, NULL)"));
         Assert.Equal(before, await AsSuperuserAsync(Oid));
     }
 
