@@ -40,7 +40,7 @@ def reasons(text: str, spanish: list[str], english: str, **kwargs) -> list[str]:
      ["number_not_in_sources"]),
     ("Levotiroxina 50 microgramos al día.", "Levotiroxina 50 microgramos al día", "Levothyroxine 50 mg daily.",
      ["unit_not_in_sources"]),
-    ("Suspender metformina.", "Suspender metformina.", "Stop metoprolol.", ["drug_not_in_sources"]),
+    ("Suspender metformina.", "Suspender metformina.", "Stop metoprolol.", ["drug_not_in_sources", "drug_dropped"]),
     ("Suspender metformina.", "Suspender metformina.", "Continue metformin.", ["action_changed"]),
     ("Su padre tuvo un infarto a los 50 años.", "Su padre tuvo un infarto a los 50 años.",
      "Her mother had a heart attack at age 50.", ["experiencer_changed"]),
@@ -272,3 +272,38 @@ def test_un_una_and_uno_are_one(text, english, expected):
 ])
 def test_a_relative_told_something_has_nothing(text, english, expected):
     assert reasons(text, [text], english) == expected
+
+
+# ---- Drugs, failing closed both ways --------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("text", "english", "expected"), [
+    # A drug the lists know only as a word of a name given in several, swapped in for the one said, and the right ones.
+    ("Continuar levetiracetam 500 mg cada 12 horas.", "Continue valproic acid 500 mg every 12 hours.",
+     ["drug_not_in_sources", "drug_dropped"]),
+    ("Ácido valproico 500 mg cada 12 horas.", "Valproic acid 500 mg every 12 hours.", []),
+    ("Insulina glargina 10 unidades por la noche.", "Insulin glargine 10 units at night.", []),
+    # A drug no list knows at all, swapped in: the one said is gone from the English.
+    ("Continuar levetiracetam.", "Continue zorbitex.", ["drug_dropped", "action_changed"]),
+    # Every drug the Spanish names must be in the English, not just one of them.
+    ("Continuar metformina y losartán.", "Continue metformin.", ["drug_dropped"]),
+    # A word just before a dose is a drug's name, whether a list knows it or not.
+    ("Continuar levetiracetam 500 mg.", "Continue zorbitex 500 mg.", ["drug_not_in_sources", "drug_dropped"]),
+    ("Usa Plixor 2 inhalaciones al día.", "Uses kraxin 2 puffs daily.", ["drug_not_in_sources"]),
+    # Brand names: one no list knows swapped for another before a dose, and a listed one swapped for another.
+    ("Toma Plixor 20 mg al día.", "Takes Vortanex 20 mg daily.", ["drug_not_in_sources"]),
+    ("Toma Zyrtec 10 mg al día.", "Takes Claritin 10 mg daily.", ["drug_not_in_sources", "drug_dropped"]),
+    ("Toma Plixor 20 mg al día.", "Takes Plixor 20 mg daily.", []),
+    ("Toma Zyrtec 10 mg al día.", "Takes Zyrtec 10 mg daily.", []),
+    # What comes before a dose and isn't a drug.
+    ("Tomar 2 comprimidos de paracetamol.", "Take 2 tablets of acetaminophen.", []),
+    ("Dieta con sodio 2 g al día.", "Diet with sodium 2 g a day.", []),
+    ("Salbutamol inhalado 2 inhalaciones cada 6 horas.", "Albuterol inhaled 2 puffs every 6 hours.", []),
+])
+def test_drugs_fail_closed_both_ways(text, english, expected):
+    assert reasons(text, [text], english) == expected
+
+
+def test_what_the_drug_checks_still_miss():
+    # A name no list knows, with no dose just after it, for one no list knows either (translation.py's header).
+    assert reasons("Continuar plixor.", ["Continuar plixor."], "Continue vortanex.") == []

@@ -475,6 +475,10 @@ DRUG_ENDINGS = [
     ("ida", ("ide",)), ("ido", ("ide",)), ("aco", ("ac",)), ("ico", ("ic",)), ("io", ("ium",)), ("ol", ("ol", "ole")),
     ("an", ("an",)),
 ]
+# Words that read as a drug's name and aren't one, as validation.NOT_DRUGS for English: "colesterol" ends in a
+# bronchodilator's stem, "ultrasonido" in a corticosteroid's, and "allí", "actos", "retina", "valió" are brand names
+# (Alli, Actos, Retin-A, Valium) once their accents go.
+NOT_DRUGS = frozenset({"colesterol", "ultrasonido", "alli", "actos", "retina", "valio", "soma", "cardeno", "bonina"})
 
 
 def drug_candidates(word: str) -> set[str]:

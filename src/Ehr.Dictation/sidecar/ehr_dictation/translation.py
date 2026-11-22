@@ -25,8 +25,12 @@ each field as a list of statements, each the Spanish passages it rests on, copie
    - a dose unit with its number ("50 mcg" is not "50 mg"): no more (unit_not_in_sources). A unit of measurement
      (mmHg, beats a minute, degrees, percent) may be added to a number said without one, never changed;
    - how often (times a day, a week, as needed, at bedtime): no more (frequency_not_in_sources);
-   - dates ("hace una semana" is a week ago, or the past week): no more (date_not_in_sources); drug names, each an
-     English name the Spanish names give (spanish.py's endings and exceptions): no more (drug_not_in_sources);
+   - dates ("hace una semana" is a week ago, or the past week): no more (date_not_in_sources);
+   - drug names, failing closed both ways: every English word a list knows as a drug (a USAN stem, drugnames.py's
+     RxNorm ingredients, the words of their names and brand names) or that comes just before a dose ("zorbitex 20
+     mg", whether a list knows it or not) must be a word of the Spanish or an English name one gives (spanish.py's
+     endings and exceptions) (drug_not_in_sources); and every drug the Spanish names must be named in the English
+     (drug_dropped), so a drug no list knows can't be swapped in for one the clinician said;
    - sides, routes, severity and abbreviations: no more (side_, route_, severity_ and abbreviation_not_in_sources);
    - medication changes (start, stop, hold, continue, increase, decrease, switch), each said of a drug, a dose or a
      number: the same (action_changed);
@@ -39,8 +43,9 @@ each field as a list of statements, each the Spanish passages it rests on, copie
 5. If any statement fails, the whole field is discarded, as an English value is.
 
 What these don't check: the meaning of every other word. "dolor abdominal leve" translated "mild chest pain" passes
-(the severity and the length agree), and so does a finding moved inside a statement. The review shows each English
-statement beside its Spanish for the clinician to compare, and says so.
+(the severity and the length agree), and so does a finding moved inside a statement; nor a drug name no list knows,
+written with no dose just after it, for one no list knows either ("continuar plixor" written "continue vortanex"). The
+review shows each English statement beside its Spanish for the clinician to compare, and says so.
 
 Warnings, each a code and a place in the transcript, never text, as validation.py's: possible_correction (a later
 number, date or drug of the same kind just after one the value uses, with a Spanish correction-like word between),
@@ -90,6 +95,7 @@ REASONS = (
     "frequency_not_in_sources",
     "date_not_in_sources",
     "drug_not_in_sources",
+    "drug_dropped",
     "side_not_in_sources",
     "route_not_in_sources",
     "severity_not_in_sources",
@@ -198,7 +204,8 @@ GLUE = frozenset({"sobre", "de", "el", "la", "los", "las", "un", "una"}) | spani
 def _terms(toks: list[spanish.Token]) -> list[_Term]:
     found = [_Term("number", n.readings, n.first, n.last, n.ambiguous) for n in spanish.numbers(toks)]
     for i, token in enumerate(toks):
-        if token.key.isalpha() and len(token.key) >= 4 and any(is_drug(name) for name in spanish.drug_candidates(token.key)):
+        if (token.key.isalpha() and len(token.key) >= 4 and token.key not in spanish.NOT_DRUGS
+                and any(is_drug(name) for name in spanish.drug_candidates(token.key))):
             found.append(_Term("drug", frozenset(spanish.drug_candidates(token.key)), i, i))
         elif token.key in spanish.SIDES:
             found.append(_Term("side", frozenset({spanish.SIDES[token.key]}), i, i))
@@ -270,7 +277,8 @@ EXCEPTION_NAMES = frozenset(name for names in spanish.DRUG_EXCEPTIONS.values() f
 
 
 def is_drug(word: str) -> bool:
-    """An English drug name: a USAN stem (validation.py), an RxNorm ingredient (drugnames.py), or an exception's."""
+    """An English drug name: a USAN stem (validation.py), an RxNorm ingredient, a word of one or a brand name
+    (drugnames.py), or an exception's."""
     return validation._is_drug(word) or word in drugnames.NAMES or word in EXCEPTION_NAMES
 
 
@@ -458,6 +466,35 @@ def english_actions(text: str) -> set[str]:
         if word in ACTIONS and any(w in OBJECT_WORDS or w[0].isdigit() or is_drug(w) for w in words[i + 1 : i + 1 + OBJECT_REACH]):
             found.add(ACTIONS[word])
     return found
+
+
+# A word just before a dose is a drug's name whether a list knows it or not ("zorbitex 20 mg", "kraxin 2 puffs"):
+# unless it is a function word, a number, a route, a dose form, a salt or release ("valproic acid 500 mg", "extended
+# release 500 mg"), a measurement, a laboratory or diet word, or a word that says how much or how it is taken ("weight
+# 11 kg" has no dose unit; "take 2 tablets", "sodium 2 g").
+DOSE = re.compile(
+    r"\b([a-z]{3,})\s+\d+(?:[.,]\d+)?\s*(?:mg|mcg|μg|µg|g|ml|units?|iu|micrograms?|milligrams?|grams?|milliliters?|"
+    r"millilitres?|puffs?|tablets?|capsules?|drops?|sprays?|inhalations?|ampoules?|ampules?|vials?|patch(?:es)?|"
+    r"sachets?|lozenges?|suppositor(?:y|ies)|pills?)(?![a-z/])"
+)
+NOT_DOSED = frozenset(
+    """weight weighs weighed height temperature glucose sugar hemoglobin creatinine potassium sodium calcium magnesium
+    albumin protein fiber salt fat carbohydrate carbohydrates cholesterol triglycerides bilirubin urine output intake
+    fluid fluids loss drained drainage voided volume residual blood take takes taking took give gives given giving use
+    uses using used dose doses dosage total extra another additional maximum max minimum daily nightly weekly twice
+    once now plus except approximately about around nearly almost least single double half bolus oral orally inhaled
+    nebulized topical topically sublingual intravenous intramuscular subcutaneous rectal vaginal nasal intranasal
+    ophthalmic otic tablet tablets capsule capsules puff puffs drop drops spray sprays patch inhaler injection solution
+    suspension syrup cream ointment gel units acid hydrochloride hcl sulfate phosphate acetate citrate succinate
+    tartrate maleate mesylate besylate fumarate bromide chloride carbonate bicarbonate hyclate monohydrate extended
+    delayed release""".split()
+) | frozenset(ACTIONS) | validation.NUMBER_WORDS
+
+
+def dosed(text: str) -> set[str]:
+    """The words just before a dose that no rule says aren't a drug's name (DOSE)."""
+    return {m.group(1) for m in DOSE.finditer(text.lower())
+            if m.group(1) not in STOPWORDS and m.group(1) not in NOT_DOSED}
 
 
 # A past tense ends in an accented vowel ("dejó de fumar", "aumentó", "suspendió"), and is what happened, not a change
@@ -680,14 +717,16 @@ def _compare(result: _Statement, ctx: _Context) -> None:
     if not validation._date_terms(english) <= spanish.date_terms(said):
         reasons.add("date_not_in_sources")
 
-    english_drugs = {t.text for t in tokens(english) if t.text.isalpha() and is_drug(t.text)}
-    unbacked = english_drugs - values("drug", terms) - {t.key for t in said}
+    english_words = [t.text for t in tokens(english)]
+    english_drugs = {w for w in english_words if w.isalpha() and is_drug(w)} | dosed(english)
+    unbacked = english_drugs - {name for t in said if t.key.isalpha() for name in spanish.drug_candidates(t.key)}
     if unbacked & values("drug", back):
         reasons.add("source_superseded")
     elif unbacked:
         reasons.add("drug_not_in_sources")
+    if any(term.kind == "drug" and not term.values & set(english_words) for term in terms):
+        reasons.add("drug_dropped")
 
-    english_words = [t.text for t in tokens(english)]
     if not {ENGLISH_SIDES[w] for w in english_words if w in ENGLISH_SIDES} <= values("side", terms):
         reasons.add("side_not_in_sources")
     if not english_routes(english) <= spanish.routes(said_text):
