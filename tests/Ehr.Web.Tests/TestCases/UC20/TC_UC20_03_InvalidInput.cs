@@ -52,7 +52,7 @@ public class TC_UC20_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         }
 
         var vitaminD = await SignedAsync(session.Client, patient, "lab", "Vitamin D, 25-hydroxy", Cbc);
-        using (await FileAsync(session.Client, patient, vitaminD, ("62292-8", "41")))
+        using (await FileAsync(apps, session.Client, patient, vitaminD, ("62292-8", "41")))
         using (await AcknowledgeAsync(session.Client, patient, vitaminD))
         {
         }

@@ -17,9 +17,9 @@ static class VitalTests
 
     public static string Path(Guid patient) => $"/patients/{patient}/vitals";
 
-    // "Record vital signs" with the values typed, taken so many minutes ago.
-    public static Task<HttpResponseMessage> RecordAsync(HttpClient client, Guid patient, int minutesAgo, params (string Code, string Value)[] values) =>
-        RecordAtAsync(client, patient, DateTime.UtcNow.AddMinutes(-minutesAgo).ToString("yyyy-MM-ddTHH:mm"), values);
+    // "Record vital signs" with the values typed, taken so many minutes ago by the database's clock, which judges the time.
+    public static async Task<HttpResponseMessage> RecordAsync(WebApps apps, HttpClient client, Guid patient, int minutesAgo, params (string Code, string Value)[] values) =>
+        await RecordAtAsync(client, patient, (await apps.Database.NowAsync()).AddMinutes(-minutesAgo).ToString("yyyy-MM-ddTHH:mm"), values);
 
     public static Task<HttpResponseMessage> RecordAtAsync(HttpClient client, Guid patient, string takenAt, params (string Code, string Value)[] values) =>
         PostFormAsync(client, Path(patient), Path(patient), [.. values.Select(v => ($"Values[{v.Code}]", (object)v.Value)), ("TakenAt", takenAt)]);

@@ -32,7 +32,7 @@ public class TC_UC4_22_Nfr12_VitalSignErrorKeyboardFirst(WebApps apps) : IClassF
     public async Task A_reading_is_marked_entered_in_error_from_the_keyboard()
     {
         var (_, patient, session) = await OnPanelAsync(apps);
-        using var recorded = await RecordAsync(session.Client, patient, 30, (Systolic, "180"), (Diastolic, "92"));
+        using var recorded = await RecordAsync(apps, session.Client, patient, 30, (Systolic, "180"), (Diastolic, "92"));
         await using var server = await ClinicalBrowserHost.StartAsync(apps);
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);

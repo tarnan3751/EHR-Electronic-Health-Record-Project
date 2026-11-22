@@ -28,11 +28,11 @@ public class TC_UC1_21_ResultTrends(WebApps apps) : IClassFixture<WebApps>
     {
         var (_, patient, session) = await OnPanelAsync(apps);
         var earlier = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
-        using var first = await FileAsync(session.Client, patient, earlier, (Hemoglobin, "9.1"));
+        using var first = await FileAsync(apps, session.Client, patient, earlier, (Hemoglobin, "9.1"));
         Assert.DoesNotContain("data-trend", await ReadAsync(first));
 
         var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
-        using var second = await FileAsync(session.Client, patient, order, (Hemoglobin, "13.5"), (Platelets, "250"));
+        using var second = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, "13.5"), (Platelets, "250"));
         var page = await ReadAsync(second);
 
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(page, "<figure class=\"sc-trend\""));

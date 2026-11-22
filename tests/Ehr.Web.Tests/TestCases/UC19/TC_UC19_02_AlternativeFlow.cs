@@ -136,7 +136,7 @@ public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var session = await SignInAsync(apps.OnPrem, clinician);
         foreach (var (minutesAgo, systolic, diastolic) in new[] { (90, "131", "85"), (30, "122", "79") })
         {
-            using var recorded = await VitalTests.RecordAsync(session.Client, patient, minutesAgo, (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic));
+            using var recorded = await VitalTests.RecordAsync(apps, session.Client, patient, minutesAgo, (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic));
             Assert.Equal(VitalTests.Path(patient), PathOf(recorded));
         }
 

@@ -12,7 +12,7 @@ namespace Ehr.Security.Tests;
 // its ID, which stands whole or not at all when a transaction commits, and which is marked entered in error whole, by
 // one person. Each rule for the app's role and, where it is the rule for everyone, for a superuser; and with two
 // connections where timing matters.
-public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
+public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>, IAsyncLifetime
 {
     const string Systolic = "8480-6";
     const string Diastolic = "8462-4";
@@ -27,8 +27,16 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
 
     string Superuser => database.SuperuserConnectionString;
 
-    // Ten minutes ago, to the second.
-    static readonly DateTime Taken = new(DateTime.UtcNow.AddMinutes(-10).Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+    // Ten minutes before the test started, by the database's clock, which its rules hold a time to, to the second.
+    DateTime Taken { get; set; }
+
+    public async ValueTask InitializeAsync()
+    {
+        var now = await database.NowAsync();
+        Taken = new(now.AddMinutes(-10).Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+    }
+
+    public ValueTask DisposeAsync() => default;
 
     // One value, everything a client could choose for itself sent too; as the app, the database decides the rest.
     const string Insert = """
@@ -36,7 +44,7 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
         VALUES (gen_random_uuid(), @patient, @visit, @reading, 'vital-signs', @code, 'x', @status, @value, @at);
         """;
 
-    static (string, object)[] Values(Guid patient, string code, decimal value, DateTime? at = null, Guid? visit = null, Guid? reading = null, string status = "final") =>
+    (string, object)[] Values(Guid patient, string code, decimal value, DateTime? at = null, Guid? visit = null, Guid? reading = null, string status = "final") =>
         [("patient", patient), ("code", code), ("value", value), ("at", at ?? Taken), ("visit", (object?)visit ?? DBNull.Value), ("reading", (object?)reading ?? DBNull.Value),
             ("status", status)];
 
@@ -188,7 +196,7 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
         await RecordAsync(clinician, patient, HeartRate, 74m, at: before);
         await RefusedAsync(PostgresErrorCodes.CheckViolation, () => RecordAsync(clinician, patient, HeartRate, 75m, at: before.AddMinutes(-1), visit: visit));
         await RecordAsync(clinician, patient, Temperature, 36.8m, at: before, visit: visit);
-        var after = new DateTime((DateTime.UtcNow.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond) + (2 * TimeSpan.TicksPerSecond), DateTimeKind.Utc);
+        var after = new DateTime(((await database.NowAsync()).Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond) + (2 * TimeSpan.TicksPerSecond), DateTimeKind.Utc);
         await RecordAsync(clinician, patient, HeartRate, 76m, at: after);
         await RecordPressureAsync(clinician, patient, 118m, 76m, at: after);
         const string visits = "SELECT coalesce(encounter_id::text, 'none') FROM ehr.observations WHERE patient_id = @patient AND effective_at = @at";

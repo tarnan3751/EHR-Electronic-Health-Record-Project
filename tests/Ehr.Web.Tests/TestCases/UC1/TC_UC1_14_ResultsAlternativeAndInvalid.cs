@@ -49,13 +49,13 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
         var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
         var path = Path(patient, order);
 
-        using var notANumber = await FileAsync(session.Client, patient, order, (Hemoglobin, "abc"));
+        using var notANumber = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, "abc"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, notANumber.StatusCode);
         var refused = await notANumber.Content.ReadAsStringAsync(Cancel);
         Assert.Contains("Not saved:", refused);
         Assert.Contains("Enter a number, like 5.4.", refused);
         Assert.Contains($"name=\"Values[{Hemoglobin}]\" value=\"abc\"", refused);
-        using var nothing = await FileAsync(session.Client, patient, order);
+        using var nothing = await FileAsync(apps, session.Client, patient, order);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, nothing.StatusCode);
         Assert.Contains("Enter at least one result.", await nothing.Content.ReadAsStringAsync(Cancel));
         using var tomorrow = await PostFormAsync(session.Client, path, path, ($"Values[{Hemoglobin}]", "14.2"), ("CollectedAt", DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm")));
@@ -64,7 +64,7 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
         Assert.Empty(await FiledAsync(apps, patient));
         Assert.Equal("active", await StatusAsync(apps, patient));
 
-        using var first = await FileAsync(session.Client, patient, order, (Hemoglobin, "14.2"));
+        using var first = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, "14.2"));
         var partial = await ReadAsync(first);
         Assert.Contains("Enter the remaining results", partial);
         Assert.DoesNotContain($"name=\"Values[{Hemoglobin}]\"", partial);
@@ -72,7 +72,7 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
         var second = await apps.CreateStaffAsync("Dr. Second Results", StaffRoles.Clinician);
         await apps.AssignAsync(second, patient);
         var colleague = await SignInAsync(apps.OnPrem, second);
-        using var later = await FileAsync(colleague.Client, patient, order, (Platelets, "90"));
+        using var later = await FileAsync(apps, colleague.Client, patient, order, (Platelets, "90"));
         Assert.Contains("Saved:", await ReadAsync(later));
 
         // The first clinician's page still shows one result. Acknowledging from it covers only what it showed: the

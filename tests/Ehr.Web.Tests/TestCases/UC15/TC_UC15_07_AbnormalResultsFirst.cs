@@ -35,8 +35,8 @@ public class TC_UC15_07_AbnormalResultsFirst(WebApps apps) : IClassFixture<WebAp
         // Total cholesterol, one of the lipid panel's tests (db/reference): 125 to 199.
         const string cholesterol = "2093-3";
 
-        using var normal = await FileAsync(session.Client, patient, lipids, (cholesterol, "180"));
-        using var abnormal = await FileAsync(session.Client, patient, count, (Hemoglobin, "9.1"));
+        using var normal = await FileAsync(apps, session.Client, patient, lipids, (cholesterol, "180"));
+        using var abnormal = await FileAsync(apps, session.Client, patient, count, (Hemoglobin, "9.1"));
         Assert.Equal(2, (await FiledAsync(apps, patient)).Count);
 
         var inbox = await session.Client.GetStringAsync("/inbox", Cancel);

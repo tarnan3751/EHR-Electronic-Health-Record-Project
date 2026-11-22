@@ -43,7 +43,7 @@ public class TC_UC20_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 
         // Step 1.
         var count = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
-        using (await FileAsync(session.Client, patient, count, (Hemoglobin, "13.1")))
+        using (await FileAsync(apps, session.Client, patient, count, (Hemoglobin, "13.1")))
         {
         }
 

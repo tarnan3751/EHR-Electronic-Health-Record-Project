@@ -46,7 +46,7 @@ public class TC_UC1_15_ResultsExceptionalCondition(WebApps apps) : IClassFixture
         Assert.Contains("No results yet.", await cloud.GetStringAsync(path, Cancel));
         Assert.True(await apps.Cloud.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.Cloud) >= 1);
-        using var filed = await FileAsync(cloud, patient, order, (Hemoglobin, "13.5"));
+        using var filed = await FileAsync(apps, cloud, patient, order, (Hemoglobin, "13.5"));
         Assert.Contains($"POST {path}", apps.Forwarded);
         Assert.Equal([$"{Hemoglobin} 13.5 normal"], await FiledAsync(apps, patient));
         var token = Token(await session.Client.GetStringAsync(path, Cancel));

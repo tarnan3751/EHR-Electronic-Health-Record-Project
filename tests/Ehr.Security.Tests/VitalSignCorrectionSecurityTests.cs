@@ -12,7 +12,7 @@ namespace Ehr.Security.Tests;
 // entered in error, once, with a reason, and the database records who and when; the patient stops seeing it; the
 // correct value is a new reading. Heart rate, respiratory rate and blood pressure get the range for the patient's
 // age on the day they were taken.
-public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
+public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>, IAsyncLifetime
 {
     const string Systolic = "8480-6";
     const string Diastolic = "8462-4";
@@ -26,7 +26,14 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
 
-    static readonly DateTime Taken = DateTime.UtcNow.AddMinutes(-10);
+    // When the test started, by the database's clock, which its rules hold a time to; and ten minutes before.
+    DateTime Started { get; set; }
+
+    DateTime Taken => Started.AddMinutes(-10);
+
+    public async ValueTask InitializeAsync() => Started = await database.NowAsync();
+
+    public ValueTask DisposeAsync() => default;
 
     const string Mark = "UPDATE ehr.observations SET status = 'entered-in-error', entered_in_error_reason = @reason WHERE patient_id = @patient AND code = @code AND status = 'final'";
 
@@ -226,7 +233,7 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             "UPDATE ehr.patients SET birth_date = (now() - interval '6 years 1 month')::date WHERE id = @patient", ("patient", patient));
 
-        await RecordAsync(clinician, patient, HeartRate, 90m, DateTime.UtcNow.AddDays(-62));
+        await RecordAsync(clinician, patient, HeartRate, 90m, Started.AddDays(-62));
         await RecordAsync(clinician, patient, HeartRate, 90m);
 
         Assert.Equal(["65-131", "59-123"], await AsSuperuserAsync(

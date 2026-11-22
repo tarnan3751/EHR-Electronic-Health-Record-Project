@@ -42,7 +42,7 @@ public class TC_UC4_31_ChildBloodPressureBySexAndAge(WebApps apps) : IClassFixtu
             var child = await apps.InsertPatientAsync("Synthetic", $"Child {sex}", DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-18));
             await apps.AssignAsync(clinician, child);
             await ProxyTests.QueryAsync(apps, $"UPDATE ehr.patients SET gender = '{sex}' WHERE id = @patient RETURNING id::text", child);
-            using var recorded = await RecordAsync(session.Client, child, 10, (Systolic, "97"), (Diastolic, "53"));
+            using var recorded = await RecordAsync(apps, session.Client, child, 10, (Systolic, "97"), (Diastolic, "53"));
             var cell = Regex.Match(Row(await ReadAsync(recorded)), "(?s)<td class=\"sc-table__mono\">.*?</td>").Value;
             Assert.Contains("97/53", cell);
             if (expected is null)

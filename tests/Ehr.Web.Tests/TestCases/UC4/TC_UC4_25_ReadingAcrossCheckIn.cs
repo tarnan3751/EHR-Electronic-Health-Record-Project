@@ -39,7 +39,8 @@ public class TC_UC4_25_ReadingAcrossCheckIn(WebApps apps) : IClassFixture<WebApp
     async Task<Guid> CorrectAsync(bool typedFirst, int minutesBefore, string at)
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
-        var taken = DateTime.UtcNow.AddMinutes(-minutesBefore).ToString("yyyy-MM-ddTHH:mm");
+        // By the database's clock, which judges the time and starts the visit.
+        var taken = (await apps.Database.NowAsync()).AddMinutes(-minutesBefore).ToString("yyyy-MM-ddTHH:mm");
         async Task RecordFirstAsync()
         {
             using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "120"), (Diastolic, "80"));
@@ -65,7 +66,7 @@ public class TC_UC4_25_ReadingAcrossCheckIn(WebApps apps) : IClassFixture<WebApp
         using var corrected = await RecordAtAsync(session.Client, patient, taken, (Systolic, "120"), (Diastolic, "78"));
         Assert.Contains("Saved:", await ReadAsync(corrected));
         // To the second, just after the check-in.
-        using var rate = await RecordAtAsync(session.Client, patient, DateTime.UtcNow.AddSeconds(2).ToString("yyyy-MM-ddTHH:mm:ss"), (HeartRate, "70"));
+        using var rate = await RecordAtAsync(session.Client, patient, (await apps.Database.NowAsync()).AddSeconds(2).ToString("yyyy-MM-ddTHH:mm:ss"), (HeartRate, "70"));
         Assert.Contains("Saved:", await ReadAsync(rate));
         return patient;
     }
