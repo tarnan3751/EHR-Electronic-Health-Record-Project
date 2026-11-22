@@ -26,6 +26,12 @@
 --     Who answered and when are the database's.
 -- READ COMMITTED, as signing an order requires (60-orders.sql): a statement that waited for a lock reads what was
 -- committed while it waited.
+-- Lock order: a medication's row, then its advisory lock ('ehr.medication_statements:' and its ID), then a request's
+-- row. Marking a medication sensitive takes them in that order (its update, then ehr.follow_refill_medication). So an
+-- approval takes the first two before it updates the request (RefillRequestQueries.LockMedicationSql, which
+-- ClinicalOrders runs first): this trigger runs only once the request's row is locked, too late to take them first,
+-- and its own FOR SHARE below finds the medication's row locked already. Asking takes the advisory lock alone, and the
+-- key-share lock its foreign key takes doesn't wait for an update of the medication's sensitivity or status.
 CREATE OR REPLACE FUNCTION ehr.guard_refill_request() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp

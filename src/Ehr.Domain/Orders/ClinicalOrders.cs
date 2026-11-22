@@ -169,6 +169,9 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
     // Null when it was answered; why not otherwise.
     async Task<SignRefusal?> AnswerRefillAsync(Guid request, Guid patient, Guid order, CancellationToken cancellationToken)
     {
+        // The medication's locks first, then the request's row, in the order marking the medication sensitive takes them:
+        // the other way round, the two could each wait for the other.
+        await RefillRequestQueries.LockMedicationAsync(db, request, cancellationToken);
         // A stand-in for the row, with its key: only order_id is sent.
         var row = new RefillRequest { Id = request, PatientId = patient, Status = RefillRequestStatus.Requested };
         var entry = db.Attach((object)row);

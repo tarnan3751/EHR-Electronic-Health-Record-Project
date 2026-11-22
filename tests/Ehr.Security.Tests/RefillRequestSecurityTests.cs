@@ -1,5 +1,6 @@
 using System.Data;
 using Ehr.Data.Accounts;
+using Ehr.Data.Patients;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
@@ -741,5 +742,65 @@ public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixtu
         var (alone, lonely, lonelyAccount) = await OnPanelAsync();
         await Accounts.LockOutAsync(database, alone);
         await RefusedAsync(PostgresErrorCodes.CheckViolation, async () => await AskAsync(lonelyAccount, lonely, await MedicationAsync(lonely)), "refill_requests_care_team");
+    }
+
+    // The review's finding: an approval whose request's row was locked before its medication's, beside a clinician marking
+    // the medication sensitive, which takes the medication's locks first, ended in a deadlock. The approval now takes the
+    // medication's locks first too (RefillRequestQueries.LockMedicationSql, as ClinicalOrders runs it), so whichever
+    // starts first finishes, and the other waits. Two connections.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Approving_and_marking_the_medication_sensitive_at_once_never_deadlock(bool approvedFirst)
+    {
+        var (clinician, patient, account) = await OnPanelAsync();
+        var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, colleague, patient);
+        var medication = await MedicationAsync(patient);
+        var request = await AskAsync(account, patient, medication);
+
+        var (approving, approvingTransaction) = await BeginAsync(App, clinician);
+        var (marking, markingTransaction) = await BeginAsync(App, colleague);
+        await using (approving)
+        await using (marking)
+        {
+            async Task RunOnAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string sql)
+            {
+                await using var command = new NpgsqlCommand(sql, connection, transaction);
+                foreach (var (name, value) in new (string, object)[] { ("order", Guid.CreateVersion7()), ("patient", patient), ("request", request), ("medication", medication) })
+                {
+                    command.Parameters.AddWithValue(name, value);
+                }
+
+                await command.ExecuteNonQueryAsync(Cancel);
+            }
+
+            const string Mark = "UPDATE ehr.medication_statements SET sensitive = true WHERE id = @medication";
+            const string Answer = "UPDATE ehr.refill_requests SET order_id = (SELECT o.id FROM ehr.orders o WHERE o.patient_id = @patient AND o.signed_at >= now()) WHERE id = @request";
+            await RunOnAsync(approving, approvingTransaction,
+                "INSERT INTO ehr.orders (id, patient_id, type, catalog_code, details, status) VALUES (@order, @patient, 'medication', '314076', '{}', 'active')");
+            if (approvedFirst)
+            {
+                await RunOnAsync(approving, approvingTransaction, RefillRequestQueries.LockMedicationSql);
+                var waiting = RunOnAsync(marking, markingTransaction, Mark);
+                Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), Cancel)));
+                await RunOnAsync(approving, approvingTransaction, Answer);
+                await approvingTransaction.CommitAsync(Cancel);
+                await waiting;
+                await markingTransaction.CommitAsync(Cancel);
+            }
+            else
+            {
+                await RunOnAsync(marking, markingTransaction, Mark);
+                var waiting = RunOnAsync(approving, approvingTransaction, RefillRequestQueries.LockMedicationSql);
+                Assert.NotSame(waiting, await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromMilliseconds(500), Cancel)));
+                await markingTransaction.CommitAsync(Cancel);
+                await waiting;
+                await RunOnAsync(approving, approvingTransaction, Answer);
+                await approvingTransaction.CommitAsync(Cancel);
+            }
+        }
+
+        Assert.Equal(["completed true"], await AsSuperuserAsync("SELECT status || ' ' || sensitive FROM ehr.refill_requests WHERE id = @id", ("id", request)));
     }
 }
