@@ -42,7 +42,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         return draft;
     }
 
-    public async Task<NoteResult> SaveAsync(Guid patient, Guid id, long version, NoteContent content, CancellationToken cancel)
+    // The visit types a note can be written for (step 14), in the order the editor lists them: reference data, not PHI.
+    public Task<List<Ehr.Data.Reference.NoteTemplate>> TemplatesAsync(CancellationToken cancel) =>
+        db.NoteTemplates.AsNoTracking().OrderBy(t => t.Position).ToListAsync(cancel);
+
+    // `template`: the visit type the author chose, or none (step 14). Guidance for the editor only; saved with the draft.
+    public async Task<NoteResult> SaveAsync(Guid patient, Guid id, long version, NoteContent content, CancellationToken cancel, string? template = null)
     {
         if (!authority.IsPrimaryHost)
         {
@@ -70,6 +75,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             return new(422, errors);
         }
 
+        if (template is not null && !await db.NoteTemplates.AnyAsync(t => t.Code == template, cancel))
+        {
+            return new(422, ["Choose a visit type from the list."]);
+        }
+
+        draft.NoteTemplateCode = template;
         content.ApplyTo(draft);
         await db.SaveChangesAsync(cancel);
         return new(200, [], draft);

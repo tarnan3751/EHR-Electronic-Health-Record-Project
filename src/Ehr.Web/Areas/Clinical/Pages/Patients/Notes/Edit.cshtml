@@ -1,4 +1,5 @@
 @page "/patients/{patientId:guid}/notes/drafts/{draftId:guid}"
+@using Ehr.Domain.Notes
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.EditModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
@@ -32,35 +33,60 @@ else
     }
     @* Step 14: the text of an earlier draft, or of one last saved on the desktop, is in Subjective until its author sorts
        and saves it. Nothing has changed in the saved draft. *@
-    @if (Model.Origin == Ehr.Domain.Notes.NoteOrigin.History)
+    @if (Model.Origin == NoteOrigin.History)
     {
         <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="history"><span class="sc-notice__state">Check:</span> this draft was written before notes had four sections. Its History is now in Subjective: move today's vital signs, examination findings and the results you reviewed to Objective before signing.</p>
     }
-    else if (Model.Origin == Ehr.Domain.Notes.NoteOrigin.Body)
+    else if (Model.Origin == NoteOrigin.Body)
     {
         <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="body"><span class="sc-notice__state">Check:</span> this draft was last saved on the desktop app, and all its text is in Subjective. Sort it into the four sections before signing.</p>
     }
     <div id="note-errors" class="sc-notice sc-notice--danger" role="alert" hidden="@(Model.Errors.Count == 0)">
         @foreach (var error in Model.Errors) { <p>@error</p> }
     </div>
+    // Step 14: under each section's label, what the section holds and, once a visit type is chosen, what to cover in it
+    // for that kind of visit. Guidance only, never put into the note; note-editor.js changes the prompts as another visit
+    // type is chosen, and without JavaScript they change when the draft is saved.
+    var chosen = Model.Templates.FirstOrDefault(t => t.Code == Model.NoteTemplateCode);
+    Func<string, string> described = name => $"note-definition-{name.ToLowerInvariant()} note-prompt-{name.ToLowerInvariant()}";
+    Func<string, object> hints = @<text>
+        <p id="note-definition-@item.ToLowerInvariant()" class="sc-field__hint">@NoteSections.Definitions[item]</p>
+        <p id="note-prompt-@item.ToLowerInvariant()" class="sc-field__hint" data-note-prompt="@item.ToLowerInvariant()" hidden="@(chosen is null)">@(chosen is null ? "" : $"{chosen.Title}: {NoteSections.Prompt(chosen, item)}")</p>
+    </text>;
     <form method="post" asp-page-handler="Save" class="sc-form sc-form--wide" data-note-editor>
         <input type="hidden" asp-for="Version" />
         <p id="note-help" class="sc-field__hint">Drafts save to the clinic server as you type. Complete all four sections before signing.</p>
+        <div class="sc-field">
+            <label asp-for="NoteTemplateCode" class="sc-field__label">Visit type</label>
+            <select asp-for="NoteTemplateCode" class="sc-field__input" aria-describedby="note-template-help" data-note-template>
+                <option value="">None</option>
+                @foreach (var template in Model.Templates)
+                {
+                    <option value="@template.Code" data-subjective="@($"{template.Title}: {template.SubjectivePrompt}")" data-objective="@($"{template.Title}: {template.ObjectivePrompt}")"
+                            data-assessment="@($"{template.Title}: {template.AssessmentPrompt}")" data-plan="@($"{template.Title}: {template.PlanPrompt}")">@template.Title</option>
+                }
+            </select>
+            <p id="note-template-help" class="sc-field__hint">Shows what to cover in each section for this kind of visit. Nothing is added to the note.</p>
+        </div>
         <div class="sc-field sc-field--wide">
             <label asp-for="Subjective" class="sc-field__label">Subjective</label>
-            <textarea asp-for="Subjective" class="sc-field__input" rows="7" autofocus aria-describedby="@(Model.Origin == Ehr.Domain.Notes.NoteOrigin.Sections ? "note-help" : "note-help note-origin")"></textarea>
+            @hints(NoteSections.Subjective)
+            <textarea asp-for="Subjective" class="sc-field__input" rows="7" autofocus aria-describedby="@(described(NoteSections.Subjective) + (Model.Origin == NoteOrigin.Sections ? " note-help" : " note-help note-origin"))"></textarea>
         </div>
         <div class="sc-field sc-field--wide">
             <label asp-for="Objective" class="sc-field__label">Objective</label>
-            <textarea asp-for="Objective" class="sc-field__input" rows="5"></textarea>
+            @hints(NoteSections.Objective)
+            <textarea asp-for="Objective" class="sc-field__input" rows="5" aria-describedby="@described(NoteSections.Objective)"></textarea>
         </div>
         <div class="sc-field sc-field--wide">
             <label asp-for="Assessment" class="sc-field__label">Assessment</label>
-            <textarea asp-for="Assessment" class="sc-field__input" rows="5"></textarea>
+            @hints(NoteSections.Assessment)
+            <textarea asp-for="Assessment" class="sc-field__input" rows="5" aria-describedby="@described(NoteSections.Assessment)"></textarea>
         </div>
         <div class="sc-field sc-field--wide">
             <label asp-for="Plan" class="sc-field__label">Plan</label>
-            <textarea asp-for="Plan" class="sc-field__input" rows="5"></textarea>
+            @hints(NoteSections.Plan)
+            <textarea asp-for="Plan" class="sc-field__input" rows="5" aria-describedby="@described(NoteSections.Plan)"></textarea>
         </div>
         <div class="sc-actions">
             <button type="submit" class="sc-btn">Save draft</button>

@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
+using Ehr.Testing;
 using Xunit;
 
 namespace Ehr.Web.Tests;
@@ -85,6 +87,21 @@ public class NoteContentTests
         Assert.Equal((null, "Old history", "Blood pressure 126/80.", 5L, 5L), (draft.History, draft.Subjective, draft.Objective, draft.Version, draft.StructuredVersion));
         Assert.Equal(NoteOrigin.Sections, NoteContent.OriginOf(draft));
         Assert.Empty(ClinicalNotes.SigningProblems(draft));
+    }
+
+    // What the editor says each section holds (step 14): Assessment's and Plan's are the dictation note schema's
+    // descriptions, word for word, as the schema's $comment asks of the editor.
+    [Fact]
+    public void The_editor_defines_assessment_and_plan_as_the_note_schema_does()
+    {
+        using var schema = JsonDocument.Parse(File.ReadAllText(RepositoryRoot.Combine("src/Ehr.Dictation/schema/note-fields.schema.json")));
+        var properties = schema.RootElement.GetProperty("properties");
+        foreach (var section in new[] { NoteSections.Assessment, NoteSections.Plan })
+        {
+            Assert.Equal(properties.GetProperty(section.ToLowerInvariant()).GetProperty("description").GetString(), NoteSections.Definitions[section]);
+        }
+
+        Assert.Equal([NoteSections.Subjective, NoteSections.Objective, NoteSections.Assessment, NoteSections.Plan], NoteSections.Definitions.Keys);
     }
 
     // A note signed before step 14 is shown as it was signed; one signed in four sections gives an older desktop build

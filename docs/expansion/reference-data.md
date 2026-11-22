@@ -112,7 +112,7 @@ They are for a demonstration system's synthetic patients and **are not validated
 
 ### Note templates
 
-Added in the plan's step 14. The visit types a clinician can write a note for, each with a prompt for what to cover in Subjective, Objective, Assessment and Plan: guidance for writing a note of that kind. They are hand-written in `db/reference/37-note-templates.sql`, for this project and from no published source: follow-up, new patient, acute, well-child and telephone visits. Nothing of a template is put into a note. **Not validated for clinical use:** each needs a clinician's reading before a clinic relies on it. A template a draft was written with can't be taken out of the file: the database refuses it.
+Added in the plan's step 14. The visit types a clinician can write a note for, each with a prompt for what to cover in Subjective, Objective, Assessment and Plan: guidance for writing a note of that kind, which the note editor shows under each section's own definition when the clinician picks the visit type (`docs/UC14.md`). They are hand-written in `db/reference/37-note-templates.sql`, for this project and from no published source: follow-up, new patient, acute, well-child and telephone visits. Nothing of a template is put into a note. **Not validated for clinical use:** each needs a clinician's reading before a clinic relies on it. A template a draft was written with can't be taken out of the file: the database refuses it.
 
 ### Units
 

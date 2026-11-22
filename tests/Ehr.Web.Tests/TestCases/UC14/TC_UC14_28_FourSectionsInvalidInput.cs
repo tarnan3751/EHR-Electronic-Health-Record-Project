@@ -7,22 +7,25 @@ using static Ehr.Web.Tests.OrderTests;
 namespace Ehr.Web.Tests.TestCases.UC14;
 
 // Test Case ID: TC-UC14-28
-// Purpose / scenario: A note with an empty section isn't signed, and a section too long or holding a null character
-//   isn't saved. Nothing is signed, and the saved draft keeps what was saved before.
+// Purpose / scenario: A note with an empty section isn't signed, and a section too long or holding a null character,
+//   or a visit type that isn't one of the list's, isn't saved. Nothing is signed, and the saved draft keeps what was
+//   saved before.
 // Type: Functional (invalid input)
 // Requirements: FR-31, proposed FR-60
 // Use case: UC 14, Review and sign a clinical note
 // Preconditions: The clinician is signed in on the on-site app with the patient on their panel, and has a new draft.
 // Inputs and system conditions: POST /patients/{id}/notes/drafts/{draft} (Save, Review) and its /confirm.
 // Test data: Subjective, Assessment and Plan typed and Objective empty; then an Objective of 16,001 characters; then
-//   an Objective with a null character.
+//   an Objective with a null character; then the visit type "general-surgery", which isn't one.
 // Steps:
 //   1. Save with Objective empty and choose "Sign note…"; then try to sign that version.
 //   2. Save with the overlong Objective.
 //   3. Save with the null character in Objective.
+//   4. Save with the unknown visit type.
 // Expected result: Step 1: the draft is saved, "Sign note…" answers "Enter Objective before signing." and signing that
 //   version is refused with the same; nothing is signed. Steps 2 and 3: nothing is saved ("Shorten Objective to 16,000
-//   characters or fewer."; the null character with 400), and the draft keeps the text of step 1.
+//   characters or fewer."; the null character with 400). Step 4: nothing is saved ("Choose a visit type from the
+//   list."). The draft keeps the text of step 1, with no visit type.
 // Creator: Tahseen Arnan
 public class TC_UC14_28_FourSectionsInvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
@@ -66,8 +69,9 @@ public class TC_UC14_28_FourSectionsInvalidInput(WebApps apps) : IClassFixture<W
         // from Objective.", which NoteContentTests checks); either way nothing is saved.
         var (nullStatus, _) = await PostAsync(path + "?handler=Save", 2, "Synthetic objective\0");
         Assert.Equal(HttpStatusCode.BadRequest, nullStatus);
+        await RefusedAsync(path + "?handler=Save", 2, "Synthetic objective", "Choose a visit type from the list.", ("NoteTemplateCode", "general-surgery"));
 
         Assert.Equal(["2|Synthetic subjective: headache.||0"], await ProxyTests.QueryAsync(apps,
-            "SELECT d.version || '|' || d.subjective || '|' || d.objective || '|' || (SELECT count(*) FROM ehr.clinical_notes n WHERE n.draft_id = d.id) FROM ehr.clinical_drafts d WHERE d.patient_id = @patient", patient));
+            "SELECT d.version || '|' || d.subjective || '|' || d.objective || '|' || (SELECT count(*) FROM ehr.clinical_notes n WHERE n.draft_id = d.id) || coalesce(d.note_template_code, '') FROM ehr.clinical_drafts d WHERE d.patient_id = @patient", patient));
     }
 }

@@ -104,6 +104,19 @@
             setStatus('Unsaved');
             schedule();
         }));
+        // The visit type (step 14) is saved with the draft, and its prompts, kept on its option, shown under the sections.
+        const visitType = form.querySelector('[data-note-template]');
+        visitType?.addEventListener('change', () => {
+            const chosen = visitType.selectedOptions[0];
+            form.querySelectorAll('[data-note-prompt]').forEach(prompt => {
+                const text = chosen?.dataset[prompt.dataset.notePrompt] || '';
+                prompt.textContent = text;
+                prompt.hidden = text === '';
+            });
+            revision++;
+            setStatus('Unsaved');
+            schedule();
+        });
         form.addEventListener('submit', async event => {
             event.preventDefault();
             const review = event.submitter?.hasAttribute('data-review') === true;
