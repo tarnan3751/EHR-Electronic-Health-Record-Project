@@ -42,7 +42,7 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
         // Today's visit began half an hour ago, with nothing taken yet.
-        await apps.InsertVisitAsync(patient, DateTimeOffset.UtcNow.AddMinutes(-30), reason: "Synthetic follow-up");
+        await apps.InsertVisitAsync(patient, (await apps.Database.NowAsync()).AddMinutes(-30), reason: "Synthetic follow-up");
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Contains("blood pressure not taken, heart rate not taken", Words(chart));
         Assert.DoesNotContain("data-latest-vitals", chart);
@@ -51,7 +51,7 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         Assert.Contains("No vital signs recorded.", empty);
         Assert.Contains("data-record-vitals", empty);
 
-        using var first = await RecordAsync(session.Client, patient, 24 * 60,
+        using var first = await RecordAsync(apps, session.Client, patient, 24 * 60,
             (Systolic, "148"), (Diastolic, "92"), (HeartRate, "72"), (Weight, "81"), (Height, "180"));
         var page = await ReadAsync(first);
         Assert.Contains("Saved:", page);
@@ -63,7 +63,7 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         Assert.Equal(Enumerable.Repeat(clinician.Id.ToString(), 6), await ProxyTests.QueryAsync(apps,
             "SELECT actor_id::text FROM ehr.audit_events WHERE table_name = 'observations' AND action = 'insert' AND patient_id = @patient", patient));
 
-        using var second = await RecordAsync(session.Client, patient, 10, (Systolic, "126"), (Diastolic, "80"), (HeartRate, "68"));
+        using var second = await RecordAsync(apps, session.Client, patient, 10, (Systolic, "126"), (Diastolic, "80"), (HeartRate, "68"));
         page = await ReadAsync(second);
         Assert.Contains("The latest 2 sets of vital signs, newest first.", page);
         Assert.Matches("(?s)Blood pressure <span[^>]*>[^<]*</span></th>\\s*<td class=\"sc-table__mono\">\\s*126/80\\s*<span class=\"sc-tag sc-tag--warning\">High</span>\\s*</td>\\s*<td class=\"sc-table__mono\">\\s*148/92", page);

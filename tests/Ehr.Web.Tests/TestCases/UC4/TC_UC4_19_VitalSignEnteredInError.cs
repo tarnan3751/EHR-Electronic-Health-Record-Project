@@ -45,7 +45,7 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         var portal = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, patient);
         var yesterday = (await apps.Database.NowAsync()).AddDays(-1).ToString("yyyy-MM-ddTHH:mm");
         using var wrong = await RecordAtAsync(session.Client, patient, yesterday, (Systolic, "180"), (Diastolic, "92"), (HeartRate, "72"), (Weight, "81"), (Height, "180"));
-        using var later = await RecordAsync(session.Client, patient, 10, (Systolic, "126"), (Diastolic, "80"), (HeartRate, "68"));
+        using var later = await RecordAsync(apps, session.Client, patient, 10, (Systolic, "126"), (Diastolic, "80"), (HeartRate, "68"));
         var flowsheet = await ReadAsync(later);
         Assert.Contains("data-mark-in-error", flowsheet);
         Assert.Contains($"/patients/{patient}/vitals/error?at={Uri.EscapeDataString(yesterday + ":00")}", flowsheet);
