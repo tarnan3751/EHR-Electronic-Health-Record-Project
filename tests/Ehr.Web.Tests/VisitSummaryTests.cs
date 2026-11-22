@@ -217,7 +217,7 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
         {
             var reader = new PhiReader(db, new AuditRecorder(db, user, new AuditSource(AuditSources.OnPrem)), user);
             await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
-            Assert.Equal(SummariesModel.Limit, (await reader.VisitSummariesAsync(person.Patient, sensitive: false, SummariesModel.Limit, Cancel))!.Summaries.Count);
+            Assert.Equal(SummariesModel.Limit, (await reader.VisitSummariesAsync(person.Patient, sensitive: false, SummariesModel.Limit, AuditParts.Summaries, Cancel))!.Summaries.Count);
             await transaction.CommitAsync(Cancel);
         }
 
@@ -298,7 +298,7 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
             await using var db = new EhrDbContext(options.Options);
             var reader = new PhiReader(db, new AuditRecorder(db, user, new AuditSource(AuditSources.OnPrem)), user);
             await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
-            var chart = (await reader.ChartAsync(patient, 5, Cancel))!;
+            var chart = (await reader.ChartAsync(patient, 5, AuditParts.Chart, Cancel))!;
             await transaction.RollbackAsync(Cancel);
             return ([.. commands.Executed.Select(command => command.Text)], chart);
         }

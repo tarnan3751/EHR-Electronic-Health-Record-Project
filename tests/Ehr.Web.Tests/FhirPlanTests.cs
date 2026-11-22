@@ -75,7 +75,7 @@ public class FhirPlanTests(MigratedDatabase database) : IClassFixture<MigratedDa
 
         await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
         Assert.Equal(patient, await reader.PatientIdByMrnAsync(chart.Patient.Mrn, Cancel));
-        Assert.NotNull(await reader.PatientAsync(patient, Cancel));
+        Assert.NotNull(await reader.PatientAsync(patient, AuditParts.Fhir, Cancel));
         Assert.Equal(patient, await reader.EntryPatientAsync("allergy_intolerances", chart.Allergies[0].Id, sensitive: true, Cancel));
         Assert.Equal(patient, await reader.EntryPatientAsync("medication_statements", chart.Medications[0].Id, sensitive: true, Cancel));
         Assert.Equal(patient, await reader.EntryPatientAsync("conditions", chart.Conditions[0].Id, sensitive: true, Cancel));

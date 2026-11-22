@@ -16,8 +16,8 @@ public static class AuditEventBatch
     {
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, details)
-            SELECT * FROM unnest(@ids, @times, @actors, @actions, @tables, @rows, @patients, @sources, @reasons, @details::jsonb[])
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, details, part)
+            SELECT * FROM unnest(@ids, @times, @actors, @actions, @tables, @rows, @patients, @sources, @reasons, @details::jsonb[], @parts)
             """, (NpgsqlConnection)db.Database.GetDbConnection(), (NpgsqlTransaction?)db.Database.CurrentTransaction?.GetDbTransaction());
         command.Parameters.Add(new NpgsqlParameter<Guid[]>("ids", [.. events.Select(e => e.Id)]));
         command.Parameters.Add(new NpgsqlParameter<DateTimeOffset[]>("times", [.. events.Select(e => e.OccurredAt)]));
@@ -29,6 +29,7 @@ public static class AuditEventBatch
         command.Parameters.Add(new NpgsqlParameter<string[]>("sources", [.. events.Select(e => e.Source)]));
         command.Parameters.Add(new NpgsqlParameter<string?[]>("reasons", [.. events.Select(e => e.Reason)]));
         command.Parameters.Add(new NpgsqlParameter<string?[]>("details", [.. events.Select(e => e.Details)]) { NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text });
+        command.Parameters.Add(new NpgsqlParameter<string?[]>("parts", [.. events.Select(e => e.Part)]));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }

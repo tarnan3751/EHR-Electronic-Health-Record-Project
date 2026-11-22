@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
@@ -137,7 +138,7 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
             }
         }
 
-        var chart = await phi.ChartAsync(id, RecentVisits, HttpContext.RequestAborted, Discontinued, Sensitive);
+        var chart = await phi.ChartAsync(id, RecentVisits, AuditParts.Chart, HttpContext.RequestAborted, Discontinued, Sensitive);
         if (chart is null)
         {
             return NotFound();

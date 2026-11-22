@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Phi;
@@ -37,7 +38,7 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
         Response.Headers.CacheControl = "no-store";
         var patientId = subject.PatientId;
-        var appointments = await phi.AppointmentsAsync(patientId, past: 0, HttpContext.RequestAborted);
+        var appointments = await phi.AppointmentsAsync(patientId, past: 0, AuditParts.Home, HttpContext.RequestAborted);
         Patient = appointments?.Patient;
         Upcoming = [.. (appointments?.Upcoming ?? []).Take(3)];
         if (Patient is not null && MaySeeForms)

@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
@@ -16,7 +17,8 @@ public abstract class PatientNotePage(PhiReader phi, PatientAssignments assignme
     // The patient's current allergies, for the banner: part of the same recorded read as the patient.
     public IReadOnlyList<AllergyIntolerance> Allergies { get; private set; } = [];
 
-    protected async Task<IActionResult?> LoadPatientAsync(Guid patientId)
+    // `part`: which part of the record the page is (AuditParts), a signed note's or a note being written.
+    protected async Task<IActionResult?> LoadPatientAsync(Guid patientId, string part)
     {
         Response.Headers.CacheControl = "no-store";
         if (!await assignments.IsOnPanelAsync(patientId, HttpContext.RequestAborted)
@@ -25,7 +27,7 @@ public abstract class PatientNotePage(PhiReader phi, PatientAssignments assignme
             return RedirectToPage("/Patients/Reason", new { id = patientId });
         }
 
-        var header = await Phi.HeaderAsync(patientId, HttpContext.RequestAborted);
+        var header = await Phi.HeaderAsync(patientId, part, HttpContext.RequestAborted);
         if (header is null)
         {
             return NotFound();

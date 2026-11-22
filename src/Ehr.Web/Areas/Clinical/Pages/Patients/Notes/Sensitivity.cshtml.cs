@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
 using Ehr.Domain.Patients;
@@ -88,7 +89,7 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
 
     async Task<IActionResult?> LoadAsync(Guid patientId, Guid noteId)
     {
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.VisitNote) is { } denied)
         {
             return denied;
         }

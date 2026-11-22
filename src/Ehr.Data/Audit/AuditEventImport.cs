@@ -23,9 +23,9 @@ public static class AuditEventImport
             {
                 await db.Database.ExecuteSqlInterpolatedAsync(
                     $"""
-                    INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, details)
+                    INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, details, part)
                     VALUES ({e.Id}, {e.OccurredAt}, {e.ActorId}::uuid, {e.Action}, {e.TableName}::text, {e.RowId}::uuid,
-                            {e.PatientId}::uuid, {e.Source}, {e.Reason}::text, {e.Details}::jsonb)
+                            {e.PatientId}::uuid, {e.Source}, {e.Reason}::text, {e.Details}::jsonb, {e.Part}::text)
                     """,
                     cancellationToken);
                 await transaction.ReleaseSavepointAsync(Savepoint, cancellationToken);

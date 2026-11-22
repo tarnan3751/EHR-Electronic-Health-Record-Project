@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Notes;
@@ -88,7 +89,7 @@ public class SummaryModel(PhiReader phi, PatientAssignments assignments, BreakGl
 
     async Task<IActionResult?> LoadAsync(Guid patientId, Guid noteId, bool shown)
     {
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.VisitNote) is { } denied)
         {
             return denied;
         }

@@ -11,7 +11,8 @@ namespace Ehr.Domain.Phi;
 
 // The PHI reader's reads of pre-visit forms (the expansion plan's step 13e), kept apart from PhiReader.cs, which every
 // step touches. Every form is a sensitive item: a page that shows one records a view of the patient's sensitive items
-// (read_sensitive), and one that only counts them records a plain read, as the chart does for its hidden diagnoses.
+// (read_sensitive), and one that only counts them records a plain read, as the chart does for its hidden diagnoses;
+// each with the forms' part of the record (AuditParts.Forms, step 13c2), which no proxy without sensitive items is shown.
 // Row-level security decides which forms exist for the reader: every one for a clinician; for a portal session, the
 // record's own, and only when it may see sensitive items (db/policies/30-rls.sql).
 public sealed partial class PhiReader
@@ -45,7 +46,7 @@ public sealed partial class PhiReader
         var upcoming = (await AppointmentEntriesAsync(
             db.Appointments.Where(a => a.PatientId == patientId && a.Status == AppointmentStatus.Booked && a.StartsAt > since).OrderBy(a => a.StartsAt).Take(10),
             latestFirst: false, cancellationToken)).Where(a => a.StartsAt.AddMinutes(a.Minutes) > now).ToList();
-        audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patientId, PatientsTable, patientId);
+        audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patientId, PatientsTable, patientId, part: AuditParts.Forms);
         await db.SaveChangesAsync(cancellationToken);
         return new PatientForms(found.Patient, requests, sensitive ? 0 : found.Forms, sensitive, upcoming);
     }
@@ -77,7 +78,7 @@ public sealed partial class PhiReader
                 orderby clinician.DisplayName
                 select clinician.DisplayName).ToListAsync(cancellationToken)
             : null;
-        audit.Record(AuditActions.ReadSensitive, patientId, PatientsTable, patientId);
+        audit.Record(AuditActions.ReadSensitive, patientId, PatientsTable, patientId, part: AuditParts.Forms);
         await db.SaveChangesAsync(cancellationToken);
         return new FormAnswers(patient, entry, careTeam);
     }
@@ -95,7 +96,7 @@ public sealed partial class PhiReader
         }
 
         var forms = await FormEntriesAsync(patientId, request: null, names: false, cancellationToken);
-        audit.Record(maySeeSensitive ? AuditActions.ReadSensitive : AuditActions.Read, patientId, PatientsTable, patientId);
+        audit.Record(maySeeSensitive ? AuditActions.ReadSensitive : AuditActions.Read, patientId, PatientsTable, patientId, part: AuditParts.Forms);
         await db.SaveChangesAsync(cancellationToken);
         return new PortalForms(patient, forms);
     }
@@ -110,7 +111,7 @@ public sealed partial class PhiReader
             return null;
         }
 
-        audit.Record(AuditActions.ReadSensitive, patientId, PatientsTable, patientId);
+        audit.Record(AuditActions.ReadSensitive, patientId, PatientsTable, patientId, part: AuditParts.Forms);
         await db.SaveChangesAsync(cancellationToken);
         return form;
     }

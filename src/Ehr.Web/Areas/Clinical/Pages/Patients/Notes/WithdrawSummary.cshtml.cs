@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Notes;
@@ -63,7 +64,7 @@ public class WithdrawSummaryModel(PhiReader phi, PatientAssignments assignments,
 
     async Task<IActionResult?> LoadAsync(Guid patientId, Guid noteId, Guid summaryId)
     {
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.VisitNote) is { } denied)
         {
             return denied;
         }

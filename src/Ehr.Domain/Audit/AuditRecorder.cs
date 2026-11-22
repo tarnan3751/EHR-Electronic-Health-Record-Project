@@ -8,30 +8,31 @@ namespace Ehr.Domain.Audit;
 // and commits with its transaction, so a read without its record is impossible; RecordAllAsync writes its events at
 // once, in that transaction, so they commit with it too. The actor is the signed-in user
 // unless the caller knows better, as at a sign-in, where the user isn't signed in yet. On the cloud site, whose database
-// is a replica that takes no writes, the host registers an IAuditQueue and events go there instead.
+// is a replica that takes no writes, the host registers an IAuditQueue and events go there instead. A read says which
+// part of the record it was for (AuditParts, step 13c2), which the PHI reader gives; no other event has one.
 public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource source, IAuditQueue? queue = null)
 {
     public AuditEvent Record(
         string action, Guid? patientId = null, string? tableName = null, Guid? rowId = null, string? reason = null, Guid? actorId = null,
-        string? details = null)
+        string? details = null, string? part = null)
     {
-        var auditEvent = New(action, patientId, tableName, rowId, reason, actorId, details);
+        var auditEvent = New(action, patientId, tableName, rowId, reason, actorId, details, part);
         Store([auditEvent]);
         return auditEvent;
     }
 
     // A read of several rows at once, such as a list of patients: one event for each, stored together, so the cloud
     // site's queue goes to disk once for the list rather than once a row.
-    public void RecordReads(string tableName, IEnumerable<(Guid PatientId, Guid RowId)> rows) =>
-        Store([.. rows.Select(row => New(AuditActions.Read, row.PatientId, tableName, row.RowId, reason: null, actorId: null, details: null))]);
+    public void RecordReads(string tableName, string part, IEnumerable<(Guid PatientId, Guid RowId)> rows) =>
+        Store([.. rows.Select(row => New(AuditActions.Read, row.PatientId, tableName, row.RowId, reason: null, actorId: null, details: null, part))]);
 
     // Several reads at once, such as a page with a read of the patient and of each of many of their rows: written
     // together, on-site in one statement at once, in the caller's transaction (AuditEventBatch), where events recorded
     // one by one each take a statement of their own when the unit of work is saved; on the cloud site, given to the
-    // queue together, as RecordReads gives them.
-    public async Task RecordAllAsync(IEnumerable<(string Action, Guid PatientId, string TableName, Guid RowId)> reads, CancellationToken cancellationToken)
+    // queue together, as RecordReads gives them. One page's reads, so one part.
+    public async Task RecordAllAsync(string part, IEnumerable<(string Action, Guid PatientId, string TableName, Guid RowId)> reads, CancellationToken cancellationToken)
     {
-        AuditEvent[] auditEvents = [.. reads.Select(read => New(read.Action, read.PatientId, read.TableName, read.RowId, reason: null, actorId: null, details: null))];
+        AuditEvent[] auditEvents = [.. reads.Select(read => New(read.Action, read.PatientId, read.TableName, read.RowId, reason: null, actorId: null, details: null, part))];
         if (queue is null)
         {
             await AuditEventBatch.InsertAsync(db, auditEvents, cancellationToken);
@@ -42,7 +43,7 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
         }
     }
 
-    AuditEvent New(string action, Guid? patientId, string? tableName, Guid? rowId, string? reason, Guid? actorId, string? details) => new()
+    AuditEvent New(string action, Guid? patientId, string? tableName, Guid? rowId, string? reason, Guid? actorId, string? details, string? part) => new()
     {
         Id = Guid.CreateVersion7(),
         OccurredAt = DateTimeOffset.UtcNow,
@@ -54,6 +55,7 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
         RowId = rowId,
         Reason = reason,
         Details = details,
+        Part = part,
     };
 
     void Store(IReadOnlyCollection<AuditEvent> auditEvents)

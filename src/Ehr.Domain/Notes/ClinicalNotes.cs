@@ -19,7 +19,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             throw new InvalidOperationException("Draft creation requires the authoritative on-premises host.");
         }
 
-        if (!await phi.IsAssignedAsync(patient, cancel) || await phi.PatientAsync(patient, cancel) is null)
+        if (!await phi.IsAssignedAsync(patient, cancel) || await phi.PatientAsync(patient, AuditParts.NoteDraft, cancel) is null)
         {
             return null;
         }
@@ -93,7 +93,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
     public async Task<IReadOnlyList<string>> SigningProblemsAsync(ClinicalDraft draft, CancellationToken cancel)
     {
         var errors = SigningProblems(draft).ToList();
-        foreach (var review in await phi.AiReviewsAsync(draft.Id, cancel))
+        foreach (var review in await phi.AiReviewsAsync(draft.Id, AuditParts.NoteDraft, cancel))
         {
             var proposals = await phi.AiProposalsAsync(review.Id, cancel);
             var pending = proposals.Where(p => p.State == AiProposalStates.Pending).Select(p => p.Field).ToList();

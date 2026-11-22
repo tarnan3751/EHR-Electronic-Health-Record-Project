@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Data.Messaging;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Messaging;
@@ -60,7 +61,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, BreakGlass 
             return refused;
         }
 
-        if (await phi.HeaderAsync(patientId, HttpContext.RequestAborted) is not { } header)
+        if (await phi.HeaderAsync(patientId, AuditParts.Conversations, HttpContext.RequestAborted) is not { } header)
         {
             return NotFound();
         }

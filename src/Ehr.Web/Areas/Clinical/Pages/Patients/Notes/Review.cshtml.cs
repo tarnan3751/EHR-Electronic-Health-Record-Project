@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
 using Ehr.Domain.Patients;
@@ -62,7 +63,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 
     async Task<IActionResult?> LoadAsync(Guid patientId, Guid draftId, Guid reviewId)
     {
-        if (await LoadPatientAsync(patientId) is { } denied) return denied;
+        if (await LoadPatientAsync(patientId, AuditParts.NoteDraft) is { } denied) return denied;
         var review = await Phi.AiReviewAsync(reviewId, HttpContext.RequestAborted);
         if (review is null || review.PatientId != patientId || review.DraftId != draftId) return NotFound();
         var draft = await Phi.ReadDraftAsync(draftId, patientId, HttpContext.RequestAborted, tracking: false);
