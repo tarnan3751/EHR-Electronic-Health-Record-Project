@@ -501,6 +501,8 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, stopped.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
         Assert.Equal("stopped", await ErrorAsync(late));
+        // A dictation's words; a visit's recording says it was stopped (TC-UC23-04).
+        Assert.Equal("This dictation has stopped, so it takes no more audio.", (string?)(await JsonAsync(late))["message"]);
     }
 
     // Also TC-UC9-03 (FR-10): audio that can't be decoded is refused, 422. The primary test is the sidecar's test_sessions.py.

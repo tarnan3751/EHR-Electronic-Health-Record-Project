@@ -72,10 +72,12 @@ namespace Ehr.Web.Api.Dictation;
 // Refusals other than 401 and 403 are {error, message}, words for the clinician, and expectedSeq with out_of_order:
 //   400 bad_form_token, or bad_seq
 //   404 not_found: an unknown, expired or someone else's session
-//   409 out_of_order, stopped (a chunk after stop), or not_stopped (a result before stop)
+//   409 out_of_order, stopped (a chunk after stop; a visit's says its recording was stopped), or not_stopped (a result
+//       before stop)
 //   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes)
 //   415 unsupported_type: the body isn't audio/*
-//   422 not_audio: "The audio couldn't be decoded."
+//   422 not_audio: "The audio couldn't be decoded."; or unsupported_language: "That language isn't available for this
+//       recording."
 //   429 busy: the service is busy
 //   502 bad_answer: the service answered something this API doesn't know
 //   503 unavailable: not configured, the service can't be reached or says it's unavailable, or it refused the key
@@ -261,7 +263,7 @@ public static partial class DictationApi
             using var response = await sidecar.Client.SendAsync(request, call.Token);
             return response.IsSuccessStatusCode
                 ? await answer(response.Content, call.Token)
-                : await RefusalAsync(response, operation, log, call.Token);
+                : await RefusalAsync(response, operation, log, call.Token, ambient);
         }
         catch (OperationCanceledException) when (timer.IsCancellationRequested && !aborted.IsCancellationRequested)
         {
@@ -283,8 +285,10 @@ public static partial class DictationApi
         }
     }
 
-    // The service's refusals, mapped to this API's own. Only a 409's code and expected sequence are read from its body.
-    static async Task<IResult> RefusalAsync(HttpResponseMessage response, string operation, ILogger log, CancellationToken cancellationToken)
+    // The service's refusals, mapped to this API's own, in a visit's words for a visit's session (`ambient`). Only a code
+    // and a 409's expected sequence are read from its body.
+    static async Task<IResult> RefusalAsync(HttpResponseMessage response, string operation, ILogger log, CancellationToken cancellationToken,
+        bool ambient)
     {
         switch (response.StatusCode)
         {
@@ -295,7 +299,8 @@ public static partial class DictationApi
                 {
                     { Error: "out_of_order", ExpectedSeq: { } next } => Refuse(
                         StatusCodes.Status409Conflict, "out_of_order", $"Send the audio again from chunk {next}.", next),
-                    { Error: "stopped" } => Refuse(StatusCodes.Status409Conflict, "stopped", "This dictation has stopped, so it takes no more audio."),
+                    { Error: "stopped" } => Refuse(StatusCodes.Status409Conflict, "stopped",
+                        ambient ? "This visit's recording has already been stopped." : "This dictation has stopped, so it takes no more audio."),
                     { Error: "not_stopped" } => Refuse(StatusCodes.Status409Conflict, "not_stopped", "Stop the dictation before asking for its result."),
                     _ => Unexpected(response.StatusCode, operation, log),
                 };
@@ -305,10 +310,15 @@ public static partial class DictationApi
                     ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its 3-minute limit. Stop it and start another.")
                     : Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This chunk of audio, or the dictation as a whole, is too large.");
             case HttpStatusCode.UnprocessableEntity:
-                // Or, for a visit (AmbientApi), a role missing for a voice the service told apart.
-                return await ErrorBodyAsync(response, cancellationToken) is { Error: "speakers_incomplete" }
-                    ? SpeakersIncomplete()
-                    : Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded.");
+                // Or, for a visit (AmbientApi), a role missing for a voice the service told apart; or a language the service
+                // doesn't take.
+                return await ErrorBodyAsync(response, cancellationToken) switch
+                {
+                    { Error: "speakers_incomplete" } => SpeakersIncomplete(),
+                    { Error: "unsupported_language" } => Refuse(StatusCodes.Status422UnprocessableEntity, "unsupported_language",
+                        "That language isn't available for this recording."),
+                    _ => Refuse(StatusCodes.Status422UnprocessableEntity, "not_audio", "The audio couldn't be decoded."),
+                };
             case HttpStatusCode.TooManyRequests:
                 return Refuse(StatusCodes.Status429TooManyRequests, "busy", "Dictation is busy. Try again in a moment.");
             case HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden:

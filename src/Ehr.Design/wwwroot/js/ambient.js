@@ -12,7 +12,7 @@
 //    signed out or the listening is refused.
 // 3. Stop and draft: the server transcribes the visit and tells its voices apart; the clinician says who each voice is,
 //    with no role chosen for them, or that they can't tell, and the note is drafted and saved for review (UC 13), where
-//    the page goes.
+//    the page goes. Fetching the draft is tried again a few times while the service doesn't answer, then given up.
 // Stop and discard, at any point before that, switches the microphone off first, then discards the session and its
 // review: nothing recorded is kept. Leaving the page before the voices are named does the same, and leaving it at all
 // ends listening here for good. A chunk the recorder hands over after its listening is discarded, stopped or ended is
@@ -45,6 +45,7 @@
     const warnQuietSeconds = 240;
     const quietSeconds = 300;
     const roleWords = { clinician: "Me", patient: "The patient", other: "Someone else in the room", unsure: "I can't tell" };
+    const mostAttempts = 4;
 
     let state = fresh();
 
@@ -430,9 +431,11 @@
         }
     }
 
-    // One call that answers with the result, sent again with backoff while the connection is down. Null when it can't.
+    // One call that answers with the result, sent again with backoff while the connection is down or the service busy, a
+    // few times at most. Null when it can't, having said why and what to do. A 502, an answer this app couldn't use, isn't
+    // sent again: it would come back the same.
     async function ask(route, body) {
-        for (;;) {
+        for (let attempt = 1; ; attempt++) {
             if (state.ended) {
                 return null;
             }
@@ -449,8 +452,13 @@
                 return json(response);
             }
 
-            if (!transient(response.status)) {
+            if (!transient(response.status) || response.status === 502) {
                 say(await refusal(response), true);
+                return null;
+            }
+
+            if (attempt >= mostAttempts) {
+                say("The draft couldn't be fetched: the dictation service isn't answering. Nothing was added to the note. Open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes.", true);
                 return null;
             }
 

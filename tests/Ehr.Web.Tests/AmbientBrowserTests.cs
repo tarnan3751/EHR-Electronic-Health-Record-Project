@@ -284,6 +284,33 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Unsure", await page.Locator(".sc-transcript__speaker").AllTextContentsAsync());
     }
 
+    // TC-UC23-04 in the browser: fetching the draft after Stop. An answer this app couldn't use (502) isn't asked for
+    // again; a service that doesn't answer (503) is asked a few times, then the page gives up and says what to do.
+    [Theory]
+    [InlineData(502, """{"error":"bad_answer","message":"Dictation isn't working right now."}""", 1, "Dictation isn't working right now.")]
+    [InlineData(503, """{"error":"unavailable","message":"Dictation isn't available right now."}""", 4, "The draft couldn't be fetched: the dictation service isn't answering.")]
+    public async Task TC_UC23_04_fetching_the_draft_is_asked_a_few_times_at_most(int status, string answer, int asked, string said)
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        await page.RouteAsync("**/ambient/*/stop", route => route.FulfillAsync(new() { Status = status, ContentType = "application/json", Body = answer }));
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync($"document.querySelector('[data-ambient-status]').textContent.startsWith({System.Text.Json.JsonSerializer.Serialize(said)})",
+            null, new() { Timeout = 30_000 });
+        await page.WaitForTimeoutAsync(1500);
+        Assert.Equal(asked, (await EventsAsync(page)).Count(e => e.StartsWith("sent POST ", StringComparison.Ordinal) && e.EndsWith("/stop", StringComparison.Ordinal)));
+        if (status == 503)
+        {
+            Assert.Contains("Open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes.",
+                await page.TextContentAsync("[data-ambient-status]"));
+        }
+    }
+
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
     [Fact]

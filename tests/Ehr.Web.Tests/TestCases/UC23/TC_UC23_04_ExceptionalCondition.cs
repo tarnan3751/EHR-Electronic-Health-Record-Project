@@ -36,6 +36,7 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //      on-prem app with the forwarding header, under each of the three proofs.
 //   3. With the service unreachable, start listening; and with the service there, start listening while the database
 //      times out saving the consent.
+//   3a. Stop listening and send audio after; ask for the result when the service refuses the recording's language.
 //   4. Draft a visit, purge its transcript, open its review, and accept a proposal, edit it back to its own words, and
 //      edit it into others; open the review on an on-site app set to keep transcripts 3 days.
 // Expected result: Step 1: "Listen to the visit" on the clinic's chart only; off-site, the page's "Unavailable:" notice
@@ -43,7 +44,9 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   off-site, "Read-only here:" with the review's proposals, no transcript, no decisions and no finishing; the forwarded
 //   decision and finishing refused with "Finish this review at the clinic…", the review still open with its transcript.
 //   Step 2a: each answered as off-site, under every proof: no listening offered, no transcript, everything refused.
-//   Step 3: 503, no consent recorded; then 500, the service's session discarded, no consent or review recorded. Step 4: the review says the transcript was deleted after 7 days, offers no Accept,
+//   Step 3: 503, no consent recorded; then 500, the service's session discarded, no consent or review recorded. Step 3a:
+//   409 stopped, "This visit's recording has already been stopped."; 422 unsupported_language, "That language isn't
+//   available for this recording." Step 4: the review says the transcript was deleted after 7 days, offers no Accept,
 //   and leaves the box to edit it empty, saying why; accepting, or editing back to the words offered, even spaced
 //   differently, is refused with that sentence; editing into other words is saved; the app set to 3 days says 3 days.
 // Creator: Tahseen Arnan
@@ -206,6 +209,34 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             command.CommandText.Contains("INSERT INTO ehr.ambient_consents", StringComparison.Ordinal)
                 ? throw new NpgsqlException("Synthetic: the database didn't answer in time.", new TimeoutException())
                 : ValueTask.FromResult(result);
+    }
+
+    // The service's refusals of a visit's calls, each in its own words: audio after the recording was stopped, and a
+    // language the service doesn't take.
+    [Fact]
+    public async Task The_services_refusals_of_a_visit_are_said_in_their_own_words()
+    {
+        var sidecar = apps.Dictation.Reset();
+        var l = await StartAsync(apps);
+        using (var stop = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/stop"))
+        {
+            Assert.Equal(HttpStatusCode.OK, stop.StatusCode);
+        }
+
+        using (var late = await Audio(l, 0))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
+            var refusal = await Json(late);
+            Assert.Equal("stopped", refusal.GetProperty("error").GetString());
+            Assert.Equal("This visit's recording has already been stopped.", refusal.GetProperty("message").GetString());
+        }
+
+        sidecar.Answer = (HttpStatusCode.UnprocessableEntity, """{"error":"unsupported_language"}""");
+        using var language = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/result");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, language.StatusCode);
+        var said = await Json(language);
+        Assert.Equal("unsupported_language", said.GetProperty("error").GetString());
+        Assert.Equal("That language isn't available for this recording.", said.GetProperty("message").GetString());
     }
 
     [Fact]
