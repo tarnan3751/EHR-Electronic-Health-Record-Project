@@ -18,7 +18,7 @@ discuss ezetimibe or inclisiran {period} Repeat lipids in [[3 months|three month
 """
 
 [gold.subjective]
-value = "67-year-old man; blood results from November 9. Minor stroke in 2023. Stopped atorvastatin last year because of muscle aches, which went away when he stopped it; not keen to try the same statin again. No chest pain, no new weakness or speech problems. Takes clopidogrel 75 mg daily."
+value = "67-year-old man. Minor stroke in 2023. Stopped atorvastatin last year because of muscle aches, which went away when he stopped it; not keen to try the same statin again. No chest pain, no new weakness or speech problems. Takes clopidogrel 75 mg daily."
 sources = [
     "Spoke to the patient, a 67-year-old man, about his blood results from November 9.",
     "He had a minor stroke in 2023 and stopped his atorvastatin last year because of muscle aches.",
@@ -29,8 +29,9 @@ sources = [
 ]
 
 [gold.objective]
-value = "Cholesterol 6.8, LDL 4.4, HbA1c 44."
+value = "Blood results from November 9. Cholesterol 6.8, LDL 4.4, HbA1c 44."
 sources = [
+    "Spoke to the patient, a 67-year-old man, about his blood results from November 9.",
     "His cholesterol is 6.8 with LDL 4.4.",
     "His HbA1c is 44.",
 ]

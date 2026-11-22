@@ -41,7 +41,7 @@
  },
  "dataset": {
   "recordings_sha256": "b4f7b366b225fbd6d4f6d5840345db1e3940d2e6253b3fbb880eee8cf2b59fa5",
-  "gold_sha256": "27e68a3ca7d27390ce6a3cb9c23eb8d853304e095f48b2f34a60982126ff6e5a",
+  "gold_sha256": "524bfd61be72452d8abc0030e877846b770a49bb29a8d19d698dc5f36582d742",
   "scripts": 42,
   "recordings": 82,
   "complete": true,
@@ -1309,9 +1309,9 @@
     "f1": 0.8438
    },
    "content": {
-    "precision": 0.872,
-    "recall": 0.6294,
-    "f1": 0.7311
+    "precision": 0.8713,
+    "recall": 0.6289,
+    "f1": 0.7305
    },
    "by_field": {
     "subjective": {
@@ -1324,9 +1324,9 @@
       "f1": 0.7287
      },
      "content": {
-      "precision": 0.8637,
-      "recall": 0.5026,
-      "f1": 0.6354
+      "precision": 0.8619,
+      "recall": 0.5021,
+      "f1": 0.6345
      }
     },
     "objective": {
@@ -1340,8 +1340,8 @@
      },
      "content": {
       "precision": 0.8518,
-      "recall": 0.7073,
-      "f1": 0.7729
+      "recall": 0.7055,
+      "f1": 0.7718
      }
     },
     "assessment": {
@@ -1431,9 +1431,9 @@
       "f1": 0.8636
      },
      "content": {
-      "precision": 0.8788,
-      "recall": 0.683,
-      "f1": 0.7686
+      "precision": 0.8764,
+      "recall": 0.6812,
+      "f1": 0.7666
      }
     },
     "accent:us": {
@@ -1476,9 +1476,9 @@
       "f1": 0.8758
      },
      "content": {
-      "precision": 0.8768,
-      "recall": 0.6673,
-      "f1": 0.7578
+      "precision": 0.8755,
+      "recall": 0.6663,
+      "f1": 0.7567
      }
     },
     "container:webm": {
@@ -1506,9 +1506,9 @@
       "f1": 0.8431
      },
      "content": {
-      "precision": 0.8707,
-      "recall": 0.5897,
-      "f1": 0.7032
+      "precision": 0.8675,
+      "recall": 0.5876,
+      "f1": 0.7006
      }
     },
     "drug-new": {
@@ -1536,9 +1536,9 @@
       "f1": 0.8651
      },
      "content": {
-      "precision": 0.8705,
-      "recall": 0.6949,
-      "f1": 0.7729
+      "precision": 0.869,
+      "recall": 0.6937,
+      "f1": 0.7715
      }
     },
     "experiencer": {
@@ -1611,9 +1611,9 @@
       "f1": 0.6
      },
      "content": {
-      "precision": 0.6787,
-      "recall": 0.5993,
-      "f1": 0.6365
+      "precision": 0.6627,
+      "recall": 0.5851,
+      "f1": 0.6215
      }
     },
     "mixed-plan": {
@@ -1641,9 +1641,9 @@
       "f1": 0.854
      },
      "content": {
-      "precision": 0.88,
-      "recall": 0.6358,
-      "f1": 0.7382
+      "precision": 0.8794,
+      "recall": 0.6353,
+      "f1": 0.7377
      }
     },
     "noise:babble@0dB": {
@@ -1836,9 +1836,9 @@
       "f1": 0.851
      },
      "content": {
-      "precision": 0.8738,
-      "recall": 0.6472,
-      "f1": 0.7436
+      "precision": 0.8725,
+      "recall": 0.6462,
+      "f1": 0.7425
      }
     },
     "numbers": {
@@ -1851,9 +1851,9 @@
       "f1": 0.8438
      },
      "content": {
-      "precision": 0.872,
-      "recall": 0.6294,
-      "f1": 0.7311
+      "precision": 0.8713,
+      "recall": 0.6289,
+      "f1": 0.7305
      }
     },
     "order-attempt": {
@@ -1926,9 +1926,9 @@
       "f1": 0.8659
      },
      "content": {
-      "precision": 0.881,
-      "recall": 0.6463,
-      "f1": 0.7456
+      "precision": 0.8803,
+      "recall": 0.6458,
+      "f1": 0.745
      }
     },
     "vitals": {
@@ -17942,7 +17942,7 @@
   }
  ],
  "rescored_from": {
-  "scoring": "797957b38b6f22b4723a186b6c9e119499d8066767f3d68207110eb21582ebd5",
+  "scoring": "d88ea0217b098d9b443ef5e0e60548c8d2a6ebe4e41f189e475fa4a6b11b99e3",
   "gold_sha256": "27e68a3ca7d27390ce6a3cb9c23eb8d853304e095f48b2f34a60982126ff6e5a",
   "structuring_outputs_reused": true
  }

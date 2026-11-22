@@ -373,14 +373,14 @@ Reasons: `words_out_of_order`
 
 Reasons: `unsupported_content`
 
-- Clinical gold: 67-year-old man; blood results from November 9. Minor stroke in 2023. Stopped atorvastatin last year because of muscle aches, which went away when he stopped it; not keen to try the same statin again. No chest pain, no new weakness or speech problems. Takes clopidogrel 75 mg daily.
+- Clinical gold: 67-year-old man. Minor stroke in 2023. Stopped atorvastatin last year because of muscle aches, which went away when he stopped it; not keen to try the same statin again. No chest pain, no new weakness or speech problems. Takes clopidogrel 75 mg daily.
 - Rule-following gold: Spoke to the patient, a 67-year-old man, about his blood results from November 9. He had a minor stroke in 2023 and stopped his atorvastatin last year because of muscle aches. The aches went away when he stopped it. He is not keen to try the same statin again. No chest pain and no new weakness or speech problems. He takes clopidogrel 75 mg daily.
 
 ## d34-lipids-phone: objective
 
 Reasons: `words_out_of_order`
 
-- Clinical gold: Cholesterol 6.8, LDL 4.4, HbA1c 44.
+- Clinical gold: Blood results from November 9. Cholesterol 6.8, LDL 4.4, HbA1c 44.
 - Rule-following gold: His cholesterol is 6.8 with LDL 4.4. His HbA1c is 44.
 
 ## d35-strep-throat: subjective
