@@ -7,7 +7,7 @@ dates = []
 drugs = ["paracetamol", "ibuprofeno"]
 drugs_en = ["acetaminophen", "ibuprofen"]
 negated = ["trauma"]
-affirmed = ["knee pain", "effusion"]
+affirmed = ["knee pain", "mild effusion"]
 text = """
 Varón de [[67|sesenta y siete]] años con artrosis de ambas rodillas. Refiere dolor en la rodilla izquierda desde hace
 un mes, peor al subir escaleras en el gym. La rodilla derecha está bien. Niega traumatismo. Toma paracetamol

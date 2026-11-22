@@ -13,6 +13,13 @@ the network but llama-server, and nothing is written but the results file, which
 
 It prints each stop threshold of the plan (scoring_es.thresholds()) and whether it was crossed: any crossed stops the
 step until the owner decides.
+
+    uv run --project eval python -m ehr_eval.run_a --rescore <results file> --out <new results file>
+
+checks and scores a run's stored answers again with the current checks, scoring and scripts, running no model, and
+prints, for each script, what the first threshold counted before (as stored) and after, what is misfiled, the fields
+discarded and why, and the content F1, before and after. Answers stored by field, before the answer was one list, are
+checked field by field. It refuses a script whose text has changed since the run.
 """
 
 from __future__ import annotations
@@ -100,10 +107,17 @@ async def run_script(script: Script, structurer: Structurer) -> scoring_es.Spani
     item.tokens = {key: int(proposal.timings[key]) for key in ("prompt_n", "cache_n", "predicted_n")
                    if proposal.timings and isinstance(proposal.timings.get(key), int)}
     item.statements_written, item.statements_in_order = spanish_first(proposal.content)
-    checks = translation.check(proposal.fields, proposal.unknown, transcript)
+    check(item, proposal.fields, proposal.unknown, transcript)
+    return item
+
+
+def check(item: scoring_es.SpanishItem, fields: dict[str, list[dict]], unknown: list[str],
+          transcript: Transcript) -> None:
+    """The proposal's fields through the Spanish checks, onto the item as the sidecar would send them."""
+    checks = translation.check(fields, unknown, transcript)
     item.unknown = list(checks.unknown)
     for name, checked in checks.fields.items():
-        statements = proposal.fields.get(name, [])
+        statements = fields.get(name, [])
         item.fields[name] = scoring_es.SpanishOutcome(
             proposed=" ".join(s["english"] for s in statements),
             sources=[quote for s in statements for quote in s["spanish"]],
@@ -112,8 +126,9 @@ async def run_script(script: Script, structurer: Structurer) -> scoring_es.Spani
             value=checked.value if checked.pending else "",
             warnings=[list(w) for w in checked.warnings],
             statements=statements,
+            shown_statements=[{"english": checked.value[start:end], "sources": [list(span) for span in spans]}
+                              for start, end, spans in checked.statements] if checked.pending else [],
         )
-    return item
 
 
 def scripts_sha256(directory: Path = SCRIPTS_DIR) -> str:
@@ -138,12 +153,15 @@ def summary(metrics: dict) -> str:
         f"detection F1 {fields['detection']['f1']}.",
         f"Checks: {metrics['validation']['passed']} of {metrics['validation']['proposed']} proposed fields passed; "
         f"reasons {metrics['validation']['reasons']}.",
-        f"Mistranslations shown: {metrics['mistranslations']['shown']} (without a warning: "
-        f"{metrics['mistranslations']['unflagged']}).",
+        f"Changed from the Spanish cited and shown: {metrics['mistranslations']['shown']} (without a warning: "
+        f"{metrics['mistranslations']['unflagged']}; moved from another passage: "
+        f"{metrics['mistranslations']['moved_from_another_passage']}).",
+        f"Misfiled (said in the Spanish cited, not in that field's gold; never a stop): "
+        f"{metrics['mistranslations']['misfiled']['shown']}.",
         f"Instructions: {metrics['instructions']['said']} said, {metrics['instructions']['reported_not_carried_over']} "
         f"reported as not carried over, {metrics['instructions']['shown']} shown.",
         f"Structuring: {metrics['timing'].get('structure')} s; tokens written "
-        f"{metrics['timing'].get('tokens_predicted')}; statements with the Spanish first "
+        f"{metrics['timing'].get('tokens_predicted')}; statements with their keys in the schema's order "
         f"{metrics['timing']['statements_spanish_first']}.",
         "",
         "STOP: report to the owner before anything else." if crossed else "No threshold crossed.",
@@ -194,15 +212,118 @@ async def main_async(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---- A run's stored answers, checked and scored again ---------------------------------------------------------------
+
+
+def stored_item(entry: dict) -> scoring_es.SpanishItem:
+    """An item as a results file stored it."""
+    fields = {name: scoring_es.SpanishOutcome(**outcome) for name, outcome in entry["fields"].items()}
+    return scoring_es.SpanishItem(**{**entry, "fields": fields,
+                                     "not_carried_over": [tuple(found) for found in entry["not_carried_over"]]})
+
+
+def rescore(stored: dict, scripts: dict[str, Script]) -> tuple[dict, list[scoring_es.SpanishItem]]:
+    """The stored answers through the current checks, with the scripts' current tags, and the results file again: its
+    metrics and thresholds recomputed, its provenance the answers' own but for the checks, and what it was scored with
+    before under "rescored"."""
+    items = []
+    for old in (stored_item(entry) for entry in stored["items"]):
+        script = scripts[old.script]
+        transcript, _ = text_transcript(script)
+        if transcript.text != old.hypothesis:
+            raise ValueError(f"{script.id}'s text has changed since the run: run it again instead.")
+        item = dataclasses.replace(
+            old, tags=list(script.tags), fields={}, unknown=[],
+            not_carried_over=[(kind, s, e) for s, e, kind in spanish.directives(transcript.text)])
+        if old.sorting == "done":
+            check(item, {name: outcome.statements for name, outcome in old.fields.items()}, old.unknown, transcript)
+        items.append(item)
+    metrics = scoring_es.score(items, scripts)
+    results = {
+        **stored,
+        "provenance": {**stored["provenance"], "checks": CHECKS_CODE_SHA256},
+        "dataset": {**stored["dataset"], "scripts_sha256": scripts_sha256()},
+        "metrics": metrics,
+        "thresholds": [{"threshold": name, "crossed": over, "measured": measured}
+                       for name, over, measured in scoring_es.thresholds(metrics)],
+        "items": [dataclasses.asdict(item) for item in items],
+        "rescored": {"at": datetime.now(UTC).isoformat(timespec="seconds"),
+                     "note": "the stored answers checked and scored again; no model was run",
+                     "before": {"checks": stored["provenance"].get("checks"),
+                                "scripts_sha256": stored["dataset"].get("scripts_sha256"),
+                                "thresholds": stored.get("thresholds")}},
+    }
+    return results, items
+
+
+def rescore_table(stored: dict, results: dict, scripts: dict[str, Script]) -> str:
+    """For each script: the first threshold's count before and after, what is misfiled, the content F1 before and
+    after, and the fields discarded and why, before and after."""
+    def unflagged(metrics: dict) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for entry in metrics["mistranslations"]["listed"]:
+            counts[entry["variant"]] = counts.get(entry["variant"], 0) + (not entry["flagged"])
+        return counts
+
+    def f1(item: scoring_es.SpanishItem) -> float | None:
+        return scoring_es._fields([item], scripts, lambda script: script.gold)["content"]["f1"]
+
+    def discarded(item: scoring_es.SpanishItem) -> str:
+        if item.sorting != "done":
+            return f"not sorted ({item.reason})"
+        return "; ".join(f"{name}: {', '.join(outcome.reasons)}" for name, outcome in item.fields.items()
+                         if outcome.proposed.strip() and outcome.status != "pending") or "none"
+
+    before, after = unflagged(stored["metrics"]), unflagged(results["metrics"])
+    misfiled: dict[str, int] = {}
+    for entry in results["metrics"]["mistranslations"]["misfiled"]["listed"]:
+        misfiled[entry["variant"]] = misfiled.get(entry["variant"], 0) + 1
+    lines = ["item                          first threshold  misfiled  content F1",
+             "                              before  after    after     before  after"]
+    for old, new in zip((stored_item(e) for e in stored["items"]), (stored_item(e) for e in results["items"])):
+        lines.append(f"{old.script:30}{before.get(old.variant, 0):>6}  {after.get(new.variant, 0):>5}    "
+                     f"{misfiled.get(new.variant, 0):>8}     {f1(old)!s:>6}  {f1(new)!s:>6}")
+        lines.append(f"    discarded before: {discarded(old)}")
+        lines.append(f"    discarded after:  {discarded(new)}")
+    lines.append("")
+    for (name, was, measured_before), now in zip(
+            ((t["threshold"], t["crossed"], t["measured"]) for t in stored["thresholds"]), results["thresholds"]):
+        lines.append(f"{name}:\n    before {'CROSSED' if was else 'ok'} ({measured_before}); after "
+                     f"{'CROSSED' if now['crossed'] else 'ok'} ({now['measured']})")
+    return "\n".join(lines)
+
+
+def main_rescore(args: argparse.Namespace) -> int:
+    if args.out is None:
+        print("Say where the new results go: --out <file>.", file=sys.stderr)
+        return 2
+    stored = json.loads(args.rescore.read_text(encoding="utf-8"))
+    scripts = {s.id: s for s in load_scripts()}
+    results, _ = rescore(stored, scripts)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(rescore_table(stored, results, scripts))
+    print(summary(results["metrics"]))
+    print(f"Wrote {args.out}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--llama-url", required=True, help="llama-server's address, such as http://127.0.0.1:8080")
+    parser.add_argument("--llama-url", help="llama-server's address, such as http://127.0.0.1:8080")
     parser.add_argument("--models-dir", type=Path, default=REPO_ROOT / "infra" / "compose" / "models",
                         help="where models-manifest.json is; only read")
     parser.add_argument("--machine", help="a name for this machine in the results")
     parser.add_argument("--only", nargs="*", help="script ids to run, for a quick look")
-    parser.add_argument("--out", type=Path, default=OUT)
-    return asyncio.run(main_async(parser.parse_args(argv)))
+    parser.add_argument("--rescore", type=Path, help="a results file whose stored answers to check and score again")
+    parser.add_argument("--out", type=Path, help=f"where the results go (a run's default: {OUT.relative_to(REPO_ROOT)})")
+    args = parser.parse_args(argv)
+    if args.rescore:
+        return main_rescore(args)
+    if not args.llama_url:
+        parser.error("--llama-url is required to run the model")
+    args.out = args.out or OUT
+    return asyncio.run(main_async(args))
 
 
 if __name__ == "__main__":

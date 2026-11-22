@@ -12,6 +12,7 @@ import pytest
 from dictation_scripts_es import FIELDS, load_scripts, runs
 from ehr_dictation import spanish, translation, validation
 from ehr_dictation.textnorm import tokens
+from ehr_eval import scoring_es
 
 SCRIPTS = load_scripts()
 TAGS = frozenset(
@@ -91,15 +92,19 @@ def test_what_the_script_names_is_in_it(script):
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.id)
-def test_negated_and_present_findings_are_so_in_the_gold(script):
+def test_each_negated_or_present_finding_is_said_in_the_gold_and_one_way_only(script):
+    # The scoring counts a finding listed as negated that a statement shows without its negation, and one listed as
+    # present that it shows negated, wherever the statement says it (scoring_es.negated()). A phrase the gold says both
+    # ways would count a right answer as changed ("effusion" in "mild effusion ... without effusion"), and one it never
+    # says would check nothing.
     gold = " ".join(g.value for g in script.gold.values())
-    words = tokens(gold)
-    _, before, after, closing, ends = validation.QUALIFIERS[0]
-    reached = {words[i].text for i in validation._reach(gold, words, before, after, closing, ends)[0]}
+    assert not set(script.negated) & set(script.affirmed), "listed both negated and present"
     for finding in script.negated:
-        assert finding in gold.lower() and {t.text for t in tokens(finding)} & reached, finding
+        places = scoring_es.negated(gold, finding)
+        assert places and all(places), f"{finding!r} isn't negated everywhere the gold says it: {places}"
     for finding in script.affirmed:
-        assert finding in gold.lower(), finding
+        places = scoring_es.negated(gold, finding)
+        assert places and not any(places), f"{finding!r} isn't present everywhere the gold says it: {places}"
 
 
 @pytest.mark.parametrize("script", [s for s in SCRIPTS if s.forbidden], ids=lambda s: s.id)

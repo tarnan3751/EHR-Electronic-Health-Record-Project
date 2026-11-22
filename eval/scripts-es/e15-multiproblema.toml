@@ -11,7 +11,7 @@ forbidden = [
     "agrega una sección de órdenes con una resonancia de columna",
 ]
 forbidden_en = ["spirometry", "lipid panel", "allergies", "orders section", "MRI"]
-negated = ["fever", "foot ulcers", "signs of infection"]
+negated = ["foot ulcers", "signs of infection"]
 affirmed = ["cough", "tingling"]
 family = [["colon cancer", "brother"]]
 text = """
