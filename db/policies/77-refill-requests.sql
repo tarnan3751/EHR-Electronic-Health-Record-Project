@@ -40,10 +40,13 @@
 -- key-share lock its foreign key takes doesn't wait for an update of the medication's sensitivity or status.
 -- Approving takes the order's advisory lock ('ehr.orders:' and its ID) after the request's row, before it looks for a
 -- proposal naming the order, as deciding a proposal does before it looks for a request naming it (55-ai-review.sql): of
--- two transactions linking one order, the second waits for the first and then sees what it wrote. Nothing that holds it
--- waits for a medication's lock, a request's row or a proposal's row: an approval takes it after those, and a
--- proposal's decision takes it last; so it closes no circle with them, nor with the care-team lock, which an approval
--- takes after it and whose holders take no order's lock.
+-- two transactions linking one order, the second waits for the first and then sees what it wrote. In the app nothing
+-- that holds it waits for a medication's lock, a request's row, a proposal's row or a patient's row: an approval takes
+-- it after those, and a proposal's decision takes it as the last thing it does; and the care-team lock, which an
+-- approval takes after it, has no holder that takes an order's lock. So the app's transactions close no circle on it.
+-- A transaction written otherwise can: one that decides a proposal with an order and then signs another for the same
+-- patient (locking the patient's row), against one that signs (locking that row) and then approves with that order.
+-- PostgreSQL aborts one of the two (40P01), and no order is linked wrongly.
 -- Last comes a patient's care-team lock (an advisory lock on 'ehr.refill_care_team:' and the patient's ID), which
 -- whatever writes the patient's refill items takes before it reads: asking, once its request is inserted, after the
 -- medication's advisory lock, and answering, after the request's row (ehr.deliver_refill_request); a clinician joining
