@@ -16,7 +16,8 @@ namespace Ehr.Security.Tests;
 // waiting on a History proposal, a draft last saved by the desktop app), this proves that no row changes, nothing is
 // audited and no draft is put in the desktop's sync again; that the migration says what it kept; that it goes down and
 // up again while nothing is written in four sections; and that once something is, it refuses to go down and changes
-// nothing, leaving the drafts' row-level security enabled and forced. A database of its own: it migrates down and up.
+// nothing. Gone down or refused, it leaves the drafts' row-level security enabled and forced. A database of its own: it
+// migrates down and up.
 public class SoapNotesMigrationTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const string Before = "AuditEventParts";
@@ -77,6 +78,7 @@ public class SoapNotesMigrationTests(MigratedDatabase database) : IClassFixture<
         await Accounts.AssignAsync(database, clinician, patient);
         Assert.Empty(await MigrateAsync(Before));
         Assert.Equal(["clinical_drafts.history YES", "clinical_notes.history NO"], await ColumnsAsync());
+        Assert.Equal(["true true"], await AsSuperuserAsync(Protection));
 
         // Signed before step 14: an ordinary note; one at the limit with CRLF line ends, the word "Objective", combining
         // marks, an emoji, right-to-left text and a zero-width space; and a sensitive one with two addenda.
@@ -127,6 +129,7 @@ public class SoapNotesMigrationTests(MigratedDatabase database) : IClassFixture<
         // Nothing is written in four sections yet: it goes down, the notes' History is required again, and up again.
         Assert.Empty(await MigrateAsync(Before));
         Assert.Equal(["clinical_drafts.history YES", "clinical_notes.history NO"], await ColumnsAsync());
+        Assert.Equal(["true true"], await AsSuperuserAsync(Protection));
         Assert.Equal(rows, await RowsAsync());
         Assert.Equal(2, (await MigrateAsync(null)).Count);
         await database.ApplyAsync();
