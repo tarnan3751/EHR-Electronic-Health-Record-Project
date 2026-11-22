@@ -282,6 +282,21 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("plan", (await Proposals(without)).Select(p => p.Field));
     }
 
+    // A live result has the note's four fields only (the expansion plan's step 14): one that carries a History beside
+    // them, which only a review stored before then has, is refused at staging and nothing is stored, so the review can't
+    // be shown in the earlier layout with its Subjective proposal hidden.
+    [Fact]
+    public async Task A_live_result_with_a_history_beside_the_four_fields_is_refused_and_nothing_is_staged()
+    {
+        sidecar.LiveHistory = true;
+        var f = await BeginAsync();
+        await DictateAsync(f, 5);
+        using var staged = await Stage(f, 1);
+        Assert.Equal(HttpStatusCode.BadGateway, staged.StatusCode);
+        Assert.Empty(await Proposals(f));
+        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.ai_note_reviews WHERE id = @id AND state = 'recording' AND result_json IS NULL", f.Review));
+    }
+
     // TC-UC13-07 (alternative flow; the expansion plan's step 14): a review saved before step 14, of a dictation sorted
     // into History, Assessment and Plan, is shown in those fields, its History labeled as going into Subjective, and once
     // approved the History goes there; into a Subjective with text only when appending is allowed, after that text. The

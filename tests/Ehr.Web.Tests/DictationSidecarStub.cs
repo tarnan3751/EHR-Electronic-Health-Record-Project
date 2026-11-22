@@ -36,6 +36,9 @@ public sealed class DictationSidecarStub : HttpMessageHandler
     // An Objective too ("Chest is clear.", from the third chunk), so every one of the four fields is proposed.
     public bool IncludeObjective { get; set; }
 
+    // A History beside the four fields, as no service since the expansion plan's step 14 sends.
+    public bool LiveHistory { get; set; }
+
     public StubSorting Sorting { get; set; }
 
     // Every request fails to connect.
@@ -57,6 +60,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         Sorting = StubSorting.Done;
         IncludePlan = false;
         IncludeObjective = false;
+        LiveHistory = false;
         Unreachable = false;
         Slow = false;
         Undecodable = false;
@@ -169,6 +173,19 @@ public sealed class DictationSidecarStub : HttpMessageHandler
     }
 
     object Result(StubSession session, StubSorting sorting)
+    {
+        var result = Sorted(session, sorting);
+        if (!LiveHistory || sorting != StubSorting.Done)
+        {
+            return result;
+        }
+
+        var withHistory = JsonSerializer.SerializeToNode(result, JsonSerializerOptions.Web)!;
+        withHistory["fields"]!["history"] = JsonSerializer.SerializeToNode(Offered(0), JsonSerializerOptions.Web);
+        return withHistory;
+    }
+
+    object Sorted(StubSession session, StubSorting sorting)
     {
         var transcript = Transcript(session);
         var provenance = new

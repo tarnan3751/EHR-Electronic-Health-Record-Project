@@ -103,8 +103,9 @@ public enum Instruction
 }
 
 // The four fields (the expansion plan's step 14). History is the first of the three a dictation was sorted into before
-// then: the service never sends it now, and it is read only from a review saved then (Notes/Review), where its approved
-// value goes into Subjective (NoteReviews). Never written when it is null.
+// then: the service never sends it now, a live result that has one is refused at staging (TrustedResult), and it is
+// read only from a review saved then (Notes/Review), where its approved value goes into Subjective (NoteReviews). Never
+// written when it is null.
 public sealed record NoteFields(NoteField Subjective, NoteField Objective, NoteField Assessment, NoteField Plan,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] NoteField? History = null);
 
