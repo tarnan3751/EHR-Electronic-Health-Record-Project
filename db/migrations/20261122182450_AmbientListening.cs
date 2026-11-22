@@ -168,9 +168,12 @@ namespace Ehr.Migrations
             // Written by hand. Undone only while no visit has been listened to: each consent is a record, and a visit's
             // review would become a dictation's with its column. Consents are private to their clinicians, so the owner sees
             // none under forced row-level security: it is lifted on ambient_consents for the check alone, as the table's
-            // owner, and put back before anything is refused, in this transaction either way. Then the constraint trigger
-            // whose WHEN names the review's mode (db/policies/56-ambient-listening.sql) goes, so the column can; the
-            // migration job creates it again after Up.
+            // owner, and put back before anything is refused, in this transaction either way. Then everything of this step
+            // in db/policies/56-ambient-listening.sql goes, as the Down of NoteSensitivity and VitalReadings removes theirs:
+            // the constraint trigger whose WHEN names the review's mode, so the column can; the guards on reviews and
+            // proposals, which name the consents' table and would refuse every dictation's review once it is gone, even
+            // after the earlier release's db/policies is applied, which doesn't know them; the guards on the two tables
+            // this drops; and the purge. The migration job creates them all again after Up.
             migrationBuilder.Sql("""
                 DO $$
                 DECLARE
@@ -191,6 +194,16 @@ namespace Ehr.Migrations
                 END
                 $$;
                 DROP TRIGGER IF EXISTS ai_note_reviews_transcript_kept ON ehr.ai_note_reviews;
+                DROP TRIGGER IF EXISTS ai_note_reviews_ambient ON ehr.ai_note_reviews;
+                DROP TRIGGER IF EXISTS ai_field_proposals_ambient ON ehr.ai_field_proposals;
+                DROP TRIGGER IF EXISTS ambient_transcripts_guard ON ehr.ambient_transcripts;
+                DROP TRIGGER IF EXISTS ambient_consents_guard ON ehr.ambient_consents;
+                DROP FUNCTION IF EXISTS ehr.check_ambient_transcript_kept();
+                DROP FUNCTION IF EXISTS ehr.guard_ambient_review();
+                DROP FUNCTION IF EXISTS ehr.guard_ambient_proposal();
+                DROP FUNCTION IF EXISTS ehr.guard_ambient_transcript();
+                DROP FUNCTION IF EXISTS ehr.guard_ambient_consent();
+                DROP FUNCTION IF EXISTS ehr.purge_ambient_transcripts(interval);
                 """);
 
             migrationBuilder.DropForeignKey(
