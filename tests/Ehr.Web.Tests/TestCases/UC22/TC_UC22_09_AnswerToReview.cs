@@ -16,7 +16,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   A clinician given the item who doesn't have the patient on their panel (here, one who joined the panel when nobody
 //   on the team still held it open, then left) reads that form's answers from the inbox without emergency access, told
 //   whose patient it is and how to reach the chart; the chart, the forms page and the patient's other forms stay behind
-//   emergency access, and a clinician with no item is sent there for this form too.
+//   emergency access, and a clinician with no item is sent there for this form too. An answer whose only open item is
+//   held by a clinician an admin then disables is told again to the care team.
 // Type: Functional (exceptional condition: an answer that needs review)
 // Requirements: proposed FR-59, FR-41
 // Use case: UC 22, Answer a pre-visit form; UC 15, Work through the inbox
@@ -34,6 +35,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   4. Mark the clinician's item done, and open the chart again.
 //   5. A third clinician, "Dr. Forms Covering", joins the patient's panel and leaves it; they open the inbox's link,
 //      then the chart, the forms page and the GAD-7's answers. "Dr. Forms Bystander", with no item, opens the link.
+//   6. (A second patient.) "Dr. Forms Nine Leaving" and "Dr. Forms Nine Staying" both receive an answer to review; the
+//      second marks theirs done; an admin disables the first on the Staff page.
 // Expected result: Step 1: the GAD-7, though it scores 21, puts nothing in any inbox; the PHQ-9 puts one item in each
 //   of the two clinicians' inboxes and no one else's, and no email is sent. Step 2: the item is first, before the older
 //   one, as "Pre-visit form to review", "A pre-visit form has an answer that needs review", tagged "Needs review",
@@ -44,6 +47,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   the chart asks you for." and "An answer needs review: question 9, "Thoughts that you would be better off dead or of
 //   hurting yourself in some way"."; one recorded view of sensitive items and no emergency access; the chart, the
 //   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander.
+//   Step 6: the staying clinician's inbox links to the answers again, with a new open item beside the done one; the
+//   disabled clinician keeps theirs.
 // Creator: Tahseen Arnan
 public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
 {
@@ -143,5 +148,41 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal($"/patients/{visit.Patient}/reason", PathOf(gated));
         }
+    }
+
+    // An admin disables, on the Staff page, the one clinician still holding an answer's item open: the answer is told
+    // again at once to the care team, here the colleague on the panel who had marked theirs done.
+    [Fact]
+    public async Task An_answer_held_only_by_a_clinician_an_admin_disables_is_told_again_to_the_care_team()
+    {
+        var visit = await VisitAsync(apps, "Dr. Forms Nine Leaving");
+        var colleagueAccount = await apps.CreateStaffAsync("Dr. Forms Nine Staying", StaffRoles.Clinician);
+        await apps.AssignAsync(colleagueAccount, visit.Patient);
+        using (var asked = await AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, Phq9))
+        {
+            Assert.Equal(HttpStatusCode.OK, asked.StatusCode);
+        }
+
+        var answers = await AnswerAsync(apps, visit.Account, await RequestAsync(apps, visit.Appointment, Phq9), Answers(PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 1));
+        var colleague = await SignInAsync(apps.OnPrem, colleagueAccount);
+        var theirs = (await QueryAsync(apps, "SELECT id::text FROM ehr.inbox_items WHERE recipient_id = @colleague AND kind = 'form-alert'",
+            ("colleague", colleagueAccount.Id))).Single();
+        using (var done = await PostFormAsync(colleague.Client, $"/inbox?handler=Done&id={theirs}", "/inbox"))
+        {
+            Assert.Equal(HttpStatusCode.OK, done.StatusCode);
+        }
+
+        Assert.DoesNotContain($"/forms/{answers}", await colleague.Client.GetStringAsync("/inbox", Cancel));
+
+        var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Forms Admin", StaffRoles.Admin));
+        using (var disabled = await PostFormAsync(admin.Client, "/admin/staff?handler=Disable", "/admin/staff", ("id", visit.Clinician.Id)))
+        {
+            Assert.Contains("is disabled and can no longer sign in", await ReadAsync(disabled));
+        }
+
+        Assert.Contains($"href=\"/patients/{visit.Patient}/forms/{answers}\"", await colleague.Client.GetStringAsync("/inbox", Cancel));
+        Assert.Equal(new[] { $"{colleagueAccount.Id} true", $"{colleagueAccount.Id} false", $"{visit.Clinician.Id} true" }.Order(StringComparer.Ordinal),
+            (await QueryAsync(apps, "SELECT recipient_id || ' ' || (done_at IS NULL) FROM ehr.inbox_items WHERE source_id = @answers", ("answers", answers)))
+            .Order(StringComparer.Ordinal));
     }
 }

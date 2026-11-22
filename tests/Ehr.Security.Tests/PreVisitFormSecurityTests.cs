@@ -601,9 +601,10 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
     [GeneratedRegex("PHQ|GAD|27|Severe|severe|Nearly|Several|dead|hurt", RegexOptions.CultureInvariant)]
     private static partial Regex Words();
 
-    // An answer that needs review is never stored with nobody told (the step's review). The reviewer's case: the clinician
-    // who asked has left the patient's panel, nobody else is on it, and the appointment's clinician's account is disabled.
-    // Then every clinician whose account isn't disabled gets the item, and no admin or disabled account does.
+    // An answer that needs review isn't stored with nobody told while any clinician can be (the step's review). The
+    // reviewer's case: the clinician who asked has left the patient's panel, nobody else is on it, and the appointment's
+    // clinician's account is disabled. Then every clinician whose account isn't disabled gets the item, and no admin or
+    // disabled account does.
     [Fact]
     public async Task With_nobody_on_the_team_an_answer_to_review_goes_to_every_clinician_who_can_act()
     {
@@ -614,15 +615,15 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
         await Accounts.LockOutAsync(database, booking.AppointmentClinician);
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
 
+        var before = await EnabledCliniciansAsync();
         var response = await AnswerAsync(booking.Account, request, Phq(0, 0, 0, 0, 0, 0, 0, 0, 2));
+        var after = await EnabledCliniciansAsync();
 
-        var everyone = await AsSuperuserAsync(
-            "SELECT id::text FROM ehr.staff_users WHERE roles @> ARRAY['Clinician'] AND (lockout_end IS NULL OR lockout_end < now() + interval '10 years') ORDER BY 1");
-        Assert.Contains(booking.Clinician.ToString(), everyone);
-        Assert.Equal(everyone, await AsSuperuserAsync(
-            "SELECT recipient_id::text FROM ehr.inbox_items WHERE source_id = @response AND kind = 'form-alert' ORDER BY 1", ("response", response)));
-        Assert.DoesNotContain(booking.AppointmentClinician.ToString(), everyone);
-        Assert.DoesNotContain(admin.ToString(), everyone);
+        var holders = await OpenHoldersAsync(response);
+        ToldEveryone(before, after, holders);
+        Assert.Contains(booking.Clinician.ToString(), holders);
+        Assert.DoesNotContain(booking.AppointmentClinician.ToString(), holders);
+        Assert.DoesNotContain(admin.ToString(), holders);
         Assert.Equal(["A pre-visit form has an answer that needs review"], await AsSuperuserAsync(
             "SELECT DISTINCT summary FROM ehr.inbox_items WHERE source_id = @response", ("response", response)));
     }
@@ -735,20 +736,206 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
             ("clinician", booking.Clinician), ("patient", booking.Patient)));
     }
 
-    // The alert's delivery runs as the tables' owner, as the inbox's other deliveries do: it names only what it must
-    // (the inbox it writes, the panels and the staff accounts it reads), and its search_path is pinned.
+    // Every clinician whose account isn't disabled, as the database has them now.
+    Task<List<string>> EnabledCliniciansAsync() => AsSuperuserAsync(
+        "SELECT id::text FROM ehr.staff_users WHERE roles @> ARRAY['Clinician'] AND (lockout_end IS NULL OR lockout_end < now() + interval '10 years') ORDER BY 1");
+
+    // Who holds an open item for an answer.
+    Task<List<string>> OpenHoldersAsync(Guid response) => AsSuperuserAsync(
+        "SELECT recipient_id::text FROM ehr.inbox_items WHERE source_id = @response AND kind = 'form-alert' AND done_at IS NULL ORDER BY 1", ("response", response));
+
+    // Told to every clinician who could be: each one enabled both before and after holds it, and each holder was enabled
+    // before or after (other test classes add and disable accounts meanwhile), but those named besides.
+    static void ToldEveryone(List<string> before, List<string> after, List<string> holders, params Guid[] besides)
+    {
+        var also = besides.Select(id => id.ToString()).ToHashSet();
+        Assert.Superset(before.Intersect(after).Except(also).ToHashSet(), holders.ToHashSet());
+        Assert.Subset(before.Union(after).Union(also).ToHashSet(), holders.ToHashSet());
+    }
+
+    // An admin disables an account as the Staff page does (StaffAccounts.DisableAsync): locked out for good, through the
+    // app's role, which Npgsql writes as infinity; or enables it again.
+    async Task SetDisabledAsync(Guid admin, Guid staff, bool disabled) =>
+        await Accounts.ExecuteAsync(App, admin, $"UPDATE ehr.staff_users SET lockout_end = {(disabled ? "'infinity'" : "NULL")} WHERE id = @id", ("id", staff));
+
+    // One answer's open form-alert items, as a recipient sees them through each runtime role.
+    async Task SeesOpenAsync(Guid recipient, Guid response, int count)
+    {
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal([count.ToString(System.Globalization.CultureInfo.InvariantCulture)], await AsAsync(connection, recipient,
+                "SELECT count(*) FROM ehr.inbox_items WHERE source_id = @response AND kind = 'form-alert' AND done_at IS NULL", null, ("response", response)));
+        }
+    }
+
+    // The re-review's case: the clinician who asked leaves the panel, the answer's only item goes to the appointment's
+    // clinician, and that account is then disabled. The answer is told again at once, to everyone who can act, since
+    // nobody is on the panel; and a clinician joining the panel afterwards is given it, since a disabled account's item
+    // tells nobody. The disabled account keeps its own.
+    [Fact]
+    public async Task An_answer_held_only_by_an_account_later_disabled_goes_to_everyone_and_to_whoever_joins()
+    {
+        var booking = await BookedAsync(TimeSpan.FromDays(2));
+        var request = await AskAsync(booking.Clinician, booking.Appointment);
+        await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @me AND ended_at IS NULL",
+            ("me", booking.Clinician));
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var response = await AnswerAsync(booking.Account, request, Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+        Assert.Equal([booking.AppointmentClinician.ToString()], await OpenHoldersAsync(response));
+
+        var before = await EnabledCliniciansAsync();
+        await SetDisabledAsync(admin, booking.AppointmentClinician, disabled: true);
+        var after = await EnabledCliniciansAsync();
+        var holders = await OpenHoldersAsync(response);
+        ToldEveryone(before, after, holders, booking.AppointmentClinician);
+        Assert.Contains(booking.AppointmentClinician.ToString(), holders);
+        Assert.DoesNotContain(admin.ToString(), holders);
+
+        var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await SeesOpenAsync(joining, response, 0);
+        await Accounts.AssignAsync(database, joining, booking.Patient);
+        await SeesOpenAsync(joining, response, 1);
+    }
+
+    // Disabling an answer's only holder tells the patient's panel when it has someone who can act (here, a colleague who
+    // had marked theirs done); enabling the account again, and disabling it once more, gives nobody a second item.
+    [Fact]
+    public async Task Disabling_an_answers_only_holder_tells_the_panel_once_and_enabling_it_again_changes_nothing()
+    {
+        var booking = await BookedAsync(TimeSpan.FromDays(2));
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var response = await AnswerAsync(booking.Account, await AskAsync(booking.Clinician, booking.Appointment), Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+        await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.inbox_items SET done_at = now() WHERE kind = 'form-alert' AND source_id = @response",
+            ("response", response));
+        Assert.Equal([booking.AppointmentClinician.ToString()], await OpenHoldersAsync(response));
+
+        await SetDisabledAsync(admin, booking.AppointmentClinician, disabled: true);
+        Assert.Equal(new[] { booking.Clinician, booking.AppointmentClinician }.Select(id => id.ToString()).Order(StringComparer.Ordinal),
+            await OpenHoldersAsync(response));
+        await SeesOpenAsync(booking.Clinician, response, 1);
+        Task<List<string>> AllAsync() => AsSuperuserAsync("SELECT count(*)::text FROM ehr.inbox_items WHERE source_id = @response", ("response", response));
+        Assert.Equal(["3"], await AllAsync());
+
+        await SetDisabledAsync(admin, booking.AppointmentClinician, disabled: false);
+        Assert.Equal(["3"], await AllAsync());
+        await SetDisabledAsync(admin, booking.AppointmentClinician, disabled: true);
+        Assert.Equal(["3"], await AllAsync());
+    }
+
+    // Disabling one holder of several changes nothing: someone who can act holds it still. A lockout of fifteen minutes
+    // after wrong passwords isn't a disable: the only holder locked so still counts, nothing is told again, and a
+    // clinician joining the panel is given nothing.
+    [Fact]
+    public async Task Disabling_one_holder_of_several_or_locking_the_only_one_for_minutes_tells_nobody_new()
+    {
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var several = await BookedAsync(TimeSpan.FromDays(2));
+        var shared = await AnswerAsync(several.Account, await AskAsync(several.Clinician, several.Appointment), Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+        await SetDisabledAsync(admin, several.AppointmentClinician, disabled: true);
+        Assert.Equal(new[] { several.Clinician, several.AppointmentClinician }.Select(id => id.ToString()).Order(StringComparer.Ordinal),
+            await AsSuperuserAsync("SELECT recipient_id::text FROM ehr.inbox_items WHERE source_id = @response ORDER BY 1", ("response", shared)));
+
+        var only = await BookedAsync(TimeSpan.FromDays(2));
+        var request = await AskAsync(only.Clinician, only.Appointment);
+        await Accounts.ExecuteAsync(App, only.Clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @me AND ended_at IS NULL",
+            ("me", only.Clinician));
+        var response = await AnswerAsync(only.Account, request, Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+        await Accounts.ExecuteAsync(App, admin, "UPDATE ehr.staff_users SET lockout_end = now() + interval '15 minutes' WHERE id = @id", ("id", only.AppointmentClinician));
+        var joining = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, joining, only.Patient);
+        Assert.Equal([only.AppointmentClinician.ToString()], await AsSuperuserAsync(
+            "SELECT recipient_id::text FROM ehr.inbox_items WHERE source_id = @response", ("response", response)));
+        await SeesOpenAsync(joining, response, 0);
+    }
+
+    // An answer stored at the moment its only recipient's account is disabled still reaches someone who can act, in
+    // either order: the disable waits for the answer and tells it again, or the answer waits for the disable and leaves
+    // that account out. (The alerts' lock, 85-pre-visit-forms.sql.)
+    [Fact]
+    public async Task An_answer_stored_as_its_only_recipient_is_disabled_reaches_someone_who_can_act_in_either_order()
+    {
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        foreach (var disableFirst in new[] { true, false })
+        {
+            var booking = await BookedAsync(TimeSpan.FromDays(2));
+            var request = await AskAsync(booking.Clinician, booking.Appointment);
+            await Accounts.ExecuteAsync(App, booking.Clinician, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE clinician_id = @me AND ended_at IS NULL",
+                ("me", booking.Clinician));
+            var response = Guid.CreateVersion7();
+            await using var disabling = await BeginAsync(admin);
+            await using var answering = await BeginAsync(booking.Account);
+            var disable = new NpgsqlCommand("UPDATE ehr.staff_users SET lockout_end = 'infinity' WHERE id = @id", disabling.Connection, disabling.Transaction);
+            disable.Parameters.AddWithValue("id", booking.AppointmentClinician);
+            var answer = new NpgsqlCommand(
+                """
+                INSERT INTO ehr.questionnaire_responses (id, request_id, patient_id, questionnaire_code, clinician_id, answers)
+                VALUES (@id, @request, gen_random_uuid(), 'forged', gen_random_uuid(), @answers::jsonb)
+                """, answering.Connection, answering.Transaction);
+            answer.Parameters.AddWithValue("id", response);
+            answer.Parameters.AddWithValue("request", request);
+            answer.Parameters.AddWithValue("answers", Phq(0, 0, 0, 0, 0, 0, 0, 0, 1));
+            var (first, firstCommand, second, secondCommand) = disableFirst
+                ? (disabling, disable, answering, answer)
+                : (answering, answer, disabling, disable);
+
+            await firstCommand.ExecuteNonQueryAsync(Cancel);
+            var waiting = secondCommand.ExecuteNonQueryAsync(Cancel);
+            await Task.Delay(TimeSpan.FromMilliseconds(500), Cancel);
+            Assert.False(waiting.IsCompleted, "The second waits for the first.");
+            await first.Transaction.CommitAsync(Cancel);
+            await waiting;
+            await second.Transaction.CommitAsync(Cancel);
+
+            var holders = await OpenHoldersAsync(response);
+            var enabled = await EnabledCliniciansAsync();
+            Assert.Contains(holders, holder => enabled.Contains(holder));
+            if (disableFirst)
+            {
+                Assert.DoesNotContain(booking.AppointmentClinician.ToString(), holders);
+            }
+        }
+    }
+
+    sealed record Open(NpgsqlConnection Connection, NpgsqlTransaction Transaction) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await Transaction.DisposeAsync();
+            await Connection.DisposeAsync();
+        }
+    }
+
+    // A transaction as the user on the app's role, the user context set first.
+    async Task<Open> BeginAsync(Guid user)
+    {
+        var connection = new NpgsqlConnection(App);
+        await connection.OpenAsync(Cancel);
+        var transaction = await connection.BeginTransactionAsync(Cancel);
+        await using var set = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction);
+        set.Parameters.AddWithValue("user", user.ToString());
+        await set.ExecuteNonQueryAsync(Cancel);
+        return new Open(connection, transaction);
+    }
+
+    // The alerts are told by the tables' owner, as the inbox's other deliveries are: each function names only what it must
+    // (the inbox it writes; the panels and the staff accounts; the answers, to follow the team and a disabled account),
+    // pins its search_path, and can't be run by the runtime roles. The rule itself runs as its caller, only ever the
+    // owner's triggers.
     [Fact]
     public async Task The_alert_delivery_names_only_the_inbox_the_panels_and_the_staff()
     {
-        foreach (var (function, tables) in new[]
+        foreach (var (function, definer, tables) in new[]
                  {
-                     ("deliver_questionnaire_alert", new[] { "inbox_items", "patient_assignments", "staff_users" }),
-                     // Following the care team reads the answers too.
-                     ("follow_questionnaire_alert_care_team", ["inbox_items", "patient_assignments", "questionnaire_responses", "staff_users"]),
+                     ("tell_care_team_of_answer", false, new[] { "inbox_items", "patient_assignments", "staff_users" }),
+                     ("deliver_questionnaire_alert", true, []),
+                     // Following the care team, and a disabled account, read the answers too.
+                     ("follow_questionnaire_alert_care_team", true, ["inbox_items", "patient_assignments", "questionnaire_responses", "staff_users"]),
+                     ("follow_disabled_form_alert_holder", true, ["inbox_items", "questionnaire_responses"]),
                  })
         {
             var definition = Assert.Single(await AsSuperuserAsync(
-                "SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname = @name AND p.prosecdef AND p.proowner = 'ehr_owner'::regrole", ("name", function)));
+                "SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname = @name AND p.prosecdef = @definer AND p.proowner = 'ehr_owner'::regrole",
+                ("name", function), ("definer", definer)));
             Assert.Equal(tables, Tables().Matches(definition).Select(match => match.Groups[1].Value).Distinct().Order(StringComparer.Ordinal));
             Assert.Contains("SET search_path TO 'pg_catalog', 'pg_temp'", definition, StringComparison.Ordinal);
             Assert.Equal(["false"], await AsSuperuserAsync(
