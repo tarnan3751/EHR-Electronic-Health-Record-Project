@@ -317,7 +317,7 @@ CONTROLS = [
     ("Order a CBC two times.", ["Order a CBC two times"]),
     ("I'm not going to order a CBC. Order a BMP.", ["Order a BMP"]),
     ("Add penicillin to her allergies and order a CBC.", ["Add penicillin to her allergies", "and order a CBC"]),
-    ("Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray.", ["Order a stat CBC and a BMP and a lipid panel and a TSH"]),
+    ("Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray.", ["Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray"]),
 ]
 
 # Each lead-in and trailing phrase said plainly, and the plain forms the scripts use: one proposal each.

@@ -844,6 +844,22 @@ def test_a_pharmacy_mentioned_without_sending_something_to_it_is_not_an_instruct
     assert not_carried_over(transcript(said)) == []
 
 
+# An instruction reaches to the end of its clause however long it is, so no tail of it can ground a value; what follows
+# a word that starts another clause can.
+def test_the_whole_of_a_long_instruction_is_listed_and_none_of_it_grounds_a_value():
+    said = ("Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray, then recheck "
+            "in three months.")
+    text = transcript(said)
+
+    (listed,) = not_carried_over(text)
+    tail = field("Urinalysis and chest x-ray.", "a urinalysis and a chest x-ray", name="plan", text=text)
+    after = field("Recheck in three months.", "recheck in three months.", name="plan", text=text)
+
+    assert text.text[listed["start"] : listed["end"]].endswith("and a urinalysis and a chest x-ray")
+    assert not tail.pending and "order_or_allergy_change" in tail.reasons
+    assert after.pending
+
+
 # Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
 @pytest.mark.parametrize(
     ("said", "reason"),

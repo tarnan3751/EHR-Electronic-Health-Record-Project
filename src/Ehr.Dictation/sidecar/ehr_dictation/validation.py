@@ -13,8 +13,9 @@ can't come from "left knee pain, right knee normal", nor "continue lisinopril 50
 and metformin 500 mg". A source with a correction in it is read as corrected.
 
 An instruction to order something or to change the allergy list is never carried into the note (FR-14), but the rest of
-a field is: each sentence of a value holding one is cut where the instruction starts, and a source quoting one counts
-only for its words outside it. Separately, not_carried_over() lists every such instruction in the transcript, with its
+a field is: each sentence of a value holding one is cut where the instruction starts, with all of the sentence after
+it, and a source quoting one counts only for its words outside it, the instruction reaching to the end of its clause
+however long it is. Separately, not_carried_over() lists every such instruction in the transcript, with its
 kind and where the clinician said it, so the review screen can say what still has to be placed in Orders or the
 allergy list.
 
@@ -157,7 +158,6 @@ WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
 )
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
-DIRECTIVE_REACH = 14  # at most, words after an instruction that still belong to it, when nothing ends its clause sooner
 UNDOES_REACH = 3  # words before an instruction not to within which another negation makes it an instruction again
 LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and"), or its subject ("penicillin
 # should be added to her allergies")
@@ -892,8 +892,9 @@ LIST_WORDS = frozenset("list record".split())
 
 
 def _directive_end(text: str, words: list[Token], end: int) -> int:
-    """Where an instruction matched up to `end` stops: at the end of its sentence or a semicolon, at a word that starts
-    another clause, or DIRECTIVE_REACH words on, whichever comes first. One that already names the allergy list or the
+    """Where an instruction matched up to `end` stops: at the end of its sentence or a semicolon, or at a word that
+    starts another clause, however long it is, so the whole of it is cut from a field and listed ("Order a CBC and a BMP
+    and a lipid panel and a TSH and a urinalysis and a chest x-ray"). One that already names the allergy list or the
     pharmacy it goes to stops there ("take amoxicillin off her allergy list"), unless a word carries it on."""
     stop = min(_sentence_end(text, end), (text.find(";", end) + 1 or len(text) + 1) - 1)
     end += len(re.match(r"[\w'’]*", text[end:]).group())  # the whole of the word the match ended in ("allergies")
@@ -903,7 +904,7 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
     if TARGET.search(text[:end]) and not (following and following[0].text in CARRIES_ON):
         return end
     joined = False
-    for word in following[:DIRECTIVE_REACH]:
+    for word in following:
         if word.text in CLAUSE_STARTS or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start])):
             break
         joined = word.text == "and"
