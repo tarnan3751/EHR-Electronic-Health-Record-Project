@@ -87,6 +87,63 @@ static partial class RecordViewTests
         await command.ExecuteNonQueryAsync(Cancel);
     }
 
+    // The part each line by someone of this kind ("you", "staff", "proxy", "lab") names, in the page's order.
+    public static List<string> PartsOf(string html, string kind) =>
+        [.. Lines(html).Where(line => line.StartsWith(kind + " | ", StringComparison.Ordinal)).Select(line => line.Split(" | ")[2])];
+
+    // Reads of a patient's record by an account, as the PHI reader records them with their part (step 13c2): each
+    // (action, table, part), a second apart, from ten seconds into the minute that began the given minutes ago, so they
+    // fall in one minute whenever the test runs. None for a part writes a read as before that step.
+    public static async Task PartReadsAsync(WebApps apps, Guid patient, Guid actor, int minutesAgo, params (string Action, string Table, string? Part)[] reads)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        for (var i = 0; i < reads.Length; i++)
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, part)
+                VALUES (uuidv7(), date_trunc('minute', now()) - make_interval(mins => @minutes) + make_interval(secs => 10 + @second), @actor, @action, @table,
+                        CASE WHEN @table = 'audit_events' THEN NULL ELSE gen_random_uuid() END, @patient, 'onprem', false, @part)
+                """, connection);
+            command.Parameters.AddWithValue("minutes", minutesAgo);
+            command.Parameters.AddWithValue("second", i);
+            command.Parameters.AddWithValue("actor", actor);
+            command.Parameters.AddWithValue("action", reads[i].Action);
+            command.Parameters.AddWithValue("table", reads[i].Table);
+            command.Parameters.AddWithValue("patient", patient);
+            command.Parameters.AddWithValue("part", (object?)reads[i].Part ?? DBNull.Value);
+            await command.ExecuteNonQueryAsync(Cancel);
+        }
+    }
+
+    // A clinician's day with the patient on it, an appointment a minute from now, and an item about the patient in their
+    // inbox: booked and sent as the clinician.
+    public static async Task DayAndInboxAsync(WebApps apps, Guid clinician, Guid patient)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        await using (var context = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction))
+        {
+            context.Parameters.AddWithValue("user", clinician.ToString());
+            await context.ExecuteNonQueryAsync(Cancel);
+        }
+
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO ehr.appointments (id, patient_id, clinician_id, starts_at, minutes, reason, status)
+            VALUES (gen_random_uuid(), @patient, @clinician, now() + interval '1 minute', 15, 'Synthetic follow-up', 'booked');
+            INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at)
+            VALUES (gen_random_uuid(), @clinician, 'message', @patient, 'Synthetic message', now());
+            """, connection, transaction);
+        command.Parameters.AddWithValue("patient", patient);
+        command.Parameters.AddWithValue("clinician", clinician);
+        await command.ExecuteNonQueryAsync(Cancel);
+        await transaction.CommitAsync(Cancel);
+    }
+
+    // A part's words without how many times, for a test that doesn't care how a minute's views were cut.
+    public static string Uncounted(string part) => Regex.Replace(part, @", \d+ times$", "");
+
     // When the latest event of the patient's by that account and of that table was recorded.
     public static async Task<DateTimeOffset> LatestAsync(WebApps apps, Guid patient, Guid actor, string table = "patients")
     {

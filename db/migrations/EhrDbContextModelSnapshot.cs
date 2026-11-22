@@ -456,6 +456,11 @@ namespace Ehr.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_at");
 
+                    b.Property<string>("Part")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("part");
+
                     b.Property<Guid?>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
@@ -493,7 +498,10 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "OccurredAt")
                         .HasDatabaseName("ix_audit_events_patient_id_occurred_at");
 
-                    b.ToTable("audit_events", "ehr");
+                    b.ToTable("audit_events", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_audit_events_part", "part IS NULL OR action IN ('read', 'read_sensitive', 'download', 'download_sensitive') AND part IN ('chart', 'lists', 'orders', 'results', 'vitals', 'search', 'panel', 'schedule', 'inbox', 'appointments', 'home', 'conversations', 'access', 'visit-note', 'note-draft', 'offline', 'fhir', 'summaries', 'printable', 'download', 'views', 'refills', 'forms')");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.ChangeLogEntry", b =>
@@ -2414,6 +2422,9 @@ namespace Ehr.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_patient_assignments_patient_id_clinician_id")
                         .HasFilter("ended_at IS NULL");
+
+                    b.HasIndex(new[] { "PatientId", "ClinicianId" }, "History")
+                        .HasDatabaseName("ix_patient_assignments_history");
 
                     b.ToTable("patient_assignments", "ehr");
                 });

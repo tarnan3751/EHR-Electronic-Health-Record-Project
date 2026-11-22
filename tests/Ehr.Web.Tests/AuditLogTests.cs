@@ -42,6 +42,36 @@ public class AuditLogTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("No events match.", someoneElse);
     }
 
+    // Each read says which part of the record it was for (step 13c2), in a column of its own after the row, and the page
+    // lists one part's reads; an event that isn't a read has none.
+    [Fact]
+    public async Task An_admin_sees_the_part_each_read_was_for_and_lists_one_parts_reads()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Parted", StaffRoles.Clinician);
+        var patient = await apps.InsertPatientAsync("Kit", "Partaudited");
+        var clinicianSession = await SignInAsync(apps.OnPrem, clinician);
+        using var opened = await PostFormAsync(clinicianSession.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason",
+            ("Reason", "Consult requested by the attending"));
+        Assert.Equal(HttpStatusCode.OK, opened.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await clinicianSession.Client.GetAsync($"/patients/{patient}/vitals", Cancel)).StatusCode);
+
+        var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("The Part Reviewer", StaffRoles.Admin));
+        var html = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}", Cancel);
+
+        Assert.Contains("<th>Row</th><th>Part</th>", html);
+        foreach (var part in new[] { AuditParts.Chart, AuditParts.Vitals })
+        {
+            Assert.Matches($"(?s)<td>read</td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td class=\"sc-table__id\">patients {patient}</td>\\s*<td class=\"sc-table__mono\">{part}</td>", html);
+        }
+
+        Assert.Matches($"(?s)<td>break_glass <span[^>]*>Review</span></td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td[^>]*>[^<]*</td>\\s*<td class=\"sc-table__muted\">—</td>", html);
+
+        var vitals = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}&Part={AuditParts.Vitals}", Cancel);
+        Assert.Contains($"<td class=\"sc-table__mono\">{AuditParts.Vitals}</td>", vitals);
+        Assert.DoesNotContain($">{AuditParts.Chart}</td>", vitals);
+        Assert.DoesNotContain("<td>break_glass", vitals);
+    }
+
     [Fact]
     public async Task Only_admins_reach_the_audit_page()
     {

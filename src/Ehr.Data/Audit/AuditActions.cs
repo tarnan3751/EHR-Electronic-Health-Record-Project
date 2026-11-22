@@ -17,6 +17,9 @@ public static class AuditActions
 
     public const string DownloadSensitive = "download_sensitive";
 
+    // The reads, recorded by the PHI reader: the only events that say which part of the record they were for (AuditParts).
+    public static readonly string[] Reads = [Read, ReadSensitive, Download, DownloadSensitive];
+
     // Writes to a PHI table, recorded by its trigger.
     public const string Insert = "insert";
 

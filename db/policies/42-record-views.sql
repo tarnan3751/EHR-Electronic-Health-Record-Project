@@ -3,9 +3,11 @@
 -- migrations, on every run of infra/migrate; safe to run again.
 
 -- The part of the record a view was of, from the action and the table the log records, or NULL for a table it doesn't
--- name. Every table of patient data is named here (RecordViewSecurityTests holds it to the list ProtectionTests keeps),
--- so a new one is a decision: which part, and whether a proxy without sensitive items may see a view of it. Reads only
--- its arguments, so PostgreSQL writes it into ehr.record_views' own query; nobody else may run it.
+-- name: what decides which views a viewer is shown, and what names a view recorded without its part (before step 13c2,
+-- or by an app older than its migration). Every table of patient data is named here (RecordViewSecurityTests holds it
+-- to the list ProtectionTests keeps), so a new one is a decision: which part, and whether a proxy without sensitive
+-- items may see a view of it. Reads only its arguments, so PostgreSQL writes it into ehr.record_views' own query; nobody
+-- else may run it.
 CREATE OR REPLACE FUNCTION ehr.record_view_part(action text, table_name text) RETURNS text
     LANGUAGE sql
     IMMUTABLE
@@ -19,12 +21,12 @@ AS $$
         WHEN table_name = 'visit_summaries' THEN 'summary'
         WHEN table_name IN ('message_threads', 'messages') THEN 'messages'
         WHEN table_name IN ('clinical_notes', 'note_addenda', 'clinical_drafts', 'ai_note_reviews', 'ai_field_proposals') THEN 'note'
-        -- Pre-visit forms (step 13e), sensitive items always: a part of their own, which a proxy without sensitive items
-        -- is never shown a view of.
-        WHEN table_name IN ('questionnaire_requests', 'questionnaire_responses') THEN 'form'
-        -- The rest of the chart, and what the clinic keeps about the patient: the record, until step 13c2. A refill
-        -- request (step 13d) has no read of its own: its pages record a read of the patient. Should one be recorded,
-        -- step 13c2 names its part, hidden from a proxy whose access doesn't include messages, as asking is.
+        -- Pre-visit forms (step 13e), sensitive items always: a part of their own, the one their pages' reads are recorded
+        -- with too (step 13c2), which a proxy without sensitive items is never shown a view of, by either.
+        WHEN table_name IN ('questionnaire_requests', 'questionnaire_responses') THEN 'forms'
+        -- The rest of the chart, and what the clinic keeps about the patient: the record. A refill request (step 13d) has
+        -- no read of its own: its pages record a read of the patient, with the refill requests' part (step 13c2), which a
+        -- proxy without messages, as asking is, or without sensitive items is told as the record.
         WHEN table_name IN ('patient_assignments', 'break_glass_accesses', 'allergy_intolerances', 'medication_statements', 'conditions',
                             'chart_history', 'inbox_items', 'appointments', 'proxy_grants', 'result_acknowledgments', 'encounters',
                             'orders', 'observations', 'refill_requests') THEN 'record'
@@ -52,16 +54,23 @@ REVOKE ALL ON FUNCTION ehr.record_view_part(text, text) FROM PUBLIC;
 -- one through emergency access, may tell of something the patient chose not to share, so it is treated as a view of
 -- sensitive items. Nor are they shown a view of sensitive items (a read that showed them, or an event marked sensitive,
 -- 40-audit.sql), a read of a note (a read of a note that was sensitive already is recorded as a plain read of it, and
--- notes never reach the portal), or a view of any part the rule below doesn't name. A proxy without messages is shown no
--- read of a conversation. Those views simply aren't there for them: which lines exist, where a page ends and whether
--- there is more are decided from the lines the viewer may see and nothing else, so a page looks the same whether or not
--- there are views it leaves out.
+-- notes never reach the portal), a view of any part the rule below doesn't name, or a view of a pre-visit form (step
+-- 13e), which is always sensitive. A proxy without messages is shown no read of a conversation. Those views simply aren't
+-- there for them: which lines exist, where a page ends and whether there is more are decided from the lines the viewer
+-- may see and nothing else, so a page looks the same whether or not there are views it leaves out.
 --
--- Which part: a key from what the log records, the table read and the action (ehr.record_view_part, below), which the
--- page puts in words. Most pages record a read of the patient's own row, whatever part of the record they showed, so most
--- views are 'record' until a later step records which page was opened; when the log holds that, it wins over the
--- table-and-action rule. Every table of patient data is named there, and a test fails for one that isn't: a view of a
--- table nobody named is the record to the patient and hidden from a proxy without sensitive items.
+-- Which part: the part of the record the read was recorded for (ehr.audit_events.part, step 13c2: the page or API that
+-- read it, one of Ehr.Data's AuditParts), which the page puts in words, and whether the view showed the patient's
+-- sensitive items. The part names a line: which lines a viewer is shown is decided as above, by the table and the
+-- action, whatever the part, but for a pre-visit form's, which is never shown to a proxy without sensitive items. A
+-- viewer is told the part only when it can tell them nothing they may not see: the patient and a proxy with sensitive
+-- items every part, but a conversation or a refill request (step 13d) only with messages, as asking is; a proxy without
+-- sensitive items only the parts below that are no hint of a change or an item kept from them, and "the record" for the
+-- rest (the lists, orders, the inbox, who the record is shared with, a note's pages, refill requests), as every line
+-- was before that step. A view recorded without a part (before step 13c2, by an app older than its migration, or the
+-- lab's hand-over) is named from the table and the action (ehr.record_view_part, above). Every table of patient data is
+-- named there, and a test fails for one that isn't: a view of a table nobody named is the record to the patient and
+-- hidden from a proxy without sensitive items.
 --
 -- Emergency access: a staff member's read is marked when it falls inside one of their emergency-access windows for the
 -- patient (ehr.break_glass_accesses) and the patient wasn't on their panel at that moment (ehr.patient_assignments'
@@ -76,8 +85,21 @@ REVOKE ALL ON FUNCTION ehr.record_view_part(text, text) FROM PUBLIC;
 -- Runs as its owner, reading the log, the emergency-access windows, the panels and the proxy grants through the owner's
 -- policies (30-rls.sql), and the account tables, which no policy covers; its search_path is pinned, and only the runtime
 -- roles may call it.
+-- Replaced in place on every run, so it keeps its identity and a page calling it as the file runs is never refused. Once,
+-- on the upgrade to step 13c2, it is dropped first, since its result gained a column (sensitive), which CREATE OR
+-- REPLACE can't change: in the same transaction as the rest, so no page finds it missing, though a call made in that
+-- one moment can fail, once (docs/UC2.md says so for a deploy). A function already of this shape is never dropped.
+BEGIN;
+DO $drop$
+BEGIN
+    IF EXISTS (SELECT FROM pg_proc p
+               WHERE p.oid = to_regprocedure('ehr.record_views(timestamptz, timestamptz)') AND NOT 'sensitive' = ANY (p.proargnames)) THEN
+        DROP FUNCTION ehr.record_views(timestamptz, timestamptz);
+    END IF;
+END
+$drop$;
 CREATE OR REPLACE FUNCTION ehr.record_views(older_than timestamptz, newer_than timestamptz)
-    RETURNS TABLE (occurred_at timestamptz, who text, name text, role text, part text, emergency boolean, more boolean)
+    RETURNS TABLE (occurred_at timestamptz, who text, name text, role text, part text, sensitive boolean, emergency boolean, more boolean)
     LANGUAGE sql
     STABLE
     SECURITY DEFINER
@@ -93,9 +115,8 @@ AS $$
     -- And, for a proxy without sensitive items, the patient's panel history: who had the patient on their panel, from
     -- when and until when, a few rows. It is read for every such proxy's page, whatever the page holds, before anything
     -- else, so the page's time doesn't depend on whether there are views it leaves out (a review found that reading it
-    -- only when a staff member's view needed it told a proxy, by the page's time, that one such view existed). By one
-    -- scan of the panels' table, comparing each row with the patient's ID, since no index finds one patient's ended
-    -- assignments.
+    -- only when a staff member's view needed it told a proxy, by the page's time, that one such view existed). By the
+    -- index on the patient and clinician (ix_patient_assignments_history, step 13c2), which holds ended assignments too.
     viewer AS MATERIALIZED (
         SELECT c.*, h.panel_clinicians, h.panel_from, h.panel_until
         FROM who c
@@ -108,7 +129,7 @@ AS $$
     -- The events of the record this viewer is shown, before paging. Written once; each use below reads it through the
     -- index in its own order.
     shown AS NOT MATERIALIZED (
-        SELECT e.id, e.occurred_at, e.action, e.actor_id, e.table_name
+        SELECT e.id, e.occurred_at, e.action, e.actor_id, e.table_name, e.part
         FROM ehr.audit_events e
         WHERE e.patient_id = (SELECT v.subject FROM viewer v)
           AND e.occurred_at >= (SELECT v.since FROM viewer v)
@@ -122,6 +143,7 @@ AS $$
           AND ((SELECT v.sees_sensitive FROM viewer v)
                OR NOT e.sensitive AND e.action NOT IN ('read_sensitive', 'download_sensitive')
                   AND ehr.record_view_part(e.action, e.table_name) IN ('record', 'download', 'summary', 'messages', 'views', 'lab-order')
+                  AND e.part IS DISTINCT FROM 'forms'
                   AND (e.actor_id IS NULL OR e.actor_id = (SELECT v.account FROM viewer v)
                        OR EXISTS (SELECT 1 FROM viewer v, unnest(v.panel_clinicians, v.panel_from, v.panel_until) AS p(clinician, from_at, until_at)
                                   WHERE p.clinician = e.actor_id AND p.from_at <= e.occurred_at AND e.occurred_at < p.until_at)))
@@ -163,14 +185,24 @@ AS $$
                 WHEN st.roles @> ARRAY['Clinician'] THEN 'clinician'
                 WHEN st.roles @> ARRAY['Admin'] THEN 'administrator'
                 ELSE 'staff' END,
-           -- A table the rule doesn't name is the record; only the patient and proxies with sensitive items get here.
-           coalesce(ehr.record_view_part(k.action, k.table_name), 'record'),
+           -- The part recorded with the read, to a viewer who may be told it (above), or "the record". Without one, from
+           -- the table and the action, where a table the rule doesn't name is the record; only the patient and proxies
+           -- with sensitive items get there.
+           CASE WHEN k.part IS NULL THEN coalesce(ehr.record_view_part(k.action, k.table_name), 'record')
+                WHEN k.part IN ('conversations', 'refills') AND NOT (SELECT v.sees_messages FROM viewer v) THEN 'record'
+                WHEN (SELECT v.sees_sensitive FROM viewer v)
+                     OR k.part IN ('chart', 'results', 'vitals', 'search', 'panel', 'schedule', 'appointments', 'home', 'conversations',
+                                   'offline', 'fhir', 'summaries', 'printable', 'download', 'views') THEN k.part
+                ELSE 'record' END,
+           -- Whether the view showed the patient's sensitive items, which only the patient and proxies with them are shown.
+           k.action IN ('read_sensitive', 'download_sensitive'),
            st.id IS NOT NULL
                AND EXISTS (SELECT 1 FROM ehr.break_glass_accesses b
                            WHERE b.clinician_id = k.actor_id AND b.patient_id = (SELECT v.subject FROM viewer v)
                              AND b.granted_at <= k.occurred_at AND k.occurred_at < b.expires_at)
                -- On the panel at that moment: the same test as the panel history's above, against the table, since that
-               -- history is read above only for a proxy without sensitive items.
+               -- history is read above only for a proxy without sensitive items; by the same index, so a clinician's
+               -- thousands of assignments aren't read for each line.
                AND NOT EXISTS (SELECT 1 FROM ehr.patient_assignments a
                                WHERE a.clinician_id = k.actor_id AND a.patient_id = (SELECT v.subject FROM viewer v)
                                  AND a.assigned_at <= k.occurred_at AND (a.ended_at IS NULL OR a.ended_at > k.occurred_at)),
@@ -182,6 +214,7 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION ehr.record_views(timestamptz, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION ehr.record_views(timestamptz, timestamptz) TO ehr_app, ehr_read;
+COMMIT;
 
 -- The panel's history decides which staff members' views a proxy without sensitive items is shown (above), so the apps
 -- can't rewrite it: an assignment the runtime roles insert starts now and open, and the one change it takes is ending,

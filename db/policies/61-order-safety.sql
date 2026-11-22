@@ -17,9 +17,23 @@
 -- Only coded data can be checked: an allergy or a medication typed without a code is not seen here, and the order
 -- form says so. It runs as the caller, under row-level security: a clinician, who reads the chart anyway. Anyone
 -- else sees no allergies and no medications, and gets no rows.
--- Dropped first: its result gained a column, which CREATE OR REPLACE can't change.
-DROP FUNCTION IF EXISTS ehr.order_safety_warnings(uuid, text, uuid);
-CREATE FUNCTION ehr.order_safety_warnings(for_patient uuid, catalog_code text, replaces uuid DEFAULT NULL)
+-- Replaced in place on every run, so it keeps its identity and an order form calling it as the file runs is never
+-- refused. Dropped first only when the function there has a result other than the one created below, which CREATE OR
+-- REPLACE can't change: once, on the upgrade from the step's first build, whose result had no against_sensitive (its
+-- one change of result so far), in the same transaction as the rest, so no page finds it missing, though a call in that
+-- one moment can fail. Its arguments have never changed. A change to its result changes the text compared here too, or
+-- CREATE OR REPLACE refuses it, loudly.
+BEGIN;
+DO $drop$
+BEGIN
+    IF to_regprocedure('ehr.order_safety_warnings(uuid, text, uuid)') IS NOT NULL
+       AND pg_get_function_result(to_regprocedure('ehr.order_safety_warnings(uuid, text, uuid)'))
+           <> 'TABLE(kind text, severity text, ordered text, against text, source text, detail text, citation text, against_sensitive boolean)' THEN
+        DROP FUNCTION ehr.order_safety_warnings(uuid, text, uuid);
+    END IF;
+END
+$drop$;
+CREATE OR REPLACE FUNCTION ehr.order_safety_warnings(for_patient uuid, catalog_code text, replaces uuid DEFAULT NULL)
     RETURNS TABLE (kind text, severity text, ordered text, against text, source text, detail text, citation text, against_sensitive boolean)
     LANGUAGE sql
     STABLE
@@ -90,3 +104,4 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION ehr.order_safety_warnings(uuid, text, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION ehr.order_safety_warnings(uuid, text, uuid) TO ehr_app, ehr_read;
+COMMIT;

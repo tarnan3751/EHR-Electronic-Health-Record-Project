@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Domain.Phi;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -31,6 +32,6 @@ public class SummariesModel(PortalSubject subject, PhiReader phi) : PageModel
     {
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
         Response.Headers.CacheControl = "no-store";
-        Summaries = await phi.VisitSummariesAsync(subject.PatientId, Sensitive && MaySeeSensitive, Limit, HttpContext.RequestAborted);
+        Summaries = await phi.VisitSummariesAsync(subject.PatientId, Sensitive && MaySeeSensitive, Limit, AuditParts.Summaries, HttpContext.RequestAborted);
     }
 }

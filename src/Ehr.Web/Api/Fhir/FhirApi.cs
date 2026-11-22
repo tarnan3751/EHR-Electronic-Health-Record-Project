@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Ehr.Data;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Patients;
@@ -141,7 +142,7 @@ public static class FhirApi
                 return search.Answer([], 0);
             }
 
-            return await phi.PatientAsync(found, cancel) is { } patient
+            return await phi.PatientAsync(found, AuditParts.Fhir, cancel) is { } patient
                 ? search.Answer([(found, FhirResources.Patient(patient, FhirIds.Record))], 1)
                 : search.Answer([], 0);
         }
@@ -252,7 +253,7 @@ public static class FhirApi
 
         object? resource = type switch
         {
-            "Patient" => await phi.PatientAsync(key, cancel) is { } found ? FhirResources.Patient(found, FhirIds.Record) : null,
+            "Patient" => await phi.PatientAsync(key, AuditParts.Fhir, cancel) is { } found ? FhirResources.Patient(found, FhirIds.Record) : null,
             "AllergyIntolerance" => (await phi.AllergiesAsync(patient, key, 1, cancel)).Entries.Select(a => FhirResources.Allergy(a, FhirIds.Record)).SingleOrDefault(),
             "MedicationStatement" => (await phi.MedicationsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(m => FhirResources.Medication(m, FhirIds.Record)).SingleOrDefault(),
             "Condition" => (await phi.ConditionsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(c => FhirResources.Condition(c, FhirIds.Record)).SingleOrDefault(),

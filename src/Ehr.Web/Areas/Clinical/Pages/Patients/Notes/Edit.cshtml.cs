@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
 using Ehr.Domain.Patients;
@@ -28,7 +29,7 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
 
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid draftId)
     {
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.NoteDraft) is { } denied)
         {
             return denied;
         }
@@ -44,7 +45,7 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
             return RedirectToPage("View", new { patientId, noteId = signed.Id });
         }
 
-        var reviews = await Phi.AiReviewsAsync(draftId, HttpContext.RequestAborted);
+        var reviews = await Phi.AiReviewsAsync(draftId, AuditParts.NoteDraft, HttpContext.RequestAborted);
         ActiveReviewId = reviews.FirstOrDefault(r => r.State is AiReviewStates.Pending or AiReviewStates.Recording)?.Id;
         CompletedReviews = reviews.Where(r => r.State == AiReviewStates.Completed).ToList();
         var content = NoteContent.From(draft);
@@ -81,7 +82,7 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
             return Redirect(url);
         }
 
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.NoteDraft) is { } denied)
         {
             return denied;
         }

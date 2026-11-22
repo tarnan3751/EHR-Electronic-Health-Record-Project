@@ -20,8 +20,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. Dr. Test opens the chart. The patient opens the home and follows "Who viewed my record".
 //   2. The patient opens the page again.
 // Expected result: Step 1: the page sends Cache-Control: no-store and says "in the last 12 months, newest first"; its
-//   lines are "You, Your record" (the home), "Dr. Test, clinician, Your record" at the chart's time as "MMM d, yyyy,
-//   HH:mm UTC", then "You, Your record" (the home after signing in). Opening it is one recorded read by the patient's
+//   lines are "You, Your portal home page, with your appointments" (the home), "Dr. Test, clinician, Your chart: the
+//   summary page, which lists your visit notes" at the chart's time as "MMM d, yyyy, HH:mm UTC", then "You, Your portal
+//   home page, with your appointments" (the home after signing in). Opening it is one recorded read by the patient's
 //   own account, of the patient's part of the audit log, with no row. Step 2: the first line is "You, Who viewed your
 //   record".
 // Creator: Tahseen Arnan
@@ -51,7 +52,12 @@ public class TC_UC6_40_WhoViewedMyRecord(WebApps apps) : IClassFixture<WebApps>
         Assert.True(response.Headers.CacheControl?.NoStore);
         Assert.Contains("in the last 12 months, newest first", Browser.Words(html));
         var lines = Lines(html);
-        Assert.Equal(["you | You | Your record", $"staff | Dr. Test, clinician | Your record | {Shown(charted)}", "you | You | Your record"],
+        Assert.Equal(
+            [
+                "you | You | Your portal home page, with your appointments",
+                $"staff | Dr. Test, clinician | Your chart: the summary page, which lists your visit notes | {Shown(charted)}",
+                "you | You | Your portal home page, with your appointments",
+            ],
             lines.Select(line => line.StartsWith("staff", StringComparison.Ordinal) ? line : string.Join(" | ", line.Split(" | ").Take(3))));
         Assert.All(lines, line => Assert.Matches(@"\| [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2} UTC$", line));
         Assert.Equal(readsBefore + 1, await apps.AuditEventsAsync(AuditActions.Read, patient.Account, patient.Patient));

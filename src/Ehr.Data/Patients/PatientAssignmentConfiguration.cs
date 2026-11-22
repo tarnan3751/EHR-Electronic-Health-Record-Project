@@ -14,6 +14,10 @@ public sealed class PatientAssignmentConfiguration : IEntityTypeConfiguration<Pa
         assignment.HasIndex(a => new { a.PatientId, a.ClinicianId }).IsUnique().HasFilter("ended_at IS NULL");
         // A clinician's panel is read by clinician.
         assignment.HasIndex(a => a.ClinicianId);
+        // The panel's history, ended assignments included, by patient and clinician (step 13c2): "Who viewed my record"
+        // asks whether a staff member had the patient on their panel when they viewed the record
+        // (db/policies/42-record-views.sql), and reads one patient's history for a proxy without sensitive items.
+        assignment.HasIndex(a => new { a.PatientId, a.ClinicianId }, "History").HasDatabaseName("ix_patient_assignments_history");
         assignment.HasOne<Patient>().WithMany().HasForeignKey(a => a.PatientId).OnDelete(DeleteBehavior.Restrict);
         assignment.HasOne<StaffUser>().WithMany().HasForeignKey(a => a.ClinicianId).OnDelete(DeleteBehavior.Restrict);
     }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Ehr.Data.Accounts;
+using Ehr.Data.Audit;
 using Ehr.Testing;
 using Xunit;
 
@@ -30,7 +31,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
     // Every line of a page with its moment, to the microsecond, in UTC.
     const string Timed = """
-        SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '|' || who || '|' || part || '|' || more
+        SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '|' || who || '|' || part || '|' || sensitive || '|' || more
         FROM ehr.record_views(@older::timestamptz, @newer::timestamptz)
         """;
 
@@ -54,14 +55,16 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
     }
 
     // An event of the log, as the PHI reader, the triggers or the lab's door would have written it, so many minutes ago.
-    Task EventAsync(Guid patient, Guid? actor, string action, string? table, double minutesAgo, string source = "onprem", bool sensitive = false, string? reason = null) =>
+    // `part`: the part of the record the read was recorded for (step 13c2); none, as before that step.
+    Task EventAsync(Guid patient, Guid? actor, string action, string? table, double minutesAgo, string source = "onprem", bool sensitive = false, string? reason = null,
+        string? part = null) =>
         Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             """
-            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, reason)
-            VALUES (uuidv7(), now() - make_interval(secs => @minutes * 60), @actor, @action, @table, gen_random_uuid(), @patient, @source, @sensitive, @reason)
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, reason, part)
+            VALUES (uuidv7(), now() - make_interval(secs => @minutes * 60), @actor, @action, @table, gen_random_uuid(), @patient, @source, @sensitive, @reason, @part)
             """,
             ("patient", patient), ("actor", (object?)actor ?? DBNull.Value), ("action", action), ("table", (object?)table ?? DBNull.Value), ("minutes", minutesAgo),
-            ("source", source), ("sensitive", sensitive), ("reason", (object?)reason ?? DBNull.Value));
+            ("source", source), ("sensitive", sensitive), ("reason", (object?)reason ?? DBNull.Value), ("part", (object?)part ?? DBNull.Value));
 
     // A read of the patient's row at an exact moment.
     Task EventAtAsync(Guid patient, Guid actor, DateTimeOffset at) =>
@@ -235,7 +238,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         string[] outside = ["staff|Dr. Birch|clinician|record|false|false", "staff|Dr. Cedar|clinician|record|true|false"];
         const string Addendum = "staff|Dr. Alder|clinician|note|false|false";
         const string Unnamed = "staff|Dr. Alder|clinician|record|false|false";
-        const string Form = "staff|Dr. Alder|clinician|form|false|false";
+        const string Form = "staff|Dr. Alder|clinician|forms|false|false";
         foreach (var connection in new[] { App, Read })
         {
             Assert.Equal([.. staff, .. sensitive, .. messages, .. markedAndDownloaded, .. lab, Mine, "you|||views|false|false", .. outside, Addendum, .. messages, Unnamed, Form],
@@ -453,9 +456,12 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         var (clinician, patient, own) = await PatientAsync();
         var proxy = await ProxyAsync(own, patient, includeSensitive: false, scope: "record");
         var other = await ProxyAsync(own, patient, includeSensitive: true);
+        // Views with no part, as before step 13c2, and with a part they are told, or are not (lists, conversations without
+        // messages), which they are shown as the record.
+        string?[] parts = [null, "chart", "lists", "conversations", "results"];
         for (var minute = 1; minute <= 110; minute++)
         {
-            await EventAsync(patient, minute % 10 == 0 ? proxy.Account : clinician, "read", "patients", minute);
+            await EventAsync(patient, minute % 10 == 0 ? proxy.Account : clinician, "read", "patients", minute, part: parts[minute % parts.Length]);
         }
 
         var before = await PagesAsync(proxy.Account, newest: true, proxy.Grant);
@@ -463,20 +469,27 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
         // Views this proxy is not shown, around and between theirs, at the same moments as some, and past the last
         // page: the patient's own, another proxy's, sensitive ones, note reads, addenda and conversations, writes, a
-        // staff member who never had the patient on their panel, and one through emergency access.
+        // staff member who never had the patient on their panel, and one through emergency access; with no part, and
+        // with the parts they were recorded for (step 13c2): a part never shows a view the rest would hide, a chart's
+        // listed notes among them; and a pre-visit form's, which is hidden for its part alone, whatever its action, so
+        // also as a plain read and a download, which the rest would show.
         var offPanel = await StaffAsync("Dr. Ivy", StaffRoles.Clinician);
         var emergency = await StaffAsync("Dr. Juniper", StaffRoles.Clinician);
         await WindowAsync(emergency, patient, fromMinutesAgo: 60 * 24, untilMinutesAgo: -60);
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             """
-            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
-            SELECT uuidv7(), now() - make_interval(secs => n * 13), k.actor, k.action, k.table_name, gen_random_uuid(), @patient, 'onprem', k.sensitive
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, part)
+            SELECT uuidv7(), now() - make_interval(secs => n * 13), k.actor, k.action, k.table_name, gen_random_uuid(), @patient, 'onprem', k.sensitive,
+                   CASE WHEN n % 2 = 0 OR k.part = 'forms' THEN k.part END
             FROM generate_series(1, 700) AS n
             CROSS JOIN LATERAL (VALUES
-                (@own, 'read', 'patients', false), (@other, 'read', 'patients', false), (@clinician, 'read_sensitive', 'patients', false),
-                (@clinician, 'read', 'clinical_notes', false), (@clinician, 'read', 'note_addenda', false), (@clinician, 'read', 'message_threads', false),
-                (@clinician, 'read', 'messages', false), (@clinician, 'read', 'visit_summaries', true), (@clinician, 'insert', 'conditions', false),
-                (@offPanel, 'read', 'patients', false), (@emergency, 'read', 'patients', false)) AS k(actor, action, table_name, sensitive)
+                (@own, 'read', 'patients', false, 'home'), (@other, 'read', 'patients', false, 'results'), (@clinician, 'read_sensitive', 'patients', false, 'chart'),
+                (@clinician, 'read', 'clinical_notes', false, 'chart'), (@clinician, 'read', 'note_addenda', false, 'visit-note'),
+                (@clinician, 'read', 'message_threads', false, 'conversations'), (@clinician, 'read', 'messages', false, 'conversations'),
+                (@clinician, 'read', 'visit_summaries', true, 'summaries'), (@clinician, 'insert', 'conditions', false, NULL),
+                (@clinician, 'read_sensitive', 'patients', false, 'forms'), (@clinician, 'read', 'patients', false, 'forms'),
+                (@clinician, 'download', 'patients', false, 'forms'), (@clinician, 'read_sensitive', 'patients', false, 'lists'),
+                (@offPanel, 'read', 'patients', false, 'search'), (@emergency, 'read', 'patients', false, 'chart')) AS k(actor, action, table_name, sensitive, part)
             WHERE n % 7 = (CASE k.action WHEN 'insert' THEN 6 ELSE 0 END) OR k.actor IN (@own, @offPanel, @emergency)
             """, ("patient", patient), ("own", own), ("other", other.Account), ("clinician", clinician), ("offPanel", offPanel), ("emergency", emergency));
         // And at each moment the proxy is shown a view: the patient's own, the off-panel staff member's, and one through
@@ -493,6 +506,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         // The patient, and a proxy with sensitive items, are shown the emergency access marked.
         Assert.Contains(await ViewsAsync(App, own, null), line => line.StartsWith("staff|Dr. Juniper|clinician|record|true|", StringComparison.Ordinal));
         Assert.Contains(await ViewsAsync(App, other.Account, other.Grant), line => line.StartsWith("staff|Dr. Juniper|clinician|record|true|", StringComparison.Ordinal));
+        Assert.Contains(await ViewsAsync(App, own, null), line => line.StartsWith("staff|Dr. Juniper|clinician|chart|true|", StringComparison.Ordinal));
 
         Assert.Equal(before, await PagesAsync(proxy.Account, newest: true, proxy.Grant));
         Assert.Equal(beforeNewer, await PagesAsync(proxy.Account, newest: false, proxy.Grant));
@@ -513,15 +527,17 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         // What they are shown: the care team's, a view through emergency access, sensitive ones and notes, and their own.
         for (var minute = 1; minute <= 110; minute++)
         {
-            var (actor, action, table) = (minute % 10) switch
+            var (actor, action, table, part) = (minute % 10) switch
             {
-                0 => (allowed.Account, "read", "patients"),
-                1 => (outside, "read", "patients"),
-                2 => (clinician, "read_sensitive", "patients"),
-                3 => (clinician, "read", "clinical_notes"),
-                _ => (clinician, "read", "patients"),
+                0 => (allowed.Account, "read", "patients", "summaries"),
+                1 => (outside, "read", "patients", "chart"),
+                2 => (clinician, "read_sensitive", "patients", "chart"),
+                3 => (clinician, "read", "clinical_notes", "chart"),
+                4 => (clinician, "read_sensitive", "patients", "lists"),
+                5 => (clinician, "read", "patients", null),
+                _ => (clinician, "read", "patients", "orders"),
             };
-            await EventAsync(patient, actor, action, table, minute);
+            await EventAsync(patient, actor, action, table, minute, part: part);
         }
 
         var before = await PagesAsync(allowed.Account, newest: true, allowed.Grant);
@@ -531,10 +547,12 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         // The patient's own views and another proxy's, around and between theirs, and at each moment they are shown one.
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             """
-            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive)
-            SELECT uuidv7(), now() - make_interval(secs => n * 13), k.actor, k.action, 'patients', @patient, @patient, 'onprem', false
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, part)
+            SELECT uuidv7(), now() - make_interval(secs => n * 13), k.actor, k.action, 'patients', @patient, @patient, 'onprem', false,
+                   CASE WHEN n % 2 = 0 THEN k.part END
             FROM generate_series(1, 700) AS n
-            CROSS JOIN (VALUES (@own, 'read'), (@own, 'read_sensitive'), (@second, 'read'), (@own, 'download')) AS k(actor, action)
+            CROSS JOIN (VALUES (@own, 'read', 'home'), (@own, 'read_sensitive', 'summaries'), (@second, 'read', 'results'), (@own, 'download', 'download'))
+                AS k(actor, action, part)
             """, ("patient", patient), ("own", own), ("second", second.Account));
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             """
@@ -592,7 +610,9 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
     }
 
     // The panel history is read for every page of a proxy without sensitive items, whatever the page holds: so a page's
-    // time doesn't tell such a proxy whether there are staff views they aren't shown. It isn't read for the patient's.
+    // time doesn't tell such a proxy whether there are staff views they aren't shown. It isn't read for the patient's. It
+    // is read by its index on the patient and clinician (step 13c2), never by a scan of the whole table, on a table of some
+    // thousands of rows, as a clinic's is.
     [Fact]
     public async Task A_proxy_without_sensitive_items_reads_the_panel_history_whatever_the_page_holds()
     {
@@ -600,6 +620,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         var emptyProxy = await ProxyAsync(emptyOwn, empty, includeSensitive: false);
         var (_, busy, busyOwn) = await PatientAsync();
         var busyProxy = await ProxyAsync(busyOwn, busy, includeSensitive: false);
+        await PanelHistoryAsync();
         var outside = await StaffAsync("Dr. Maple", StaffRoles.Clinician);
         await WindowAsync(outside, busy, fromMinutesAgo: 60 * 24, untilMinutesAgo: -60);
         var offPanel = await StaffAsync("Dr. Nutmeg", StaffRoles.Clinician);
@@ -610,15 +631,37 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
         foreach (var connection in new[] { App, Read })
         {
-            // No staff view at all, or forty they aren't shown: the history is read once, either way.
-            Assert.Equal("0 1", await PanelScansAsync(connection, emptyProxy.Account, emptyProxy.Grant));
-            Assert.Equal("0 1", await PanelScansAsync(connection, busyProxy.Account, busyProxy.Grant));
-            Assert.Equal("0 0", await PanelScansAsync(connection, emptyOwn, null));
+            // No staff view at all, or forty they aren't shown: the history is read once, by its index, either way.
+            Assert.Equal("0 0 1", await PanelScansAsync(connection, emptyProxy.Account, emptyProxy.Grant));
+            Assert.Equal("0 0 1", await PanelScansAsync(connection, busyProxy.Account, busyProxy.Grant));
+            Assert.Equal("0 0 0", await PanelScansAsync(connection, emptyOwn, null));
         }
     }
 
-    // A page's lines, and how many times the panels' table was scanned to make it: the scans the session's transaction
-    // counts after the page, less those it counted before (a pooled session's counts carry over from earlier work).
+    // A panels' table as a clinic's: a thousand other patients, and three thousand ended assignments of theirs to one
+    // colleague, a table no page of these tests may read whole, nor all of the colleague's. Counted for the planner.
+    async Task<Guid> PanelHistoryAsync()
+    {
+        var colleague = await StaffAsync("Dr. Olive", StaffRoles.Clinician);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            WITH others AS (
+                INSERT INTO ehr.patients (id, mrn, given_name, family_name, birth_date, gender, version, updated_at)
+                SELECT gen_random_uuid(), substr(md5(random()::text), 1, 12), 'Test', 'Patient', '1980-01-01', 'unknown', 1, now()
+                FROM generate_series(1, 1000)
+                RETURNING id
+            )
+            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at)
+            SELECT gen_random_uuid(), o.id, @clinician, now() - make_interval(days => 400 + n), now() - make_interval(days => 399 + n)
+            FROM others o CROSS JOIN generate_series(1, 3) AS n
+            """, ("clinician", colleague));
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "ANALYZE ehr.patient_assignments");
+        return colleague;
+    }
+
+    // A page's lines, how many times the panels' table was scanned whole to make it, and how many times its history index
+    // was: the scans the session's transaction counts after the page, less those it counted before (a pooled session's
+    // counts carry over from earlier work).
     async Task<string> PanelScansAsync(string connectionString, Guid user, Guid? grant)
     {
         await using var connection = new Npgsql.NpgsqlConnection(connectionString);
@@ -634,9 +677,10 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
         await ScalarAsync("SELECT length(set_config('app.user_id', @user, true) || set_config('app.acting_grant', @grant, true))");
         const string Scans = "SELECT pg_stat_get_xact_numscans('ehr.patient_assignments'::regclass)";
-        var before = await ScalarAsync(Scans);
+        const string IndexScans = "SELECT pg_stat_get_xact_numscans('ehr.ix_patient_assignments_history'::regclass)";
+        var (before, indexBefore) = (await ScalarAsync(Scans), await ScalarAsync(IndexScans));
         var lines = await ScalarAsync("SELECT count(*) FROM ehr.record_views(NULL, NULL)");
-        return $"{lines} {await ScalarAsync(Scans) - before}";
+        return $"{lines} {await ScalarAsync(Scans) - before} {await ScalarAsync(IndexScans) - indexBefore}";
     }
 
     // The panel's history decides what a proxy without sensitive items is shown, so the apps can't rewrite it: through
@@ -720,56 +764,189 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
 
     // The panel history is read with the patient's ID worked out once: the session's context functions never run for each
     // row of the panels' table (a review measured 0.6 s a page when they did, at 60,000 rows), nor for each row of any other
-    // table the function reads. Read from the plan auto_explain gives for the statement inside the function, as a proxy
-    // without sensitive items, on a table of some thousands of rows: no filter or index condition names a function of the
-    // schema, so each is a value worked out once.
+    // table the function reads. Read from the plan auto_explain gives for the statement inside the function, on a table of
+    // some thousands of rows: no filter or index condition names a function of the schema, so each is a value worked out
+    // once. Both of the function's reads of the panels' table go by their index on the patient and clinician (step 13c2),
+    // never the whole table nor every assignment of the clinician: a proxy without sensitive items' read of the patient's
+    // history, and, on the patient's own page, the check that a view under emergency access was made off the panel, for a
+    // clinician with thousands of assignments (a review measured 21 to 26 ms a page at 60,000 before the index).
     [Fact]
-    public async Task The_panel_history_is_read_without_the_session_worked_out_for_each_row()
+    public async Task The_panel_history_is_read_by_its_index_without_the_session_worked_out_for_each_row()
     {
         var (_, patient, own) = await PatientAsync();
         var proxy = await ProxyAsync(own, patient, includeSensitive: false);
-        var colleague = await StaffAsync("Dr. Olive", StaffRoles.Clinician);
-        var elsewhere = await Accounts.PatientAsync(database, colleague);
-        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
-            """
-            INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at, ended_at)
-            SELECT gen_random_uuid(), @patient, @clinician, now() - make_interval(days => 400 + n), now() - make_interval(days => 399 + n)
-            FROM generate_series(1, 3000) AS n
-            """, ("patient", elsewhere), ("clinician", colleague));
+        var colleague = await PanelHistoryAsync();
+        await WindowAsync(colleague, patient, fromMinutesAgo: 60, untilMinutesAgo: -60);
+        await EventAsync(patient, colleague, "read", "patients", 5);
 
-        var plans = new List<string>();
-        await using (var connection = new Npgsql.NpgsqlConnection(database.SuperuserConnectionString))
+        foreach (var (user, grant, emergency) in new[] { (proxy.Account, (Guid?)proxy.Grant, false), (own, null, true) })
         {
-            await connection.OpenAsync(Cancel);
-            connection.Notice += (_, notice) => plans.Add(notice.Notice.MessageText);
-            await using var transaction = await connection.BeginTransactionAsync(Cancel);
-            foreach (var sql in new[]
+            var plans = await PlansAsync(user, grant);
+            // Each node that reads the panels' table or one of its indexes, with the lines that describe it, down to the
+            // next node; those the page ran.
+            var scans = plans.SelectMany(plan =>
             {
-                "LOAD 'auto_explain'", "SET LOCAL auto_explain.log_min_duration = 0", "SET LOCAL auto_explain.log_nested_statements = on",
-                "SET LOCAL auto_explain.log_analyze = on", "SET LOCAL auto_explain.log_timing = off", "SET LOCAL auto_explain.log_level = notice",
-                "SET LOCAL client_min_messages = notice", "SET LOCAL ROLE ehr_app",
-                $"SELECT set_config('app.user_id', '{proxy.Account}', true), set_config('app.acting_grant', '{proxy.Grant}', true)",
-                "SELECT count(*) FROM ehr.record_views(NULL, NULL)",
-            })
+                var lines = plan.Split('\n');
+                return lines.Select((line, index) => (line, index))
+                    .Where(node => node.line.Contains(" on patient_assignments", StringComparison.Ordinal) || node.line.Contains(" on ix_patient_assignments", StringComparison.Ordinal))
+                    .Select(node => string.Join('\n', lines.Skip(node.index).TakeWhile((line, offset) => offset == 0 || !line.Contains("->", StringComparison.Ordinal))));
+            }).Where(scan => !scan.Contains("never executed", StringComparison.Ordinal)).ToList();
+            // One read, by the history index (an index scan, or a bitmap of it), and no row read only to be thrown away.
+            Assert.Contains(scans, scan => scan.Contains("ix_patient_assignments_history", StringComparison.Ordinal));
+            Assert.All(scans, scan =>
             {
-                await using var command = new Npgsql.NpgsqlCommand(sql, connection, transaction);
-                await command.ExecuteNonQueryAsync(Cancel);
-            }
+                Assert.DoesNotContain("Seq Scan", scan, StringComparison.Ordinal);
+                Assert.DoesNotContain("ix_patient_assignments_clinician_id", scan, StringComparison.Ordinal);
+                Assert.DoesNotContain("Rows Removed", scan, StringComparison.Ordinal);
+                Assert.DoesNotMatch(@"ehr\.\w+\(", scan);
+            });
+            // The patient's page asks about the clinician of the view under emergency access; the proxy's reads the history.
+            Assert.Equal(emergency, scans.Any(scan => scan.Split('\n').Any(line => line.Contains("Cond:", StringComparison.Ordinal) && line.Contains("clinician_id", StringComparison.Ordinal))));
+            var body = Assert.Single(plans, plan => plan.Contains(" on audit_events ", StringComparison.Ordinal));
+            Assert.All(body.Split('\n').Where(line => line.Contains("Filter:", StringComparison.Ordinal) || line.Contains("Cond:", StringComparison.Ordinal)),
+                line => Assert.DoesNotMatch(@"ehr\.\w+\(", line));
+        }
+    }
+
+    // The plans auto_explain gives for a page of the function and the statements inside it, as the session given.
+    async Task<List<string>> PlansAsync(Guid user, Guid? grant)
+    {
+        var plans = new List<string>();
+        await using var connection = new Npgsql.NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync(Cancel);
+        connection.Notice += (_, notice) => plans.Add(notice.Notice.MessageText);
+        await using var transaction = await connection.BeginTransactionAsync(Cancel);
+        foreach (var sql in new[]
+        {
+            "LOAD 'auto_explain'", "SET LOCAL auto_explain.log_min_duration = 0", "SET LOCAL auto_explain.log_nested_statements = on",
+            "SET LOCAL auto_explain.log_analyze = on", "SET LOCAL auto_explain.log_timing = off", "SET LOCAL auto_explain.log_level = notice",
+            "SET LOCAL client_min_messages = notice", "SET LOCAL ROLE ehr_app",
+            $"SELECT set_config('app.user_id', '{user}', true), set_config('app.acting_grant', '{grant?.ToString() ?? ""}', true)",
+            "SELECT count(*) FROM ehr.record_views(NULL, NULL)",
+        })
+        {
+            await using var command = new Npgsql.NpgsqlCommand(sql, connection, transaction);
+            await command.ExecuteNonQueryAsync(Cancel);
         }
 
-        // Each scan of the panels' table with the lines that describe it, down to the next node.
-        var scans = plans.SelectMany(plan =>
+        return plans;
+    }
+
+    // The parts a proxy without sensitive items is told (step 13c2): those that can't hint at a change or an item kept from
+    // them. This repeats db/policies/42-record-views.sql on purpose, as ExpectedPrivileges repeats the grants: the rest
+    // (the lists, orders, the inbox, who the record is shared with, a note's pages, refills, pre-visit forms) is the record.
+    static readonly string[] ToldWithoutSensitive =
+    [
+        AuditParts.Chart, AuditParts.Results, AuditParts.Vitals, AuditParts.Search, AuditParts.Panel, AuditParts.Schedule, AuditParts.Appointments,
+        AuditParts.Home, AuditParts.Conversations, AuditParts.Offline, AuditParts.Fhir, AuditParts.Summaries, AuditParts.Printable,
+        AuditParts.Download, AuditParts.Views,
+    ];
+
+    const string Parts = "SELECT part || '|' || sensitive FROM ehr.record_views(NULL, NULL)";
+
+    // Every part the log takes, recorded with a care-team member's view of the kind each is recorded with, named to each
+    // kind of viewer as they may be told it: the patient, and a proxy with sensitive items and messages, every part; a
+    // proxy without messages, a conversation or a refill request as the record; a proxy without sensitive items the parts
+    // above, the rest as the record, and never the view of a pre-visit form, as a plain read or as one of sensitive items.
+    [Fact]
+    public async Task Every_part_is_named_to_each_viewer_as_they_may_be_told_it()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        var full = await ProxyAsync(own, patient, includeSensitive: true);
+        var noMessages = await ProxyAsync(own, patient, includeSensitive: true, scope: "record");
+        var restricted = await ProxyAsync(own, patient, includeSensitive: false);
+        var restrictedNoMessages = await ProxyAsync(own, patient, includeSensitive: false, scope: "record");
+        // Each part as a read, or a download for the download's, and a pre-visit form's also as a read of sensitive items:
+        // the first the newest.
+        (string Part, string Action)[] views = [.. AuditParts.All.Select(part => (part, part == AuditParts.Download ? "download" : "read")),
+            (AuditParts.Forms, "read_sensitive")];
+        var minute = 0;
+        foreach (var (part, action) in views)
         {
-            var lines = plan.Split('\n');
-            return lines.Select((line, index) => (line, index)).Where(node => node.line.Contains(" on patient_assignments ", StringComparison.Ordinal))
-                .Select(node => string.Join('\n', lines.Skip(node.index).TakeWhile((line, offset) => offset == 0 || !line.Contains("->", StringComparison.Ordinal))));
-        }).ToList();
-        var history = Assert.Single(scans, scan => scan.Contains("Seq Scan", StringComparison.Ordinal) && !scan.Contains("never executed", StringComparison.Ordinal));
-        Assert.True(int.Parse(System.Text.RegularExpressions.Regex.Match(history, @"Rows Removed by Filter: (\d+)").Groups[1].Value, CultureInfo.InvariantCulture) >= 3000, history);
-        Assert.All(scans, scan => Assert.DoesNotMatch(@"ehr\.\w+\(", scan));
-        var body = Assert.Single(plans, plan => plan.Contains(" on audit_events ", StringComparison.Ordinal));
-        Assert.All(body.Split('\n').Where(line => line.Contains("Filter:", StringComparison.Ordinal) || line.Contains("Cond:", StringComparison.Ordinal)),
-            line => Assert.DoesNotMatch(@"ehr\.\w+\(", line));
+            await EventAsync(patient, clinician, action, part == AuditParts.Views ? "audit_events" : "patients", ++minute, part: part);
+        }
+
+        List<string> Expected(bool sensitive, bool messages) => [.. views
+            .Where(view => sensitive || view.Part != AuditParts.Forms)
+            .Select(view => (view.Part is AuditParts.Conversations or AuditParts.Refills && !messages ? "record"
+                : sensitive || ToldWithoutSensitive.Contains(view.Part) ? view.Part : "record") + "|" + (view.Action == "read_sensitive" ? "true" : "false"))];
+
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal(Expected(true, true), await ViewsAsync(connection, own, null, sql: Parts));
+            Assert.Equal(Expected(true, true), await ViewsAsync(connection, full.Account, full.Grant, sql: Parts));
+            Assert.Equal(Expected(true, false), await ViewsAsync(connection, noMessages.Account, noMessages.Grant, sql: Parts));
+            Assert.Equal(Expected(false, true), await ViewsAsync(connection, restricted.Account, restricted.Grant, sql: Parts));
+            Assert.Equal(Expected(false, false), await ViewsAsync(connection, restrictedNoMessages.Account, restrictedNoMessages.Grant, sql: Parts));
+        }
+
+        Assert.All(ToldWithoutSensitive, part => Assert.Contains(part, AuditParts.All));
+    }
+
+    // A chart's opening, its read of the patient and of each note it lists, each with the chart's part: all of them for the
+    // patient, whose page makes them one line; for a proxy without sensitive items, the opening alone, since a read of a
+    // note is never theirs, whatever part it was recorded for. Nor is a view the rest would hide shown for its part: of
+    // sensitive items, off the panel, or a conversation to a proxy without messages.
+    [Fact]
+    public async Task A_part_names_a_view_and_never_shows_one_the_rest_would_hide()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        var restricted = await ProxyAsync(own, patient, includeSensitive: false, scope: "record");
+        var offPanel = await StaffAsync("Dr. Larch", StaffRoles.Clinician);
+        await EventAsync(patient, clinician, "read", "patients", 2, part: AuditParts.Chart);
+        for (var note = 0; note < 3; note++)
+        {
+            await EventAsync(patient, clinician, "read", "clinical_notes", 1.9 - note * 0.01, part: AuditParts.Chart);
+        }
+
+        await EventAsync(patient, clinician, "read_sensitive", "patients", 1.5, part: AuditParts.Chart);
+        await EventAsync(patient, offPanel, "read", "patients", 1.4, part: AuditParts.Search);
+        await EventAsync(patient, clinician, "read", "message_threads", 1.3, part: AuditParts.Conversations);
+        await EventAsync(patient, clinician, "read", "patients", 1.2, part: AuditParts.Conversations);
+
+        Assert.Equal(["conversations|false", "conversations|false", "search|false", "chart|true", "chart|false", "chart|false", "chart|false", "chart|false"],
+            await ViewsAsync(App, own, null, sql: Parts));
+        Assert.Equal(["record|false", "chart|false"], await ViewsAsync(App, restricted.Account, restricted.Grant, sql: Parts));
+    }
+
+    // The policy file runs on every start of the migration job, while pages call the function: it replaces the function in
+    // place, so a call made as it runs is never refused, and the function is the same one after (PolicyRerun). Dropping
+    // and creating it again on each run failed calls with "cache lookup failed for function".
+    [Fact]
+    public async Task Running_the_policy_file_again_never_fails_a_page_reading_the_function()
+    {
+        var (clinician, patient, own) = await PatientAsync();
+        await EventAsync(patient, clinician, "read", "patients", 1, part: AuditParts.Chart);
+        const string Oid = "SELECT 'ehr.record_views(timestamptz, timestamptz)'::regprocedure::oid::text";
+        var before = await AsSuperuserAsync(Oid);
+
+        Assert.Empty(await PolicyRerun.RunAsync(database, "42-record-views.sql", own, "SELECT count(*) FROM ehr.record_views(NULL, NULL)"));
+        Assert.Equal(before, await AsSuperuserAsync(Oid));
+    }
+
+    // A clinician off the panel with no emergency-access window, reading a pre-visit form's answers as one who holds its
+    // alert may (step 13e): to the patient, and a proxy with sensitive items, a pre-visit form's view, not marked as
+    // emergency access; to a proxy without sensitive items, nothing.
+    [Fact]
+    public async Task An_alert_holder_off_the_panel_is_a_form_view_unmarked_and_nothing_to_a_proxy_without_sensitive_items()
+    {
+        var (_, patient, own) = await PatientAsync();
+        var full = await ProxyAsync(own, patient, includeSensitive: true);
+        var restricted = await ProxyAsync(own, patient, includeSensitive: false);
+        var holder = await StaffAsync("Dr. Holly", StaffRoles.Clinician);
+        await PanelAsync(holder, patient, fromMinutesAgo: 60, untilMinutesAgo: 30);
+        await EventAsync(patient, holder, "read_sensitive", "patients", 5, part: AuditParts.Forms);
+
+        foreach (var connection in new[] { App, Read })
+        {
+            foreach (var (user, grant) in new[] { (own, (Guid?)null), (full.Account, full.Grant) })
+            {
+                Assert.Equal(["staff|Dr. Holly|clinician|forms|false|false"],
+                    (await ViewsAsync(connection, user, grant)).Where(line => line.Contains("Dr. Holly", StringComparison.Ordinal)));
+            }
+
+            Assert.DoesNotContain(await ViewsAsync(connection, restricted.Account, restricted.Grant), line => line.Contains("Dr. Holly", StringComparison.Ordinal));
+        }
     }
 
     // The twelve months bound what a page reads before it is cut: a record with more than a page of views from before
@@ -808,7 +985,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         Assert.True(unnamed.Count == 0, "Name these tables in ehr.record_view_part (db/policies/42-record-views.sql): " + string.Join(", ", unnamed));
         Assert.Equal(["none"], await AsSuperuserAsync("SELECT coalesce(ehr.record_view_part('read', 'made_up_table'), 'none')"));
         Assert.Equal(["note messages"], await AsSuperuserAsync("SELECT ehr.record_view_part('read', 'note_addenda') || ' ' || ehr.record_view_part('read', 'messages')"));
-        Assert.Equal(["form form"], await AsSuperuserAsync(
+        Assert.Equal(["forms forms"], await AsSuperuserAsync(
             "SELECT ehr.record_view_part('read', 'questionnaire_requests') || ' ' || ehr.record_view_part('read', 'questionnaire_responses')"));
 
         // Only its owner runs it, inside ehr.record_views.
@@ -839,7 +1016,7 @@ public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<
         // Two moments in; a time, words and marks out; no ID of any kind.
         Assert.Equal(
             ["emergency boolean o", "more boolean o", "name text o", "newer_than timestamp with time zone i", "occurred_at timestamp with time zone o",
-                "older_than timestamp with time zone i", "part text o", "role text o", "who text o"],
+                "older_than timestamp with time zone i", "part text o", "role text o", "sensitive boolean o", "who text o"],
             await AsSuperuserAsync(
                 """
                 SELECT a.name || ' ' || format_type(a.type, NULL) || ' ' || CASE a.mode WHEN 'i' THEN 'i' ELSE 'o' END FROM unnest(

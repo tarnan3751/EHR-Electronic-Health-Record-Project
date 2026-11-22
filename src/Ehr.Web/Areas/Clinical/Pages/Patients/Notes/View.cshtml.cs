@@ -1,4 +1,5 @@
 using Ehr.Data;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
@@ -49,7 +50,7 @@ public class ViewModel(PhiReader phi, PatientAssignments assignments, BreakGlass
 
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid noteId)
     {
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.VisitNote) is { } denied)
         {
             return denied;
         }
@@ -63,7 +64,7 @@ public class ViewModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         OnPanel = await assignments.IsOnPanelAsync(patientId, HttpContext.RequestAborted);
         Summaries = summaries;
         SourcesSensitive = note.Sensitive || addenda.SensitiveHidden > 0 || addenda.Shown.Any(a => a.Sensitive);
-        CompletedReviews = (await Phi.AiReviewsAsync(note.DraftId, HttpContext.RequestAborted))
+        CompletedReviews = (await Phi.AiReviewsAsync(note.DraftId, AuditParts.VisitNote, HttpContext.RequestAborted))
             .Where(r => r.State == AiReviewStates.Completed).ToList();
         SignerName = await db.StaffUsers.Where(u => u.Id == note.SignerId).Select(u => u.DisplayName)
             .SingleAsync(HttpContext.RequestAborted);
