@@ -115,6 +115,11 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // (ExpectedColumnPrivileges).
         [("ehr_app", "refill_requests")] = ["SELECT", "INSERT"],
         [("ehr_read", "refill_requests")] = ["SELECT"],
+        // Step 13e: a pre-visit form is asked for and answered, never changed or deleted.
+        [("ehr_app", "questionnaire_requests")] = ["SELECT", "INSERT"],
+        [("ehr_read", "questionnaire_requests")] = ["SELECT"],
+        [("ehr_app", "questionnaire_responses")] = ["SELECT", "INSERT"],
+        [("ehr_read", "questionnaire_responses")] = ["SELECT"],
         [("ehr_app", "clinical_drafts")] = ["SELECT", "INSERT", "UPDATE"],
         // UC 14 adds replica draft reads under the same private-author/active-panel RLS as the primary.
         [("ehr_read", "clinical_drafts")] = ["SELECT"],

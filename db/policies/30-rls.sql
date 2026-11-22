@@ -638,6 +638,49 @@ CREATE POLICY encounters_panel_insert ON ehr.encounters FOR INSERT
         )
     );
 
+-- Pre-visit forms (PHI; step 13e): a request that a patient fill in a questionnaire before an appointment, and its
+-- answers, every one a sensitive item. Clinicians read them all, as they read charts; the pages show them only when
+-- asked. A portal session reads the forms of the record it is looking at only where ehr.portal_sees_sensitive says so:
+-- always the patient's own, a proxy's only when the patient allowed them sensitive items; to a proxy without them a
+-- record has no forms. A clinician asks, as themselves, for a patient on their active panel. A portal session answers
+-- for the record it is looking at, as its own account and under its own grant, when it may see sensitive items. The
+-- triggers fill in and check the rest, and refuse every change (85-pre-visit-forms.sql). Admins and nobody see none.
+ALTER TABLE ehr.questionnaire_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.questionnaire_requests FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS questionnaire_requests_clinician_select ON ehr.questionnaire_requests;
+CREATE POLICY questionnaire_requests_clinician_select ON ehr.questionnaire_requests FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS questionnaire_requests_own_select ON ehr.questionnaire_requests;
+CREATE POLICY questionnaire_requests_own_select ON ehr.questionnaire_requests FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_sees_sensitive()));
+DROP POLICY IF EXISTS questionnaire_requests_panel_insert ON ehr.questionnaire_requests;
+CREATE POLICY questionnaire_requests_panel_insert ON ehr.questionnaire_requests FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND requested_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = questionnaire_requests.patient_id AND a.ended_at IS NULL
+        )
+    );
+ALTER TABLE ehr.questionnaire_responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.questionnaire_responses FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS questionnaire_responses_clinician_select ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_clinician_select ON ehr.questionnaire_responses FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS questionnaire_responses_own_select ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_own_select ON ehr.questionnaire_responses FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_sees_sensitive()));
+DROP POLICY IF EXISTS questionnaire_responses_own_insert ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_own_insert ON ehr.questionnaire_responses FOR INSERT
+    WITH CHECK (
+        patient_id = (SELECT ehr.current_patient_id())
+        AND (SELECT ehr.portal_sees_sensitive())
+        AND answered_by = (SELECT ehr.current_user_id())
+        AND proxy_grant_id IS NOT DISTINCT FROM (SELECT ehr.acting_grant_id())
+    );
+
 -- The staff inbox (PHI). An item is its recipient's alone: they read it and mark it done, while their account is a
 -- staff account that may sign in (a clinician or an admin). Nobody else sees it: not another clinician, not an admin
 -- who isn't the recipient, not the patient. No runtime role inserts or deletes one (10-grants.sql): items are created

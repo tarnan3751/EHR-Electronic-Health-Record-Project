@@ -230,6 +230,14 @@ CREATE OR REPLACE TRIGGER appointments_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.appointments
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
+CREATE OR REPLACE TRIGGER questionnaire_requests_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.questionnaire_requests
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER questionnaire_responses_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.questionnaire_responses
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
 CREATE OR REPLACE TRIGGER inbox_items_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.inbox_items
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();

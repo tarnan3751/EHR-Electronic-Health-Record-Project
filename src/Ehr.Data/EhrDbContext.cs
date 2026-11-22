@@ -73,6 +73,11 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // What needs a staff member's action (PHI: an item names a patient).
     public DbSet<Inbox.InboxItem> InboxItems => Set<Inbox.InboxItem>();
 
+    // Pre-visit forms (the expansion plan's step 13e; PHI, and sensitive items): the requests and their answers.
+    public DbSet<Forms.QuestionnaireRequest> QuestionnaireRequests => Set<Forms.QuestionnaireRequest>();
+
+    public DbSet<Forms.QuestionnaireResponse> QuestionnaireResponses => Set<Forms.QuestionnaireResponse>();
+
     // The rest of the reference data (Ehr.Data.Reference): not PHI.
     public DbSet<Reference.ObservationCode> ObservationCodes => Set<Reference.ObservationCode>();
 
