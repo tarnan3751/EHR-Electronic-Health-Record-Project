@@ -8,7 +8,8 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 
 // Test Case ID: TC-UC14-33
 // Purpose / scenario: In a real browser, with the keyboard only, a clinician writes a note in its four sections: picks
-//   a visit type and reads its prompts, has the vital signs offered and adds them to Objective, and signs.
+//   a visit type and reads its prompts, has the vital signs offered and adds them to Objective, saves with Ctrl+S (Cmd+S
+//   on a Mac), and signs.
 // Type: Non-functional (usability: keyboard first)
 // Requirements: NFR-12, proposed FR-60
 // Use case: UC 14, Review and sign a clinical note
@@ -22,12 +23,14 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   2. Shift+Tab to "Visit type" and type "F" to choose "Follow-up visit".
 //   3. Type Subjective; Tab to Objective, then to "Vital signs for Objective…", and press Enter; press Enter on "Add to
 //      Objective".
-//   4. Type Assessment and Plan; reach "Sign note…", confirm and sign.
+//   4. Type Assessment and Plan, and at once press Ctrl+S (Cmd+S on a Mac).
+//   5. Reach "Sign note…", confirm and sign.
 // Expected result: Step 1: the cursor is in Subjective. Step 2: each section shows its follow-up prompt. Step 3: the
 //   offer names the heart rate and the focus is on "Add to Objective"; once added, the text is in Objective, after
-//   nothing else, the focus is back in Objective, and a status says to check it. Step 4: the signed note shows the four
-//   sections with the vital signs in Objective and no prompt. Every focused control shows the focus ring, and the pages
-//   report no script errors.
+//   nothing else, the focus is back in Objective, and a status says to check it. Step 4: the draft is saved through "Save
+//   draft" (its buttons are disabled while the form is sent, which saving after a pause in typing doesn't do), and the
+//   status says "Saved". Step 5: the signed note shows the four sections with the vital signs in Objective and no
+//   prompt. Every focused control shows the focus ring, and the pages report no script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -89,7 +92,18 @@ public class TC_UC14_33_Nfr12_FourSectionsKeyboardFirst(WebApps apps) : IClassFi
         await page.Keyboard.InsertTextAsync("Synthetic keyboard assessment");
         await AiReviewBrowserTests.TabToAsync(page, "#Plan");
         await page.Keyboard.InsertTextAsync("Synthetic keyboard plan");
+        // Ctrl+S sends the form through "Save draft", which disables its buttons while it is sent; saving after a pause
+        // in typing leaves them alone. Watched from before the key is pressed, so a save by either way is told apart.
+        await page.EvaluateAsync("""
+            () => {
+                window.sentByKey = false;
+                new MutationObserver(() => { window.sentByKey = true; })
+                    .observe(document.querySelector('[data-note-save]'), { attributes: true, attributeFilter: ['disabled'] });
+            }
+            """);
+        await page.Keyboard.PressAsync("ControlOrMeta+S");
         await page.WaitForFunctionAsync("document.getElementById('note-save-status').textContent === 'Saved'");
+        Assert.True(await page.EvaluateAsync<bool>("window.sentByKey"));
         await AiReviewBrowserTests.TabToAsync(page, "[data-review]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/confirm?version=*");

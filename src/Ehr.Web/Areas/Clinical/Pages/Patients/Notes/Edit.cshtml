@@ -99,7 +99,7 @@ else
             <textarea asp-for="Plan" class="sc-field__input" rows="5" aria-describedby="@described(NoteSections.Plan)"></textarea>
         </div>
         <div class="sc-actions">
-            <button type="submit" class="sc-btn">Save draft</button>
+            <button type="submit" class="sc-btn" data-note-save>Save draft</button>
             <button type="submit" asp-page-handler="Review" class="sc-btn sc-btn--primary" data-review>Sign note…</button>
             <p id="note-save-status" class="sc-status" role="status" aria-live="polite">@Model.SaveStatus</p>
         </div>

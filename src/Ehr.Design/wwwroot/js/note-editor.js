@@ -169,7 +169,8 @@
         form.addEventListener('keydown', event => {
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
                 event.preventDefault();
-                form.requestSubmit(form.querySelector('button'));
+                // The Save draft button by name: the form has buttons that don't submit it ("Vital signs for Objective…").
+                form.requestSubmit(form.querySelector('[data-note-save]'));
             }
         });
         window.addEventListener('beforeunload', event => {
