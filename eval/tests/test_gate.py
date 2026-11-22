@@ -131,9 +131,11 @@ def test_the_code_feeding_the_models_needs_a_new_run_and_the_rest_only_scoring_a
 def test_every_eval_module_is_hashed_with_the_answers_or_the_scoring():
     modules = {f"ehr_eval/{path.name}" for path in (EVAL_DIR / "ehr_eval").glob("*.py")}
 
-    # Neither the package, the gate nor the clinical gold report makes or scores an answer.
+    # Neither the package, the gate nor the clinical gold report makes or scores an answer; nor do run A of the
+    # expansion plan's step 17 and its scoring, whose results (run-a-es-text.json) the gate doesn't check.
     assert modules - set(PIPELINE_FILES) - set(SCORING_FILES) == {
-        "ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/goldreport.py"}
+        "ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/goldreport.py", "ehr_eval/run_a.py",
+        "ehr_eval/scoring_es.py"}
     assert not set(PIPELINE_FILES) & set(SCORING_FILES)
 
 
