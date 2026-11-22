@@ -69,13 +69,15 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
     }
 
     // The vital signs the clinician may add to Objective (step 14), when they ask: JSON, for note-editor.js to show. Only
-    // for the clinician's own unsigned draft of the route's patient (and so a patient on their panel, as writing a note
-    // is); otherwise not found, with nothing read or recorded. Read as the vital signs page reads them, with its part.
-    // Nothing about the draft changes here: the text goes into Objective only if the clinician adds it.
+    // for a patient on the clinician's panel, as writing a note is, and for their own unsigned draft of that patient: the
+    // app checks both, and the drafts' row-level security the panel again; otherwise not found, with nothing read or
+    // recorded. Read as the vital signs page reads them, with its part. Nothing about the draft changes here: the text
+    // goes into Objective only if the clinician adds it.
     public async Task<IActionResult> OnGetVitalsAsync(Guid patientId, Guid draftId)
     {
         Response.Headers.CacheControl = "no-store";
-        if (!await Phi.OwnsUnsignedDraftAsync(draftId, patientId, HttpContext.RequestAborted))
+        if (!await Phi.IsAssignedAsync(patientId, HttpContext.RequestAborted)
+            || !await Phi.OwnsUnsignedDraftAsync(draftId, patientId, HttpContext.RequestAborted))
         {
             return NotFound();
         }

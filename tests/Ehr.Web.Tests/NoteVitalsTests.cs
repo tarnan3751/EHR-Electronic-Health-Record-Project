@@ -103,7 +103,13 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // The offer is for the clinician's own unsigned draft of the route's patient. A draft that doesn't exist, another
-    // patient's, another clinician's of this patient, and one signed are not found, and nothing is read or recorded.
+    // patient's, another clinician's of this patient, one signed, and the clinician's own of a patient no longer on their
+    // panel are not found, and nothing is read or recorded.
+    //
+    // The panel is checked twice, by the page (PhiReader.IsAssignedAsync) and by the drafts' row-level security, which
+    // hides a draft of a patient off the clinician's panel. Both read the same assignment, so no request can tell the
+    // page's check from the database's without weakening the test database's policies, which these tests never do: the
+    // ended assignment here is refused by both.
     [Fact]
     public async Task Vital_signs_are_offered_only_for_the_readers_own_unsigned_draft_of_that_patient()
     {
@@ -119,6 +125,10 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
         var otherPatients = await DraftAsync(session.Client, other);
         var colleaguesDraft = await DraftAsync(colleagues.Client, patient);
         var note = await NoteAddendumTests.SignedNoteAsync(session.Client, patient);
+        var former = await apps.InsertPatientAsync("Synthetic", "Former");
+        await apps.AssignAsync(clinician, former);
+        var formerDraft = await DraftAsync(session.Client, former);
+        await ProxyTests.QueryAsync(apps, $"UPDATE ehr.patient_assignments SET ended_at = now() WHERE patient_id = @patient AND clinician_id = '{clinician.Id}' RETURNING ''", former);
         var signed = (await ProxyTests.QueryAsync(apps, $"SELECT draft_id::text FROM ehr.clinical_notes WHERE id = '{note}'", patient)).Single();
         string Id(string path) => path.Split('/')[^1];
 
@@ -126,6 +136,11 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
         foreach (var draft in new[] { Guid.NewGuid().ToString(), Id(otherPatients), Id(colleaguesDraft), signed })
         {
             using var refused = await session.Client.GetAsync($"/patients/{patient}/notes/drafts/{draft}?handler=Vitals", Cancel);
+            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+        }
+
+        using (var refused = await session.Client.GetAsync(formerDraft + "?handler=Vitals", Cancel))
+        {
             Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
         }
 
