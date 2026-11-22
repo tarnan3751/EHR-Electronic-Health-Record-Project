@@ -532,6 +532,9 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData(403, """{"error":"forbidden","detail":"wrong key"}""", 503, "unavailable")]
     [InlineData(500, """{"error":"internal","detail":"a stack trace"}""", 502, "bad_answer")]
     [InlineData(503, """{"error":"starting","detail":"loading the model"}""", 503, "unavailable")]
+    [InlineData(503, """{"error":"language_unavailable","detail":"no Whisper"}""", 503, "language_unavailable")]
+    [InlineData(400, """{"error":"bad_language","detail":"not en or es"}""", 400, "bad_language")]
+    [InlineData(400, """{"error":"bad_request","detail":"a code the API doesn't know"}""", 502, "bad_answer")]
     [InlineData(200, """{"transcript":"not the contract's shape"}""", 502, "bad_answer")]
     public async Task The_services_refusals_become_the_apis_own(int status, string body, int expected, string error)
     {

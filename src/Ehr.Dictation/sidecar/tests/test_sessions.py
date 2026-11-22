@@ -1,21 +1,25 @@
-"""sessions.py: chunks in order, resent or refused; owners; limits; stopping, sorting and the result; and everything
-discarded on cancel or expiry. Uses a stand-in decoder (the bytes are samples) and stand-in models."""
+"""sessions.py: chunks in order, resent or refused; owners; limits; stopping, sorting and the result; everything
+discarded on cancel or expiry; and a dictation in Spanish. Uses a stand-in decoder (the bytes are samples) and stand-in
+models."""
 
 from __future__ import annotations
 
 import asyncio
 import dataclasses
+import json
 
 import pytest
-from conftest import MODELS, FakeLlama, FakeRecognizer, answer, raw_decoder, speech_and_pauses
+from conftest import (MODELS, MODELS_WITH_WHISPER, WHISPER, FakeLlama, FakeRecognizer, FakeWhisper, answer, raw_decoder,
+                      spanish_answer, speech_and_pauses)
 
 import threading
 import time
 
+from ehr_dictation import prompt
 from ehr_dictation.asr import Recognition
 from ehr_dictation.audio import SAMPLE_RATE, AudioError, DecodeTimeout
 from ehr_dictation.provenance import CODE_SHA256
-from ehr_dictation.sessions import SessionError, Sessions
+from ehr_dictation.sessions import SessionError, Sessions, Spanish
 
 ALICE = "11111111-1111-1111-1111-111111111111"
 BOB = "22222222-2222-2222-2222-222222222222"
@@ -621,3 +625,163 @@ def test_a_session_switched_off_proposes_nothing_and_still_lists_every_instructi
     result = asyncio.run(run())
 
     assert result["transcript"]["final"] and result["notCarriedOver"] and result["proposals"] == []
+
+
+# ---- A dictation in Spanish (the expansion plan's step 17) ----------------------------------------------------------
+
+DICTADO = "Tos seca desde hace 3 días. Pido una radiografía de tórax."
+TRADUCIDO = spanish_answer(("subjective", ["Tos seca desde hace 3 días"], "Dry cough for 3 days."))
+
+
+def make_spanish(settings, whisper: FakeWhisper | None = None, llama: FakeLlama | None = None, **limits):
+    sessions = Sessions(dataclasses.replace(settings, **limits), Ordering(), FakeLlama(GROUNDED).structurer(),
+                        MODELS_WITH_WHISPER, decoder=raw_decoder,
+                        spanish=Spanish(whisper or FakeWhisper(DICTADO), (llama or FakeLlama(TRADUCIDO)).structurer(language="es")))
+    return sessions
+
+
+async def dictate_in(sessions: Sessions, language: str) -> str:
+    session = sessions.start(ALICE, language)
+    for seq, chunk in enumerate(chunks()):
+        await sessions.add_audio(session.id, ALICE, seq, chunk)
+    return session.id
+
+
+def test_spanish_without_whisper_installed_is_refused(settings):
+    sessions, _ = make(settings)
+
+    with pytest.raises(SessionError) as refused:
+        sessions.start(ALICE, "es")
+
+    assert (refused.value.status, refused.value.code) == (503, "language_unavailable")
+    assert sessions.count == 0
+
+
+# TC-UC10-13 and 14 (FR-14, proposed FR-61): a dictation in Spanish is transcribed by Whisper, sorted with the Spanish
+# prompt and schema, checked against its Spanish, lists its Spanish instructions and proposes nothing, and says so; one
+# in English beside it goes as before.
+def test_a_dictation_in_spanish_goes_through_whisper_the_spanish_checks_and_proposes_nothing(settings):
+    async def run():
+        sessions = make_spanish(settings)
+        results = []
+        for language in ("es", "en"):
+            session_id = await dictate_in(sessions, language)
+            await sessions.stop(session_id, ALICE)
+            results.append(await sessions.result(session_id, ALICE, wait=5))
+        return results
+
+    spanish, english = asyncio.run(run())
+
+    text = spanish["transcript"]["text"]
+    assert spanish["spokenLanguage"] == "es" and spanish["transcript"]["final"]
+    subjective = spanish["fields"]["subjective"]
+    assert subjective["status"] == "pending" and subjective["value"] == "Dry cough for 3 days."
+    assert [text[s["start"] : s["end"]] for s in subjective["sources"]] == ["Tos seca desde hace 3 días"]
+    assert subjective["statements"] == [{"start": 0, "end": len("Dry cough for 3 days."), "sources": subjective["sources"]}]
+    assert {spanish["fields"][name]["reasons"][0] for name in ("objective", "assessment", "plan")} == {"not_dictated"}
+    assert {(i["reason"], text[i["start"] : i["end"]]) for i in spanish["notCarriedOver"]} >= {
+        ("order", "Pido una radiografía de tórax")}
+    assert spanish["proposals"] == []
+    structuring = prompt.load(language="es")
+    assert spanish["provenance"]["speech"] == WHISPER
+    assert spanish["provenance"]["prompt"] == f"sha256:{structuring.prompt_sha256}"
+    assert spanish["provenance"]["structuring"] == f"sha256:{structuring.structuring_sha256}"
+
+    assert "spokenLanguage" not in english and english["provenance"]["speech"] == MODELS.speech
+    assert english["provenance"]["structuring"] == f"sha256:{prompt.load().structuring_sha256}"
+    assert english["proposals"]
+
+
+# Decision 20: a dictation in Spanish holds 2 minutes of audio, one in English 3.
+def test_a_dictation_in_spanish_is_refused_past_two_minutes_and_one_in_english_isnt(settings):
+    half_minute = speech_and_pauses(("speech", 29), ("pause", 1)).astype("<f4").tobytes()
+    second = speech_and_pauses(("speech", 1)).astype("<f4").tobytes()
+
+    async def run(language: str):
+        sessions = make_spanish(settings)
+        session = sessions.start(ALICE, language)
+        for seq in range(4):
+            await sessions.add_audio(session.id, ALICE, seq, half_minute)
+        try:
+            return await sessions.add_audio(session.id, ALICE, 4, second), sessions.max_seconds(session)
+        except SessionError as error:
+            return error, sessions.max_seconds(session)
+
+    refused, spanish_limit = asyncio.run(run("es"))
+    accepted, english_limit = asyncio.run(run("en"))
+
+    assert (spanish_limit, english_limit) == (120, 180)
+    assert isinstance(refused, SessionError) and (refused.status, refused.code) == (413, "too_long")
+    assert refused.detail == "A dictation can be up to 2 minutes."
+    assert accepted["receivedSeq"] == 4 and accepted["audioSeconds"] == 121.0
+
+
+def test_a_live_spanish_transcript_has_finished_passages_only(settings):
+    async def run():
+        sessions = make_spanish(settings)
+        session = sessions.start(ALICE, "es")
+        return [await sessions.add_audio(session.id, ALICE, seq, chunk) for seq, chunk in enumerate(chunks())]
+
+    answers = asyncio.run(run())
+
+    assert all(s["final"] for a in answers for s in a["transcript"]["segments"])
+    assert answers[-1]["transcript"]["text"].startswith("Tos seca")
+
+
+# TC-UC9-11 (NFR-14 as reworded, proposed FR-61), the live-transcript speed in Spanish: a chunk is answered within its
+# budget while Whisper is busy, and the next catches up.
+def test_a_spanish_chunk_is_answered_in_time_while_whisper_is_busy_and_the_next_one_catches_up(settings):
+    async def run():
+        sessions = make_spanish(settings, call_seconds=0.3)
+        session = sessions.start(ALICE, "es")
+        parts = chunks()
+        await sessions._transcribing.acquire()
+        started = time.perf_counter()
+        busy = await sessions.add_audio(session.id, ALICE, 0, b"".join(parts[:4]))
+        took = time.perf_counter() - started
+        sessions._transcribing.release()
+        caught_up = await sessions.add_audio(session.id, ALICE, 1, b"".join(parts[4:8]))
+        return busy, took, caught_up
+
+    busy, took, caught_up = asyncio.run(run())
+
+    assert busy["receivedSeq"] == 0 and busy["transcript"]["text"] == "" and took < 1
+    assert caught_up["transcript"]["text"].startswith("Tos seca")
+
+
+# TC-UC9-11, the live-transcript speed in Spanish: stop answers within its budget while Whisper is still at work.
+def test_a_spanish_stop_answers_within_its_budget_and_the_result_follows(settings):
+    async def run():
+        whisper = FakeWhisper(DICTADO)
+        sessions = make_spanish(settings, whisper, stop_wait_seconds=0.2)
+        session_id = await dictate_in(sessions, "es")
+        whisper.hold = threading.Event()
+        started = time.perf_counter()
+        stopped = await sessions.stop(session_id, ALICE)
+        took = time.perf_counter() - started
+        whisper.hold.set()
+        later = await sessions.result(session_id, ALICE, wait=5)
+        return stopped, took, later
+
+    stopped, took, later = asyncio.run(run())
+
+    assert took < 1 and stopped["sorting"] == "pending" and not stopped["transcript"]["final"]
+    assert later["sorting"] == "done" and later["transcript"]["final"] and later["spokenLanguage"] == "es"
+
+
+def test_a_passage_not_heard_as_spanish_is_marked_and_left_out_of_what_is_sorted(settings):
+    llama = FakeLlama(TRADUCIDO)
+
+    async def run():
+        sessions = make_spanish(settings, FakeWhisper(DICTADO, "other_language", lambda samples: samples.size > 3 * SAMPLE_RATE),
+                                llama)
+        session_id = await dictate_in(sessions, "es")
+        await sessions.stop(session_id, ALICE)
+        return await sessions.result(session_id, ALICE, wait=5)
+
+    result = asyncio.run(run())
+
+    marked = [s for s in result["transcript"]["segments"] if s["unclear"] == "other_language"]
+    assert marked and len(marked) < len(result["transcript"]["segments"])
+    sent = [json.loads(r.content) for r in llama.requests if r.url.path == "/v1/chat/completions"]
+    assert sent and "[unclear]" in sent[0]["messages"][1]["content"]

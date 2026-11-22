@@ -17,7 +17,7 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | `lab` | A lab's system on the clinic's network | The simulated lab (`src/Ehr.Lab.Simulator`): asks the on-prem app for the lab orders waiting for results and files synthetic results for them, a few seconds after each is signed. Only with `EHR_LAB_KEY` in `.env`; without it, its log says it isn't running, and it waits doing nothing. No port; read-only apart from a tmpfs; given the public certificate it pins and nothing else from `certs/` |
 | `mail` | The clinic's mail relay | [Mailpit](https://mailpit.axllent.org/): catches every email the on-prem app sends and shows them at http://127.0.0.1:8025; delivers nothing |
 | `llama` | K2 Horizon 7B in llama.cpp's `llama-server`, on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
-| `dictation` | The dictation sidecar on the on-prem server: MedASR, then K2 Horizon through `llama`, then the checks on what it proposes (`src/Ehr.Dictation/sidecar`) | Opt-in `ai` profile, on the same network as `llama`; only the on-prem app reaches it, with a key. Keeps nothing: its file system is read-only apart from a tmpfs |
+| `dictation` | The dictation sidecar on the on-prem server: MedASR (Whisper for a dictation in Spanish), then K2 Horizon through `llama`, then the checks on what it proposes (`src/Ehr.Dictation/sidecar`) | Opt-in `ai` profile, on the same network as `llama`; only the on-prem app reaches it, with a key. Keeps nothing: its file system is read-only apart from a tmpfs |
 | `restore-db` | A restored copy of the primary | Opt-in `restore` profile, for the restore drill |
 
 Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. Pages that read patient data come from the replica as well; the cloud app records those reads in its own audit queue and ships them to the on-prem app.
@@ -30,7 +30,7 @@ The lab is on-prem only too: `lab` calls the on-prem app at https://ehr.example.
 
 ## One-time setup
 
-1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty. For the `ai` profile, give Docker at least 10 GB. On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
+1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty. For the `ai` profile, give Docker at least 10 GB, or 13 GB with Whisper installed for Spanish dictation (the `dictation` service's cap is 5 GB). On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
 2. **Settings file.** Copy `.env.example` to `.env`. The defaults work; `.env` is gitignored. If you already have a `.env`, copy over any lines it's missing from `.env.example`; Compose names the missing setting if you don't. `EHR_LAB_KEY` is optional, so Compose doesn't ask for it: without it there is no lab, and the stack runs as before.
 3. **Certificates.** Install [mkcert](https://github.com/FiloSottile/mkcert) (macOS: `brew install mkcert`; Windows: `winget install FiloSottile.mkcert`), then:
    ```
@@ -159,12 +159,12 @@ Barman takes a base backup about a minute after its first start, streams WAL con
 
 ## AI profile
 
-1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/`, MedASR in `infra/compose/models/medasr/`, and prints the `LLAMA_MODEL_FILE` value. Set that, `LLAMA_API_KEY` and `DICTATION_API_KEY` in `.env`. The models folder is gitignored; `llama` refuses to start without its key, and `dictation` without both keys or with a MedASR that isn't the one `models-manifest.json` records.
-2. Start with `docker compose --profile ai up -d --build`. `dictation` is healthy once MedASR has loaded; the on-prem app's dictation API answers that dictation is unavailable until then, and whenever the profile isn't running.
+1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/`, MedASR in `infra/compose/models/medasr/`, and prints the `LLAMA_MODEL_FILE` value. Set that, `LLAMA_API_KEY` and `DICTATION_API_KEY` in `.env`. For dictation in Spanish, also `uv run src/Ehr.Dictation/setup_models.py --only whisper`, which puts Whisper in `infra/compose/models/whisper/`; without it `dictation` starts and refuses Spanish. The models folder is gitignored; `llama` refuses to start without its key, and `dictation` without both keys or with a MedASR or a Whisper that isn't the one `models-manifest.json` records.
+2. Start with `docker compose --profile ai up -d --build`. `dictation` is healthy once MedASR, and Whisper if it is installed, have loaded; the on-prem app's dictation API answers that dictation is unavailable until then, and whenever the profile isn't running.
 3. On a machine with an NVIDIA GPU, add the override file:
    `docker compose -f compose.yaml -f compose.nvidia.yaml --profile ai up -d --build`
 
-Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. The root README's "Dictation server hardware" section covers the faster native options. MedASR runs on the CPU in every case; it's small.
+Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. The root README's "Dictation server hardware" section covers the faster native options. MedASR runs on the CPU in every case; it's small. Whisper does too in Docker, in fp32, which is slower: it transcribes finished passages only, between pauses.
 
 ## Encryption
 

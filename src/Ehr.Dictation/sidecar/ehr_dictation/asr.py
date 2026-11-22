@@ -5,6 +5,10 @@ HF_HUB_OFFLINE=1, and local_files_only says the same here. Decoding is greedy CT
 optional 6-gram language model in the MedASR repository isn't used. The text is MedASR's own, with spoken punctuation as
 {period} and section headings as [HEADING]; transcript.py formats it. The confidence is the mean probability of the
 token MedASR chose, over the frames where it chose one, and feeds quality.py.
+
+A recognizer may also give its own verdict on a passage (unclear, one of quality.py's codes), which transcriber.py
+marks the passage with when quality.py finds nothing wrong with its sound. MedASR gives none; Whisper, which
+transcribes dictation in Spanish (whisper_asr.py), does.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from .audio import SAMPLE_RATE
 class Recognition:
     text: str
     confidence: float | None
+    unclear: str | None = None
 
 
 class Recognizer(Protocol):

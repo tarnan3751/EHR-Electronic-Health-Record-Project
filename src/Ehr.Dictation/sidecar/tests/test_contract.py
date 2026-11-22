@@ -23,12 +23,13 @@ from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
-from conftest import MODELS, FakeLlama, FakeRecognizer, answer, encode, noise, tone
+from conftest import MODELS, MODELS_WITH_WHISPER, FakeLlama, FakeRecognizer, FakeWhisper, answer, encode, noise, spanish_answer, tone
 from fastapi.testclient import TestClient
 
 from ehr_dictation.api import create_app
 from ehr_dictation.asr import Recognition
 from ehr_dictation.audio import SAMPLE_RATE
+from ehr_dictation.sessions import Spanish
 from ehr_dictation.settings import Settings
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contract"
@@ -95,18 +96,20 @@ class Instructing(FakeRecognizer):
 
 
 def client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, model_timeout: float = 0.5,
-           **limits) -> TestClient:
+           spanish: tuple[FakeWhisper, FakeLlama] | None = None, **limits) -> TestClient:
     settings = dataclasses.replace(settings, **limits)
-    return TestClient(create_app(settings, recognizer=recognizer or FakeRecognizer(),
-                                 structurer=llama.structurer(model_timeout), models=MODELS))
+    in_spanish = Spanish(spanish[0], spanish[1].structurer(model_timeout, language="es")) if spanish else None
+    return TestClient(create_app(settings, recognizer=recognizer or FakeRecognizer(), structurer=llama.structurer(model_timeout),
+                                 models=MODELS_WITH_WHISPER if spanish else MODELS, spanish=in_spanish))
 
 
-def start(http: TestClient) -> str:
-    return http.post("/v1/sessions", headers=HEADERS).json()["sessionId"]
+def start(http: TestClient, language: str | None = None) -> str:
+    body = {"spokenLanguage": language} if language else None
+    return http.post("/v1/sessions", headers=HEADERS, json=body).json()["sessionId"]
 
 
-def stopped(http: TestClient, audio: bytes | None = None) -> str:
-    session = start(http)
+def stopped(http: TestClient, audio: bytes | None = None, language: str | None = None) -> str:
+    session = start(http, language)
     http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=audio or dictation(), headers=HEADERS)
     http.post(f"/v1/sessions/{session}/stop", headers=HEADERS)
     return session
@@ -205,6 +208,28 @@ def answers(settings: Settings) -> dict[str, dict]:
     with client(settings, FakeLlama(GROUNDED), max_sessions=0) as http:
         keep("start-429-busy", "start", http.post("/v1/sessions", headers=HEADERS))
 
+    # A dictation in Spanish (the expansion plan's step 17): started in Spanish, two minutes at most; a passage Whisper
+    # didn't hear as Spanish, marked; and a result whose English sentences each cite the Spanish they were translated
+    # from, with the Spanish instruction listed and nothing proposed. Without Whisper, Spanish is refused, and any
+    # other language is a bad one.
+    translated = spanish_answer(("subjective", ["Tos seca desde hace 3 días"], "Dry cough for 3 days."),
+                                ("subjective", ["Niega fiebre"], "Denies fever."),
+                                ("plan", ["Pido una radiografía de tórax"], "Chest X-ray."))
+    whisper = FakeWhisper("Tos seca desde hace 3 días. Niega fiebre. Pido una radiografía de tórax.")
+    with client(settings, FakeLlama(GROUNDED), spanish=(whisper, FakeLlama(translated))) as http:
+        keep("start-201-es", "start", http.post("/v1/sessions", headers=HEADERS, json={"spokenLanguage": "es"}))
+        keep("start-400-bad_language", "start", http.post("/v1/sessions", headers=HEADERS, json={"spokenLanguage": "fr"}))
+        session = stopped(http, one_passage(), "es")
+        keep("result-200-done-es", "result", http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+    heard_as_english = FakeWhisper("Patient says the pain started yesterday.", "other_language", lambda samples: True)
+    with client(settings, FakeLlama(GROUNDED), spanish=(heard_as_english, FakeLlama(translated))) as http:
+        session = start(http, "es")
+        keep("audio-200-other_language", "audio",
+             http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=dictation(), headers=HEADERS))
+    with client(settings, FakeLlama(GROUNDED)) as http:
+        keep("start-503-language_unavailable", "start",
+             http.post("/v1/sessions", headers=HEADERS, json={"spokenLanguage": "es"}))
+
     return {name: {"$comment": COMMENT, **_fixed(value)} for name, value in produced.items()}
 
 
@@ -244,7 +269,7 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     produced = answers(settings)
     bodies = {name: value["body"] for name, value in produced.items()}
 
-    assert {value["status"] for value in produced.values()} == {200, 201, 204, 401, 404, 409, 413, 422, 429}
+    assert {value["status"] for value in produced.values()} == {200, 201, 204, 400, 401, 404, 409, 413, 422, 429, 503}
     assert {value["route"] for value in produced.values()} == {"start", "audio", "stop", "result", "cancel"}
     reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long", "transcription_failed")
     assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in reasons} == set(reasons)
@@ -267,3 +292,16 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     assert [w["code"] for w in near["warnings"]] == ["near_unclear_passage"]
     failed = bodies["result-200-unavailable-transcription_failed"]
     assert failed["transcript"]["text"] and not failed["transcript"]["final"]
+    # Spanish (the expansion plan's step 17).
+    assert bodies["start-201-es"]["maxSeconds"] == 120 and bodies["start-201"]["maxSeconds"] == 180
+    assert bodies["start-400-bad_language"]["error"] == "bad_language"
+    assert bodies["start-503-language_unavailable"]["error"] == "language_unavailable"
+    assert any(s["unclear"] == "other_language" for s in bodies["audio-200-other_language"]["transcript"]["segments"])
+    spanish = bodies["result-200-done-es"]
+    assert spanish["spokenLanguage"] == "es" and spanish["proposals"] == [] and spanish["notCarriedOver"]
+    said = spanish["fields"]["subjective"]
+    assert [said["value"][s["start"] : s["end"]] for s in said["statements"]] == ["Dry cough for 3 days.", "Denies fever."]
+    assert [s for statement in said["statements"] for s in statement["sources"]] == said["sources"]
+    assert spanish["fields"]["plan"]["reasons"] == ["order_or_allergy_change"]
+    assert spanish["provenance"]["speech"]["repository"] == "openai/whisper-large-v3-turbo"
+    assert all("spokenLanguage" not in body for name, body in bodies.items() if body and not name.endswith("-es"))

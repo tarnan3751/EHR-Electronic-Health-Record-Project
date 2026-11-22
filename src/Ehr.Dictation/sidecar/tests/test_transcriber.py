@@ -1,8 +1,9 @@
-"""transcriber.py: a live transcript commits passages once and keeps a tentative tail; stopping commits the rest."""
+"""transcriber.py: a live transcript commits passages once and keeps a tentative tail, or none when told (a dictation
+in Spanish); stopping commits the rest; a passage is marked by its sound first, then by the recognizer's verdict."""
 
 from __future__ import annotations
 
-from conftest import FakeRecognizer, speech_and_pauses
+from conftest import FakeRecognizer, FakeWhisper, speech_and_pauses
 
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.transcriber import Progress, advance
@@ -72,3 +73,32 @@ class CommandRecognizer(FakeRecognizer):
         from ehr_dictation.asr import Recognition
 
         return Recognition("{new paragraph}", 0.9)
+
+
+# ---- Spanish (the expansion plan's step 17) ---------------------------------------------------------------------------
+
+
+def test_without_a_tentative_tail_only_finished_passages_are_transcribed():
+    samples = recording()
+    recognizer = FakeWhisper()
+
+    live = advance(samples[: 7 * SAMPLE_RATE], Progress(), recognizer, final=False, tentative=False)
+
+    assert live.tail is None and [s.final for s in live.segments] == [True]
+    assert recognizer.calls == [live.segments[0].end_sample - live.segments[0].start_sample]
+    assert advance(samples, live, recognizer, final=True, tentative=False).committed == samples.size
+
+
+def test_the_recognizers_verdict_marks_a_passage_whose_sound_passes():
+    progress = advance(recording(), Progress(), FakeWhisper(unclear="other_language"), final=True)
+
+    assert {s.unclear for s in progress.segments} == {"other_language"}
+    assert all(s.text == "Tos seca desde hace 3 días." for s in progress.segments)
+
+
+def test_a_passage_too_quiet_is_marked_so_whatever_the_recognizer_says():
+    quiet = speech_and_pauses(("pause", 1), ("speech", 3)) * 10 ** (-30 / 20)
+
+    progress = advance(quiet, Progress(), FakeWhisper(unclear="other_language"), final=True)
+
+    assert {s.unclear for s in progress.segments} == {"too_quiet"}

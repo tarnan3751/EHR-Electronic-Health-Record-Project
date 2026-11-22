@@ -70,7 +70,7 @@ namespace Ehr.Web.Api.Dictation;
 // service's tests write and DictationApiTests reads through this API.
 //
 // Refusals other than 401 and 403 are {error, message}, words for the clinician, and expectedSeq with out_of_order:
-//   400 bad_form_token, or bad_seq
+//   400 bad_form_token, or bad_seq; or bad_language: the service refused the language a dictation was started in
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop), or not_stopped (a result before stop)
 //   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes)
@@ -78,7 +78,8 @@ namespace Ehr.Web.Api.Dictation;
 //   422 not_audio: "The audio couldn't be decoded."
 //   429 busy: the service is busy
 //   502 bad_answer: the service answered something this API doesn't know
-//   503 unavailable: not configured, the service can't be reached or says it's unavailable, or it refused the key
+//   503 unavailable: not configured, the service can't be reached or says it's unavailable, or it refused the key;
+//       or language_unavailable: "Spanish dictation isn't installed on this server." (Whisper isn't, step 17)
 //   504 timed_out: the service didn't answer within DictationSidecar.DefaultTimeout (20 seconds)
 // A model that is unavailable or too slow isn't a refusal: the result says so. What is logged is the operation and
 // the service's status, never a body, a transcript or a field.
@@ -275,11 +276,22 @@ public static partial class DictationApi
         }
     }
 
-    // The service's refusals, mapped to this API's own. Only a 409's code and expected sequence are read from its body.
+    // The service's refusals, mapped to this API's own. Only the code of a 400, a 409, a 413 or a 503, and a 409's
+    // expected sequence, are read from its body.
     static async Task<IResult> RefusalAsync(HttpResponseMessage response, string operation, ILogger log, CancellationToken cancellationToken)
     {
         switch (response.StatusCode)
         {
+            case HttpStatusCode.BadRequest:
+                // A dictation started in a language the service doesn't take (the expansion plan's step 17).
+                return await ErrorBodyAsync(response, cancellationToken) is { Error: "bad_language" }
+                    ? Refuse(StatusCodes.Status400BadRequest, "bad_language", "Choose English or Spanish for this dictation.")
+                    : Unexpected(response.StatusCode, operation, log);
+            case HttpStatusCode.ServiceUnavailable:
+                // Spanish, on a server without Whisper (step 17); any other 503 is the service unavailable.
+                return await ErrorBodyAsync(response, cancellationToken) is { Error: "language_unavailable" }
+                    ? Refuse(StatusCodes.Status503ServiceUnavailable, "language_unavailable", "Spanish dictation isn't installed on this server.")
+                    : Unexpected(response.StatusCode, operation, log);
             case HttpStatusCode.NotFound:
                 return NotFound();
             case HttpStatusCode.Conflict:

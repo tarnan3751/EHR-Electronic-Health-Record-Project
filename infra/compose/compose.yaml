@@ -191,10 +191,11 @@ services:
       - ./models:/models:ro
     networks: [inference]
 
-  # Opt-in (--profile ai). MedASR transcribes, llama sorts the transcript into note fields, and every proposed value is
-  # checked (src/Ehr.Dictation/sidecar). Reachable only from the on-prem app, with no internet access. It refuses to
-  # start without DICTATION_API_KEY and LLAMA_API_KEY, which are optional here, not required, for the same reason as
-  # llama's. It keeps nothing: audio and transcripts stay in memory, and its only writable place is a tmpfs.
+  # Opt-in (--profile ai). MedASR transcribes (Whisper, when installed, a dictation in Spanish), llama sorts the
+  # transcript into note fields, and every proposed value is checked (src/Ehr.Dictation/sidecar). Reachable only from
+  # the on-prem app, with no internet access. It refuses to start without DICTATION_API_KEY and LLAMA_API_KEY, which are
+  # optional here, not required, for the same reason as llama's. It keeps nothing: audio and transcripts stay in
+  # memory, and its only writable place is a tmpfs.
   dictation:
     profiles: [ai]
     build:
@@ -210,8 +211,9 @@ services:
     read_only: true
     tmpfs: [/tmp]
     # It decodes audio from outside: a cap, so nothing it's sent can take the server's memory. About 0.4 GB in use
-    # with MedASR loaded; a full house of 3-minute dictations adds well under 1 GB.
-    mem_limit: 2g
+    # with MedASR loaded, and about 3.3 GB more with Whisper (Spanish dictation, in fp32 on the CPU); a full house of
+    # 3-minute dictations adds well under 1 GB.
+    mem_limit: 5g
     networks: [inference]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]

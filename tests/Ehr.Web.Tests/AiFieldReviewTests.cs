@@ -900,6 +900,25 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await Scalar("SELECT version FROM ehr.clinical_drafts WHERE id = @id", f.Draft));
     }
 
+    // Step 17's second series: the result in Spanish that the dictation service itself writes (its pinned contract file,
+    // result-200-done-es.json) is staged as it is, so TrustedResult takes the shape the service writes: sentences joined
+    // by one space, each citing whole Spanish of its own, a Spanish instruction listed, nothing proposed.
+    [Fact]
+    public async Task The_dictation_services_own_result_in_spanish_is_staged()
+    {
+        var f = await BeginAsync();
+        var contract = System.Text.Json.Nodes.JsonNode.Parse(
+            await File.ReadAllTextAsync(Ehr.Testing.RepositoryRoot.Combine("src/Ehr.Dictation/contract/result-200-done-es.json"), Cancel))!;
+        sidecar.Answer = (HttpStatusCode.OK, contract["body"]!.ToJsonString());
+
+        using var stage = await Stage(f, 1);
+
+        Assert.Equal(HttpStatusCode.OK, stage.StatusCode);
+        var stored = await StoredResultAsync(f);
+        Assert.Equal("es", stored.GetProperty("spokenLanguage").GetString());
+        Assert.Equal(2, stored.GetProperty("fields").GetProperty("subjective").GetProperty("statements").GetArrayLength());
+    }
+
     // Step 17: a stored review's line among the saved reviews says "in Spanish" only when its result's spokenLanguage is
     // exactly "es", and reading it never throws, whatever the stored evidence holds.
     [Theory]

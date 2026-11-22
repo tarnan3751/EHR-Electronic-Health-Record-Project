@@ -4,6 +4,9 @@ A passage is judged by its speech, the frames more than 6 dB above the recording
 how far that is above the background (a signal-to-noise estimate), and MedASR's own confidence in what it heard. The
 thresholds are starting values, tuned against the eval's noisy recordings (eval/README.md). A marked passage keeps its
 text, marked, but is left out of what K2 Horizon sorts.
+
+The recognizer may judge a passage too (asr.Recognition.unclear): in a dictation in Spanish, Whisper marks one it didn't
+hear as Spanish other_language, and one whose words look made up low_confidence (whisper_asr.py).
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import numpy as np
 TOO_QUIET = "too_quiet"
 TOO_NOISY = "too_noisy"
 LOW_CONFIDENCE = "low_confidence"
+OTHER_LANGUAGE = "other_language"
 
 QUIET_DBFS = -42.0
 NOISY_SNR_DB = 10.0

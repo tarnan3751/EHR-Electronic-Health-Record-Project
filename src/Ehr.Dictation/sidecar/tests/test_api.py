@@ -1,5 +1,6 @@
 """api.py, over HTTP as the on-prem app calls it: the key, the owner, a whole dictation recorded as Chromium records it,
-the transcript kept when the model fails, discarded values never sent, and refusing to start without what it needs."""
+the transcript kept when the model fails, discarded values never sent, the language a dictation starts in, and
+refusing to start without what it needs."""
 
 from __future__ import annotations
 
@@ -8,14 +9,15 @@ import dataclasses
 import json
 
 import pytest
-from conftest import MODELS, FakeLlama, FakeRecognizer, answer, encode, speech_and_pauses
+from conftest import (MODELS, MODELS_WITH_WHISPER, FakeLlama, FakeRecognizer, FakeWhisper, answer, encode, spanish_answer,
+                      speech_and_pauses)
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from ehr_dictation import api
 from ehr_dictation.api import create_app
 from ehr_dictation.provenance import ProvenanceError
-from ehr_dictation.sessions import SessionError
+from ehr_dictation.sessions import SessionError, Spanish
 from ehr_dictation.settings import Settings, SettingsError
 
 OWNER = "11111111-1111-1111-1111-111111111111"
@@ -177,3 +179,47 @@ def test_refuses_to_start_when_medasr_isnt_the_model_the_manifest_records(settin
 
     with pytest.raises(ProvenanceError), TestClient(app):
         pass
+
+
+# ---- The language a dictation starts in (the expansion plan's step 17) ----------------------------------------------
+
+
+def spanish_client(settings) -> TestClient:
+    english = FakeLlama(answer(("Speech speech.", ["speech speech"])))
+    spanish = Spanish(FakeWhisper(), FakeLlama(spanish_answer()).structurer(language="es"))
+    app = create_app(settings, recognizer=FakeRecognizer(), structurer=english.structurer(), models=MODELS_WITH_WHISPER,
+                     spanish=spanish)
+    return TestClient(app)
+
+
+@pytest.mark.parametrize(("body", "seconds"), [
+    (None, 180), (b"", 180), (b"{}", 180), (b'{"spokenLanguage": "en"}', 180), (b'{"spokenLanguage": "es"}', 120),
+])
+def test_a_dictation_starts_in_english_unless_asked_for_spanish(settings, body, seconds):
+    with spanish_client(settings) as http:
+        started = http.post("/v1/sessions", headers=HEADERS, content=body)
+
+    assert started.status_code == 201 and started.json()["maxSeconds"] == seconds
+
+
+@pytest.mark.parametrize("body", [
+    b'{"spokenLanguage": "fr"}', b'{"spokenLanguage": "ES"}', b'{"spokenLanguage": " es"}', b'{"spokenLanguage": null}',
+    b'{"spokenLanguage": 1}', b'{"spokenLanguage": ["es"]}', b'{"spokenLanguage": "es", "other": 1}', b'"es"', b"[]",
+    b"es", b"{", b'{"spokenLanguage": "es"}' + b" " * 1024,
+])
+def test_any_other_start_is_refused_as_a_bad_language(settings, body):
+    with spanish_client(settings) as http:
+        refused = http.post("/v1/sessions", headers=HEADERS, content=body)
+        listed = http.app.state.sessions.count
+
+    assert (refused.status_code, refused.json()["error"]) == (400, "bad_language") and listed == 0
+
+
+def test_spanish_without_whisper_is_refused_as_unavailable(settings):
+    with client(settings) as http:
+        refused = http.post("/v1/sessions", headers=HEADERS, content=b'{"spokenLanguage": "es"}')
+        english = http.post("/v1/sessions", headers=HEADERS)
+
+    assert (refused.status_code, refused.json()) == (503, {
+        "error": "language_unavailable", "detail": "Spanish dictation isn't installed on this server."})
+    assert english.status_code == 201

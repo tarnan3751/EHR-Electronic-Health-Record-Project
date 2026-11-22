@@ -5,6 +5,10 @@ At startup MedASR's weights are hashed and compared with the manifest, and the s
 so a result never claims a model it didn't use. The K2 Horizon file is llama-server's to load: llama.py checks that it
 serves the file the manifest names. The manifest's hashes are the ones Hugging Face publishes.
 
+Whisper, which transcribes dictation in Spanish (the expansion plan's step 17), is optional: setup_models.py fetches it
+only when asked. Without it in the manifest the sidecar starts and refuses Spanish (spanish_speech is None); with it,
+its weights are hashed at startup as MedASR's are, and the sidecar refuses to start if they differ.
+
 CODE_SHA256 is a hash over this package's source: every result names the code that transcribed and checked it, and
 the eval's results are tied to it, so any change to what is measured asks for a new eval run (eval/ehr_eval/gate.py).
 """
@@ -21,6 +25,8 @@ MANIFEST = "models-manifest.json"
 PACKAGE = Path(__file__).resolve().parent
 MEDASR_DIR = "medasr"
 MEDASR_WEIGHTS = "model.safetensors"
+WHISPER_DIR = "whisper"
+WHISPER_WEIGHTS = "model.safetensors"
 
 
 class ProvenanceError(Exception):
@@ -31,6 +37,7 @@ class ProvenanceError(Exception):
 class Models:
     speech: dict
     language: dict | None
+    spanish_speech: dict | None = None  # Whisper, when it is installed
 
     @property
     def language_file(self) -> str | None:
@@ -56,6 +63,21 @@ def load(models_dir: Path, *, verify: bool = True) -> Models:
         )
     speech = {"repository": medasr["repository"], "commit": medasr["commit"], "sha256": weights["sha256"]}
 
+    whisper = manifest.get("whisper")
+    spanish_speech = None
+    if whisper:
+        whisper_weights = next((f for f in whisper.get("files", []) if f.get("path") == WHISPER_WEIGHTS), None)
+        if not whisper_weights:
+            raise ProvenanceError(
+                f"{MANIFEST} records no Whisper weights: run src/Ehr.Dictation/setup_models.py --only whisper."
+            )
+        if verify and _sha256(models_dir / WHISPER_DIR / WHISPER_WEIGHTS) != whisper_weights["sha256"]:
+            raise ProvenanceError(
+                f"Whisper's {WHISPER_WEIGHTS} doesn't match {MANIFEST}: run src/Ehr.Dictation/setup_models.py --verify."
+            )
+        spanish_speech = {"repository": whisper["repository"], "commit": whisper["commit"],
+                          "sha256": whisper_weights["sha256"]}
+
     llm = manifest.get("llm")
     language = (
         {
@@ -67,7 +89,7 @@ def load(models_dir: Path, *, verify: bool = True) -> Models:
         if llm
         else None
     )
-    return Models(speech, language)
+    return Models(speech, language, spanish_speech)
 
 
 def _sha256(path: Path) -> str | None:

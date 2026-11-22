@@ -19,6 +19,13 @@ MedASR fails on the rest of the recording, or ffmpeg can't decode it in time twi
 was live, not final, with the reason transcription_failed. The fields are checked (validation.py) and marked pending; a field that failed
 carries only its reason codes.
 
+A dictation is in English unless it starts in Spanish (the expansion plan's step 17), and keeps its language: a
+Spanish one is transcribed by Whisper (whisper_asr.py) with finished passages only, no tentative tail, up to 2 minutes
+of audio; it is sorted with the Spanish prompt and schema and checked by translation.py, its instructions are listed by
+the Spanish detector, it proposes nothing (proposes is False), and its result says "spokenLanguage": "es" and names
+Whisper and the Spanish prompt, schema and structuring in its provenance. Without Whisper installed, a Spanish
+dictation is refused (language_unavailable). A dictation in English goes exactly as before.
+
 Cancelling discards everything at once (UC 9): the session is marked cancelled, and its background work is cancelled,
 including a model call in flight, so it stores nothing more; a call still waiting on the session checks the mark after
 each wait and stores nothing either.
@@ -42,7 +49,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import audio, validation
+from . import audio, translation, validation
 from .asr import Recognizer
 from .llama import StructuringFailed, Structurer
 from .prompt import FIELDS
@@ -78,6 +85,15 @@ def _not_audio() -> SessionError:
     return SessionError(422, "not_audio", "The audio couldn't be decoded.")
 
 
+@dataclass(frozen=True)
+class Spanish:
+    """What a dictation in Spanish goes through instead of MedASR and the English prompt: Whisper, and K2 Horizon asked
+    with the Spanish prompt and schema (prompt.load(language="es"))."""
+
+    recognizer: Recognizer
+    structurer: Structurer
+
+
 @dataclass
 class Session:
     id: str
@@ -88,12 +104,13 @@ class Session:
     audio_seconds: float = 0.0
     progress: Progress = field(default_factory=Progress)
     transcript: Transcript = field(default_factory=lambda: assemble([], final=False))
+    language: str = "en"  # "en" or "es", for the whole dictation
     stopped: bool = False
     cancelled: bool = False
     failure: SessionError | None = None
     sorting: str = "pending"
     reason: str | None = None
-    checks: validation.Checks | None = None
+    checks: validation.Checks | translation.Translations | None = None
     # Whether its results propose the orders and allergies to add it dictates (the expansion plan's step 15). The one
     # switch for them: a kind of session that must propose nothing sets it False when it starts.
     proposes: bool = True
@@ -111,6 +128,7 @@ class Sessions:
         structurer: Structurer,
         models: Models,
         *,
+        spanish: Spanish | None = None,
         clock: Callable[[], float] = time.monotonic,
         decoder: Callable[..., np.ndarray] = audio.decode,
     ) -> None:
@@ -118,6 +136,7 @@ class Sessions:
         self._recognizer = recognizer
         self._structurer = structurer
         self._models = models
+        self._spanish = spanish
         self._clock = clock
         self._decode = decoder
         self._sessions: dict[str, Session] = {}
@@ -130,7 +149,9 @@ class Sessions:
 
     # ---- Lifecycle -----------------------------------------------------------------------------------------------
 
-    def start(self, owner: str) -> Session:
+    def start(self, owner: str, language: str = "en") -> Session:
+        if language == "es" and self._spanish is None:
+            raise SessionError(503, "language_unavailable", "Spanish dictation isn't installed on this server.")
         self.sweep()
         # Until its result is ready, a session is using MedASR, K2 Horizon or both.
         working = [s for s in self._sessions.values() if s.finished_at is None]
@@ -138,10 +159,21 @@ class Sessions:
             raise SessionError(429, "busy", "Too many dictations are in progress. Try again in a minute.")
         if sum(1 for s in working if s.owner == owner) >= self._settings.max_sessions_per_owner:
             raise SessionError(429, "busy", "Finish or cancel your other dictation first.")
-        session = Session(id=secrets.token_urlsafe(24), owner=owner, touched=self._clock())
+        session = Session(id=secrets.token_urlsafe(24), owner=owner, touched=self._clock(), language=language,
+                          proposes=language == "en")
         self._sessions[session.id] = session
-        log.info("session %s started", session.id)
+        log.info("session %s started%s", session.id, " in Spanish" if language == "es" else "")
         return session
+
+    def max_seconds(self, session: Session) -> int:
+        """How much audio the dictation may hold: 2 minutes in Spanish, 3 in English (settings.py)."""
+        return self._settings.max_spanish_seconds if session.language == "es" else self._settings.max_session_seconds
+
+    def _recognizer_for(self, session: Session) -> Recognizer:
+        return self._spanish.recognizer if session.language == "es" else self._recognizer
+
+    def _structurer_for(self, session: Session) -> Structurer:
+        return self._spanish.structurer if session.language == "es" else self._structurer
 
     def cancel(self, session_id: str, owner: str) -> None:
         session = self._get(session_id, owner)
@@ -202,7 +234,7 @@ class Sessions:
 
             started = time.perf_counter()
             candidate = bytes(session.audio) + data
-            limit = self._settings.max_session_seconds
+            limit = self.max_seconds(session)
             try:
                 samples = await asyncio.to_thread(
                     self._decode, candidate, partial=True, max_seconds=limit + 1,
@@ -225,7 +257,8 @@ class Sessions:
             # The transcript catches up if MedASR is free in time; otherwise the next chunk brings it up to date.
             async with _within(self._transcribing, self._left(deadline)) as transcribing:
                 if transcribing:
-                    progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer, final=False)
+                    progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer_for(session),
+                                                       final=False, tentative=session.language == "en")
                     self._still_there(session)
                     session.progress = progress
                     session.transcript = assemble(progress.all_segments, final=False)
@@ -271,22 +304,23 @@ class Sessions:
         if session.failure is not None:
             raise session.failure
         sorting = session.sorting if session.done.is_set() else "pending"
+        spanish = session.language == "es"
         return {
             "transcript": session.transcript.to_json(),
             "sorting": sorting,
             "reason": session.reason if sorting == "unavailable" else None,
             "fields": session.checks.to_json(session.transcript) if sorting == "done" and session.checks else None,
-            "notCarriedOver": validation.not_carried_over(session.transcript),
+            "notCarriedOver": (translation if spanish else validation).not_carried_over(session.transcript),
             "proposals": validation.proposals(session.transcript) if session.proposes else [],
-            "provenance": self.provenance(),
-        }
+            "provenance": self.provenance(session),
+        } | ({"spokenLanguage": "es"} if spanish else {})
 
     async def _finish(self, session: Session, recording: bytes) -> None:
         """After stop: the rest of the transcript, then the fields. Cancelling the session cancels this task."""
         started = time.perf_counter()
         try:
             try:
-                samples = await self._decoded(recording)
+                samples = await self._decoded(recording, self.max_seconds(session))
             except audio.DecodeTimeout:
                 self._unfinished(session, "DecodeTimeout")
                 return
@@ -295,7 +329,8 @@ class Sessions:
                 return
             try:
                 async with self._transcribing:
-                    progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer, final=True)
+                    progress = await asyncio.to_thread(advance, samples, session.progress, self._recognizer_for(session),
+                                                       final=True)
             except Exception as error:  # noqa: BLE001 (the live transcript still goes back)
                 self._unfinished(session, type(error).__name__)
                 return
@@ -315,11 +350,11 @@ class Sessions:
             session.finished_at = self._clock()
             session.done.set()
 
-    async def _decoded(self, recording: bytes) -> np.ndarray:
+    async def _decoded(self, recording: bytes, limit: int) -> np.ndarray:
         """The whole recording, decoded; tried once more if ffmpeg runs out of time, since nobody is waiting on it."""
 
         def decode() -> np.ndarray:
-            return self._decode(recording, partial=False, max_seconds=self._settings.max_session_seconds + 1)
+            return self._decode(recording, partial=False, max_seconds=limit + 1)
 
         try:
             return await asyncio.to_thread(decode)
@@ -335,14 +370,19 @@ class Sessions:
     async def _sort(self, session: Session) -> None:
         started = time.perf_counter()
         transcript = session.transcript
+        spanish = session.language == "es"
         try:
             if not transcript.text.strip():
-                checks = validation.check({name: {"value": "", "sources": []} for name in FIELDS}, [], transcript)
+                checks = (
+                    translation.check({name: [] for name in FIELDS}, [], transcript)
+                    if spanish
+                    else validation.check({name: {"value": "", "sources": []} for name in FIELDS}, [], transcript)
+                )
             else:
                 # K2 Horizon's time starts now, waiting for a turn included.
                 async with asyncio.timeout(self._settings.structuring_seconds), self._sorting:
-                    proposal = await self._structurer.propose(transcript.for_structuring())
-                checks = validation.check(proposal.fields, proposal.unknown, transcript)
+                    proposal = await self._structurer_for(session).propose(transcript.for_structuring())
+                checks = (translation.check if spanish else validation.check)(proposal.fields, proposal.unknown, transcript)
             session.checks, session.sorting = checks, "done"
             log.info(
                 "session %s sorted in %.1f s: %s%s",
@@ -369,12 +409,16 @@ class Sessions:
     def _left(self, deadline: float) -> float:
         return max(0.0, deadline - self._clock())
 
-    def provenance(self) -> dict:
-        structuring = self._structurer.structuring
+    def provenance(self, session: Session) -> dict:
+        """The models, prompt, schema and code that made a session's result: for Spanish, Whisper and the Spanish
+        prompt and schema."""
+        spanish = session.language == "es"
+        structurer = self._structurer_for(session)
+        structuring = structurer.structuring
         return {
-            "speech": self._models.speech,
+            "speech": self._models.spanish_speech if spanish else self._models.speech,
             "language": self._models.language,
-            "llamaServer": self._structurer.build,
+            "llamaServer": structurer.build,
             "prompt": f"sha256:{structuring.prompt_sha256}",
             "schema": f"sha256:{structuring.schema_sha256}",
             "structuring": f"sha256:{structuring.structuring_sha256}",
