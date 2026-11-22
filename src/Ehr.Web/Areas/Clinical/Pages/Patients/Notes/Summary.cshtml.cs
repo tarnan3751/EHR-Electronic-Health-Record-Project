@@ -66,12 +66,9 @@ public class SummaryModel(PhiReader phi, PatientAssignments assignments, BreakGl
             : await summaries.ReleaseAsync(patientId, noteId, TalkedAbout, Found, NextSteps, Sensitive, HttpContext.RequestAborted);
         if (result.Status == StatusCodes.Status200OK)
         {
-            // At most one notice a day: none when another summary was released for the patient in the last day. The link
-            // is the configured portal's, never built from this request (step 6c).
-            if (await Phi.SummariesReleasedTodayAsync(patientId, HttpContext.RequestAborted) == 1)
-            {
-                await summaries.NotifyPatientAsync(patientId, Links.Build(addresses.Value.PortalBaseUrl, "/portal/summaries"), HttpContext.RequestAborted);
-            }
+            // At most one notice a day: none when another summary was released for the patient earlier in the clinic's
+            // day. The link is the configured portal's, never built from this request (step 6c).
+            await summaries.NotifyReleasedAsync(patientId, Links.Build(addresses.Value.PortalBaseUrl, "/portal/summaries"), HttpContext.RequestAborted);
 
             // A sensitive one of an ordinary note is shown to the person who has just released it.
             return RedirectToPage("View", null, new { patientId, noteId, done = "summary", sensitive = Sensitive && !SourcesSensitive ? true : (bool?)null }, "summary");

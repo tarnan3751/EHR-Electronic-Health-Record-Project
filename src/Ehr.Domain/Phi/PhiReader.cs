@@ -1076,14 +1076,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return new PatientVisitSummaries(patient, shown, sensitive ? withdrawn : [.. withdrawn.Where(w => !w.Sensitive)], hidden, sensitive);
     }
 
-    // How many visit summaries were released for a patient in the last day, the one just released included: whether the
-    // patient has already been told today that there is something new. A number, about no summary in particular: not a
-    // recorded read.
-    public Task<int> SummariesReleasedTodayAsync(Guid patientId, CancellationToken cancellationToken)
-    {
-        var since = DateTimeOffset.UtcNow.AddDays(-1);
-        return db.VisitSummaries.CountAsync(s => s.PatientId == patientId && s.ReleasedAt > since, cancellationToken);
-    }
+    // How many visit summaries were released for a patient since a moment, the one just released included: from the
+    // start of the clinic's day, whether the patient has already been told today that there is something new
+    // (PortalNotices). A number, about no summary in particular: not a recorded read.
+    public Task<int> SummariesReleasedSinceAsync(Guid patientId, DateTimeOffset since, CancellationToken cancellationToken) =>
+        db.VisitSummaries.CountAsync(s => s.PatientId == patientId && s.ReleasedAt >= since, cancellationToken);
 
     public const string AuditTable = "audit_events";
 
@@ -1422,13 +1419,11 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return request;
     }
 
-    // How many of a patient's refill requests were answered in the last day, the one just answered included: whether
-    // the patient has already been told today. A number, about no request in particular: not a recorded read.
-    public Task<int> RefillAnswersTodayAsync(Guid patientId, CancellationToken cancellationToken)
-    {
-        var since = DateTimeOffset.UtcNow.AddDays(-1);
-        return db.RefillRequests.CountAsync(r => r.PatientId == patientId && r.DecidedAt > since, cancellationToken);
-    }
+    // How many of a patient's refill requests were answered since a moment, the one just answered included: from the
+    // start of the clinic's day, whether the patient has already been told today (PortalNotices). A number, about no
+    // request in particular: not a recorded read.
+    public Task<int> RefillAnswersSinceAsync(Guid patientId, DateTimeOffset since, CancellationToken cancellationToken) =>
+        db.RefillRequests.CountAsync(r => r.PatientId == patientId && r.DecidedAt >= since, cancellationToken);
 
     // A request of the patient's with its medication, who asked and who answered, and the catalog item for its
     // medication: recording nothing. Who asked is the patient by name, or someone they share their record with as

@@ -169,11 +169,21 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
     }
 
     // Tells the patient, at their own portal account's address, that there is something new in their portal, with
-    // nothing about the summary (PortalNotices). Sent when a summary is released, at most once a day (the page asks
-    // PhiReader.SummariesReleasedTodayAsync: the few emails an address may be sent in an hour, CappedEmailSender, are
-    // also what a password reset draws on), and when one the patient or a proxy had viewed is withdrawn, whatever was
-    // sent that day (Tahseen's decision of 21 November 2026).
+    // nothing about the summary (PortalNotices). Sent when a summary is released, at most once a day
+    // (NotifyReleasedAsync: the few emails an address may be sent in an hour, CappedEmailSender, are also what a password
+    // reset draws on), and when one the patient or a proxy had viewed is withdrawn, whatever was sent that day (Tahseen's
+    // decision of 21 November 2026).
     public Task NotifyPatientAsync(Guid patient, string portalLink, CancellationToken cancel) => notices.SomethingNewAsync(patient, portalLink, cancel);
+
+    // Once a summary was released: the notice, unless another summary was released for the patient earlier in the
+    // clinic's day (PortalNotices.StartOfToday).
+    public async Task NotifyReleasedAsync(Guid patient, string portalLink, CancellationToken cancel)
+    {
+        if (await phi.SummariesReleasedSinceAsync(patient, notices.StartOfToday, cancel) == 1)
+        {
+            await notices.SomethingNewAsync(patient, portalLink, cancel);
+        }
+    }
 
     // What the page says about one thing the rule found, naming it and where it is.
     static string Explain(VisitSummaryProblem problem)

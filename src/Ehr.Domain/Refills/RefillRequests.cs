@@ -119,11 +119,11 @@ public sealed class RefillRequests(EhrDbContext db, PhiReader phi, PortalNotices
 
     // Tells the patient, at their own portal account's address, that there is something new in their portal, with
     // nothing about the request (PortalNotices), once a request was answered: at most once a day for answers to refill
-    // requests, since the few emails an address may be sent in an hour are also what a password reset draws on. The link
-    // is the portal's home, which names nothing.
+    // requests, the first of the clinic's day (PortalNotices.StartOfToday), since the few emails an address may be sent
+    // in an hour are also what a password reset draws on. The link is the portal's home, which names nothing.
     public async Task NotifyAnsweredAsync(Guid patient, string portalLink, CancellationToken cancellationToken)
     {
-        if (await phi.RefillAnswersTodayAsync(patient, cancellationToken) == 1)
+        if (await phi.RefillAnswersSinceAsync(patient, notices.StartOfToday, cancellationToken) == 1)
         {
             await notices.SomethingNewAsync(patient, portalLink, cancellationToken);
         }
