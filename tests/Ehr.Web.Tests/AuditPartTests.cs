@@ -1,6 +1,9 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Web.Areas.Portal.Pages;
+using Ehr.Web.CloudAudit;
 using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
@@ -51,27 +54,6 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         return reads;
     }
 
-    // As the clinician, who books and is sent the item.
-    async Task ExecuteAsync(Guid user, string sql, params (string Name, object Value)[] parameters)
-    {
-        await using var connection = await apps.OpenDatabaseAsync();
-        await using var transaction = await connection.BeginTransactionAsync(Cancel);
-        await using (var context = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction))
-        {
-            context.Parameters.AddWithValue("user", user.ToString());
-            await context.ExecuteNonQueryAsync(Cancel);
-        }
-
-        await using var command = new NpgsqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters)
-        {
-            command.Parameters.AddWithValue(name, value);
-        }
-
-        await command.ExecuteNonQueryAsync(Cancel);
-        await transaction.CommitAsync(Cancel);
-    }
-
     // The clinic's pages for one patient, and the portal's, each with the reads it records. {0} is the patient.
     [Theory]
     [InlineData("clinic", "/patients/{0}", "patients chart")]
@@ -111,18 +93,45 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(reads, await ReadsAsync(patient.Patient, actor, since));
     }
 
+    // The parts are one list wherever they are kept: the code's (AuditParts), the database's check, the cloud app's
+    // allow-list and the portal's words, none with a part the others don't have, in either direction; the words also
+    // name every part a view recorded without one is named by, and say "with its sensitive items" for every part the
+    // allow-list takes on a read of them.
+    [Fact]
+    public async Task The_parts_are_one_list_in_the_code_the_database_the_cloud_app_and_the_words()
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_audit_events_part'", connection);
+        var check = (string)(await command.ExecuteScalarAsync(Cancel))!;
+        var database = Regex.Matches(check[check.IndexOf("(part)::text", StringComparison.Ordinal)..], @"'([^']*)'::character varying")
+            .Select(match => match.Groups[1].Value);
+        var cloud = CloudAuditEvents.Parts.Values.SelectMany(parts => parts).Distinct();
+        string[] all = [.. AuditParts.All.Order(StringComparer.Ordinal)];
+
+        Assert.Equal(all.Length, AuditParts.All.Distinct().Count());
+        Assert.Equal(all, database.Order(StringComparer.Ordinal));
+        Assert.Equal(all, cloud.Order(StringComparer.Ordinal));
+        Assert.Equal(all.Union(RecordViewParts.All).Order(StringComparer.Ordinal), ViewsModel.Parts.Keys.Order(StringComparer.Ordinal));
+        Assert.All(CloudAuditEvents.Parts.Where(shape => shape.Key.Action is AuditActions.ReadSensitive or AuditActions.DownloadSensitive).SelectMany(shape => shape.Value),
+            part => Assert.NotNull(ViewsModel.Parts[part].Sensitive));
+    }
+
+    // A part the page has no words for, as from a database newer than the app during a deploy, is never shown as it is:
+    // the line is the record.
+    [Fact]
+    public void A_part_the_page_has_no_words_for_is_the_record()
+    {
+        Assert.Equal("Your record", ViewsModel.PartWords("from-a-newer-database", own: true, count: 1, sensitive: false));
+        Assert.Equal("The record", ViewsModel.PartWords("from-a-newer-database", own: false, count: 1, sensitive: true));
+        Assert.Equal("Your record, 3 times", ViewsModel.PartWords("from-a-newer-database", own: true, count: 3, sensitive: false));
+    }
+
     // A clinician's day and inbox name the patient: each a read of the patient, as part of that list.
     [Fact]
     public async Task The_day_and_the_inbox_record_their_parts()
     {
         var (clinician, session, patient) = await PatientAsync();
-        await ExecuteAsync(clinician.Id,
-            """
-            INSERT INTO ehr.appointments (id, patient_id, clinician_id, starts_at, minutes, reason, status)
-            VALUES (gen_random_uuid(), @patient, @clinician, now() + interval '1 minute', 15, 'Synthetic follow-up', 'booked');
-            INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at)
-            VALUES (gen_random_uuid(), @clinician, 'message', @patient, 'Synthetic message', now());
-            """, ("patient", patient.Patient), ("clinician", clinician.Id));
+        await RecordViewTests.DayAndInboxAsync(apps, clinician.Id, patient.Patient);
 
         var since = DateTimeOffset.UtcNow;
         Assert.Equal(HttpStatusCode.OK, (await session.Client.GetAsync("/schedule", Cancel)).StatusCode);

@@ -77,8 +77,8 @@ public partial class TC_UC6_48_Nfr06_WhoViewedSecurity(WebApps apps) : IClassFix
         var firstLines = Lines(await PageAsync(first.Client));
         var secondLines = Lines(await PageAsync(second.Client));
         Assert.Contains(firstLines, line => line.Contains("with its sensitive items", StringComparison.Ordinal));
-        Assert.Contains(firstLines, line => line.Contains("visit note", StringComparison.Ordinal));
-        Assert.DoesNotContain(secondLines, line => line.Contains("with its sensitive items", StringComparison.Ordinal) || line.Contains("visit note", StringComparison.Ordinal));
+        Assert.Contains(firstLines, line => line.Contains("| A visit note", StringComparison.Ordinal));
+        Assert.DoesNotContain(secondLines, line => line.Contains("with its sensitive items", StringComparison.Ordinal) || line.Contains("| A visit note", StringComparison.Ordinal));
 
         // Step 2.
         static List<string> Others(string html) => [.. Lines(html).Where(line => !line.StartsWith("you | You | Who viewed", StringComparison.Ordinal))];

@@ -21,7 +21,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. The second proxy opens the patient's record. The patient removes the second's access.
 //   3. The patient opens Who viewed my record, and their Access page.
 // Expected result: Of the page's lines, those of people the record is shared with are, newest first: the second's
-//   address, "Your record"; the first's, "Who viewed your record"; the first's, "Your record". Each address is the
+//   address, "Your portal home page, with your appointments"; the first's, "Who viewed your record"; the first's, "Your
+//   portal home page, with your appointments". Each address is the
 //   one the Access page shows. Neither proxy's name is on the page.
 // Creator: Tahseen Arnan
 public class TC_UC6_42_ProxyViewsShownToThePatient(WebApps apps) : IClassFixture<WebApps>
@@ -48,9 +49,9 @@ public class TC_UC6_42_ProxyViewsShownToThePatient(WebApps apps) : IClassFixture
         var html = await PageAsync(patient.Client);
         Assert.Equal(
             [
-                $"proxy | {second.Email} | Your record",
+                $"proxy | {second.Email} | Your portal home page, with your appointments",
                 $"proxy | {first.Email} | Who viewed your record",
-                $"proxy | {first.Email} | Your record",
+                $"proxy | {first.Email} | Your portal home page, with your appointments",
             ],
             Lines(html).Where(line => line.StartsWith("proxy", StringComparison.Ordinal)).Select(line => string.Join(" | ", line.Split(" | ").Take(3))));
         var access = await patient.Client.GetStringAsync("/portal/access", Cancel);

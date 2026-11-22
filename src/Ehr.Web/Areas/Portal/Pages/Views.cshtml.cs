@@ -10,7 +10,8 @@ namespace Ehr.Web.Areas.Portal.Pages;
 // at, from the audit log, newest first, 50 at a time: who (a staff member's name and role, "You", a proxy by the address
 // the patient gave access to, or the lab), when, which part, and whether under emergency access. Which patient comes
 // from the session, never from the request (AGENTS.md); the database answers only for the session's own record, and only
-// with the lines its viewer may see (ehr.record_views, db/policies/42-record-views.sql). A page is asked for by a moment
+// with the lines its viewer may see, each naming the part of the record the read was recorded for (step 13c2), or the
+// record to a viewer who may not be told it (ehr.record_views, db/policies/42-record-views.sql). A page is asked for by a moment
 // alone, older or newer than the page before, so no ID is ever in an address. The read goes through the PHI reader,
 // which records it. Off-site it comes from the cloud copy, which a view from the last few seconds may not have reached.
 public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
@@ -30,8 +31,7 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public bool Available { get; private set; }
 
-    // The page's lines, newest first: views by the same person of the same part in the same minute are one line, with
-    // how many there were.
+    // The page's lines, newest first: views by the same person of the same part in the same minute are one line (Collapse).
     public IReadOnlyList<ViewLine> Lines { get; private set; } = [];
 
     // The moments the links to the next pages start from, when there is a page that way.
@@ -84,6 +84,10 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
     // One line of the page.
     public sealed record ViewLine(string Who, string? Role, string Part, bool Emergency, DateTimeOffset At, string Kind);
 
+    // Views by the same person of the same part in the same minute, one after another, are one line. A part whose page
+    // records one read a view is counted, and its views that showed sensitive items are a line apart from those that
+    // didn't. A part whose page records several (the chart with each note it lists, a note's page, the visit summaries)
+    // is one line of the views in that minute, with no count, which says it showed sensitive items when any of them did.
     static List<ViewLine> Collapse(IReadOnlyList<RecordViewRow> views, bool own)
     {
         var lines = new List<ViewLine>();
@@ -96,7 +100,8 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
             }
 
             var first = views[start];
-            lines.Add(new ViewLine(Who(first, own), Role(first.Role), Part(first.Part, own, i - start), first.Emergency, first.OccurredAt, first.Who));
+            var sensitive = views.Skip(start).Take(i - start).Any(view => view.Sensitive);
+            lines.Add(new ViewLine(Who(first, own), Role(first.Role), PartWords(first.Part, own, i - start, sensitive), first.Emergency, first.OccurredAt, first.Who));
             start = i;
         }
 
@@ -105,6 +110,7 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
 
     static bool Same(RecordViewRow a, RecordViewRow b) =>
         (a.Who, a.Name, a.Role, a.Part, a.Emergency) == (b.Who, b.Name, b.Role, b.Part, b.Emergency)
+        && (!Words(a.Part).Counted || a.Sensitive == b.Sensitive)
         && Minute(a.OccurredAt) == Minute(b.OccurredAt);
 
     static DateTime Minute(DateTimeOffset moment) => new(moment.UtcDateTime.Ticks - moment.UtcDateTime.Ticks % TimeSpan.TicksPerMinute, DateTimeKind.Utc);
@@ -127,31 +133,81 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
         _ => "member of staff",
     };
 
-    // The words for each part the database names, the patient's and a proxy's, for one view and for several in the same
-    // minute. One it doesn't know is the record. Until a later step records which page was opened, most views are the
-    // record: the chart, results, vital signs and appointments are all read as the patient's row.
-    static readonly Dictionary<string, (string Own, string Proxy, string OwnMany, string ProxyMany)> Parts = new()
+    // A part's words: the patient's and a proxy's for one view; for a counted part, the same with how many ("{0}"), for
+    // a line of several; and, for a part a view of which can show the patient's sensitive items, the words for a line
+    // that did. A proxy without sensitive items or messages is never given a part that would tell them of either: the
+    // database names such a view "record" (42-record-views.sql).
+    public sealed record Wording(string Own, string Proxy, string? OwnMany = null, string? ProxyMany = null, Wording? Sensitive = null)
     {
-        [RecordViewParts.Record] = ("Your record", "The record", "Your record, {0} times", "The record, {0} times"),
-        [RecordViewParts.RecordSensitive] = ("Your record, with its sensitive items", "The record, with its sensitive items",
+        public bool Counted => OwnMany is not null;
+    }
+
+    // Counted: the words, then how many times.
+    static Wording Counted(string own, string proxy, Wording? sensitive = null) => new(own, proxy, own + ", {0} times", proxy + ", {0} times", sensitive);
+
+    // One line a minute, however many reads its page recorded.
+    static Wording Once(string own, string proxy, Wording? sensitive = null) => new(own, proxy, Sensitive: sensitive);
+
+    // The words for each part the database names, in one place: the parts a read is recorded for (AuditParts, step 13c2),
+    // and those a view recorded without its part is named by (RecordViewParts), which are as before that step. One the
+    // page doesn't know, as from a database newer than the app during a deploy, is the record.
+    internal static readonly Dictionary<string, Wording> Parts = new()
+    {
+        [AuditParts.Chart] = Once("Your chart: the summary page, which lists your visit notes", "The chart: the summary page, which lists the visit notes",
+            Once("Your chart, with its sensitive items: the summary page, which lists your visit notes",
+                "The chart, with its sensitive items: the summary page, which lists the visit notes")),
+        [AuditParts.Lists] = Counted("Your allergies, medications and diagnoses", "The allergies, medications and diagnoses",
+            Counted("Your allergies, medications and diagnoses, with the sensitive ones", "The allergies, medications and diagnoses, with the sensitive ones")),
+        [AuditParts.Orders] = Counted("Your orders for tests and medicines", "The orders for tests and medicines"),
+        [AuditParts.Results] = Counted("Your test results", "The test results"),
+        [AuditParts.Vitals] = Counted("Your vital signs", "The vital signs"),
+        [AuditParts.Search] = Counted("Your name, in a search for patients", "The patient's name, in a search for patients"),
+        [AuditParts.Panel] = Counted("Your name, in their list of patients", "The patient's name, in their list of patients"),
+        [AuditParts.Schedule] = Counted("Your name, on their day's appointments", "The patient's name, on their day's appointments"),
+        [AuditParts.Inbox] = Counted("Your name, on their list of tasks", "The patient's name, on their list of tasks"),
+        [AuditParts.Appointments] = Counted("Your appointments", "The appointments"),
+        [AuditParts.Home] = Counted("Your portal home page, with your appointments", "The portal home page, with the appointments"),
+        [AuditParts.Conversations] = Counted("Your messages", "The messages"),
+        [AuditParts.Access] = Counted("Who you share your record with", "Who the record is shared with"),
+        [AuditParts.VisitNote] = Once("A visit note", "A visit note", Once("A visit note, with sensitive items", "A visit note, with sensitive items")),
+        [AuditParts.NoteDraft] = Once("A visit note, being written", "A visit note, being written"),
+        [AuditParts.Offline] = Once("Your chart, copied to a clinician's computer for use offline", "The chart, copied to a clinician's computer for use offline"),
+        [AuditParts.Fhir] = Counted("Your record, read through the clinic's FHIR connection", "The record, read through the clinic's FHIR connection",
+            Counted("Your record, with its sensitive items, read through the clinic's FHIR connection",
+                "The record, with its sensitive items, read through the clinic's FHIR connection")),
+        [AuditParts.Summaries] = Once("Your visit summaries", "The visit summaries", Once("Your visit summaries, with the sensitive ones", "The visit summaries, with the sensitive ones")),
+        [AuditParts.Printable] = Once("Your record, the page to print", "The record, the page to print",
+            Once("Your record, the page to print with its sensitive items", "The record, the page to print with its sensitive items")),
+        [AuditParts.Download] = new("Your record, downloaded", "The record, downloaded", "Your record, downloaded {0} times", "The record, downloaded {0} times",
+            new("Your record, downloaded with its sensitive items", "The record, downloaded with its sensitive items",
+                "Your record, downloaded with its sensitive items {0} times", "The record, downloaded with its sensitive items {0} times")),
+        [AuditParts.Views] = Counted("Who viewed your record", "Who viewed the record"),
+        [AuditParts.Refills] = Counted("Your refill requests", "The refill requests"),
+        // A pre-visit form (step 13e), always a sensitive item: the same words whether the part was recorded with the read
+        // or named from the forms' tables (RecordViewParts.Form, the same key).
+        [AuditParts.Forms] = new("A pre-visit form", "A pre-visit form", "{0} pre-visit forms", "{0} pre-visit forms",
+            new("A pre-visit form", "A pre-visit form", "{0} pre-visit forms", "{0} pre-visit forms")),
+        [RecordViewParts.Record] = new("Your record", "The record", "Your record, {0} times", "The record, {0} times"),
+        [RecordViewParts.RecordSensitive] = new("Your record, with its sensitive items", "The record, with its sensitive items",
             "Your record, with its sensitive items, {0} times", "The record, with its sensitive items, {0} times"),
-        [RecordViewParts.Download] = ("Your record, downloaded", "The record, downloaded", "Your record, downloaded {0} times", "The record, downloaded {0} times"),
-        [RecordViewParts.DownloadSensitive] = ("Your record, downloaded with its sensitive items", "The record, downloaded with its sensitive items",
+        [RecordViewParts.DownloadSensitive] = new("Your record, downloaded with its sensitive items", "The record, downloaded with its sensitive items",
             "Your record, downloaded with its sensitive items {0} times", "The record, downloaded with its sensitive items {0} times"),
-        [RecordViewParts.Note] = ("A visit note", "A visit note", "{0} visit notes", "{0} visit notes"),
-        [RecordViewParts.Form] = ("A pre-visit form", "A pre-visit form", "{0} pre-visit forms", "{0} pre-visit forms"),
-        [RecordViewParts.Summary] = ("A visit summary", "A visit summary", "{0} visit summaries", "{0} visit summaries"),
-        [RecordViewParts.Messages] = ("A conversation in your messages", "A conversation in the messages",
+        [RecordViewParts.Note] = new("A visit note", "A visit note", "{0} visit notes", "{0} visit notes"),
+        [RecordViewParts.Summary] = new("A visit summary", "A visit summary", "{0} visit summaries", "{0} visit summaries"),
+        [RecordViewParts.Messages] = new("A conversation in your messages", "A conversation in the messages",
             "{0} conversations in your messages", "{0} conversations in the messages"),
-        [RecordViewParts.LabOrder] = ("A lab order, sent for testing", "A lab order, sent for testing", "{0} lab orders, sent for testing", "{0} lab orders, sent for testing"),
-        [RecordViewParts.Views] = ("Who viewed your record", "Who viewed the record", "Who viewed your record, {0} times", "Who viewed the record, {0} times"),
+        [RecordViewParts.LabOrder] = new("A lab order, sent for testing", "A lab order, sent for testing", "{0} lab orders, sent for testing", "{0} lab orders, sent for testing"),
     };
 
-    static string Part(string part, bool own, int count)
+    static Wording Words(string part) => Parts.GetValueOrDefault(part) ?? Parts[RecordViewParts.Record];
+
+    // The words for a line: a part's, the patient's or a proxy's, for how many views, and whether any showed the patient's
+    // sensitive items (said by the part's own name when it was recorded without one: "record-sensitive").
+    internal static string PartWords(string part, bool own, int count, bool sensitive)
     {
-        var words = Parts.GetValueOrDefault(part, Parts[RecordViewParts.Record]);
-        return count == 1
-            ? own ? words.Own : words.Proxy
-            : string.Format(CultureInfo.InvariantCulture, own ? words.OwnMany : words.ProxyMany, count);
+        var words = Words(part);
+        words = sensitive && words.Sensitive is { } shown ? shown : words;
+        var many = own ? words.OwnMany : words.ProxyMany;
+        return count > 1 && many is not null ? string.Format(CultureInfo.InvariantCulture, many, count) : own ? words.Own : words.Proxy;
     }
 }

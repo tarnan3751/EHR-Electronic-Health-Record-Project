@@ -1,4 +1,5 @@
 using Ehr.Data.Accounts;
+using Ehr.Data.Audit;
 using Microsoft.Playwright;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
@@ -15,8 +16,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Requirements: NFR-12, proposed FR-57
 // Use case: UC 6, View my results and appointments in the portal
 // Preconditions: The patient has a portal account, signed in. The audit log holds 60 views of the record by Dr. Test, a
-//   minute apart, one by a clinician with a long name through emergency access, and one by someone the record is shared
-//   with, whose address is 45 characters with nowhere to break. Chromium, driven by Playwright,
+//   minute apart, one by a clinician with a long name through emergency access, of the chart with its sensitive items
+//   (the longest words a part has, step 13c2), and one by someone the record is shared with, whose address is 45
+//   characters with nowhere to break. Chromium, driven by Playwright,
 //   360 by 740 pixels, with the keyboard only.
 // Inputs and system conditions: GET /portal/views; key presses only: Tab and Enter.
 // Test data: The clinician "Dr. Bartholomew Featherstonehaugh-Wolfeschlegelsteinhausen"; the address, 32 hex digits
@@ -51,7 +53,7 @@ public class TC_UC6_50_Nfr12_WhoViewedSmallScreen(WebApps apps) : IClassFixture<
             await window.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
 
-        await ReadsAsync(apps, patient.Patient, away.Id, 1, newestMinutesAgo: 0);
+        await PartReadsAsync(apps, patient.Patient, away.Id, 1, (AuditActions.ReadSensitive, "patients", AuditParts.Chart));
         // Someone the record is shared with, named by an address of 45 characters with nowhere to break.
         var proxy = await ProxyTests.PersonAsync(apps, "Synthetic", "Longaddress");
         await ReadsAsync(apps, patient.Patient, proxy.Account, 1, newestMinutesAgo: 0);
@@ -73,6 +75,7 @@ public class TC_UC6_50_Nfr12_WhoViewedSmallScreen(WebApps apps) : IClassFixture<
         Assert.True(await page.EvaluateAsync<bool>(fits), "The page scrolls sideways at 360 pixels.");
         Assert.Contains("Emergency access:", await page.Locator("[data-emergency=explained]").TextContentAsync());
         Assert.Contains("Featherstonehaugh", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Your chart, with its sensitive items: the summary page, which lists your visit notes", await page.Locator("main").TextContentAsync());
         Assert.Contains(proxy.Email, await page.Locator("main").TextContentAsync());
 
         // Step 2.

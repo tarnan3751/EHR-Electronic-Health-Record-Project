@@ -77,23 +77,23 @@ public class TC_UC6_41_EmergencyAccessMarked(WebApps apps) : IClassFixture<WebAp
         var html = await PageAsync(patient.Client);
         Assert.Equal(
             [
-                "staff | Dr. Oak, clinician | Your record",
-                "staff | Dr. Oak, clinician Emergency access | Your record",
-                "staff | Dr. Test, clinician | Your record",
+                "staff | Dr. Oak, clinician | Your chart: the summary page, which lists your visit notes",
+                "staff | Dr. Oak, clinician Emergency access | Your chart: the summary page, which lists your visit notes",
+                "staff | Dr. Test, clinician | Your chart: the summary page, which lists your visit notes",
             ], Staff(html));
         Assert.Contains("Emergency access: a clinician who wasn't on your care team opened the record and gave the clinic a reason, which the clinic reviews.", Words(html));
 
         var allowedHtml = await PageAsync(allowed.Client);
         Assert.Equal(
             [
-                "staff | Dr. Oak, clinician | The record",
-                "staff | Dr. Oak, clinician Emergency access | The record",
-                "staff | Dr. Test, clinician | The record",
+                "staff | Dr. Oak, clinician | The chart: the summary page, which lists the visit notes",
+                "staff | Dr. Oak, clinician Emergency access | The chart: the summary page, which lists the visit notes",
+                "staff | Dr. Test, clinician | The chart: the summary page, which lists the visit notes",
             ], Staff(allowedHtml));
         Assert.Contains("Emergency access: a clinician who wasn't on the patient's care team opened the record", Words(allowedHtml));
 
         var withoutHtml = await PageAsync(without.Client);
-        Assert.Equal(["staff | Dr. Oak, clinician | The record", "staff | Dr. Test, clinician | The record"], Staff(withoutHtml));
+        Assert.Equal(["staff | Dr. Oak, clinician | The chart: the summary page, which lists the visit notes", "staff | Dr. Test, clinician | The chart: the summary page, which lists the visit notes"], Staff(withoutHtml));
         Assert.DoesNotContain("Emergency", Words(withoutHtml), StringComparison.Ordinal);
         Assert.Contains("shown to the patient's care team, the lab or you", Words(withoutHtml));
 
