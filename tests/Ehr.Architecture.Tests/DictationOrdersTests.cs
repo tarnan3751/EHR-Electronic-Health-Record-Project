@@ -43,7 +43,8 @@ public class DictationOrdersTests
 
     // Also TC-UC10-02 (FR-14 as reworded in step 15): nothing in the dictation code, nor the review that shows and decides
     // what a dictation proposes, reaches the code that signs an order or writes the allergy list: the test above holds
-    // them to the order code, this to the chart lists' writer too, which allergies go through.
+    // them to the order code, this to the chart lists' writer too, which allergies go through, and to the chart lists'
+    // entities and the context's sets of them, so none can be made or written around that writer either.
     [Fact]
     public void Nothing_in_the_dictation_code_or_its_review_reaches_order_signing_or_the_chart_lists()
     {
@@ -55,7 +56,8 @@ public class DictationOrdersTests
             foreach (var type in assembly.MainModule.GetTypes().Where(type => IsDictation(Outermost(type)) || Reviews.Contains(Outermost(type).FullName)))
             {
                 scanned++;
-                foreach (var used in TypesUsed(type).Where(used => IsOrders(used) || used.Contains(ChartListsWriter, StringComparison.Ordinal)))
+                foreach (var used in TypesUsed(type).Where(used => IsOrders(used) || used.Contains(ChartListsWriter, StringComparison.Ordinal)
+                    || MakesOrWritesChartEntries(used)))
                 {
                     reaches.Add($"{Outermost(type).FullName}: {used}");
                 }
@@ -102,6 +104,19 @@ public class DictationOrdersTests
 
     // What writes a patient's allergies, medications and diagnoses (step 2).
     const string ChartListsWriter = "Ehr.Domain.Patients.ChartLists";
+
+    // Their entities. A page may show them (the patient banner's allergies), but no dictation or review code may make one
+    // (its constructor) or reach the context's sets of them, directly or through a generic method of the context's or a
+    // set's (Add<T>, Attach<T>, Set<T>, Entry<T>, DbSet<T>.Add), which is how one would be written around ChartLists.
+    static readonly string[] ChartEntities =
+        ["Ehr.Data.Patients.AllergyIntolerance", "Ehr.Data.Patients.MedicationStatement", "Ehr.Data.Patients.Condition"];
+
+    static bool MakesOrWritesChartEntries(string used) => ChartEntities.Any(entity =>
+        used.Contains($"{entity}::.ctor", StringComparison.Ordinal)
+        || used.Contains($"<{entity}>", StringComparison.Ordinal)
+            && (used.Contains("Ehr.Data.EhrDbContext::get_", StringComparison.Ordinal)
+                || used.Contains("Microsoft.EntityFrameworkCore.DbContext::", StringComparison.Ordinal)
+                || used.Contains("Microsoft.EntityFrameworkCore.DbSet`1", StringComparison.Ordinal)));
 
     static bool IsDictation(TypeDefinition type) => type.FullName.Contains("Dictat", StringComparison.Ordinal);
 
