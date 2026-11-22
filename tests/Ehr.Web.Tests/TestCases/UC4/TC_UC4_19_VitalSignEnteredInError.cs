@@ -43,7 +43,7 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
         var portal = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, patient);
-        var yesterday = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-ddTHH:mm");
+        var yesterday = (await apps.Database.NowAsync()).AddDays(-1).ToString("yyyy-MM-ddTHH:mm");
         using var wrong = await RecordAtAsync(session.Client, patient, yesterday, (Systolic, "180"), (Diastolic, "92"), (HeartRate, "72"), (Weight, "81"), (Height, "180"));
         using var later = await RecordAsync(session.Client, patient, 10, (Systolic, "126"), (Diastolic, "80"), (HeartRate, "68"));
         var flowsheet = await ReadAsync(later);
@@ -114,7 +114,8 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
     public async Task A_whole_set_is_marked_and_a_weight_corrected_alone_gets_its_body_mass_index_and_an_older_set_can_be_reached()
     {
         var (_, patient, session) = await OnPanelAsync(apps);
-        var times = Enumerable.Range(1, 8).Select(days => DateTime.UtcNow.AddDays(-days).ToString("yyyy-MM-ddTHH:mm")).ToList();
+        var now = await apps.Database.NowAsync();
+        var times = Enumerable.Range(1, 8).Select(days => now.AddDays(-days).ToString("yyyy-MM-ddTHH:mm")).ToList();
         foreach (var time in times)
         {
             using var recorded = await RecordAtAsync(session.Client, patient, time, (Systolic, "120"), (Diastolic, "70"), (HeartRate, "70"), (Weight, "81"), (Height, "180"));

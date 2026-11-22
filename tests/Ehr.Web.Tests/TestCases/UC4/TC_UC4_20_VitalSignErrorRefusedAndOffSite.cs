@@ -37,7 +37,7 @@ public class TC_UC4_20_VitalSignErrorRefusedAndOffSite(WebApps apps) : IClassFix
     public async Task Marking_in_error_needs_a_reading_a_reason_and_the_panel_and_follows_the_off_site_rules()
     {
         var (_, patient, session) = await OnPanelAsync(apps);
-        var at = DateTime.UtcNow.AddHours(-1).ToString("yyyy-MM-ddTHH:mm");
+        var at = (await apps.Database.NowAsync()).AddHours(-1).ToString("yyyy-MM-ddTHH:mm");
         using var recorded = await RecordAtAsync(session.Client, patient, at, (HeartRate, "72"), (Temperature, "36.8"));
         var set = at + ":00";
         string[] standing = [$"{Temperature} 36.8 final", $"{HeartRate} 72 final"];
