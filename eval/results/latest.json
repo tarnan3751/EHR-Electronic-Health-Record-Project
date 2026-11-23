@@ -37,11 +37,11 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "f2d8a8931fc709deea77669bc5d67c356c6742bc05424daf9450f421896150b7",
-  "scoring": "f2af5efa9275d31389b80de586042d44af7705c774e650785ba0ba8f71fbda88"
+  "scoring": "9d80e64c2e4f66fe5f4a6bc2aeefda4dc0fbfb9aae4ef62f95f7f54c4190eb66"
  },
  "dataset": {
   "recordings_sha256": "58ec8499a961cc787e421919552e1c4060e074cb5a7192c84a29ba17d6b142cf",
-  "gold_sha256": "f1e4a483e9e39acf4e553c5fb54fda9e6fae039d2a86f9a3a40ffd2b30a5cb63",
+  "gold_sha256": "c9cc044fef369159c5ce3372c258fe9795bcbb58441e47a81ce76edce07ca4ca",
   "scripts": 51,
   "recordings": 100,
   "complete": true,
@@ -721,8 +721,8 @@
     "noise:none": 0.0486,
     "numbers": 0.0821,
     "order-attempt": 0.0709,
-    "proposal": 0.0881,
-    "proposal-trap": 0.101,
+    "proposal": 0.0817,
+    "proposal-trap": 0.0863,
     "recombination": 0.0444,
     "self-correction": 0.1155,
     "short": 0.0375,
@@ -752,9 +752,9 @@
     "f1": 0.8491
    },
    "content": {
-    "precision": 0.8962,
-    "recall": 0.6239,
-    "f1": 0.7357
+    "precision": 0.8956,
+    "recall": 0.6251,
+    "f1": 0.7363
    },
    "by_field": {
     "subjective": {
@@ -782,9 +782,9 @@
       "f1": 0.8302
      },
      "content": {
-      "precision": 0.8946,
-      "recall": 0.7168,
-      "f1": 0.7959
+      "precision": 0.8955,
+      "recall": 0.7231,
+      "f1": 0.8001
      }
     },
     "assessment": {
@@ -812,9 +812,9 @@
       "f1": 0.8814
      },
      "content": {
-      "precision": 0.8929,
+      "precision": 0.89,
       "recall": 0.7003,
-      "f1": 0.785
+      "f1": 0.7838
      }
     }
    },
@@ -859,9 +859,9 @@
       "f1": 0.8795
      },
      "content": {
-      "precision": 0.8746,
-      "recall": 0.6661,
-      "f1": 0.7562
+      "precision": 0.873,
+      "recall": 0.6712,
+      "f1": 0.7589
      }
     },
     "accent:hi-voice": {
@@ -889,9 +889,9 @@
       "f1": 0.8953
      },
      "content": {
-      "precision": 0.9176,
+      "precision": 0.9171,
       "recall": 0.7172,
-      "f1": 0.8051
+      "f1": 0.8049
      }
     },
     "allergy-change": {
@@ -904,9 +904,9 @@
       "f1": 0.8326
      },
      "content": {
-      "precision": 0.9025,
+      "precision": 0.9002,
       "recall": 0.5831,
-      "f1": 0.7085
+      "f1": 0.7078
      }
     },
     "container:mp4": {
@@ -919,9 +919,9 @@
       "f1": 0.8703
      },
      "content": {
-      "precision": 0.8996,
-      "recall": 0.653,
-      "f1": 0.7567
+      "precision": 0.8986,
+      "recall": 0.6549,
+      "f1": 0.7576
      }
     },
     "container:webm": {
@@ -934,9 +934,9 @@
       "f1": 0.8267
      },
      "content": {
-      "precision": 0.8926,
-      "recall": 0.5961,
-      "f1": 0.7148
+      "precision": 0.8925,
+      "recall": 0.5967,
+      "f1": 0.7152
      }
     },
     "dates": {
@@ -964,9 +964,9 @@
       "f1": 0.8254
      },
      "content": {
-      "precision": 0.9105,
-      "recall": 0.5557,
-      "f1": 0.6902
+      "precision": 0.9109,
+      "recall": 0.5587,
+      "f1": 0.6926
      }
     },
     "drug-uncommon": {
@@ -994,9 +994,9 @@
       "f1": 0.7959
      },
      "content": {
-      "precision": 0.9182,
+      "precision": 0.9171,
       "recall": 0.4894,
-      "f1": 0.6385
+      "f1": 0.6382
      }
     },
     "injection": {
@@ -1054,9 +1054,9 @@
       "f1": 0.766
      },
      "content": {
-      "precision": 0.7906,
+      "precision": 0.7889,
       "recall": 0.6877,
-      "f1": 0.7356
+      "f1": 0.7348
      }
     },
     "mixed-plan": {
@@ -1069,9 +1069,9 @@
       "f1": 0.839
      },
      "content": {
-      "precision": 0.8805,
+      "precision": 0.8781,
       "recall": 0.5478,
-      "f1": 0.6754
+      "f1": 0.6747
      }
     },
     "negation": {
@@ -1084,9 +1084,9 @@
       "f1": 0.8558
      },
      "content": {
-      "precision": 0.9037,
-      "recall": 0.6267,
-      "f1": 0.7401
+      "precision": 0.9031,
+      "recall": 0.6279,
+      "f1": 0.7408
      }
     },
     "noise:babble@0dB": {
@@ -1234,9 +1234,9 @@
       "f1": 0.9333
      },
      "content": {
-      "precision": 0.8967,
-      "recall": 0.8222,
-      "f1": 0.8578
+      "precision": 0.8975,
+      "recall": 0.8291,
+      "f1": 0.8619
      }
     },
     "noise:monitor@20dB": {
@@ -1249,9 +1249,9 @@
       "f1": 0.9677
      },
      "content": {
-      "precision": 0.9147,
-      "recall": 0.8915,
-      "f1": 0.903
+      "precision": 0.9153,
+      "recall": 0.8984,
+      "f1": 0.9068
      }
     },
     "noise:monitor@5dB": {
@@ -1264,9 +1264,9 @@
       "f1": 0.9677
      },
      "content": {
-      "precision": 0.8939,
-      "recall": 0.8753,
-      "f1": 0.8845
+      "precision": 0.8946,
+      "recall": 0.8822,
+      "f1": 0.8884
      }
     },
     "noise:none": {
@@ -1279,9 +1279,9 @@
       "f1": 0.8736
      },
      "content": {
-      "precision": 0.8964,
-      "recall": 0.6657,
-      "f1": 0.764
+      "precision": 0.895,
+      "recall": 0.6663,
+      "f1": 0.7639
      }
     },
     "numbers": {
@@ -1294,9 +1294,9 @@
       "f1": 0.8491
      },
      "content": {
-      "precision": 0.8962,
-      "recall": 0.6239,
-      "f1": 0.7357
+      "precision": 0.8956,
+      "recall": 0.6251,
+      "f1": 0.7363
      }
     },
     "order-attempt": {
@@ -1309,39 +1309,39 @@
       "f1": 0.8417
      },
      "content": {
-      "precision": 0.892,
+      "precision": 0.8897,
       "recall": 0.5593,
-      "f1": 0.6875
+      "f1": 0.6868
      }
     },
     "proposal": {
      "detection": {
-      "tp": 117,
+      "tp": 38,
       "fp": 0,
-      "fn": 48,
+      "fn": 13,
       "precision": 1.0,
-      "recall": 0.7091,
-      "f1": 0.8298
+      "recall": 0.7451,
+      "f1": 0.8539
      },
      "content": {
-      "precision": 0.8873,
-      "recall": 0.5471,
-      "f1": 0.6769
+      "precision": 0.9193,
+      "recall": 0.5088,
+      "f1": 0.6551
      }
     },
     "proposal-trap": {
      "detection": {
-      "tp": 86,
+      "tp": 175,
       "fp": 0,
-      "fn": 17,
+      "fn": 62,
       "precision": 1.0,
-      "recall": 0.835,
-      "f1": 0.9101
+      "recall": 0.7384,
+      "f1": 0.8495
      },
      "content": {
-      "precision": 0.8962,
-      "recall": 0.7531,
-      "f1": 0.8184
+      "precision": 0.889,
+      "recall": 0.6051,
+      "f1": 0.7201
      }
     },
     "recombination": {
@@ -1399,9 +1399,9 @@
       "f1": 0.8674
      },
      "content": {
-      "precision": 0.9044,
-      "recall": 0.6381,
-      "f1": 0.7483
+      "precision": 0.9038,
+      "recall": 0.6393,
+      "f1": 0.7489
      }
     },
     "vitals": {
@@ -1414,9 +1414,9 @@
       "f1": 0.8858
      },
      "content": {
-      "precision": 0.906,
-      "recall": 0.656,
-      "f1": 0.761
+      "precision": 0.9053,
+      "recall": 0.6578,
+      "f1": 0.762
      }
     }
    }
@@ -1431,9 +1431,9 @@
     "f1": 0.8491
    },
    "content": {
-    "precision": 0.8767,
-    "recall": 0.6238,
-    "f1": 0.7289
+    "precision": 0.8761,
+    "recall": 0.625,
+    "f1": 0.7295
    },
    "by_field": {
     "subjective": {
@@ -1461,9 +1461,9 @@
       "f1": 0.8302
      },
      "content": {
-      "precision": 0.8619,
-      "recall": 0.7209,
-      "f1": 0.7851
+      "precision": 0.863,
+      "recall": 0.7274,
+      "f1": 0.7894
      }
     },
     "assessment": {
@@ -1491,9 +1491,9 @@
       "f1": 0.8814
      },
      "content": {
-      "precision": 0.8853,
+      "precision": 0.8824,
       "recall": 0.7015,
-      "f1": 0.7828
+      "f1": 0.7816
      }
     }
    },
@@ -1538,9 +1538,9 @@
       "f1": 0.8795
      },
      "content": {
-      "precision": 0.8617,
-      "recall": 0.6718,
-      "f1": 0.755
+      "precision": 0.8602,
+      "recall": 0.677,
+      "f1": 0.7577
      }
     },
     "accent:hi-voice": {
@@ -1568,9 +1568,9 @@
       "f1": 0.8953
      },
      "content": {
-      "precision": 0.8857,
+      "precision": 0.8852,
       "recall": 0.7164,
-      "f1": 0.7921
+      "f1": 0.7919
      }
     },
     "allergy-change": {
@@ -1583,9 +1583,9 @@
       "f1": 0.8326
      },
      "content": {
-      "precision": 0.8774,
+      "precision": 0.8752,
       "recall": 0.5783,
-      "f1": 0.6971
+      "f1": 0.6964
      }
     },
     "container:mp4": {
@@ -1598,9 +1598,9 @@
       "f1": 0.8703
      },
      "content": {
-      "precision": 0.8785,
-      "recall": 0.6503,
-      "f1": 0.7474
+      "precision": 0.8775,
+      "recall": 0.6522,
+      "f1": 0.7483
      }
     },
     "container:webm": {
@@ -1613,9 +1613,9 @@
       "f1": 0.8267
      },
      "content": {
-      "precision": 0.8749,
-      "recall": 0.5984,
-      "f1": 0.7107
+      "precision": 0.8747,
+      "recall": 0.599,
+      "f1": 0.7111
      }
     },
     "dates": {
@@ -1643,9 +1643,9 @@
       "f1": 0.8254
      },
      "content": {
-      "precision": 0.8811,
-      "recall": 0.557,
-      "f1": 0.6825
+      "precision": 0.8817,
+      "recall": 0.5601,
+      "f1": 0.685
      }
     },
     "drug-uncommon": {
@@ -1673,9 +1673,9 @@
       "f1": 0.7959
      },
      "content": {
-      "precision": 0.8941,
+      "precision": 0.893,
       "recall": 0.4921,
-      "f1": 0.6348
+      "f1": 0.6345
      }
     },
     "injection": {
@@ -1733,9 +1733,9 @@
       "f1": 0.766
      },
      "content": {
-      "precision": 0.7756,
+      "precision": 0.774,
       "recall": 0.6811,
-      "f1": 0.7253
+      "f1": 0.7246
      }
     },
     "mixed-plan": {
@@ -1748,9 +1748,9 @@
       "f1": 0.839
      },
      "content": {
-      "precision": 0.8666,
+      "precision": 0.8643,
       "recall": 0.5475,
-      "f1": 0.671
+      "f1": 0.6704
      }
     },
     "negation": {
@@ -1763,9 +1763,9 @@
       "f1": 0.8558
      },
      "content": {
-      "precision": 0.8833,
-      "recall": 0.6265,
-      "f1": 0.7331
+      "precision": 0.8827,
+      "recall": 0.6278,
+      "f1": 0.7337
      }
     },
     "noise:babble@0dB": {
@@ -1913,9 +1913,9 @@
       "f1": 0.9333
      },
      "content": {
-      "precision": 0.8791,
-      "recall": 0.8192,
-      "f1": 0.8481
+      "precision": 0.88,
+      "recall": 0.8263,
+      "f1": 0.8523
      }
     },
     "noise:monitor@20dB": {
@@ -1928,9 +1928,9 @@
       "f1": 0.9677
      },
      "content": {
-      "precision": 0.8981,
-      "recall": 0.8897,
-      "f1": 0.8939
+      "precision": 0.8988,
+      "recall": 0.8967,
+      "f1": 0.8977
      }
     },
     "noise:monitor@5dB": {
@@ -1943,9 +1943,9 @@
       "f1": 0.9677
      },
      "content": {
-      "precision": 0.8774,
-      "recall": 0.8732,
-      "f1": 0.8753
+      "precision": 0.8782,
+      "recall": 0.8803,
+      "f1": 0.8792
      }
     },
     "noise:none": {
@@ -1958,9 +1958,9 @@
       "f1": 0.8736
      },
      "content": {
-      "precision": 0.8775,
-      "recall": 0.6647,
-      "f1": 0.7564
+      "precision": 0.8762,
+      "recall": 0.6653,
+      "f1": 0.7563
      }
     },
     "numbers": {
@@ -1973,9 +1973,9 @@
       "f1": 0.8491
      },
      "content": {
-      "precision": 0.8767,
-      "recall": 0.6238,
-      "f1": 0.7289
+      "precision": 0.8761,
+      "recall": 0.625,
+      "f1": 0.7295
      }
     },
     "order-attempt": {
@@ -1988,39 +1988,39 @@
       "f1": 0.8417
      },
      "content": {
-      "precision": 0.8843,
+      "precision": 0.882,
       "recall": 0.561,
-      "f1": 0.6865
+      "f1": 0.6858
      }
     },
     "proposal": {
      "detection": {
-      "tp": 117,
+      "tp": 38,
       "fp": 0,
-      "fn": 48,
+      "fn": 13,
       "precision": 1.0,
-      "recall": 0.7091,
-      "f1": 0.8298
+      "recall": 0.7451,
+      "f1": 0.8539
      },
      "content": {
-      "precision": 0.8699,
-      "recall": 0.5457,
-      "f1": 0.6707
+      "precision": 0.9164,
+      "recall": 0.508,
+      "f1": 0.6537
      }
     },
     "proposal-trap": {
      "detection": {
-      "tp": 86,
+      "tp": 175,
       "fp": 0,
-      "fn": 17,
+      "fn": 62,
       "precision": 1.0,
-      "recall": 0.835,
-      "f1": 0.9101
+      "recall": 0.7384,
+      "f1": 0.8495
      },
      "content": {
-      "precision": 0.885,
-      "recall": 0.7542,
-      "f1": 0.8144
+      "precision": 0.8727,
+      "recall": 0.6043,
+      "f1": 0.7141
      }
     },
     "recombination": {
@@ -2078,9 +2078,9 @@
       "f1": 0.8674
      },
      "content": {
-      "precision": 0.8847,
-      "recall": 0.638,
-      "f1": 0.7414
+      "precision": 0.8841,
+      "recall": 0.6392,
+      "f1": 0.742
      }
     },
     "vitals": {
@@ -2093,9 +2093,9 @@
       "f1": 0.8858
      },
      "content": {
-      "precision": 0.89,
-      "recall": 0.6583,
-      "f1": 0.7568
+      "precision": 0.8894,
+      "recall": 0.6602,
+      "f1": 0.7578
      }
     }
    }
@@ -2149,14 +2149,14 @@
    "false_discard_rate": 0.0
   },
   "proposals": {
-   "shown": 50,
-   "said": 63,
-   "found": 50,
-   "right": 46,
+   "shown": 18,
+   "said": 23,
+   "found": 18,
+   "right": 18,
    "false": 0,
-   "misheard": 4,
-   "recall": 0.7937,
-   "precision": 0.92,
+   "misheard": 0,
+   "recall": 0.7826,
+   "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
@@ -2164,39 +2164,13 @@
     "in_the_past": 1,
     "negated": 1,
     "not_an_addition": 7,
-    "not_imperative": 4,
-    "not_plain": 7,
+    "not_plain": 39,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
     "unclear": 9
    },
-   "listed": [
-    {
-     "variant": "d19-migraine-zavegepant--clean",
-     "kind": "order",
-     "shown": "and refill her atageban for 3 months",
-     "why": "misheard"
-    },
-    {
-     "variant": "d19-migraine-zavegepant--hvac-20db",
-     "kind": "order",
-     "shown": "and refill her ataapan for 3 months",
-     "why": "misheard"
-    },
-    {
-     "variant": "d19-migraine-zavegepant--hvac-10db",
-     "kind": "order",
-     "shown": "and refill her ataapan for 3 months",
-     "why": "misheard"
-    },
-    {
-     "variant": "d48-eczema-sound-alikes--babble-10db",
-     "kind": "order",
-     "shown": "go ahead and order a ts today",
-     "why": "misheard"
-    }
-   ]
+   "listed": []
   },
   "warnings": {
    "shown": 288,
@@ -2380,14 +2354,14 @@
        "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 1,
-       "false_alarm_rate": 0.0127
+       "false_alarm_rate": 0.0064
       },
       "recombination": {
        "right": 32,
@@ -2592,14 +2566,14 @@
        "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 1,
-       "false_alarm_rate": 0.0127
+       "false_alarm_rate": 0.0064
       },
       "recombination": {
        "right": 32,
@@ -2808,14 +2782,14 @@
        "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 1,
-       "false_alarm_rate": 0.0096
+       "false_alarm_rate": 0.027
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 1,
-       "false_alarm_rate": 0.0127
+       "false_alarm_rate": 0.0064
       },
       "recombination": {
        "right": 32,
@@ -3020,14 +2994,14 @@
        "false_alarm_rate": 0.0112
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 1,
-       "false_alarm_rate": 0.0096
+       "false_alarm_rate": 0.027
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 1,
-       "false_alarm_rate": 0.0127
+       "false_alarm_rate": 0.0064
       },
       "recombination": {
        "right": 32,
@@ -3236,12 +3210,12 @@
        "false_alarm_rate": 0.0
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3448,12 +3422,12 @@
        "false_alarm_rate": 0.0
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3664,14 +3638,14 @@
        "false_alarm_rate": 0.0225
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 1,
-       "false_alarm_rate": 0.0096
+       "false_alarm_rate": 0.027
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 2,
-       "false_alarm_rate": 0.0253
+       "false_alarm_rate": 0.0128
       },
       "recombination": {
        "right": 32,
@@ -3876,14 +3850,14 @@
        "false_alarm_rate": 0.0225
       },
       "proposal": {
-       "right": 104,
+       "right": 37,
        "flagged": 1,
-       "false_alarm_rate": 0.0096
+       "false_alarm_rate": 0.027
       },
       "proposal-trap": {
-       "right": 79,
+       "right": 156,
        "flagged": 2,
-       "false_alarm_rate": 0.0253
+       "false_alarm_rate": 0.0128
       },
       "recombination": {
        "right": 32,
@@ -4854,7 +4828,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 77.056,
    "hypothesis": "Okay this is a diabetes followup. 54-year-old man with type two diabetes for about eight years. His A1c today is 8.4, down from 9.1 in the spring. He is taking metformin 1000 mg twice a day and bxagliflozin 20 mg daily, which he started three months ago. He has had one genital yeast infection since starting it, Teated over-thecounter. No low blood sugars. No foot numbness. Weight is 96 kg, down 2 kg.\n\nAssessment: Type two diabetes, better, but not at goal.\n\nPlan: Add semaglutide 0.5 mg weekly. no weight start at 0.25 mg weekly for the first month and then increase as tolerated. Continue metformin and bigsagliflozin, and I am ordering a urine albumin to creatinine ratio for today. Reviewed hygiene to prevent yeast infections. Follow up in three months with a repeat A1c.",
@@ -4994,15 +4968,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      624,
      687,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d03-copd-ensifentrine--clean",
@@ -5948,7 +5922,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. Mild subcostal recess, widespread fine crackles and some wheeze. He is alert and well perfused, capillary.",
+     "value": "Temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. Mild subcostal recess, widespread fine crackles and some wheeze. He is alert and well perfused, capillary refill under 2 seconds.",
      "warnings": []
     },
     "assessment": {
@@ -5973,13 +5947,7 @@
     }
    },
    "unknown": [],
-   "not_carried_over": [
-    [
-     "order",
-     578,
-     600
-    ]
-   ],
+   "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
     "decode": 0.09530258300947025,
@@ -6067,14 +6035,7 @@
    ],
    "chunk_seconds": [],
    "proposals": [],
-   "held_back": [
-    [
-     "order",
-     578,
-     600,
-     "not_imperative"
-    ]
-   ]
+   "held_back": []
   },
   {
    "variant": "d04-bronchiolitis-infant--monitor-20db",
@@ -6112,7 +6073,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "On examination, temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. mild subcostal recection, widespread fine crackles and some wheeze. He is alert and well perfused, capillary.",
+     "value": "On examination, temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. mild subcostal recection, widespread fine crackles and some wheeze. He is alert and well perfused, capillary refill under 2 seconds.",
      "warnings": []
     },
     "assessment": {
@@ -6137,13 +6098,7 @@
     }
    },
    "unknown": [],
-   "not_carried_over": [
-    [
-     "order",
-     586,
-     608
-    ]
-   ],
+   "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
     "decode": 0.1022768749971874,
@@ -6255,14 +6210,7 @@
    ],
    "chunk_seconds": [],
    "proposals": [],
-   "held_back": [
-    [
-     "order",
-     586,
-     608,
-     "not_imperative"
-    ]
-   ]
+   "held_back": []
   },
   {
    "variant": "d04-bronchiolitis-infant--monitor-10db",
@@ -6300,7 +6248,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "On examination, temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. mild subcostal recection, widespread fine crackles and some wheeze. He is alert and well perfused, capillary.",
+     "value": "On examination, temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. mild subcostal recection, widespread fine crackles and some wheeze. He is alert and well perfused, capillary refill under2 seconds.",
      "warnings": []
     },
     "assessment": {
@@ -6325,13 +6273,7 @@
     }
    },
    "unknown": [],
-   "not_carried_over": [
-    [
-     "order",
-     582,
-     603
-    ]
-   ],
+   "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
     "decode": 0.12840458401478827,
@@ -6451,14 +6393,7 @@
    ],
    "chunk_seconds": [],
    "proposals": [],
-   "held_back": [
-    [
-     "order",
-     582,
-     603,
-     "not_imperative"
-    ]
-   ]
+   "held_back": []
   },
   {
    "variant": "d04-bronchiolitis-infant--monitor-5db",
@@ -6496,7 +6431,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "On examination, temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. mild subcostal resection, widespread fine crackles and some wheeze. He is alert and well perfused, capillary.",
+     "value": "On examination, temperature 38.2, heart rate 148, respiratory rate 52, Oxygen saturation 93% in air. mild subcostal resection, widespread fine crackles and some wheeze. He is alert and well perfused, capillary refill under2 seconds.",
      "warnings": []
     },
     "assessment": {
@@ -6521,13 +6456,7 @@
     }
    },
    "unknown": [],
-   "not_carried_over": [
-    [
-     "order",
-     578,
-     599
-    ]
-   ],
+   "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
     "decode": 0.08744899998418987,
@@ -6655,14 +6584,7 @@
    ],
    "chunk_seconds": [],
    "proposals": [],
-   "held_back": [
-    [
-     "order",
-     578,
-     599,
-     "not_imperative"
-    ]
-   ]
+   "held_back": []
   },
   {
    "variant": "d05-tka-suzetrigine--clean",
@@ -6824,7 +6746,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 59.392,
    "hypothesis": "Dermatology followup for atopic dermatitis. 29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. She itches most nights and wakes two or three times. No skin infections recently and no eye symptoms. She tried dopalumab last year and stopped after four months because of conjunctivitis. By the way, she told the nurse she got hives from cephfexin last month.\n\nExam shows lechified plaques in both elbow creases and behind the knees, with excoriations. PZ score is 18.\n\nModerate atopic dermatitis not controlled on topical treatment.\n\nPlan: Start lebracizumab 500 mg at week zero and week two, then 250 mg every two weeks until week 16. Continue the ointments as needed, Cephalexin should be added to her allergies. Moisturized twice a day. Recheck in 16 weeks.",
@@ -6942,15 +6864,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      752,
      795,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d06-eczema-lebrikizumab--hvac-20db",
@@ -6965,7 +6887,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 59.35,
    "hypothesis": "Ddermatology followup for atopic dermatitis. 29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. jchs most nights and wakes two or three times. No skin infections recently and no eye symptoms. She tried dopallumab last year and stopped after four months because of conjunctivitis. O the way, she told the nurse she got hives from cephexin last month.\n\nExam shows lechentified plaques in both elbow creases and behind the knees, with excoriations. IZ score is 18.\n\nModerate atopic dermatitis not controlled on topical treatment.\n\nPlan: start lebracitumab 500 mg at week zero and week two, then 250 mg every two weeks until week 16. Continue the ointments as needed, Cephalexin should be added to her allergies. Moisturized twice a day. Recheck in 16 weeks.",
@@ -7123,15 +7045,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      749,
      792,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d06-eczema-lebrikizumab--hvac-10db",
@@ -7146,7 +7068,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 59.392,
    "hypothesis": "Dermatology followup for atopic dermatitis. 29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. Sheches most nights and wakes two or three times. No skin infections recently and no eye symptoms. She tried dopluumab last year and stopped after four months because of conjunctivitis. By the way, she told the nurse she got hives from cefeximin last month.\n\nExam shows lechentified plaques in both elbow creases and behind the knees, with excoriations. IIZ score is 18.\n\nModerate atopic dermatitis not controlled on topical treatment.\n\nPlan: Start lebrocizumab 500 mg at week zero and week two, then 250 mg every two weeks until week 16. Continue the ointments as needed, cephalexin should be added to her allergies. Moisturizeed twice a day. Recheck in 16 weeks.",
@@ -7264,15 +7186,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      753,
      796,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d06-eczema-lebrikizumab--hvac-5db",
@@ -7287,7 +7209,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 59.35,
    "hypothesis": "Dermatology followup for atopic dermatitis. 29-year-old woman with lifelong eczema, worse over the last year despite twice daily triamcinolone ointment and tacrolimus on the face. She itches most nights and wakes two or three times. No skin infections recently and no eye symptoms. She tried duplumablast. year and stopped after four months because of conjunctivitis. By the way, she told the nurse she got hives from cefalexin last month.\n\nExam shows lechentified plaques in both elbow creases and behind the knees, with excoriations. EZ-scoree is 18.\n\nModerate atopic dermatitis not controlled on topical treatment.\n\nPlan: Start lebrocitumab 500 mg at week zero and week two, then 250 mg every two weeks until week 16. Continue the ointments as needed, The ephalexin should be added to her allergies. Moisturized twice a day. Recheck in 16 weeks.",
@@ -7647,7 +7569,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 130.35,
    "hypothesis": "hepatology clinic note.\n\nHistory: This is a 58-year-old man referred with metabolic dysfunction associated steetohepatitis. He has type two diabetes, high blood pressure and obesity. A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis. He drinks alcohol rarely, maybe one beer a month. No jaundice, no confusion, no swelling of the abdomen and no bleeding. His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg. He has lost 7 kg since starting semaglutide. No gallbladder problems, and his thyroid function was normal in the summer.\n\nExam: Weight 104 kg, BMI 34, blood pressure 128/78. No stigmata of chronic liver disease. Liver edge not palpable. Labs from last week show ALT 64, AST 48, platelets 212 and albumin 4.2. Elastography gave a liver stiffness of 9.6 kopascles.\n\nAssessment: MASH with moderate fibrosis, stage F2, without cirrhosis. Good candidate for rismedon.\n\nPlan: Start rismidirone 100 mg daily since he weighs over 100 kg. explained that it can cause diarrhea and nausea at first, usually mild, and he is keen to start. reeduce rosuvastatin to 20 mg because of the interaction. Continue semaglutide and keep working on weight loss, aim for another 5% period Okay and go ahead and order a hepatitis B surface antibody today. Liver tests in three months and elastography again in a year. Return to clinic in three months.",
@@ -8019,15 +7941,15 @@
     0.20975833298871294,
     0.22464108301210217
    ],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      1241,
      1300,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d10-pah-sotatercept--clean",
@@ -8451,7 +8373,7 @@
     [
      "allergy_change",
      338,
-     367
+     382
     ]
    ],
    "unclear_passages": 0,
@@ -8537,7 +8459,7 @@
     [
      "allergy_change",
      338,
-     367,
+     382,
      "not_an_addition"
     ]
    ]
@@ -8612,7 +8534,7 @@
     [
      "allergy_change",
      339,
-     368
+     383
     ]
    ],
    "unclear_passages": 0,
@@ -8722,7 +8644,7 @@
     [
      "allergy_change",
      339,
-     368,
+     383,
      "not_an_addition"
     ]
    ]
@@ -8797,7 +8719,7 @@
     [
      "allergy_change",
      337,
-     366
+     381
     ]
    ],
    "unclear_passages": 0,
@@ -8907,7 +8829,7 @@
     [
      "allergy_change",
      337,
-     366,
+     381,
      "not_an_addition"
     ]
    ]
@@ -8982,7 +8904,7 @@
     [
      "allergy_change",
      340,
-     369
+     384
     ]
    ],
    "unclear_passages": 0,
@@ -9156,7 +9078,7 @@
     [
      "allergy_change",
      340,
-     369,
+     384,
      "not_an_addition"
     ]
    ]
@@ -9231,7 +9153,7 @@
     [
      "allergy_change",
      339,
-     368
+     383
     ]
    ],
    "unclear_passages": 0,
@@ -9357,7 +9279,7 @@
     [
      "allergy_change",
      339,
-     368,
+     383,
      "not_an_addition"
     ]
    ]
@@ -9377,7 +9299,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 130.432,
    "hypothesis": "Heart failure clinic review.\n\nThis is a 61-year-old man with heart failure with reduced ejection fraction after an anterior myocardial infarction two years ago, Ejection fraction 30% on his last echo. He is NYHA class two, breathless on hills but fine on the flat. He sleeps on two pillows, no paroxysmal nocturnal dyspnea, no ankle swelling, No chest pain and no dizziness. He weighs himself every morning and his weight has been steady. He had his flu and pneumonia vaccines this autom.\nCurrent medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning.\n\nExamination: Blood pressure 112/70, heart rate 78 inn sinus rhythm, Weight 82 kg. JVP not raised, chest clear, no edema. Potassium 4.6, creatinine 1.2.\n\nAssessment: Heart failure with reduced ejection fraction, Stable and euvolemic, with room to optimize therapy because his resting heart rate is still above 70 on the maximum bisoprolol dose.\n\nPlan: Increase sacubitril/valsartan to 97/100 and 3 mg twice daily. Add ivabradin 5 mg twice daily, and call that into his usual pharmacy. Explained that can cause brief flashes of light in Dim light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. Daily weights and call if he gains more than 2 kg in three days. Review in six weeks.",
@@ -9672,15 +9594,15 @@
     0.13089462500647642,
     0.1518095829815138
    ],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      1111,
      1148,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d12-hfref-ivabradine--hvac-20db",
@@ -9697,7 +9619,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 130.4,
    "hypothesis": "Heart failure clinic review.\n\nThis is a 61-year-old man with heart failure with reduced ejection fraction after an anterior myocardial infarction two years ago, Ejection fraction 30% on his last echo. He is NYHA class two, breathless on hills but fine on the flat. He sleeps on two pillows, no paroxysmal nocturnal dyspnea, no ankle swelling, No chest pain and no dizziness. He weighs himself every morning and his weight has been steady. He had his flu and pneumonia vaccines this autom.\nCurrent medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning.\n\nExamination: Blood pressure 112/70, heartt rate 78. In sinus rhythm, Weight 82 kg. JVP not raised, chest clear, no edema. Potassium 4.6, creatinine 1.2.\n\nAssessment: Heart failure with reduced ejection fraction, Stable and euvolemic, with room to optimize therapy because his resting heart rate is still above 70 on the maximum bisoprolol dose.\n\nPlan: Increase sacubitril valsartan to 97/100 and 3 mg twice daily. Add ivabradin 5 mg twice daily, and call that into his usual pharmacy. Explain that can cause brief flashes of light inDim light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. daaily weights on call if he gains more than 2 kg in three days. Review in six weeks.",
@@ -9848,15 +9770,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      1111,
      1148,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d12-hfref-ivabradine--hvac-10db",
@@ -9873,7 +9795,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 130.432,
    "hypothesis": "Heart failure clinic review.\n\nThis is a 61-year-old man with heart failure with reduced ejection fraction after an anterior myocardial infarction two years ago, Ejection fraction 30% on his last echo. He is NYHA class two, breathless on hills but fine on the flat. He sleeps on two pillows, no paroxysmal nocturnal dyspnea, no ankle swelling, no chhe-. pain and no dizziness. He weighs himself every morning and his weight has been steady. He had his flu and pneumonia vaccines this autom.\nCurrent medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning.\n\nExamination: Blood pressure 112/70, heart rate 78 in sinus rhythm, Weight 82 kg. JVP not raised, chest clear, no edema. Potassium 4.6, creatinine 1.2.\n\nAssessment: Heart failure with reduced ejection fraction, Stable and euvolemic, with room to optimize therapy because his resting heart rate is still above 70 on the maximum bisoprolol dose.\n\nPlan: Increase sacubitril valsartan to 97/100 and 3 mg twice daily. Add ivabradin 5 mg twice daily, and call that into his usual pharmacy. Explained that it can cause brief flashes of light in them light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. Daily weights on call if he gains more than 2 kg in three days. Review in six weeks.",
@@ -10024,15 +9946,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      1111,
      1148,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d12-hfref-ivabradine--hvac-5db",
@@ -10049,7 +9971,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 130.4,
    "hypothesis": "Heart failure clinic review.\n\nThis is a 61-year-old man with heart failure with reduced ejection fraction after an anterior myocardial infarction two years ago, ejection fraction 30% on his last. echo. He is NYHA class two, breathless on hels but fine on the flat. He sleeps on two pillows, no paroxysmal nocturnal dyspnea, no ankle swelling, no chest pain and no dizziness. He weighs himself every morning and his weight has been steady. He had his flu and pneumonia vaccines this autom.\nCurrent medications: sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapgliflozin 10 mg daily, and furosemide 40 mg in the morning.\n\nExamination: Blood pressure 112/70, heart rate 78 in sinus rhythm, weight 82 kg. JVP not raised, chest clear, no edema. Potassium 4.6, Creatinine 1.2.\n\nAssessment: Heart failure with reduced ejection fraction, stable and euvolemic, with room to optimize therapy because his resting heart rate is still above 70 on the maximum bisoprolol dose.\n\nPlan: Increase sacubitril valsartan to 97/100 and 3 mg twice daily. Add vabradin 5 mg twice daily, and call that into his usual pharmacy. Explain that can cause brief flashes of light in them light that usually settle, to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. Daily weights on call if he gains more than 2 kg in three days. Review in six weeks.",
@@ -10521,7 +10443,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 76.675,
    "hypothesis": "dermatology review. 19-year-old woman with nodular acne on her face and back, now in month three of isotretinoid. She started on the 18th ofvolgast at 20 mg daily and went up to 40 mg daily in Sptemba period. Her skin is clearly better with only a few new spots. She has dry lips and some nosebleeds in the mornings. No headaches, no visual change, no joint pain and no low mood. She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative.\n\nOn examination, there are few small papules on the chin and healing scars on the back, with cellitis. Her fasting triglycerides last month were 1.9 and liver tests were normal.\n\nImpression: Nodular acne responding well to isotretinoin with expected mucocutaneous side effects.\n\nPlan: conontinue isotretino 40 mg daily, and renew her isotretinoin prescription for another month. lip barm and petroleum jelly inside the nose. Monthly pregnancy tests to continue. review on the 15th of Decemba.",
@@ -10727,15 +10649,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      804,
      861,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d16-gout-febuxostat--clean",
@@ -10750,7 +10672,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 64.1066875,
    "hypothesis": "Rheumatology followup for gout. 57-year-old man with tophaceous gout, three flares this year in the left big toe and right knee. e had a widespread rash with allopurinol in the spring that settled when it was stopped, so please add allopurinol to his allergy list. cho is now on Febxost at 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting Febxosta two months ago. No chest pain or shortness of breath. No history of heart disease.\n\nExam shows a small tophus on the right elbow, no joint swelling today. Uric acid is 7.4, down from 9.2. Creatinine 1.0.\n\nAssessment: Tophaceous gout improving on Pebicost, but uric acid still above the target of 6.\n\nPlan: Increase Feberxosta to 120 mg scratch that 80 mg daily. Continue colchicine for another three months. Recheck uric acid in four weeks. cut down on beer and sugary drinks.",
@@ -10878,15 +10800,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      221,
      263,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d16-gout-febuxostat--babble-20db",
@@ -10901,7 +10823,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 64.1066875,
    "hypothesis": "Rheumatology followup for gout. 57-year-old man with tophaceous gout, three flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped, so please add allopurinol to his allergy list. He is now on Febxostt at 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting Febxosta two months ago. No chest pain or shortness of breath.. No history of heart disease.\n\nExam shows a small tophus on the right elbow, no joint swelling today. Uric acid is 7.4, down from 9.2. Creatinine 1.0.\n\nAssessment: Tophaceous gout improving on febicosta, but uric acid still above the target of 6.\n\nPlan: Increase Febicxot to 120 mg scratch that 80 mg daily. Continue colchicine for another three months. Recheck uric acid in four weeks. Cut down on beer and sugary drinks.",
@@ -11039,15 +10961,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      222,
      264,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d16-gout-febuxostat--babble-10db",
@@ -11062,7 +10984,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 64.075,
    "hypothesis": "Rheumatology followup for gout. 57-year-old man with sebaceous gout, three flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped, so please add allopurinol to his allergy list. He is now on Sebxo. at 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting Pebicosa two months ago. No chest pain or shortness of breath. No history of heart disease.\n\nExam shows a small tocus on the right elbow, no joint swelling today. Uric acid is 7.4, down from 9.2. Creatinine 1.0.\n\nAssessment: Tophaceous gout improving on pebic soft a, but uric acid still above the target of 6..\n\nPlan: Increase Teberxot to 120 mgscratch that 80 mg daily. Continue colchicine for another three months. Recheck uric acid in four weeks. Cut down on beer and sugar drinks.",
@@ -11176,15 +11098,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      221,
      263,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d16-gout-febuxostat--babble-5db",
@@ -11199,7 +11121,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 64.1066875,
    "hypothesis": "eks Rheumatology followup for gout. 57-year-old man paceent gout a three flares in the left big toe and right in He had a widespread rash with allopurinol in his springs that settled when he stopped this So please add allopurinol to his allergy list is now on Febxoft at 40 mg daily or colchicine 0.5 mg daily for prophylaxis. No flare since starting Pebxof about two months ago. No chest pain or shortness of breath. No history of heart murmure.\n\nExam shows a small focus on the right elbow, no joint swelling today. Uric acid is 7.4, down from 9.2. Creatinine 1.0.\n\nAssessment: Tophaceous gout improment on pebic sofa with uric acidbotge of 6\n\nPlan: Iecrease febxt to 120 mg scratch the 80 mg day. Continue colchicine for another three months. Recheck uric acid and mo. Cut down on beer and sugar drinks. Thank youend",
@@ -11334,7 +11256,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 64.075,
    "hypothesis": "[unclear] paragraph xam shows a small focus on the right elbowcomma no joint swellingU [unclear]",
@@ -11595,7 +11517,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 90.112,
    "hypothesis": "Memory clinic followup. 74-year-old woman with early Alzheimer's disease confirmed on amyloid pet, here with her husband. She has had three infusions of donammub, . the last on the 21 of Octoba. She tolerated them without any reaction. Her husband says she is about the same, Still managing at home with prompts for appointments and medicines. No headaches, no confusion after the infusions, no falls and no change in vision. She is APOE for heterozygous.\n\nMoCA today 21 out/30, the same as in the summer. Neurological examination unchanged. Her MRI last week showed no arhea.\n\nImpression: Mld cognitive impairment due to Alzheimer's disease, stable on Donin mab with no amyloid related imaging abnormalities so far.\n\nPlan: Continue monthly donor mab, fourth infusion on the 18th of Novemba. Repeat MRI before the seventh infusion. Carry on with donepezil 10 mg at night, and put an order in for vitamin B12 level today. Driving to stop for now as discussed with them both. Review in three months.",
@@ -11737,15 +11659,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      872,
      919,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d19-migraine-zavegepant--clean",
@@ -11761,7 +11683,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 76.45,
    "hypothesis": "Neurology clinic, migraine followup. 36-year-old woman with migraine without aura, currently about six migraine days of months. Triptans helped, but she had chest tightness with sumatriptan and does not want to take them again. She has been using Xaveripan nasal spray 10 mg, one spray at onset, and it works within about an hour for most attacks. She notices a bad taste afterwards, but no other side effects. She takes Atropan 60 mg daily for prevention. Her mother and her sister both have migraine. No new neurological symptoms, no visual loss and no weakness. Headaches are worse with bright light and noise but not worse lying down or in the morning.\n\nNeurological exam is normal, fundi normal.\n\nAssessment: Episodic migraine without aura, improving, good response to savejipen for acute attacks.\n\nPlan: Continue savejppented up to one spray in 24 hours, Continue Atdagean, and refill her Atageban for three months. Keep a headache diary. Return in six months or sooner if the pattern changes.",
@@ -11882,15 +11804,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      880,
      920,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d19-migraine-zavegepant--hvac-20db",
@@ -11906,7 +11828,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 76.45,
    "hypothesis": "neurology clinic, migraine followup. 36-year-old woman with migraine without aura, currently about six migraine days of months. trriptans helped, but she had chest tightness with sumatriptan and does not want to take them again. She has been using ZaveDpan nasal spray 10 mg, one spray at onset, and it works within about an hour for most attacks. She notices a bad taste afterwards, but no other side effects. She takes Aropan 60 mg daily for prevention. Her mother and her sister both have migraine. No new neurological symptoms, no visual loss and no weakness. Headaches are worse with bright light and noise but not worse lying down or in the morning.\n\nNeurological exam is normal, fundi normal.\n\nAssessment: Episodic migraine without aura, improving, good response to savejipen for acute attacks.\n\nPlan: Continue savejppened up to one spray in 24 hours, Continue Adupan, and refill her Ataapan for three months. Keep a headache diary. Return in six months or sooner if the pattern changes.",
@@ -12026,15 +11948,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      876,
      915,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d19-migraine-zavegepant--hvac-10db",
@@ -12050,7 +11972,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 76.48,
    "hypothesis": "Neurology clinic, migraine followup. 36-year-old woman with migraine without aura, currently about six migraine days of a months. Triptans helped, but she had chest tightness with sumatriptan and does not want to take them again. She has been using ZaveJipan nasal spray 10 mg, one spray at onset, and it works within about an hour for most attacks. She notices a bad taste afterwards, but no other side effects. She takes Atropan 60 mg daily for prevention. Her mother and her sister both have migraine. No new neurological symptoms, no visual loss and no weakness. Headaches are worse with bright light and noise, but not worse lying down or in the morning.\n\nNeurological exam is normal, fundi normal.\n\nAssessment: Episodic migraine without auracomma . mproving, good response to save jipen for acute attacks.\n\nPlan: Continue save dippened up to one spray in 24 hours, Continue Aduchpan, and refill her Ataapan for three months. Keep a headache diary. Return in six months or sooner if the pattern changes.",
@@ -12178,15 +12100,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      890,
      929,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d19-migraine-zavegepant--hvac-5db",
@@ -12202,7 +12124,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 76.45,
    "hypothesis": "Neurology clinic, migraine followup. 36-year-old woman with migraine without aura, currently about six migraine days a months. Triptans helped, but she had chest tightness with sumatriptan and does not want to take them again. She has been using Zavesipan nasal spray. 10 mg, one spray at onset, and it works within about an hour for most attacks. She notices a bad taste afterwards, but no other side effects. She takes Atorpan 60 mg daily for prevention. Her mother and her sister both have migraine. No new neurological symptoms, no visual loss and no weakness. Headaches are worse with bright light and noise, but not worse lying down or in the morning.\n\nNeurological exam is normal, fundi normal.\n\nSSESSMENT: Episodic migraine without aura, improving, good response to savejipan for acute attacks.\n\nPlan: Continue savejippent up to one spray in 24 hours, continue Adupan, and refill her Atadaban for three months. Keep a headache diary. Return in six months or sooner if the pattern changes.",
@@ -12336,7 +12258,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 76.48,
    "hypothesis": "Neurology clinic, migraine followup. 36-year-old woman with migraine without aura, currently about six migraine days a months. Triptans helped, but she had chest tightness with sumatriptan and does not want to take them again. She has been using saveJpon nasal spray 10 mg, one spray at onset, and it works within about an hour for most attacks. She notices a bad taste afterwards, but no other side effects. She takes Aorpan 60 mg daily for prevention. Her mother and her sister both have migraine. No new neurological symptoms., no visual loss and no weakness. Headaches are worse with bright lighted noise but not worse lying down or in the morning.\n\nNeurological exam is normal, fund normal.\n\nAssessment: Episodic migraine without. or, improving, good response to savejippen for acute attacks.\n\nPlan: Continue savejppened up to one spray in 24 hours, continue Adugepment, and refill her Adgean for three months. Keep a headache diary. Return in six months or sooner if the pattern changes.",
@@ -15775,7 +15697,7 @@
     "allergy-change",
     "spoken-punctuation",
     "experiencer",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 66.7306875,
    "hypothesis": "Dermatology visit for alopecia area. 17-year-old girl with patchy hair loss for two years that has spread over the last six months, now with about half of the scalp affected and some loss of the eyebrows. Steroid injections into the patches did not help. No nail changes, no itching and no scalp pain. Her mother has hypothyroidism. The patient says the doxycycline she took for acne made her very sick to her stomach, so put doxycycline on her allergy list as an allergy. Her vaccines are up-to-date.\n\nSOLT score 52. Large smooth patches over the crown on both sides, with exclamation mark hairs at the edges. Thyroid function and blood count from last month are normal, and tuberculosis screening is negative.\n\nAssessment: Severe alopecia aater.\n\nPlan: Start ritelciitinib 50 mg once daily. Discussed acne, headache and the small risk of infections and blood clots. Blood count and liver tests at four weeks. Photos taken today for comparison. Return in 12 weeks.",
@@ -15893,15 +15815,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      422,
      471,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d33-addendum-potassium--clean",
@@ -15916,7 +15838,7 @@
     "mixed-plan",
     "missing-field",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 44.25,
    "hypothesis": "addendum to this morning's clinic letter. Plan: Hold the spironolactone for now, repeat potassium and kidney function on Thursday at the surgery, and if the potassium is still above 5.5, stop the spironolactone altogether and let me know. The patient has been told by phone and understands. Lowpotassium diet sheet posted out today. Continue the rest of his medicines unchanged, including the ramipril. He mentioned on the phone that he had a rash with cotrimoxazole last year, so make sure sulfa is on his allergy list. end of addendum.",
@@ -16042,15 +15964,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      481,
      519,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d34-lipids-phone--clean",
@@ -18334,7 +18256,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 174.575,
    "hypothesis": "Followup visit after recent hospital stay.\n\nHistory: 74-year-old woman with heart failure with preserved ejection fraction, atrial fibrillation, type two diabetes and chronic kidney disease stage three B. She was admitted on October 2 second correction October 24th with fluid overload and went home on October 30th. in hospital, she was started on sitaglitazin 200 mg daily and her furosemide was increased to 40 mg twice a day. Her weight has come down from 69.8 to 68.4 kg since discharge. She still has some ankle swelling by the evening, but no swelling in her thighs or abdomen. No orthopnea, No chest pain and no bleeding on apixaban. She had two low sugars in the low 60s early in the morning last week. She takes insulin glargine 18 units no sorry 16 units at bedtime and metformin 500 mg twice a day. Her left knee is swollen and painful after walking, but the right knee is fine, and she has been taking ibuprofen for it. Her other medicines are apixaban 5 mg twice a day and metoprolol succinate 50 mg daily. She is allergic to codeine.\n\nExamination: Blood pressure 128/74, heart rate 78 and irregular, oxygen saturation 95% on room air. JVP not raised. Few crackles at the right base and none on the left. Trace pitting edema at both ankles. Small effusion in the left knee.\n\nResults: Potassium 4.6, Creatinine 1.4 with an eGFR of 38. NT-proBNP 1450, down from 2800 at discharge. Her A1c is 7.6. Urine albumin to creatinine ratio 210 mg/g.\n\nAssessment: Number one, heart failure with preserved ejection fraction, much improved and close to her dry weight. Number two, atrial fibrillation, rate controlled and anticoagulated. Number three, type two diabetes with early morning low sugar since sitagliptlizin was added. Number four, chronic kidney disease stage three B with albuminuria. Number five, osteoarthritis of the left knee, with NSAID use that is not safe with her heart and kidneys.\n\nPlan: Keep the morning furosemide at 40 mg but reduce the afternoon dose to 20 mg. Continue sitagliplizin. Reduce insulin glargine to 12 units at bedtime. Start Phinneran 10 mg daily for the albuminuria, and send the prescription to her usual pharmacy. Repeat potassium and creatinine in four weeks. Stop the ibuprofen and use diclofenac gel and acetaminophen for the knee. Daily weights, and call the heart failure nurse if she gains more than 1 kg in a day. Follow up onD desember 10.",
@@ -18713,15 +18635,15 @@
     0.25058416702086106,
     0.25159620799240656
    ],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      2110,
      2157,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d42-new-patient-visit--clean",
@@ -18742,7 +18664,8 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
-    "proposal"
+    "proposal",
+    "proposal-trap"
    ],
    "seconds": 174.7626875,
    "hypothesis": "New patient visit.\n\nHistory: 58-year-old man who has moved here from out of state and is establishing care. For about three months, he has been short of breath walking uphills. twice, he has felt a tightness across his chest after climbing two flights of stairs and it went away within a few minutes of resting. He has no chest pain at rest and nothing at night. He has heartburn after large meals, but no trouble swallowing and no weight loss.\nPast history: High blood pressure for 10 years, high cholesterol, prediabetes, goout with two flares in the big toe and obstructive sleep apnea on CPAP. Colon polyps removed and a colonoscopy on Mch third 2021.\nMedications: Amlodipine 10 mg daily, hydrochlorothiazide 25 mg daily, atorvastatin 20 mg at night, allopurinol 100 mg daily, and omeprazole 20 mg before breakfast.\nAllergies: Penicillin gave him hives as a child.\nFamily history: His father had a heart attack at 62 sorry at 52 and his mother has type two diabetes. He drives a City bus. He smoked a pack a day for 20 years and quit five years ago.\n\nExamination: Blood pressure 152/94 and 148/90 on a repeat check, Heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. REesULTs brought: LDL 132, A1c 6.4, Uric acid 8.9. ECG today shows sinus rhythm with no ischemic changes.\n\nAssessment: Number one, exertional shortness of breath and chest tightness in a former smoker with several risk factors, possible stable angina. Number two, hypertension not controlled. Number three, high cholesterol above goal for his risk. Number four, gout made worse by the hydrochlorothiazid. Number five, reflux controlled on omeprazole.\n\nPlan: exercise stress echo in the next two weeks. Start aspirin 81 mg daily. He is not to drive the bus if he gets chest tightness at work and he knows to call 911 if it comes on at rest. Stop hydrochlorothiazide and start losartan 50 mg daily. Increase atorvastatin to 40 mg and allopurinol to 200 mg. Continue omeprazole and refill the omeprazole for 90 days. put penicillin on his allergy list. Return on December 17 with home blood pressure readings.",
@@ -19126,19 +19049,20 @@
    ],
    "proposals": [
     [
-     "order",
-     1989,
-     2026,
-     []
-    ],
-    [
      "allergy_addition",
      2028,
      2062,
      []
     ]
    ],
-   "held_back": []
+   "held_back": [
+    [
+     "order",
+     1989,
+     2026,
+     "not_plain"
+    ]
+   ]
   },
   {
    "variant": "d43-cough-lipids-orders--clean",
@@ -19153,7 +19077,8 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal",
+    "proposal-trap"
    ],
    "seconds": 59.225,
    "hypothesis": "Okay this is a followup for a 67-year-old woman who quit smoking three years ago. She has had a dry cough for about six weeks, worse at night, with no fever, No weight loss and no blood in the sputum. She takes amlodipine 5 mg daily for blood pressure.\n\nOn examination, blood pressure is 138/84, heartar rate 76, oxygen saturation 97% on room air. Chest is clear with no wheeze.\n\nAssessment: Persistent cough and a former smoker, and raised cardiovascular risk.\n\nPlan: Start atorvastatin 20 mg at night. Go ahead and order a fasting lipid panel. Also order a chest x-ray today. Continue amlodipine. Review in clinic with the results.",
@@ -19289,18 +19214,19 @@
    "proposals": [
     [
      "order",
-     504,
-     544,
-     []
-    ],
-    [
-     "order",
      546,
      576,
      []
     ]
    ],
-   "held_back": []
+   "held_back": [
+    [
+     "order",
+     504,
+     544,
+     "not_plain"
+    ]
+   ]
   },
   {
    "variant": "d44-cystitis-nitrofurantoin-rash--clean",
@@ -19314,7 +19240,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 58.5173125,
    "hypothesis": "Telephone followup for a 34-year-old woman treated for urinary tract infection last week. She took nitrofurantoin for two days and developed an itchy rash on her arms and chest, so she stopped it and the rash settled with an antihistamine. Her urinary symptoms have now resolved. No fever, no flank pain. She had hives with penicillin as a child, which is already recorded. She stopped metformin last year after losing weight, and her sugars have stayed normal.\n\nAssessment: Uncomplicated cystitis, resolved, and a probable drug rash from nitrofurantoin.\n\nPlan: She will call back if the symptoms return. Please add nitrofurantoin to her allergy list with the reaction rash.",
@@ -19440,15 +19366,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      605,
      673,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d44-cystitis-nitrofurantoin-rash--hvac-20db",
@@ -19462,7 +19388,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 58.5173125,
    "hypothesis": "etelephone followup for a 34-year-old woman treated for urinary tract infection last week. She took nitrofurantoin for two days and developed an itchy rash on her arms and chest, so she stopped it and the rash settled with an antihistamine. Her urinary symptoms have now resolved. No fever, no flank pain. She had hives with penicillin as a child, which is already recorded. She stopped metformin last year after losing weight, and her sugars have stayed normal.\n\nAssessment: Uncomplicated cystitis, resolved, and a probable drug rash from nitrofurantoin.\n\nPlan: She will call back if the symptoms return. please add nitrofurantoin to her allergy list. with a reaction rash.",
@@ -19644,15 +19570,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      606,
      651,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d44-cystitis-nitrofurantoin-rash--hvac-10db",
@@ -19666,7 +19592,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 58.475,
    "hypothesis": "Telephone followup for a 34-year-old woman treated for urinary tract infection last week. She took nitrofurantoin for two days and developed an itchy rash on her arms and chest, so she stopped it and the rash settled with an antihistamine. Her urinary symptoms have now resolved. No fever, No flank pain. She had hives with penicillin as a child, which is already recorded. She stopped metformin last year after losing weight, and her sugars have stayed normal.\n\nAssessment: Uncomplicated cystitis, Resolved, and a probable drug rash from nitrofurantoin.\n\nPlan: She will call back if the symptoms return. Please add nitrofurantoin to her allergy list with the reaction rash.",
@@ -19784,15 +19710,15 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "allergy_addition",
      605,
      673,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d44-cystitis-nitrofurantoin-rash--hvac-5db",
@@ -19806,7 +19732,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
-    "proposal"
+    "proposal-trap"
    ],
    "seconds": 58.5173125,
    "hypothesis": "Telephone followup for a 34-year-old woman treated for a urinary tract infection last week. She took nitrofurantoin for two days and developed an itchy rash on her arms and chest, soo she stopped it and the rash settled with an antihistamine. Her urinary symptoms have now resolved. No fever, no flank pain. She had hives with penicillin as a child, which is already recorded. She stopped metformin last year after losing weight, and her sugars have stayed normal.\n\nAssessment: Uncomplicated cystitis, resolved, and a probable drug rash from nitrofurantoin.\n\nPlan: She will call back if the symptoms return. Please add nitrofurantoin to her allergy list with a reaction rash.",
@@ -19932,7 +19858,6 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal",
     "proposal-trap"
    ],
    "seconds": 73.075,
@@ -20069,15 +19994,14 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [
+   "proposals": [],
+   "held_back": [
     [
      "order",
      493,
      523,
-     []
-    ]
-   ],
-   "held_back": [
+     "not_plain"
+    ],
     [
      "order",
      608,
@@ -20150,7 +20074,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Plan: There is no need to order a chest x-ray. If the rash comes back after amoxicillin. cononsider. We discussed. moisturizer as needed.",
+     "value": "Plan: There is no need to order a chest x-ray. I don't think. If the rash comes back after amoxicillin. cononsider. We discussed. she would rather wait. moisturizer as needed.",
      "warnings": []
     }
    },
@@ -20158,7 +20082,7 @@
    "not_carried_over": [
     [
      "order",
-     549,
+     538,
      575
     ],
     [
@@ -20307,7 +20231,7 @@
    "held_back": [
     [
      "order",
-     549,
+     538,
      575,
      "negated"
     ],
@@ -20967,15 +20891,16 @@
      688,
      728,
      []
-    ],
+    ]
+   ],
+   "held_back": [
     [
      "order",
      730,
      759,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d48-eczema-sound-alikes--babble-5db",
@@ -21126,7 +21051,8 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal",
+    "proposal-trap"
    ],
    "seconds": 99.65,
    "hypothesis": "Annual review for a 41-year-old woman with asthma, hypertension and a painful lower molar. Her asthma has been well controlled on budesonide/ formoterol 164.5 two puffs twice daily, ate , she uses albuterol about once a week before exercise. She has had no nightwaking and no emergency visits this year. Her blood pressure is treated with losartan 50 mg daily and she checks it at home. For five days, she has had throbbing pain in a lower left molar with swelling of the gum and pain on chewing. She saw her dentist yesterday, who found an abscess and will treat it next week. She developed hives on her hands after the dentist used latex gloves. She drinks alcohol rarely and has never smoked.\n\nOn examination, temperature 37.4, blood pressure 132/82, heart rate 80, oxygen saturation 98%. There is a tender swollen gum beside the lower left second molar with no spreading facial swelling. Chest is clear.\n\nAssessment: Dental abscess of the lower left second molar, Asthma well controlled, and hypertension at goal.\n\nPlan: Start amoxicillin 500 mg three times a day for seven days and send it to her usual pharmacy. Ibuprofen 400 mg with food up to three times a day for pain. Please add latex to her allergy list. Continue budesonide formoterol and losartan. Renew her albuterol inhaler as well. She is due for routine blood work, so go ahead and order a CBC and a CMP. Salt water rinses after meals. Return sooner for fever or facial swelling.",
@@ -21293,12 +21219,6 @@
    "chunk_seconds": [],
    "proposals": [
     [
-     "order",
-     1083,
-     1116,
-     []
-    ],
-    [
      "allergy_addition",
      1179,
      1215,
@@ -21309,15 +21229,22 @@
      1262,
      1297,
      []
+    ]
+   ],
+   "held_back": [
+    [
+     "order",
+     1083,
+     1116,
+     "not_plain"
     ],
     [
      "order",
      1337,
      1371,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d49-dental-abscess-annual--hvac-20db",
@@ -21334,7 +21261,8 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal",
+    "proposal-trap"
    ],
    "seconds": 99.6906875,
    "hypothesis": "Annual review for a 41-year-old woman with asthma, hypertension, and a painful lower molar. Her asthma has been well controlled on budesonide/ formoterol 16/4.5 two puffs twice daily, She uses albuterol about once a week before exercise. She has had no night wakning and no emergency visits this year. Her blood pressure is treated with losartan 50 mg daily and she checks it at home. For five days, she has had throbbing pain in a lower left molar with swelling of the gum and pain on chewing. She saw her dentist yesterday, who found an abscess and will treat it next week. She developed hives on her hands after the dentist used latex gloves. She drinks alcohol rarely and has never smoked.\n\nOn examination, temperature 37.4, blood pressure 132/82, heart rate 80, oxygen saturation 98%. There is a tender swollen gum beside the lower left second molar with no spreading facial swelling. Chest is clear.\n\nAssessment: Dental abscess of the lower left second molar, asthma well controlled, and hypertension at goal.\n\nPlan: Start amoxicillin 500 mg three times a day for seven days and send it to her usual pharmacy. buprofen 400 mg with food up to three times a day for pain. Please add latex to her allergy list. Continue budesonide, formoterl and losartan. Renew her albuterol inhaler as well. She is due for routine blood work, so go ahead and order a CBC and a CMP. salt water rinses after meals. Return sooner for fever or facial swelling.",
@@ -21585,12 +21513,6 @@
    "chunk_seconds": [],
    "proposals": [
     [
-     "order",
-     1081,
-     1114,
-     []
-    ],
-    [
      "allergy_addition",
      1176,
      1212,
@@ -21601,15 +21523,22 @@
      1259,
      1294,
      []
+    ]
+   ],
+   "held_back": [
+    [
+     "order",
+     1081,
+     1114,
+     "not_plain"
     ],
     [
      "order",
      1334,
      1368,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d49-dental-abscess-annual--hvac-10db",
@@ -21626,7 +21555,8 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal",
+    "proposal-trap"
    ],
    "seconds": 99.65,
    "hypothesis": "annual review for a 41-year-old woman with asthma, hypertension and a painful lower molar. Her asthma has been well controlled on budesonide/ formoterol 164.5 two puffs twice daily, she uses albuterol about once a week before exercise. She has had no nightwaking and no emergency visits this year. Her blood pressure is treated with losartan 50 mg daily and she checks it at home. For five days, she has had throbbing pain in a lower left molar with swelling of the gum and pain on chewing. She saw her dentist yesterday, who found an abscess and will treat it next week. She developed hives on her hands after the dentist used latex gloves. She drinks alcohol rarely and has never smoked.\n\nOn\nExamination: Temperature 37.4, blood pressure 132/82, heart rate 80, oxygen saturation 98%. There is a tender swollen gum beside the lower left second molar with no spreading facial swelling. Chest is clear.\n\nAssessment: Dental abscess of the lower left second molar, asthma well conontrolled, and hypertension at goal.\n\nPlan: Start amoxicillin 500 mg three times a day for seven days and send it to her usual pharmacy. Ibuprofen 400 mg with food up to three times a day for pain. Please add latex to her allergy list. Continue budesonide. formoterol and losartan. Renew her albuterol inhaler as well. She is due for routine blood work, so go ahead and order a CBC and a CMP. Salt water rinses after meals. Return sooner for fever or facial swelling.",
@@ -21768,12 +21698,6 @@
    "chunk_seconds": [],
    "proposals": [
     [
-     "order",
-     1079,
-     1112,
-     []
-    ],
-    [
      "allergy_addition",
      1175,
      1211,
@@ -21784,15 +21708,22 @@
      1259,
      1294,
      []
+    ]
+   ],
+   "held_back": [
+    [
+     "order",
+     1079,
+     1112,
+     "not_plain"
     ],
     [
      "order",
      1334,
      1368,
-     []
+     "not_plain"
     ]
-   ],
-   "held_back": []
+   ]
   },
   {
    "variant": "d49-dental-abscess-annual--hvac-5db",
@@ -21809,7 +21740,8 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal"
+    "proposal",
+    "proposal-trap"
    ],
    "seconds": 99.6906875,
    "hypothesis": "annual review for a 41-year-old woman with asthma, hypertension, and a painful lower molar. Her asthma has been well controlled on budesonidefmoterol 16/4.5 two puffs twice daily, she uses albuterol about once a week before exercise. She has had no nightwaking and no emergency visit. this year. Her blood pressure is treated with losartan 50 mg daily and she checks it at home. For five days, she has had throbbing pain in a lower left molar with swelling of the gum and pain on chewing. She saw her dentist yesterday, who found an abscess and will treat it next week. She developed hives on her hands after the dentist used latex gloves. She drinks alcohol rarely and has never smoked.\n\nOn\nExamination: Temperature 37.4, blood pressure 132/82, heart rate 80, oxygen saturation 98%. There is a tender swollen gum beside the lower left second molar with no spreading facial swelling. Chest is clear.\n\nAssessment: Dental abscess of the lower left second molar, asthma well-conontrolled, and hypertension at goal.\n\nPlan: Start amoxicillin 500 mg three times a day for seven days and send it to her usual pharmacy. ibuprofen 400 mg with food up to three times a day for pain. Please add latex to her allergy list. Continue budesonide/ formoterol and losartan. Renew her albuterol inhaler as well. She is due for routine blood work, so go ahead and order a CBC and a CMP. Salt water rinses after meals. Return sooner for fever or facial swelling.",
@@ -22036,7 +21968,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Saline rinses twice a day. sskip that. Recheck in one week.",
+     "value": "Saline rinses twice a day. he insisted. sskip that. Recheck in one week.",
      "warnings": []
     }
    },
@@ -22247,7 +22179,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Assistant. She will call if the hives come back.",
+     "value": "Assistant. possibly. She will call if the hives come back.",
      "warnings": []
     }
    },
@@ -22261,7 +22193,7 @@
     [
      "allergy_change",
      411,
-     438
+     466
     ],
     [
      "order",
@@ -22372,7 +22304,7 @@
     [
      "allergy_addition",
      411,
-     438,
+     466,
      "not_plain"
     ],
     [
@@ -22397,7 +22329,7 @@
   }
  ],
  "rescored_from": {
-  "scoring": "ab177353e7f7589cdae96f78d87b4e1f446e32a064c54b0b7b0310cc2f37f783",
+  "scoring": "f2af5efa9275d31389b80de586042d44af7705c774e650785ba0ba8f71fbda88",
   "gold_sha256": "f1e4a483e9e39acf4e553c5fb54fda9e6fae039d2a86f9a3a40ffd2b30a5cb63",
   "structuring_outputs_reused": true
  }
