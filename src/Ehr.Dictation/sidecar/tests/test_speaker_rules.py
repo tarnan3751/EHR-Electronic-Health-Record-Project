@@ -186,7 +186,7 @@ def test_the_transcript_is_a_line_a_turn_and_its_windows_label_each_line():
     text = heard(("clinician", "What brings you in {question mark}"), ("patient", "A cough {period}"),
                  ("patient", "For two weeks {period}"), ("other", "She coughs at night {period}"),
                  ("clinician", "Your chest is clear {period}"))
-    windows = conversation.windows(text, words=6)
+    windows = conversation.windows(text, 6)
 
     assert text.text == "What brings you in?\nA cough. For two weeks.\nShe coughs at night.\nYour chest is clear."
     assert [w.text for w in windows] == [
@@ -206,7 +206,7 @@ def test_a_turn_longer_than_a_window_is_cut_at_its_passages_and_unclear_ones_are
         (Segment(32000, 48000, "Worse at night {period}", 0.9, None, True), 2, False),
     ]).named({2: "patient", 1: "clinician"})
 
-    windows = conversation.windows(text, words=4)
+    windows = conversation.windows(text, 4)
 
     assert [w.text for w in windows] == ["Patient: Cough for two weeks.", "Patient: [unclear] Worse at night."]
 
@@ -318,13 +318,30 @@ def test_sorting_out_a_refill_just_asked_for_is_cut_and_listed():
 
 # F6: an order in a passage whose speaker couldn't be told is listed too, marked; a patient's request still isn't.
 def test_an_order_whose_speaker_couldnt_be_told_is_listed_and_says_so():
-    text = heard(("patient", "can you refill my inhaler"), ("clinician", "i'll send that to your pharmacy", True),
-                 ("clinician", "i'll put in a referral to cardiology"))
+    text = heard(("patient", "can you refill my inhaler"), ("clinician", "i'll send that to your pharmacy {period}", True),
+                 ("clinician", "i'll put in a referral to cardiology {period}"))
 
     listed = validation.conversation_not_carried_over(text, text.passages())
 
     assert [(text.text[i["start"] : i["end"]], i["speaker"]) for i in listed] == [
         ("i'll send that to your pharmacy", "unsure"), ("i'll put in a referral to cardiology", "clinician")]
+
+
+# The second review: one voice's turn is one line however sure each passage is, so a cue or an instruction reaches
+# across a passage diarize.py was unsure of, and a source across both is unsure, warned, not wrong.
+def test_a_cue_an_instruction_and_a_source_reach_across_one_voices_unsure_passage():
+    text = heard(("clinician", "i don't think you have", True), ("clinician", "a chest infection or pneumonia"),
+                 ("clinician", "i'm going to send you", True), ("clinician", "for an ultrasound of your kidneys"),
+                 ("patient", "okay"))
+
+    fields = checked(text, assessment=("Chest infection or pneumonia.", ["a chest infection or pneumonia"]),
+                     objective=("You have a chest infection.", ["i don't think you have a chest infection"]))
+    listed = validation.conversation_not_carried_over(text, text.passages())
+
+    assert "negation_dropped" in fields["assessment"].reasons
+    assert any("ultrasound of your kidneys" in text.text[i["start"] : i["end"]] for i in listed)
+    unsure = checked(text, assessment=("I don't think you have a chest infection.", ["i don't think you have a chest infection"]))
+    assert unsure["assessment"].pending and unsure["assessment"].speakers == ["unsure"]
 
 
 # The service's contract (series 1's fix round): the voices listed for naming are numbered 1 to k with none missing, so
@@ -336,3 +353,167 @@ def test_the_voices_that_said_something_are_numbered_from_one_with_none_missing(
     heard = conversation.assemble(passages).numbered()
 
     assert heard.voices == (1, 2, 2) and [v["group"] for v in heard.speakers()] == [1, 2]
+
+
+# ---- The second review: one shape for hedges, denials and reports; questions; bare answers --------------------------
+
+# Said with a head, fillers, a subject and its verb before the finding; offered without them, each is refused.
+LEAKS = [
+    ("clinician", "it doesn't look like you have a chest infection", "assessment", "chest infection"),
+    ("clinician", "there's no sign that you have a fracture", "assessment", "fracture"),
+    ("clinician", "i can't rule out that you have a stone", "assessment", "stone"),
+    ("clinician", "it's possible you have a stone", "assessment", "stone"),
+    ("clinician", "we'll see whether you have an infection", "assessment", "infection"),
+    ("clinician", "if you have chest pain come straight back", "objective", "chest pain"),
+    ("clinician", "i think um given what you've told me you have a sinus infection", "assessment", "sinus infection"),
+    ("clinician", "i think um you have a sinus infection", "assessment", "sinus infection"),
+    ("clinician", "there's a chance you have a hernia", "assessment", "hernia"),
+    ("clinician", "there's no evidence you have a clot", "assessment", "clot"),
+    ("clinician", "nothing to suggest you have a clot", "assessment", "clot"),
+    ("clinician", "it's unlikely you have a clot", "assessment", "clot"),
+    ("clinician", "i wouldn't think you have a fracture", "assessment", "fracture"),
+    ("clinician", "my guess is you have a sprain", "assessment", "sprain"),
+    ("clinician", "i suspect um you have a sprain", "assessment", "sprain"),
+    ("clinician", "you may well have a sprain", "assessment", "sprain"),
+    ("clinician", "we're not sure yet whether it's a sprain", "assessment", "sprain"),
+    ("clinician", "hard to say if it's a sprain", "assessment", "sprain"),
+    ("clinician", "i'd like to exclude a clot", "assessment", "clot"),
+    ("patient", "i don't think i have a fever", "subjective", "fever"),
+    ("patient", "i might have had a temperature", "subjective", "temperature"),
+    ("patient", "i'm not sure if i had a temperature", "subjective", "temperature"),
+    ("patient", "i thought i had a fever but", "subjective", "fever"),
+    ("patient", "i wouldn't say i've had a fever", "subjective", "fever"),
+    ("patient", "i don't reckon i've had a fever", "subjective", "fever"),
+    ("patient", "i dunno if i had a fever", "subjective", "fever"),
+    ("patient", "i could have had a fever", "subjective", "fever"),
+    ("patient", "my wife thinks i have sleep apnoea", "subjective", "sleep apnoea"),
+    ("patient", "i was told i might have asthma", "subjective", "asthma"),
+    ("patient", "the other doctor said i had asthma", "subjective", "asthma"),
+]
+
+
+@pytest.mark.parametrize(("who", "said", "field", "finding"), LEAKS)
+def test_a_hedge_denial_or_report_reaches_its_finding_past_fillers_and_a_subject(who, said, field, finding):
+    text = heard((who, said))
+
+    reasons = checked(text, **{field: (f"Has {finding}.", [said])})[field].reasons
+
+    assert {"negation_dropped", "certainty_dropped", "reported_dropped"} & set(reasons), reasons
+
+
+def test_a_report_kept_with_its_frame_is_the_patients_to_give():
+    text = heard(("patient", "my wife thinks i have sleep apnoea"))
+
+    assert checked(text, subjective=("My wife thinks I have sleep apnoea.", ["my wife thinks i have sleep apnoea"]))[
+        "subjective"].pending
+
+
+QUESTIONS = [
+    (("clinician", "any fever"), ("patient", "no"), "objective", "Fever."),
+    (("clinician", "have you had any fever or chills"), ("patient", "no"), "objective", "Fever or chills."),
+    (("clinician", "do you have chest pain"), ("patient", "nope"), "assessment", "Chest pain."),
+    (("clinician", "your chest is clear any shortness of breath"), ("patient", "not really"), "objective",
+     "Shortness of breath."),
+    (("patient", "do i need antibiotics for it"), ("clinician", "no"), "subjective", "I need antibiotics for it."),
+    (("clinician", "chest pain at all"), ("patient", "no"), "objective", "Chest pain."),
+]
+
+
+@pytest.mark.parametrize(("asked", "answered", "field", "value"), QUESTIONS)
+def test_a_question_is_never_a_findings_source(asked, answered, field, value):
+    text = heard(asked, answered)
+    source = asked[1].split("clear ")[-1] if "clear " in asked[1] else asked[1]
+
+    assert "source_is_a_question" in checked(text, **{field: (value, [source])})[field].reasons
+
+
+def test_a_statement_answered_yes_is_still_a_statement_and_not_every_auxiliary_asks():
+    text = heard(("clinician", "your tummy is a little tender just above the pubic bone"), ("patient", "yes"),
+                 ("clinician", "the thing is it hurts more at night i'll have you back in two weeks"))
+
+    fields = checked(text, objective=("Tender just above the pubic bone.", ["tender just above the pubic bone"]),
+                     plan=("Back in two weeks.", ["back in two weeks"]))
+
+    assert fields["objective"].pending and fields["plan"].pending
+    assert validation.conversation_questions(text.text, text.passages()) == []
+
+
+def test_an_answer_alone_is_never_a_value():
+    text = heard(("clinician", "any chest pain"), ("patient", "not really"))
+
+    assert "bare_answer" in checked(text, subjective=("Not really.", ["not really"]))["subjective"].reasons
+
+
+# The second review's acts: a closed-class noun and its verb in one clause, in either order.
+ACTS = [
+    "let me print you off a prescription for the cream", "it should be ready for you at the chemist by four",
+    "it'll be with the pharmacy this afternoon", "i'll get the bloods requested before you leave",
+    "i'll get your repeat sorted", "i'll sort the refill out for you", "i'll ask the lab to run a thyroid panel",
+    "i'll pop a form in for some blood tests", "i'll write up the request for a dexa scan",
+    "i'll mark the amoxicillin as an intolerance rather than an allergy", "i'm going to note that you're allergic to sulfa",
+    "let me note you're allergic to latex", "i'll put you down as allergic to penicillin",
+    "i'll update your record so it shows the latex allergy",
+    # "Can" is no possibility.
+    "i can book you in for an ultrasound this afternoon", "i can request the bloods now",
+    "we can send you for an x-ray right now",
+]
+NOT_ACTS = [
+    "i'll get you an appointment with the physio", "if it doesn't settle we can arrange an ultrasound",
+    "we can book you in for a scan if you'd like", "let me get you another tissue", "can i get you a fresh glass of water",
+    "we'll top up the vitamin d with some sunshine", "you're allergic to penicillin aren't you",
+]
+
+
+@pytest.mark.parametrize("said", ACTS)
+def test_an_act_said_in_other_words_is_cut_and_listed(said):
+    text = heard(("clinician", said))
+
+    assert validation.conversation_not_carried_over(text, text.passages()), said
+
+
+@pytest.mark.parametrize("said", NOT_ACTS)
+def test_what_names_no_act_or_only_a_possibility_is_not_listed(said):
+    text = heard(("clinician", said))
+
+    assert validation.conversation_not_carried_over(text, text.passages()) == [], said
+
+
+def test_a_list_of_tests_is_cut_whole_and_care_said_after_an_order_is_kept():
+    text = heard(("clinician", "i'm sending you for bloods an ecg and a chest x-ray and a urine sample"),
+                 ("clinician", "i'll send that to your pharmacy and you should rest your knee for a week"))
+
+    fields = checked(text, plan=("X-ray and urine sample. Rest your knee for a week.",
+                                 ["a chest x-ray and a urine sample", "you should rest your knee for a week"]))
+
+    listed = " ".join(text.text[i["start"] : i["end"]] for i in validation.conversation_not_carried_over(text, text.passages()))
+
+    assert "a chest x-ray and a urine sample" in listed and "send that to your pharmacy" in listed
+    assert "rest your knee" not in listed
+    assert not fields["plan"].pending, "the list's tail is the order's, not the Plan's"
+    rest = checked(text, plan=("Rest your knee for a week.", ["you should rest your knee for a week"]))["plan"]
+    assert rest.pending
+
+
+def test_nothing_of_an_act_is_left_in_a_value_and_sort_that_out_needs_the_refill_last():
+    referral = heard(("clinician", "i've put in a referral to cardiology"))
+    parking = heard(("patient", "can you refill my inhaler also i got a parking ticket out there"),
+                    ("clinician", "i'll sort that out"))
+
+    plan = checked(referral, plan=("I've put in a referral to cardiology.", ["i've put in a referral to cardiology"]))["plan"]
+
+    assert not plan.pending and plan.value == ""
+    assert validation.conversation_not_carried_over(parking, parking.passages()) == []
+
+
+# The conversation's own names live beside the common ones in one module: none may stand in for a common one, which
+# would change what a dictation's checks do.
+def test_no_name_in_the_checks_is_defined_twice():
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse(Path(validation.__file__).read_text(encoding="utf-8"))
+    names = [target.id for node in tree.body if isinstance(node, ast.Assign) for target in node.targets
+             if isinstance(target, ast.Name)]
+    names += [node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.ClassDef))]
+
+    assert sorted({name for name in names if names.count(name) > 1}) == []

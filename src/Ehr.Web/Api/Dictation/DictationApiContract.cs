@@ -193,9 +193,10 @@ public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField
     public static readonly string[] Codes =
     [
         "unknown_field", "not_dictated", "too_long", "bad_format", "order_or_allergy_change", "no_sources", "source_too_short",
-        "source_not_in_transcript", "source_in_unclear_passage", "wrong_speaker", "source_superseded", "number_not_in_sources",
-        "date_not_in_sources", "drug_not_in_sources", "negation_dropped", "experiencer_dropped", "certainty_dropped",
-        "history_dropped", "words_out_of_order", "unsupported_content",
+        "source_not_in_transcript", "source_in_unclear_passage", "wrong_speaker", "source_is_a_question", "bare_answer",
+        "source_superseded", "number_not_in_sources", "date_not_in_sources", "drug_not_in_sources", "negation_dropped",
+        "experiencer_dropped", "certainty_dropped", "history_dropped", "reported_dropped", "words_out_of_order",
+        "unsupported_content",
     ];
 }
 

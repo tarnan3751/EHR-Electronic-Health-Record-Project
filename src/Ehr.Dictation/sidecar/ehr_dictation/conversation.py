@@ -2,9 +2,10 @@
 it and whether that is sure, and once the clinician has said who each voice is, who said it; and the parts of it K2
 Horizon drafts the note from, a window at a time.
 
-The text is the passages joined as a dictation's are (transcript.py), with a line break wherever who is speaking
-changes, so the review shows a turn a line and no negation or other cue reaches from one speaker's words into the next
-(validation.py ends a cue's reach at a line break). to_json() adds each segment's speakerGroup (its voice) and speaker:
+The text is the passages joined as a dictation's are (transcript.py), with a line break wherever the voice changes,
+so the review shows a turn a line and no negation or other cue reaches from one speaker's words into the next
+(validation.py ends a cue's reach at a line break); within one voice's turn, a passage diarize.py was unsure of is on
+the same line as the rest, so a cue or an instruction reaches across it. to_json() adds each segment's speakerGroup (its voice) and speaker:
 clinician, patient or other as the clinician named its voice, or unsure where diarize.py couldn't tell or the clinician
 named the voice "unsure", and null for every segment until the voices are named. A dictation's transcript has neither.
 numbered() numbers the voices that said something 1 to k, in the order they first spoke, with none missing, so a voice
@@ -63,9 +64,10 @@ class Conversation(Transcript):
                 seconds[voice] = seconds.get(voice, 0.0) + (placed.segment.end_sample - placed.segment.start_sample) / SAMPLE_RATE
         return [{"group": voice, "seconds": round(seconds[voice], 1)} for voice in sorted(seconds)]
 
-    def passages(self) -> tuple[tuple[int, int, str], ...]:
-        """Each passage's place in the text (code points) and who said it, for the checks (validation.Scope)."""
-        return tuple((placed.start, placed.end, self.speaker(i) or "unsure") for i, placed in enumerate(self.placed))
+    def passages(self) -> tuple[tuple[int, int, str, int | None], ...]:
+        """Each passage's place in the text (code points), who said it and its voice, for the checks (validation.Scope)."""
+        return tuple((placed.start, placed.end, self.speaker(i) or "unsure", self.voices[i])
+                     for i, placed in enumerate(self.placed))
 
     def to_json(self) -> dict:
         out = super().to_json()
@@ -77,7 +79,7 @@ class Conversation(Transcript):
 
 def assemble(passages: Sequence[tuple[Segment, int | None, bool]]) -> Conversation:
     """The final transcript of a visit's passages, in order, each with its voice and whether that is unsure: a line a
-    run of one speaker's passages."""
+    run of one voice's passages, sure or not, so neither a cue nor an instruction ends where only the doubt changes."""
     text = ""
     placed: list[Placed] = []
     voices: list[int | None] = []
@@ -101,7 +103,7 @@ def assemble(passages: Sequence[tuple[Segment, int | None, bool]]) -> Conversati
         run.clear()
 
     for passage in passages:
-        if run and (run[-1][1], run[-1][2]) != (passage[1], passage[2]):
+        if run and run[-1][1] != passage[1]:
             flush()
         run.append(passage)
     flush()

@@ -199,6 +199,8 @@ REASONS = (
     "source_not_in_transcript",
     "source_in_unclear_passage",
     "wrong_speaker",
+    "source_is_a_question",
+    "bare_answer",
     "source_superseded",
     "number_not_in_sources",
     "date_not_in_sources",
@@ -207,6 +209,7 @@ REASONS = (
     "experiencer_dropped",
     "certainty_dropped",
     "history_dropped",
+    "reported_dropped",
     "words_out_of_order",
     "unsupported_content",
 )
@@ -304,6 +307,8 @@ class _Transcript:
     qualified: dict[str, set[int]]  # by reason code: the words each kind of qualifier reaches
     expressions: dict[_Term, int]  # which expression each term belongs to
     kinds: tuple = ()  # the qualifiers read: QUALIFIERS, or a conversation's CONVERSATION_QUALIFIERS
+    questions: tuple = ()  # a conversation's questions (conversation_questions()), where no finding may be quoted from
+    spoken: bool = False  # a conversation's: its transcript has no commas, so neither has a value read against it
 
 
 def not_carried_over(transcript: Transcript) -> list[dict]:
@@ -334,6 +339,8 @@ def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript, *
         qualified=_qualifiers(transcript.text, words, kinds),
         expressions=_expressions(terms, words),
         kinds=kinds,
+        questions=() if scope is None else tuple(conversation_questions(transcript.text, scope.passages)),
+        spoken=scope is not None,
     )
     checked = {name: _check_field(name, fields[name]["value"], fields[name]["sources"], context, scope) for name in FIELDS}
     if scope is None:
@@ -391,6 +398,9 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         if len(quote_words) < 2 and not any(word.text[0].isdigit() for word in quote_words):
             reasons.add("source_too_short")
             continue
+        if scope is not None and all(word.text in ANSWER_WORDS for word in quote_words):
+            reasons.add(BARE_ANSWER)
+            continue
         found = _locate(quote_words, transcript, spans, scope, name)
         if isinstance(found, str):
             reasons.add(found)
@@ -403,7 +413,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
             if scope is not None:
                 speakers.append(scope.speaker(found))
     if quotes and not kept and not reasons & {"source_too_short", "source_not_in_transcript", "source_in_unclear_passage",
-                                              WRONG_SPEAKER}:
+                                              WRONG_SPEAKER, QUESTION_QUOTED, BARE_ANSWER}:
         reasons.add("order_or_allergy_change")
     quotes = kept
 
@@ -464,6 +474,11 @@ def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int
         clear = [span for span in clear if scope.speaker(span) in SPEAKERS[name]]
         if not clear:
             return WRONG_SPEAKER
+        # What an instruction takes from a question ("can you refill my inhaler") is cut as the instruction it is.
+        clear = [span for span in clear if not any(_overlaps(piece, question) for piece in _outside_instructions(span, transcript)
+                                                   for question in transcript.questions)]
+        if not clear:
+            return QUESTION_QUOTED
     unused = [span for span in clear if span not in earlier]
     after = earlier[-1][1] if earlier else 0
     ordered = [span for span in unused if span[0] >= after] + [span for span in unused if span[0] < after] or clear
@@ -1391,6 +1406,8 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
     """The qualifiers that reach words of the value's sources, in the transcript, which the value uses without them,
     even if another source has those words plain: a negation, someone else having it, uncertainty, or the past. Read
     in the transcript, so a source can't leave its qualifier out ("chest pain" quoted from "no chest pain")."""
+    if transcript.spoken:
+        value = value.replace(", ", " ")
     words = tokens(value)
     found = set()
     for qualifier in transcript.kinds:
@@ -1898,26 +1915,35 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #
 # - wrong_speaker (decision D15): a source must be in one turn of someone the field may quote (SPEAKERS): Subjective
 #   what the patient or someone with them said, Objective, Assessment and Plan what the clinician said, and any of them
-#   a passage whose speaker couldn't be told. A role written before a source ("Patient: ...") is taken off first. A
-#   source outside the window is source_not_in_transcript.
-# - Conversation hedges as well as dictation's: "could be", "might be", "maybe", "I think", "I wonder", "not sure"
-#   (CONVERSATION_CERTAINTY), so "could be gout" isn't offered as "gout"; and a hedge or a denial said to the patient,
-#   with the "you" and its verb in the cue ("I think you have gout", "I don't think you have pneumonia", "you might have
-#   gout"), so its reach starts at what it hedges rather than stopping at "you" as TERMINATORS would.
+#   a passage whose speaker couldn't be told; a source over one voice's sure and unsure passages is unsure, and one
+#   across two voices nobody's. A role written before a source ("Patient: ...") is taken off first. A source outside
+#   the window is source_not_in_transcript.
+# - The common cues read as people speak (CONVERSATION_NEGATION, CONVERSATION_CERTAINTY): each common cue, and a closed
+#   class of heads people say to each other rather than dictate ("I reckon", "my guess is", "hard to say", "I'd be
+#   surprised", "nothing to suggest", "if you have"), followed by what speech puts between a cue and its finding
+#   (_SAID_TO_THE_FINDING: fillers such as "um" or "given what you've told me", a verb of belief, "that", "if" or
+#   "whether", a clause between commas, and a subject, "I", "we" and "you" among them, with its verb), so the reach
+#   starts at the finding: "I think um you have gout", "I don't reckon I've had a fever", "it's unlikely you've had a
+#   stroke". A cue never reaches past its speaker's line. An answer "no" opening a turn reaches no further than the
+#   common rule says ("no I had my period last week").
+# - reported_dropped: someone else's belief or word, reported ("my wife thinks I have", "I was told I might have", "the
+#   other doctor said I had"), is the patient's to report; a value that drops the report is refused (REPORTED).
+# - source_is_a_question: a question is never a finding's source, in any field, for any speaker (conversation_questions(),
+#   built on the common QUESTION_OPENING): a turn or a sentence opening with a verb and its subject or with "any", the
+#   same anywhere in a turn ("your chest is clear have you had any fever"), one opening with a wh-word, "ever" or
+#   "anything", and the clinician's turn, or its last words from such an opener, when the next speaker answers it
+#   ("no", "not really", "a bit"). bare_answer: an answer alone ("not really") is never a value's source (the prompt's
+#   rule 5).
+# - The value is read as the transcript is: without commas, which nobody says.
 # - Instructions said to the patient as well as dictated ones (conversation_directives(), beside directives()): talk of
 #   an ordering act or of the prescription itself is cut from every value and listed, as dictation's instructions are;
-#   care described without one stays in the Plan. What dictation's rules don't already find ("write you a
-#   prescription", "sort out the refill", "get that refilled", "note that you're allergic", "add it to your allergies"
-#   are theirs): a prescription or script printed, done or put through; sent electronically, or to a pharmacy or chemist
-#   named or "your usual", ready or waiting there, to pick up there, or the pharmacy called; a medicine topped up or got
-#   for the patient anew, and "I'll sort that out" when a refill or a prescription was spoken of in the REFILL_LOOKBACK
-#   characters before; a test requested, arranged or booked, the patient sent for or to one, a referral put in, unless
-#   only as a possibility ("if it's no better, we can arrange an ultrasound" stays in the Plan); and a change to the
-#   chart's allergies said as people say it ("put that in your chart as an allergy", "change your codeine allergy to an
-#   intolerance", "take that off your list" when an allergy was spoken of in the ALLERGY_LOOKBACK characters before).
-#   Kept: "we'll get some bloods today", "let's get an x-ray of that knee", "I want you to have a chest x-ray", "I'll
-#   refer you to the physio", "the nurse will give you the flu jab", "I'm going to put you on amoxicillin". Where that
-#   line falls needs a clinician's reading.
+#   care described without one stays in the Plan. Found as acts, a closed-class noun and its verb in one clause in either
+#   order (_ACTS: the prescription, a supply, a test or a referral, the allergy list), "I'll sort that out" when the refill
+#   was the last thing spoken of, and "take that off your list" when the allergy was. Kept: "we'll get some bloods
+#   today", "let's get an x-ray of that knee", "I want you to have a chest x-ray", "I'll refer you to the physio", "I'll
+#   get you an appointment with the physio", "the nurse will give you the flu jab", "I'm going to put you on
+#   amoxicillin", and a test spoken of only as a possibility, with if, unless or when ("if it doesn't settle we can
+#   arrange an ultrasound"). Where that line falls needs a clinician's reading.
 # - No one_field_holds_dictation: a conversation isn't dictated into one section.
 # - Warnings on a value that passes, each pointing at a source: speaker_unsure, from a passage whose speaker couldn't be
 #   told; other_speaker, from someone else in the room, who may be speaking of themselves.
@@ -1938,6 +1964,9 @@ OTHER_SPEAKER = "other_speaker"
 PATIENTS_OWN_WORDS = "patients_own_words"
 PART_NOT_OFFERED = "part_not_offered"
 WRONG_SPEAKER = "wrong_speaker"
+QUESTION_QUOTED = "source_is_a_question"
+BARE_ANSWER = "bare_answer"
+REPORTED_DROPPED = "reported_dropped"
 
 SPEAKERS = {
     "subjective": frozenset({"patient", "other", "unsure"}),
@@ -1946,31 +1975,177 @@ SPEAKERS = {
     "plan": frozenset({"clinician", "unsure"}),
 }
 ROLE_MARK = re.compile(r"\A\s*(?:clinician|patient|other|unsure)\s*:\s*", re.IGNORECASE)
-# A hedge or a denial said to the patient, its "you" and verb part of the cue (see above): the common cues, which pass
-# over a subject and its verb, "you" among them (TO_THE_FINDING), and then a few more said to someone's face, first so
-# they win where a shorter cue starts at the same word.
-_YOU = r"you(?:['’](?:re|ve)|\s+(?:are|have|had|were|got))?"
-CONVERSATION_DENIALS = (
-    rf"i\s+(?:didn['’]t|did\s+not)\s+(?:think|believe)(?:\s+that)?\s+{_YOU}",
-    rf"i\s+(?:don['’]t|do\s+not|didn['’]t|did\s+not)\s+(?:suspect|feel)(?:\s+that)?\s+{_YOU}",
+# A hedge, a denial or a report said in a conversation, read as one shape (see above): the common cues (NEGATION,
+# CERTAINTY, which pass over a subject and its verb, TO_THE_FINDING) and a few heads people say to each other rather
+# than dictate, each followed by what speech puts between it and what it is about (_SAID_TO_THE_FINDING): fillers ("um",
+# "you know", "given what you've told me"), a verb of belief ("reckon", "say", "expect"), "that", "if" or "whether", and
+# a subject, "I" and "we" among them, with its have, be or do. All of it is the cue, so its reach starts at the finding.
+# Each list is a closed class of heads, not of sentences.
+_SP = r"[^\S\n]"  # a space within a turn: no cue reaches past its speaker's line, into the next speaker's words
+_FILLER = (
+    rf"(?:um+|uh+|er+|erm|hmm+|like|well|so|just|actually|honestly|you{_SP}+know|i{_SP}+mean|sort{_SP}+of|kind{_SP}+of"
+    rf"|to{_SP}+be{_SP}+honest|(?:given|from|based{_SP}+on){_SP}+what{_SP}+you(?:['’]ve|{_SP}+have)?{_SP}+"
+    rf"(?:told{_SP}+me|said|described))"
 )
-CONVERSATION_HEDGES = (
-    rf"i\s+(?:believe|suspect|guess|reckon|imagine)(?:\s+that)?\s+{_YOU}",
-    rf"probably\s+{_YOU}",
-    r"you\s+(?:probably|possibly|likely)\s+(?:have|had|are|were)",
-    rf"it\s+(?:might|may)\s+be(?:\s+that)?\s+{_YOU}",
-    rf"i['’]d\s+be\s+surprised\s+if\s+{_YOU}",
+_HAVE = (
+    rf"(?:['’](?:s|re|ve|m|d)(?:{_SP}+(?:got|had|been))?"
+    rf"|{_SP}+(?:(?:might|may|could|would|must)(?:{_SP}+well)?{_SP}+(?:have|be)(?:{_SP}+(?:had|been|got))?"
+    rf"|(?:do|does|did)(?:n['’]t|{_SP}+not)?{_SP}+have|(?:have|has|had)(?:n['’]t|{_SP}+not)?(?:{_SP}+(?:had|got|been))?"
+    rf"|(?:is|are|was|were|am)(?:n['’]t|{_SP}+not)?|got))"
 )
-CONVERSATION_NEGATION = re.compile(rf"\b(?:{'|'.join(CONVERSATION_DENIALS)})\b|{NEGATION.pattern}", re.IGNORECASE)
-CONVERSATION_CERTAINTY = re.compile(
-    rf"\b(?:{'|'.join(CONVERSATION_HEDGES)})\b|{CERTAINTY.pattern}|\b(?:could be|might be|maybe|i think|i wonder|not sure)\b",
+_SAID_SUBJECT = rf"(?:you|i|we|she|he|it|they|this|that|there|the{_SP}+patient|{SUBJECT})"
+# The common TO_THE_FINDING, as speech says it: fillers anywhere, more verbs of belief, "I" and "we", and never past a
+# line break (TO_THE_FINDING's own spaces would cross one, into the next speaker's words).
+_SAID_TO_THE_FINDING = (
+    rf"(?:{_SP}+{_FILLER})*(?:{_SP}*\b(?:think|believe|reckon|say|suspect|imagine|expect|feel|know)\b)?(?:{_SP}+{_FILLER})*"
+    rf"(?:{_SP}*\b(?:that|if|whether)\b)?(?:{_SP}*,[^,.;:!?\n]{{1,80}},)?(?:{_SP}+{_FILLER})*"
+    rf"(?:{_SP}+{_SAID_SUBJECT}{_HAVE})?"
+)
+_DENIAL_HEADS = (
+    rf"(?:i|we){_SP}+(?:wouldn['’]t|would{_SP}+not)",
+    rf"nothing{_SP}+(?:to{_SP}+suggest|suggests|that{_SP}+suggests)",
+)
+_DOUBT_HEADS = (
+    rf"(?:i|we){_SP}+(?:guess|guessed|reckon|reckoned|imagine|thought|dunno|don['’]t{_SP}+know)",
+    rf"hard{_SP}+to{_SP}+(?:say|tell)",
+    rf"my{_SP}+(?:guess|hunch|feeling|suspicion|impression){_SP}+is",
+    rf"(?:i['’]d|i{_SP}+would){_SP}+be{_SP}+surprised",
+    rf"(?:we['’]ll|we{_SP}+will|let['’]s|let{_SP}+us|i['’]ll|i{_SP}+will){_SP}+see",
+    rf"(?:could|might|may){_SP}+be",
+    rf"(?:to{_SP}+)?exclude",
+    rf"(?:you|i|we|she|he|it|they){_SP}+(?:might|may|could)(?:{_SP}+well)?{_SP}+(?:have|be)",
+)
+# Someone else's belief or word, reported by the patient ("my wife thinks I have", "I was told I might have", "the
+# other doctor said I had"): the patient's to report, and Subjective keeps the report or the value is refused. A
+# report reaches only with its subject ("she says it sounds funny"), not "they told me to".
+_REPORTED_HEADS = (
+    rf"(?:my|his|her|their|our|the|another|other|a){_SP}+(?:\w+{_SP}+)?(?:wife|husband|partner|mum|mom|mother|dad|father|"
+    rf"son|daughter|sister|brother|friend|family|doctor|gp|nurse|pharmacist|consultant|specialist|physio|dentist|hospital)"
+    rf"{_SP}+(?:thinks?|thought|says?|said|reckons?|reckoned|believes?|believed|suspects?|suspected|told{_SP}+me"
+    rf"|tells{_SP}+me|(?:is|was){_SP}+worried|worries|worried|wonders?|wondered)",
+    rf"(?:they|he|she|someone|everyone|people){_SP}+(?:told|tell|tells){_SP}+me"
+    rf"|(?:they|he|she|someone){_SP}+(?:said|says|thinks?|thought)",
+    rf"i{_SP}+(?:was|were|['’]ve{_SP}+been|have{_SP}+been|am|['’]m|got){_SP}+told",
+)
+# A condition ("if you have chest pain") is a doubt only with its subject and verb: a bare "if" would reach, in speech
+# nobody punctuates, into whatever is said next.
+_CONDITION = rf"(?:if|whether|unless)(?:{_SP}+{_FILLER})*{_SP}+{_SAID_SUBJECT}{_HAVE}"
+
+
+def _heads(*heads: str) -> str:
+    return rf"(?:{'|'.join(heads)})"
+
+
+# An answer "no" opening a turn reaches no further than the common rule says: "no I had my period last week" answers the
+# question and then says something plain.
+CONVERSATION_NEGATION = re.compile(
+    rf"(?m:^)(?:no|nope|nah)\b|\b{_heads(*_DENIAL_HEADS)}{_SAID_TO_THE_FINDING}\b|(?:{NEGATION.pattern}){_SAID_TO_THE_FINDING}",
     re.IGNORECASE,
 )
-CONVERSATION_QUALIFIERS = tuple(
-    qualifier._replace(before={id(NEGATION): CONVERSATION_NEGATION, id(CERTAINTY): CONVERSATION_CERTAINTY}.get(
-        id(qualifier.before), qualifier.before))
-    for qualifier in QUALIFIERS
+CONVERSATION_CERTAINTY = re.compile(
+    rf"\b(?:{_CONDITION}|{_heads(*_DOUBT_HEADS)}{_SAID_TO_THE_FINDING})\b|(?:{CERTAINTY.pattern}){_SAID_TO_THE_FINDING}",
+    re.IGNORECASE,
 )
+REPORTED = re.compile(
+    rf"\b{_heads(*_REPORTED_HEADS)}(?:{_SP}+that)?(?:{_SP}+{_FILLER})*{_SP}+{_SAID_SUBJECT}(?:{_HAVE})?\b", re.IGNORECASE
+)
+CONVERSATION_QUALIFIERS = (
+    *(
+        # The spoken cues carry their own way to the finding (_SAID_TO_THE_FINDING), so not the common one too.
+        qualifier._replace(before=CONVERSATION_NEGATION, past_the_subject=False) if qualifier.before is NEGATION
+        else qualifier._replace(before=CONVERSATION_CERTAINTY, past_the_subject=False) if qualifier.before is CERTAINTY
+        else qualifier
+        for qualifier in QUALIFIERS
+    ),
+    Qualifier(REPORTED_DROPPED, REPORTED, None, None, False, TERMINATORS),
+)
+# Questions, by grammar and by turn-taking (conversation_questions()), for any speaker: a stretch that opens with an
+# auxiliary or modal followed by its subject ("have you had any fever", "do I need a tablet"), or, at the start of a
+# turn or a sentence, with a wh-word or "any", "ever", "anything" ("any chest pain", "how long has it been"); and the
+# clinician's last words in a turn when the other speaker's next turn opens with an answer (ANSWER). A question is
+# never a finding's source, in any field (source_is_a_question), and an answer that is only "yes", "no" or the like is
+# never a value's source on its own (bare_answer): the conversation prompt's rule 5, checked.
+_AUXILIARY = r"do|does|did|have|has|had|is|are|was|were|can|could|will|would|should|shall|may|might|am"
+QUESTION_INVERSION = re.compile(
+    rf"\b(?:{_AUXILIARY})(?:n['’]t)?[^\S\n]+(?:you|i|he|she|it|they|we|there)\b(?!['’])", re.IGNORECASE
+)
+# Before an auxiliary, words that make it a statement's ("I'll have you", "the thing is it hurts", "to have it").
+_STATEMENT_BEFORE = frozenset(
+    """i we you they he she it to will would 'll can could should must thing problem point trouble issue fact truth
+    worry question what which that never not no guess hunch feeling suspicion impression""".split()
+)
+QUESTION_OPENER = re.compile(r"\A(?:what|when|where|which|who|whom|whose|why|how|any|anything|anyone|anybody|ever)\b",
+                             re.IGNORECASE)
+_TURN_OPENERS = frozenset("and so okay ok alright right now um uh er erm well also then oh but".split())
+ANSWER = re.compile(
+    r"\A\W*(?:(?:um+|uh+|er+|erm|oh|well)\W+)*(?:yes|yeah|yep|yup|no|nope|nah|not\s+really|not\s+at\s+all|never|a\s+bit"
+    r"|a\s+little|sometimes|occasionally|i\s+think\s+so|i\s+don['’]t\s+think\s+so|mm+|mhm|uh[\s-]huh)\b",
+    re.IGNORECASE,
+)
+ANSWER_WORDS = frozenset(
+    "yes yeah yep yup no nope nah not really at all never a bit little sometimes occasionally i think so don't mm mhm uh-huh "
+    "uh huh um oh well okay ok right sure".split()
+)
+QUESTION_REACH = 12  # at most, words in a question from its opener, when nothing ends it sooner
+QUESTION_TAIL = 6  # words at the end of the clinician's turn in which an answered question is looked for
+# Words that start a statement after a question in speech nobody punctuates ("any fever okay let me listen").
+_AFTER_A_QUESTION = frozenset("okay ok alright right let let's i'll i'm we'll now so anyway".split())
+
+
+def conversation_questions(text: str, passages: tuple[tuple[int, int, str, int | None], ...]) -> list[tuple[int, int]]:
+    """The questions in a conversation's transcript, as spans (see above)."""
+    words = tokens(text)
+    found: list[tuple[int, int]] = []
+
+    def stretch(first: int) -> tuple[int, int]:
+        stop = _sentence_end(text, words[first].start)
+        last = first
+        for i in range(first + 1, min(len(words), first + QUESTION_REACH)):
+            if words[i].end > stop or words[i].text in _AFTER_A_QUESTION:
+                break
+            last = i
+        return words[first].start, words[last].end
+
+    def opens_a_sentence(i: int) -> bool:
+        k = i - 1
+        while k >= 0 and words[k].text in _TURN_OPENERS and "\n" not in text[words[k].end : words[i].start]:
+            k -= 1
+        return k < 0 or any(mark in text[words[k].end : words[k + 1].start] for mark in ".!?;\n")
+
+    # The common questions (QUESTION_OPENING: a turn or a sentence opening with a verb and its subject, or "any"), then
+    # what speech adds: the same anywhere in a turn, and the turn-taking below.
+    for match in re.finditer(QUESTION_OPENING, text, re.IGNORECASE):
+        found.append(stretch(next(k for k, word in enumerate(words) if word.end > match.end() - 1)))
+    for match in QUESTION_INVERSION.finditer(text):
+        i = next(k for k, word in enumerate(words) if word.start >= match.start())
+        before = words[i - 1].text if i else ""
+        statement = before in _STATEMENT_BEFORE or before.endswith(("'ll", "’ll", "'d", "’d"))
+        if i and statement and "\n" not in text[words[i - 1].end : words[i].start]:
+            continue
+        found.append(stretch(i))
+    for i, word in enumerate(words):
+        if QUESTION_OPENER.match(word.text) and opens_a_sentence(i):
+            found.append(stretch(i))
+    # Turn-taking: the clinician's turn answered by the next speaker. Its question is the whole turn when the turn is no
+    # longer than QUESTION_TAIL words ("chest pain at all"), or else from an opener among its last QUESTION_TAIL words
+    # ("your chest is clear any fever"); a statement answered "yes" is still a statement.
+    for (start, end, who, _), (next_start, _, next_who, _) in zip(passages, passages[1:], strict=False):
+        if who != "clinician" or next_who == "clinician" or "\n" not in text[end : next_start + 1]:
+            continue
+        if not ANSWER.match(text[next_start:]):
+            continue
+        line_start = text.rfind("\n", 0, end) + 1
+        turn = [word for word in words if line_start <= word.start and word.end <= end]
+        tail = turn[-QUESTION_TAIL:]
+        opener = next((word for word in tail if QUESTION_OPENER.match(word.text)
+                       or QUESTION_INVERSION.match(text, word.start)), None)
+        if len(turn) <= QUESTION_TAIL:
+            found.append((turn[0].start, turn[-1].end))
+        elif opener is not None:
+            found.append((opener.start, turn[-1].end))
+    return sorted(found)
+
+
 # A merged value's length at most, under the note's own limit on a field (16,000 characters, NoteContent in Ehr.Domain).
 MERGED_LIMIT = 12_000
 
@@ -1981,12 +2156,16 @@ class Scope:
     who said it (clinician, patient, other or unsure), in order."""
 
     window: tuple[int, int]
-    passages: tuple[tuple[int, int, str], ...]
+    passages: tuple[tuple[int, int, str, int | None], ...]  # place, who and voice (conversation.Conversation.passages())
 
     def speaker(self, span: tuple[int, int]) -> str | None:
-        """Who said the span: the speaker of the turn it lies in, or None if it runs across two speakers' turns."""
-        inside = [who for start, end, who in self.passages if start < span[1] and span[0] < end]
-        return inside[0] if inside and len(set(inside)) == 1 else None
+        """Who said the span: the speaker of the passages it lies in; unsure if they are one voice's, some of them unsure;
+        None if it runs across two voices."""
+        inside = [(who, voice) for start, end, who, voice in self.passages if start < span[1] and span[0] < end]
+        if not inside or len({voice for _, voice in inside}) != 1:
+            return None
+        said = {who for who, _ in inside}
+        return said.pop() if len(said) == 1 else "unsure"
 
 
 def _warn_of_speakers(checked: dict[str, Checked]) -> None:
@@ -2035,10 +2214,10 @@ def merge(parts: list[tuple[Scope, Checks]]) -> Checks:
     return Checks(fields, unknown)
 
 
-def conversation_not_carried_over(transcript: Transcript, passages: tuple[tuple[int, int, str], ...]) -> list[dict]:
+def conversation_not_carried_over(transcript: Transcript, passages: tuple[tuple[int, int, str, int | None], ...]) -> list[dict]:
     """not_carried_over() for a conversation: the instructions said in the clinician's passages, and in those whose speaker
     couldn't be told, each with who said it (see above)."""
-    said = [(start, end, who) for start, end, who in passages if who in ("clinician", "unsure")]
+    said = [(start, end, who) for start, end, who, _ in passages if who in ("clinician", "unsure")]
     return [
         {"reason": kind, "start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end),
          "speaker": who}
@@ -2048,80 +2227,142 @@ def conversation_not_carried_over(transcript: Transcript, passages: tuple[tuple[
     ]
 
 
-# Instructions said to the patient (see above), beside directives(): each pattern an ordering act or the prescription
-# itself, or a change to the allergy list. A span starts at its lead-in, and one negated in its clause ("I won't send it
-# to the pharmacy") is no instruction. It ends at most SPOKEN_REACH words on, at the end of its line, or before a word
-# that starts another sentence or step (SPOKEN_STARTS, CLAUSE_STARTS, NEW_CLAUSE but "you"): nobody says the full stop,
-# so "I'll sort that out before you go I've got your questionnaire" ends before "I've", and "I'm sending it to your
-# pharmacy take it twice a day" before "take".
-_PHARMACY = (
-    r"(?:(?:your|the|a)\s+)?(?:usual\s+|local\s+|regular\s+|nearest\s+)?(?:pharmacy|pharmacist|chemist'?s?|drugstore|drug\s+store"
-    r"|walgreens|cvs|rite\s?aid|walmart|costco|kroger|duane\s+reade|boots|lloyds|superdrug)"
+# Instructions said to the patient (see above), beside directives(), found as acts rather than phrases: a noun of a
+# closed class and a verb of the act it names, in either order, in one clause and at most ACT_REACH words apart
+# (_ACTS). The prescription itself (prescription, script, repeat, refill, pharmacy or chemist, sent, given, printed,
+# sorted, readied, called), a medicine got anew or topped up (an inhaler, tablets, a supply; or "more of" a drug), a
+# test or a referral ordered (a test or a form, request, referral or booking, requested, booked, arranged, popped in,
+# written up, sent for, or asked of the lab) and the allergy list changed (allergy, allergic or intolerance, noted,
+# marked, recorded, put down, updated, flagged, added, removed, changed). A test or a referral spoken of only as a
+# possibility, with if, unless or when in its line near it ("if it doesn't settle we can arrange an ultrasound"), stays
+# in the Plan; "can" alone is no possibility. One negated in its clause ("I won't send it to the pharmacy") is no
+# instruction. Its span starts at its subject and lead-in ("I've put in a referral", so nothing of it is left behind)
+# and ends as _spoken_end() says. "I'll sort that out" and "we'll take that off your list" are acts when the refill or
+# the allergy is what was spoken of last: among the TOPIC_WORDS words before, in that turn or the one before it.
+ACT_REACH = 8
+TOPIC_WORDS = 8
+_PHARMACIES = (
+    r"(?:pharmacy|pharmacist|chemist['’]?s?|drugstore|drug\s+store|walgreens|cvs|rite\s?aid|walmart|costco|kroger|"
+    r"duane\s+reade|boots|lloyds|superdrug)"
 )
-_TESTS = (
-    r"(?:scans?|x-?rays?|mri|ct|ultrasound|ecg|ekg|echo(?:cardiogram)?|tests?|bloods|blood\s+(?:work|tests?|count)|panel"
-    r"|cultures?|swabs?|colonoscopy|endoscopy|biopsy|mammogram|smear|referral|count)"
+_PRESCRIPTION = rf"(?:(?:e-?)?(?:prescriptions?|scripts?|repeats?|refills?|rx)|electronically|{_PHARMACIES})"
+_SUPPLY = r"(?:inhalers?|tablets?|pills?|capsules?|cream|ointment|patch(?:es)?|drops|supply|supplies|medicines?|medications?)"
+_TEST = (
+    r"(?:tests?|bloods|blood\s+(?:work|tests?|count|panel)|panel|scan|x-?rays?|mri|ct|ultrasound|ecg|ekg|echo(?:cardiogram)?|"
+    r"colonoscopy|endoscopy|biopsy|mammogram|smear|dexa|cultures?|swabs?|referral|forms?|request|booking)"
 )
-# The prescription, the pharmacy, a refill.
-CONVERSATION_ORDERS = [re.compile(pattern, re.IGNORECASE) for pattern in (
-    r"\b(?:print|printing|do|doing)\s+you\s+(?:a\s+|another\s+|the\s+|your\s+)?(?:new\s+|repeat\s+|paper\s+)?"
-    r"(?:prescription|script|rx)\b",
-    r"\bput(?:ting)?\s+(?:a|the|your)\s+(?:new\s+|repeat\s+)?(?:prescription|script)\s+through\b",
-    r"\bsent\s+(?:it|that|this|them|the\s+prescription|your\s+prescription)\s+(?:off\s+|over\s+)?electronically\b",
-    rf"\b(?:send|sending|sent)\b(?:(?![.\n]).){{0,40}}?\b(?:to|over\s+to|off\s+to)\s+{_PHARMACY}\b",
-    rf"\b(?:get|getting)\s+(?:that|it|this|them|those)\s+sent\s+(?:over\s+|off\s+)?to\s+{_PHARMACY}\b",
-    rf"\b(?:you'll|you will)\s+have\s+(?:a\s+)?(?:new\s+)?(?:one|prescription|supply|refill|inhaler|it|them)\b(?:(?![.\n]).){{0,30}}?"
-    rf"\bat\s+{_PHARMACY}\b",
-    rf"\b(?:it'll|it will|that'll|that will|they'll|they will)\s+be\s+(?:ready|waiting)\b(?:(?![.\n]).){{0,20}}?\b(?:at|in)\s+"
-    rf"{_PHARMACY}\b",
-    rf"\bpick\s+(?:it|that|them|this|those)\s+up\s+(?:from|at)\s+{_PHARMACY}\b",
-    rf"\bcall(?:ing)?\s+{_PHARMACY}\b",
-    r"\bget\s+you\s+(?:a\s+|an\s+|some\s+)?(?:new|fresh|another|more)\b",
-    r"\btop(?:ping)?\s+up\s+(?:your|the|that|this|it)\b",
-)]
-# A test or a referral: not when spoken of only as a possibility (_ONLY_POSSIBLY).
-CONVERSATION_TEST_ORDERS = [re.compile(pattern, re.IGNORECASE) for pattern in (
-    rf"\brequest(?:ing)?\s+(?:a\s+|an\s+|some\s+|the\s+|your\s+)?(?:\w+\s+){{0,2}}?{_TESTS}\b",
-    rf"\barrang(?:e|ing)\s+(?:a\s+|an\s+|some\s+|the\s+|your\s+|for\s+)?(?:\w+\s+){{0,2}}?{_TESTS}\b",
-    r"\bbook(?:ing)?\s+you\s+(?:in\s+)?(?:for|with|into)\b",
-    r"\bget(?:ting)?\s+you\s+booked\b",
-    r"\bsend(?:ing)?\s+you\s+(?:off\s+|over\s+|down\s+)?(?:for|to)\b",
-    r"\bput(?:ting)?\s+(?:in\s+)?(?:a|the|your)\s+referral\b",
-)]
-CONVERSATION_ALLERGY_CHANGES = [re.compile(pattern, re.IGNORECASE) for pattern in (
-    # Said to the patient: dictation's rule reads only "that she, he, they or the patient is allergic".
-    r"\b(?:note|make\s+(?:a\s+)?note|record|document|flag)\s+(?:that\s+)?(?:you['’]re|you\s+are|you)\s+(?:allergic|react|reacted)\b",
-    r"\bput\s+(?:that|it|this)\s+(?:in|on|into)\s+(?:your|the)\s+(?:chart|record|notes?|file)\s+as\s+(?:an\s+)?allerg",
-    r"\b(?:write|put|mark|note|record|list)\s+(?:that|it|this)\s+(?:down\s+)?as\s+(?:an\s+)?allerg",
-    r"\b(?:remove|delete|take)\b(?:(?![.\n]).){0,40}?\b(?:from|off)\s+(?:your|the)\s+(?:chart(?:'s)?|record(?:'s)?|notes?)\s+allerg",
-    r"\bchange\s+(?:your|the|that)\s+(?:\w+\s+)?allerg\w*\s+to\b",
-    r"\bget\s+rid\s+of\s+(?:your|the|that)\s+(?:\w+\s+)?allerg",
-)]
-# "We'll take that off your list" is an allergy change when an allergy was spoken of this many characters before, and
-# "I'll sort that out" an order when a refill or a prescription was.
-ALLERGY_LOOKBACK = 300
-REFILL_LOOKBACK = 300
-_OFF_THE_LIST = re.compile(r"\b(?:take|get|remove|cross)\s+(?:that|it|this|those|them)\s+off\s+(?:your|the)\s+list\b",
-                           re.IGNORECASE)
+_ALLERGY = r"(?:allerg(?:y|ies|ic)|intoleran(?:ce|t)|sensitivit(?:y|ies)|react(?:s|ed|ions?)?)"
+# Each act: what it lists as, its nouns, and its verbs.
+_ACTS = (
+    ("order", _PRESCRIPTION,
+     r"send|sent|sending|give|giving|print|printing|print\s+(?:you\s+)?off|do|doing|sort|sorted|sorting|ready|readied|put|"
+     r"write|writing|put\s+through|putting\s+through|call|calling|ring|ringing|phone|fax|faxed|pick\s+(?:it|that|them)\s+up|"
+     r"collect|renew|renewing|renewed|issue|issued|be\s+(?:ready|waiting|with)|you['’]ll\s+have|you\s+will\s+have"),
+    ("order", _SUPPLY,
+     r"get\s+you\s+(?:a\s+|an\s+|some\s+)?(?:new|fresh|another|more|replacement)|top(?:ping)?\s+up|refilled|renew|renewed"),
+    ("order", _TEST,
+     r"request|requested|requesting|book|booked|booking|arrange|arranged|arranging|put\s+in|putting\s+in|pop|popped|"
+     r"fill\s+in|write\s+up|writing\s+up|send\s+off|sending\s+off|send\s+you|sending\s+you|get\s+you\s+booked|"
+     r"ask\s+the\s+lab|asking\s+the\s+lab|order|ordered|ordering"),
+    ("allergy_change", _ALLERGY,
+     r"note|noting|noted|make\s+(?:a\s+)?note|mark|marking|marked|record|recording|recorded|document|documented|"
+     r"put|putting|write\s+(?:it|that\s+)?down|update|updating|updated|flag|flagging|"
+     r"flagged|add|adding|added|remove|removing|removed|take\s+off|change|changing|changed|list|get\s+rid\s+of"),
+)
+# "get you more of the metformin": more of a drug is the medicine got anew too.
+_MORE_OF = re.compile(r"\bget\s+you\s+(?:some\s+)?more\s+of\s+(?:the\s+|your\s+)?(\w+)", re.IGNORECASE)
 _SORTED = re.compile(r"\b(?:sort|sorting)\s+(?:that|it|this|those|them)\s+out\b|\bget\s+(?:that|it|this)\s+sorted\b",
                      re.IGNORECASE)
-_REFILL_SPOKEN = re.compile(r"\b(?:refill|prescription|script|repeat|running out|run out|last few)", re.IGNORECASE)
-# A test or a referral spoken of only as a possibility ("we can arrange", "we could book you in"): no ordering act.
-_ONLY_POSSIBLY = re.compile(r"\b(?:can|could|might|may|would)\s*\Z", re.IGNORECASE)
-
-
+_OFF_THE_LIST = re.compile(r"\b(?:take|get|remove|cross)\s+(?:that|it|this|those|them)\s+off\s+(?:your|the)\s+list\b",
+                           re.IGNORECASE)
+_REFILL_SPOKEN = re.compile(
+    r"\b(?:refill|prescription|script|repeat|running\s+out|run\s+out|ran\s+out|last\s+few|days\s+left|running\s+low)",
+    re.IGNORECASE,
+)
+_ALLERGY_SPOKEN = re.compile(_ALLERGY, re.IGNORECASE)
+_POSSIBILITY = re.compile(r"\b(?:if|unless|when|whenever|in\s+case)\b", re.IGNORECASE)
+# Where a clause ends in speech nobody punctuates: a mark if there is one, a word that starts another clause, or a
+# subject starting another sentence.
+_CLAUSE_BREAK = CLAUSE_STARTS | frozenset("okay ok alright right now anyway".split())
+SPOKEN_LEAD_IN = LEAD_IN | frozenset(
+    "i i'll i've i'm i'd we we'll we've we're we'd let me let's just going gonna to will can could should shall now quickly "
+    "also then so".split()
+)
 SPOKEN_REACH = 6
+SPOKEN_LIMIT = 24
 SPOKEN_STARTS = frozenset("i i'm i've i'll i'd we we'll we're we've let let's how what why now okay ok right well anyway".split())
+_SUBJECTS = frozenset("you i we he she they".split())
+_MODALS = frozenset("should need must can could will would shall ought".split())
 
 
 def _spoken_end(text: str, words: list[Token], end: int) -> int:
+    """Where an instruction said aloud ends: at the end of its line, before a word that starts another sentence or step
+    (SPOKEN_STARTS, CLAUSE_STARTS, NEW_CLAUSE but "you", "you should", "and you"), SPOKEN_REACH words on, each
+    coordinated item ("bloods an ecg and a chest x-ray and a urine sample") with a reach of its own, SPOKEN_LIMIT at most."""
     stop = _sentence_end(text, end)
     end += len(re.match(r"[\w'’]*", text[end:]).group())
-    for word in [word for word in words if word.start >= end and word.end <= stop][:SPOKEN_REACH]:
-        if word.text in SPOKEN_STARTS or word.text in CLAUSE_STARTS or word.text in NEW_CLAUSE and word.text != "you":
+    following = [word for word in words if word.start >= end and word.end <= stop][:SPOKEN_LIMIT]
+    reach = SPOKEN_REACH
+    for k, word in enumerate(following):
+        after = following[k + 1].text if k + 1 < len(following) else ""
+        if word.text in SPOKEN_STARTS or word.text in CLAUSE_STARTS or (word.text in NEW_CLAUSE and word.text != "you"):
             break
-        end = word.end
+        if word.text == "you" and after in _MODALS:
+            break
+        if word.text in ("and", "or"):
+            if after in _SUBJECTS or after in NEW_CLAUSE or after in SPOKEN_STARTS:
+                break
+            reach = SPOKEN_REACH
+            continue
+        if reach == 0:
+            break
+        end, reach = word.end, reach - 1
     return end
+
+
+def _clause_apart(text: str, words: list[Token], first: int, last: int) -> bool:
+    """Whether a clause ends between the words first and last."""
+    if any(mark in text[words[first].end : words[last].start] for mark in ".,;:!?\n"):
+        return True
+    def breaks(k: int) -> bool:
+        after = words[k + 1].text if k + 1 <= last else ""
+        if words[k].text == "so" and after in ("it", "that"):  # a purpose: "update your record so it shows the allergy"
+            return False
+        return words[k].text in _CLAUSE_BREAK or (words[k].text in ("and", "but") and after in _SUBJECTS)
+
+    return any(breaks(k) for k in range(first + 1, last))
+
+
+def _acts(text: str, words: list[Token]) -> list[tuple[int, int, str, bool]]:
+    """Each act's verb and noun, in one clause: its start, end, kind, and whether it is a test's or a referral's."""
+    found = []
+    index = {word.start: k for k, word in enumerate(words)}
+
+    def at(position: int) -> int:
+        return next(k for k, word in enumerate(words) if word.end > position)
+
+    for number, (kind, noun, verb) in enumerate(_ACTS):
+        nouns = [at(m.start()) for m in re.finditer(rf"\b{noun}\b", text, re.IGNORECASE)]
+        for verb_match in re.finditer(rf"\b(?:{verb})\b", text, re.IGNORECASE):
+            first, last = index.get(verb_match.start(), at(verb_match.start())), at(verb_match.end() - 1)
+            near = [k for k in nouns if (k > last and k - last <= ACT_REACH or k < first and first - k <= ACT_REACH)
+                    and not _clause_apart(text, words, min(k, first), max(k, last))]
+            if near:  # the verb's object if it has one ("add sulfa to the allergy list"), else what it points back to
+                k = min((k for k in near if k > last), default=None) or max(near)
+                found.append((min(words[k].start, verb_match.start()), max(words[k].end, verb_match.end()), kind, number == 2))
+    for match in _MORE_OF.finditer(text):
+        if _is_drug(match.group(1).lower()):
+            found.append((match.start(), match.end(), "order", False))
+    return found
+
+
+def _topic(text: str, words: list[Token], start: int, spoken: re.Pattern) -> bool:
+    """Whether what was spoken of last, among the TOPIC_WORDS words before `start` in its turn and the one before, is
+    what `spoken` finds: the refill for "I'll sort that out", the allergy for "take that off your list"."""
+    line = text.rfind("\n", 0, start)
+    previous = text.rfind("\n", 0, max(line, 0))
+    before = [word for word in words if word.end <= start and word.start > previous][-TOPIC_WORDS:]
+    return bool(before) and bool(spoken.search(text[before[0].start : start]))
 
 
 def conversation_directive_spans(text: str) -> list[tuple[int, int]]:
@@ -2131,29 +2372,31 @@ def conversation_directive_spans(text: str) -> list[tuple[int, int]]:
 def conversation_directives(text: str) -> list[tuple[int, int, str]]:
     """directives(), and the instructions said to the patient (see above), merged as directives() merges them."""
     words = tokens(text)
-    matches = [(match, "order") for pattern in CONVERSATION_ORDERS for match in pattern.finditer(text)]
-    matches += [(match, "order") for pattern in CONVERSATION_TEST_ORDERS for match in pattern.finditer(text)
-                if not _ONLY_POSSIBLY.search(text[max(0, match.start() - 12) : match.start()])]
-    matches += [(match, "order") for match in _SORTED.finditer(text)
-                if _REFILL_SPOKEN.search(text[max(0, match.start() - REFILL_LOOKBACK) : match.start()])]
-    matches += [(match, "allergy_change") for pattern in CONVERSATION_ALLERGY_CHANGES for match in pattern.finditer(text)]
-    matches += [(match, "allergy_change") for match in _OFF_THE_LIST.finditer(text)
-                if "allerg" in text[max(0, match.start() - ALLERGY_LOOKBACK) : match.start()].lower()]
+    matches = []
+    for start, end, kind, test in _acts(text, words):
+        line_start, line_end = text.rfind("\n", 0, start) + 1, (text.find("\n", end) + 1 or len(text) + 1) - 1
+        near = [word for word in words if line_start <= word.start and word.end <= line_end]
+        if test and _POSSIBILITY.search(" ".join(w.text for w in near if abs(w.start - start) < 80 or abs(w.end - end) < 80)):
+            continue
+        matches.append((start, end, kind))
+    matches += [(m.start(), m.end(), "order") for m in _SORTED.finditer(text) if _topic(text, words, m.start(), _REFILL_SPOKEN)]
+    matches += [(m.start(), m.end(), "allergy_change") for m in _OFF_THE_LIST.finditer(text)
+                if _topic(text, words, m.start(), _ALLERGY_SPOKEN)]
     found = list(directives(text))
-    for match, kind in matches:
-        clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, match.start())), default=0)
-        negated = NEGATED_INSTRUCTION.search(text[clause : match.start()])
+    for match_start, match_end, kind in matches:
+        clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, match_start)), default=0)
+        negated = NEGATED_INSTRUCTION.search(text[clause:match_start])
         before = text[clause : clause + negated.start()] if negated else ""
         if negated and not NO_REASON.search(before) and not any(
             ANY_NEGATION.search(token.text) for token in tokens(before)[-UNDOES_REACH:]
         ):
             continue
-        start = match.start()
-        for token in reversed([token for token in words if token.end <= match.start()][-LEAD_IN_REACH:]):
-            if token.start < clause or token.text not in LEAD_IN:
+        start = match_start
+        for token in reversed([token for token in words if token.end <= match_start][-LEAD_IN_REACH:]):
+            if token.start < clause or token.text not in SPOKEN_LEAD_IN:
                 break
             start = token.start
-        found.append((start, _spoken_end(text, words, match.end()), kind))
+        found.append((start, _spoken_end(text, words, match_end), kind))
     merged: list[tuple[int, int, str]] = []
     for start, end, kind in sorted(found):
         if merged and start < merged[-1][1]:

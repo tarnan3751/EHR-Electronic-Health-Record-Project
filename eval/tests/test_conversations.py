@@ -204,5 +204,5 @@ def test_the_gold_is_checked_against_the_visit_as_medasr_writes_it():
     heard = heard_conversation(visit)
 
     assert heard.text.count("\n") >= 1 and "?" not in heard.text
-    assert all(speaker in cs.ROLES for _, _, speaker in heard.passages())
+    assert all(speaker in cs.ROLES for _, _, speaker, _ in heard.passages())
     assert conversation.windows(heard)[0].text.split("\n")[0].startswith(("Clinician: ", "Patient: ", "Other: "))
