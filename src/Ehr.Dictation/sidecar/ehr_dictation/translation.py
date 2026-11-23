@@ -75,16 +75,19 @@ import re
 import string
 from dataclasses import dataclass, field
 
-from . import drugnames, spanish, validation
+from . import drugnames, prompt, spanish, validation
 from .prompt import FIELDS
 from .textnorm import STOPWORDS, numbers, tokens
 from .transcript import Transcript, utf16_offset
 
 LIMITS = validation.LIMITS
 MAX_STATEMENTS = 30
-MAX_QUOTES = 4
-MAX_QUOTE = validation.MAX_QUOTE
-MAX_ENGLISH = 600
+# What the Spanish note schema lets one statement hold (note-fields-es.schema.json), read from it so the two can't
+# differ: two quotes of 200 characters, and 240 characters of English.
+_SCHEMA = prompt.load(language="es").schema["properties"]["statements"]["items"]["properties"]
+MAX_QUOTES = _SCHEMA["spanish"]["maxItems"]
+MAX_QUOTE = _SCHEMA["spanish"]["items"]["maxLength"]
+MAX_ENGLISH = _SCHEMA["english"]["maxLength"]
 MAX_SPANISH = 400  # UTF-16 code units of the transcript a statement's sources cover, as the on-prem app counts them
 EXTRA_WORDS = 2  # content words the English of a statement may have beyond its Spanish
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
@@ -666,7 +669,9 @@ def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]], ci
             or any(any(c.isalpha() and c not in ENGLISH_LETTERS for c in t.text) and t.text not in ctx.words
                    for t in spanish.tokens(english))):
         result.reasons.add("bad_format")
-    if len(english) > MAX_ENGLISH:
+    # The grammar stops the English at MAX_ENGLISH: a statement that reaches it without a full stop was cut, and what
+    # was cut may have changed what it says.
+    if len(english) > MAX_ENGLISH or (len(english) == MAX_ENGLISH and english[-1] not in ".!?"):
         result.reasons.add("too_long")
     english, _ = validation._without_instructions(english)
     result.english = english

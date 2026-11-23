@@ -130,17 +130,34 @@ def test_a_statement_too_long_or_too_many_is_too_long():
 
 
 def test_a_statement_citing_more_than_400_characters_of_spanish_is_too_long():
-    # The schema allows two quotes of 200; the on-prem app refuses a sentence citing more (TrustedResult).
-    def cited(first: int, second: int) -> list[str]:
-        text = "Refiere cansancio por las tardes. " * first + "Niega dolor torácico al caminar. " * second
-        statement = {"spanish": [("Refiere cansancio por las tardes. " * first).strip(" ."),
-                                 ("Niega dolor torácico al caminar. " * second).strip(" .")],
+    # The schema allows two quotes of 200; the on-prem app refuses a sentence citing more (TrustedResult). A quote is
+    # found ignoring punctuation, so the transcript's words it cites can be longer than the quote.
+    def cited(mark: str) -> list[str]:
+        text = ("Refiere cansancio por las tardes" + mark) * 5 + "fin. " + ("Niega dolor torácico al caminar" + mark) * 5
+        statement = {"spanish": [(("Refiere cansancio por las tardes ") * 5).strip(),
+                                 (("Niega dolor torácico al caminar ") * 5).strip()],
                      "english": "Tired in the afternoons, denies chest pain walking."}
-        assert sum(len(quote) for quote in statement["spanish"]) == 34 * first + 33 * second - 4
+        assert all(len(quote) <= translation.MAX_QUOTE for quote in statement["spanish"])
         return translation.check({"plan": [statement]}, [], transcript(text)).fields["plan"].reasons
 
-    assert "too_long" not in cited(6, 6)  # 398 characters
-    assert "too_long" in cited(6, 7)  # 431
+    assert "too_long" not in cited(" ")  # 323 characters cited
+    assert "too_long" in cited(" ... ... ... ")  # 413
+
+
+@pytest.mark.parametrize(("quotes", "english"), [
+    (["Tos productiva", "desde ayer", "sin fiebre"], "Productive cough since yesterday without fever."),  # three quotes
+    (["Tos productiva " + "con flemas " * 17 + "desde ayer"], "Productive cough since yesterday."),  # 201 characters
+    (["Tos productiva desde ayer"], "Productive cough since yesterday" + " with phlegm" * 18 + "."),  # 247 characters
+    # 240 characters with no full stop: the grammar cut it there, so it isn't a whole sentence.
+    (["Tos productiva desde ayer"], ("Productive cough since yesterday" + " with phlegm" * 18)[:240]),
+])
+def test_a_statement_past_the_schemas_limits_or_cut_at_them_is_too_long(quotes, english):
+    text = "Tos productiva " + "con flemas " * 17 + "desde ayer y sin fiebre."
+    assert "too_long" in reasons(text, quotes, english)
+
+
+def test_the_checks_limits_are_the_spanish_schemas():
+    assert (translation.MAX_QUOTES, translation.MAX_QUOTE, translation.MAX_ENGLISH) == (2, 200, 240)
 
 
 def test_one_failing_statement_discards_the_whole_field():
@@ -421,8 +438,7 @@ def test_a_quote_cut_inside_a_word_at_the_schemas_limit_is_not_found():
 
 
 def test_a_quote_ending_between_words_is_found():
-    assert reasons(LONG, [LONG[:QUOTE_LIMIT].rsplit(" ", 1)[0]], LONG_ENGLISH) == []
-    assert reasons(LONG, [LONG], LONG_ENGLISH) == []
+    assert reasons(LONG, [LONG[:QUOTE_LIMIT].rsplit(" ", 1)[0], LONG[QUOTE_LIMIT - 9 :]], LONG_ENGLISH) == []
 
 
 # ---- A doubt, said before what it doubts or after it (sentences outside the test set) -------------------------------
