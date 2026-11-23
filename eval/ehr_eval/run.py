@@ -16,9 +16,11 @@ instead, reasoning on at "low" capped at 256 tokens (and enable_thinking set, si
 doesn't check.
 
 The results go to eval/results/latest.json (--out), stamped with the models' hashes, the prompt, schema and parameters
-hash, the pipeline and scoring hashes (scripts.py), the test set's hash and the machine. Record the
-accepted baseline on the server machine only (README.md, "Dictation server hardware"): a run on another machine is for
-information.
+hash, the pipeline and scoring hashes (scripts.py), the test set's hash and the machine. The file is written as the run
+goes: each recording's answers as K2 Horizon gave them, before any check, then checked, and the measures only once
+every recording is in. A fault in the checks or the scoring leaves every answer so far in the file, which rescore.py
+finishes without the models once it is fixed. Record the accepted baseline on the server machine only (README.md,
+"Dictation server hardware"): a run on another machine is for information.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ import os
 import platform
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -49,8 +52,17 @@ SCHEMA_VERSION = 1
 OUT = {"off": "latest.json", "low256": "compare-low256.json"}
 
 
-async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: Structurer, scripts) -> scoring.Item:  # noqa: ANN001
+async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: Structurer, scripts,  # noqa: ANN001
+                      raw: Callable[[scoring.Item], None] | None = None) -> scoring.Item:
+    """The recording's item, checked as the sidecar checks it; `raw` is given it first, with its answer as K2 Horizon
+    gave it and no check run yet."""
     item, transcript, proposal = await answer(variant, audio_dir, recognizer, structurer, scripts)
+    if proposal is not None:
+        item.unknown = list(proposal.unknown)
+        item.fields = {name: scoring.FieldOutcome(proposed=field["value"], sources=field["sources"])
+                       for name, field in proposal.fields.items()}
+    if raw is not None:
+        raw(item)
     scoring.weigh_proposals(item, transcript)
     if proposal is None:
         return item
@@ -130,26 +142,14 @@ async def main_async(args: argparse.Namespace) -> int:
     models, recognizer, llama, structuring, structurer = open_pipeline(args, api_key)
     out = args.out or EVAL_DIR / "results" / OUT[args.reasoning]
     started_at = datetime.now(UTC).isoformat(timespec="seconds")
-
-    items: list[scoring.Item] = []
-    for number, variant in enumerate(variants, 1):
-        item = await run_variant(variant, args.audio, recognizer, structurer, scripts)
-        if item.seconds >= scoring.TWO_MINUTES and variant.get("noise") is None and not args.no_live:
-            data = (args.audio / variant["file"]).read_bytes()
-            item.chunk_seconds = await live_chunks(data, item.seconds, recognizer, structurer, models)
-        items.append(item)
-        print(f"[{number}/{len(variants)}] {variant['id']}: {item.sorting}"
-              f" ({', '.join(f'{k} {v:.1f}s' for k, v in item.timings.items())})", flush=True)
-    await llama.aclose()
-
-    results = {
+    header = {
         "schema_version": SCHEMA_VERSION,
         "baseline": False,
         "run": {
             "started_at": started_at,
-            "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "finished_at": None,
             "machine": machine(args.machine, args.device),
-            "llama_server": structurer.build,
+            "llama_server": None,
             "reasoning": args.reasoning,
             "parameters": structuring.parameters,
         },
@@ -170,13 +170,37 @@ async def main_async(args: argparse.Namespace) -> int:
             "complete": not args.only,
             "audio": manifest.get("generator", {}),
         },
-        "metrics": scoring.score(items, scripts),
-        "items": [dataclasses.asdict(item) for item in items],
     }
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def save(items: list[scoring.Item], metrics: dict | None = None) -> None:
+        header["run"] |= {"finished_at": datetime.now(UTC).isoformat(timespec="seconds"), "llama_server": structurer.build}
+        write(out, header, items, metrics)
+
+    items: list[scoring.Item] = []
+    for number, variant in enumerate(variants, 1):
+        item = await run_variant(variant, args.audio, recognizer, structurer, scripts,
+                                 raw=lambda answered: save([*items, answered]))
+        if item.seconds >= scoring.TWO_MINUTES and variant.get("noise") is None and not args.no_live:
+            data = (args.audio / variant["file"]).read_bytes()
+            item.chunk_seconds = await live_chunks(data, item.seconds, recognizer, structurer, models)
+        items.append(item)
+        save(items)
+        print(f"[{number}/{len(variants)}] {variant['id']}: {item.sorting}"
+              f" ({', '.join(f'{k} {v:.1f}s' for k, v in item.timings.items())})", flush=True)
+    await llama.aclose()
+
+    save(items, scoring.score(items, scripts))
     print(f"Wrote {out}")
     return 0
+
+
+def write(out: Path, header: dict, items: list, metrics: dict | None = None) -> None:
+    """The results file as it stands: the run's stamps, every recording answered so far, and the measures once there
+    are some."""
+    results = header | ({"metrics": metrics} if metrics is not None else {}) | {
+        "items": [dataclasses.asdict(item) for item in items]}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:

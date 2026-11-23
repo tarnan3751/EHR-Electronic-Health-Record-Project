@@ -39,6 +39,7 @@ import json
 import os
 import sys
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -112,7 +113,10 @@ class KeptAnswers(LlamaServer):
         return answer
 
 
-async def run_script(script: Script, structurer: Structurer, kept: KeptAnswers | None = None) -> scoring_es.SpanishItem:
+async def run_script(script: Script, structurer: Structurer, kept: KeptAnswers | None = None,
+                     raw: Callable[[scoring_es.SpanishItem], None] | None = None) -> scoring_es.SpanishItem:
+    """The script's display text sorted and checked; `raw` is given the item first, with the statements as K2 Horizon
+    proposed them and no check run yet."""
     transcript, sent = text_transcript(script)
     item = scoring_es.SpanishItem(
         variant=f"{script.id}--text", script=script.id, tags=list(script.tags), hypothesis=transcript.text,
@@ -133,8 +137,21 @@ async def run_script(script: Script, structurer: Structurer, kept: KeptAnswers |
                    if proposal.timings and isinstance(proposal.timings.get(key), int)}
     item.statements_written, item.statements_in_order = spanish_first(proposal.content)
     item.answer = kept.answer if kept else None
+    unchecked(item, proposal.fields, proposal.unknown)
+    if raw is not None:
+        raw(item)
     check(item, proposal.fields, proposal.unknown, transcript)
     return item
+
+
+def unchecked(item: scoring_es.SpanishItem, fields: dict[str, list[dict]], unknown: list[str]) -> None:
+    """The statements K2 Horizon proposed onto the item as it gave them, no check run: what a stored run is checked
+    again from (rescore())."""
+    item.unknown = list(unknown)
+    item.fields = {name: scoring_es.SpanishOutcome(proposed=" ".join(s["english"] for s in statements),
+                                                   sources=[quote for s in statements for quote in s["spanish"]],
+                                                   statements=statements)
+                   for name, statements in fields.items()}
 
 
 def check(item: scoring_es.SpanishItem, fields: dict[str, list[dict]], unknown: list[str],
