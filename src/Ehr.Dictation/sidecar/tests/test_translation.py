@@ -605,6 +605,13 @@ def test_a_number_with_its_label_and_a_qualifier_on_its_clause_are_offered(text,
     assert reasons(text, [text], english) == []
 
 
+def test_a_frequency_read_two_ways_may_be_written_both_ways_in_its_place():
+    text = "Warfarina 5 mg al día excepto 2,5 mg cada tercer día."
+    assert reasons(text, [text], "Warfarin 5 mg daily except 2.5 mg every other day or every third day.") == []
+    text = "Losartán en la mañana y amlodipino en la noche."
+    assert reasons(text, [text], "Losartan at night and amlodipine in the morning.") == ["order_changed"]
+
+
 def test_another_order_is_refused_and_what_isnt_spelled_alike_still_passes():
     # Fail closed: a reordering can't be told from a swap.
     text = "Amlodipino y losartán."

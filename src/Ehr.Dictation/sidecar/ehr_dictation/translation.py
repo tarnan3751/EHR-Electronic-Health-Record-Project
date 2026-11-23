@@ -88,7 +88,8 @@ statement:
      "pneumonia", _skeleton()) (order_changed): "Posible neumonía, asma conocida" is not "Pneumonia, possible asthma",
      nor "Madre con diabetes y padre con hipertensión" "Mother with hypertension and father with diabetes". English
      that says the Spanish in another order is refused as well ("Amlodipino y losartán" as "Losartan and amlodipine"):
-     the checks can't tell a reordering from a swap;
+     the checks can't tell a reordering from a swap. A frequency read two ways may be written both ways in its place
+     ("cada tercer día" as "every other day or every third day");
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
      model added ("continue metformin and check kidney function" from "continuar metformina").
 5. If any statement fails, the whole field is discarded, as an English value is.
@@ -1282,8 +1283,9 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
          [m.action for m in _spanish_mentions(said_index, ctx) if m.action not in (None, "take")], lambda e, s: e == s),
         ("periods", english_periods(english), spanish_periods(said, terms, position), lambda e, s: e in s),
     ]
-    if not all(_follows(english_items, said_items, same) for name, english_items, said_items, same in classes
-               if not refused & ALREADY[name]):
+    # A frequency read two ways ("cada tercer día") may be written both ways, each reading in its place.
+    if not all(_follows(english_items, said_items, same, shared=name == "frequencies")
+               for name, english_items, said_items, same in classes if not refused & ALREADY[name]):
         found.add("order_changed")
 
     if refused & ALREADY["clauses"]:
