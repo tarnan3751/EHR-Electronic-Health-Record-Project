@@ -11,7 +11,9 @@ the passages said in English marked unclear, as the Spanish pipeline will mark a
 Horizon sorts it with the Spanish prompt and schema (prompt.load(language="es")), the sidecar's own code, as the
 sidecar ships it (reasoning off), and the Spanish checks (translation.py) decide what would be offered. Nothing reaches
 the network but llama-server, and nothing is written but the results file, which the CI gate doesn't check. The five
-held-out scripts (eval/scripts-es-holdout) are left out unless --holdout is given, which runs only them.
+held-out scripts (eval/scripts-es-holdout) are left out unless --holdout is given, which runs only them; their fact
+lists, kept apart in eval/scripts-es-holdout-facts so their files stay as they were sealed, have a hash of their own
+in the results (facts_sha256).
 
 It prints each stop threshold of the plan (scoring_es.thresholds()) and whether it was crossed: any crossed stops the
 step until the owner decides. The results file is written as the run goes, as run.py and run_es.py write theirs: each
@@ -177,6 +179,13 @@ def check(item: scoring_es.SpanishItem, fields: dict[str, list[dict]], unknown: 
         )
 
 
+def facts_sha256(scripts_dir: Path) -> dict[str, str]:
+    """The hash of the fact lists kept apart from a folder of scripts (scoring_es.facts_dir()), when there are some: a
+    hash of their own, beside the scripts', which they leave as it was."""
+    kept_apart = scoring_es.facts_dir(scripts_dir)
+    return {"facts_sha256": scripts_sha256(kept_apart)} if kept_apart.is_dir() else {}
+
+
 def scripts_sha256(directory: Path = SCRIPTS_DIR) -> str:
     digest = hashlib.sha256()
     for path in sorted(directory.glob("*.toml")):
@@ -249,7 +258,7 @@ async def main_async(args: argparse.Namespace) -> int:
                        "schema": structuring.schema_sha256, "structuring": structuring.structuring_sha256,
                        "checks": CHECKS_CODE_SHA256, "pipeline": PIPELINE_CODE_SHA256},
         "dataset": {"scripts_sha256": scripts_sha256(scripts_dir), "scripts": len(chosen), "complete": not args.only,
-                    "holdout": args.holdout},
+                    "holdout": args.holdout} | facts_sha256(scripts_dir),
     }
 
     def save(items: list[scoring_es.SpanishItem], metrics: dict | None = None) -> None:
@@ -313,7 +322,8 @@ def rescore(stored: dict, scripts: dict[str, Script]) -> tuple[dict, list[scorin
     results = {
         **stored,
         "provenance": {**stored["provenance"], "checks": CHECKS_CODE_SHA256},
-        "dataset": {**stored["dataset"], "scripts_sha256": scripts_sha256(stored_scripts_dir(stored))},
+        "dataset": {**stored["dataset"], "scripts_sha256": scripts_sha256(stored_scripts_dir(stored))}
+                   | facts_sha256(stored_scripts_dir(stored)),
         "metrics": metrics,
         "thresholds": [{"threshold": name, "crossed": over, "measured": measured}
                        for name, over, measured in scoring_es.thresholds(metrics)],
@@ -393,7 +403,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--keep-answers", action="store_true",
                         help="store each answer as the model wrote it; makes the run a diagnostic one")
     parser.add_argument("--holdout", action="store_true",
-                        help="run only the five held-out scripts (eval/scripts-es-holdout), never used to tune the checks")
+                        help="run only the five held-out scripts (eval/scripts-es-holdout), read once unseen in run A2 and "
+                             "regression items since (eval/README.md)")
     parser.add_argument("--rescore", type=Path, help="a results file whose stored answers to check and score again")
     parser.add_argument("--out", type=Path, help=f"where the results go (a run's default: {OUT.relative_to(REPO_ROOT)})")
     args = parser.parse_args(argv)

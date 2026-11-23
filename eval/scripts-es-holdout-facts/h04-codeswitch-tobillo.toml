@@ -1,0 +1,26 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Paciente de 29 años que viene por un check-up después de un esguince de tobillo izquierdo hace 3 semanas."
+items = [{ of = "age", number = "29" }, { of = "ankle sprain", aka = ["sprain"], side = "left", duration = "3 weeks" }]
+
+[[facts]]
+said = "No ha tomado nada para el dolor."
+items = [{ of = "pain", action = "took" }]
+
+[[facts]]
+said = "tobillo izquierdo sin edema, con dolor leve a la palpación del ligamento lateral."
+items = [{ of = "ankle", side = "left" }, { of = "edema", negated = true }, { of = "tenderness", negated = false, severity = "mild" }]
+
+[[facts]]
+said = "esguince de tobillo izquierdo en resolución."
+items = [{ of = "ankle sprain", aka = ["sprain"], side = "left" }]
+
+[[facts]]
+said = "Usar una tobillera para hacer deporte."
+items = [{ of = "ankle brace", action = "take" }]
+
+[[facts]]
+said = "Follow-up en 4 semanas si persiste el dolor."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "4 weeks" }]

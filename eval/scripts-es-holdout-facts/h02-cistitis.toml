@@ -1,0 +1,34 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Mujer de 34 años con ardor al orinar y ganas de orinar con frecuencia desde hace 2 días."
+items = [{ of = "age", number = "34" }, { of = "burning on urination", aka = ["dysuria"], negated = false }, { of = "urinary frequency", negated = false, duration = "2 days" }]
+
+[[facts]]
+said = "Niega fiebre y niega dolor lumbar."
+items = [{ of = "fever", negated = true }, { of = "low back pain", aka = ["back pain"], negated = true }]
+
+[[facts]]
+said = "No está embarazada."
+items = [{ of = "pregnant", aka = ["pregnancy"], negated = true }]
+
+[[facts]]
+said = "Tira reactiva de orina con nitritos positivos."
+items = [{ of = "urine dipstick", aka = ["dipstick"], polarity = "positive" }, { of = "nitrites", polarity = "positive" }]
+
+[[facts]]
+said = "Temperatura 36,8 grados."
+items = [{ of = "temperature", number = "36.8 degrees" }]
+
+[[facts]]
+said = "cistitis aguda no complicada."
+items = [{ of = "cystitis" }]
+
+[[facts]]
+said = "nitrofurantoína 50 mg, no, perdón, 100 mg cada 12 horas durante 5 días."
+items = [{ of = "nitrofurantoin", number = "100 mg", frequency = "every 12 hours", duration = "5 days" }]
+
+[[facts]]
+said = "Control en 3 días, mejor dicho, en 7 días si no mejora."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "7 days", polarity = "better" }]

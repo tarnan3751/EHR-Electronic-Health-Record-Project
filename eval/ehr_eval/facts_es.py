@@ -152,14 +152,14 @@ ACTIONS = {
                  ["decreased", "reduced", "lowered", "tapered"]),
     "switch": (["switch", "switches", "switching", "change", "replace"], ["switched", "changed", "replaced"]),
     "take": (["take", "takes", "taking", "use", "uses", "using", "receive", "receives", "receiving"],
-             ["took", "used", "received"]),
+             ["took", "taken", "used", "received"]),
 }
 NEGATIONS = ["no", "not", "denies", "deny", "denied", "without", "negative for", "never", "none", "nor", "neither",
              "free of", "absence of", "absent"]
 AFTER_NEGATIONS = ["ruled out", "was ruled out", "were ruled out", "excluded", "was excluded"]
 NEGATION_ENDS = {"but", "however", "although", "though", "except", "with", ";", "."}
 DOUBT = ["possible", "possibly", "probable", "probably", "likely", "suspected", "suspect", "suspicion of", "maybe",
-         "perhaps", "might", "may", "rule out", "r/o", "questionable", "consistent with", "compatible with",
+         "perhaps", "might", "rule out", "r/o", "questionable", "consistent with", "compatible with",
          "suggestive of", "suggests", "concerning for", "i think", "presumed", "cannot exclude", "can't exclude"]
 HISTORY = ["history of", "previous", "previously", "prior", "past", "old", "remote", "formerly", "used to",
            "in the past", "last year"]
@@ -503,10 +503,15 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
                 if _match(toks, i, phrase) and free(i, i + len(phrase)):
                     take(i, i + len(phrase), kind, "yes")
     for i, tok in enumerate(toks):
-        if tok in RELATIVES and free(i, i + 1) and (
-                any(t in HAVING for t in toks[i + 1 : i + 3])) and not (i and toks[i - 1] in ("to", "the") and (
-                i < 2 or toks[i - 2] == "to")):
+        # A relative who has something ("her mother has"), or has what was named before ("colon cancer in her father"),
+        # not one told or given something ("advice given to the mother").
+        told = i and toks[i - 1] in ("to", "the") and (i < 2 or toks[i - 2] == "to")
+        if tok not in RELATIVES or not free(i, i + 1) or told:
+            continue
+        if any(t in HAVING for t in toks[i + 1 : i + 3]):
             take(i, i + 1, "who", tok)
+        elif toks[max(0, i - 2) : i] in (["in", "his"], ["in", "her"]):
+            take(i, i + 1, "who of what was named before", tok)
     for i, tok in enumerate(toks):
         if free(i, i + 1) and tok in ABBREVIATIONS:
             take(i, i + 1, "abbreviation", tok)
@@ -529,10 +534,11 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
         # The nearest name in the clause; at the same distance, the one after for what English says before its noun
         # (a medication change, a side, severity, polarity, doubt, the past, a relative), the one before otherwise.
         after_first = kind in ("action", "side", "severity", "polarity", "doubt", "history", "present", "who")
+        before_only = kind == "who of what was named before"
         near = [(start - (le - 1) if le <= start else s - (end - 1), (s < end) == after_first, label)
-                for s, le, label, _ in labels if clause_of[s] == clause_of[start]]
+                for s, le, label, _ in labels if clause_of[s] == clause_of[start] and (s < start or not before_only)]
         label = min(near)[2] if near else None
-        found.append(Claim(kind, label, value))
+        found.append(Claim("who" if before_only else kind, label, value))
     found += _negations(toks, labels, clause_of)
     return found
 

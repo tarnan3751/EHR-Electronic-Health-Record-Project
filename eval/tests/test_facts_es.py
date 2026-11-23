@@ -6,6 +6,7 @@ every gold statement is unchanged by them; and every change the review found the
 from __future__ import annotations
 
 import ast
+import hashlib
 import sys
 
 import pytest
@@ -14,8 +15,10 @@ from dictation_scripts_es import HOLDOUT_DIR, load_scripts
 from ehr_eval import facts_es, scoring_es
 from ehr_eval.scripts import EVAL_DIR
 
-SCRIPTS = {script.id[:3]: script for script in load_scripts()}
 HOLDOUT = load_scripts(HOLDOUT_DIR)
+SCRIPTS = {script.id[:3]: script for script in load_scripts() + HOLDOUT}  # the held-out ones too
+# The held-out scripts' five files, as sealed after run A2 (the decision log's step 17): their fact lists are kept apart.
+SEALED = "7180abd6707bf9f62b19c3b94ee21a3879fc33698f15c866752e7aef032005a9"
 
 
 def test_the_reading_imports_nothing_but_the_standard_library():
@@ -33,14 +36,29 @@ def test_the_scoring_of_changes_reads_neither_the_spanish_checks_nor_the_english
     assert not names & {"translation", "validation"}
 
 
-def test_every_script_has_a_fact_list_and_the_held_out_ones_none():
-    assert all(script.facts for script in SCRIPTS.values())
+def test_every_script_has_a_fact_list_the_held_out_ones_kept_apart_so_their_files_stay_as_sealed():
+    assert all(scoring_es.facts_of(script) for script in SCRIPTS.values())
     assert not any(script.facts for script in HOLDOUT)
+    kept_apart = scoring_es.facts_dir(HOLDOUT_DIR)
+    assert sorted(path.name for path in kept_apart.glob("*.toml")) == sorted(s.path.name for s in HOLDOUT)
+    sealed = b"".join(path.read_bytes() for path in sorted(HOLDOUT_DIR.glob("*.toml")))
+    assert hashlib.sha256(sealed).hexdigest() == SEALED
+
+
+def test_a_script_with_no_fact_list_anywhere_is_refused(tmp_path):
+    lost = tmp_path / "scripts-es"
+    lost.mkdir()
+    content = SCRIPTS["e14"].path.read_text(encoding="utf-8")
+    without = content[: content.index("\n[[facts]]")] + content[content.index("\n[[gold.") :]
+    (lost / "e14-nino-sano.toml").write_text(without, encoding="utf-8")
+    (script,) = load_scripts(lost)
+    with pytest.raises(ValueError, match="has no fact list"):
+        scoring_es.facts_of(script)
 
 
 @pytest.mark.parametrize("script", SCRIPTS.values(), ids=lambda s: s.id)
 def test_each_fact_is_said_once_in_the_text_and_follows_the_format(script):
-    for entry in facts_es.entries(script.facts):
+    for entry in facts_es.entries(scoring_es.facts_of(script)):
         assert script.display.count(entry.said) == 1, entry.said
 
 
@@ -120,6 +138,12 @@ def test_what_the_checks_own_reading_let_through_is_changed(key, said, english, 
     ("e09", "No tiene ideas suicidas.", "No suicidal ideation.", "Suicidal ideation.", "negation"),
     ("e16", "Evitar antiinflamatorios.", "Avoid NSAIDs.", "Avoid NSAIDs, hiv positive.", "abbreviation"),
     ("e12", "El INR de hoy es de 3,6.", "INR today is 3.6.", "INR yesterday was 3.6.", "date"),
+    # The held-out scripts are read against their own facts too.
+    ("h05", "Suspender enalapril e iniciar losartán 50 mg al día.", "Stop enalapril and start losartan 50 mg daily.",
+     "Start enalapril and stop losartan 50 mg daily.", "action"),
+    ("h03", "Antecedentes familiares de cáncer de colon en su padre a los 60 años.",
+     "Family history of colon cancer in her father at age 60.", "Family history of colon cancer in her sister at age 60.",
+     "relative"),
     # A value moved to another vital sign or result: "glucose 140" as "blood pressure 140".
     ("e01", "TA 152/94, FC 78, peso 88 kg.", "BP 152/94, HR 78, weight 88 kg.", "BP 152/94, pulse 88, weight 78 kg.",
      "number"),

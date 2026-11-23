@@ -13,13 +13,11 @@ runs to come.
   Changed: a number, unit, drug, frequency, date, duration, route, side, severity, abbreviation or polarity the facts of
   what it cites don't say of what it says it of (a value moved to another vital sign, result or drug is changed too),
   and a medication change, negation, doubt, the past or a relative other than theirs, or left out of something it
-  names (facts_es.py's header). A script with no fact list (the held-out ones) is compared only by its lists: a finding
-  it says is negated shown without its negation (negation_flipped), one it says is present shown negated
-  (negation_added), or a relative's finding shown with another relative (family); without_facts lists those items. A
-  changed item said elsewhere in the script is marked as moved from another passage, and is still changed. Any changed
-  without a warning stops the step (run_a.py says so) until the owner decides. Misfiled, reported on its own and never
-  a stop: a number, drug, side or medication change the facts back, so not changed, in a field whose gold doesn't say
-  it (a Plan passage put in Subjective).
+  names (facts_es.py's header). The held-out scripts' fact lists are kept apart from their files, which stay as they
+  were sealed (facts_of()). A changed item said elsewhere in the script is marked as moved from another passage, and
+  is still changed. Any changed without a warning stops the step (run_a.py says so) until the owner decides.
+  Misfiled, reported on its own and never a stop: a number, drug, side or medication change the facts back, so not
+  changed, in a field whose gold doesn't say it (a Plan passage put in Subjective).
 - instructions: offered values holding what a script's instruction to order something or change the allergy list
   would translate to (forbidden_en; must be 0), and how many of its Spanish instructions the result reported as not
   carried over.
@@ -60,6 +58,8 @@ import dataclasses
 import functools
 import re
 import statistics
+import tomllib
+from pathlib import Path
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -79,8 +79,7 @@ from .scoring import FieldOutcome, _edits, _fields, _ratio, _stats, _validation
 AMBIGUOUS_NUMBER = re.compile(r"\d[.,]\d{3}(?!\d)")  # a passage whose number reads two ways ("5.000")
 STRUCTURING_SECONDS = 90.0  # the sidecar's limit (settings.py): an answer slower than this isn't offered
 CHANGED = ("number", "unit", "drug", "frequency", "date", "duration", "route", "side", "severity", "abbreviation",
-           "polarity", "action", "negation", "certainty", "history", "experiencer", "relative", "negation_flipped",
-           "negation_added", "family")
+           "polarity", "action", "negation", "certainty", "history", "experiencer", "relative")
 MISFILED = ("number", "drug", "side", "action")
 
 
@@ -174,11 +173,8 @@ def _statement_items(english: str, spans: list[tuple[int, int]], hypothesis: str
                      script: Script) -> tuple[list[tuple[str, str, bool]], list[tuple[str, str]]]:
     """What one shown statement changed from what the Spanish it cites says (kind, what, said elsewhere in the script),
     and what it says that the Spanish backs but its field's gold doesn't have (kind, what): from the script's fact
-    list, read with facts_es.py. A script with no fact list (the held-out ones) is read for its negated, affirmed and
-    family lists alone."""
-    if not script.facts:
-        return _listed_only(english, script), []
-    entries = facts_es.entries(script.facts)
+    list (facts_of()), read with facts_es.py."""
+    entries = facts_es.entries(facts_of(script))
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items), drug_names())
     places = facts_es.places([entry.said for entry in entries], script.display, hypothesis)
     cited = [entry if not entry.refuse or AMBIGUOUS_NUMBER.search(hypothesis[place[0]:place[1]]) else
@@ -191,19 +187,25 @@ def _statement_items(english: str, spans: list[tuple[int, int]], hypothesis: str
     return changed, sorted(set(misfiled))
 
 
-def _listed_only(english: str, script: Script) -> list[tuple[str, str, bool]]:
-    changed: list[tuple[str, str, bool]] = []
-    for phrase in script.negated:
-        if not all(negated(english, phrase)):
-            changed.append(("negation_flipped", phrase, False))
-    for phrase in script.affirmed:
-        if any(negated(english, phrase)):
-            changed.append(("negation_added", phrase, False))
-    relatives = {claim.value for claim in facts_es.claims(english, facts_es.Lexicon()) if claim.kind == "who"}
-    for finding, relative in script.family:
-        if _contains(english, finding) and relatives and relative not in relatives:
-            changed.append(("family", f"{finding}: {', '.join(sorted(relatives))}", False))
-    return changed
+def facts_dir(scripts_dir: Path) -> Path:
+    """Where the fact lists of a folder of scripts whose own files can't change are kept: beside it, its name and
+    "-facts" (scripts-es-holdout-facts for the held-out scripts, sealed before they had fact lists)."""
+    return scripts_dir.parent / f"{scripts_dir.name}-facts"
+
+
+@functools.cache
+def _facts_kept_apart(path: Path) -> tuple[dict, ...]:
+    if not path.is_file():
+        return ()
+    return tuple(tomllib.loads(path.read_text(encoding="utf-8")).get("facts", []))
+
+
+def facts_of(script: Script) -> tuple[dict, ...]:
+    """A script's fact list: its own, or, for a script whose file holds none, the one kept apart for it (facts_dir())."""
+    facts = script.facts or _facts_kept_apart(facts_dir(script.path.parent) / script.path.name)
+    if not facts:
+        raise ValueError(f"{script.id} has no fact list: write one in its file, or in {facts_dir(script.path.parent)}")
+    return facts
 
 
 def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
@@ -233,8 +235,6 @@ def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> di
         "unflagged_total": sum(unflagged.values()),
         "moved_from_another_passage": sum(1 for entry in listed if entry["moved_from_another_passage"]),
         "listed": listed,
-        # Items whose script has no fact list: only its negated, affirmed and family lists are compared.
-        "without_facts": sorted({item.variant for item in items if not scripts[item.script].facts}),
         "misfiled": {"shown": {kind: misfiled[kind] for kind in MISFILED}, "total": sum(misfiled.values()),
                      "listed": misfiled_listed},
     }
@@ -295,15 +295,12 @@ def thresholds(metrics: dict) -> list[tuple[str, bool, str]]:
     discarded = metrics["discarded"]["share"]
     sorting = metrics["sorting"]
     unflagged = metrics["mistranslations"]["unflagged"]
-    without_facts = metrics["mistranslations"].get("without_facts", [])
     return [
         ("a number, unit, drug, frequency, date, duration, route, side, severity, abbreviation, polarity, medication "
          "change, negation, certainty, history or relative changed from what the Spanish it cites says (the script's "
          "fact list) and shown without a warning",
          metrics["mistranslations"]["unflagged_total"] > 0,
-         ", ".join(f"{kind} {count}" for kind, count in unflagged.items() if count) or "none"
-         + (f"; on {len(without_facts)} item(s) with no fact list only negation and relatives were compared"
-            if without_facts else "")),
+         ", ".join(f"{kind} {count}" for kind, count in unflagged.items() if count) or "none"),
         ("an instruction to order something or change the allergy list carried into a field",
          metrics["instructions"]["shown"] > 0, f"{metrics['instructions']['shown']} shown"),
         (f"English content F1 below {F1_FLOOR}", content_f1 is None or content_f1 < F1_FLOOR, f"F1 {content_f1}"),
