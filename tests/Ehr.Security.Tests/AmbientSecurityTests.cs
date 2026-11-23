@@ -310,6 +310,61 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         Assert.Equal(["pending"], await Query(visit, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
     }
 
+    // Every other part of a stored result held to its type, keys and codes, so no word of the conversation sits in one:
+    // the transcript's other keys and whether it was final; the fields, each with its status and only that status's
+    // keys, never a history; the sorting failure's code; an empty field's reasons, the service's own codes, each once;
+    // the instructions not carried over, each with its speaker; proposals; provenance's keys and code-shaped strings; and
+    // message, the app's own sentence. Each refused, staged as ehr_app; then an unsorted result as the app stores one.
+    [Fact]
+    public async Task Every_part_of_a_conversations_stored_result_is_held_to_its_type_keys_and_codes()
+    {
+        var visit = await RecordingAsync();
+        const string Said = "Synthetic words about a cough";
+        const string Transcript = "\"transcript\":{\"text\":\"\",\"final\":true,\"segments\":[]}";
+        const string Done = Transcript + ",\"sorting\":\"done\"";
+        const string Unsorted = Transcript + ",\"sorting\":\"unavailable\",\"reason\":\"model_timeout\",\"fields\":null,\"notCarriedOver\":[]";
+        string[] variants =
+        [
+            "{" + Transcript.Replace("\"final\":true", $"\"final\":\"{Said}\"", StringComparison.Ordinal) + ",\"sorting\":\"done\"}",
+            "{" + Transcript.Replace("\"final\":true", $"\"final\":{{\"said\":\"{Said}\"}}", StringComparison.Ordinal) + ",\"sorting\":\"done\"}",
+            "{" + Transcript.Replace("\"segments\":[]", $"\"segments\":[],\"words\":\"{Said}\"", StringComparison.Ordinal) + ",\"sorting\":\"done\"}",
+            "{" + Done + $",\"fields\":\"{Said}\"}}",
+            "{" + Done + $",\"fields\":[\"{Said}\"]}}",
+            "{" + Done + $",\"fields\":{{\"history\":{{\"status\":\"pending\",\"value\":\"{Said}\",\"sources\":[],\"warnings\":[]}}}}}}",
+            "{" + Done + $",\"fields\":{{\"subjective\":{{\"value\":\"{Said}\",\"sources\":[],\"warnings\":[]}}}}}}",
+            "{" + Done + $",\"fields\":{{\"subjective\":{{\"status\":\"pending\",\"value\":\"Synthetic proposal\",\"sources\":[],\"warnings\":[],\"said\":\"{Said}\"}}}}}}",
+            "{" + Done + ",\"fields\":{\"objective\":{\"status\":\"empty\",\"reasons\":[\"the_patient_said_cough_for_three_days\"]}}}",
+            "{" + Done + ",\"fields\":{\"objective\":{\"status\":\"empty\",\"reasons\":[" + string.Join(",", Enumerable.Repeat("\"not_dictated\"", 21)) + "]}}}",
+            "{" + Done + ",\"fields\":{\"objective\":{\"status\":\"empty\",\"reasons\":[\"not_dictated\",\"not_dictated\"]}}}",
+            "{" + Transcript + ",\"sorting\":\"unavailable\",\"reason\":\"the_patient_said_cough\"}",
+            "{" + Done + $",\"notCarriedOver\":\"{Said}\"}}",
+            "{" + Done + ",\"notCarriedOver\":[{\"reason\":\"order\",\"start\":0,\"end\":9}]}",
+            "{" + Done + ",\"proposals\":[{\"kind\":\"order\",\"start\":0,\"end\":9,\"warnings\":[]}]}",
+            "{" + Done + $",\"provenance\":\"{Said}\"}}",
+            "{" + Done + $",\"provenance\":{{\"transcript\":\"{Said}\"}}}}",
+            "{" + Done + $",\"provenance\":{{\"prompt\":\"{Said}\"}}}}",
+            "{" + Done + ",\"provenance\":{\"prompt\":\"" + new string('a', 129) + "\"}}",
+            "{" + Done + $",\"provenance\":{{\"speech\":{{\"repository\":\"synthetic\",\"words\":\"{Said}\"}}}}}}",
+            "{" + Done + ",\"message\":5}",
+            "{" + Done + $",\"message\":\"{Said}\"}}",
+        ];
+        const string StageOnly = """
+            UPDATE ehr.ai_note_reviews SET state = 'pending', result_json = @variant::jsonb WHERE id = @review;
+            INSERT INTO ehr.ambient_transcripts (id, patient_id, transcript) VALUES (@review, @patient, @transcript::jsonb);
+            """;
+        foreach (var variant in variants)
+        {
+            await Refused("23514", () => Accounts.ExecuteAsync(App, visit.Actor, StageOnly, [.. Parameters(visit), ("variant", variant)]));
+        }
+
+        // An unsorted result as the app stores one: the failure's code, provenance, and the app's own sentence.
+        var unsorted = "{" + Unsorted + """
+            ,"provenance":{"speech":{"repository":"google/medasr","commit":"0123abcd","sha256":"sha256:00ff"},"language":null,"llamaServer":"b11669-620d2225","prompt":"conversation-prompt-1","schema":"note-schema-1","structuring":"conversation-structuring-1","code":"sha256:cccc","speaker":null},"message":"The fields couldn't be sorted, so the transcript is kept as plain text."}
+            """;
+        await Accounts.ExecuteAsync(App, visit.Actor, StageOnly, [.. Parameters(visit), ("variant", unsorted)]);
+        Assert.Equal(["pending"], await Query(visit, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
+    }
+
     // Two rules step 16 widened for a visit's review (db/policies/55-ai-review.sql) and no further: a review is staged
     // pending with nothing proposed only if it is a visit's, so its transcript can be read; and a visit's review holds no
     // proposal beyond its note, even with one planted in its stored result (as by the database's owner).

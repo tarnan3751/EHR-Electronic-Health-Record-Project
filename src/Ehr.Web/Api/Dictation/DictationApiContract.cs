@@ -24,8 +24,8 @@ public sealed record Transcript(string Text, bool Final, IReadOnlyList<Transcrip
 
 // Start and End are half-open UTF-16 offsets into the transcript's text (a JavaScript string's indexes); StartMs and
 // EndMs are where the segment is in the audio. Unclear says why the words may be wrong, or is null. A recorded visit's
-// segments (step 16) say who spoke: SpeakerGroup, the voice the service told apart (1 to 3), and once the clinician has
-// said which group is whom, Speaker. A dictation's have neither.
+// segments (step 16) say who spoke: SpeakerGroup, the voice the service told apart (1 to AmbientApi.MaxVoices, 9), and
+// once the clinician has said which group is whom, Speaker. A dictation's have neither.
 public sealed record TranscriptSegment(int Start, int End, long StartMs, long EndMs, bool Final, Unclear? Unclear = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? SpeakerGroup = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Speaker? Speaker = null);
@@ -107,6 +107,10 @@ public enum Sorting
     Unavailable,
 }
 
+// Why the fields couldn't be sorted. A new reason from the service (one is coming for a visit ended undrafted because the
+// service was busy too long, such as service_busy) is added here, with its JsonStringEnumMemberName, and in the one other
+// place, the list of reasons in ehr.ambient_result_is_bare (db/policies/56-ambient-listening.sql, marked there):
+// DictationApiTests fails until the two lists are the same.
 [JsonConverter(typeof(JsonStringEnumConverter<SortingFailure>))]
 public enum SortingFailure
 {
@@ -181,8 +185,19 @@ public abstract record NoteField;
 // clinician may have corrected what it says.
 public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Sources, IReadOnlyList<FieldWarning> Warnings) : NoteField;
 
-// Nothing dictated, or what was proposed failed validation: the reasons' codes, never the text.
-public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField;
+// Nothing dictated, or what was proposed failed validation: the reasons' codes, never the text. Codes are those the
+// service gives (validation.py's REASONS: DictationApiTests reads that file, and db/policies/56-ambient-listening.sql,
+// so the three lists can't drift); a visit's are held to them (TrustedResult, and the database).
+public sealed record EmptyField(IReadOnlyList<string> Reasons) : NoteField
+{
+    public static readonly string[] Codes =
+    [
+        "unknown_field", "not_dictated", "too_long", "bad_format", "order_or_allergy_change", "no_sources", "source_too_short",
+        "source_not_in_transcript", "source_in_unclear_passage", "wrong_speaker", "source_superseded", "number_not_in_sources",
+        "date_not_in_sources", "drug_not_in_sources", "negation_dropped", "experiencer_dropped", "certainty_dropped",
+        "history_dropped", "words_out_of_order", "unsupported_content",
+    ];
+}
 
 // In a recorded visit (step 16), who said it.
 public sealed record SourceSpan(int Start, int End,

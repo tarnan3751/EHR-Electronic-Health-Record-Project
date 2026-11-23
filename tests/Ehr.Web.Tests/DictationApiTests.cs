@@ -633,6 +633,37 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         };
     }
 
+    // An empty field's reason codes are one list in three places, so none drifts: the service's (validation.py's REASONS),
+    // the contract's (EmptyField.Codes, which a visit's are held to as it is staged), and the database's guard on a
+    // visit's stored result (db/policies/56-ambient-listening.sql).
+    [Fact]
+    public async Task An_empty_fields_reasons_are_the_services_own_codes_in_the_contract_and_the_database()
+    {
+        static List<string> Quoted(string text) => [.. System.Text.RegularExpressions.Regex.Matches(text, "\"([a-z_]+)\"").Select(m => m.Groups[1].Value)];
+        var service = await File.ReadAllTextAsync(RepositoryRoot.Combine("src/Ehr.Dictation/sidecar/ehr_dictation/validation.py"), Cancel);
+        var reasons = System.Text.RegularExpressions.Regex.Match(service, @"(?m)^REASONS = \((.*?)^\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(reasons.Success, "validation.py has no REASONS.");
+        Assert.Equal(Quoted(reasons.Groups[1].Value), EmptyField.Codes);
+
+        var policies = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/56-ambient-listening.sql"), Cancel);
+        var guarded = System.Text.RegularExpressions.Regex.Match(policies, @"WHERE r NOT IN \((.*?)\)\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(guarded.Success, "56-ambient-listening.sql holds no list of reasons.");
+        Assert.Equal(EmptyField.Codes, Quoted(guarded.Groups[1].Value));
+    }
+
+    // Why fields couldn't be sorted, in the contract (SortingFailure) and in the database's guard on a visit's stored
+    // result: the same list, so a reason the service adds can't be staged by one and refused by the other.
+    [Fact]
+    public async Task The_reasons_fields_couldnt_be_sorted_are_the_contracts_in_the_database_too()
+    {
+        var policies = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/56-ambient-listening.sql"), Cancel);
+        var guarded = System.Text.RegularExpressions.Regex.Match(policies, @"result -> 'reason' IN \((.*?)\)\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(guarded.Success, "56-ambient-listening.sql holds no list of sorting failures.");
+        Assert.Equal(
+            Enum.GetValues<SortingFailure>().Select(reason => JsonSerializer.Serialize(reason).Trim('"')),
+            System.Text.RegularExpressions.Regex.Matches(guarded.Groups[1].Value, "\"([a-z_]+)\"").Select(m => m.Groups[1].Value));
+    }
+
     public static TheoryData<string> ContractAnswers() =>
         [.. Directory.EnumerateFiles(ContractFile(""), "*.json").Select(path => System.IO.Path.GetFileNameWithoutExtension(path.AsSpan()).ToString()).Order(StringComparer.Ordinal)];
 

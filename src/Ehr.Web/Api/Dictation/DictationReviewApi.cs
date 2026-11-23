@@ -209,6 +209,7 @@ public static partial class DictationApi
         if (ambient
             ? proposals.Count > 0 || result.Transcript.Segments.Any(s => s.Speaker is null)
                 || result.NotCarriedOver.Any(i => i.Speaker is not (Speaker.Clinician or Speaker.Unsure))
+                || !Bare(result)
             : spoken) return null;
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
@@ -241,5 +242,23 @@ public static partial class DictationApi
 
         var json = JsonSerializer.Serialize(result, ServiceJson);
         return System.Text.Encoding.UTF8.GetByteCount(json) > 1_048_576 ? null : new(json, suggestions, kinds);
+    }
+
+    // What the database holds a visit's stored result to besides (ehr.ambient_result_is_bare), here first, so a result
+    // it would refuse isn't staged: an empty field's reasons are the service's codes, each once at most, and provenance's
+    // names are short and code-shaped.
+    static bool Bare(DictationResult result)
+    {
+        static bool Code(string? value) => value is null
+            || value.Length is > 0 and <= 128 && value.All(c => char.IsAsciiLetterOrDigit(c) || "._:/+-".Contains(c));
+        var empty = result.Fields is { } fields
+            ? new[] { fields.Subjective, fields.Objective, fields.Assessment, fields.Plan }.OfType<EmptyField>()
+            : [];
+        var p = result.Provenance;
+        return empty.All(e => e.Reasons.Count <= EmptyField.Codes.Length && e.Reasons.Distinct().Count() == e.Reasons.Count
+                && e.Reasons.All(EmptyField.Codes.Contains))
+            && new[] { p.Speech, p.Language is { } l ? new SpeechModel(l.Repository, l.Commit, l.Sha256) : null, p.Speaker }
+                .All(m => m is null || Code(m.Repository) && Code(m.Commit) && Code(m.Sha256))
+            && Code(p.Language?.File) && Code(p.LlamaServer) && Code(p.Prompt) && Code(p.Schema) && Code(p.Structuring) && Code(p.Code);
     }
 }

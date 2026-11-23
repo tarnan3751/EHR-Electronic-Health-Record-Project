@@ -20,8 +20,9 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 // Test data: Consents without the agreement, with 4 speakers, agreed by a "neighbour", or in Spanish; a visit of three
 //   voices named with one missing, two clinicians, an unknown role, two others, a voice numbered past a gap, or a voice
 //   left out; a visit of two people, by its consent, and three voices, the third named as a person; drafts whose
-//   passage has no speaker, as the fields couldn't be sorted, whose Subjective lacks the patient's-own-words warning, or
-//   that list the patient's request as an instruction not carried over.
+//   passage has no speaker, as the fields couldn't be sorted, whose Subjective lacks the patient's-own-words warning,
+//   that list the patient's request as an instruction not carried over, whose empty field gives a reason in a code's
+//   shape that isn't the service's, or whose provenance holds words.
 // Steps:
 //   1. Start listening with each consent that isn't one.
 //   2. Start listening properly, and send a chunk of its audio through the dictation's route.
@@ -157,7 +158,23 @@ public class TC_UC23_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
          "fields":{"subjective":{"status":"pending","value":"I have had a cough for three days.","sources":[{"start":0,"end":34,"speaker":"patient"}],"warnings":[{"code":"patients_own_words","start":0,"end":34}]},
                    "objective":{"status":"empty","reasons":["not_dictated"]},"assessment":{"status":"empty","reasons":["not_dictated"]},"plan":{"status":"empty","reasons":["not_dictated"]}},
         """)]
-    public async Task A_draft_that_doesnt_say_who_said_what_isnt_staged(string draft)
+    // Or one whose empty field gives a reason the service doesn't (words in a code's shape), or whose provenance holds
+    // words: the database would refuse either as it is stored.
+    [InlineData("""
+        {"transcript":{"text":"I have had a cough for three days.","final":true,"segments":[{"start":0,"end":34,"startMs":0,"endMs":3000,"final":true,"speakerGroup":2,"speaker":"patient"}]},
+         "sorting":"done","notCarriedOver":[],
+         "fields":{"subjective":{"status":"pending","value":"I have had a cough for three days.","sources":[{"start":0,"end":34,"speaker":"patient"}],"warnings":[{"code":"patients_own_words","start":0,"end":34}]},
+                   "objective":{"status":"empty","reasons":["the_patient_said_cough_for_three_days"]},"assessment":{"status":"empty","reasons":["not_dictated"]},"plan":{"status":"empty","reasons":["not_dictated"]}},
+        """)]
+    [InlineData("""
+        {"transcript":{"text":"I have had a cough for three days.","final":true,"segments":[{"start":0,"end":34,"startMs":0,"endMs":3000,"final":true,"speakerGroup":2,"speaker":"patient"}]},
+         "sorting":"done","notCarriedOver":[],
+         "fields":{"subjective":{"status":"pending","value":"I have had a cough for three days.","sources":[{"start":0,"end":34,"speaker":"patient"}],"warnings":[{"code":"patients_own_words","start":0,"end":34}]},
+                   "objective":{"status":"empty","reasons":["not_dictated"]},"assessment":{"status":"empty","reasons":["not_dictated"]},"plan":{"status":"empty","reasons":["not_dictated"]}},
+         "provenance":{"speech":{"repository":"google/medasr","commit":"1111111","sha256":"aaaa"},"language":null,"llamaServer":null,
+         "prompt":"I have had a cough for three days","schema":"note-schema-1","structuring":"conversation-structuring-1","code":"sha256:cccc"}}
+        """, false)]
+    public async Task A_draft_that_doesnt_say_who_said_what_isnt_staged(string draft, bool withProvenance = true)
     {
         var sidecar = apps.Dictation.Reset();
         var l = await StartAsync(apps);
@@ -168,7 +185,7 @@ public class TC_UC23_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.OK, named.StatusCode);
         }
 
-        sidecar.Answer = (HttpStatusCode.OK, draft + Provenance + "}");
+        sidecar.Answer = (HttpStatusCode.OK, withProvenance ? draft + Provenance + "}" : draft);
         using var staged = await Post(l.Session.Client, l.Token, $"{DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version });
         Assert.Equal(HttpStatusCode.BadGateway, staged.StatusCode);
         Assert.Equal("invalid_result", (await Json(staged)).GetProperty("error").GetString());

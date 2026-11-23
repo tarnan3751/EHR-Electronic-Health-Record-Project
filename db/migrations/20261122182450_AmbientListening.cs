@@ -173,7 +173,8 @@ namespace Ehr.Migrations
             // the constraint trigger whose WHEN names the review's mode, so the column can; the guards on reviews and
             // proposals, which name the consents' table and would refuse every dictation's review once it is gone, even
             // after the earlier release's db/policies is applied, which doesn't know them; the guards on the two tables
-            // this drops; and the purge. The migration job creates them all again after Up.
+            // this drops; the purge; and the two functions the guards read a stored result and an edit's words with. The
+            // migration job creates them all again after Up.
             migrationBuilder.Sql("""
                 DO $$
                 DECLARE
@@ -204,6 +205,8 @@ namespace Ehr.Migrations
                 DROP FUNCTION IF EXISTS ehr.guard_ambient_transcript();
                 DROP FUNCTION IF EXISTS ehr.guard_ambient_consent();
                 DROP FUNCTION IF EXISTS ehr.purge_ambient_transcripts(interval);
+                DROP FUNCTION IF EXISTS ehr.ambient_result_is_bare(jsonb);
+                DROP FUNCTION IF EXISTS ehr.ambient_words(text);
                 """);
 
             migrationBuilder.DropForeignKey(

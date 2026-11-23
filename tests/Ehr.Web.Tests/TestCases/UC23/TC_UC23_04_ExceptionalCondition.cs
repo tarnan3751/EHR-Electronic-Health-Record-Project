@@ -239,6 +239,27 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.Equal("That language isn't available for this recording.", said.GetProperty("message").GetString());
     }
 
+    // A visit whose fields couldn't be sorted is staged as the app stores it, with the app's own sentence, which the
+    // database's guard on stored results holds it to, and the review says it.
+    [Fact]
+    public async Task A_visit_whose_fields_couldnt_be_sorted_is_staged_with_the_apps_own_sentence()
+    {
+        var sidecar = apps.Dictation.Reset();
+        sidecar.Sorting = StubSorting.Unavailable;
+        var l = await StartAsync(apps);
+        using (var stop = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/stop"))
+        using (var named = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/speakers",
+            new { speakers = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient" } }))
+        {
+            Assert.Equal(HttpStatusCode.OK, named.StatusCode);
+        }
+
+        using var staged = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version });
+        Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
+        Assert.Equal([Ehr.Web.Api.Dictation.DictationResult.UnsortedMessage], await RowsAsync(apps,
+            "SELECT result_json ->> 'message' FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
+    }
+
     [Fact]
     public async Task With_the_dictation_service_unreachable_nothing_is_recorded()
     {
