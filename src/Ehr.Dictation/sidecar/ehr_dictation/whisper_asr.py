@@ -20,8 +20,13 @@ whole vocabulary. The verdict (Recognition.unclear) is then, in this order:
   text compresses more than MAX_COMPRESSION times (a phrase repeated), or it is nothing but stock caption phrases from
   Whisper's training data (STOCK_PHRASES).
 
-The thresholds are those Whisper's own decoding uses to try again; here they mark the passage instead. There is no
-confidence for quality.py's MedASR threshold to read (None): the verdict above takes its place.
+A passage that holds more than stock caption phrases but ends with one or more loses them (without_stock_ending()):
+Whisper can add one after real speech, as it does over silence, and nobody dictates them. A stock phrase anywhere else
+in a passage, or an ending that is only like one, is kept as written.
+
+The thresholds are those Whisper's own decoding uses to try again; here they mark the passage instead. They are
+starting values, not yet measured on Spanish recordings: the Spanish eval's run B is the first to measure them. There
+is no confidence for quality.py's MedASR threshold to read (None): the verdict above takes its place.
 
 Spanish needs no spoken punctuation, since Whisper writes it. Only "punto y aparte" and "nuevo párrafo" (a full stop and
 a new paragraph) and "punto y seguido" (a full stop) are read as punctuation; "punto", "coma" and "dos puntos" stay
@@ -106,7 +111,7 @@ class Whisper:
             read = torch.tensor([self._prompt + words], device=self._device)
             logits = self._model(encoder_outputs=encoded, decoder_input_ids=read).logits[0, len(self._prompt) - 1 :].float()
             mean = mean_log_probability(logits, torch.tensor(words + [self._end], device=self._device))
-            text = self._processor.tokenizer.decode(words, skip_special_tokens=True).strip()
+            text = without_stock_ending(self._processor.tokenizer.decode(words, skip_special_tokens=True).strip())
         return Recognition(punctuated(text), None, verdict(text, spanish, no_speech, mean))
 
 
@@ -128,8 +133,18 @@ def compression_ratio(text: str) -> float:
 
 
 def _words(text: str) -> list[str]:
-    folded = "".join(c for c in unicodedata.normalize("NFD", text.casefold()) if unicodedata.category(c) != "Mn")
-    return re.findall(r"\w+", folded)
+    return [word for word, _ in _placed_words(text)]
+
+
+def _placed_words(text: str) -> list[tuple[str, int]]:
+    """Each word of the text in lower case without accents, and where it starts in the text."""
+    folded, at = [], []
+    for i, character in enumerate(text):
+        for part in unicodedata.normalize("NFD", character.casefold()):
+            if unicodedata.category(part) != "Mn":
+                folded.append(part)
+                at.append(i)
+    return [(match.group(), at[match.start()]) for match in re.finditer(r"\w+", "".join(folded))]
 
 
 STOCK = [_words(phrase) for phrase in STOCK_PHRASES]
@@ -144,6 +159,18 @@ def is_stock(text: str) -> bool:
             return False
         words = words[len(phrase) :]
     return bool(_words(text))
+
+
+def without_stock_ending(text: str) -> str:
+    """The text without the stock caption phrases it ends with, whole words in any case, accents or punctuation, when
+    something comes before them; as it is otherwise (nothing but stock phrases is is_stock()'s to mark)."""
+    words = _placed_words(text)
+    end = len(words)
+    while phrase := next((p for p in STOCK if end >= len(p) and [w for w, _ in words[end - len(p) : end]] == p), None):
+        end -= len(phrase)
+    if end in (0, len(words)):
+        return text
+    return text[: words[end][1]].rstrip(" \t\n,;:¡¿(\"'«")
 
 
 def verdict(text: str, spanish: float, no_speech: float, mean: float) -> str | None:

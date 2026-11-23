@@ -18,7 +18,8 @@ from ehr_dictation.transcript import format
 # A vocabulary of the shape Whisper's has: text tokens, then <|endoftext|>, then the special tokens.
 END, START, ENGLISH, SPANISH, TRANSCRIBE, NO_SPEECH, NO_TIMESTAMPS = 40, 41, 42, 43, 44, 45, 46
 SIZE = 47
-WORDS = {5: "Tos", 6: " seca", 7: " desde", 8: " hace", 9: " 3", 10: " días", 11: "."}
+WORDS = {5: "Tos", 6: " seca", 7: " desde", 8: " hace", 9: " 3", 10: " días", 11: ".", 12: " Gracias", 13: " por",
+         14: " ver", 15: " el", 16: " video"}
 PROMPT = [START, SPANISH, TRANSCRIBE, NO_TIMESTAMPS]
 
 
@@ -102,6 +103,33 @@ def test_a_passage_not_heard_as_spanish_is_other_language():
 ])
 def test_a_passage_whisper_may_have_made_up_is_low_confidence(model):
     assert whisper(model).recognize(SPEECH).unclear == LOW_CONFIDENCE
+
+
+def test_a_stock_caption_phrase_whisper_adds_after_real_speech_is_taken_off():
+    thanks = [12, 13, 14, 15, 16, 11]  # " Gracias por ver el video."
+    recognition = whisper(Model(SURE_OF_SPANISH, [*PROMPT, *TEXT, *thanks, END])).recognize(SPEECH)
+
+    assert recognition == whisper_asr.Recognition("Tos seca desde hace 3 días.", None, None)
+
+
+@pytest.mark.parametrize(("text", "kept"), [
+    # A stock phrase, or more than one, at the end of a passage that says something else is taken off.
+    ("Control en dos semanas. Gracias por ver el video.", "Control en dos semanas."),
+    ("Niega fiebre. Subtítulos realizados por la comunidad de Amara.org", "Niega fiebre."),
+    ("Tos seca, gracias por ver el vídeo. ¡Suscríbete!", "Tos seca"),
+    ("Sin disnea. GRACIAS POR VER EL VIDEO", "Sin disnea."),
+    # An ending only like one, or a stock phrase anywhere else, is kept as written.
+    ("Le explico los ejercicios. Gracias por venir.", "Le explico los ejercicios. Gracias por venir."),
+    ("Que vea el video de los ejercicios.", "Que vea el video de los ejercicios."),
+    ("Puede ver el video.", "Puede ver el video."),
+    ("Ejercicios realizados por la comunidad.", "Ejercicios realizados por la comunidad."),
+    ("Gracias por ver el video del paciente.", "Gracias por ver el video del paciente."),
+    ("Dice: gracias por ver el videojuego.", "Dice: gracias por ver el videojuego."),
+    # Nothing but stock phrases is left whole, for the verdict to mark low confidence.
+    ("Gracias por ver el video. Gracias por ver el video.", "Gracias por ver el video. Gracias por ver el video."),
+])
+def test_only_a_stock_ending_after_something_else_is_taken_off(text, kept):
+    assert whisper_asr.without_stock_ending(text) == kept
 
 
 def test_a_tenth_of_a_second_or_less_isnt_transcribed():
