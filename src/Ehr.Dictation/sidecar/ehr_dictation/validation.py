@@ -2279,7 +2279,9 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #   the window is source_not_in_transcript.
 # - The common cues read as people speak (CONVERSATION_NEGATION, CONVERSATION_CERTAINTY): each common cue, and a closed
 #   class of heads people say to each other rather than dictate ("I reckon", "my guess is", "hard to say", "I'd be
-#   surprised", "nothing to suggest", "if you have"), followed by what speech puts between a cue and its finding
+#   surprised", "nothing to suggest", "if you have"), and an opinion by its frame, "I" or "we", any one word but a
+#   verb of knowing or seeing, and "you have" or "you've got" ("I recogn you got", as MedASR hears "I reckon you've
+#   got"), followed by what speech puts between a cue and its finding
 #   (_SAID_TO_THE_FINDING: fillers such as "um" or "given what you've told me", a verb of belief, "that", "if" or
 #   "whether", a clause between commas, and a subject, "I", "we" and "you" among them, with its verb), so the reach
 #   starts at the finding: "I think um you have gout", "I don't reckon I've had a fever", "it's unlikely you've had a
@@ -2290,9 +2292,12 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 # - source_is_a_question: a question is never a finding's source, in any field, for any speaker (conversation_questions(),
 #   built on the common QUESTION_OPENING): a turn or a sentence opening with a verb and its subject or with "any", the
 #   same anywhere in a turn ("your chest is clear have you had any fever"), one opening with a wh-word, "ever" or
-#   "anything", and the clinician's turn, or its last words from such an opener, when the next speaker answers it
-#   ("no", "not really", "a bit"). bare_answer: an answer alone ("not really") is never a value's source (the prompt's
-#   rule 5).
+#   "anything", a wh-word run on after "and", "but", "so" or "or" with its auxiliary and subject, or its subject and an
+#   -ing verb where the auxiliary wasn't heard ("until the pain is gone and how you holding up"), the sentence before
+#   one that is only an answer in the same line ("so I read you the last week. yes please.", where the answer was too
+#   short to be a turn of its own), and the clinician's turn, or its last words from such an opener, when the next
+#   speaker answers it ("no", "not really", "a bit"). bare_answer: an answer alone ("not really") is never a value's
+#   source (the prompt's rule 5).
 # - The value is read as the transcript is: without commas, which nobody says.
 # - Instructions said to the patient as well as dictated ones (conversation_directives(), beside directives()): talk of
 #   an ordering act or of the prescription itself is cut from every value and listed, as dictation's instructions are;
@@ -2364,6 +2369,8 @@ _DENIAL_HEADS = (
     rf"(?:i|we){_SP}+(?:wouldn['’]t|would{_SP}+not)",
     rf"nothing{_SP}+(?:to{_SP}+suggest|suggests|that{_SP}+suggests)",
 )
+_KNOWING = ("know", "knew", "see", "saw", "seen", "hear", "heard", "notice", "noticed", "find", "found", "remember",
+            "understand", "understood", "told", "confirm", "confirmed")
 _DOUBT_HEADS = (
     rf"(?:i|we){_SP}+(?:guess|guessed|reckon|reckoned|imagine|thought|dunno|don['’]t{_SP}+know)",
     rf"hard{_SP}+to{_SP}+(?:say|tell)",
@@ -2373,6 +2380,11 @@ _DOUBT_HEADS = (
     rf"(?:could|might|may){_SP}+be",
     rf"(?:to{_SP}+)?exclude",
     rf"(?:you|i|we|she|he|it|they){_SP}+(?:might|may|could)(?:{_SP}+well)?{_SP}+(?:have|be)",
+    # An opinion by its frame, whatever its verb was heard as ("I recogn you got" for "I reckon you've got"): "I" or
+    # "we", one word, and "you", "she", "he" or "they" with have or got. Only a verb of knowing or seeing (_KNOWING)
+    # says it plainly ("I see you've got a rash").
+    rf"(?:i|we){_SP}+(?!(?:{'|'.join(_KNOWING)})\b)[a-z]+"
+    rf"(?=(?:{_SP}+that)?{_SP}+(?:you|she|he|they)(?:['’]ve|{_SP}+(?:have|got))\b)",
 )
 # Someone else's belief or word, reported by the patient ("my wife thinks I have", "I was told I might have", "the
 # other doctor said I had"): the patient's to report, and Subjective keeps the report or the value is refused. A
@@ -2420,8 +2432,10 @@ CONVERSATION_QUALIFIERS = (
 )
 # Questions, by grammar and by turn-taking (conversation_questions()), for any speaker: a stretch that opens with an
 # auxiliary or modal followed by its subject ("have you had any fever", "do I need a tablet"), or, at the start of a
-# turn or a sentence, with a wh-word or "any", "ever", "anything" ("any chest pain", "how long has it been"); and the
-# clinician's last words in a turn when the other speaker's next turn opens with an answer (ANSWER). A question is
+# turn or a sentence, with a wh-word or "any", "ever", "anything" ("any chest pain", "how long has it been"), or after
+# a conjunction with a wh-word and its auxiliary and subject or its subject and an -ing verb
+# (QUESTION_AFTER_A_CONJUNCTION); the sentence before one that is only an answer in the same line (ANSWER, ANSWER_ALONE);
+# and the clinician's last words in a turn when the other speaker's next turn opens with an answer (ANSWER). A question is
 # never a finding's source, in any field (source_is_a_question), and an answer that is only "yes", "no" or the like is
 # never a value's source on its own (bare_answer): the conversation prompt's rule 5, checked.
 _AUXILIARY = r"do|does|did|have|has|had|is|are|was|were|can|could|will|would|should|shall|may|might|am"
@@ -2432,6 +2446,11 @@ QUESTION_INVERSION = re.compile(
 _STATEMENT_BEFORE = frozenset(
     """i we you they he she it to will would 'll can could should must thing problem point trouble issue fact truth
     worry question what which that never not no guess hunch feeling suspicion impression""".split()
+)
+QUESTION_AFTER_A_CONJUNCTION = re.compile(
+    rf"\b(?:and|but|so|or)[^\S\n]+((?:what|when|where|which|who|whom|whose|why|how)[^\S\n]+"
+    rf"(?:(?:{_AUXILIARY})(?:n['’]t)?[^\S\n]+(?:you|i|he|she|it|they|we|there)\b|(?:you|i|he|she|it|they|we)[^\S\n]+[a-z]+ing\b))",
+    re.IGNORECASE,
 )
 QUESTION_OPENER = re.compile(r"\A(?:what|when|where|which|who|whom|whose|why|how|any|anything|anyone|anybody|ever)\b",
                              re.IGNORECASE)
@@ -2445,6 +2464,8 @@ ANSWER_WORDS = frozenset(
     "yes yeah yep yup no nope nah not really at all never a bit little sometimes occasionally i think so don't mm mhm uh-huh "
     "uh huh um oh well okay ok right sure".split()
 )
+# The words a sentence that is only an answer is made of ("yes please", "no never", "not at all").
+ANSWER_ALONE = ANSWER_WORDS | {"please"}
 QUESTION_REACH = 12  # at most, words in a question from its opener, when nothing ends it sooner
 QUESTION_TAIL = 6  # words at the end of the clinician's turn in which an answered question is looked for
 # Words that start a statement after a question in speech nobody punctuates ("any fever okay let me listen").
@@ -2485,6 +2506,15 @@ def conversation_questions(text: str, passages: tuple[tuple[int, int, str, int |
     for i, word in enumerate(words):
         if QUESTION_OPENER.match(word.text) and opens_a_sentence(i):
             found.append(stretch(i))
+    for match in QUESTION_AFTER_A_CONJUNCTION.finditer(text):
+        found.append(stretch(next(k for k, word in enumerate(words) if word.start >= match.start(1))))
+    # A sentence that is only an answer answers the sentence before it in its line, however that one was heard.
+    for line in re.finditer(r"[^\n]+", text):
+        sentences = [(m.start() + line.start(), m.end() + line.start()) for m in re.finditer(r"[^.!?]+[.!?]*", line.group())]
+        said = [[word for word in words if start <= word.start and word.end <= end] for start, end in sentences]
+        for before, answer in zip(said, said[1:], strict=False):
+            if before and answer and ANSWER.match(text[answer[0].start :]) and _alone(answer) and not _alone(before):
+                found.append((before[0].start, before[-1].end))
     # Turn-taking: the clinician's turn answered by the next speaker. Its question is the whole turn when the turn is no
     # longer than QUESTION_TAIL words ("chest pain at all"), or else from an opener among its last QUESTION_TAIL words
     # ("your chest is clear any fever"); a statement answered "yes" is still a statement.
@@ -2503,6 +2533,11 @@ def conversation_questions(text: str, passages: tuple[tuple[int, int, str, int |
         elif opener is not None:
             found.append((opener.start, turn[-1].end))
     return sorted(found)
+
+
+def _alone(sentence: list[Token]) -> bool:
+    """Whether a sentence's words are only an answer's (ANSWER_ALONE)."""
+    return all(word.text in ANSWER_ALONE for word in sentence)
 
 
 # A merged value's length at most, under the note's own limit on a field (16,000 characters, NoteContent in Ehr.Domain).

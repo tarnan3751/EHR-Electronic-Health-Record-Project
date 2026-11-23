@@ -444,6 +444,59 @@ def test_an_answer_alone_is_never_a_value():
     assert "bare_answer" in checked(text, subjective=("Not really.", ["not really"]))["subjective"].reasons
 
 
+# ---- The third review: a question or a hedge MedASR heard wrong, read by its frame ---------------------------------
+
+def test_a_question_run_on_after_a_conjunction_is_a_question_with_or_without_its_auxiliary():
+    for said in ("lets skip this weeks lesson and keep her ear dry until the pain is gone and how you holding up you had "
+                 "a long night too", "keep her ear dry until the pain is gone and how are you holding up"):
+        text = heard(("clinician", said), ("other", "I am okay just tired"))
+
+        assert "source_is_a_question" in checked(text, plan=("Keep her ear dry until the pain is gone.", [said]))[
+            "plan"].reasons, said
+
+
+def test_a_wh_word_after_a_conjunction_that_asks_nothing_is_no_question():
+    text = heard(("clinician", "take the tamsulosin at bedtime and when you get up at night sit on the edge of the bed"),
+                 ("clinician", "we will go through your blood pressure and how your mood is"))
+
+    assert validation.conversation_questions(text.text, text.passages()) == []
+
+
+def test_the_sentence_an_answer_alone_answers_in_its_line_is_a_question():
+    said = ("I did I wrote them all in a little notebook like you asked me to {period} So I read you the last week {period} "
+            "yes please {period} This morning it was 142/88 {period}")
+    text = heard(("patient", said))
+
+    fields = checked(text, subjective=("I read you the last week.", ["So I read you the last week"]))
+    kept = checked(text, subjective=("This morning it was 142/88.", ["This morning it was 142/88"]))
+
+    assert "source_is_a_question" in fields["subjective"].reasons and kept["subjective"].pending
+
+
+def test_a_word_that_isnt_an_answer_or_an_answer_after_an_answer_asks_nothing():
+    text = heard(("patient", "I take it every morning {period} Okay {period} No {period} Not at all {period}"))
+
+    assert validation.conversation_questions(text.text, text.passages()) == []
+
+
+@pytest.mark.parametrize("verb", ["recogn", "recog", "reckon", "bet", "suppose", "expect", "gather", "imagine", "hope"])
+def test_an_opinion_is_a_hedge_by_its_frame_whatever_its_verb_was_heard_as(verb):
+    said = f"I {verb} you got allergic rhinitis on top of the asthma"
+    text = heard(("clinician", said))
+
+    reasons = checked(text, assessment=("Allergic rhinitis on top of the asthma.", [said]))["assessment"].reasons
+
+    assert "certainty_dropped" in reasons, reasons
+
+
+@pytest.mark.parametrize("verb", validation._KNOWING)
+def test_a_verb_of_knowing_or_seeing_says_it_plainly(verb):
+    said = f"I {verb} you have got allergic rhinitis"
+    text = heard(("clinician", said))
+
+    assert checked(text, assessment=("You have got allergic rhinitis.", [said]))["assessment"].pending
+
+
 # The second review's acts: a closed-class noun and its verb in one clause, in either order.
 ACTS = [
     "let me print you off a prescription for the cream", "it should be ready for you at the chemist by four",
