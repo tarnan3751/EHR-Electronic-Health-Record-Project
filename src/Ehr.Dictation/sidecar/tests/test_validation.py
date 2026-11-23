@@ -1148,6 +1148,10 @@ def test_that_the_patient_is_allergic_said_alone_or_noted_by_someone_is_document
         "She is trying to get her inhaler refilled but insurance denied it.",
         "She has been unable to get her metformin refilled since March.",
         "She forgot to have her levothyroxine refilled and ran out a week ago.",
+        "Getting her medications refilled has been hard since she lost her job.",
+        # Sorting out a refill only at the start of its clause.
+        "The pharmacy will sort out the refill with her insurance.",
+        "She asked the pharmacist to sort out her prescription.",
         # Noting that she is allergic only when that is all the sentence says.
         "Note that her allergic rhinitis is worse in spring.",
         "Document that she has no known drug allergies.",

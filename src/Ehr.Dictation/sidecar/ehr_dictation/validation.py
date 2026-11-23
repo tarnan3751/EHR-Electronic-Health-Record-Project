@@ -709,9 +709,8 @@ _NOUN_BEFORE = frozenset(
 _COMPOUND_AFTER = frozenset("history number entry request requests status".split())
 _ORDERS = [
     re.compile(
-        rf"\b(?:place|put in|putting in|enter|send in|send over|send|call in|phone in|fax|write|writing|give|giving|"
-        rf"sort out|sorting out)\s+(?:(?:{_DET}|him|them|me|us|you)\s+)?(?:{_DET}\s+)?(?:\w+\s+)?"
-        rf"(?:order|prescription|script|rx|refill)s?\b",
+        rf"\b(?:place|put in|putting in|enter|send in|send over|send|call in|phone in|fax|write|writing|give|giving)\s+"
+        rf"(?:(?:{_DET}|him|them|me|us|you)\s+)?(?:{_DET}\s+)?(?:\w+\s+)?(?:order|prescription|script|rx|refill)s?\b",
         re.IGNORECASE,
     ),
     re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
@@ -784,8 +783,12 @@ _NOTED_ALLERGIC = re.compile(
     rf"(?:\s+{_NOT_MORE}[\w'’-]+){{1,4}}?(?:\s+with(?:\s+{_NOT_MORE}[\w'’-]+){{1,4}})?\s*(?=[.;!?\n]|$)",
     re.IGNORECASE,
 )
-# Having it refilled, not that it was or someone is trying to: "have her lisinopril refilled", "get that refilled".
-_REFILLED = re.compile(rf"\b(?:have|get|getting)\s+(?:(?:{_DET}|him|them|it)\s+)?(?:\w+\s+){{0,3}}?refilled\b", re.I)
+# Having it refilled, not that it was or someone is trying to: "have her lisinopril refilled", "get that refilled"; and
+# sorting out a refill or a prescription, not that the pharmacy will.
+_REFILLED = re.compile(rf"\b(?:have|get)\s+(?:(?:{_DET}|him|them|it)\s+)?(?:\w+\s+){{0,3}}?refilled\b", re.I)
+_SORT_OUT = re.compile(
+    rf"\bsort(?:ing)? out\s+(?:{_DET}\s+)?(?:\w+\s+)?(?:order|prescription|script|rx|refill)s?\b", re.IGNORECASE
+)
 _ASKING = re.compile(r"\b(?:need to|make sure(?: to)?|remember to|be sure to|don't forget to|do not forget to)\b", re.I)
 _NOTING = frozenset({"i", "we"})
 
@@ -820,6 +823,7 @@ def _not_in_the_past(text: str, match: re.Match, clause: int) -> bool:
 _PLACED = [
     ("order", _CALL_IN, _calls_in_an_order),
     ("order", _REFILLED, _at_clause_start),
+    ("order", _SORT_OUT, _at_clause_start),
     (ALLERGY_ADDITION, _NOTE_ALLERGY, _at_clause_start),
     (ALLERGY_ADDITION, _NOTED_ALLERGIC, _at_clause_start),
 ]
