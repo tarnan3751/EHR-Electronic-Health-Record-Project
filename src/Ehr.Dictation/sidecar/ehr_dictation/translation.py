@@ -51,8 +51,10 @@ statement:
      negation_added, and so on), and the relatives named the same (experiencer_changed). A doubt is the clinician's
      whether it comes before what it doubts ("creo que", "quizá", "tal vez", "a lo mejor", "puede que", "podría
      tener") or closes its clause (", creo", ", probablemente"), as validation.py hears one in English ("I think she
-     has", "maybe", "she might have", "probably", a closing ", I think"); and "no creo que tenga" is a negation, as
-     validation.py reads "I don't think she has";
+     has", "maybe", "she might have", "probably", a closing ", I think"); "no creo que tenga" and "dudo que" are a
+     negation and a doubt, as validation.py reads "I don't think she has" and "I doubt"; and "le preocupa", "me
+     pregunto si", "posibilidad de" and "presuntamente" are doubt, as "worried", "wonder", "a chance" and
+     "presumably" are;
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
      model added ("continue metformin and check kidney function" from "continuar metformina").
 5. If any statement fails, the whole field is discarded, as an English value is.
