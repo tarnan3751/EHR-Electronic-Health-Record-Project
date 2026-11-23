@@ -149,7 +149,12 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     async Task<IActionResult?> ReadAsync(Guid patientId, Guid draftId, Guid reviewId, bool read)
     {
         if (await LoadPatientAsync(patientId, AuditParts.NoteDraft) is { } denied) return denied;
-        var review = await Phi.AiReviewAsync(reviewId, HttpContext.RequestAborted);
+        // At the clinic, for a page that shows it, a visit's transcript is read with its review, a recorded read, its JSON
+        // read once; otherwise, and for what the cloud app forwards here, only whether it is still kept (below), so it never
+        // leaves the clinic's network.
+        var (review, transcript) = AtTheClinic && read
+            ? await Phi.AiReviewWithTranscriptAsync(reviewId, HttpContext.RequestAborted)
+            : (await Phi.AiReviewAsync(reviewId, HttpContext.RequestAborted), null);
         if (review is null || review.PatientId != patientId || review.DraftId != draftId) return NotFound();
         var draft = await Phi.ReadDraftAsync(draftId, patientId, HttpContext.RequestAborted, tracking: false);
         if (draft is null) return NotFound();
@@ -159,10 +164,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
             : JsonSerializer.Deserialize<DictationResult>(review.ResultJson, review.Mode == AiReviewModes.Ambient ? Visit : Json);
         if (Ambient && Result is not null)
         {
-            // At the clinic, for a page that shows it, the transcript itself, a recorded read, its JSON read once; otherwise,
-            // and for what the cloud app forwards here, only whether it is still kept, so it never leaves the clinic's
-            // network. The stored result's own transcript has no words: this one replaces it, or none does.
-            var transcript = AtTheClinic && read ? await Phi.AmbientTranscriptAsync(reviewId, HttpContext.RequestAborted) : null;
+            // The stored result's own transcript has no words: the one read with the review replaces it, or none does.
             TranscriptKept = transcript is not null
                 || !(AtTheClinic && read) && await Phi.AmbientTranscriptKeptAsync(reviewId, HttpContext.RequestAborted);
             Result = Result with { Transcript = null! };

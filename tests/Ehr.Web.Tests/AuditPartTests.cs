@@ -434,7 +434,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
     // The review of a recorded visit records every read it makes (the patient, the review, the draft, the transcript
     // and each proposal) together, in one statement: none of them is left for the unit of work, which would write each
-    // in a statement of its own (step 16, for its render time).
+    // in a statement of its own; and it reads the transcript in the query that reads its review, one round trip fewer
+    // (step 16, for its render time).
     [Fact]
     public async Task The_review_of_a_visit_records_its_reads_together()
     {
@@ -450,6 +451,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         using var page = await session.Client.GetAsync(d.ReviewUrl, Cancel);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         Assert.Equal(signedIn, saves.Count);
+        var read = Assert.Single(saves.Transcripts);
+        Assert.Contains("ai_note_reviews", read, StringComparison.Ordinal);
         await using var connection = await apps.OpenDatabaseAsync();
         await using var reads = new NpgsqlCommand("""
             SELECT table_name || ' ' || count(*) FROM ehr.audit_events
@@ -472,10 +475,14 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
         public int Count => count;
 
+        // The queries that read a visit's transcript.
+        public System.Collections.Concurrent.ConcurrentQueue<string> Transcripts { get; } = new();
+
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
             DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
         {
             if (command.CommandText.Contains("INSERT INTO ehr.audit_events", StringComparison.Ordinal)) Interlocked.Increment(ref count);
+            else if (command.CommandText.Contains("ambient_transcripts", StringComparison.Ordinal)) Transcripts.Enqueue(command.CommandText);
             return ValueTask.FromResult(result);
         }
 

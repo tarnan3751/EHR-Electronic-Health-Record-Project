@@ -1225,6 +1225,32 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     public Task<bool> AmbientTranscriptKeptAsync(Guid review, CancellationToken cancel) =>
         db.AmbientTranscripts.Where(t => t.Id == review).Select(t => t.Id).AnyAsync(cancel);
 
+    // A review and, when it is a visit's whose transcript is still kept, that transcript, in one query: the review page at
+    // the clinic (step 16), one round trip fewer than reading them apart. Each a recorded read of the note being written,
+    // as AiReviewAsync and AmbientTranscriptAsync record them.
+    public async Task<(AiNoteReview? Review, AmbientTranscript? Transcript)> AiReviewWithTranscriptAsync(Guid id, CancellationToken cancel)
+    {
+        var row = await (
+            from review in db.AiNoteReviews.AsNoTracking()
+            where review.Id == id && review.ClinicianId == user.UserId
+            join kept in db.AmbientTranscripts.AsNoTracking() on review.Id equals kept.Id into transcripts
+            from transcript in transcripts.DefaultIfEmpty()
+            select new { review, transcript }).SingleOrDefaultAsync(cancel);
+        if (row is null)
+        {
+            return (null, null);
+        }
+
+        audit.Record(AuditActions.Read, row.review.PatientId, "ai_note_reviews", row.review.Id, part: AuditParts.NoteDraft);
+        if (row.transcript is { } read)
+        {
+            audit.Record(AuditActions.Read, read.PatientId, "ambient_transcripts", read.Id, part: AuditParts.NoteDraft);
+        }
+
+        await db.SaveChangesAsync(cancel);
+        return (row.review, row.transcript);
+    }
+
     // The conversation's transcript, for the review screen: a recorded read of the note being written.
     public async Task<AmbientTranscript?> AmbientTranscriptAsync(Guid review, CancellationToken cancel)
     {
