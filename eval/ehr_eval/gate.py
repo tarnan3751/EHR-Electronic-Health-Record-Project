@@ -1,7 +1,8 @@
 """The CI gate on the dictation eval (AGENTS.md, "What done means"). CI can't run the models, so it checks the results
 someone committed instead:
 
-1. eval/results/latest.json exists, covers every script, and was produced by this commit's prompt, schema and
+1. eval/results/latest.json exists, holds exactly the recordings the scripts define (variant_ids(): none missing,
+   none extra), and was produced by this commit's prompt, schema and
    generation parameters, its code making the transcript and the answers (the pipeline hash), and from this test set's
    recordings (the recordings hash); if any of them changed, the eval has to run again. And it was scored by this
    commit's checks and scoring code and against its gold (the scoring and gold hashes); if only they changed,
@@ -18,8 +19,8 @@ someone committed instead:
    naming its recording (variant), its kind and the words shown, as the results list them (shown); a warning doesn't
    excuse one. Each accepted there still occurs, so the list stays true. The gate doesn't take the results' word for
    what was proposed: it scores the proposals again from the stored recordings (each transcript rebuilt from its
-   passages, the checks run over it, against this commit's gold; no model needed), and fails results whose proposals
-   say anything else. The two gates above on orders and allergy
+   passages, the checks run over it, against this commit's gold; no model needed), fails results whose proposals
+   block says anything else in any of its measures, and reports only the numbers it scored again. The two gates above on orders and allergy
    changes in the note's fields are unchanged beside it.
 5. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
@@ -59,7 +60,7 @@ from ehr_dictation.transcript import Segment, assemble
 from . import scoring
 from .scoring import WARNING_CODES
 from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
-                      recordings_sha256, scoring_sha256)
+                      recordings_sha256, scoring_sha256, variant_ids)
 
 RESULTS_DIR = EVAL_DIR / "results"
 KNOWN_LIMITATIONS = "known-limitations.toml"
@@ -102,7 +103,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
         )
     elif recorded.get("scoring") != scoring_sha256(eval_dir):
         problems.append(
-            "The checks or the scoring (validation.py, textnorm.py or the eval's own code) changed since these results "
+            "The checks or the scoring (validation.py, textnorm.py, catalog.py or the eval's own code) changed since these results "
             "were scored. Score the stored answers again with the code that ships: "
             "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
         )
@@ -125,6 +126,15 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
         )
     if latest.get("dataset", {}).get("recordings") != len(latest.get("items", [])):
         problems.append(f"The results' recording count doesn't match their items. {RUN_IT}")
+    defined, held = variant_ids(eval_dir), [item.get("variant") for item in latest.get("items", [])]
+    if sorted(held) != sorted(defined):
+        missing = sorted(defined - set(held))
+        extra = sorted({variant for variant in held if variant not in defined or held.count(variant) > 1})
+        problems.append(
+            f"The results hold {len(held)} recordings, not exactly the {len(defined)} the scripts define (missing: "
+            f"{', '.join(missing) or 'none'}; not defined, or held twice: {', '.join(extra) or 'none'}). Generate the "
+            f"audio for all of them, then: {RUN_IT}"
+        )
     unsorted = latest.get("metrics", {}).get("sorting", {}).get("unavailable")
     if unsorted != {}:
         problems.append(
@@ -150,7 +160,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
         problems.append(f"The results don't say what the dictation proposed. {RUN_IT}")
     else:
         again = _proposals_again(latest, eval_dir)
-        if any(proposals.get(key) != again[key] for key in PROPOSAL_METRICS):
+        if proposals != again:
             problems.append(
                 "The results' proposals aren't what their stored recordings give, scored again with this commit's checks "
                 "and gold. Score the stored answers again: "
@@ -376,14 +386,15 @@ def main() -> int:
         return 1
     latest = json.loads((RESULTS_DIR / "latest.json").read_text(encoding="utf-8"))
     metrics = latest["metrics"]
+    proposals = _proposals_again(latest, EVAL_DIR)
     baseline = "against the accepted baseline" if (RESULTS_DIR / "baseline.json").is_file() else "(no accepted baseline yet)"
     print(
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
         f"field F1 {metrics['fields']['content']['f1']} (clinical gold {metrics['fields_clinical']['content']['f1']}), "
         f"every recording sorted, no order or allergy change shown and no retracted value without a warning, "
         f"{metrics['warnings']['any']['flagged']} of {metrics['warnings']['shown']} offered values carry a warning, "
-        f"{metrics['proposals']['shown']} proposals ({metrics['proposals']['right']} right, every false or misheard one "
-        f"accepted). "
+        f"{proposals['shown']} proposals scored again from the recordings ({proposals['right']} right, recall "
+        f"{proposals['recall']}, precision {proposals['precision']}, every false or misheard one accepted). "
         f"Run on {latest['run']['machine']['label']}."
     )
     spanish = json.loads((RESULTS_DIR / "latest-es.json").read_text(encoding="utf-8"))

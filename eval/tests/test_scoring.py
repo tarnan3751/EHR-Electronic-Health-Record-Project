@@ -292,10 +292,10 @@ def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_c
         return said
 
     right = heard("Plan: go ahead and order a lipid panel. Rest.")
-    misheard = heard("Plan: go ahead and order a lipid panol. Rest.")
+    misheard = heard("Plan: go ahead and order a basic metabolic panel. Rest.")
     false = heard("Plan: go ahead and order a chest X-ray. Rest.")
     held = heard("Plan: consider ordering a lipid panel. Rest.")
-    warned = heard("Plan: go ahead and order a lipid panel. No rest.")
+    warned = heard("Plan: go ahead and order a lipid panel. Change the dressing.")
 
     proposals = score([right, misheard, false, held, warned], scripts)["proposals"]
 
@@ -304,7 +304,7 @@ def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_c
     assert proposals["held_back"] == {"hedged": 1}
     assert (proposals["recall"], proposals["precision"]) == (0.6, 0.5)
     assert proposals["listed"] == [
-        {"variant": "d03-x", "kind": "order", "shown": "go ahead and order a lipid panol", "why": "misheard"},
+        {"variant": "d03-x", "kind": "order", "shown": "go ahead and order a basic metabolic panel", "why": "misheard"},
         {"variant": "d03-x", "kind": "order", "shown": "go ahead and order a chest x ray", "why": "false"},
     ]
 

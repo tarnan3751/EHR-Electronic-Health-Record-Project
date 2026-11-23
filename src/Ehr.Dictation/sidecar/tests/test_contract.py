@@ -92,7 +92,10 @@ class Instructing(FakeRecognizer):
     """Hears a plan with an order and an allergy change in it, in every passage."""
 
     def recognize(self, samples: np.ndarray) -> Recognition:
-        return Recognition("Start metformin {period} Go ahead and order an A1c {period} Add sulfa to her allergy list {period}", 0.9)
+        return Recognition(
+            "Start metformin {period} Go ahead and order a hemoglobin A1c {period} Add penicillin to her allergy list "
+            "{period}", 0.9
+        )
 
 
 def client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, model_timeout: float = 0.5,
@@ -153,7 +156,9 @@ def answers(settings: Settings) -> dict[str, dict]:
 
     # The clinician dictated an order and an allergy change: the plan keeps "Start metformin", and both instructions
     # are listed as not carried over.
-    planned = answer(plan=("Start metformin. Go ahead and order an A1c.", ["Start metformin", "Go ahead and order an A1c"]))
+    planned = answer(
+        plan=("Start metformin. Go ahead and order a hemoglobin A1c.", ["Start metformin", "Go ahead and order a hemoglobin A1c"])
+    )
     with client(settings, FakeLlama(planned), Instructing()) as http:
         session = stopped(http)
         keep("result-200-done-not_carried_over", "result",

@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): memory clinic on donanemab, with a lab order to leave out. Format: eval/README.md.
 id = "d18-alzheimers-donanemab"
 voice = "bm_george"
-tags = ["dates", "numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal"]
+tags = ["dates", "numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal-trap"]
 dates = ["--10-21", "--11-18"]
 drugs = ["donanemab", "donepezil"]
 forbidden = ["put an order in for a vitamin B12 level"]
@@ -75,7 +75,6 @@ sources = [
     "Her MRI last week showed no ARIA.",
 ]
 
-[[proposals]]
-kind = "order"
+[[not_proposed]]
 words = "put an order in for a vitamin B12 level"
-item = "vitamin B12 level"
+why = "not_plain"

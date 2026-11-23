@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): a telephone follow-up after cystitis, with an allergy to add, and a drug history and an allergy already listed that are neither. Format: eval/README.md.
 id = "d44-cystitis-nitrofurantoin-rash"
 voice = "bm_george"
-tags = ["numbers", "negation", "allergy-change", "missing-field", "spoken-punctuation", "proposal"]
+tags = ["numbers", "negation", "allergy-change", "missing-field", "spoken-punctuation", "proposal-trap"]
 noise = ["hvac"]
 dates = []
 drugs = ["nitrofurantoin", "penicillin", "metformin"]
@@ -42,7 +42,6 @@ sources = ["uncomplicated cystitis, resolved, and a probable drug rash from nitr
 value = "She will call back if the symptoms return."
 sources = ["she will call back if the symptoms return."]
 
-[[proposals]]
-kind = "allergy_addition"
+[[not_proposed]]
 words = "add nitrofurantoin to her allergy list"
-item = "nitrofurantoin"
+why = "not_plain"

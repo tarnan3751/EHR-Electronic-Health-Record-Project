@@ -1,0 +1,50 @@
+# Plain sentences the recall review wrote (plain.txt) that the closed sentence doesn't propose, each with why: the
+# word it can't account for, the rule that holds it back first, or the sentence next to it. Read by test_plain.py.
+# sentence ||| why
+Order a chest x-ray, PA and lateral. ||| 'PA' and 'lateral' are in no closed class (no name in the reference data says the views)
+Order a CBC to check for anemia. ||| 'to' is in no closed class
+Order a CBC to check her hemoglobin. ||| 'to' is in no closed class
+Order a TSH to rule out hypothyroidism. ||| 'to' is in no closed class
+Order an MRI to evaluate for a tear. ||| 'to' is in no closed class
+Refill her albuterol inhaler as needed for wheeze. ||| 'as' is in no closed class
+Order a CBC because I think she may be anemic. ||| 'because' is in no closed class
+Order a lipid panel since she is fasting. ||| 'since' is in no closed class
+Order an x-ray of the left knee that she injured. ||| 'of' is in no closed class
+Order a CBC for the patient. ||| 'for' is in no closed class
+Order a urine culture before starting antibiotics. ||| 'before' is in no closed class
+Order a CBC; she looks pale. ||| the mark ';'
+Order a CBC and I will call her with the results. ||| 'and I will call her': a second clause
+Order a CBC so we can monitor her counts. ||| 'so' is in no closed class
+Order a hemoglobin A1c which is due. ||| 'which' is in no closed class
+Order an A1c, it is due. ||| 'A1c' alone names no item (the reference data's 'Hemoglobin A1c' does); ', it is due' is a clause
+Order a CBC and continue iron. ||| 'and continue iron': a second verb
+Add penicillin to her allergies, rash. ||| 'rash' is in no closed class
+Add penicillin to her allergy list, reaction hives. ||| 'reaction' is in no closed class
+Add amoxicillin to her allergies because she got hives. ||| 'because' is in no closed class
+Add an allergy to penicillin with hives as the reaction. ||| 'with' is in no closed class
+Add penicillin to her allergies with hives as the reaction. ||| 'with' is in no closed class
+Add codeine to her allergy list as an intolerance. ||| 'as' is in no closed class
+She is allergic to penicillin, please add it to her allergies. ||| a statement before the verb, and 'it' is never an item
+Order a CBC. That's it. ||| the next sentence points back at it
+Order a CBC. That is all. ||| the next sentence points back at it
+Order a CBC. That's everything. ||| the next sentence points back at it
+Order a CBC. That's the plan. ||| the next sentence points back at it
+Refill her lisinopril. She agrees with that. ||| the next sentence points back at it
+Order an MRI of the right knee. She is fine with that. ||| 'of the right knee': no name in the reference data says it
+Order an MRI of the lumbar spine. Thank you. ||| 'of the': the reference data's name is 'MRI lumbar spine without contrast'
+Order a lipid panel to be drawn fasting. ||| 'to' is in no closed class
+Order a lipid panel to be drawn in the morning. ||| 'to' is in no closed class
+Order a CBC with differential and a CMP. ||| 'with' is in no closed class
+Order a CBC with diff. ||| 'with' is in no closed class
+Order a mammogram, she is due. ||| ', she is due' is a clause
+Order a screening colonoscopy, she is 50. ||| the reference data names no colonoscopy; ', she is 50' is a clause
+Continue lisinopril and refill it. ||| a second verb (continue) before it, and 'it' is never an item
+Continue the omeprazole and refill the omeprazole. ||| a second verb (continue) before it
+Stop the metformin and order an A1c. ||| a second verb (stop) before it; 'A1c' alone names no item
+Order an A1c and see her back in three months. ||| for_later (a rule of the second layer)
+Order a CBC and follow up in two weeks. ||| for_later (a rule of the second layer)
+Order a CBC and have her return in two weeks. ||| for_later (a rule of the second layer)
+Order a CBC and recheck in a week. ||| for_later (a rule of the second layer)
+Can you order a CBC please. ||| 'can you' is no lead-in: a question
+Plan to order a CBC. ||| 'plan to' is no lead-in
+Plan is to order a CBC. ||| not_imperative (a rule of the second layer)
