@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,7 +10,9 @@ using Ehr.Domain.Audit;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.Areas.Portal.Pages;
 using Ehr.Web.CloudAudit;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
@@ -387,6 +390,101 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         await using var count = new NpgsqlCommand("SELECT count(*) FROM ehr.audit_events WHERE patient_id = ANY(@patients) AND part = 'panel'", connection);
         count.Parameters.AddWithValue("patients", patients.Select(p => p.Item1).ToArray());
         Assert.Equal(100L, await count.ExecuteScalarAsync(Cancel));
+    }
+
+    // A page's reads through several of the PHI reader's calls, recorded together (the expansion plan's step 16): every
+    // event held until the reads return, nothing in the unit of work, then all written in the page's transaction; and
+    // nothing at all when the reads throw.
+    [Fact]
+    public async Task A_pages_reads_recorded_together_are_written_when_they_return()
+    {
+        using var scope = apps.OnPrem.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Ehr.Data.EhrDbContext>();
+        var audit = scope.ServiceProvider.GetRequiredService<AuditRecorder>();
+        Guid[] patients = [Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()];
+
+        await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => audit.TogetherAsync<bool>(() =>
+        {
+            audit.Record(AuditActions.Read, patients[0], "patients", patients[0], part: AuditParts.NoteDraft);
+            throw new InvalidOperationException("Synthetic: the page failed after a read.");
+        }, Cancel));
+        var unsaved = await audit.TogetherAsync(async () =>
+        {
+            audit.Record(AuditActions.Read, patients[1], "patients", patients[1], part: AuditParts.NoteDraft);
+            await audit.RecordReadsAsync("ai_field_proposals", AuditParts.NoteDraft, [(patients[2], Guid.CreateVersion7()), (patients[2], Guid.CreateVersion7())], Cancel);
+            return db.ChangeTracker.Entries<AuditEvent>().Count();
+        }, Cancel);
+
+        Assert.Equal(0, unsaved);
+        Assert.Empty(db.ChangeTracker.Entries<AuditEvent>());
+        await transaction.CommitAsync(Cancel);
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var count = new NpgsqlCommand(
+            "SELECT patient_id, count(*) FROM ehr.audit_events WHERE patient_id = ANY(@patients) GROUP BY patient_id", connection);
+        count.Parameters.AddWithValue("patients", patients);
+        var recorded = new Dictionary<Guid, long>();
+        await using (var reader = await count.ExecuteReaderAsync(Cancel))
+        {
+            while (await reader.ReadAsync(Cancel)) recorded[reader.GetGuid(0)] = reader.GetInt64(1);
+        }
+
+        Assert.Equal(new Dictionary<Guid, long> { [patients[1]] = 1, [patients[2]] = 2 }, recorded);
+    }
+
+    // The review of a recorded visit records every read it makes (the patient, the review, the draft, the transcript
+    // and each proposal) together, in one statement: none of them is left for the unit of work, which would write each
+    // in a statement of its own (step 16, for its render time).
+    [Fact]
+    public async Task The_review_of_a_visit_records_its_reads_together()
+    {
+        apps.Dictation.Reset();
+        var d = await AmbientFlows.DraftAsync(apps);
+        var saves = new AuditSaves();
+        await using var counted = apps.OnPrem.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.ConfigureDbContext<Ehr.Data.EhrDbContext>(options => options.AddInterceptors(saves))));
+        var session = await SignInAsync(counted, await apps.ClinicianAsync());
+        var since = DateTimeOffset.UtcNow;
+        var signedIn = saves.Count;
+
+        using var page = await session.Client.GetAsync(d.ReviewUrl, Cancel);
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Equal(signedIn, saves.Count);
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var reads = new NpgsqlCommand("""
+            SELECT table_name || ' ' || count(*) FROM ehr.audit_events
+            WHERE patient_id = @patient AND action = 'read' AND occurred_at >= @since GROUP BY table_name ORDER BY table_name
+            """, connection);
+        reads.Parameters.AddWithValue("patient", d.Listening.Patient);
+        reads.Parameters.AddWithValue("since", since);
+        var recorded = new List<string>();
+        await using (var reader = await reads.ExecuteReaderAsync(Cancel))
+        {
+            while (await reader.ReadAsync(Cancel)) recorded.Add(reader.GetString(0));
+        }
+
+        Assert.Equal(["ai_field_proposals 4", "ai_note_reviews 1", "ambient_transcripts 1", "clinical_drafts 1", "patients 1"], recorded);
+    }
+
+    sealed class AuditSaves : DbCommandInterceptor
+    {
+        int count;
+
+        public int Count => count;
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO ehr.audit_events", StringComparison.Ordinal)) Interlocked.Increment(ref count);
+            return ValueTask.FromResult(result);
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO ehr.audit_events", StringComparison.Ordinal)) Interlocked.Increment(ref count);
+            return ValueTask.FromResult(result);
+        }
     }
 
     // The parts are one list wherever they are kept: the code's (AuditParts), the database's check, the cloud app's

@@ -141,7 +141,11 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     }
 
     // `read`: whether this request shows a visit's transcript, which is then read once, a recorded read, at the clinic.
-    async Task<IActionResult?> LoadAsync(Guid patientId, Guid draftId, Guid reviewId, bool read = true)
+    // Every read the page makes is recorded together, in one statement.
+    Task<IActionResult?> LoadAsync(Guid patientId, Guid draftId, Guid reviewId, bool read = true) =>
+        Phi.TogetherAsync(() => ReadAsync(patientId, draftId, reviewId, read), HttpContext.RequestAborted);
+
+    async Task<IActionResult?> ReadAsync(Guid patientId, Guid draftId, Guid reviewId, bool read)
     {
         if (await LoadPatientAsync(patientId, AuditParts.NoteDraft) is { } denied) return denied;
         var review = await Phi.AiReviewAsync(reviewId, HttpContext.RequestAborted);

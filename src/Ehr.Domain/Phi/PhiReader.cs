@@ -28,6 +28,9 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
 {
     public const string PatientsTable = "patients";
 
+    // The reads one page makes through several of these calls, recorded together in one statement (AuditRecorder).
+    public Task<T> TogetherAsync<T>(Func<Task<T>> reads, CancellationToken cancellationToken) => audit.TogetherAsync(reads, cancellationToken);
+
     public async Task<Patient?> PatientAsync(Guid id, string part, CancellationToken cancellationToken)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
