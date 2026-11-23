@@ -511,7 +511,29 @@ def test_a_negation_carries_through_a_list_after_a_comma(said, value, source):
     assert own(said, value, source).reasons == ["negation_dropped"]
 
 
+# A list the negation carries through ends at the first word that ends it, "but", a semicolon, or something said to be
+# there after "and" or "or"; what follows is the patient's.
+@pytest.mark.parametrize(("said", "negated", "after"), [
+    ("Denies fever, chills or night sweats but reports weight loss.", "chills or night sweats", "weight loss"),
+    ("Denies chest pain, shortness of breath or palpitations but endorses fatigue.",
+     "shortness of breath or palpitations", "endorses fatigue"),
+    ("No nausea, vomiting or diarrhea but has abdominal pain.", "vomiting or diarrhea", "has abdominal pain"),
+    ("Denies fever, chills and night sweats; reports weight loss.", "chills and night sweats", "weight loss"),
+    ("Denies fever, chills, or night sweats but reports weight loss.", "or night sweats", "reports weight loss"),
+    ("Negative for headache, vision changes and weakness but positive for neck pain.", "vision changes and weakness",
+     "neck pain"),
+    ("Denies fever, chills or night sweats and reports weight loss.", "chills or night sweats", "weight loss"),
+])
+def test_a_negation_carries_through_a_list_up_to_the_word_that_ends_it(said, negated, after):
+    assert own(said, f"{negated.removeprefix('or ').capitalize()}.", negated).reasons == ["negation_dropped"]
+    assert own(said, f"{after.capitalize()}.", after).pending
+
+
 @pytest.mark.parametrize(("said", "value"), [
+    ("No fever, but cough for three days.", "Cough for three days."),
+    ("Denies fever, reports cough for three days.", "Reports cough for three days."),
+    ("No fever, she has a cough for three days.", "She has a cough for three days."),
+    ("No fever, chills, but a productive cough.", "A productive cough."),
     ("No fever, the cough is better.", "The cough is better."),
     ("Denies fever, reports a cough.", "Reports a cough."),
     ("Negative for nausea, positive for headache.", "Positive for headache."),

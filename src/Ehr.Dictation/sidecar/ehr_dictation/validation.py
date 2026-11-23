@@ -123,7 +123,11 @@ and every check reads the cleaned text. The checks, each with the reason code re
   (four back, for one that follows what it qualifies, such as "denied"), and stops at its clause: punctuation, a
   contrast ("but"), a new subject ("she", "patient"), a step of the plan or a heading after its first word ("no further
   pancreatitis continue monthly olezarsen"), and for someone else, a word of telling ("mom says the rash started
-  Monday" is the patient's rash). A negation or a doubt passes over a subject and its verb instead of stopping there
+  Monday" is the patient's rash); no cue reaches past a line break, a spoken new paragraph, forwards or back. A
+  negation of something named carries on through a list after a comma, up to LIST_SCOPE words, to the first word that
+  ends it: a full stop, a semicolon, a word that stops a cue ("but"), a step of the plan, or a word saying something is
+  there or someone told it after "and" or "or" ("denies fever, chills or night sweats but reports weight loss"); never
+  into a clause of its own after the comma ("no fever, the cough is better"). A negation or a doubt passes over a subject and its verb instead of stopping there
   (TO_THE_FINDING), and over a "that", "if" or "whether", "think" or "believe", and a clause between commas: "I don't
   think, given her normal oxygen, that she has pneumonia", "no evidence she has a fracture", "I think her knee pain is
   from arthritis", "it doesn't look like she has cellulitis". The subject is a pronoun (you included), "this", "there",
@@ -1509,8 +1513,9 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
         return word in ends or any(mark in between for mark in marks)
 
     for cue in before.finditer(text):
-        # A negation carries through a list after a comma ("denies fever, chills, night sweats"), but not into a
-        # clause that says something else ("no fever, the cough is better", "no fever, reports a cough").
+        # A negation carries through a list after a comma ("denies fever, chills, night sweats"), up to the word that
+        # ends it ("... but reports weight loss"), and not into a clause that says something else ("no fever, the cough
+        # is better", "no fever, reports a cough").
         listing = before is NEGATION
         relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
         relative = None if relative and "\n" in relative.group() else relative
@@ -1521,6 +1526,7 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
             edge = cue.end()
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < edge}
         ahead = [i for i, token in enumerate(words) if token.start >= edge]
+        crossed = False  # a comma, into more of the list
         for k, i in enumerate(ahead[: LIST_SCOPE if listing else NEGATION_SCOPE]):
             next_clause = k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"
             between = text[edge : words[i].start]
@@ -1530,8 +1536,9 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
                     text, words, i, ends
                 ):
                     break
-            elif stops(between, words[i].text) or next_clause or (listing and k >= NEGATION_SCOPE and "," not in text[
-                    cue.end() : words[i].start]):
+                crossed = True
+            elif stops(between, words[i].text) or next_clause or (crossed and words[i].text in LIST_ENDS | CLAUSE_STARTS) or (
+                    listing and k >= NEGATION_SCOPE and "," not in text[cue.end() : words[i].start]):
                 break
             reached.add(i)
             edge = words[i].end
@@ -1555,15 +1562,31 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
 
 
 def _more_of_the_list(text: str, words: list[Token], first: int, ends: frozenset[str]) -> bool:
-    """Whether what follows a comma, to the next comma or full stop, is more of a list a negation carries through: no
-    word in it ends the negation's reach, starts a step of the plan, or says something is there or someone told it
-    (LIST_ENDS: "has", "is", "with", "reports", "endorses", "complains")."""
-    end = min(_sentence_end(text, words[first].start), (text.find(",", words[first].start) + 1 or len(text) + 1) - 1)
-    return not any(
-        word.text in ends or word.text in NEXT_CLAUSE or word.text in LIST_ENDS
-        for word in words[first:]
-        if word.end <= end
+    """Whether what follows a comma is more of a list a negation carries through, up to the first word that ends it
+    (_reach() stops there): it doesn't open with one, and the first of them before the next comma, semicolon or full
+    stop is a contrast ("but", "except"), a word starting a clause ("so", "because") or a step of the plan, or else a
+    new subject (_SUBJECTS) or a word saying something is there or someone told it (LIST_ENDS: "has", "is", "with",
+    "reports", "endorses") after "and" or "or". So "denies fever, chills or night sweats but reports weight loss"
+    carries to "but"; "no fever, the cough is better" and "without high steroid doses, so 3 months ago we added ..."
+    don't cross the comma, what follows being a clause of its own."""
+    end = min(
+        _sentence_end(text, words[first].start),
+        *((text.find(mark, words[first].start) + 1 or len(text) + 1) - 1 for mark in ",;"),
     )
+    piece = [word for word in words[first:] if word.end <= end]
+    for k, word in enumerate(piece):
+        if not (word.text in ends or word.text in NEXT_CLAUSE or word.text in CLAUSE_STARTS or word.text in LIST_ENDS):
+            continue
+        if not k:
+            return False
+        if word.text in _SUBJECTS or word.text in LIST_ENDS:
+            return piece[k - 1].text in ("and", "or")
+        return True
+    return True
+
+
+# The words a new subject starts with, which end a negation's list only after "and" or "or": "chills and she ...".
+_SUBJECTS = frozenset("i we you he she they patient which who he's she's they're i'm we're i've let's i'll we'll".split())
 
 
 def _object_of_a_preposition(text: str, start: int) -> bool:
