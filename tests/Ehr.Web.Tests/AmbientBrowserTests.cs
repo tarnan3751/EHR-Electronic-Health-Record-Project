@@ -287,10 +287,11 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
             await page.Locator("[data-dictation-not-carried-list] li").TextContentAsync());
     }
 
-    // TC-UC23-04 in the browser: fetching the visit after Stop. An answer this app couldn't use (502) isn't asked for
-    // again; a service that doesn't answer (503) is asked a few times, then the page gives up and says what to do. Its
-    // voices aren't named yet, which the draft's Retrieve can't do, so the page says only that the visit can be discarded
-    // and that the service keeps nothing past 10 minutes, never to retrieve it.
+    // TC-UC23-04 in the browser: fetching the visit after Stop, before its voices are named. An answer this app couldn't
+    // use (502) isn't asked for again; a service that doesn't answer (503) is asked a few times, then the page gives up.
+    // Either way it stays alive: it says what happened and offers Try again, the cursor on it, and Discard the recording,
+    // never to open the draft or retrieve it there, which can't name the voices. Trying again once the service answers
+    // goes on to the voices.
     [Theory]
     [InlineData(502, """{"error":"bad_answer","message":"Dictation isn't working right now."}""", 1, "Dictation isn't working right now.")]
     [InlineData(503, """{"error":"unavailable","message":"Dictation isn't available right now."}""", 4, "The visit couldn't be fetched: the dictation service isn't answering")]
@@ -309,12 +310,98 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
             null, new() { Timeout = 30_000 });
         await page.WaitForTimeoutAsync(1500);
         Assert.Equal(asked, (await EventsAsync(page)).Count(e => e.StartsWith("sent POST ", StringComparison.Ordinal) && e.EndsWith("/stop", StringComparison.Ordinal)));
+        var words = await page.TextContentAsync("[data-ambient-status]");
+        Assert.DoesNotContain("retrieve", words, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("draft", words, StringComparison.OrdinalIgnoreCase);
         if (status == 503)
         {
-            var said503 = await page.TextContentAsync("[data-ambient-status]");
-            Assert.Contains("Discard the visit from its draft; the service keeps nothing for more than 10 minutes.", said503);
-            Assert.DoesNotContain("retrieve", said503, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Try again in a moment, or discard the recording; the service keeps nothing for more than 10 minutes.", words);
         }
+
+        Assert.True(await page.IsVisibleAsync("[data-ambient-retry]"));
+        Assert.True(await page.IsVisibleAsync("[data-ambient-discard-stuck]"));
+        Assert.True(await page.IsHiddenAsync("[data-ambient-open-draft]"));
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-ambient-retry]')"));
+
+        await page.UnrouteAsync("**/ambient/*/stop");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForSelectorAsync("[data-ambient-voice='2']");
+        Assert.True(await page.IsHiddenAsync("[data-ambient-again]"));
+    }
+
+    // TC-UC23-04 in the browser: a visit that can't be drafted, as the service answers Stop: transcribed but its voices
+    // not told apart (its fields unsorted), or more voices than can be named. The page says so and offers only to discard
+    // the recording, which discards the review and the service's session as Stop and discard does.
+    [Theory]
+    [InlineData("""{"transcript":{"text":"","final":true,"segments":[]},"sorting":"unavailable","reason":"transcription_failed","fields":null,"notCarriedOver":[],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null,"llamaServer":null,"prompt":"p","schema":"s","structuring":"t","code":"c"}}""",
+        "This visit couldn't be transcribed and its voices told apart, so it can't be drafted.")]
+    [InlineData("""{"transcript":{"text":"","final":true,"segments":[]},"sorting":"awaiting_speakers","fields":null,"notCarriedOver":[],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null,"llamaServer":null,"prompt":"p","schema":"s","structuring":"t","code":"c"},"speakers":[{"group":1,"seconds":1},{"group":2,"seconds":1},{"group":3,"seconds":1},{"group":4,"seconds":1},{"group":5,"seconds":1},{"group":6,"seconds":1},{"group":7,"seconds":1},{"group":8,"seconds":1},{"group":9,"seconds":1},{"group":10,"seconds":1}]}""",
+        "The dictation service told apart more voices than can be named (9 at most), so this visit can't be drafted.")]
+    public async Task TC_UC23_04_a_visit_that_cant_be_drafted_offers_only_discarding_it(string answer, string said)
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        await page.RouteAsync("**/ambient/*/stop", route => route.FulfillAsync(new() { Status = 200, ContentType = "application/json", Body = answer }));
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync($"document.querySelector('[data-ambient-status]').textContent.startsWith({System.Text.Json.JsonSerializer.Serialize(said)})");
+        Assert.True(await page.IsHiddenAsync("[data-ambient-retry]"));
+        Assert.True(await page.IsHiddenAsync("[data-ambient-voices]") || await page.Locator("[data-ambient-voice]").CountAsync() == 0);
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-ambient-discard-stuck]')"));
+        Assert.DoesNotContain(await EventsAsync(page), e => e.Contains("/stage", StringComparison.Ordinal));
+
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.startsWith('DELETE ') && e.endsWith(' 204'))"
+            + " && window.__ambient.events.some(e => e.endsWith('/discard 200'))");
+        Assert.True(await page.IsVisibleAsync("[data-ambient-consent]"));
+        Assert.True(await page.IsHiddenAsync("[data-ambient-again]"));
+    }
+
+    // TC-UC23-04 in the browser: once the voices are handed over, the draft is the service's to write and can be retrieved
+    // from the draft. When it can't be fetched, the page says so, offers Try again and Open the draft, not discarding;
+    // and leaving the page then keeps the visit: nothing discarded at the service or in the database.
+    [Fact]
+    public async Task TC_UC23_04_after_the_voices_are_handed_over_leaving_keeps_the_visit()
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        await page.RouteAsync("**/ambient/*/result", route => route.FulfillAsync(new()
+        {
+            Status = 503,
+            ContentType = "application/json",
+            Body = """{"error":"unavailable","message":"Dictation isn't available right now."}"""
+        }));
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForSelectorAsync("[data-ambient-voice='2']");
+        await page.Keyboard.TypeAsync("M");
+        await page.Keyboard.PressAsync("Tab");
+        await page.Keyboard.TypeAsync("T");
+        await AiReviewBrowserTests.TabToAsync(page, "[data-ambient-draft]");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-status]').textContent.startsWith('The draft couldn\\'t be fetched')",
+            null, new() { Timeout = 30_000 });
+        Assert.Contains("open the draft in a few minutes to retrieve it", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.True(await page.IsVisibleAsync("[data-ambient-retry]"));
+        Assert.True(await page.IsVisibleAsync("[data-ambient-open-draft]"));
+        Assert.True(await page.IsHiddenAsync("[data-ambient-discard-stuck]"));
+        Assert.Equal(await page.GetAttributeAsync("[data-ambient-open-draft]", "href"),
+            "/patients/" + patient + "/notes/drafts/" + (await AmbientFlows.RowsAsync(apps,
+                "SELECT draft_id::text FROM ehr.ai_note_reviews WHERE patient_id = @id AND mode = 'ambient'", patient)).Single());
+
+        await page.EvaluateAsync("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }))");
+        await page.WaitForTimeoutAsync(500);
+        Assert.DoesNotContain(await EventsAsync(page), e => e.StartsWith("sent DELETE ", StringComparison.Ordinal) || e.Contains("/discard", StringComparison.Ordinal));
+        Assert.Equal(["recording"], await AmbientFlows.RowsAsync(apps,
+            "SELECT r.state FROM ehr.ai_note_reviews r WHERE r.patient_id = @id AND r.mode = 'ambient'", patient));
     }
 
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the

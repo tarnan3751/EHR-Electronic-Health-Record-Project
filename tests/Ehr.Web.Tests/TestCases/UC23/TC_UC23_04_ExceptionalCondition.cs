@@ -239,6 +239,38 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.Equal("That language isn't available for this recording.", said.GetProperty("message").GetString());
     }
 
+    // A visit left never drafted, its Listen page closed or unable to fetch it: from the draft, its review says what it
+    // is and when it was recorded, refuses to retrieve a draft whose voices were never named, and discards it, so the
+    // draft can be dictated into or listened to again.
+    [Fact]
+    public async Task A_visit_never_drafted_says_so_on_its_review_and_is_discarded_there()
+    {
+        apps.Dictation.Reset();
+        var l = await StartAsync(apps);
+        using (var stop = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/stop"))
+        {
+            Assert.Equal(HttpStatusCode.OK, stop.StatusCode);
+        }
+
+        var draft = (await RowsAsync(apps, "SELECT draft_id::text FROM ehr.ai_note_reviews WHERE id = @id", l.Review)).Single();
+        var url = $"/patients/{l.Patient}/notes/drafts/{draft}/review/{l.Review}";
+        var editor = await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/notes/drafts/{draft}", Cancel);
+        Assert.Contains("Resume saved AI review", editor);
+        var html = await l.Session.Client.GetStringAsync(url, Cancel);
+        Assert.Matches(@"A visit recorded at \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC was never drafted\. Discard it to dictate or listen again\.", html);
+
+        using (var retrieved = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version }))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, retrieved.StatusCode);
+            Assert.Equal("speakers_not_named", (await Json(retrieved)).GetProperty("error").GetString());
+        }
+
+        using var discarded = await ReviewPost(l.Session.Client, Token(html), url, "Discard");
+        Assert.Equal(HttpStatusCode.OK, discarded.StatusCode);
+        Assert.Equal(["cancelled"], await RowsAsync(apps, "SELECT state FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
+        Assert.Contains("Listen to the visit into this draft", await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/notes/drafts/{draft}", Cancel));
+    }
+
     // A visit whose fields couldn't be sorted is staged as the app stores it, with the app's own sentence, which the
     // database's guard on stored results holds it to, and the review says it.
     [Fact]

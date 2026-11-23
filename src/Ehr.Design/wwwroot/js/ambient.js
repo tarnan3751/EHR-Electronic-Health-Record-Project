@@ -14,8 +14,9 @@
 //    with no role chosen for them, or that they can't tell, and the note is drafted and saved for review (UC 13), where
 //    the page goes. Fetching the draft is tried again a few times while the service doesn't answer, then given up.
 // Stop and discard, at any point before that, switches the microphone off first, then discards the session and its
-// review: nothing recorded is kept. Leaving the page before the voices are named does the same, and leaving it at all
-// ends listening here for good. A chunk the recorder hands over after its listening is discarded, stopped or ended is
+// review: nothing recorded is kept. Leaving the page before the voices are handed over does the same, and leaving it at
+// all ends listening here for good. When the visit can't be fetched or drafted, the page offers what can be done: try
+// again, discard the recording, or once the voices are handed over, open the draft to retrieve it. A chunk the recorder hands over after its listening is discarded, stopped or ended is
 // dropped. Every piece of text is set with textContent, never parsed as HTML.
 "use strict";
 
@@ -46,12 +47,18 @@
     const quietSeconds = 300;
     const roleWords = { clinician: "Me", patient: "The patient", other: "Someone else in the room", unsure: "I can't tell" };
     const mostAttempts = 4;
+    // As AmbientApi.MaxVoices.
+    const mostVoices = 9;
+    const again = part("again");
+    const retryButton = part("retry");
+    const discardStuck = part("discard-stuck");
+    const openDraft = part("open-draft");
 
     let state = fresh();
 
     function fresh() {
         return { requestId: null, session: null, consented: 0, stream: null, recorder: null, queue: [], nextSeq: 0, sending: false,
-            paused: false, hidden: false, stopping: false, stopped: false, drafting: false, ended: false, left: false,
+            paused: false, hidden: false, stopping: false, stopped: false, drafting: false, handedOff: false, ended: false, left: false,
             persisted: false, warned: false, retrying: false, retryMs: firstRetryMs, retryTimer: 0, clock: 0, recordedMs: 0,
             resumedAt: 0, voices: [] };
     }
@@ -349,6 +356,7 @@
         document.title = title;
         capture.hidden = true;
         speakersArea.hidden = true;
+        again.hidden = true;
         say(message, true);
         if (session) {
             forget(session);
@@ -415,27 +423,63 @@
             return;
         }
 
-        let result = await ask("stop");
+        let result = await ask("stop", undefined, beforeNaming);
         while (result && result.sorting === "pending" && !state.ended) {
-            result = await ask("result");
+            result = await ask("result", undefined, beforeNaming);
         }
 
-        if (!result || state.ended) {
+        if (state.ended) {
             return;
         }
 
-        if (result.sorting === "awaiting_speakers") {
-            showVoices(result);
+        if (!result) {
+            stuck(true);
+        } else if (result.sorting !== "awaiting_speakers") {
+            // Not transcribed and its voices told apart: nothing a visit can be drafted from.
+            say("This visit couldn't be transcribed and its voices told apart, so it can't be drafted. Nothing was added to the note. Discard the recording, and dictate or type the note.", true);
+            stuck(false);
+        } else if ((result.speakers ?? []).length > mostVoices) {
+            say(`The dictation service told apart more voices than can be named (${mostVoices} at most), so this visit can't be drafted. Nothing was added to the note. Discard the recording, and dictate or type the note.`, true);
+            stuck(false);
         } else {
-            await stage();
+            showVoices(result);
+        }
+    }
+
+    const beforeNaming = "The visit couldn't be fetched: the dictation service isn't answering, so its voices can't be named yet. Nothing was added to the note. Try again in a moment, or discard the recording; the service keeps nothing for more than 10 minutes.";
+    const afterNaming = "The draft couldn't be fetched: the dictation service isn't answering. Nothing was added to the note. Try again in a moment, or open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes.";
+
+    // Where the page waits when the visit can't be fetched or drafted, never a dead end. Before the voices are named:
+    // try again (when it might work) or discard the recording, as leaving the page would. Once they have been handed
+    // over: try again, or open the draft, where Retrieve stages it; leaving keeps it.
+    function stuck(retry) {
+        retryButton.hidden = !retry;
+        discardStuck.hidden = state.handedOff;
+        openDraft.hidden = !state.handedOff;
+        if (state.session?.editorUrl) {
+            openDraft.href = state.session.editorUrl;
+        }
+
+        again.hidden = false;
+        (retry ? retryButton : state.handedOff ? openDraft : discardStuck).focus();
+    }
+
+    async function tryAgain() {
+        again.hidden = true;
+        state.retryMs = firstRetryMs;
+        if (state.handedOff) {
+            say("Fetching the draft again.");
+            await fetchDraft(await ask("result", undefined, afterNaming));
+        } else {
+            say("Fetching the visit again.");
+            await finishRecording();
         }
     }
 
     // One call that answers with the result, sent again with backoff while the connection is down or the service busy, a
-    // few times at most. Null when it can't, having said why and what to do. A 502, an answer this app couldn't use, isn't
-    // sent again: it would come back the same. Before the voices are named, the draft's Retrieve can't name them, so the
-    // page then says only that the visit can be discarded and that the service keeps nothing past 10 minutes.
-    async function ask(route, body) {
+    // few times at most. Null when it can't, having said why (gaveUp, when the service didn't answer) and what to do. A 502,
+    // an answer this app couldn't use, isn't sent again: it would come back the same.
+    async function ask(route, body, gaveUp) {
         for (let attempt = 1; ; attempt++) {
             if (state.ended) {
                 return null;
@@ -459,9 +503,7 @@
             }
 
             if (attempt >= mostAttempts) {
-                say(state.drafting
-                    ? "The draft couldn't be fetched: the dictation service isn't answering. Nothing was added to the note. Open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes."
-                    : "The visit couldn't be fetched: the dictation service isn't answering, so its voices can't be named. Nothing was added to the note. Discard the visit from its draft; the service keeps nothing for more than 10 minutes.", true);
+                say(gaveUp, true);
                 return null;
             }
 
@@ -536,17 +578,35 @@
         draftButton.disabled = true;
         speakersArea.hidden = true;
         say("Drafting the note. Keep this page open until it's ready: a few minutes for a long visit.");
-        let result = await ask("speakers", JSON.stringify({ speakers: Object.fromEntries(chosenRoles()) }));
+        const named = await ask("speakers", JSON.stringify({ speakers: Object.fromEntries(chosenRoles()) }),
+            "The voices couldn't be sent: the dictation service isn't answering. Select Draft the note to try again, or discard the recording.");
+        if (!named) {
+            if (!state.ended) {
+                state.drafting = false;
+                speakersArea.hidden = false;
+                checkVoices();
+            }
+
+            return;
+        }
+
+        // Handed over: the service drafts the note from here, and the draft can be retrieved from its page, so leaving
+        // this one keeps it.
+        state.handedOff = true;
+        await fetchDraft(named);
+    }
+
+    // Asks for the draft while it is being written, then saves it for review.
+    async function fetchDraft(answer) {
+        let result = answer;
         while (result && result.sorting === "pending" && !state.ended) {
-            result = await ask("result");
+            result = await ask("result", undefined, afterNaming);
         }
 
         if (result) {
             await stage();
         } else if (!state.ended) {
-            state.drafting = false;
-            speakersArea.hidden = false;
-            checkVoices();
+            stuck(true);
         }
     }
 
@@ -586,6 +646,11 @@
     part("stop").addEventListener("click", () => stopAndDraft());
     part("discard").addEventListener("click", () => discard());
     part("discard-recording").addEventListener("click", () => discard());
+    discardStuck.addEventListener("click", () => {
+        again.hidden = true;
+        discard();
+    });
+    retryButton.addEventListener("click", tryAgain);
     draftButton.addEventListener("click", draft);
 
     // Out of sight, the recording pauses, and resumes only when the clinician says so.
@@ -596,15 +661,15 @@
     });
 
     window.addEventListener("beforeunload", (event) => {
-        if (state.session && !state.persisted && !state.ended && !state.drafting) {
+        if (state.session && !state.persisted && !state.ended && !state.handedOff) {
             event.preventDefault();
             event.returnValue = "";
         }
     });
 
-    // Leaving the page ends listening here for good: the microphone off, nothing waiting kept, nothing sent again. Before
-    // the voices are named it discards it all too, as Stop and discard would; once drafting has started, the draft is
-    // saved for review whenever it is retrieved.
+    // Leaving the page ends listening here for good: the microphone off, nothing waiting kept, nothing sent again. Until the
+    // voices are handed over it discards it all too, as Stop and discard would; once the service has taken them, the
+    // draft is kept, saved for review whenever it is retrieved from the draft.
     window.addEventListener("pagehide", () => {
         if (!state.session || state.persisted || state.ended) {
             return;
@@ -613,7 +678,7 @@
         const session = state.session;
         stopHere();
         state.left = true;
-        if (!state.drafting) {
+        if (!state.handedOff) {
             const headers = { RequestVerificationToken: token };
             fetch(`${reviewApi}/review/${session.reviewId}/discard`, { method: "POST", headers, credentials: "same-origin", keepalive: true }).catch(() => { });
             fetch(`${api}/${session.sessionId}`, { method: "DELETE", headers, credentials: "same-origin", keepalive: true }).catch(() => { });
@@ -630,7 +695,7 @@
         document.title = title;
         capture.hidden = true;
         speakersArea.hidden = true;
-        if (state.drafting) {
+        if (state.handedOff) {
             say("Listening ended when you left this page while the note was being drafted. Open the draft to retrieve it.");
         } else {
             say("Listening ended when you left this page: nothing recorded was kept.");

@@ -67,6 +67,13 @@ else
         @* What changes is said here, each message kept until the next; the clock that ticks while listening is apart, beneath
            the heading, and not announced. *@
         <p class="sc-status" role="status" aria-live="polite" data-ambient-status></p>
+        @* When the visit can't be fetched or drafted: never a dead end. Before its voices are named, try again or discard
+           the recording; once they have been, try again or open the draft, where it can be retrieved. *@
+        <div class="sc-actions" data-ambient-again hidden>
+            <button type="button" class="sc-btn sc-btn--primary" data-ambient-retry>Try again</button>
+            <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard-stuck>Discard the recording</button>
+            <a class="sc-btn" data-ambient-open-draft hidden>Open the draft</a>
+        </div>
 
         <section data-ambient-capture hidden aria-labelledby="ambient-capture">
             <h2 id="ambient-capture">Listening to the visit</h2>

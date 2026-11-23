@@ -100,7 +100,11 @@ public static partial class DictationApi
             $"v1/sessions/{binding.SessionId}/result?wait={ResultWaitSeconds}", null, async (body, token) =>
             {
                 var result = await body.ReadFromJsonAsync<DictationResult>(ServiceJson, token) ?? throw new JsonException();
-                if (result.Sorting is Sorting.Pending or Sorting.AwaitingSpeakers)
+                // A visit whose voices were never named can't be drafted from here: only from its Listen page, before it
+                // was left.
+                if (result.Sorting is Sorting.AwaitingSpeakers)
+                    return Refuse(409, "speakers_not_named", "This visit's voices were never named, so it can't be drafted. Discard it to dictate or listen again.");
+                if (result.Sorting is Sorting.Pending)
                     return Refuse(409, "not_ready", "The dictation result is still being prepared. Try again shortly.");
                 var trusted = TrustedResult(result, ambient);
                 if (trusted is null) return Refuse(502, "invalid_result", "This result could not be staged safely. Keep the transcript and continue manually, or retry dictation.");

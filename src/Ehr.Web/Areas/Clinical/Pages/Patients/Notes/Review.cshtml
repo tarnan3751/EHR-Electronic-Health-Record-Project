@@ -57,11 +57,20 @@
     @Html.AntiForgeryToken()
     @if (Model.Review.State == AiReviewStates.Recording && !Model.Signed)
     {
-        <p class="sc-notice sc-notice--warning">This dictation has not been staged for review. Retrieve its finished result, or discard the temporary dictation and continue manually. No AI text has entered the note.</p>
+        @* Step 16: a visit left here when its page couldn't fetch it, or was closed, says what it is; it is retrieved if
+           its voices were named in time, or discarded. *@
+        @if (Model.Ambient)
+        {
+            <p class="sc-notice sc-notice--warning" data-ambient-never-drafted>A visit recorded at @Clinic.Format(Model.Review.CreatedAt) was never drafted. Discard it to dictate or listen again.</p>
+        }
+        else
+        {
+            <p class="sc-notice sc-notice--warning">This dictation has not been staged for review. Retrieve its finished result, or discard the temporary dictation and continue manually. No AI text has entered the note.</p>
+        }
         <div class="sc-actions">
-            <button type="button" class="sc-btn" data-review-retrieve>Retrieve finished dictation</button>
+            <button type="button" class="sc-btn" data-review-retrieve>@(Model.Ambient ? "Retrieve the visit's draft" : "Retrieve finished dictation")</button>
             <form method="post" asp-page-handler="Discard" data-review-submit>
-                <button class="sc-btn sc-btn--danger">Discard unfinished dictation and continue manually</button>
+                <button class="sc-btn sc-btn--danger">@(Model.Ambient ? "Discard the visit" : "Discard unfinished dictation and continue manually")</button>
             </form>
         </div>
     }
