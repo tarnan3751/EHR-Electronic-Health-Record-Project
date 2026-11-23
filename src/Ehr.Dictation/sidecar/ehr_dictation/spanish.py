@@ -620,6 +620,15 @@ NEXT_CLAUSE = frozenset(
     seguir sigue control cita derivar derivo interconsulta exploracion examen impresion plan revisar regresar volver
     recomiendo recomendar indico""".split()
 )
+# A qualifier carries over a list, item by item past its commas ("Niega fiebre, tos, disnea y síncope"), up to the end
+# of its sentence, a contrast, or an item that says something of its own: a verb of having, seeing or telling
+# ("refiere", "presenta", "tiene", "con", "hay", "ha"), the next step of the plan, or more than LIST_ITEM words.
+LIST_STOPS = frozenset(
+    """refiere refirio presenta presento tiene tenia tuvo con hay es son esta estan era fue ha han he muestra mostro
+    aqueja persiste persisten se observa aprecia nota""".split()
+)
+LIST_JOINS = frozenset("y e o u ni".split())
+LIST_ITEM = 5
 SCOPE = 6  # words after a cue it can reach, within its clause
 POST_SCOPE = 4  # words before a cue that follows what it qualifies
 
@@ -666,6 +675,43 @@ def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: l
             reached.add(i)
             edge = toks[i].start
     return reached - cues, cues
+
+
+def carry_over_list(text: str, toks: list, words: list[str], reached: set[int], stops: frozenset[str],
+                    joins: frozenset[str]) -> set[int]:
+    """The words a qualifier reaches (reached), with the items of a list it reaches the first of, after a comma (see
+    LIST_STOPS). toks have the text's positions; words are what stops and joins are read on. English is read the same
+    way, with its own words (translation.py)."""
+    carried = set(reached)
+    i = 0
+    while i < len(toks):
+        if i not in carried or i + 1 >= len(toks) or i + 1 in carried:
+            i += 1
+            continue
+        gap = text[toks[i].end : toks[i + 1].start]
+        if "," not in gap or any(mark in gap for mark in ".;:?!\n"):
+            i += 1
+            continue
+        j = i + 1
+        while j < len(toks):
+            item = []
+            k = j
+            while k < len(toks) and (k == j or not any(m in text[toks[k - 1].end : toks[k].start] for m in ",.;:?!\n")):
+                if k > j and words[k] in joins:
+                    break
+                item.append(k)
+                k += 1
+            if not item or len(item) > LIST_ITEM or any(words[m] in stops for m in item):
+                break
+            carried |= {m for m in item if words[m] not in joins}
+            between = text[toks[k - 1].end : toks[k].start] if k < len(toks) else "."
+            if k >= len(toks) or any(mark in between for mark in ".;:?!\n"):
+                break
+            j = k + 1 if words[k] in joins and "," not in between else k
+            if j < len(toks) and words[j] in joins:
+                j += 1
+        i = j
+    return carried
 
 
 def _closing(text: str, toks: list[Token], phrases: list[tuple[str, ...]]) -> list[tuple[int, int]]:
@@ -731,6 +777,8 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
         ("experiencer", sorted(_matches(keys, EXPERIENCER_BEFORE) + relatives), relatives_after, TERMINATORS | REPORTING),
     ):
         reached, cues = _reach(text, toks, before, after, ends, closing.get(kind, []))
+        reached = carry_over_list(text, toks, [t.key for t in toks], reached - cues,
+                                  ends | NEXT_CLAUSE | REPORTING | LIST_STOPS, LIST_JOINS)
         out[kind] = {i for i in reached if _is_content(toks[i])}
         cue_words[kind] = cues
     return out, cue_words

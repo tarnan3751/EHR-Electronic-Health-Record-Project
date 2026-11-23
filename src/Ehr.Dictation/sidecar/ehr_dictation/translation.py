@@ -61,7 +61,11 @@ statement:
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
      validation.py reads them in English, with an English word that negates itself ("uncontrolled") a negation and a
      relative told something ("the mother is explained") not someone having it: the same (negation_dropped or
-     negation_added, and so on), and the relatives named the same (experiencer_changed). A doubt is the clinician's
+     negation_added, and so on), and the relatives named the same (experiencer_changed). A qualifier carries over a
+     list, item by item past its commas, in both languages, until its sentence ends or an item says something of its
+     own (spanish.carry_over_list()): "Niega fiebre, tos, disnea y síncope" negates the four. And it is read in the
+     whole transcript, so a passage quoting the tail of a negated list ("tos, disnea y síncope") takes the negation
+     with it. A doubt is the clinician's
      whether it comes before what it doubts ("creo que", "quizá", "tal vez", "a lo mejor", "puede que", "podría
      tener") or closes its clause (", creo", ", probablemente"), as validation.py hears one in English ("I think she
      has", "maybe", "she might have", "probably", a closing ", I think"); "no creo que tenga" and "dudo que" are a
@@ -1140,6 +1144,14 @@ def _parts(words: list[str], gaps: list[str], content: list[bool], flagged: dict
     return found
 
 
+# What ends a qualifier's carrying over an English list, as spanish.LIST_STOPS does the Spanish: "No fever, cough or
+# dyspnea" carries, "No fever, has a cough" doesn't.
+ENGLISH_LIST_STOPS = validation.REPORTING | frozenset(
+    "has have had is are was were with shows showed presents presented endorses endorsed complains persists".split()
+)
+ENGLISH_LIST_JOINS = frozenset("and or nor".split())
+
+
 def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, set[int]], dict[str, set[int]]]:
     """For each kind, the English words a qualifier reaches (as _english_qualified() reads them), and its cues' words,
     with the words of MORE_ENGLISH and NEGATED_WORDS among the cues. Cues of a kind that reach nothing in the statement
@@ -1151,6 +1163,9 @@ def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, 
     for qualifier in validation.QUALIFIERS:
         read = _without_told_relatives(text) if qualifier.reason == "experiencer_dropped" else text
         reached, cue_words = validation._reach(read, tokens(read), qualifier)
+        stops = qualifier.ends | validation.NEXT_CLAUSE | ENGLISH_LIST_STOPS
+        reached = spanish.carry_over_list(text, words, [w.text for w in words], reached - cue_words, stops,
+                                          ENGLISH_LIST_JOINS)
         flagged[names[qualifier.reason]] = set(reached)
         cues[names[qualifier.reason]] = set(cue_words) if reached else set()
     for kind, pattern in MORE_ENGLISH.items():
@@ -1257,15 +1272,24 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
     skeletons = {s for t in said if (s := _skeleton(t.key))}
     reached = {s for k, t in enumerate(said) if any(k in f for f in said_flagged.values()) if (s := _skeleton(t.key))}
 
-    # An English clause sits in a Spanish one that says the same qualifiers, with the findings both name; or, saying
-    # none, in any Spanish clause, unless it names a finding a Spanish qualifier reaches.
-    def same(e: _Part, s: _Part) -> bool:
+    # An English clause sits in a run of Spanish ones ("No edema or cyanosis" in "Sin edema, cianosis") that each say
+    # the same qualifiers, with the findings both name; or, saying none, in any, unless it names a finding a Spanish
+    # qualifier reaches. Clauses may share a Spanish one, and keep their order.
+    def same(e: _Part, run: list[_Part]) -> bool:
         shared = e.skeletons & skeletons
-        return (e.relatives <= s.relatives and shared <= s.skeletons
-                and (e.kinds == s.kinds or (not e.kinds and not shared & reached)))
+        if not (e.relatives <= frozenset().union(*(s.relatives for s in run))
+                and shared <= frozenset().union(*(s.skeletons for s in run))):
+            return False
+        return all(e.kinds == s.kinds for s in run) or (not e.kinds and not shared & reached)
 
-    if not _follows(english_parts, said_parts, same, shared=True):
-        found.add("order_changed")
+    start = 0
+    for part in english_parts:
+        run = next(((a, b) for a in range(start, len(said_parts)) for b in range(a, len(said_parts))
+                    if same(part, said_parts[a : b + 1])), None)
+        if run is None:
+            found.add("order_changed")
+            break
+        start = run[1]
     return found
 
 

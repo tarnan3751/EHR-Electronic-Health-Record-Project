@@ -681,3 +681,32 @@ def test_what_is_done_with_a_drug_or_a_habit_is_kept(text, changed, kept):
 ])
 def test_a_drug_taken_or_changed_as_the_spanish_says_is_offered(text, english):
     assert reasons(text, [text], english) == []
+
+
+# ---- A qualifier over a list, and a passage quoting its tail (sentences outside the test set) ------------------------
+
+LIST = "Niega fiebre, tos, disnea, dolor torácico y síncope."
+LONG_LIST = "Niega dolor torácico, disnea, palpitaciones, mareo, síncope y edema."
+
+
+@pytest.mark.parametrize(("text", "quote", "english", "expected"), [
+    (LIST, "tos, disnea, dolor torácico y síncope", "Cough, dyspnea, chest pain and syncope.", ["negation_dropped"]),
+    (LIST, "tos, disnea, dolor torácico y síncope", "No cough, dyspnea, chest pain or syncope.", []),
+    (LIST, LIST, "Denies fever. Cough, dyspnea, chest pain and syncope.", ["order_changed"]),
+    (LIST, LIST, "Denies fever, cough, dyspnea, chest pain and syncope.", []),
+    (LONG_LIST, "síncope y edema", "Syncope and edema.", ["negation_dropped"]),  # past the six words a cue reaches
+    (LONG_LIST, "síncope y edema", "No syncope or edema.", []),
+    ("Sin edema, cianosis.", "Sin edema, cianosis.", "No edema; cyanosis present.", ["order_changed"]),
+    ("Sin edema, cianosis.", "Sin edema, cianosis.", "No edema or cyanosis.", []),
+])
+def test_a_negation_carries_over_its_list_and_into_a_quote_of_its_tail(text, quote, english, expected):
+    assert reasons(text, [quote], english) == expected
+
+
+@pytest.mark.parametrize(("text", "quote", "english"), [
+    ("Niega fiebre, refiere tos.", "refiere tos", "Reports cough."),  # an item that says something of its own
+    ("Niega fiebre, refiere tos.", "Niega fiebre, refiere tos.", "Denies fever, reports cough."),
+    ("Sin fiebre, la tos ha mejorado.", "Sin fiebre, la tos ha mejorado.", "No fever, the cough has improved."),
+])
+def test_a_negation_stops_at_an_item_that_says_something_of_its_own(text, quote, english):
+    assert reasons(text, [quote], english) == []

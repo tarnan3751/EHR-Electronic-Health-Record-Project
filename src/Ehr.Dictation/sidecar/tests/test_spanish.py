@@ -125,6 +125,14 @@ def qualified(text: str) -> dict[str, list[str]]:
     ("Infarto previo.", {"history": ["infarto"]}),
     ("Su padre tuvo un infarto.", {"experiencer": ["tuvo", "infarto"]}),
     ("Cáncer de mama en su madre.", {"experiencer": ["cáncer", "mama"]}),
+    # Over a list, item by item, to its sentence's end or an item that says something of its own.
+    ("Niega fiebre, tos, disnea, dolor torácico y síncope.",
+     {"negation": ["fiebre", "tos", "disnea", "dolor", "torácico", "síncope"]}),
+    ("Antecedentes de hipertensión, diabetes, dislipidemia.",
+     {"history": ["hipertensión", "diabetes", "dislipidemia"]}),
+    ("Niega fiebre, refiere tos.", {"negation": ["fiebre"]}),
+    ("Sin fiebre, la tos ha mejorado.", {"negation": ["fiebre"]}),
+    ("Sin edema. Tos, disnea.", {"negation": ["edema"]}),
 ])
 def test_each_cue_reaches_what_it_qualifies(text, expected):
     assert qualified(text) == expected
