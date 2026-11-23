@@ -24,8 +24,9 @@ scoring to compare each statement shown with what the Spanish it cites says with
 Spanish-speaking clinician's reading before any real use.
 
 Five more scripts, eval/scripts-es-holdout/h01 to h05, in the same format, are held out: written once the checks of run
-A's first round were settled and never used to tune them, they are run only when asked (run_a.py --holdout), so the
-checks can be measured on dictations they weren't fitted to.
+A's first round were settled, read once, unseen, in run A2, and regression items since, with changes made after seeing
+them (eval/README.md lists them); they are run only when asked (run_a.py --holdout). Their files stay as sealed, so
+their fact lists are kept apart, in eval/scripts-es-holdout-facts.
 
     uv run eval/dictation_scripts_es.py            # every script: id, voice, spoken words, tags
     uv run eval/dictation_scripts_es.py e07        # e07's spoken text, to read aloud
