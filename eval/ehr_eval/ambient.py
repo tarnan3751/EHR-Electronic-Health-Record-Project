@@ -14,8 +14,9 @@ at a time as the sidecar drafts them (ehr_dictation.listening.drafted()). Each r
 --rescore needs, are written to the results file as soon as the recording is done, before anything is scored; once
 all are in, the checks, the merging and the measures run (ambient_scoring), and if they fail the file still holds
 every answer, for --rescore to finish. --resume skips the recordings a file from the same prompt, code and recordings
-already holds. The long recordings are also fed in five-second chunks, to time each chunk's answer. Nothing reaches
-the network but llama-server.
+already holds. The longest clean recording of the run, whatever its length, is also fed in five-second chunks, to time
+each chunk's answer (unless --no-live), and the results name it (run.chunks_timed). Nothing reaches the network but
+llama-server.
 
 --contention adds to the results file a measure of K2 Horizon shared (decision D16): the dictation set's longest clean
 recording (--dictation-audio, default eval/audio) sorted once alone and twice at once, then the same while the longest
@@ -176,12 +177,15 @@ async def evaluate(args: argparse.Namespace) -> int:
         items = [VisitItem(**item) for item in stored["items"]]
         run = stored["run"]
     done = {item.variant for item in items}
+    clean = [variant for variant in variants if variant.get("noise") is None]
+    timed = None if args.no_live or not clean else max(clean, key=lambda variant: variant["seconds"])["id"]
+    run["chunks_timed"] = timed
 
     for number, variant in enumerate(variants, 1):
         if variant["id"] in done:
             continue
         item = await run_variant(variant, args.audio, recognizer, embedder, structurer, visits)
-        if variant["seconds"] >= listening.LONG_SECONDS and variant.get("noise") is None and not args.no_live:
+        if variant["id"] == timed:
             data = (args.audio / variant["file"]).read_bytes()
             item.chunk_seconds = await listening.chunk_seconds(data, variant["seconds"], recognizer, embedder, structurer, models)
         items.append(item)

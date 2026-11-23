@@ -35,7 +35,7 @@ not labelled right (missed_at_turn_change), since that is where a short answer g
 - warnings: how many offered values carry each warning.
 - sorting and timing: how many recordings were drafted, left undrafted (and why) or couldn't have their voices named;
   how long decoding, telling the voices apart, transcribing and drafting took, each window, and each five-second chunk
-  of a twenty-minute visit.
+  of the longest clean visit (which, and how long it is), the last six apart (near_the_end).
 
 checked() runs the sidecar's checks over a recording's window proposals and merges them, and builds the visit's result
 with the sidecar's own listening.result_json(), so the chart proposals and the instructions listed are the service's;
@@ -524,9 +524,10 @@ def _timing(items: list[VisitItem]) -> dict:
     chunks = sorted(seconds for item in items for seconds in item.chunk_seconds)
     live: dict = {"chunks": len(chunks)}
     if chunks:
-        live |= {"p50": round(statistics.median(chunks), 3), "p95": round(chunks[int(0.95 * (len(chunks) - 1))], 3),
-                 "max": round(chunks[-1], 3),
-                 "at_20_minutes": stats([s for item in items for s in item.chunk_seconds[-6:]])}
+        timed = next(item for item in items if item.chunk_seconds)
+        live |= {"recording": timed.variant, "seconds": timed.seconds,
+                 "p50": round(statistics.median(chunks), 3), "p95": round(chunks[int(0.95 * (len(chunks) - 1))], 3),
+                 "max": round(chunks[-1], 3), "near_the_end": stats(timed.chunk_seconds[-6:])}
     return {
         "all": summary(items),
         "long": summary([i for i in items if "long" in i.tags]),

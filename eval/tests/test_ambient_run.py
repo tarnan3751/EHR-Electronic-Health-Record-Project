@@ -235,3 +235,31 @@ def test_the_contention_probe_runs_its_four_cases_and_the_gate_accepts_them(run_
     (run_dir / "results" / "ambient-latest.json").write_text(json.dumps(data), encoding="utf-8")
     assert not any("contention" in p for p in ambient_gate.check(run_dir / "results", run_dir))
     assert prompt.load_conversation().parameters["max_tokens"] == 1100
+
+
+# D17's measure: the longest clean visit of the run is fed in five-second chunks whatever its length (the visits are
+# under the 20 minutes the decision speaks of), the results say which, and a run that should have timed them and didn't
+# fails the gate by name.
+def test_the_longest_clean_visit_has_its_chunks_timed_whatever_its_length(run_dir, monkeypatch):
+    fed = []
+
+    async def chunk_seconds(data, seconds, *_):
+        fed.append(seconds)
+        return [0.5] * 8
+
+    monkeypatch.setattr(ambient.listening, "chunk_seconds", chunk_seconds)
+    assert ambient.main(["--llama-url", "http://llama.test", "--audio", str(run_dir / "audio"), "--out",
+                         str(run_dir / "results" / "ambient-latest.json"), "--models-dir", str(run_dir)]) == 0
+    data = stored(run_dir)
+    longest = max((v for v in json.loads((run_dir / "audio" / "manifest.json").read_text())["variants"] if v["noise"] is None),
+                  key=lambda v: v["seconds"])
+
+    assert fed == [longest["seconds"]] and data["run"]["chunks_timed"] == longest["id"]
+    live = data["metrics"]["timing"]["chunk_seconds"]
+    assert live["recording"] == longest["id"] and live["near_the_end"] == {"mean": 0.5, "max": 0.5}
+    assert not any("chunks" in p for p in ambient_gate.check(run_dir / "results", run_dir))
+
+    untimed = data | {"items": [item | {"chunk_seconds": []} for item in data["items"]]}
+    (run_dir / "results" / "ambient-latest.json").write_text(json.dumps(untimed), encoding="utf-8")
+    assert any(p.startswith(f"{longest['id']}, the longest clean visit, should have had its five-second chunks timed")
+               for p in ambient_gate.check(run_dir / "results", run_dir))

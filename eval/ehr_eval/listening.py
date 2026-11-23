@@ -1,7 +1,7 @@
 """What makes a visit's answers (ambient.py): each recording through the sidecar's own code for listening to a visit, as
 its listening.py runs it after stop and once the voices are named: ffmpeg decoding, the speaker model telling the
 voices apart (diarize.py), MedASR a turn at a time, and K2 Horizon a window at a time with the conversation's prompt,
-timed stage by stage and window by window. A twenty-minute recording is also fed in five-second chunks, as the page
+timed stage by stage and window by window. The longest clean recording is also fed in five-second chunks, as the page
 sends a visit, to time each chunk's answer (every chunk is decoded with all before it).
 
 Naming the voices is the one step a person takes. Here each voice is named for the role it spoke most of the time in
@@ -32,7 +32,6 @@ from ehr_dictation.sessions import AMBIENT, GaveWay
 from ehr_dictation.settings import Settings
 
 CHUNK_SECONDS = 5.0  # as the Listen page sends a visit (ambient.js)
-LONG_SECONDS = 900.0  # recordings this long are also fed chunk by chunk
 
 
 @dataclass

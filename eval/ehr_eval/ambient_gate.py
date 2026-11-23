@@ -7,7 +7,9 @@ eval/results/ambient-latest.json:
    test set's recordings; else the eval runs again. And they were scored by this commit's checks and scoring code and
    against its gold; else rescoring the stored answers is enough (ambient.py --rescore).
 2. They cover every visit, every recording's voices were named and every recording was drafted: a run where K2
-   Horizon was unavailable or too slow, or the voices couldn't be told apart, measured nothing about the fields.
+   Horizon was unavailable or too slow, or the voices couldn't be told apart, measured nothing about the fields. The
+   recording the run says it timed five-second chunks of (run.chunks_timed, the longest clean one unless the run was
+   --no-live) has them.
 3. No offered value contains an order or allergy change a visit said; none without a warning that points at a passage
    contains a retracted value or a drug no gold value carries; none offers a symptom the patient denied as present, or
    a diagnosis or finding hedged, denied or reported as certain; no offered value's source is a question; no offered
@@ -99,6 +101,14 @@ def check(results_dir: Path, eval_dir: Path) -> list[str]:
         problems.append(f"The results' {', '.join(differ)} aren't what their stored answers come to. {RESCORE}")
     for item in latest.get("items", []):
         problems += [f"{item.get('variant')}: {fault}. {RUN_IT}" for fault in _faults(item)]
+    run = latest.get("run", {})
+    timed = run.get("chunks_timed")
+    if "chunks_timed" not in run:
+        problems.append(f"The results don't say whose five-second chunks were timed. {RUN_IT}")
+    elif timed is not None and not any(item.get("variant") == timed and item.get("chunk_seconds")
+                                       for item in latest.get("items", [])):
+        problems.append(f"{timed}, the longest clean visit, should have had its five-second chunks timed and has none. "
+                        f"{RUN_IT}")
     contention = latest.get("contention")
     cases = ("one_alone", "two_alone", "one_beside_a_window", "two_beside_a_window")
     if not isinstance(contention, dict) or any(

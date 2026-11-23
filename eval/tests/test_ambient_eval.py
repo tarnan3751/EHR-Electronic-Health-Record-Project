@@ -369,8 +369,8 @@ def honest(tmp_path, visit_dir, visits, answer: dict = ANSWER) -> dict:
         {"id": "c01-test--clean", "script": "c01-test", "file": "c01.webm", "container": "webm", "noise": None,
          "seconds": 10.5, "turns": _recorded(tmp_path)}, tmp_path, Recognizer(), Embedder(),
         fake_structurer(answer).using(ambient.conversation_prompt()), visits))
-    raw = ambient.results([item], {"machine": {"label": "the server"}, "parameters": prompt.CONVERSATION_PARAMETERS},
-                          {}, MODELS, ambient.conversation_prompt(), True)
+    raw = ambient.results([item], {"machine": {"label": "the server"}, "parameters": prompt.CONVERSATION_PARAMETERS,
+                                   "chunks_timed": None}, {}, MODELS, ambient.conversation_prompt(), True)
     raw["provenance"] |= {"pipeline": conversations.pipeline_sha256(visit_dir), "scoring": conversations.scoring_sha256(visit_dir)}
     raw["dataset"] |= {"recordings_sha256": conversations.recordings_sha256(visit_dir),
                        "gold_sha256": conversations.gold_sha256(visit_dir)}
