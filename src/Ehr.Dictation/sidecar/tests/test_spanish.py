@@ -220,5 +220,57 @@ def test_documentation_plans_and_instructions_not_to_are_not_instructions(text):
     assert instructions(text) == []
 
 
+# The everyday forms (sentences outside the test set): each verb's forms generated, an act-noun with a verb of the
+# act in its clause.
+@pytest.mark.parametrize(("text", "kind"), [
+    ("Resúrtele el losartán.", "order"),
+    ("Pide una radiografía de tórax.", "order"),
+    ("Hazle una orden de laboratorios.", "order"),
+    ("Sácale una placa de tórax.", "order"),
+    ("Que le tomen una radiografía.", "order"),
+    ("Se le indica laboratorio de control.", "order"),
+    ("Agendar tomografía.", "order"),
+    ("Anota que es alérgica a la penicilina.", "allergy_change"),
+    ("Quítale la alergia a la penicilina.", "allergy_change"),
+    ("Registra alergia a la aspirina.", "allergy_change"),
+    ("Renuévale la receta de metformina.", "order"),
+    ("Ordénale un perfil de lípidos.", "order"),
+    ("Indico paracetamol 500 mg cada 8 horas.", "order"),
+    ("Se indica amoxicilina 500 mg cada 8 horas.", "order"),
+    ("Mándale hacer una prueba de orina.", "order"),
+    ("Le doy una orden para laboratorio.", "order"),
+    ("Me le pides unos labs.", "order"),
+    ("Agrégale alergia a la amoxicilina.", "allergy_change"),
+    ("Ponle alergia a las sulfas.", "allergy_change"),
+    ("Borra la alergia al látex.", "allergy_change"),
+    ("Elimina la alergia a la codeína.", "allergy_change"),
+    ("Márcala como alérgica a la penicilina.", "allergy_change"),
+    ("Agregar alergia a penicilina.", "allergy_change"),
+    ("Dale de baja la alergia al ibuprofeno.", "allergy_change"),
+])
+def test_an_instruction_said_in_an_everyday_form_is_found(text, kind):
+    assert instructions(text) == [(text.rstrip("."), kind)]
+
+
+@pytest.mark.parametrize("text", [
+    # Past, told by the accent: documentation.
+    "Ya se solicitó la tomografía.",
+    "Se le recetó amoxicilina hace una semana.",
+    "El cardiólogo le recetó atorvastatina.",
+    "Le tomaron una radiografía ayer.",
+    # Someone else's request.
+    "Le pide al médico una receta.",
+    "La paciente quiere que le receten algo para dormir.",
+    "El cardiólogo le receta atorvastatina.",
+    # Plans, and words that only look like the act.
+    "Repetir INR en 7 días.",
+    "Toma la metformina con la comida.",
+    "Trae los resultados de laboratorio.",
+    "Control en dos semanas con laboratorios.",
+])
+def test_the_past_someone_elses_request_and_a_plan_are_not_instructions(text):
+    assert instructions(text) == []
+
+
 def test_two_negations_make_an_instruction_again():
     assert instructions("No hay razón para no pedir una radiografía.")

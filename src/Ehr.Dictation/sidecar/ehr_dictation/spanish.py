@@ -957,104 +957,89 @@ def correction_cues(text: str, toks: list[Token]) -> list[tuple[int, int]]:
 
 # ---- Instructions (FR-14) -------------------------------------------------------------------------------------------
 
-def _forms(*groups: str) -> str:
-    return "|".join(sorted({form for group in groups for form in group.split()}, key=len, reverse=True))
+# An instruction is a verb of the act in a form that asks for it now (any present, imperative, subjunctive, future or
+# infinitive form, conjugate(); with the pronouns a command takes, "resúrtele", "sácale", "ordénale"), in its clause:
+# - a verb of ordering, whatever it orders: "pido una creatinina", "solicitar hemograma", "receto amoxicilina", "se
+#   indica laboratorio", "me le pides unos labs", "resúrtele el losartán", "renuévale la receta";
+# - a verb of doing, sending or scheduling, with something to order (ORDERABLE) before or after it in its clause:
+#   "sácale una placa de tórax", "agendar resonancia", "que le tomen una radiografía", "mándale hacer una prueba", "le
+#   doy una orden", "hazle una orden de laboratorios";
+# - a verb of adding, removing or changing, with an allergy in its clause: "ponle alergia a las sulfas", "quítale la
+#   alergia a la penicilina", "anota que es alérgica a la penicilina", "alergia a la sulfa, agrégala".
+# A past form is documentation, told by its accent ("ya se solicitó", "se le recetó", "el cardiólogo le recetó"), and so
+# is someone else's request (OTHER_SUBJECTS, WANTS). When it can't be told whether something is a plan or an
+# instruction, it is taken for an instruction: cut from the note and listed, the clinician sees it and can type it.
+ORDERING = "pedir solicitar ordenar recetar prescribir indicar renovar resurtir surtir rellenar"
+DOING = "hacer sacar tomar mandar enviar agendar programar realizar tramitar dar poner generar dejar"
+ALLERGY_ACTS = """agregar anadir poner anotar registrar documentar incluir marcar quitar eliminar borrar retirar sacar
+actualizar cambiar corregir modificar inactivar desactivar"""
+# Forms conjugate() can't make: a changed stem, or an irregular imperative ("pon", "haz", "pídele").
+IRREGULAR.update({
+    "pedir": ("pido pides pide piden pida pidas pidan pidiendo pidele pidale pidanle pideme pidame", "pidio pidieron"),
+    "renovar": ("renuevo renuevas renueva renuevan renueve renueves renueven renuevale renuevele", ""),
+    "poner": ("pongo pones pone ponen ponga pongas pongan pon ponle ponla ponlo ponles ponlas ponlos pongale pondre "
+              "pondremos pondra", "puso puse pusimos pusieron puesto puesta"),
+    "hacer": ("hago haces hace hacen haga hagas hagan haz hazle hazla hazlo hagale hagala hare haremos hara",
+              "hizo hice hicimos hicieron hecho hecha"),
+    "dar": ("doy das da dan de des den dale dele denle dame deme dare daremos dara", "dio di dimos dieron dado dada"),
+    "corregir": ("corrijo corrige corrigen corrija corrijan corrigele", "corrigio"),
+})
+# What a verb of doing orders: a prescription, an order, a refill, laboratory tests, imaging, a study, a referral.
+ORDERABLE = frozenset(
+    """orden ordenes receta recetas prescripcion resurtido resurtidos refill refills laboratorio laboratorios labs lab
+    analisis analitica placa placas radiografia radiografias rx tomografia tac resonancia rm ultrasonido ecografia
+    eco ecocardiograma electrocardiograma ecg biometria hemograma perfil quimica prueba pruebas examen examenes estudio
+    estudios cultivo urocultivo biopsia interconsulta referencia derivacion mamografia densitometria espirometria
+    colonoscopia endoscopia""".split()
+)
+ALLERGY_NOUNS = frozenset("alergia alergias alergico alergica alergicos alergicas".split())
+# "Anoto que es alérgica" is the clinician noting it, documentation; "Anota que es alérgica" asks for it.
+NOTING = frozenset("anoto registro documento incluyo marco".split())
 
 
-# Present, imperative, subjunctive and future forms (and the enclitic imperatives: "pídale", "mándale", folded), and
-# the infinitive, which a plan uses as an imperative ("Solicitar hemograma."). Past forms are documentation: "pidió",
-# "ordenó", "recetó", "solicitó", "pedí", "receté".
-ORDER_VERBS = _forms(
-    "pido pide pida pidan pedimos pedire pediremos pidele pidale pidanle pedir",
-    "ordeno ordena ordene ordenen ordenamos ordenare ordenaremos ordenese ordenar",
-    "solicito solicita solicite soliciten solicitamos solicitare solicitaremos solicitese solicitar",
-    "receto recete receten recetamos recetare recetaremos recetese recetar",
-    "prescribo prescribe prescriba prescriban prescribimos prescribire prescribiremos prescribir",
-)
-THIRD_PERSON = frozenset("pide piden ordena ordenan solicita solicitan receta recetan prescribe prescriben manda mandan "
-                         "envia envian".split())
-INFINITIVES = "pedir|ordenar|solicitar|recetar|prescribir|mandar|enviar|renovar|resurtir"
-SEND_ONLY = _forms(
-    "mando manda mande manden mandamos mandare mandaremos mandale mandele mandenle mandar",
-    "envio envia envie envien enviamos enviare enviaremos enviale enviele enviar",
-)
-SEND_VERBS = SEND_ONLY + "|" + _forms("llamo llama llame llamamos llamale llamar")
-ALLERGY_ADD = _forms(
-    "agrega agregue agreguen agrego agregamos agregar agregala agregalo agreguela agreguelo",
-    "anade anada anadan anado anadimos anadir anadela anadelo",
-    "pon ponga pongan pongo ponemos poner ponla ponlo",
-    "anota anote anoten anoto anotamos anotar anotala anotalo",
-    "registra registre registren registro registramos registrar registrala registralo",
-    "documenta documente documento documentamos documentar",
-    "incluye incluya incluyo incluimos incluir",
-    "marca marque marco marcamos marcar",
-)
-ALLERGY_REMOVE = _forms(
-    "quita quite quiten quito quitamos quitar quitala quitalo",
-    "elimina elimine eliminen elimino eliminamos eliminar eliminala eliminalo",
-    "borra borre borren borro borramos borrar borrala borralo",
-    "retira retire retiren retiro retiramos retirar",
-    "saca saque saquen saco sacamos sacar sacala sacalo",
-)
-ALLERGY_CHANGE = _forms(
-    "actualiza actualice actualizo actualizamos actualizar",
-    "cambia cambie cambio cambiamos cambiar",
-    "corrige corrija corrijo corregimos corregir",
-    "modifica modifique modifico modificamos modificar",
-)
-# After the allergy is named ("alergia a la sulfa, agrégala"): only the imperative and the infinitive, so a past
-# ("cambió") or a first person ("documento") isn't taken for one.
-ALLERGY_AFTER = _forms(
-    "agrega agregue agregar agregala agregalo agreguela agreguelo anade anada anadir anadela anadelo anota anote anotar",
-    "registra registre registrar quita quite quitar quitala quitalo elimina elimine eliminar eliminala eliminalo",
-    "borra borre borrar borrala borralo actualiza actualice actualizar",
-)
+def _verb_forms(infinitives: str) -> dict[str, frozenset[str]]:
+    """Every form of the verbs, by key, with the verb's past forms (to tell a past from it: tense()); not one that is a
+    function word as often ("de", dé)."""
+    forms: dict[str, frozenset[str]] = {}
+    for infinitive in infinitives.split():
+        present, past = conjugate(infinitive)
+        forms.update({form: past for form in present | past if form not in STOPWORDS})
+    return forms
+
+
+ORDERING_FORMS = _verb_forms(ORDERING)
+DOING_FORMS = _verb_forms(DOING)
+ALLERGY_FORMS = _verb_forms(ALLERGY_ACTS)
 _LIST = r"(?:(?:sus|su|la|las|tu|tus|esta)\s+)?(?:(?:lista|listado|registro)\s+de\s+)?"
 _SENTENCE = r"(?:(?![.\n;]).)"
-
+SEND_VERBS = "|".join(sorted((form for verb in ("mandar", "enviar", "llamar") for form in conjugate(verb)[0]),
+                             key=len, reverse=True))
+# Before one of these, a verb's form is a noun: "la receta", "las órdenes".
+DETERMINERS = frozenset(
+    "el la los las un una unos unas su sus esta este estas estos esa ese otra otro nueva nuevo".split()
+)
+# What no verb and noun in a clause say: sending to the pharmacy, a refill by itself, the software asked for an orders
+# section, an allergy given up ("dar de baja").
 ORDERS = [
-    re.compile(rf"\b(?:{ORDER_VERBS})\b"),
-    re.compile(r"\b(?:le|les|se)\s+receta(?:n)?\b"),
-    re.compile(rf"\b(?:voy|vamos|va|van)\s+a\s+(?:{INFINITIVES})\b"),
-    re.compile(rf"\bhay\s+que\s+(?:{INFINITIVES})\b"),
-    re.compile(r"\bse\s+(?:pide|piden|ordena|ordenan|solicita|solicitan|prescribe|prescriben)\b"),
-    # Sending to the pharmacy, or a prescription or order sent or made: any form of the verb with its object.
     re.compile(rf"\b(?:{SEND_VERBS})\b{_SENTENCE}{{0,60}}?\bfarmacia\b"),
-    re.compile(rf"\b(?:{SEND_ONLY})\b{_SENTENCE}{{0,30}}?\b(?:receta|recetas|orden|ordenes|a hacer|al laboratorio|"
-               r"estudios?|analisis)\b"),
-    re.compile(r"\b(?:renovar|renuevo|renueva|renueve|renovamos|resurtir|resurto|resurta|resurtimos|surtir|surta|"
-               r"rellenar|rellene|repetir|repito|repita)\s+(?:(?:la|las|su|sus|esa|esta)\s+)?(?:receta|recetas|"
-               r"prescripcion|prescripciones)\b"),
-    re.compile(r"\b(?:hacer|hago|haga|hacemos|poner|pongo|ponga|ponemos|meter|meto|meta|metemos|generar|genero|genere|"
-               r"generamos|dejar|dejo|deje|dejamos)\s+(?:(?:una|la|las|unas|otra|nueva)\s+)?(?:orden|ordenes|receta|"
-               r"recetas|prescripcion)\b"),
-    # Code-switching: "un refill", "mándale el refill".
     re.compile(r"\brefills?\b"),
-    # The model told to make an orders section: "agrega una sección de órdenes".
     re.compile(r"\b(?:agrega|agregue|agregar|anade|anada|anadir|crea|cree|crear|haz|haga|hacer|incluye|incluya|incluir|"
                rf"pon|ponga|poner|abre|abra|abrir)\b{_SENTENCE}{{0,30}}?\b(?:seccion|campo|apartado|pestana)\s+de\s+"
                r"(?:ordenes|pedidos|orden)\b"),
 ]
 ALLERGY_CHANGES = [
-    re.compile(rf"\b(?:{ALLERGY_ADD})\b{_SENTENCE}{{0,50}}?\b(?:a|en|como|entre)\s+{_LIST}(?:alergias?|alergic[oa]s?)\b"),
-    re.compile(rf"\b(?:{ALLERGY_REMOVE})\b{_SENTENCE}{{0,50}}?\bde\s+{_LIST}alergias?\b"),
-    re.compile(rf"\b(?:{ALLERGY_CHANGE})\s+{_LIST}alergias?\b"),
-    re.compile(r"\b(?:agreguese|anadase|anotese|registrese|quitese|eliminese|borrese|retirese|incluyase|marquese)\b"
+    re.compile(r"\b(?:dar de baja|da de baja|dale de baja|de de baja)\b{0}{{0,40}}?\balergi".format(_SENTENCE)),
+    re.compile(rf"\b(?:debe|deben|hay que)\s+(?:agregarse|anadirse|anotarse|registrarse|quitarse|eliminarse)\b"
                rf"{_SENTENCE}{{0,50}}?\balergi"),
-    re.compile(r"\bse\s+(?:agrega|agregan|anade|anaden|anota|anotan|registra|registran|quita|quitan|elimina|eliminan|"
-               rf"borra|borran|incluye|incluyen)\b{_SENTENCE}{{0,50}}?\balergi"),
-    re.compile(r"\b(?:debe|deben|hay que)\s+(?:agregarse|anadirse|anotarse|registrarse|quitarse|eliminarse|agregar|"
-               rf"anadir|anotar|registrar|quitar|eliminar)\b{_SENTENCE}{{0,50}}?\balergi"),
-    re.compile(rf"\bque\s+se\s+(?:agregue|anada|anote|registre|quite|elimine)\b{_SENTENCE}{{0,50}}?\balergi"),
-    re.compile(r"\b(?:dar de baja|inactivar|inactiva|inactive|desactivar|desactiva|desactive)\s+(?:(?:la|esa|esta)\s+)?"
-               r"alergia"),
-    re.compile(rf"\balergi\w*\b{_SENTENCE}{{0,40}}?\b(?:{ALLERGY_AFTER})\b"),
 ]
-# Who else may ask: "la paciente pide una incapacidad" is not the clinician ordering.
+# Who else may ask: "la paciente pide una incapacidad", "le pide al médico una receta", "el cardiólogo le receta" are
+# not the clinician ordering; nor is what someone else wants ("la paciente quiere que le receten algo").
 OTHER_SUBJECTS = frozenset(
     """paciente ella madre padre mama papa familia familiar esposo esposa hijo hija hermano hermana cardiologo
     cardiologa medico medica doctor doctora especialista enfermera enfermero""".split()
 )
+WANTS = frozenset("quiere quieren desea desean prefiere prefieren espera esperan pide piden".split())
+STAFF = frozenset("medico medica doctor doctora especialista enfermera enfermero cardiologo cardiologa".split())
 # An instruction not to: "no pidas", "no hace falta pedir", "sin necesidad de solicitar". Unless another negation comes
 # just before it, which makes it one again: "no hay razón para no pedir".
 NEGATED_INSTRUCTION = re.compile(
@@ -1068,8 +1053,8 @@ PAST = re.compile(r"\b(?:ayer|la semana pasada|el mes pasado|el ano pasado|hace|
                   r"\bse\s+(?:envio|enviaron|mando|mandaron)\b|\bfue\s+(?:enviad|mandad)\w*")
 SENTENCE_MARK = re.compile(r"[!?\n;]|\.(?!\d)|(?<!\d)\.")
 CLAUSE_MARK = re.compile(r"[!?;\n:]|[.,](?!\d)|(?<!\d)[.,]")
-LEAD_IN = frozenset("por favor de tambien ademas ahora luego entonces le les se lo la yo nosotros y voy vamos a hay que "
-                    "usted ya".split())
+LEAD_IN = frozenset("por favor de tambien ademas ahora luego entonces le les se lo la me yo nosotros y voy vamos a hay "
+                    "que usted ya".split())
 LEAD_IN_REACH = 5
 DIRECTIVE_REACH = 14
 # Words that start another clause, which ends an instruction.
@@ -1080,6 +1065,39 @@ NEW_CLAUSE = NEXT_CLAUSE | frozenset("yo ella el paciente recomiendo explico se 
 # After the allergy list, the pharmacy or a prescription these carry the instruction on; anything else ends it.
 CARRIES_ON = frozenset("a para de con como del al que".split())
 TARGET = re.compile(r"(?:alergias?|alergic[oa]s?|farmacia|receta|recetas|orden|ordenes)$")
+
+
+def _clause_bounds(folded: str, at: int) -> tuple[int, int]:
+    start = max((m.end() for m in CLAUSE_MARK.finditer(folded, 0, at)), default=0)
+    found = CLAUSE_MARK.search(folded, at)
+    return start, found.start() if found else len(folded)
+
+
+def _acts(folded: str, toks: list[Token]) -> list[tuple[int, int, str]]:
+    """Each verb of an act said to ask for it now, with what it acts on (see ORDERING, DOING, ALLERGY_ACTS), as (start,
+    end, kind): from the verb, or what it acts on when that comes first, to the later of the two."""
+    found: list[tuple[int, int, str]] = []
+    for i, token in enumerate(toks):
+        key = token.key
+        if i and toks[i - 1].key in DETERMINERS:
+            continue
+        verbs = [(forms, kind) for forms, kind in ((ALLERGY_FORMS, "allergy_change"), (ORDERING_FORMS, "order"),
+                                                   (DOING_FORMS, "order")) if key in forms]
+        for forms, kind in verbs:
+            if tense(token, forms[key]) == "past" or (kind == "allergy_change" and key in NOTING):
+                continue
+            # What it acts on: after it in its clause, or before it in its sentence ("alergia a la sulfa, agrégala").
+            sentence_start, _ = _sentence_bounds(folded, token.start)
+            _, end = _clause_bounds(folded, token.start)
+            clause = [t for t in toks if sentence_start <= t.start and t.end <= end]
+            wanted = ALLERGY_NOUNS if kind == "allergy_change" else ORDERABLE if forms is DOING_FORMS else None
+            objects = [t for t in clause if t is not token and t.key in wanted] if wanted is not None else [token]
+            if not objects:
+                continue
+            first = min(token.start, objects[0].start)
+            found.append((first, max(token.end, max(t.end for t in objects)), kind))
+            break
+    return found
 
 
 def _sentence_bounds(folded: str, at: int) -> tuple[int, int]:
@@ -1110,7 +1128,7 @@ def directives(text: str) -> list[tuple[int, int, str]]:
     does in English)."""
     folded = fold(text)
     toks = tokens(text)
-    matches: list[tuple[int, int, str]] = []
+    matches: list[tuple[int, int, str]] = _acts(folded, toks)
     for kind, patterns in (("order", ORDERS), ("allergy_change", ALLERGY_CHANGES)):
         for pattern in patterns:
             for match in pattern.finditer(folded):
@@ -1122,8 +1140,15 @@ def directives(text: str) -> list[tuple[int, int, str]]:
         negated = NEGATED_INSTRUCTION.search(before)
         if negated and not any(t.key in ANY_NEGATION for t in tokens(before[: negated.start()])[-UNDOES_REACH:]):
             continue
+        # Someone else asking: a verb that may be the third person ("pide", "receta", "solicitan") with another subject
+        # before it in its clause, or asking the doctor after it ("le pide al médico"); or someone wanting it.
+        _, clause_end = _clause_bounds(folded, end)
         verb = folded[start:end].split()[0]
-        if verb in THIRD_PERSON and any(t.key in OTHER_SUBJECTS for t in tokens(before)):
+        after = [t.key for t in tokens(folded[end:clause_end])]
+        third = verb.endswith(("a", "e", "an", "en"))
+        asks_staff = any(word in STAFF and k and after[k - 1] in ("al", "a", "la") for k, word in enumerate(after))
+        if (third and (any(t.key in OTHER_SUBJECTS for t in tokens(before)) or asks_staff)
+                or any(t.key in WANTS for t in tokens(before))):
             continue
         sentence_start, sentence_end = _sentence_bounds(folded, start)
         if "farmacia" in folded[start:end] and PAST.search(folded[sentence_start:sentence_end]):

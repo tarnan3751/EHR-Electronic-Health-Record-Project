@@ -771,3 +771,21 @@ def test_an_english_cue_the_spanish_doesnt_say_is_never_added(english, added):
 ])
 def test_what_only_looks_like_a_cue_isnt_one(text, english):
     assert reasons(text, [text], english) == []
+
+
+# ---- Instructions: what reaches the note, and what is listed (sentences outside the test set) ----------------------
+
+
+@pytest.mark.parametrize(("said", "english", "kind"), [
+    ("Sácale una placa de tórax.", "Chest X-ray.", "order"),
+    ("Quítale la alergia a la penicilina.", "Penicillin allergy.", "allergy_change"),
+])
+def test_an_everyday_instruction_never_reaches_the_note_and_is_listed(said, english, kind):
+    text = "Continuar losartán 50 mg al día. " + said
+    checks = translation.check({"plan": [
+        {"spanish": ["Continuar losartán 50 mg al día"], "english": "Continue losartan 50 mg daily."},
+        {"spanish": [said.rstrip(".")], "english": english},
+    ]}, [], transcript(text))
+    assert checks.fields["plan"].value == "Continue losartan 50 mg daily."
+    assert translation.not_carried_over(transcript(text)) == [
+        {"reason": kind, "start": text.index(said), "end": len(text) - 1}]
