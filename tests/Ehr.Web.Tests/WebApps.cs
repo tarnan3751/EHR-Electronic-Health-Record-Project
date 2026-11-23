@@ -478,6 +478,8 @@ public sealed class WebApps : IAsyncLifetime
                 // Required outside Development (step 10d). UTC here, as every page read before the step; the tests of
                 // the clinic's clock set a zone of their own.
                 .UseSetting("Ehr:Clinic:TimeZone", "UTC")
+                // Listening to a visit, off unless switched on: on here, for the tests of it (AmbientSwitchTests turn it off).
+                .UseSetting(Ehr.Web.Ambient.AmbientListening.Setting, "true")
                 .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")))
                 // Every test client has the same address, so the limits are out of reach (RateLimitTests lowers them).
                 .UseSetting("RateLimits:PermitLimit", "1000000")

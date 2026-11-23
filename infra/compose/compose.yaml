@@ -29,6 +29,8 @@ x-web-app: &web-app
     Ehr__DataProtection__CertificateKey: /certs/example.com-key.pem
     # The secret the cloud app ships its audit events to the on-prem app with; both apps hold it.
     Ehr__CloudAudit__Key: ${EHR_CLOUD_AUDIT_KEY:?set it in infra/compose/.env}
+    # Listening to a visit (step 16) ships switched off; this stack, with synthetic data only, switches it on.
+    Ehr__Ambient__Enabled: "true"
 
 x-postgres-healthcheck: &postgres-healthcheck
   test: ["CMD", "pg_isready", "-U", "postgres"]

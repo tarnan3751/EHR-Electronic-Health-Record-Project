@@ -2039,6 +2039,8 @@ internal static partial class RenderBenchmark
             builder
                 .UseContentRoot(RepositoryRoot.Combine("src/Ehr.Web"))
                 .UseSetting("Ehr:Site", "OnPrem")
+                // Listening to a visit is off unless switched on; on here, as the visit's review is measured.
+                .UseSetting("Ehr:Ambient:Enabled", "true")
                 .UseSetting("Logging:LogLevel:Default", "Warning")
                 .UseSetting("Logging:LogLevel:Microsoft.AspNetCore.DataProtection", "Critical")
                 .ConfigureTestServices(services =>
@@ -2078,6 +2080,7 @@ internal static partial class RenderBenchmark
                 .UseContentRoot(RepositoryRoot.Combine("src/Ehr.Web"))
                 .UseEnvironment(Environments.Production)
                 .UseSetting("Ehr:Site", "Cloud")
+                .UseSetting("Ehr:Ambient:Enabled", "true")
                 .UseSetting("ConnectionStrings:Ehr", connectionString)
                 .UseSetting("Ehr:OnPrem:Url", OnPremUrl)
                 .UseSetting("Ehr:CloudAudit:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))

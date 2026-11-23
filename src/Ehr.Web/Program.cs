@@ -35,8 +35,10 @@ builder.Services.AddScoped<Ehr.Domain.Accounts.PortalNotices>();
 // Refill requests (Ehr.Domain.Refills).
 builder.Services.AddScoped<Ehr.Domain.Refills.RefillRequests>();
 builder.Services.AddScoped<Ehr.Domain.Notes.NoteReviews>();
-// Listening to a visit (step 16): how long a transcript of a review nobody finished is kept, which both apps' reviews say.
+// Listening to a visit (step 16): how long a transcript of a review nobody finished is kept, which both apps' reviews say;
+// and whether the clinic listens to visits at all, off unless switched on (Ambient/AmbientListening).
 builder.Services.AddSingleton(Ehr.Web.Ambient.AmbientTranscriptPurgeService.KeepFrom(builder.Configuration));
+builder.Services.AddSingleton(Ehr.Web.Ambient.AmbientListening.From(builder.Configuration));
 builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Site.OnPrem));
 // Which of the two apps this is, for the few pages that write as part of a read (marking a message read) and so must
 // know whether their database takes writes.

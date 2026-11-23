@@ -89,7 +89,7 @@ namespace Ehr.Web.Api.Dictation;
 // the service's status, never a body, a transcript or a field.
 //
 // Listening to a visit (ambient listening, the expansion plan's step 16) has routes of its own under /ambient, in the same
-// group: AmbientApi.cs.
+// group: AmbientApi.cs. With listening switched off (Ehr:Ambient:Enabled), all of them answer 404.
 public static partial class DictationApi
 {
     public const string Path = "/api/dictation/sessions";
@@ -112,7 +112,17 @@ public static partial class DictationApi
         var sessions = endpoints.MapGroup(Path).AddEndpointFilter(RequireCurrentAccountAsync).AddEndpointFilter(RequireFormTokenAsync);
         sessions.MapPost("/", StartAsync);
         MapNoteReview(sessions);
-        MapAmbient(sessions);
+        if (endpoints.ServiceProvider.GetRequiredService<Ehr.Web.Ambient.AmbientListening>().Enabled)
+        {
+            MapAmbient(sessions);
+        }
+        else
+        {
+            // Listening to a visit switched off: every route under /ambient answers 404, with no body read and nothing
+            // asked of the service (Ambient/AmbientListening).
+            sessions.Map("/ambient/{**rest}", () => Results.NotFound());
+        }
+
         sessions.MapPost("/{id}/audio", SendAudioAsync).WithMetadata(new RequestSizeLimitAttribute(MaxChunkBytes));
         sessions.MapPost("/{id}/stop", StopAsync);
         sessions.MapPost("/{id}/result", ResultAsync);

@@ -17,8 +17,10 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 //
 // As Dictate's: only for a patient on the clinician's panel, and anyone else is sent back to the chart before anything
 // about the patient is read; the patient's name for the banner is one recorded read. A draft with a review open goes to
-// that review. On the cloud site the page opens but offers nothing: a visit is recorded only at the clinic.
-public class ListenModel(PhiReader phi, PatientAssignments assignments, NoteWriteAuthority authority) : PageModel
+// that review. On the cloud site the page opens but offers nothing: a visit is recorded only at the clinic. With
+// listening switched off (Ehr:Ambient:Enabled), the page answers 404.
+public class ListenModel(PhiReader phi, PatientAssignments assignments, NoteWriteAuthority authority, Ambient.AmbientListening listening)
+    : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public SearchQuery Search { get; set; } = SearchQuery.None;
@@ -38,6 +40,12 @@ public class ListenModel(PhiReader phi, PatientAssignments assignments, NoteWrit
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
+        // Listening switched off (Ambient/AmbientListening): not here at all.
+        if (!listening.Enabled)
+        {
+            return NotFound();
+        }
+
         if (!await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted))
         {
             return RedirectToPage("Chart", Search.ChartRouteValues(id));
