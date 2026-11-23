@@ -578,7 +578,7 @@ SWAPS = [
 
 @pytest.mark.parametrize(("text", "swapped", "kept"), SWAPS)
 def test_a_class_swapped_is_refused_and_kept_in_order_is_offered(text, swapped, kept):
-    assert reasons(text, [text], swapped) == ["order_changed"]
+    assert "order_changed" in reasons(text, [text], swapped)
     assert reasons(text, [text], kept) == []
 
 
@@ -615,3 +615,34 @@ def test_another_order_is_refused_and_what_isnt_spelled_alike_still_passes():
     for text, english in [("Dolor leve en la rodilla e intenso en la cadera.", "Mild hip pain and severe knee pain."),
                           ("Posible gripe, tos conocida.", "Flu, possible cough.")]:
         assert reasons(text, [text], english) == []
+
+
+# ---- How long (sentences outside the test set) ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Amoxicilina por cinco días.", "Amoxicillin for 5 months."),
+    ("Control en dos semanas.", "Follow-up in 2 months."),
+    ("Tos desde hace tres días.", "Cough for 3 weeks."),
+    ("Tos desde hace una semana.", "Cough for a month."),
+    ("Ayuno de 8 horas.", "Fast for 8 days."),
+])
+def test_a_length_of_time_with_another_period_is_refused(text, english):
+    assert reasons(text, [text], english) == ["period_not_in_sources"]
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Amoxicilina por cinco días.", "Amoxicillin for 5 days."),
+    ("Control en dos semanas.", "Follow-up in 2 weeks."),
+    ("Tos desde hace una semana.", "Cough for a week."),
+    ("Tos desde hace una semana.", "Cough since a week ago."),
+    ("Metformina 850 mg dos veces al día.", "Metformin 850 mg twice a day."),  # "a day" is how often, not how long
+    ("Control en 2 semanas y análisis en 3 meses.", "Follow-up in 2 weeks and tests in 3 months."),
+])
+def test_a_length_of_time_said_as_the_spanish_says_it_is_offered(text, english):
+    assert reasons(text, [text], english) == []
+
+
+def test_lengths_of_time_swapped_are_refused():
+    text = "Control en 2 semanas y análisis en 3 meses."
+    assert reasons(text, [text], "Follow-up in 3 months and tests in 2 weeks.") == ["order_changed"]

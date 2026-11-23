@@ -37,6 +37,8 @@ statement:
      checks can't know which was meant;
    - a dose unit with its number ("50 mcg" is not "50 mg"): no more (unit_not_in_sources). A unit of measurement
      (mmHg, beats a minute, degrees, percent) may be added to a number said without one, never changed;
+   - how long, a number with its hours, days, weeks, months or years ("por cinco días" is not "for 5 months", "hace
+     una semana" is "a week ago"): no more (period_not_in_sources);
    - how often (times a day, a week, as needed, at bedtime): no more (frequency_not_in_sources);
    - dates ("hace una semana" is a week ago, or the past week): no more (date_not_in_sources);
    - drug names, failing closed both ways: every English word a list knows as a drug (a USAN stem, drugnames.py's
@@ -57,16 +59,16 @@ statement:
      negation and a doubt, as validation.py reads "I don't think she has" and "I doubt"; and "le preocupa", "me
      pregunto si", "posibilidad de" and "presuntamente" are doubt, as "worried", "wonder", "a chance" and
      "presumably" are;
-   - in order, and paired: numbers, drugs, sides, routes, severity, how often, relatives and medication changes each
-     come in the English in the Spanish's order, some left out but none moved (order_changed): "TA 142 sobre 88" is
-     not "BP 88/142", nor "Suspender metformina e iniciar insulina" "Start metformin and stop insulin"; a number
-     measures what the Spanish says it measures, the vital sign, result (LABELS) or drug named before it in its
+   - in order, and paired: numbers, how long, drugs, sides, routes, severity, how often, relatives and medication
+     changes each come in the English in the Spanish's order, some left out but none moved (order_changed): "TA 142
+     sobre 88" is not "BP 88/142", nor "Suspender metformina e iniciar insulina" "Start metformin and stop insulin"; a
+     number measures what the Spanish says it measures, the vital sign, result (LABELS) or drug named before it in its
      clause (label_changed): "Glucosa de 140" is not "Blood pressure 140", nor "Reading of 140"; and a qualifier stays
      on the clause it qualifies in the Spanish, with the findings both languages spell alike ("neumonía" and
      "pneumonia", _skeleton()) (order_changed): "Posible neumonía, asma conocida" is not "Pneumonia, possible asthma",
      nor "Madre con diabetes y padre con hipertensión" "Mother with hypertension and father with diabetes". English
-     that says the Spanish in another order is refused as well ("Amlodipino y losartán" as "Losartan and
-     amlodipine"): the checks can't tell a reordering from a swap;
+     that says the Spanish in another order is refused as well ("Amlodipino y losartán" as "Losartan and amlodipine"):
+     the checks can't tell a reordering from a swap;
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
      model added ("continue metformin and check kidney function" from "continuar metformina").
 5. If any statement fails, the whole field is discarded, as an English value is.
@@ -135,6 +137,7 @@ REASONS = (
     "number_unreadable",
     "ambiguous_number",
     "unit_not_in_sources",
+    "period_not_in_sources",
     "frequency_not_in_sources",
     "date_not_in_sources",
     "drug_not_in_sources",
@@ -712,6 +715,47 @@ def _english_qualified(text: str) -> dict[str, bool]:
     return found
 
 
+# How long, as a number and its period: "5 days", "dos semanas", "for a week" (1 week).
+SPANISH_PERIODS = {"hora": "hour", "horas": "hour", "minuto": "minute", "minutos": "minute", "dia": "day",
+                   "dias": "day", "semana": "week", "semanas": "week", "mes": "month", "meses": "month", "ano": "year",
+                   "anos": "year"}
+ENGLISH_PERIODS = {"hour": "hour", "hours": "hour", "minute": "minute", "minutes": "minute", "day": "day",
+                   "days": "day", "week": "week", "weeks": "week", "month": "month", "months": "month", "year": "year",
+                   "years": "year"}
+# "A week" is one week after a word of how long or when ("for a week", "a month ago"), not in "twice a day".
+ONE_PERIOD = re.compile(
+    r"\b(?:for|in|over|during|within|after|past|about|nearly|almost)\s+(?:a|an)\s+(hour|minute|day|week|month|year)\b"
+    r"|\b(?:a|an)\s+(hour|minute|day|week|month|year)\s+(?:ago|later|earlier)\b",
+    re.IGNORECASE,
+)
+
+
+def english_periods(text: str) -> list[tuple[str, str]]:
+    """Each length of time the English gives, in order, as (number, period)."""
+    words = spanish.tokens(text)
+    found = []
+    for value, start in english_number_items(text):
+        at = next((k for k, w in enumerate(words) if w.start >= start), len(words))
+        after = next((w.key for w in words[at + 1 :]
+                      if not w.key[:1].isdigit() and w.key not in validation.NUMBER_WORDS), "")
+        if after in ENGLISH_PERIODS:
+            found.append((start, (value, ENGLISH_PERIODS[after])))
+    for match in ONE_PERIOD.finditer(text):
+        found.append((match.start(), ("1", (match.group(1) or match.group(2)).lower())))
+    return [period for _, period in sorted(found)]
+
+
+def spanish_periods(said: list[spanish.Token], terms: list[_Term],
+                    position: dict[int, int]) -> list[set[tuple[str, str]]]:
+    """Each length of time the Spanish says, in order, as the (number, period) it may be read as."""
+    found = []
+    for term in terms:
+        after = position.get(term.last, -1) + 1
+        if term.kind == "number" and 0 < after < len(said) and said[after].key in SPANISH_PERIODS:
+            found.append({(value, SPANISH_PERIODS[said[after].key]) for value in term.values})
+    return found
+
+
 # ---- In order, and paired ------------------------------------------------------------------------------------------
 
 # What a number measures, named before it: the vital signs and common results, each by an id of its own, as Spanish
@@ -918,6 +962,7 @@ def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, 
 # again.
 ALREADY = {
     "numbers": {"number_not_in_sources", "number_unreadable", "ambiguous_number", "source_superseded"},
+    "periods": {"number_not_in_sources", "period_not_in_sources", "source_superseded"},
     "labels": {"drug_not_in_sources", "drug_dropped", "abbreviation_not_in_sources"},
     "drugs": {"drug_not_in_sources", "drug_dropped", "source_superseded"},
     "sides": {"side_not_in_sources"},
@@ -988,6 +1033,7 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
         ("relatives", [ENGLISH_RELATIVES[w] for w in english_words if w in ENGLISH_RELATIVES], spanish.relatives(said),
          lambda e, s: e in s),
         ("actions", english_action_items(english), spanish_action_items(said), lambda e, s: e == s),
+        ("periods", english_periods(english), spanish_periods(said, terms, position), lambda e, s: e in s),
     ]
     if not all(_follows(english_items, said_items, same) for name, english_items, said_items, same in classes
                if not refused & ALREADY[name]):
@@ -1187,6 +1233,12 @@ def _compare(result: _Statement, ctx: _Context) -> None:
             continue
         if unit in DOSE_UNITS or reading in with_a_unit:
             reasons.add("unit_not_in_sources")
+
+    position = {index: k for k, index in enumerate(said_index)}
+    spoken_periods = spanish_periods(said, terms, position)
+    if any(number in said_nums and not any((number, period) in read for read in spoken_periods)
+           for number, period in english_periods(english)):
+        reasons.add("period_not_in_sources")
 
     if not english_frequencies(english) <= spanish.frequencies(said_text):
         reasons.add("frequency_not_in_sources")
