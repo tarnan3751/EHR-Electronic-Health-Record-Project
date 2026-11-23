@@ -31,8 +31,8 @@ Logs name the session (a random ID, not patient information), sizes, times and r
 
 A session listening to a visit (the expansion plan's step 16) is one too, of its own kind (mode), which every call
 names: listening.py adds what such a session does. A call of one kind never finds a session of the other. While a
-dictation waits for K2 Horizon or is being sorted, no visit's window starts, and a window being drafted gives its slot
-back when dictations need every one (Turns).
+dictation waits for K2 Horizon or is being sorted, no visit's window starts, and a window being drafted gives way the
+moment one asks (Turns).
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import math
 import secrets
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -141,7 +142,7 @@ class Sessions:
         self._sessions: dict[str, Session] = {}
         self._transcribing = asyncio.Semaphore(1)
         self._sorting = asyncio.Semaphore(settings.sorting_at_once)
-        self._turns = Turns(settings.sorting_at_once)
+        self._turns = Turns()
 
     @property
     def count(self) -> int:
@@ -405,15 +406,20 @@ class GaveWay(Exception):
     """A visit's window stopped so that a dictation could have K2 Horizon: it is asked again when its turn comes."""
 
 
+class TooBusy(Exception):
+    """A visit's windows waited for their turns as long as they may in all (ambient_wait_seconds)."""
+
+
 class Turns:
     """Whose turn it is with K2 Horizon (decision D16): a dictation's whenever it asks, within its own time; a visit's
-    window one at a time across all visits, and only once no dictation is waiting for K2 Horizon or being sorted. A
-    window already being drafted holds one of K2 Horizon's slots; when dictations come to need every slot, it gives its
-    slot back at once (GaveWay) and waits for its turn again, so no dictation's time is spent waiting for a window."""
+    window one at a time across all visits, and only while no dictation is waiting for K2 Horizon or being sorted. A
+    window already being drafted gives way the moment a dictation asks (GaveWay) and waits for its turn again, so no
+    dictation shares K2 Horizon with a window. A window waits at most the time it is given (TooBusy), and says how long
+    it waited (waited)."""
 
-    def __init__(self, slots: int) -> None:
-        self._slots = slots
+    def __init__(self) -> None:
         self._dictations = 0
+        self.waited = 0.0
         self._none = asyncio.Event()
         self._none.set()
         self._window = asyncio.Lock()
@@ -424,7 +430,7 @@ class Turns:
     async def dictation(self) -> AsyncIterator[None]:
         self._dictations += 1
         self._none.clear()
-        if self._drafting is not None and self._dictations >= self._slots:
+        if self._drafting is not None:
             self._gave_way = True
             self._drafting.cancel()
         try:
@@ -435,11 +441,24 @@ class Turns:
                 self._none.set()
 
     @contextlib.asynccontextmanager
-    async def window(self) -> AsyncIterator[Turns]:
-        async with self._window:
-            while self._dictations:
-                await self._none.wait()
+    async def window(self, wait: float = math.inf) -> AsyncIterator[Turns]:
+        began = time.monotonic()
+        try:
+            async with asyncio.timeout(None if math.isinf(wait) else max(wait, 0.0)):
+                await self._window.acquire()
+                try:
+                    while self._dictations:
+                        await self._none.wait()
+                except BaseException:
+                    self._window.release()
+                    raise
+        except TimeoutError:
+            raise TooBusy from None
+        self.waited = time.monotonic() - began
+        try:
             yield self
+        finally:
+            self._window.release()
 
     async def draft(self, request: Awaitable) -> object:
         """A window's request to K2 Horizon, in its turn: GaveWay if a dictation needed its slot first."""

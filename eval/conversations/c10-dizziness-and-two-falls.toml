@@ -2,6 +2,7 @@ id = "c10-dizziness-and-two-falls"
 speakers = 3
 voices = { clinician = "am_michael", patient = "hm_omega", other = "hf_alpha" }
 tags = ["three-speakers", "same-gender", "self-correction", "relative-health", "question-no", "order-spoken", "negation", "numbers"]
+hedged = ["stroke"]
 noise = ["babble"]
 dates = []
 drugs = ["hydrochlorothiazide", "amlodipine", "aspirin", "tamsulosin"]
@@ -188,7 +189,7 @@ text = "That's a relief. I was sure he'd broken something."
 
 [[turns]]
 role = "clinician"
-text = "So here's what's going on. This is called orthostatic hypotension. Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall. The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse."
+text = "So here's what's going on. This is called orthostatic hypotension. Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall. The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse. It's unlikely you've had a stroke."
 gap = 0.6
 
 [[turns]]
@@ -272,11 +273,12 @@ sources = [
 ]
 
 [gold.assessment]
-value = "This is called orthostatic hypotension. Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall. The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse."
+value = "This is called orthostatic hypotension. Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall. The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse. It's unlikely you've had a stroke."
 sources = [
     "This is called orthostatic hypotension",
     "Your blood pressure drops when you stand up, and that drop is what makes you dizzy and makes you fall",
     "The hydrochlorothiazide and the tamsulosin both add to it, and you're not drinking much, which makes it worse",
+    "It's unlikely you've had a stroke",
 ]
 
 [gold.plan]

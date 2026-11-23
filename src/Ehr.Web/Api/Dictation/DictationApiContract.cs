@@ -81,10 +81,13 @@ public sealed record DictationResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<SpeakerVoice>? Speakers = null)
 {
     public const string UnsortedMessage = "The fields couldn't be sorted, so the transcript is kept as plain text.";
+    public const string BusyMessage =
+        "The dictation server was too busy to draft this visit, so the transcript is kept as plain text.";
 
-    // Ours, never the service's, and only when the fields couldn't be sorted (UC 10).
+    // Ours, never the service's, and only when the fields couldn't be sorted (UC 10): a visit left undrafted because
+    // dictations had K2 Horizon all along (model_busy) says so.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Message => Sorting == Sorting.Unavailable ? UnsortedMessage : null;
+    public string? Message => Sorting != Sorting.Unavailable ? null : Reason == SortingFailure.ModelBusy ? BusyMessage : UnsortedMessage;
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<Sorting>))]
@@ -130,6 +133,10 @@ public enum SortingFailure
     // Speech recognition failed on the rest of the recording after stop: the transcript is as it was live, not final.
     [JsonStringEnumMemberName("transcription_failed")]
     TranscriptionFailed,
+
+    // A recorded visit (step 16) whose windows waited ten minutes in all for K2 Horizon, which dictations had first.
+    [JsonStringEnumMemberName("model_busy")]
+    ModelBusy,
 }
 
 // An instruction the clinician dictated that the note doesn't carry: its kind, and where they said it in the transcript

@@ -150,22 +150,36 @@ def test_a_patients_request_is_never_listed_as_the_clinicians_instruction(visit)
         assert not any(request.lower() in item or item in request.lower() for item in listed), request
 
 
-# Series 1's review, F1: a diagnosis hedged or denied to the patient's face ("I don't think you have pneumonia") is kept
-# with its hedge in the gold, and the checks refuse it offered as certain.
+# A diagnosis or a finding hedged, denied or reported, by the clinician to the patient's face ("I don't think you have
+# pneumonia") or by the patient ("I don't reckon I've had any hypos", "my daughter thinks I've got gout"), is kept with
+# its hedge in the gold, and the checks refuse it offered as certain.
 @pytest.mark.parametrize("visit", [v for v in VISITS if v.hedged], ids=lambda v: v.id)
 def test_each_hedged_diagnosis_is_said_with_its_hedge_kept_so_and_refused_as_certain(visit):
     heard = heard_conversation(visit)
     scope = validation.Scope((0, len(heard.text)), heard.passages())
     for diagnosis in visit.hedged:
-        said = [turn for turn in visit.turns if turn.role == "clinician" and diagnosis in turn.display.lower()]
-        assert said and not any(ambient_scoring._offered_as_certain(turn.display, diagnosis) for turn in said)
+        said = [turn for turn in visit.turns if diagnosis in turn.display.lower()]
+        assert said and not any(ambient_scoring._offered_as_certain(turn.display, diagnosis) for turn in said), diagnosis
         for golds in (visit.gold, visit.gold_rules):
-            assert not any(ambient_scoring._offered_as_certain(gold.value, diagnosis) for gold in golds.values())
-        (source,) = [s for s in visit.gold["assessment"].sources if diagnosis in s.lower()]
+            assert not any(ambient_scoring._offered_as_certain(gold.value, diagnosis) for gold in golds.values()), diagnosis
+        (field, source), *_ = [(name, s) for name in cs.FIELDS for s in visit.gold[name].sources if diagnosis in s.lower()]
         certain = {name: {"value": "", "sources": []} for name in cs.FIELDS} | {
-            "assessment": {"value": f"You have {diagnosis}.", "sources": [source]}}
-        reasons = validation.check(certain, [], heard, scope=scope).fields["assessment"].reasons
-        assert {"negation_dropped", "certainty_dropped"} & set(reasons), (diagnosis, reasons)
+            field: {"value": f"Has {diagnosis}.", "sources": [source]}}
+        reasons = validation.check(certain, [], heard, scope=scope).fields[field].reasons
+        assert {"negation_dropped", "certainty_dropped", "reported_dropped"} & set(reasons), (diagnosis, reasons)
+
+
+# A question, in the shapes people ask them, is never a finding's source: each listed is asked in a turn, and the
+# checks find it a question.
+@pytest.mark.parametrize("visit", [v for v in VISITS if v.asked], ids=lambda v: v.id)
+def test_each_listed_question_is_asked_and_found_a_question(visit):
+    heard = heard_conversation(visit)
+    questions = validation.conversation_questions(heard.text, heard.passages())
+    for asked in visit.asked:
+        assert any(f"{asked}?" in turn.display for turn in visit.turns), asked
+        phrase = " ".join(cs.CLAUSE_PUNCTUATION.sub(" ", asked).split()).lower()
+        at = heard.text.lower().find(phrase)
+        assert any(start < at + len(phrase) and at < end for start, end in questions), asked
 
 
 @pytest.mark.parametrize("visit", [v for v in VISITS if v.denied], ids=lambda v: v.id)

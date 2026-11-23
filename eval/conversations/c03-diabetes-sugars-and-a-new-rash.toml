@@ -2,6 +2,7 @@ id = "c03-diabetes-sugars-and-a-new-rash"
 speakers = 2
 voices = { clinician = "bf_emma", patient = "ef_dora" }
 tags = ["small-talk", "thinking-aloud", "home-readings", "allergy-change", "self-correction", "question-no", "negation", "numbers", "dates", "same-gender"]
+hedged = ["hypos"]
 noise = ["room"]
 dates = ["--03-14"]
 drugs = ["metformin", "atorvastatin"]
@@ -23,7 +24,7 @@ text = "Children never seem to feel the cold. So, how has the diabetes been?"
 
 [[turns]]
 role = "patient"
-text = "Up and down, to be honest. My sugars have been creeping up over the last couple of months."
+text = "Up and down, to be honest. My sugars have been creeping up over the last couple of months. I don't reckon I've had any hypos, though."
 
 [[turns]]
 role = "clinician"
@@ -168,7 +169,7 @@ role = "clinician"
 text = "You're welcome. Enjoy the rest of your week, and say hello to the grandchildren."
 
 [gold.subjective]
-value = "My sugars have been creeping up over the last couple of months. Every morning before breakfast. Most mornings I'm between 150 and 170. This morning it was 164. The highest was 188, after a birthday party. I only check after dinner now and then. It's usually around 200. I take it with breakfast and with dinner, and I haven't missed any doses. A bit of loose stool at the start, but that settled down after a few weeks. I check my feet every night, and they look fine to me. I've got my eye exam booked for March 14. I had a water infection last month, and the walk-in clinic gave me an antibiotic. After 3 days I came out in a rash, red itchy blotches all over my arms and my chest. The pharmacist said it was a sulfa antibiotic and told me to stop it. It cleared up about a week after I stopped."
+value = "My sugars have been creeping up over the last couple of months. Every morning before breakfast. Most mornings I'm between 150 and 170. This morning it was 164. The highest was 188, after a birthday party. I only check after dinner now and then. It's usually around 200. I take it with breakfast and with dinner, and I haven't missed any doses. A bit of loose stool at the start, but that settled down after a few weeks. I check my feet every night, and they look fine to me. I've got my eye exam booked for March 14. I had a water infection last month, and the walk-in clinic gave me an antibiotic. After 3 days I came out in a rash, red itchy blotches all over my arms and my chest. The pharmacist said it was a sulfa antibiotic and told me to stop it. It cleared up about a week after I stopped. I don't reckon I've had any hypos."
 sources = [
     "My sugars have been creeping up over the last couple of months",
     "Every morning before breakfast",
@@ -185,6 +186,7 @@ sources = [
     "After 3 days I came out in a rash, red itchy blotches all over my arms and my chest",
     "The pharmacist said it was a sulfa antibiotic and told me to stop it",
     "it cleared up about a week after I stopped",
+    "I don't reckon I've had any hypos",
 ]
 
 [gold.objective]

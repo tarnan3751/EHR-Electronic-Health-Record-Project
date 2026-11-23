@@ -310,10 +310,19 @@ def _visits(settings: Settings, keep: Callable) -> None:
         keep("result-ambient-200-unavailable-model_timeout", "result-ambient",
              http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
 
+    # Named, and never a turn with K2 Horizon, a dictation always waiting: the visit is left undrafted as busy.
+    with listening_client(settings, FakeLlama(DRAFTED), ambient_wait_seconds=0.2) as http:
+        session = heard(http, "clinician", "patient")
+        turns = http.app.state.sessions._turns
+        turns._dictations, _ = 1, turns._none.clear()
+        drafted(http, session, NAMED)
+        keep("result-ambient-200-unavailable-model_busy", "result-ambient",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
+
     # Drafted in two windows, the second without the patient: Subjective comes from the first, and says the second had
     # something for it that didn't pass.
-    original = conversation.WINDOW_WORDS
-    conversation.WINDOW_WORDS = 12
+    original = conversation.WINDOW_TOKENS
+    conversation.WINDOW_TOKENS = 12
     try:
         with listening_client(settings, FakeLlama(answer(("I have had a cough for three days.", ["I have had a cough for three days"]),
                                                          objective=("Your chest is clear.", ["Your chest is clear"])))) as http:
@@ -322,7 +331,7 @@ def _visits(settings: Settings, keep: Callable) -> None:
             keep("result-ambient-200-done-part_not_offered", "result-ambient",
                  http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
     finally:
-        conversation.WINDOW_WORDS = original
+        conversation.WINDOW_TOKENS = original
 
     # The third voice named unsure: its passage is Unsure, and the instruction said in it is listed beside the
     # clinician's, each with who said it; the patient's request for a refill isn't.
@@ -428,6 +437,7 @@ def test_the_contract_covers_every_answer_of_a_visit(settings):
     parted = bodies["result-ambient-200-done-part_not_offered"]["fields"]["subjective"]
     assert [w["code"] for w in parted["warnings"]] == ["patients_own_words", "part_not_offered"]
     assert bodies["result-ambient-200-unavailable-model_timeout"]["reason"] == "model_timeout"
+    assert bodies["result-ambient-200-unavailable-model_busy"]["reason"] == "model_busy"
     instructed = bodies["result-ambient-200-done-not_carried_over"]
     assert [s["speaker"] for s in instructed["transcript"]["segments"]] == ["clinician", "patient", "unsure"]
     assert [(i["reason"], i["speaker"]) for i in instructed["notCarriedOver"]] == [("order", "clinician"), ("order", "unsure")]

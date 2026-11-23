@@ -10,8 +10,8 @@ eval/results/ambient-latest.json:
    Horizon was unavailable or too slow, or the voices couldn't be told apart, measured nothing about the fields.
 3. No offered value contains an order or allergy change a visit said; none without a warning that points at a passage
    contains a retracted value or a drug no gold value carries; none offers a symptom the patient denied as present, or
-   a diagnosis the clinician hedged or denied as certain; no offered value's source holds a word said by someone its
-   field may not quote without a speaker_unsure warning on it; nothing is proposed for the chart; and nothing a patient
+   a diagnosis or finding hedged, denied or reported as certain; no offered value's source is a question; no offered
+   value's source holds a word said by someone its field may not quote without a speaker_unsure warning on it; nothing is proposed for the chart; and nothing a patient
    or someone else said is listed as the clinician's instruction. Each, unless the owner has accepted that case in
    eval/known-limitations.toml ([[accepted_conversation]]: variant, field, kind, shown, reason, accepted, by), and each
    accepted case still occurs. These are scored again here from the stored answers (ambient_scoring.restored()), as
@@ -32,7 +32,9 @@ from pathlib import Path
 from ehr_dictation import prompt
 
 from . import ambient_scoring
-from .conversations import gold_sha256, load_conversations, pipeline_sha256, recordings_sha256, scoring_sha256
+from .conversations import (
+    gold_sha256, load_conversations, pipeline_sha256, recordings_sha256, scoring_sha256, variant_ids,
+)
 
 KNOWN_LIMITATIONS = "known-limitations.toml"
 RUN_IT = (
@@ -53,6 +55,7 @@ SAFETY = {
     "retracted_or_absent_drug": ("order_allergy", "unflagged"),
     "denied_as_present": ("safety", "denied_as_present"),
     "hedged_as_certain": ("safety", "hedged_as_certain"),
+    "asked_as_finding": ("safety", "asked_as_finding"),
     "wrong_speaker_unwarned": ("safety", "wrong_speaker_unwarned"),
     "request_as_instruction": ("safety", "requests_as_instructions"),
 }
@@ -68,7 +71,7 @@ def check(results_dir: Path, eval_dir: Path) -> list[str]:
     recorded, dataset, metrics = latest.get("provenance", {}), latest.get("dataset", {}), latest.get("metrics", {})
     problems: list[str] = []
 
-    structuring = prompt.load(prompt_file=prompt.CONVERSATION_PROMPT_FILE)
+    structuring = prompt.load_conversation()
     if recorded.get("structuring") != structuring.structuring_sha256:
         problems.append(f"The conversation prompt, the note schema or the generation parameters changed since the visits' "
                         f"eval ran. {RUN_IT}")
@@ -84,11 +87,26 @@ def check(results_dir: Path, eval_dir: Path) -> list[str]:
         problems.append(f"The visits' gold, tags or lists changed since these results were scored. {RESCORE}")
 
     scripts = {visit.id: visit for visit in load_conversations(eval_dir / "conversations")}
-    visits = set(scripts)
-    covered = {item.get("script") for item in latest.get("items", [])}
-    if not dataset.get("complete", False) or covered != visits or dataset.get("recordings") != len(latest.get("items", [])):
-        problems.append(f"The results cover {len(covered & visits)} of the {len(visits)} visits. Generate the audio for all "
-                        f"of them, then: {RUN_IT}")
+    expected = variant_ids(eval_dir)
+    stored = [item.get("variant") for item in latest.get("items", [])]
+    if sorted(stored) != sorted(expected) or not dataset.get("complete", False):
+        problems.append(f"The results hold {len(set(stored) & expected)} of the {len(expected)} recordings the visits "
+                        f"define, and no other once each. Generate the audio for all of them, then: {RUN_IT}")
+    metrics, differ = _scored_again(latest, scripts)
+    if differ is None:
+        problems.append(f"The results' stored answers can't be checked again, so their measures can't be trusted. {RUN_IT}")
+    elif differ:
+        problems.append(f"The results' {', '.join(differ)} aren't what their stored answers come to. {RESCORE}")
+    for item in latest.get("items", []):
+        problems += [f"{item.get('variant')}: {fault}. {RUN_IT}" for fault in _faults(item)]
+    contention = latest.get("contention")
+    cases = ("one_alone", "two_alone", "one_beside_a_window", "two_beside_a_window")
+    if not isinstance(contention, dict) or any(
+        not isinstance(contention.get(case), dict) or set(contention[case].get("dictation_sorted") or ["no"]) != {"done"}
+        for case in cases
+    ):
+        problems.append("The results have no contention probe, or a dictation in it wasn't sorted (its timings are the "
+                        "model session's to judge, not the gate's): run ehr_eval.ambient --contention, then commit.")
     unsorted = metrics.get("sorting", {}).get("unavailable")
     if unsorted != {}:
         problems.append(f"Not every visit was drafted ({unsorted}): K2 Horizon was unavailable or too slow, or the voices "
@@ -96,11 +114,6 @@ def check(results_dir: Path, eval_dir: Path) -> list[str]:
     if latest.get("baseline"):
         problems.append("ambient-latest.json says it is a baseline. Keep the accepted baseline in ambient-baseline.json.")
 
-    metrics, differ = _scored_again(latest, scripts)
-    if differ is None:
-        problems.append(f"The results' stored answers can't be checked again, so their safety lists can't be trusted. {RUN_IT}")
-    elif differ:
-        problems.append(f"The results' {', '.join(differ)} aren't what their stored answers come to. {RESCORE}")
     if metrics.get("order_allergy", {}).get("shown") != 0:
         problems.append(f"An offered value from a visit contains an order or an allergy change, or the results don't say. "
                         f"There must be none: tighten the conversation prompt or the checks, then: {RUN_IT}")
@@ -126,19 +139,22 @@ def check(results_dir: Path, eval_dir: Path) -> list[str]:
 
 
 def _scored_again(latest: dict, scripts: dict) -> tuple[dict, list[str] | None]:
-    """The results' metrics with the safety measures scored again from the stored answers, and which of them the file
-    says otherwise; or the file's metrics and None where its answers can't be scored again."""
-    metrics = latest.get("metrics", {})
+    """Every measure scored again from the stored answers, as --rescore would, and which of them the file says otherwise;
+    or the file's own and None where its answers can't be scored again. The gate judges the measures it scored."""
     try:
         again = json.loads(json.dumps(ambient_scoring.score(ambient_scoring.restored(latest, scripts), scripts)))
-    except (KeyError, TypeError, ValueError):
-        return metrics, None
-    judged = [("order_allergy", "shown"), ("safety", "chart_proposals"), *SAFETY.values()]
-    differ = [f"{section}.{key}" for section, key in judged if metrics.get(section, {}).get(key) != again[section][key]]
-    scored = {section: dict(metrics.get(section, {})) for section, _ in judged}
-    for section, key in judged:
-        scored[section][key] = again[section][key]
-    return metrics | scored, differ
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return latest.get("metrics") or {}, None
+    said = latest.get("metrics") or {}
+    return again, sorted(key for key in again.keys() | said.keys() if said.get(key) != again.get(key))
+
+
+def _faults(item: dict) -> list[str]:
+    """What in a stored recording isn't what its own parts come to (ambient_scoring.faults()), or that it can't be read."""
+    try:
+        return ambient_scoring.faults(ambient_scoring.VisitItem(**{k: v for k, v in item.items() if k != "fields"}))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return ["its stored answers can't be read"]
 
 
 def _unaccepted(metrics: dict, known: Path) -> list[str]:

@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from ehr_dictation import audio, conversation, diarize, segmenter, transcriber
 from ehr_dictation.llama import Proposal, StructuringFailed, Structurer
+from ehr_dictation import listening as service
 from ehr_dictation.listening import Listening
 from ehr_dictation.sessions import AMBIENT, GaveWay
 from ehr_dictation.settings import Settings
@@ -41,9 +42,10 @@ class Heard:
     conversation: conversation.Conversation
     doubts: list[dict | None]
     names: dict[int, str]
-    windows: list[conversation.Window] = field(default_factory=list)
-    proposals: list[Proposal | None] = field(default_factory=list)
-    window_seconds: list[float] = field(default_factory=list)
+    sizes: list[int] = field(default_factory=list)  # each passage's tokens, as the windows were cut by
+    # Each window K2 Horizon was asked for, in order, a timed-out one's halves after it: the window, its proposal (None
+    # if it failed), its seconds, and why it failed.
+    tries: list[tuple[conversation.Window, Proposal | None, float, str | None]] = field(default_factory=list)
     reason: str | None = None
     timings: dict[str, float] = field(default_factory=dict)
 
@@ -106,20 +108,26 @@ def hear(data: bytes, speakers: int, turns: list[dict], recognizer, embedder) ->
 
 
 async def draft(heard: Heard, structurer: Structurer) -> Heard:
-    """Each window drafted by K2 Horizon, timed; the first window it couldn't draft ends the drafting, as it leaves the
-    visit undrafted in the sidecar."""
+    """The visit drafted as the sidecar drafts it (ehr_dictation.listening.drafted()): windows by tokens, a window that
+    timed out or ran out of tokens asked for again as two halves, once; each try timed and kept, the one that ended the
+    drafting too, as it leaves the visit undrafted in the sidecar."""
     started = time.perf_counter()
-    heard.windows = conversation.windows(heard.conversation, conversation.WINDOW_WORDS)
-    for window in heard.windows:
+    heard.sizes = await service.passage_tokens(heard.conversation, structurer)
+
+    async def ask(window: conversation.Window) -> Proposal:
         began = time.perf_counter()
         try:
-            heard.proposals.append(await structurer.propose(window.text))
+            proposal = await structurer.propose(window.text)
         except StructuringFailed as error:
-            heard.proposals.append(None)
-            heard.reason = error.reason
-            break
-        finally:
-            heard.window_seconds.append(time.perf_counter() - began)
+            heard.tries.append((window, None, time.perf_counter() - began, error.reason))
+            raise
+        heard.tries.append((window, proposal, time.perf_counter() - began, None))
+        return proposal
+
+    try:
+        await service.drafted(heard.conversation, structurer, ask, heard.sizes)
+    except StructuringFailed as error:
+        heard.reason = error.reason
     heard.timings["draft"] = time.perf_counter() - started
     return heard
 
@@ -147,11 +155,12 @@ def proposes(recognizer, embedder, structurer: Structurer, models) -> bool:  # n
     return sessions.start("eval", AMBIENT, 2).proposes
 
 
-async def contend(window: str, dictation: str, drafting: Structurer, dictating: Structurer, recognizer, models,  # noqa: ANN001
-                  lead: float = 2.0) -> dict:
-    """A visit's window drafted, and `lead` seconds into it two dictations sorted at once, each with the sidecar's own
-    turns and slots (Listening's), as the sidecar would: each dictation's seconds from asking to answer, and the
-    window's, with how often it gave way."""
+async def contend(window: str | None, dictation: str, dictations: int, drafting: Structurer, dictating: Structurer,  # noqa: ANN001
+                  recognizer, models, lead: float = 2.0) -> dict:
+    """`dictations` dictations sorted at once, each with the sidecar's own turns and slots (Listening's), as the sidecar
+    would; with a visit's window being drafted from `lead` seconds before they ask, or with none (window None, the
+    baseline): each dictation's seconds from asking to answer and how it was sorted, and the window's seconds and how
+    often it gave way."""
     sessions = Listening(Settings(api_key="eval", llama_api_key="eval"), recognizer, dictating, models, embedder=object())
     turns, slots = sessions._turns, sessions._sorting
     gave_way = 0
@@ -178,9 +187,11 @@ async def contend(window: str, dictation: str, drafting: Structurer, dictating: 
             return time.perf_counter() - began, getattr(error, "reason", "model_timeout")
         return time.perf_counter() - began, "done"
 
-    drafted = asyncio.create_task(window_drafted())
-    await asyncio.sleep(lead)
-    both = await asyncio.gather(dictation_sorted(), dictation_sorted())
-    return {"dictation_seconds_two_at_once": [round(seconds, 1) for seconds, _ in both],
-            "dictation_sorted": [sorting for _, sorting in both],
-            "window_seconds_alongside": round(await drafted, 1), "window_gave_way": gave_way}
+    drafted = asyncio.create_task(window_drafted()) if window is not None else None
+    if drafted is not None:
+        await asyncio.sleep(lead)
+    sorted_ = await asyncio.gather(*(dictation_sorted() for _ in range(dictations)))
+    out = {"dictation_seconds": [round(seconds, 1) for seconds, _ in sorted_], "dictation_sorted": [s for _, s in sorted_]}
+    if drafted is not None:
+        out |= {"window_seconds_alongside": round(await drafted, 1), "window_gave_way": gave_way}
+    return out

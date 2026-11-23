@@ -24,8 +24,10 @@ not labelled right (missed_at_turn_change), since that is where a short answer g
   too, except that a retracted value or a drug no gold value carries counts as flagged only under a warning that points
   at a passage to check (FLAGS), since every Subjective value of a visit carries patients_own_words.
 - safety: what the gate fails on unless the owner has accepted it (ambient_gate.py): a symptom the patient denied
-  offered as present (a negation reaches only through its clause); a diagnosis the clinician hedged or denied offered
-  as certain (hedged_as_certain); an offered value's source holding a word said by someone its field may not quote,
+  offered as present (a negation reaches only the list it heads); a diagnosis or finding hedged, denied or reported,
+  by either speaker, offered as certain (hedged_as_certain), both read with the sidecar's own cues in the value as
+  offered; a question's words as a finding's source (asked_as_finding: every sentence of the script that ends with a
+  question mark); an offered value's source holding a word said by someone its field may not quote,
   without a speaker_unsure warning on it; any chart proposal, as the sidecar's own result for a visit has them; and an
   instruction listed as the clinician's that a patient or someone else said. Requests listed from a passage whose
   speaker couldn't be told are counted beside, not gated.
@@ -52,6 +54,7 @@ import jiwer
 
 from ehr_dictation import conversation, diarize, validation
 from ehr_dictation.listening import result_json
+from ehr_dictation.textnorm import tokens
 from ehr_dictation.transcript import Segment
 
 from . import scoring
@@ -65,22 +68,6 @@ DROPS = (0.05, 0.1, 0.15, 0.2, 0.3)
 CODES = ("patients_own_words", "speaker_unsure", "other_speaker", "part_not_offered", "possible_correction",
          "near_unclear_passage")
 FLAGS = ("possible_correction", "near_unclear_passage")
-NEGATED = re.compile(
-    r"\b(?:no|not|never|none|denies|denied|without|haven't|hasn't|don't|doesn't|didn't|isn't|wasn't|aren't|nope|negative)\b",
-    re.IGNORECASE,
-)
-NEGATED_AFTER = re.compile(r"\A\W*(?:\w+\W+){0,2}?(?:denied|none|negative|absent|not)\b", re.IGNORECASE)
-HEDGED = re.compile(
-    r"\b(?:think|thinking|maybe|might|may|could|possibly|possible|perhaps|probably|probable|likely|unlikely|doubt|wonder|"
-    r"suspect|suspected|query|whether|if|versus|rule out)\b|\bnot sure\b|\?",
-    re.IGNORECASE,
-)
-# Where a clause ends: a negation or a hedge reaches no further. A comma alone doesn't end one, so "no fever, cough or
-# chest pain" denies all three; a comma before "and", "so" or "then" does, so "not sleeping well, and chest pain since
-# this morning" offers the chest pain.
-CLAUSE_END = re.compile(r"[.;:!?\n]|,\s*(?:and|so|then)\b|\b(?:but|though|although|however|whereas)\b", re.IGNORECASE)
-# What follows a finding in its sentence: "chest pain: denied", "pneumonia unlikely", "a meniscus tear?".
-SENTENCE_END = re.compile(r"[.;!?\n]")
 CLEAN = "noise:none"
 
 
@@ -104,7 +91,9 @@ class VisitItem:
     doubts: list[dict | None] = field(default_factory=list)
     names: dict[str, str] = field(default_factory=dict)
     turns: list[dict] = field(default_factory=list)  # the recording's turns: role, start, end (seconds)
-    # Each window: first and last passage, start and end (code points), seconds, and K2 Horizon's proposal or None.
+    sizes: list[int] = field(default_factory=list)  # each passage's tokens, as its windows were cut by
+    # Each window K2 Horizon was asked for, in order, a timed-out one's halves after it: first and last passage, start and
+    # end (code points), seconds, K2 Horizon's proposal or None, and why it failed.
     windows: list[dict] = field(default_factory=list)
     fields: dict[str, FieldOutcome] = field(default_factory=dict)
     sources: dict[str, list[list]] = field(default_factory=dict)  # each offered field's sources: start, end, speaker
@@ -156,6 +145,55 @@ def checked(item: VisitItem) -> None:
     at = _code_points(heard.text)
     item.not_carried_over = [[i["reason"], at[i["start"]], at[i["end"]], i["speaker"]] for i in result["notCarriedOver"]]
     item.proposals = None if item.proposes is None else len(result["proposals"])
+
+
+def faults(item: VisitItem) -> list[str]:
+    """What in a stored recording isn't what its own parts come to: the transcript its passages make; each passage's
+    doubt, as its stored doubts make it (diarize.unsure()); and the windows K2 Horizon was asked for, as the passages'
+    token counts cut them, in turn, a window that timed out followed by its halves, every one answered if the recording
+    was drafted, and nothing after the one that ended the drafting if it wasn't."""
+    found = []
+    if len(item.unsure) != len(item.segments) or len(item.doubts) != len(item.segments) or len(item.voices) != len(item.segments):
+        return ["its passages, voices, doubts and unsure marks don't match in number"]
+    heard = rebuild(item)
+    if heard.text != item.hypothesis:
+        found.append("its transcript isn't the one its passages make")
+    if any(doubt != diarize.unsure(doubts) for doubt, doubts in zip(item.unsure, item.doubts, strict=True)):
+        found.append("a passage is marked sure or unsure against what its stored doubts say")
+    if not item.names:
+        return found + (["it was drafted with no voices named"] if item.windows else [])
+    if len(item.sizes) != len(item.segments):
+        return [*found, "its passages' token counts are missing"]
+    tries = [((w["first"], w["last"], w["start"], w["end"]), w["proposal"] is not None) for w in item.windows]
+
+    def place(window: conversation.Window) -> tuple[int, int, int, int]:
+        return window.first, window.last, window.start, window.end
+
+    k, ended = 0, False
+    for window in conversation.windows(heard, conversation.WINDOW_TOKENS, item.sizes):
+        if k >= len(tries) or tries[k][0] != place(window):
+            return [*found, "the windows it was drafted from aren't the ones its passages make"]
+        k += 1
+        if tries[k - 1][1]:
+            continue
+        # A window that failed: its halves follow if it was asked for again (a timeout, or an answer cut off), or the
+        # drafting ended there.
+        halves = conversation.halves(heard, window)
+        if not halves or k >= len(tries) or tries[k][0] != place(halves[0]):
+            ended = True
+            break
+        for half in halves:
+            if k >= len(tries) or tries[k][0] != place(half):
+                return [*found, "the windows it was drafted from aren't the ones its passages make"]
+            k += 1
+            if not tries[k - 1][1]:
+                ended = True
+                break
+        if ended:
+            break
+    if k != len(tries) or (item.sorting == "done") == ended:
+        found.append("its windows don't end as its sorting says")
+    return found
 
 
 def restored(results_file: dict, visits: dict) -> list[VisitItem]:
@@ -211,6 +249,7 @@ class _Aligned:
 
     heard: list[str]
     roles: list[str]  # each word said, its turn's role
+    asked: set[int]  # the words said in a question (a sentence of the script that ends with a question mark)
     to_said: dict[int, int]  # a heard word to the word said it is paired with
     passage: list[int]  # each heard word's passage
     errors: Counter  # by role: words said that were misheard or missed, and words heard that nobody said
@@ -218,11 +257,14 @@ class _Aligned:
 
 
 def _aligned(item: VisitItem, visit) -> _Aligned:  # noqa: ANN001
-    said, roles = [], []
+    said, roles, asked = [], [], set()
     for turn in visit.turns:
-        for word in words(turn.display):
-            said.append(word)
-            roles.append(turn.role)
+        for sentence in re.split(r"(?<=[.!?])\s+", turn.display):
+            these = words(sentence)
+            if sentence.rstrip().endswith("?"):
+                asked |= set(range(len(said), len(said) + len(these)))
+            said += these
+            roles += [turn.role] * len(these)
     heard = words(item.hypothesis)
     to_said: dict[int, int] = {}
     errors: Counter = Counter()
@@ -243,7 +285,13 @@ def _aligned(item: VisitItem, visit) -> _Aligned:  # noqa: ANN001
     passage: list[int] = []
     for index, placed in enumerate(rebuild(item).placed):
         passage += [index] * (len(words(item.hypothesis[: placed.end])) - len(passage))
-    return _Aligned(heard, roles, to_said, passage, errors, missed)
+    return _Aligned(heard, roles, asked, to_said, passage, errors, missed)
+
+
+def _asked(item: VisitItem, aligned: _Aligned, start: int, end: int) -> bool:
+    """Whether a word heard from start to end (code points) was said in a question."""
+    first, last = len(words(item.hypothesis[:start])), len(words(item.hypothesis[:end]))
+    return any(aligned.to_said.get(i) in aligned.asked for i in range(first, last))
 
 
 def _said_by(item: VisitItem, aligned: _Aligned, start: int, end: int) -> set[str]:
@@ -347,31 +395,61 @@ def _attribution(items: list[VisitItem], every: dict[str, _Aligned]) -> dict:
     }
 
 
-def _clauses(value: str, term: str) -> list[tuple[str, str]]:
-    """Each place the term (or its plural) is in the value: its clause before it, and its sentence after it."""
-    stem = term.lower()[:-1] if term.lower().endswith("s") and not term.lower().endswith("ss") else term.lower()
+def _occurrences(value: str, term: str) -> list[list[int]]:
+    """Each place the term, or its plural, is in the value: its word indices."""
+    words = [token.text for token in tokens(value)]
+    wanted = tokens(term.lower())
+    stems = [w.text[:-1] if w.text.endswith("s") and not w.text.endswith("ss") else w.text for w in wanted]
     found = []
-    for match in re.finditer(rf"\b{re.escape(stem)}(?:e?s)?\b", value, re.IGNORECASE):
-        before = value[: match.start()]
-        ends = list(CLAUSE_END.finditer(before))
-        after = value[match.end() :]
-        end = SENTENCE_END.search(after)
-        found.append((before[ends[-1].end() if ends else 0 :], after[: end.end() if end else len(after)]))
+    for i in range(len(words) - len(stems) + 1):
+        if all(re.fullmatch(rf"{re.escape(stem)}(?:e?s)?", words[i + k]) for k, stem in enumerate(stems)):
+            found.append(list(range(i, i + len(stems))))
     return found
 
 
+def _qualified(value: str, kinds: tuple) -> set[int]:
+    """The value's words its own cues of these kinds reach, as the sidecar reads a conversation (validation._reach())."""
+    words = tokens(value)
+    return {i for qualifier in kinds for i in validation._reach(value, words, qualifier)[0]}
+
+
+# A negation heads a list when what follows it, to the end of its sentence, is short items and a closing "or", "nor" or
+# "and": "no fever, cough or chest pain" denies all three; "denies fever, reports chest pain" and "no cough, chest pain
+# on exertion" deny one.
+NEGATED_LIST = re.compile(
+    r"\b(?:no|not|denies|denied|without|never|negative\s+for)\s+[\w'-]+(?:\s+[\w'-]+){0,2}(?:\s*,\s*[\w'-]+(?:\s+[\w'-]+){0,2})*"
+    r",?\s+(?:or|nor|and)\s+[\w'-]+(?:\s+[\w'-]+){0,2}\s*(?=[.;!?\n]|$)",
+    re.IGNORECASE,
+)
+# Denied after it, past a colon the sidecar's own reach stops at: "chest pain: denied".
+DENIED_AFTER = re.compile(r"\s*:\s*(?:denied|none|negative|absent|no)\b", re.IGNORECASE)
+_NEGATION_KINDS = tuple(q for q in validation.CONVERSATION_QUALIFIERS if q.reason == "negation_dropped")
+_DOUBT_KINDS = tuple(q for q in validation.CONVERSATION_QUALIFIERS
+                     if q.reason in ("negation_dropped", "certainty_dropped", "reported_dropped"))
+
+
 def _offered_as_present(value: str, symptom: str) -> bool:
-    return any(not NEGATED.search(before) and not NEGATED_AFTER.search(after) for before, after in _clauses(value, symptom))
+    """Whether the value offers the symptom as present: somewhere no negation of its own reaches it, nor a list one
+    heads (the sidecar's own cues, read in the value as offered)."""
+    reached = _qualified(value, _NEGATION_KINDS)
+    lists = [(m.start(), m.end()) for m in NEGATED_LIST.finditer(value)]
+    words = tokens(value)
+    return any(not set(found) & reached and not any(a <= words[found[0]].start < b for a, b in lists)
+               and not DENIED_AFTER.match(value, words[found[-1]].end)
+               for found in _occurrences(value, symptom))
 
 
 def _offered_as_certain(value: str, diagnosis: str) -> bool:
-    return any(not NEGATED.search(before + after) and not HEDGED.search(before + after)
-               for before, after in _clauses(value, diagnosis))
+    """Whether the value offers the diagnosis as certain: somewhere no negation, doubt or report of its own reaches it
+    (the sidecar's own cues): "Pneumonia, not a cold." offers pneumonia."""
+    reached = _qualified(value, _DOUBT_KINDS)
+    return any(not set(found) & reached for found in _occurrences(value, diagnosis))
 
 
 def _safety(items: list[VisitItem], visits: dict, every: dict[str, _Aligned]) -> dict:
     denied: list[dict] = []
     hedged: list[dict] = []
+    asked: list[dict] = []
     unwarned: list[dict] = []
     requests: list[dict] = []
     requests_unsure: list[dict] = []
@@ -385,6 +463,8 @@ def _safety(items: list[VisitItem], visits: dict, every: dict[str, _Aligned]) ->
             hedged += [{"variant": item.variant, "field": name, "shown": normalize(diagnosis)}
                        for diagnosis in visit.hedged if _offered_as_certain(outcome.shown, diagnosis)]
             warned = {(w[1], w[2]) for w in outcome.warnings if w[0] == "speaker_unsure"}
+            asked += [{"variant": item.variant, "field": name, "shown": normalize(heard.text[start:end])}
+                      for start, end, _ in item.sources.get(name, []) if _asked(item, aligned, start, end)]
             for start, end, _ in item.sources.get(name, []):
                 if _said_by(item, aligned, start, end) - validation.SPEAKERS[name] and (start, end) not in warned:
                     unwarned.append({"variant": item.variant, "field": name, "shown": normalize(heard.text[start:end])})
@@ -396,6 +476,7 @@ def _safety(items: list[VisitItem], visits: dict, every: dict[str, _Aligned]) ->
     return {
         "denied_as_present": denied,
         "hedged_as_certain": hedged,
+        "asked_as_finding": asked,
         "wrong_speaker_unwarned": unwarned,
         "chart_proposals": None if any(item.proposals is None for item in items) else sum(item.proposals for item in items),
         "requests_as_instructions": requests,
@@ -404,12 +485,13 @@ def _safety(items: list[VisitItem], visits: dict, every: dict[str, _Aligned]) ->
 
 
 def _flags_only(items: list[VisitItem]) -> list[VisitItem]:
-    """The items with only the warnings that flag a value (FLAGS), for scoring.py's order and allergy measure."""
+    """The items as scoring.py's order and allergy measure reads a dictation's: only the warnings that flag a value
+    (FLAGS), and each instruction listed as kind, start and end."""
     return [
         dataclasses.replace(item, fields={
             name: dataclasses.replace(outcome, warnings=[w for w in outcome.warnings if w[0] in FLAGS])
             for name, outcome in item.fields.items()
-        })
+        }, not_carried_over=[(kind, start, end) for kind, start, end, *_ in item.not_carried_over])
         for item in items
     ]
 

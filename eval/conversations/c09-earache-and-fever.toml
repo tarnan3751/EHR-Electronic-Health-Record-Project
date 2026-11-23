@@ -2,6 +2,7 @@ id = "c09-earache-and-fever"
 speakers = 3
 voices = { clinician = "bm_lewis", patient = "af_nicole", other = "bf_isabella" }
 tags = ["three-speakers", "relative-health", "question-no", "backchannel", "small-talk", "negation", "numbers", "order-spoken"]
+asked = ["Has she been pulling at that ear"]
 noise = ["room"]
 dates = []
 drugs = ["ibuprofen", "amoxicillin"]

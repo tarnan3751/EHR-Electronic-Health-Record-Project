@@ -2,6 +2,7 @@ id = "c11-annual-visit-four-problems"
 speakers = 2
 voices = { clinician = "af_bella", patient = "bf_emma" }
 tags = ["long", "same-gender", "home-readings", "small-talk", "thinking-aloud", "hedging", "backchannel", "question-no", "order-spoken", "negation", "numbers"]
+hedged = ["sleep apnoea"]
 noise = ["room"]
 dates = []
 drugs = ["lisinopril", "metformin", "atorvastatin", "empagliflozin", "ibuprofen", "paracetamol"]
@@ -295,7 +296,7 @@ text = "And how are you sleeping?"
 
 [[turns]]
 role = "patient"
-text = "Badly. I fall asleep easily enough, but I wake up around [[4|four]] and lie there thinking."
+text = "Badly. I fall asleep easily enough, but I wake up around [[4|four]] and lie there thinking. I was told I might have sleep apnoea a few years ago."
 
 [[turns]]
 role = "clinician"
@@ -631,7 +632,7 @@ role = "patient"
 text = "Thank you again. I came in feeling like a bit of a fraud, and I'm going home with a plan."
 
 [gold.subjective]
-value = "My right shoulder has been aching, and I've been feeling a bit low lately. This morning it was 142/88. Yesterday it was 138/84, and the day before, 146/90. Then 135/82, 140/86, and on Sunday it was 151/92, but I'd had a big lunch out with friends that day. I sit quietly for 5 minutes first, the way the leaflet says. The metformin upset my stomach when I first started, but that settled down after a few weeks. They're usually between 130 and 150. Once or twice it's been near 170. I've been snacking more since I stopped working. Biscuits with every cup of tea, mostly, and I'm drinking a lot more tea. I used to walk to work and back, which was 2 miles a day. Now it's mostly the garden. I'm overdue at the optician. I have a glass of wine at the weekend, and that's about it. Since I retired, the days feel a bit empty. I used to see people all day at the library, and now some days I don't speak to anyone until the evening. About 3 months now, since the end of the summer. I fall asleep easily enough, but I wake up around 4 and lie there thinking. I've stopped going to my walking group on Tuesdays, which I used to love. My energy's low. I can still do the crossword, but it takes me twice as long. I just feel flat. About 2 months ago. I think it started with all the painting, reaching up over my head. It's worst when I reach up to the top cupboard, and when I lie on that side at night. It wakes me up. A couple of paracetamol now and then. They take the edge off. I don't really want to go on tablets for it, if I can help it."
+value = "My right shoulder has been aching, and I've been feeling a bit low lately. This morning it was 142/88. Yesterday it was 138/84, and the day before, 146/90. Then 135/82, 140/86, and on Sunday it was 151/92, but I'd had a big lunch out with friends that day. I sit quietly for 5 minutes first, the way the leaflet says. The metformin upset my stomach when I first started, but that settled down after a few weeks. They're usually between 130 and 150. Once or twice it's been near 170. I've been snacking more since I stopped working. Biscuits with every cup of tea, mostly, and I'm drinking a lot more tea. I used to walk to work and back, which was 2 miles a day. Now it's mostly the garden. I'm overdue at the optician. I have a glass of wine at the weekend, and that's about it. Since I retired, the days feel a bit empty. I used to see people all day at the library, and now some days I don't speak to anyone until the evening. About 3 months now, since the end of the summer. I fall asleep easily enough, but I wake up around 4 and lie there thinking. I've stopped going to my walking group on Tuesdays, which I used to love. My energy's low. I can still do the crossword, but it takes me twice as long. I just feel flat. About 2 months ago. I think it started with all the painting, reaching up over my head. It's worst when I reach up to the top cupboard, and when I lie on that side at night. It wakes me up. A couple of paracetamol now and then. They take the edge off. I don't really want to go on tablets for it, if I can help it. I was told I might have sleep apnoea a few years ago."
 sources = [
     "My right shoulder has been aching, and I've been feeling a bit low lately",
     "This morning it was 142/88",
@@ -662,6 +663,7 @@ sources = [
     "A couple of paracetamol now and then",
     "They take the edge off",
     "I don't really want to go on tablets for it, if I can help it",
+    "I was told I might have sleep apnoea a few years ago",
 ]
 
 [gold.objective]

@@ -2,6 +2,7 @@ id = "c08-low-back-strain"
 speakers = 2
 voices = { clinician = "am_puck", patient = "am_michael" }
 tags = ["thinking-aloud", "hedging", "small-talk", "allergy-change", "same-gender", "question-no", "negation", "numbers"]
+hedged = ["slipped a disc"]
 noise = []
 dates = []
 drugs = ["ibuprofen", "codeine"]
@@ -151,7 +152,7 @@ text = "So what do you think it is?"
 
 [[turns]]
 role = "clinician"
-text = "Let me think it through out loud. You lifted something heavy, and the pain stays on the right side. It doesn't go down your leg, and your nerves are working normally. So I don't think a disc is pressing on a nerve. It's most likely a strain of the muscles in your lower back."
+text = "Let me think it through out loud. You lifted something heavy, and the pain stays on the right side. It doesn't go down your leg, and your nerves are working normally. So I don't think a disc is pressing on a nerve. It's most likely a strain of the muscles in your lower back. And there's no sign you've slipped a disc."
 gap = 1.0
 
 [[turns]]
@@ -212,10 +213,11 @@ sources = [
 ]
 
 [gold.assessment]
-value = "I don't think a disc is pressing on a nerve. It's most likely a strain of the muscles in your lower back."
+value = "I don't think a disc is pressing on a nerve. It's most likely a strain of the muscles in your lower back. There's no sign you've slipped a disc."
 sources = [
     "I don't think a disc is pressing on a nerve",
     "It's most likely a strain of the muscles in your lower back",
+    "there's no sign you've slipped a disc",
 ]
 
 [gold.plan]

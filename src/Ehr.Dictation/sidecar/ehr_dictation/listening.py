@@ -20,10 +20,13 @@ and dictation works as before.
    left out or named twice, a third role on a visit of two, a group that isn't a plain number, a body that isn't one
    JSON object with "speakers" once. The web app checks the same against the consent. The same names again are answered as the first time, so a client that lost the
    answer can ask again; other names once they are given are refused (409 speakers_given).
-4. Then, in the background, the note is drafted a window at a time (conversation.py). Each window waits its turn with
-   K2 Horizon (sessions.Turns: after every dictation waiting, one window at a time across visits) and then has
-   structuring_seconds, with the conversation's prompt (conversation-prompt.md); if dictations come to need every one of
-   K2 Horizon's slots meanwhile, it gives its slot back at once and waits for its turn again. Its proposal is checked against the
+4. Then, in the background, the note is drafted a window at a time (conversation.py, drafted()): windows of about
+   conversation.WINDOW_TOKENS tokens, as llama-server counts them. Each window waits its turn with K2 Horizon
+   (sessions.Turns: while no dictation is waiting or being sorted, one window at a time across visits) and then has
+   structuring_seconds, with the conversation's prompt and its shorter answer (prompt.load_conversation()); if a
+   dictation asks meanwhile, the window gives way at once and waits for its turn again. A window that timed out or ran
+   out of tokens is drafted once more as two halves. A visit's windows wait ambient_wait_seconds in all at most; after
+   that it is left undrafted with its transcript (model_busy: the service was busy). Its proposal is checked against the
    whole visit, its sources held to the window and to who may be quoted (validation.py), and the windows' fields are
    merged. A window K2 Horizon couldn't draft leaves the whole visit unsorted, saying why, so the review gets the
    transcript as plain text rather than a note missing a part nobody can see. A visit proposes no order or allergy
@@ -45,6 +48,7 @@ import contextlib
 import logging
 import re
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -52,18 +56,19 @@ import numpy as np
 from . import audio, conversation, diarize, prompt, quality, segmenter, transcriber, validation
 from .audio import SAMPLE_RATE
 from .diarize import Embedder
-from .llama import StructuringFailed, Structurer
+from .llama import AnswerCutOff, ModelTimeout, Proposal, StructuringFailed, Structurer
 from .prompt import FIELDS
 from .provenance import CODE_SHA256
-from .transcript import Transcript
+from .transcript import UNCLEAR_MARK, Transcript
 from .sessions import (
-    AMBIENT, DICTATION, UNDECODABLE_BYTES, GaveWay, Session, SessionError, Sessions, _busy, _not_audio, _within,
+    AMBIENT, DICTATION, UNDECODABLE_BYTES, GaveWay, Session, SessionError, Sessions, TooBusy, _busy, _not_audio, _within,
 )
 
 log = logging.getLogger("ehr_dictation")
 
 QUIET_RUN = 30  # frames: sound this long ends a quiet stretch; a click or a cough doesn't
 GROUP = re.compile(r"[1-9][0-9]*")  # a voice's number, in ASCII digits only
+MODEL_BUSY = "model_busy"  # a visit's windows waited ambient_wait_seconds for their turns, in all
 DECODE_SECONDS = 60.0  # for the whole recording after stop, which nobody waits on: a 20-minute visit takes a few
 
 
@@ -107,9 +112,7 @@ class Listening(Sessions):
                  **options: object) -> None:
         super().__init__(*args, **options)
         self._embedder = embedder
-        self._conversation = conversation or self._structurer.using(
-            prompt.load(prompt_file=prompt.CONVERSATION_PROMPT_FILE)
-        )
+        self._conversation = conversation or self._structurer.using(prompt.load_conversation())
 
     def start(self, owner: str, mode: str = DICTATION, speakers: int = 0) -> Session:
         if mode != AMBIENT:
@@ -313,24 +316,29 @@ class Listening(Sessions):
         started = time.perf_counter()
         heard = session.transcript
         passages = heard.passages()
-        parts: list[tuple[validation.Scope, validation.Checks]] = []
+        waited = 0.0
+
+        async def ask(window: conversation.Window) -> Proposal:
+            nonlocal waited
+            while True:
+                async with self._turns.window(self._settings.ambient_wait_seconds - waited) as turn:
+                    waited += turn.waited
+                    began = time.perf_counter()
+                    try:
+                        async with asyncio.timeout(self._settings.structuring_seconds), self._sorting:
+                            proposal = await turn.draft(self._conversation.propose(window.text))
+                    except GaveWay:
+                        log.info("session %s window gave way to a dictation", session.id)
+                        continue
+                    log.info("session %s window drafted in %.1f s", session.id, time.perf_counter() - began)
+                    return proposal
+
         try:
-            windows = conversation.windows(heard, conversation.WINDOW_WORDS)
-            for number, window in enumerate(windows, 1):
-                while True:
-                    async with self._turns.window() as turn:
-                        began = time.perf_counter()
-                        try:
-                            async with asyncio.timeout(self._settings.structuring_seconds), self._sorting:
-                                proposal = await turn.draft(self._conversation.propose(window.text))
-                        except GaveWay:
-                            log.info("session %s window %d gave way to a dictation", session.id, number)
-                            continue
-                    break
-                scope = validation.Scope((window.start, window.end), passages)
-                parts.append((scope, validation.check(proposal.fields, proposal.unknown, heard, scope=scope)))
-                log.info("session %s window %d of %d drafted in %.1f s", session.id, number, len(windows),
-                         time.perf_counter() - began)
+            parts = [
+                (scope, validation.check(proposal.fields, proposal.unknown, heard, scope=scope))
+                for window, proposal in await drafted(heard, self._conversation, ask)
+                for scope in [validation.Scope((window.start, window.end), passages)]
+            ]
             checks = validation.merge(parts)
             session.checks, session.sorting = checks, "done"
             log.info(
@@ -339,6 +347,9 @@ class Listening(Sessions):
                 time.perf_counter() - started,
                 ", ".join(f"{name} {'pending' if c.pending else '/'.join(c.reasons)}" for name, c in checks.fields.items()),
             )
+        except TooBusy:
+            session.sorting, session.reason = "unavailable", MODEL_BUSY
+            log.warning("session %s not drafted: %s", session.id, MODEL_BUSY)
         except TimeoutError:
             session.sorting, session.reason = "unavailable", "model_timeout"
             log.warning("session %s not drafted: model_timeout", session.id)
@@ -405,3 +416,29 @@ def result_json(heard: Transcript, sorting: str, reason: str | None, checks: val
     if sorting == "awaiting_speakers":
         result["speakers"] = list(voices)
     return result
+
+
+async def passage_tokens(heard: conversation.Conversation, structurer: Structurer) -> list[int]:
+    """Each passage's length in tokens, by llama-server's tokenizer, as its window shows it."""
+    return [await structurer.tokens(UNCLEAR_MARK if placed.segment.unclear else placed.segment.text) for placed in heard.placed]
+
+
+async def drafted(heard: conversation.Conversation, structurer: Structurer,
+                  ask: Callable[[conversation.Window], Awaitable[Proposal]],
+                  sizes: list[int] | None = None) -> list[tuple[conversation.Window, Proposal]]:
+    """Each window of the named visit and K2 Horizon's proposal for it, asked for with `ask` (see the header): windows
+    by llama-server's count of each passage's tokens (passage_tokens(), unless given), and a window that timed out or
+    ran out of tokens asked for again as two halves, once. Raises what the first window that still couldn't be drafted
+    raised."""
+    sizes = sizes if sizes is not None else await passage_tokens(heard, structurer)
+    out: list[tuple[conversation.Window, Proposal]] = []
+    for window in conversation.windows(heard, conversation.WINDOW_TOKENS, sizes):
+        try:
+            out.append((window, await ask(window)))
+        except (TimeoutError, ModelTimeout, AnswerCutOff):
+            halves = conversation.halves(heard, window)
+            if not halves:
+                raise
+            log.info("a window of %d passages is drafted again as two", window.last - window.first)
+            out += [(half, await ask(half)) for half in halves]
+    return out

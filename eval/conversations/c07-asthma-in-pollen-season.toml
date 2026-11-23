@@ -2,6 +2,7 @@ id = "c07-asthma-in-pollen-season"
 speakers = 2
 voices = { clinician = "bm_george", patient = "af_heart" }
 tags = ["home-readings", "refill-request", "hedging", "backchannel", "question-no", "negation", "numbers", "order-spoken"]
+hedged = ["allergic rhinitis"]
 noise = ["room"]
 dates = []
 drugs = ["albuterol", "budesonide", "cetirizine"]
@@ -145,7 +146,7 @@ text = "So what do you think is going on?"
 
 [[turns]]
 role = "clinician"
-text = "Your asthma isn't as well controlled as it should be right now. I think it's mostly allergy driven. It might be the pollen, since this happens to you every spring."
+text = "Your asthma isn't as well controlled as it should be right now. I think it's mostly allergy driven. It might be the pollen, since this happens to you every spring. I reckon you've got allergic rhinitis on top of the asthma."
 
 [[turns]]
 role = "patient"
@@ -208,11 +209,12 @@ sources = [
 ]
 
 [gold.assessment]
-value = "Your asthma isn't as well controlled as it should be right now. I think it's mostly allergy driven. It might be the pollen."
+value = "Your asthma isn't as well controlled as it should be right now. I think it's mostly allergy driven. It might be the pollen. I reckon you've got allergic rhinitis on top of the asthma."
 sources = [
     "Your asthma isn't as well controlled as it should be right now",
     "I think it's mostly allergy driven",
     "It might be the pollen",
+    "I reckon you've got allergic rhinitis on top of the asthma",
 ]
 
 [gold.plan]

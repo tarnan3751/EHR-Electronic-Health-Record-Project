@@ -89,7 +89,7 @@ def test_editing_only_the_comment_for_people_keeps_the_hash(tmp_path):
 
 # ---- A recorded visit's conversation (the expansion plan's step 16) -------------------------------------------------
 
-CONVERSATION = prompt.load(prompt_file=prompt.CONVERSATION_PROMPT_FILE)
+CONVERSATION = prompt.load_conversation()
 # What the two prompts say alike, in the dictation prompt's words.
 SHARED = (
     "The transcript is in the user message, between <transcript> and </transcript>.",
@@ -109,7 +109,10 @@ def test_the_conversation_prompt_shares_the_dictation_prompts_words_and_schema()
     assert dictation.system.splitlines()[-1] == CONVERSATION.system.splitlines()[-1], "the same answer"
     for name, field in CONVERSATION.schema["properties"].items():
         assert f"- {name}: {field['description']}\n" in CONVERSATION.system, name
-    assert CONVERSATION.schema == dictation.schema and CONVERSATION.parameters == dictation.parameters
+    assert CONVERSATION.schema == dictation.schema
+    # The same parameters but the answer's length: a window's answer ends well within its 90 seconds.
+    assert CONVERSATION.parameters == dictation.parameters | {"max_tokens": 1100}
+    assert dictation.parameters["max_tokens"] == 2048, "dictation's own is unchanged"
 
 
 def test_the_conversation_prompt_names_the_roles_its_lines_are_led_by_and_isnt_sent_its_comment():

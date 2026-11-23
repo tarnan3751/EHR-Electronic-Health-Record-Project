@@ -2,6 +2,7 @@ id = "c04-knee-pain-after-gardening"
 speakers = 2
 voices = { clinician = "am_fenrir", patient = "af_bella" }
 tags = ["small-talk", "hedging", "backchannel", "question-no", "order-spoken", "negation", "numbers"]
+hedged = ["meniscus tear", "gout"]
 noise = []
 dates = []
 drugs = ["ibuprofen"]
@@ -30,7 +31,7 @@ text = "Puppies. So, tell me about this knee."
 
 [[turns]]
 role = "patient"
-text = "It's my right knee. It started hurting about [[6 weeks|six weeks]] ago, after I'd been gardening, kneeling and twisting a lot. It aches on the inside of the knee, just here."
+text = "It's my right knee. It started hurting about [[6 weeks|six weeks]] ago, after I'd been gardening, kneeling and twisting a lot. It aches on the inside of the knee, just here. My daughter thinks I've got gout in it."
 
 [[turns]]
 role = "clinician"
@@ -192,7 +193,7 @@ role = "clinician"
 text = "Good luck with that. Take care of the knee."
 
 [gold.subjective]
-value = "It's my right knee. It started hurting about 6 weeks ago, after I'd been gardening, kneeling and twisting a lot. It aches on the inside of the knee. I don't remember a pop, but it was a bit puffy the next day. Then it settled down. Most days it's about a 4. After a long walk it's more like a 7. Stairs, especially going down, and getting up from a low chair. Turning quickly on it is the worst. It doesn't get stuck. I do notice a click sometimes when I bend it. My left knee is fine, and so are my hips. I twisted it skiing years ago, but it was fine after a few weeks. I work in a school kitchen, so I'm on my feet most of the day. Ibuprofen, 400 mg when it's bad. It helps, but I don't like taking it every day because of my stomach. I walk most days, and I go to a swimming class on Thursdays. Swimming doesn't hurt at all."
+value = "It's my right knee. It started hurting about 6 weeks ago, after I'd been gardening, kneeling and twisting a lot. It aches on the inside of the knee. I don't remember a pop, but it was a bit puffy the next day. Then it settled down. Most days it's about a 4. After a long walk it's more like a 7. Stairs, especially going down, and getting up from a low chair. Turning quickly on it is the worst. It doesn't get stuck. I do notice a click sometimes when I bend it. My left knee is fine, and so are my hips. I twisted it skiing years ago, but it was fine after a few weeks. I work in a school kitchen, so I'm on my feet most of the day. Ibuprofen, 400 mg when it's bad. It helps, but I don't like taking it every day because of my stomach. I walk most days, and I go to a swimming class on Thursdays. Swimming doesn't hurt at all. My daughter thinks I've got gout in it."
 sources = [
     "It's my right knee",
     "It started hurting about 6 weeks ago, after I'd been gardening, kneeling and twisting a lot",
@@ -212,6 +213,7 @@ sources = [
     "It helps, but I don't like taking it every day because of my stomach",
     "I walk most days, and I go to a swimming class on Thursdays",
     "Swimming doesn't hurt at all",
+    "My daughter thinks I've got gout in it",
 ]
 
 [gold.objective]

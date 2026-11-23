@@ -18,7 +18,7 @@ from ehr_dictation import conversation, prompt, provenance
 from ehr_dictation.api import create_app
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.listening import Listening
-from ehr_dictation.sessions import AMBIENT, GaveWay, SessionError, Turns
+from ehr_dictation.sessions import AMBIENT, GaveWay, SessionError, TooBusy, Turns
 
 ALICE = "11111111-1111-1111-1111-111111111111"
 BOB = "22222222-2222-2222-2222-222222222222"
@@ -94,7 +94,7 @@ def test_a_visit_is_heard_its_voices_named_and_its_note_drafted_from_who_said_wh
     assert objective["warnings"] == []
     provenance = done["provenance"]
     assert provenance["speaker"] == LISTENING_MODELS.speaker
-    assert provenance["structuring"] == f"sha256:{prompt.load(prompt_file=prompt.CONVERSATION_PROMPT_FILE).structuring_sha256}"
+    assert provenance["structuring"] == f"sha256:{prompt.load_conversation().structuring_sha256}"
     assert provenance["structuring"] != f"sha256:{prompt.load().structuring_sha256}"
 
 
@@ -314,7 +314,7 @@ def test_a_visit_where_nobody_spoke_is_done_at_stop_without_the_model(settings):
 
 
 def test_a_long_visit_is_drafted_a_window_at_a_time(settings, monkeypatch):
-    monkeypatch.setattr(conversation, "WINDOW_WORDS", 12)  # a turn of each: 4 words and 8
+    monkeypatch.setattr(conversation, "WINDOW_TOKENS", 12)  # a turn of each: 4 tokens and 8 (FakeLlama counts words)
 
     async def run():
         llama = FakeLlama(DRAFTED)
@@ -357,9 +357,9 @@ def test_a_visits_window_waits_while_a_dictation_is_being_sorted(settings):
     assert waiting == [] and result["sorting"] == "done"
 
 
-# Series 1's review, F8 (decision D16): a window being drafted gives its slot back the moment dictations need every one,
-# so two dictations at once are sorted at once, and the window is drafted again after them.
-def test_a_window_being_drafted_gives_way_when_dictations_need_every_slot(settings):
+# Decision D16 as approved: a window is drafted only while no dictation is being sorted, so one being drafted gives way
+# the moment a dictation asks, and is drafted again after it.
+def test_a_window_being_drafted_gives_way_at_the_first_dictation(settings):
     class FirstWindowSlow(FakeLlama):
         async def handle(self, request):
             self.delay = 0 if any(r.url.path == "/v1/chat/completions" for r in self.requests) else 10
@@ -373,22 +373,20 @@ def test_a_window_being_drafted_gives_way_when_dictations_need_every_slot(settin
         while not any(r.url.path == "/v1/chat/completions" for r in llama.requests):
             await asyncio.sleep(0.02)
         async with asyncio.timeout(1), sessions._turns.dictation(), sessions._sorting:
-            one_waits = llama.cancelled
-            async with asyncio.timeout(1), sessions._turns.dictation(), sessions._sorting:
-                both = True
-        return one_waits, both, llama, await sessions.visit_result(session_id, ALICE, wait=5)
+            await asyncio.sleep(0)
+            gave_way = llama.cancelled
+        return gave_way, llama, await sessions.visit_result(session_id, ALICE, wait=5)
 
-    one_waits, both, llama, result = asyncio.run(run())
+    gave_way, llama, result = asyncio.run(run())
 
-    assert not one_waits, "one dictation takes the free slot; the window keeps its own"
-    assert both and llama.cancelled
+    assert gave_way, "one dictation is enough"
     assert len([r for r in llama.requests if r.url.path == "/v1/chat/completions"]) == 2
     assert result["sorting"] == "done"
 
 
-def test_only_a_dictation_needing_the_slot_makes_a_window_give_way():
+def test_a_window_gives_way_to_a_dictation_and_waits_no_longer_than_it_is_given():
     async def run():
-        turns = Turns(1)
+        turns = Turns()
 
         async def window():
             async with turns.window() as turn:
@@ -406,8 +404,51 @@ def test_only_a_dictation_needing_the_slot_makes_a_window_give_way():
             await drafting
         with pytest.raises(TimeoutError):
             await timed_out()
+        async with turns.dictation():
+            with pytest.raises(TooBusy):
+                async with turns.window(0.05):
+                    pass
 
     asyncio.run(run())
+
+
+# The second review, D16: a visit whose windows never get a turn (a new dictation every few seconds) ends undrafted
+# after ambient_wait_seconds of waiting, with its transcript, as model_busy, and goes when results go.
+def test_a_visit_that_never_gets_a_turn_ends_undrafted_as_busy(settings):
+    async def run():
+        sessions = make(settings, ambient_wait_seconds=0.3)
+        session_id, _ = await stopped(sessions, "clinician", "patient")
+        async with sessions._turns.dictation():
+            await sessions.name_speakers(session_id, ALICE, NAMES)
+            return await sessions.visit_result(session_id, ALICE, wait=2)
+
+    result = asyncio.run(run())
+
+    assert (result["sorting"], result["reason"]) == ("unavailable", "model_busy")
+    assert result["transcript"]["segments"] and all(s["speaker"] for s in result["transcript"]["segments"])
+
+
+# The second measurement's windows: one that times out, or whose answer runs out of tokens, is drafted again as two
+# halves, once, before the visit is given up.
+def test_a_window_that_times_out_is_drafted_again_as_two_halves(settings, monkeypatch):
+    monkeypatch.setattr(conversation, "WINDOW_TOKENS", 1000)
+
+    class FirstTooLong(FakeLlama):
+        async def handle(self, request):
+            self.finish_reason = "length" if not any(r.url.path == "/v1/chat/completions" for r in self.requests) else "stop"
+            return await super().handle(request)
+
+    async def run():
+        llama = FirstTooLong(DRAFTED)
+        _, result = await drafted(make(settings, llama), "clinician", "patient", "clinician", "patient")
+        return result, [json.loads(r.content) for r in llama.requests if r.url.path == "/v1/chat/completions"]
+
+    result, requests = asyncio.run(run())
+
+    assert len(requests) == 3, "the whole, then each half"
+    assert result["sorting"] == "done"
+    assert all(len(r["messages"][1]["content"].split("\n")) == 4 for r in requests[1:]), "two turns each"
+    assert requests[0]["max_tokens"] == 1100
 
 
 # ALSO from series 1's review: weights that are the manifest's but won't load turn listening off and nothing else;

@@ -11,16 +11,19 @@ named the voice "unsure", and null for every segment until the voices are named.
 numbered() numbers the voices that said something 1 to k, in the order they first spoke, with none missing, so a voice
 diarize.py told apart that MedASR heard nothing from leaves no gap in the voices the clinician names.
 
-windows() cuts the visit into parts of about WINDOW_WORDS words at the line breaks, a turn longer than that at its
-passages, for K2 Horizon to draft one at a time (decision D16), so each fits the context a request has and the time it
-is given. Each part's text is a line a turn, led by who said it ("Clinician:", "Patient:", "Other:", "Unsure:"), as
+windows() cuts the visit into parts of about WINDOW_TOKENS tokens (as llama-server counts them, passage by passage,
+or words where nothing has counted them) at the line breaks, a turn longer than that at its passages, for K2 Horizon to
+draft one at a time (decision D16). K2 Horizon repeats a value's sources in its answer, so a window's answer runs to
+about twice its text: 450 tokens of conversation make an answer that ends well within prompt.CONVERSATION_PARAMETERS'
+1,100 tokens, about 55 seconds at 20 tokens a second, inside structuring_seconds. halves() cuts a window in two, for the
+one more try a window that timed out or ran out of tokens has (listening.drafted()). Each part's text is a line a turn, led by who said it ("Clinician:", "Patient:", "Other:", "Unsure:"), as
 conversation-prompt.md describes, with each unclear passage as [unclear].
 """
 
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from .audio import SAMPLE_RATE
@@ -32,7 +35,7 @@ ROLES = ("clinician", "patient", "other")
 # Unsure).
 NAMES = (*ROLES, "unsure")
 LABELS = {"clinician": "Clinician", "patient": "Patient", "other": "Other", "unsure": "Unsure"}
-WINDOW_WORDS = 450
+WINDOW_TOKENS = 450
 
 
 @dataclass(frozen=True)
@@ -122,20 +125,16 @@ class Window:
     text: str
 
 
-def windows(conversation: Conversation, words: int = WINDOW_WORDS) -> list[Window]:
-    """The named visit in parts of about `words` words, cut where who is speaking changes (see the header)."""
-    lines: list[list[int]] = []
-    for i in range(len(conversation.placed)):
-        if lines and conversation.speaker(lines[-1][-1]) == conversation.speaker(i):
-            lines[-1].append(i)
-        else:
-            lines.append([i])
+def windows(conversation: Conversation, size: int = WINDOW_TOKENS, sizes: Sequence[int] | None = None) -> list[Window]:
+    """The named visit in parts of about `size` tokens, cut where who is speaking changes (see the header). `sizes` is
+    each passage's, by llama-server's tokenizer; without it, its words."""
+    sizes = sizes if sizes is not None else [len(tokens(placed.segment.text)) for placed in conversation.placed]
     # A turn longer than a window is cut at its passages.
     pieces: list[list[int]] = []
-    for line in lines:
+    for line in _lines(conversation, range(len(conversation.placed))):
         piece: list[int] = []
         for i in line:
-            if piece and _words(conversation, [*piece, i]) > words:
+            if piece and sum(sizes[k] for k in [*piece, i]) > size:
                 pieces.append(piece)
                 piece = []
             piece.append(i)
@@ -144,7 +143,7 @@ def windows(conversation: Conversation, words: int = WINDOW_WORDS) -> list[Windo
     out: list[Window] = []
     taken: list[list[int]] = []
     for piece in pieces:
-        if taken and sum(_words(conversation, p) for p in taken) + _words(conversation, piece) > words:
+        if taken and sum(sizes[k] for p in [*taken, piece] for k in p) > size:
             out.append(_window(conversation, taken))
             taken = []
         taken.append(piece)
@@ -153,8 +152,24 @@ def windows(conversation: Conversation, words: int = WINDOW_WORDS) -> list[Windo
     return out
 
 
-def _words(conversation: Conversation, passages: list[int]) -> int:
-    return sum(len(tokens(conversation.placed[i].segment.text)) for i in passages)
+def halves(conversation: Conversation, window: Window) -> list[Window]:
+    """The window as two, each about half its passages; none if it is one passage."""
+    if window.last - window.first < 2:
+        return []
+    middle = (window.first + window.last) // 2
+    return [_window(conversation, _lines(conversation, range(window.first, middle))),
+            _window(conversation, _lines(conversation, range(middle, window.last)))]
+
+
+def _lines(conversation: Conversation, passages: Iterable[int]) -> list[list[int]]:
+    """The passages grouped as a window shows them: a line a run of one speaker's."""
+    lines: list[list[int]] = []
+    for i in passages:
+        if lines and conversation.speaker(lines[-1][-1]) == conversation.speaker(i):
+            lines[-1].append(i)
+        else:
+            lines.append([i])
+    return lines
 
 
 def _window(conversation: Conversation, pieces: list[list[int]]) -> Window:

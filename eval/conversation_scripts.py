@@ -43,7 +43,7 @@ DEFAULT_GAP = 0.35  # seconds of silence before a turn that sets neither gap nor
 WORDS_A_MINUTE = 150  # the voices' pace (generate_audio.py), for an estimate of each visit's length
 
 KEYS = {"id", "speakers", "voices", "tags", "noise", "dates", "drugs", "forbidden", "retracted", "denied", "hedged",
-        "requests", "turns", "gold", "gold_rules"}
+        "asked", "requests", "turns", "gold", "gold_rules"}
 REQUIRED = {"id", "speakers", "voices", "tags", "dates", "drugs", "turns", "gold"}
 TURN_KEYS = {"role", "text", "gap", "overlap"}
 # Punctuation that ends a clause or a sentence, never the point or slash inside a number.
@@ -92,7 +92,8 @@ class Conversation:
     gold_rules: dict[str, ds.Gold]
     path: Path
     rules_fields: tuple[str, ...] = ()
-    hedged: tuple[str, ...] = ()  # diagnoses the clinician hedged or denied to the patient: never offered as certain
+    hedged: tuple[str, ...] = ()  # diagnoses or findings hedged, denied or reported: never offered as certain
+    asked: tuple[str, ...] = ()  # questions, as said: never a finding's source (and every question in a turn is one)
 
     @property
     def display(self) -> str:
@@ -165,6 +166,7 @@ def load_conversation(path: Path) -> Conversation:
         retracted=strings("retracted"),
         denied=strings("denied"),
         hedged=strings("hedged"),
+        asked=strings("asked"),
         requests=strings("requests"),
         turns=tuple(turns),
         gold=fields,

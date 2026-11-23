@@ -582,6 +582,10 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal((string?)sorting, (string?)answered["sorting"]);
             Assert.Equal((string?)body["transcript"]!["text"], (string?)answered["transcript"]!["text"]);
+            if ((string?)body["reason"] == "model_busy")
+            {
+                Assert.Equal(DictationResult.BusyMessage, (string?)answered["message"]);
+            }
         }
     }
 

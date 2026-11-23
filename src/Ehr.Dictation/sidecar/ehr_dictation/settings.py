@@ -28,10 +28,12 @@ sessions at once above:
     ambient_max_sessions                   2 visits at once across the server, counted until each one's draft is ready,
                                            since each holds up to 32 MB of recording and decodes it to 77 MB
     ambient_max_session_bytes              32 MB a visit
-    ambient_max_session_seconds            20 minutes of audio a visit: about 5 or 6 windows of about 450 words
+    ambient_max_session_seconds            20 minutes of audio a visit: about 8 to 12 windows of about 450 tokens
                                            (conversation.py) to draft, a few minutes; each window has
                                            structuring_seconds once its turn comes, and waits for its turn while any
                                            dictation is being sorted
+    ambient_wait_seconds                   10 minutes of waiting for its turns, in all, a visit's windows have; after
+                                           that the visit is left undrafted (model_busy), with its transcript
 
 The on-prem app gives every call 20 seconds (Ehr.Web, Api/Dictation), so no answer here may take longer.
 """
@@ -72,6 +74,7 @@ class Settings:
     ambient_max_sessions: int = 2
     ambient_max_session_bytes: int = 32 * 1024 * 1024
     ambient_max_session_seconds: int = 1200
+    ambient_wait_seconds: float = 600.0
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] = os.environ) -> Settings:

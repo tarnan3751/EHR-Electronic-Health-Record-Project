@@ -2,6 +2,7 @@ id = "c02-blood-pressure-home-readings"
 speakers = 2
 voices = { clinician = "bm_george", patient = "hm_omega" }
 tags = ["small-talk", "home-readings", "refill-request", "order-spoken", "question-no", "negation", "numbers", "same-gender"]
+asked = ["And any swelling in your ankles"]
 noise = ["babble"]
 dates = []
 drugs = ["lisinopril"]

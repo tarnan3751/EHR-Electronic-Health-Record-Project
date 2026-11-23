@@ -4,19 +4,24 @@ which the gate checks beside latest.json (ambient_gate.py).
     uv run --project eval python -m ehr_eval.ambient --llama-url http://127.0.0.1:8080 --device mps [--machine "..."]
     uv run --project eval python -m ehr_eval.ambient --contention --llama-url http://127.0.0.1:8080 --device mps
     uv run --project eval python -m ehr_eval.ambient --rescore eval/results/ambient-latest.json
+    uv run --project eval python -m ehr_eval.ambient --resume --llama-url http://127.0.0.1:8080 --device mps
 
 with llama-server's key in LLAMA_API_KEY, the models where setup_models.py put them (--models-dir, default
 infra/compose/models), the speaker model among them, and the recordings generate_conversations.py made (--audio,
 default eval/audio/conversations). Each recording goes through the sidecar's own code (listening.py): decoding,
 telling the voices apart, MedASR a turn at a time, the voices named as the recording's turns say, K2 Horizon a window
-at a time; then the checks and the merging (ambient_scoring.checked), as the sidecar does them. The twenty-minute
-recordings are also fed in five-second chunks, to time each chunk's answer. Nothing reaches the network but
-llama-server.
+at a time as the sidecar drafts them (ehr_dictation.listening.drafted()). Each recording's raw answers, everything
+--rescore needs, are written to the results file as soon as the recording is done, before anything is scored; once
+all are in, the checks, the merging and the measures run (ambient_scoring), and if they fail the file still holds
+every answer, for --rescore to finish. --resume skips the recordings a file from the same prompt, code and recordings
+already holds. The long recordings are also fed in five-second chunks, to time each chunk's answer. Nothing reaches
+the network but llama-server.
 
 --contention adds to the results file a measure of K2 Horizon shared (decision D16): the dictation set's longest clean
-recording (--dictation-audio, default eval/audio) sorted alone, then twice at once while the longest visit's first
-window is being drafted, through the sidecar's own turns, which make the window give way (listening.contend()), each
-timed. It reads the window from the results, so run it after the eval.
+recording (--dictation-audio, default eval/audio) sorted once alone and twice at once, then the same while the longest
+visit's first window is being drafted, through the sidecar's own turns, under which the window gives way to the first
+dictation (listening.contend()); each dictation beside a window is compared with its time without one. It reads the
+window from the results, so run it after the eval.
 
 --rescore checks a run's stored window proposals again with the current checks and scores them, without the models,
 as rescore.py does for the dictations; it refuses results from another prompt, pipeline or recordings.
@@ -58,7 +63,7 @@ SCHEMA_VERSION = 1
 
 
 def conversation_prompt(parameters: dict | None = None) -> prompt.Structuring:
-    return prompt.load(parameters=parameters, prompt_file=prompt.CONVERSATION_PROMPT_FILE)
+    return prompt.load_conversation(parameters=parameters)
 
 
 def variant_tags(variant: dict, visit) -> list[str]:  # noqa: ANN001
@@ -67,6 +72,7 @@ def variant_tags(variant: dict, visit) -> list[str]:  # noqa: ANN001
 
 
 async def run_variant(variant: dict, audio_dir: Path, recognizer, embedder, structurer: Structurer, visits) -> VisitItem:  # noqa: ANN001
+    """The recording through the pipeline, its raw answers stored: nothing checked or scored yet."""
     visit = visits[variant["script"]]
     heard = listening.hear((audio_dir / variant["file"]).read_bytes(), visit.speakers, variant["turns"], recognizer, embedder)
     said = heard.conversation
@@ -82,24 +88,22 @@ async def run_variant(variant: dict, audio_dir: Path, recognizer, embedder, stru
         item.sorting, item.reason = "unnamed", "voices_not_named"
         return item
     await listening.draft(heard, structurer)
-    item.timings = heard.timings
+    item.timings, item.sizes = heard.timings, heard.sizes
     item.windows = [
         {"first": w.first, "last": w.last, "start": w.start, "end": w.end, "seconds": round(seconds, 2),
-         "proposal": {"fields": p.fields, "unknown": p.unknown} if p else None,
+         "proposal": {"fields": p.fields, "unknown": p.unknown} if p else None, "failed": reason,
          "tokens": {k: int(p.timings[k]) for k in ("prompt_n", "cache_n", "predicted_n")
                     if p and p.timings and isinstance(p.timings.get(k), int)}}
-        for w, p, seconds in zip(heard.windows, heard.proposals, heard.window_seconds, strict=False)
+        for w, p, seconds, reason in heard.tries
     ]
     if heard.reason:
         item.sorting, item.reason = "unavailable", heard.reason
-        return item
-    ambient_scoring.checked(item)
     return item
 
 
 def results(items: list[VisitItem], run: dict, manifest: dict, models: provenance.Models, structuring: prompt.Structuring,
             complete: bool) -> dict:
-    visits = {visit.id: visit for visit in load_conversations()}
+    """A results file of raw answers, not scored yet (scored())."""
     return {
         "schema_version": SCHEMA_VERSION,
         "baseline": False,
@@ -122,12 +126,25 @@ def results(items: list[VisitItem], run: dict, manifest: dict, models: provenanc
             "complete": complete,
             "audio": manifest.get("generator", {}),
         },
-        "metrics": ambient_scoring.score(items, visits),
+        "metrics": None,
         "items": [dataclasses.asdict(item) for item in items],
     }
 
 
+def scored(results_file: dict, visits: dict | None = None) -> dict:
+    """The file's stored answers checked and scored (ambient_scoring.restored(), score())."""
+    visits = visits or {visit.id: visit for visit in load_conversations()}
+    items = ambient_scoring.restored(results_file, visits)
+    return results_file | {"metrics": ambient_scoring.score(items, visits), "items": [dataclasses.asdict(item) for item in items]}
+
+
+def _write(out: Path, data: dict) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 async def evaluate(args: argparse.Namespace) -> int:
+    """The run (see the header)."""
     api_key = os.environ.get("LLAMA_API_KEY", "")
     manifest_path = args.audio / "manifest.json"
     if not api_key or not manifest_path.is_file():
@@ -146,32 +163,50 @@ async def evaluate(args: argparse.Namespace) -> int:
     llama = LlamaServer(args.llama_url, api_key)
     structuring = conversation_prompt()
     structurer = Structurer(llama, structuring, models.language_file, timeout=Settings.structuring_seconds)
-    started_at = datetime.now(UTC).isoformat(timespec="seconds")
+    out = args.out or OUT
+    items: list[VisitItem] = []
+    run = {"started_at": datetime.now(UTC).isoformat(timespec="seconds"), "machine": machine(args.machine, args.device),
+           "parameters": structuring.parameters}
+    if args.resume and out.is_file():
+        stored = json.loads(out.read_text(encoding="utf-8"))
+        problem = _stale(stored)
+        if problem:
+            print(f"--resume can't use {out}: {problem}", file=sys.stderr)
+            return 2
+        items = [VisitItem(**item) for item in stored["items"]]
+        run = stored["run"]
+    done = {item.variant for item in items}
 
-    items = []
     for number, variant in enumerate(variants, 1):
+        if variant["id"] in done:
+            continue
         item = await run_variant(variant, args.audio, recognizer, embedder, structurer, visits)
         if variant["seconds"] >= listening.LONG_SECONDS and variant.get("noise") is None and not args.no_live:
             data = (args.audio / variant["file"]).read_bytes()
             item.chunk_seconds = await listening.chunk_seconds(data, variant["seconds"], recognizer, embedder, structurer, models)
         items.append(item)
-        windows = ", ".join(f"{w['seconds']:.0f}" for w in item.windows)
+        windows = ", ".join(f"{w['seconds']:.0f}{'!' if w['failed'] else ''}" for w in item.windows)
         print(f"[{number}/{len(variants)}] {variant['id']}: {item.sorting}"
               f" ({', '.join(f'{k} {v:.1f}s' for k, v in item.timings.items())}; windows {windows} s)", flush=True)
+        run |= {"finished_at": datetime.now(UTC).isoformat(timespec="seconds"), "llama_server": structurer.build}
+        _write(out, results(items, run, manifest, models, structuring, not args.only and len(items) == len(variants)))
     await llama.aclose()
-    run = {
-        "started_at": started_at,
-        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "machine": machine(args.machine, args.device),
-        "llama_server": structurer.build,
-        "parameters": structuring.parameters,
-    }
-    out = args.out or OUT
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(results(items, run, manifest, models, structuring, not args.only), indent=1,
-                              ensure_ascii=False) + "\n", encoding="utf-8")
+    raw = results(items, run, manifest, models, structuring, not args.only and len(items) == len(variants))
+    _write(out, raw)
+    _write(out, scored(raw))
     print(f"Wrote {out}")
     return 0
+
+
+def _stale(results_file: dict) -> str | None:
+    """Why a results file's answers can't be used with this code and these recordings, or None."""
+    if results_file["provenance"]["structuring"] != conversation_prompt(results_file["run"]["parameters"]).structuring_sha256:
+        return "it came from another prompt, schema or parameters: run the eval again instead"
+    if results_file["dataset"].get("recordings_sha256") != recordings_sha256():
+        return "it came from other recordings: generate the audio and run the eval again instead"
+    if results_file["provenance"].get("pipeline") != pipeline_sha256():
+        return "it came from other code making the transcript or the answers: run the eval again"
+    return None
 
 
 async def contention(args: argparse.Namespace) -> int:
@@ -184,7 +219,7 @@ async def contention(args: argparse.Namespace) -> int:
     stored = json.loads(out.read_text(encoding="utf-8"))
     longest = max((i for i in stored["items"] if i["sorting"] == "done"), key=lambda i: i["seconds"])
     item = VisitItem(**{k: v for k, v in longest.items() if k != "fields"})
-    window = conversation.windows(ambient_scoring.rebuild(item), conversation.WINDOW_WORDS)[0]
+    window = conversation.windows(ambient_scoring.rebuild(item), conversation.WINDOW_TOKENS, item.sizes)[0]
     dictations = json.loads((args.dictation_audio / "manifest.json").read_text(encoding="utf-8"))["variants"]
     dictation = max((v for v in dictations if v.get("noise") is None), key=lambda v: v["seconds"])
 
@@ -195,38 +230,31 @@ async def contention(args: argparse.Namespace) -> int:
     drafting = dictating.using(conversation_prompt())
     scripts = load_all()
 
-    alone, transcript, _ = await answers.answer(dictation, args.dictation_audio, recognizer, dictating, scripts)
-    shared = await listening.contend(window.text, transcript.for_structuring(), drafting, dictating, recognizer, models)
+    _, transcript, _ = await answers.answer(dictation, args.dictation_audio, recognizer, dictating, scripts)
+    said = transcript.for_structuring()
+    cases = {}
+    for name, window_text, count in (("one_alone", None, 1), ("two_alone", None, 2), ("one_beside_a_window", window.text, 1),
+                                     ("two_beside_a_window", window.text, 2)):
+        cases[name] = await listening.contend(window_text, said, count, drafting, dictating, recognizer, models)
     await llama.aclose()
-    stored["contention"] = {
-        "dictation": dictation["id"],
-        "dictation_seconds_alone": round(alone.timings["structure"], 1),
-        "window": longest["variant"],
-        "window_seconds_alone": longest["windows"][0]["seconds"],
-        "dictation_alone_sorted": alone.sorting,
-    } | shared
+    stored["contention"] = {"dictation": dictation["id"], "window": longest["variant"],
+                            "window_seconds_alone": longest["windows"][0]["seconds"]} | cases
     out.write_text(json.dumps(stored, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Wrote the contention probe into {out}: {stored['contention']}")
     return 0
 
 
 def rescore(results_file: dict) -> dict:
-    """A run's stored answers checked and scored again with the current code (see the header)."""
-    if results_file["provenance"]["structuring"] != conversation_prompt(results_file["run"]["parameters"]).structuring_sha256:
-        raise ValueError("These results came from another prompt, schema or parameters: run the eval again instead.")
-    if results_file["dataset"].get("recordings_sha256") != recordings_sha256():
-        raise ValueError("These results came from other recordings: generate the audio and run the eval again instead.")
-    if results_file["provenance"].get("pipeline") != pipeline_sha256():
-        raise ValueError("These results came from other code making the transcript or the answers: run the eval again.")
-    visits = {visit.id: visit for visit in load_conversations()}
-    items = ambient_scoring.restored(results_file, visits)
-    out = dict(results_file)
+    """A run's stored answers checked and scored again with the current code (see the header): a finished run's, or one
+    whose scoring failed."""
+    problem = _stale(results_file)
+    if problem:
+        raise ValueError(f"These results can't be scored again: {problem}.")
+    out = scored(results_file)
     out["provenance"] = results_file["provenance"] | {"scoring": scoring_sha256()}
     out["dataset"] = results_file["dataset"] | {"gold_sha256": gold_sha256()}
     out["rescored_from"] = {"scoring": results_file["provenance"].get("scoring"),
                             "gold_sha256": results_file["dataset"].get("gold_sha256"), "structuring_outputs_reused": True}
-    out["metrics"] = ambient_scoring.score(items, visits)
-    out["items"] = [dataclasses.asdict(item) for item in items]
     return out
 
 
@@ -243,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-live", action="store_true", help="skip the five-second-chunk timing")
     parser.add_argument("--contention", action="store_true", help="add the contention probe to the results")
     parser.add_argument("--rescore", type=Path, help="score this results file again, without the models")
+    parser.add_argument("--resume", action="store_true", help="skip the recordings the results file already holds")
     args = parser.parse_args(argv)
     if args.rescore:
         rescored = rescore(json.loads(args.rescore.read_text(encoding="utf-8")))

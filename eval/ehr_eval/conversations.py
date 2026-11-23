@@ -59,6 +59,16 @@ def gold_sha256(eval_dir: Path = EVAL_DIR) -> str:
     return digest.hexdigest()
 
 
+def variant_ids(eval_dir: Path = EVAL_DIR) -> set[str]:
+    """The recordings the visits define, by id, as generate_conversations.py names them: each visit's clean one, and its
+    room and babble ones where it lists them."""
+    return {
+        f"{visit.id}--{noise or 'clean'}"
+        for visit in load_conversations(eval_dir / "conversations")
+        for noise in (None, *(n for n in ("room", "babble") if n in visit.noise))
+    }
+
+
 def pipeline_sha256(eval_dir: Path = EVAL_DIR) -> str:
     return _files_sha256(eval_dir, PIPELINE_FILES, PIPELINE_CODE_SHA256)
 
