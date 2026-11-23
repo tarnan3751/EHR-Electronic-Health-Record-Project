@@ -152,10 +152,12 @@ MAX_QUOTES = _SCHEMA["spanish"]["maxItems"]
 MAX_QUOTE = _SCHEMA["spanish"]["items"]["maxLength"]
 MAX_ENGLISH = _SCHEMA["english"]["maxLength"]
 MAX_SPANISH = 400  # UTF-16 code units of the transcript a statement's sources cover, as the on-prem app counts them
-# Content words the English of a statement may have beyond its Spanish: the most the gold needs, 1 in the scripts and 2
-# in the hold-outs ("Lasègue positivo" is "Positive Lasègue sign"). What those words may say that matters most is
-# compared on its own: opposites (POLARITY), findings (FINDINGS), what can be ordered (ORDERABLES).
-EXTRA_WORDS = 2
+# Content words the English of a statement may have beyond its Spanish: the most the scripts' gold needs (the
+# coordinator's decision). The hold-outs, spent, don't set it: h01's "Lasègue positivo en la pierna derecha a los 40
+# grados" written "Positive Lasègue sign in the right leg at 40 degrees" is two more, and refused. What a word more may
+# say that matters most is compared on its own: opposites (POLARITY), findings (FINDINGS), what can be ordered
+# (ORDERABLES).
+EXTRA_WORDS = 1
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
 WARNING_REACH = validation.WARNING_REACH
 NEAR_UNCLEAR = validation.NEAR_UNCLEAR

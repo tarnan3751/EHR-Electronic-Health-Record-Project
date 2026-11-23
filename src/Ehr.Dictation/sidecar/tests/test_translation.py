@@ -46,6 +46,8 @@ def reasons(text: str, spanish: list[str], english: str, **kwargs) -> list[str]:
      "Her mother had a heart attack at age 50.", ["experiencer_changed"]),
     ("Continuar metformina.", "Continuar metformina.", "Continue metformin and check kidney function.",
      ["translation_adds_words"]),
+    ("Dolor lumbar.", "Dolor lumbar.", "Dull lower back pain.", ["translation_adds_words"]),  # two words more
+    ("Dolor lumbar.", "Dolor lumbar.", "Lower back pain.", []),  # one word more
     ("Amoxicilina 500, no, perdón, 875 mg cada 12 horas.", "Amoxicilina 500, no, perdón, 875 mg cada 12 horas.",
      "Amoxicillin 500 mg every 12 hours.", ["source_superseded"]),
     # Example 12, the stated limit: a wrong word outside the classes checked passes. The review must catch it.
@@ -285,7 +287,9 @@ def test_suspend_is_a_stop(english, expected):
     ("Caída hace 3 días.", "Fall 3 days ago.", []),
     ("Mareo desde hace una semana.", "Dizziness since last week.", ["date_not_in_sources"]),
     ("Caída hace 3 días.", "Fall 5 days ago.", ["number_not_in_sources"]),
-    ("Caída hace 3 días.", "Fall in the past 3 days, since yesterday.", ["date_not_in_sources"]),
+    # Two content words more than the Spanish, as well as the date it doesn't say.
+    ("Caída hace 3 días.", "Fall in the past 3 days, since yesterday.",
+     ["date_not_in_sources", "translation_adds_words"]),
 ])
 def test_hace_is_a_time_up_to_now(text, english, expected):
     assert reasons(text, [text], english) == expected

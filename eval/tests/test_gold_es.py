@@ -17,6 +17,12 @@ from ehr_eval.scripts import EVAL_DIR
 SCRIPTS = load_scripts()
 HOLDOUT = load_scripts(HOLDOUT_DIR)
 MEANT = {translation.AMBIGUOUS_FREQUENCY}
+# The one gold statement the checks refuse, on purpose: the English may say one content word more than its Spanish, the
+# most the scripts' gold needs (translation.EXTRA_WORDS, the coordinator's decision), and this hold-out's "sign" is a
+# second. The hold-outs are spent, so the allowance doesn't follow them. Its field is discarded, with this reason.
+REFUSED = {
+    ("h01-lumbalgia", "objective", "Positive Lasègue sign in the right leg at 40 degrees."): ["translation_adds_words"],
+}
 
 
 @pytest.mark.parametrize("script", SCRIPTS + HOLDOUT, ids=lambda s: s.id)
@@ -27,6 +33,15 @@ def test_every_gold_statement_passes_the_spanish_checks(script):
     checks = translation.check(fields, [], goldreport.transcript(script.display))
 
     for name, checked in checks.fields.items():
+        refused = [s for s in fields[name] if (script.id, name, s["english"]) in REFUSED]
+        if refused:
+            # Exactly the statement named is refused, with its reason, and every other one of its field passes.
+            transcript = goldreport.transcript(script.display)
+            for statement in fields[name]:
+                alone = translation.check({name: [statement]}, [], transcript).fields[name].reasons
+                assert alone == REFUSED.get((script.id, name, statement["english"]), []), statement["english"]
+            assert checked.reasons == REFUSED[(script.id, name, refused[0]["english"])]
+            continue
         expected = [] if fields[name] else ["not_dictated"]
         assert checked.reasons == expected, f"gold.{name} would be discarded: {checked.reasons}"
         assert {code for code, _, _ in checked.warnings} <= MEANT, f"gold.{name}: {checked.warnings}"
