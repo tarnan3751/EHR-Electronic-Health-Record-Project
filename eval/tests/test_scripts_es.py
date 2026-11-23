@@ -75,7 +75,7 @@ def test_the_gold_quotes_the_display_text_and_writes_no_markup(script):
             for quote in statement.spanish:
                 assert quote in script.display, f"{name}: {quote!r} isn't in the display text"
             assert not re.search(r"[\[\]{}<>|]", statement.english)
-            assert validation._without_instructions(statement.english)[1] == 0, "an English instruction"
+            assert validation._without_instructions(statement.english, "", [])[1] == 0, "an English instruction"
 
 
 @pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)

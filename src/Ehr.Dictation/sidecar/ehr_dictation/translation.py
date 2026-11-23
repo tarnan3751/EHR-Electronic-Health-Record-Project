@@ -1669,7 +1669,9 @@ def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]], ci
     if len(english) > MAX_ENGLISH or (len(english) == MAX_ENGLISH and english[-1] not in ".!?"):
         result.reasons.add("too_long")
     cut = validation.directives(english)
-    english, _ = validation._without_instructions(english)
+    # No English transcript reads the English in context, so nothing it finds is kept as said outside an instruction:
+    # every instruction found is cut, and what it cites listed.
+    english, _ = validation._without_instructions(english, "", [])
     result.english = english
     if cut:
         # The English was, or held, an instruction: what it cites is listed, whatever else the statement says.
