@@ -693,6 +693,24 @@ def test_a_dictation_in_spanish_goes_through_whisper_the_spanish_checks_and_prop
     assert english["proposals"]
 
 
+def test_a_translated_statement_the_english_backstop_cuts_is_listed_with_its_spanish(settings):
+    # "Tos seca desde hace 3 días" isn't an instruction, but its English is one: the backstop cuts it from the note,
+    # and the result lists the Spanish it cites, once the dictation is sorted.
+    llama = FakeLlama(spanish_answer(("subjective", ["Tos seca desde hace 3 días"], "Order a chest X-ray.")))
+
+    async def run():
+        sessions = make_spanish(settings, llama=llama)
+        session_id = await dictate_in(sessions, "es")
+        await sessions.stop(session_id, ALICE)
+        return await sessions.result(session_id, ALICE, wait=5)
+
+    result = asyncio.run(run())
+    text = result["transcript"]["text"]
+    assert result["fields"]["subjective"]["reasons"] == ["order_or_allergy_change"]
+    assert ("order", "Tos seca desde hace 3 días") in {(i["reason"], text[i["start"] : i["end"]])
+                                                        for i in result["notCarriedOver"]}
+
+
 # TC-UC10-16 (FR-11, FR-13, proposed FR-61): with the language model down, slow or answering nonsense, a dictation in
 # Spanish keeps its Spanish transcript as plain text and says why, as one in English does; it proposes nothing.
 @pytest.mark.parametrize(("llama", "reason"), [

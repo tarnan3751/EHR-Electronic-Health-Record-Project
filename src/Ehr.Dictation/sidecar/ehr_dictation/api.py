@@ -36,7 +36,8 @@ value's sources, or one_field_holds_dictation, on the only value offered when it
 pointing at what it quotes (validation.py). A result in Spanish also has "spokenLanguage": "es"; its pending fields
 are English, each with statements, [{start, end, sources: [{start, end}]}], each sentence's UTF-16 place in the value
 and the Spanish passages it was translated from, and may also warn ambiguous_frequency; its
-notCarriedOver lists the Spanish instructions, its proposals are always empty, and its provenance names Whisper and
+notCarriedOver lists the instructions, said in Spanish or in English, and what the checks cut from a translation as
+an instruction (translation.not_carried_over()), its proposals are always empty, and its provenance names Whisper and
 the Spanish prompt, schema and structuring (translation.py).
 
 The limits on all of it (sizes, sessions at once, how long things are kept and waited for) are in settings.py.

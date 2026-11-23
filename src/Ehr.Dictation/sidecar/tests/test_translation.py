@@ -789,3 +789,28 @@ def test_an_everyday_instruction_never_reaches_the_note_and_is_listed(said, engl
     assert checks.fields["plan"].value == "Continue losartan 50 mg daily."
     assert translation.not_carried_over(transcript(text)) == [
         {"reason": kind, "start": text.index(said), "end": len(text) - 1}]
+
+
+def test_an_instruction_said_in_english_in_a_spanish_dictation_is_cut_and_listed():
+    text = "Continuar metformina. Order a CBC."
+    checks = translation.check({"plan": [
+        {"spanish": ["Continuar metformina."], "english": "Continue metformin."},
+        {"spanish": ["Order a CBC"], "english": "Order a CBC."},
+    ]}, [], transcript(text))
+    assert checks.fields["plan"].value == "Continue metformin."
+    assert translation.not_carried_over(transcript(text)) == [
+        {"reason": "order", "start": text.index("Order"), "end": len(text) - 1}]
+
+
+def test_what_the_english_backstop_cuts_is_listed_with_the_spanish_it_cites():
+    # A plan the Spanish detector doesn't read as an instruction, translated as one: the backstop cuts the English, and
+    # the Spanish is listed, so the clinician sees it.
+    text = "Continuar losartán 50 mg al día y control con perfil de lípidos."
+    checks = translation.check({"plan": [
+        {"spanish": ["Continuar losartán 50 mg al día y control con perfil de lípidos"],
+         "english": "Continue losartan 50 mg daily and order a lipid panel."},
+    ]}, [], transcript(text))
+    assert checks.fields["plan"].value == "Continue losartan 50 mg daily."
+    assert translation.not_carried_over(transcript(text)) == []
+    assert translation.not_carried_over(transcript(text), checks) == [
+        {"reason": "order", "start": 0, "end": len(text) - 1}]

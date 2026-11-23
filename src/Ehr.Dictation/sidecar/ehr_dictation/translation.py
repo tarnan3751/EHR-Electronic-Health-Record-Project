@@ -14,7 +14,8 @@ statement:
    Here, too, a word holding a letter English isn't written in (ENGLISH_LETTERS) must be a word of the transcript as
    said (an eponym, "Lasègue"), so such a word fails even where the transcript uses its letters elsewhere. An
    instruction in it to order something or change the allergy list is cut out by validation.py's own rule (the English
-   backstop); a statement that was only an instruction is dropped.
+   backstop), and the Spanish the statement cites is listed as not carried over (not_carried_over()), so the clinician
+   sees what was cut; a statement that was only an instruction is dropped.
 2. Each Spanish passage must be in the transcript, word for word, ignoring case, punctuation and accents
    (source_not_in_transcript), not in a passage marked unclear, and two words or more unless it holds a number. Every
    check below reads the transcript's own words where the passage was found, never the model's copy. No word may be
@@ -22,10 +23,10 @@ statement:
    an instruction fails (source_repeated), so no passage is shown twice, in one field or two. What a statement cites
    is at most MAX_SPANISH characters of the transcript (too_long), the most the schema's two quotes of 200 allow and
    the most the on-prem app takes for a sentence (TrustedResult).
-3. Only the words outside a Spanish instruction to order something or change the allergy list count (spanish.py,
-   FR-14). A statement whose passages are all inside one is that instruction translated: it is dropped, and the field
-   is empty (order_or_allergy_change) when nothing is left of it. The Spanish is read as corrected: without a
-   correction cue and what it took back.
+3. Only the words outside an instruction to order something or change the allergy list count: one spanish.py finds
+   (FR-14), or one said in English that validation.py finds ("order a CBC"). A statement whose passages are all inside
+   one is that instruction translated: it is dropped, and the field is empty (order_or_allergy_change) when nothing is
+   left of it. The Spanish is read as corrected: without a correction cue and what it took back.
 4. The English is compared with that Spanish, class by class. "No more" means the English may leave something out, as
    an English value may, but may not add or change it; "the same" means both ways.
    - numbers, as digits (Spanish decimal commas, number words, 1 for "un", "una" or "uno" even as an article, and
@@ -228,18 +229,40 @@ class Translated:
 class Translations:
     fields: dict[str, Translated]
     unknown: list[str]
+    # The Spanish each statement cites whose English was an instruction the English backstop cut (step 1), and its kind.
+    listed: list[tuple[int, int, str]] = field(default_factory=list)
 
     def to_json(self, transcript: Transcript) -> dict:
         return {name: checked.to_json(transcript) for name, checked in self.fields.items()}
 
 
-def not_carried_over(transcript: Transcript) -> list[dict]:
+def not_carried_over(transcript: Transcript, checks: Translations | None = None) -> list[dict]:
     """Each instruction in the Spanish transcript to order something or change the allergy list, which the note never
-    carries: its kind and where the clinician said it, as UTF-16 offsets, the shape validation.not_carried_over() gives."""
+    carries: its kind and where the clinician said it, as UTF-16 offsets, the shape validation.not_carried_over() gives.
+    The instructions are those spanish.py finds, those validation.py finds said in English ("order a CBC" in a Spanish
+    dictation), and, once the checks have run, the Spanish each statement cites whose English the backstop cut, so
+    nothing cut from the note goes unlisted."""
     return [
         {"reason": kind, "start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end)}
-        for start, end, kind in spanish.directives(transcript.text)
+        for start, end, kind in _merged(directives(transcript.text) + (checks.listed if checks else []))
     ]
+
+
+def directives(text: str) -> list[tuple[int, int, str]]:
+    """The instructions in the transcript: spanish.directives() and validation.directives() merged."""
+    return _merged(spanish.directives(text) + validation.directives(text))
+
+
+def _merged(spans: list[tuple[int, int, str]]) -> list[tuple[int, int, str]]:
+    """Overlapping spans as one, an allergy change winning, as spanish.directives() merges its own."""
+    merged: list[tuple[int, int, str]] = []
+    for start, end, kind in sorted(spans):
+        if merged and start < merged[-1][1]:
+            first, last, other = merged[-1]
+            merged[-1] = (first, max(last, end), "allergy_change" if "allergy_change" in (kind, other) else kind)
+        else:
+            merged.append((start, end, kind))
+    return merged
 
 
 # ---- The transcript, read once ------------------------------------------------------------------------------------
@@ -335,7 +358,7 @@ def _context(transcript: Transcript) -> _Context:
         text=text,
         toks=toks,
         unclear=transcript.unclear_ranges(),
-        directives=[(start, end) for start, end, _ in spanish.directives(text)],
+        directives=[(start, end) for start, end, _ in directives(text)],
         letters=frozenset(validation.clean(text).casefold()),
         words=frozenset(t.text for t in spanish.tokens(validation.clean(text))),
         terms=terms,
@@ -1374,6 +1397,7 @@ class _Statement:
     reasons: set[str] = field(default_factory=set)
     dropped: bool = False  # only an instruction, in English or in the Spanish it cites
     warnings: list[tuple[str, int, int]] = field(default_factory=list)
+    listed: list[tuple[int, int, str]] = field(default_factory=list)  # its Spanish, if the backstop cut its English
 
 
 def said_numbers(said: list[spanish.Token], terms: list[_Term]) -> set[str]:
@@ -1435,8 +1459,16 @@ def _statement(proposed: dict, ctx: _Context, earlier: list[tuple[int, int]], ci
     # was cut may have changed what it says.
     if len(english) > MAX_ENGLISH or (len(english) == MAX_ENGLISH and english[-1] not in ".!?"):
         result.reasons.add("too_long")
+    cut = validation.directives(english)
     english, _ = validation._without_instructions(english)
     result.english = english
+    if cut:
+        # The English was, or held, an instruction: what it cites is listed, whatever else the statement says.
+        kind = "allergy_change" if any(kind == "allergy_change" for _, _, kind in cut) else "order"
+        for quote in proposed.get("spanish", []):
+            found = _locate(spanish.tokens(validation.clean(str(quote))), ctx, earlier, cited)
+            if not isinstance(found, str):
+                result.listed.append((found[0], found[1], kind))
     if not english:
         result.dropped = True
         return result
@@ -1664,4 +1696,5 @@ def check(fields: dict[str, list[dict]], unknown: list[str], transcript: Transcr
         if covered >= validation.WHOLE_DICTATION * len(ctx.toks):
             only.warnings.append((validation.ONE_FIELD_HOLDS_DICTATION, min(s for s, _ in only.spans),
                                   max(e for _, e in only.spans)))
-    return Translations(checked, list(unknown))
+    listed = [span for name in FIELDS for result in results[name].values() for span in result.listed]
+    return Translations(checked, list(unknown), listed)

@@ -22,7 +22,8 @@ carries only its reason codes.
 A dictation is in English unless it starts in Spanish (the expansion plan's step 17), and keeps its language: a
 Spanish one is transcribed by Whisper (whisper_asr.py) with finished passages only, no tentative tail, up to 2 minutes
 of audio; it is sorted with the Spanish prompt and schema and checked by translation.py, its instructions are listed by
-the Spanish detector, it proposes nothing (proposes is False), and its result says "spokenLanguage": "es" and names
+translation.not_carried_over() (with, once sorted, what the checks cut as one), it proposes nothing (proposes is
+False), and its result says "spokenLanguage": "es" and names
 Whisper and the Spanish prompt, schema and structuring in its provenance. Without Whisper installed, a Spanish
 dictation is refused (language_unavailable). A dictation in English goes exactly as before.
 
@@ -310,7 +311,9 @@ class Sessions:
             "sorting": sorting,
             "reason": session.reason if sorting == "unavailable" else None,
             "fields": session.checks.to_json(session.transcript) if sorting == "done" and session.checks else None,
-            "notCarriedOver": (translation if spanish else validation).not_carried_over(session.transcript),
+            "notCarriedOver": translation.not_carried_over(
+                session.transcript, session.checks if sorting == "done" else None)
+            if spanish else validation.not_carried_over(session.transcript),
             "proposals": validation.proposals(session.transcript) if session.proposes else [],
             "provenance": self.provenance(session),
         } | ({"spokenLanguage": "es"} if spanish else {})
