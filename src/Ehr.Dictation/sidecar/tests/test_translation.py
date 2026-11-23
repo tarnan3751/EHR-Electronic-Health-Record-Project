@@ -814,3 +814,28 @@ def test_what_the_english_backstop_cuts_is_listed_with_the_spanish_it_cites():
     assert translation.not_carried_over(transcript(text)) == []
     assert translation.not_carried_over(transcript(text), checks) == [
         {"reason": "order", "start": 0, "end": len(text) - 1}]
+
+
+# ---- What can be ordered, in English (sentences outside the test set) ---------------------------------------------
+
+
+@pytest.mark.parametrize(("text", "quote", "english"), [
+    ("Continuar losartán 50 mg al día y pido una radiografía de tórax.", "Continuar losartán 50 mg al día",
+     "Continue losartan 50 mg daily; chest X-ray."),
+    ("Control en dos semanas. Pido una biometría hemática.", "Control en dos semanas",
+     "Follow-up in 2 weeks with blood count."),
+    ("Control en dos semanas.", "Control en dos semanas", "Follow-up in 2 weeks with labs."),
+    ("Continuar metformina.", "Continuar metformina.", "Continue metformin; urine culture pending."),
+])
+def test_something_to_order_the_cited_spanish_doesnt_say_is_refused(text, quote, english):
+    assert "orderable_not_in_sources" in reasons(text, [quote], english)
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("La radiografía de tórax de hoy es compatible con congestión pulmonar.",
+     "Today's chest X-ray is consistent with pulmonary congestion."),
+    ("Analítica del 3 de marzo de 2026: TSH 6,2.", "Labs from March 3, 2026: TSH 6.2."),
+    ("El último ecocardiograma muestra una FEVI de 35 %.", "The last echocardiogram shows an LVEF of 35%."),
+])
+def test_something_ordered_the_spanish_says_is_offered(text, english):
+    assert reasons(text, [text], english) == []

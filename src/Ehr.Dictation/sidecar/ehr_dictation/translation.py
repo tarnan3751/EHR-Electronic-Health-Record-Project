@@ -48,6 +48,9 @@ statement:
      endings and exceptions) (drug_not_in_sources); and every drug the Spanish names must be named in the English
      (drug_dropped), so a drug no list knows can't be swapped in for one the clinician said;
    - sides, routes, severity and abbreviations: no more (side_, route_, severity_ and abbreviation_not_in_sources);
+   - what can be ordered (an X-ray, labs, a culture, a referral, a prescription, a refill: ORDERABLES): no more
+     (orderable_not_in_sources), so an instruction cut from the note can't come back in a neighbouring statement
+     ("Continuar losartán 50 mg al día" as "Continue losartan 50 mg daily; chest X-ray.");
    - what is done with each drug, dose, dose's number and habit (smoking, alcohol): the verb nearest it within
      ACTION_REACH words either side in its clause, a change (start, stop, hold, continue, increase, decrease, switch)
      or a taking ("toma", "takes", "fuma"), said before it or after it ("Metformina: suspender", "Metformina se
@@ -166,6 +169,7 @@ REASONS = (
     "drug_dropped",
     "side_not_in_sources",
     "route_not_in_sources",
+    "orderable_not_in_sources",
     "severity_not_in_sources",
     "abbreviation_not_in_sources",
     "action_changed",
@@ -1205,6 +1209,42 @@ def _parts(words: list[str], gaps: list[str], content: list[bool], flagged: dict
     return found
 
 
+# What can be ordered, in English, by what in Spanish says it: an English one the Spanish a statement cites doesn't say
+# is refused, so an instruction cut from the note can't come back in a neighbouring statement ("Continue losartan 50 mg
+# daily; chest X-ray."). Abbreviations ("CBC", "CT", "MRI", "ECG") are the abbreviation check's.
+ORDERABLES = {
+    "xray": (r"x-?rays?|radiographs?|radiography|films?", "radiografia radiografias placa placas rx rayos"),
+    "ct": (r"ct scans?|cat scans?|computed tomography|tomography", "tomografia tac tc"),
+    "mri": (r"magnetic resonance|resonance", "resonancia rm rmn"),
+    "ultrasound": (r"ultrasounds?|sonograms?|sonography|ultrasonography",
+                   "ultrasonido ultrasonidos ecografia ecografias eco"),
+    "echo": (r"echocardiograms?|echocardiography|echo", "ecocardiograma ecocardiogramas ecocardiografia eco"),
+    "ecg": (r"electrocardiograms?|electrocardiography", "electrocardiograma electrocardiogramas ecg ekg"),
+    "labs": (r"labs?|laboratory|blood (?:work|tests?)|bloodwork|lab tests?|tests",
+             "laboratorio laboratorios labs lab analisis analitica estudios pruebas examenes"),
+    "blood count": (r"blood counts?|complete blood count|hemogram", "biometria hemograma bh"),
+    "panel": (r"panels?|profiles?", "perfil perfiles panel"),
+    "culture": (r"cultures?", "cultivo cultivos urocultivo hemocultivo"),
+    "biopsy": (r"biops(?:y|ies)", "biopsia biopsias"),
+    "referral": (r"referrals?|consults?", "interconsulta referencia derivacion derivar referir consulta"),
+    "prescription": (r"prescriptions?|scripts?|rx", "receta recetas prescripcion"),
+    "refill": (r"refills?|re-?fill", "resurtido resurtidos refill refills resurtir"),
+    "mammogram": (r"mammograms?|mammography", "mamografia mamografias"),
+    "spirometry": (r"spirometry", "espirometria"),
+    "colonoscopy": (r"colonoscopy|colonoscopies", "colonoscopia"),
+    "endoscopy": (r"endoscopy|endoscopies", "endoscopia"),
+}
+ENGLISH_ORDERABLES = [(name, re.compile(rf"\b(?:{pattern})\b", re.IGNORECASE))
+                      for name, (pattern, _) in ORDERABLES.items()]
+SPANISH_ORDERABLES = {word: {name for name, (_, words) in ORDERABLES.items() if word in words.split()}
+                      for _, words in ORDERABLES.values() for word in words.split()}
+
+
+def english_orderables(text: str) -> set[str]:
+    """What can be ordered that the English names, by ORDERABLES' name ("X-ray", "labs", "referral")."""
+    return {name for name, pattern in ENGLISH_ORDERABLES if pattern.search(text)}
+
+
 HAVING_NOW = re.compile(r"\b(?:is|are|am) having\b|\bcurrent(?:ly)?\b|\bnow\b|\bongoing\b|\bactive\b", re.IGNORECASE)
 # What ends a qualifier's carrying over an English list, as spanish.LIST_STOPS does the Spanish: "No fever, cough or
 # dyspnea" carries, "No fever, has a cough" doesn't.
@@ -1573,6 +1613,8 @@ def _compare(result: _Statement, ctx: _Context) -> None:
 
     if not {ENGLISH_SIDES[w] for w in english_words if w in ENGLISH_SIDES} <= values("side", terms):
         reasons.add("side_not_in_sources")
+    if not english_orderables(english) <= {name for t in said for name in SPANISH_ORDERABLES.get(t.key, ())}:
+        reasons.add("orderable_not_in_sources")
     if not english_routes(english) <= spanish.routes(said_text):
         reasons.add("route_not_in_sources")
     allowed = {word for t in said for word in spanish.SEVERITY.get(t.key, ())}
