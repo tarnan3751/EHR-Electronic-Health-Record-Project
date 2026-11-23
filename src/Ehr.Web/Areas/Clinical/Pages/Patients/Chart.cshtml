@@ -154,7 +154,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             <ul class="sc-list">
                 @foreach (var order in Model.Chart.Orders)
                 {
-                    <li>
+                    <li id="order-@order.Id">
                         <strong>@order.Display</strong> (@Ehr.Domain.Orders.OrderForms.TypeNames[order.Type])
                         @Ehr.Domain.Orders.OrderForms.Summary(order.Type, order.Details) · signed @Clinic.Format(order.SignedAt)
                         @if (Model.OnPanel && OnPrem.IsReachable)
@@ -350,7 +350,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             <ul class="sc-list">
                 @foreach (var allergy in Model.KnownAllergies)
                 {
-                    <li>
+                    <li id="allergy-@allergy.Id">
                         <strong>@allergy.Display</strong>@if (allergy.Reaction is { } reaction) { <text>: @reaction</text> }
                         @if (allergy.Criticality == AllergyCriticality.High)
                         {
