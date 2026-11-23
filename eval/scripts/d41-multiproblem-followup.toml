@@ -138,4 +138,4 @@ sources = [
 
 [[not_proposed]]
 words = "send the prescription to her usual pharmacy"
-why = "not_plain"
+why = "names_no_item"

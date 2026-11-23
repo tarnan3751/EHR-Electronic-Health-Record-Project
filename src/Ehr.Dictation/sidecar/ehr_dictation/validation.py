@@ -65,7 +65,9 @@ needed; changed my mind: from its start to the end of the next sentence, within 
 overlaps a passage marked unclear); question (its sentence ends in a question mark); quoted (the clause before it ends
 in a word of telling: "she asked, can you order an MRI"); not_imperative (anything but an opener, from the start of
 its clause or the last "and" or word starting a clause, up to its lead-in or subject: "capillary refill under 2
-seconds"); not_plain (not said in the closed sentence, or a sentence next to it holds a cue, as above); too_many (past
+seconds"); names_no_item (no run of its words is an item the reference data names: "call that in", "send the
+prescription", "send it", or "add penicillin", which the reference data names only as penicillin G or V); not_plain
+(not said in the closed sentence, or a sentence next to it holds a cue, as above); too_many (past
 MAX_PROPOSALS). A proposal is its kind (order or allergy_addition), the place of its listed
 instruction, and its warnings, never words: possible_correction, pointing from a correction-like word said after the
 instruction, in its words or within WARNING_REACH words after them; and near_unclear_passage, as for a value.
@@ -1608,7 +1610,7 @@ FRAGMENT_REACH = 10  # at most, words of a piece of an instruction's sentence th
 # Why a listed instruction isn't proposed, in the order the rules are tried: the first that applies is the one given.
 HELD_BACK = (
     "not_final", "to_the_software", "mixed_kinds", "not_an_addition", "negated", "hedged", "for_later", "taken_back",
-    "in_the_past", "unclear", "question", "quoted", "not_imperative", "not_plain", "too_many",
+    "in_the_past", "unclear", "question", "quoted", "not_imperative", "names_no_item", "not_plain", "too_many",
 )  # fmt: skip
 # What may come between the start of an instruction's clause and the instruction: its lead-in (LEAD_IN) and the words
 # a clinician starts a step of the plan with.
@@ -1747,6 +1749,9 @@ def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], st
     if any(token.text not in OPENERS for token in lead[joins[-1] + 1 if joins else 0 :] if token.start < start):
         return "not_imperative"
     kind = "order" if kinds == {"order"} else ALLERGY_ADDITION
+    said = [token.text for token in words if start <= token.start and token.end <= end]
+    if not any(is_item(said[i : i + size], kind) for i in range(len(said)) for size in range(1, MAX_ITEM_WORDS + 1)):
+        return "names_no_item"
     if not closed(text[sentence:sentence_end], kind) or _neighbours_hold_it(text, sentence, sentence_end, kind):
         return "not_plain"
     return None

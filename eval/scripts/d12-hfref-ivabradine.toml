@@ -80,4 +80,4 @@ sources = [
 
 [[not_proposed]]
 words = "call that in to his usual pharmacy"
-why = "not_plain"
+why = "names_no_item"

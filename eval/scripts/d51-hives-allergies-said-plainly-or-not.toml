@@ -60,15 +60,15 @@ item = "amoxicillin"
 
 [[not_proposed]]
 words = "Penicillin should be added to her allergies"
-why = "not_plain"
+why = "names_no_item"
 
 [[not_proposed]]
 words = "Add a note to her allergies"
-why = "not_plain"
+why = "names_no_item"
 
 [[not_proposed]]
 words = "Order a penicillin skin test"
-why = "not_plain"
+why = "names_no_item"
 
 [[not_proposed]]
 words = "add shellfish to her allergy list"
@@ -76,4 +76,4 @@ why = "to_the_software"
 
 [[not_proposed]]
 words = "Add latex to her allergies"
-why = "not_plain"
+why = "names_no_item"

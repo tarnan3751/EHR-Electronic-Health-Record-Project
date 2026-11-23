@@ -48,4 +48,4 @@ sources = [
 
 [[not_proposed]]
 words = "make sure sulfa is on his allergy list"
-why = "not_plain"
+why = "names_no_item"

@@ -130,4 +130,4 @@ why = "not_plain"
 
 [[not_proposed]]
 words = "Put penicillin on his allergy list"
-why = "not_plain"
+why = "names_no_item"

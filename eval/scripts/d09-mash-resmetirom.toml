@@ -99,4 +99,4 @@ sources = [
 
 [[not_proposed]]
 words = "order a hepatitis B surface antibody"
-why = "not_plain"
+why = "names_no_item"
