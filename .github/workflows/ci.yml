@@ -85,6 +85,7 @@ jobs:
         run: |
           docker compose config --quiet
           docker compose -f compose.yaml -f compose.nvidia.yaml config --quiet
+          docker compose -f compose.yaml -f compose.backup-drill.yaml config --quiet
 
       - name: Build the images
         run: docker compose build
@@ -178,6 +179,46 @@ jobs:
           done
           echo "$report"
           exit 1
+
+      # Old backups are deleted with the WAL before them (infra/barman). The clinic's policy is the one in force: a
+      # 6-day recovery window, with a base backup a day. Then Barman is restarted with compose.backup-drill.yaml (a base
+      # backup at every pass of its loop, two kept), and the backup link's latency is lifted so a backup takes seconds,
+      # not minutes: the stack's first backup goes, two remain, and no WAL file is older than where the older began.
+      - name: Old backups are deleted
+        run: |
+          barman() { docker compose exec -T -u postgres barman barman "$@"; }
+          barman show-server onprem | grep -E '^\s*retention_policy: RECOVERY WINDOW OF 6 DAYS$'
+          first=$(barman list-backups --minimal onprem)
+          echo "The stack's first backup: $first"
+          [ "$(printf '%s\n' "$first" | grep -c .)" = 1 ]
+          for stream in upstream downstream; do
+            docker compose exec -T wan /toxiproxy-cli toxic remove --toxicName "latency_$stream" wan_backup
+          done
+          docker compose -f compose.yaml -f compose.backup-drill.yaml up --detach --no-deps barman
+          for _ in $(seq 60); do
+            barman -q cron || true
+            backups=$(barman list-backups --minimal onprem || true)
+            if ! printf '%s\n' "$backups" | grep -qx "$first" && [ "$(printf '%s\n' "$backups" | grep -c .)" = 2 ]; then
+              break
+            fi
+            sleep 5
+          done
+          echo "Backups kept:" $backups
+          if printf '%s\n' "$backups" | grep -qx "$first" || [ "$(printf '%s\n' "$backups" | grep -c .)" != 2 ]; then
+            echo "The stack's first backup wasn't deleted, or more or fewer than two backups are kept"
+            exit 1
+          fi
+          barman show-server onprem | grep -E '^\s*retention_policy: REDUNDANCY 2$'
+          oldest=$(printf '%s\n' "$backups" | sort | head -n 1)
+          begin=$(barman show-backup onprem "$oldest" | sed -n 's/^ *Begin WAL *: *//p')
+          wals=$(docker compose exec -T -u postgres barman find /var/lib/barman/onprem/wals -type f -printf '%f\n' \
+            | cut -c1-24 | grep -xE '[0-9A-F]{24}' | sort)
+          lowest=$(printf '%s\n' "$wals" | head -n 1)
+          echo "The older backup kept, $oldest, began at WAL $begin; the oldest WAL kept is $lowest"
+          if [ -z "$begin" ] || [ -z "$lowest" ] || [[ "$lowest" < "$begin" ]]; then
+            echo "WAL from before the oldest backup kept is still there"
+            exit 1
+          fi
 
       - name: Show containers and logs
         if: failure()
