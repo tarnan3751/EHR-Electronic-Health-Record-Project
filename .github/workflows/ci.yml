@@ -181,7 +181,7 @@ jobs:
           exit 1
 
       # Old backups are deleted with the WAL before them (infra/barman). The clinic's policy is the one in force: a
-      # 6-day recovery window, with a base backup a day. Then Barman is restarted with compose.backup-drill.yaml (a base
+      # 6-day recovery window, with a base backup every 23 hours. Then Barman is restarted with compose.backup-drill.yaml (a base
       # backup at every pass of its loop, two kept), and the backup link's latency is lifted so a backup takes seconds,
       # not minutes: the stack's first backup goes, two remain, and no WAL file is older than where the older began.
       - name: Old backups are deleted
