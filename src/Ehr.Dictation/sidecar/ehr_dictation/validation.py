@@ -44,9 +44,12 @@ doesn't hold) is never proposed, only listed: the clinician still sees it, and t
 read whole. The sentences next to it are read only for cues, the one place a list still decides (see "The sentences next
 to a plain instruction" below): after it, a short sentence that doubts, retracts or points back at it, one that opens
 with "no", "not", "or", "instead", "actually", "hold" or "wait", one that points back in its first three words, one that
-points back or names its item again with a negation, a doubt or a word of removing it, or, for an allergy, one that
-denies it; before it, a bare negation or doubt, or a report or list of what not to do (quoting, per, according to,
-says, a request, the following, avoid, not to do). A proposal can still be wrong, and is the clinician's to dismiss.
+points back or names its item again with a negation, a doubt or a word of removing it, one that is only a condition,
+a time for later or says it was done already, ordered or sent, or, for an allergy, one that denies it; and any sentence
+after it, while none holds an instruction of its own, within TAKEN_BACK_REACH words, that retracts it or opens like a
+retraction ("Order a CBC. She is anxious about needles. Actually, let's not."); before it, a bare negation or doubt, a
+condition said as a sentence of its own, a heading line but Plan, Orders or Labs, or a report or list of what not to do
+(quoting, per, according to, says, a request, the following, avoid, not to do). A proposal can still be wrong, and is the clinician's to dismiss.
 Every rule below holds it back too, a second layer, and weigh() names the first that applies (HELD_BACK): not_final (the transcript isn't final yet); to_the_software (its
 sentence tells the software to ignore, disregard or forget its rules, instructions or directions, calls on it
 ("Assistant, ...", "Dear model, ..."), or is a note to the assistant, the AI or the system); mixed_kinds (an order and an allergy change run together); not_an_addition (an orders section, or an allergy
@@ -1853,9 +1856,14 @@ def _trailers(words: list[str], at: int) -> bool:
 #   of the plan", "She had one done two days ago");
 # - for an allergy to add, speaks of an allergy or a reaction with a negation, someone else or a word pointing back ("She
 #   is not truly allergic to penicillin", "It was her mother who reacted", "Turns out it was a viral rash").
-# Before it, when the previous sentence is a bare negation or doubt of BARE_SENTENCE words or fewer, or introduces a
-# report or a list of what not to do (_REPORT_BEFORE: quoting, reading from, per, according to, says, a request, a
-# question, the following, avoid, not to do).
+# - is only a condition, a time for later, or says it was done already, ordered or sent ("Order a CBC. In two weeks.",
+#   "Already done."), unless it opens a step of the plan of its own ("Recheck in one week.");
+# and any later sentence, while none holds an instruction of its own, within TAKEN_BACK_REACH words, that retracts it
+# or opens like a retraction (_later_sentences_hold_it()). Before it, when the previous sentence is a bare negation or
+# doubt of BARE_SENTENCE words or fewer, a condition said as a sentence of its own ("If her potassium is low."), a
+# heading line but Plan, Orders or Labs (PROPOSAL_HEADINGS), or introduces a report or a list of what not to do
+# (_REPORT_BEFORE: quoting, reading from, per, according to, says, a request, a question, the following, avoid, not to
+# do).
 BARE_SENTENCE = 4
 _NEXT_DOUBT = frozenset(
     "no nope not never none nothing sure maybe or wrong hold wait think instead rather actually probably perhaps possibly "
@@ -1880,9 +1888,20 @@ _REPORT_BEFORE = re.compile(
 
 
 def _neighbours_hold_it(text: str, sentence: int, sentence_end: int, kind: str) -> bool:
-    """Whether the sentence before or after a plain instruction may take it back, doubt it or report it (see above)."""
-    previous_start = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, max(sentence - 1, 0))), default=0)
-    previous = [token.text for token in tokens(text[previous_start:sentence])]
+    """Whether the sentences before or after a plain instruction may take it back, doubt it, put it off or report it
+    (see above)."""
+    previous_end = len(text[:sentence].rstrip())  # back over the blank lines between paragraphs
+    previous_start = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, max(previous_end - 1, 0))), default=0)
+    previous = [token.text for token in tokens(text[previous_start:previous_end])]
+    said_before = text[previous_start:previous_end].strip()
+    # A heading line it stands under, but Plan, Orders or Labs ("Next visit:", "Declined:", "If symptoms persist:"); a
+    # condition said as a sentence of its own ("If her potassium is low. Then order a BMP.").
+    if said_before.endswith(":") and said_before[:-1].strip().lower() not in PROPOSAL_HEADINGS:
+        return True
+    if said_before and _CONDITION_OPENING.match(said_before) and not directives(said_before):
+        return True
+    if _later_sentences_hold_it(text, sentence_end):
+        return True
     if previous and len(previous) <= BARE_SENTENCE and any(
         word in _BARE_BEFORE or word.endswith("n't") for word in previous
     ):
@@ -1925,6 +1944,45 @@ def _neighbours_hold_it(text: str, sentence: int, sentence_end: int, kind: str) 
 
 
 _SOMEONE_ELSE = re.compile(rf"\b(?:{FAMILY})\b", re.IGNORECASE)
+# The headings a proposal may stand under, on a line before it.
+PROPOSAL_HEADINGS = frozenset({"plan", "orders", "labs", "assessment and plan"})
+# A sentence that opens with a condition: "If her fever returns.", "Only if...", "In case...", "Depending on...".
+_CONDITION_OPENING = re.compile(
+    r"\s*(?:(?:only|but|and)\s+)?(?:if|unless|when|whenever|once|should|in case|provided|assuming|depending|until|after|"
+    r"before|pending)\b",
+    re.IGNORECASE,
+)
+_DONE = re.compile(r"\b(?:done|ordered|sent)\b", re.IGNORECASE)
+# How a later sentence opens that takes it back: "No, just the BMP.", "Actually, let's not.", "Wait, that was her sister."
+_LATER_OPENING = frozenset("no not nope never or instead rather actually hold wait".split())
+
+
+def _later_sentences_hold_it(text: str, sentence_end: int) -> bool:
+    """Whether the sentences after a plain instruction that hold no instruction of their own, within TAKEN_BACK_REACH
+    words, take it back or put it off: the first by opening with a condition, or saying a time for later, that it was
+    done already, ordered or sent (unless it opens a step of the plan of its own, "Recheck in one week."); any of them
+    with a retraction (TAKEN_BACK) or opening like one (_LATER_OPENING)."""
+    at, left, first = sentence_end, TAKEN_BACK_REACH, True
+    while at < len(text) and left > 0:
+        end = _sentence_end(text, at + 1)
+        said = text[at + 1 : end]
+        words = [token.text for token in tokens(said)]
+        if not words:
+            if end <= at + 1:
+                break
+            at = end
+            continue
+        if directives(said):
+            return False
+        if first and words[0] not in NEXT_CLAUSE and (
+            _CONDITION_OPENING.match(said) or FOR_LATER.search(said) or PAST.search(said) or _DONE.search(said)
+        ):
+            return True
+        if not first and (TAKEN_BACK.search(said) or words[0] in _LATER_OPENING):
+            return True
+        left -= len(words)
+        at, first = end, False
+    return False
 
 
 def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, int]], start: int, end: int,

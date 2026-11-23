@@ -1609,6 +1609,18 @@ def test_an_instruction_over_an_unclear_passage_or_in_a_transcript_not_yet_final
     assert proposals(unclear) == proposals(live) == []
 
 
+# A heading line an instruction stands under holds it back, but Plan, Orders or Labs.
+@pytest.mark.parametrize(("heading", "proposed_under_it"), [
+    ("Next visit", False), ("Options discussed", False), ("Declined", False), ("If symptoms persist", False),
+    ("Plan", True), ("Orders", True), ("Labs", True),
+])
+def test_only_a_plan_orders_or_labs_heading_lets_an_instruction_under_it_be_proposed(heading, proposed_under_it):
+    text = assemble([Segment(0, 16000, f"{heading} {{colon}} {{new paragraph}} Order a lipid panel {{period}}", 0.9, None,
+                             True)], final=True)
+
+    assert bool(proposals(text)) == proposed_under_it
+
+
 def test_at_most_twenty_are_proposed_and_every_rule_is_named():
     text = transcript(*["Go ahead and order a CBC."] * (MAX_PROPOSALS + 1))
 
