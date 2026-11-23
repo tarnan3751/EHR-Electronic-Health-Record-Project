@@ -74,10 +74,12 @@ def test_the_same_words_said_by_both_are_quoted_from_the_one_the_field_may_quote
     assert fields["objective"].pending
 
 
-def test_a_source_running_across_two_speakers_turns_is_wrong_speaker():
-    fields = checked(VISIT, subjective=("Today I have had a cough.", ["today I have had a cough"]))
+def test_a_source_running_across_two_voices_is_cut_and_its_value_supported_by_what_is_left():
+    cut = checked(VISIT, subjective=("I have had a cough.", ["today I have had a cough"]))["subjective"]
+    took = checked(VISIT, subjective=("Today I have had a cough.", ["today I have had a cough"]))["subjective"]
 
-    assert fields["subjective"].reasons[0] == "wrong_speaker"
+    assert cut.pending and cut.speakers == ["patient"] and [VISIT.text[s:e] for s, e in cut.spans] == ["I have had a cough"]
+    assert "unsupported_content" in took.reasons, "a value's word from the clinician's piece is no one's to give"
 
 
 def test_a_role_written_before_a_source_is_taken_off():
@@ -436,6 +438,40 @@ def test_a_statement_answered_yes_is_still_a_statement_and_not_every_auxiliary_a
 
     assert fields["objective"].pending and fields["plan"].pending
     assert validation.conversation_questions(text.text, text.passages()) == []
+
+
+# A source across a question and its answer: what is left of it after the cut must say something on its own.
+CUT_AT_THE_VOICE = [
+    (("clinician", "any chest pain"), ("patient", "no"), "No chest pain.", "any chest pain no", False),
+    (("clinician", "any chest pain"), ("patient", "no chest pain"), "No chest pain.", "any chest pain no chest pain", True),
+    (("clinician", "how long has it been going on"), ("patient", "about two weeks"), "About two weeks.",
+     "how long has it been going on about two weeks", False),
+    (("clinician", "how long has it been going on"), ("patient", "about two weeks"), "Going on about two weeks.",
+     "how long has it been going on about two weeks", False),
+    (("clinician", "how long has the cough been going on"), ("patient", "the cough's been about two weeks"),
+     "The cough's been about two weeks.", "how long has the cough been going on the cough's been about two weeks", True),
+    (("clinician", "what brings you in today"), ("patient", "i've had a cough for two weeks"),
+     "I've had a cough for two weeks.", "what brings you in today i've had a cough for two weeks", True),
+    (("patient", "i get headaches most mornings"), ("clinician", "okay noted"), "I get headaches most mornings.",
+     "i get headaches most mornings okay noted", True),
+]
+
+
+@pytest.mark.parametrize(("first", "second", "value", "source", "offered"), CUT_AT_THE_VOICE)
+def test_a_question_and_its_answer_quoted_together_leave_only_an_answer_that_says_what_it_is_about(
+        first, second, value, source, offered):
+    field = checked(heard(first, second), subjective=(value, [source]))["subjective"]
+
+    assert field.pending == offered, field.reasons
+    assert offered or field.reasons
+
+
+def test_a_source_cut_at_the_voice_gives_the_furthest_reason_when_nothing_is_left():
+    text = heard(("clinician", "any chest pain"), ("patient", "not really"))
+
+    reasons = checked(text, subjective=("Not really.", ["any chest pain not really"]))["subjective"].reasons
+
+    assert "bare_answer" in reasons and "wrong_speaker" not in reasons and "source_is_a_question" not in reasons
 
 
 def test_an_answer_alone_is_never_a_value():

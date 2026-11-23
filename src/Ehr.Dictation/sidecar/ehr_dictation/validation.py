@@ -426,12 +426,13 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
             reasons.add(found)
             continue
         # Only the part of a source outside any instruction counts: whatever the value took from the instruction is then
-        # ungrounded.
-        for piece in _outside_instructions(found, transcript):
-            spans.append(piece)
-            kept.append(transcript.text[piece[0] : piece[1]])
-            if scope is not None:
-                speakers.append(scope.speaker(found))
+        # ungrounded. So too in a conversation for the pieces of a source the field may not take (_said_pieces()).
+        for said in [found] if scope is None else _said_pieces(found, transcript, scope, name):
+            for piece in _outside_instructions(said, transcript):
+                spans.append(piece)
+                kept.append(transcript.text[piece[0] : piece[1]])
+                if scope is not None:
+                    speakers.append(scope.speaker(said))
     if quotes and not kept and not reasons & {"source_too_short", "source_not_in_transcript", "source_in_unclear_passage",
                                               WRONG_SPEAKER, QUESTION_QUOTED, BARE_ANSWER}:
         reasons.add("order_or_allergy_change")
@@ -489,18 +490,15 @@ def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int
         found = [span for span in found if scope.window[0] <= span[0] and span[1] <= scope.window[1]]
     if not found:
         return "source_not_in_transcript"
-    clear = [span for span in found if not any(_overlaps(span, passage) for passage in transcript.unclear)]
-    if not clear:
-        return "source_in_unclear_passage"
-    if scope is not None:
-        clear = [span for span in clear if scope.speaker(span) in SPEAKERS[name]]
+    if scope is None:
+        clear = [span for span in found if not any(_overlaps(span, passage) for passage in transcript.unclear)]
         if not clear:
-            return WRONG_SPEAKER
-        # What an instruction takes from a question ("can you refill my inhaler") is cut as the instruction it is.
-        clear = [span for span in clear if not any(_overlaps(piece, question) for piece in _outside_instructions(span, transcript)
-                                                   for question in transcript.questions)]
+            return "source_in_unclear_passage"
+    else:
+        judged = [(span, _said_pieces(span, transcript, scope, name)) for span in found]
+        clear = [span for span, pieces in judged if not isinstance(pieces, str)]
         if not clear:
-            return QUESTION_QUOTED
+            return max((pieces for _, pieces in judged), key=PIECE_REASONS.index)
     unused = [span for span in clear if span not in earlier]
     after = earlier[-1][1] if earlier else 0
     ordered = [span for span in unused if span[0] >= after] + [span for span in unused if span[0] < after] or clear
@@ -2272,11 +2270,16 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 # A recorded visit is drafted a window at a time (conversation.py), each window's proposal checked by check() with its
 # Scope: the window, and who said each passage. On top of every rule above:
 #
-# - wrong_speaker (decision D15): a source must be in one turn of someone the field may quote (SPEAKERS): Subjective
+# - wrong_speaker (decision D15): a source must be in a turn of someone the field may quote (SPEAKERS): Subjective
 #   what the patient or someone with them said, Objective, Assessment and Plan what the clinician said, and any of them
-#   a passage whose speaker couldn't be told; a source over one voice's sure and unsure passages is unsure, and one
-#   across two voices nobody's. A role written before a source ("Patient: ...") is taken off first. A source outside
-#   the window is source_not_in_transcript.
+#   a passage whose speaker couldn't be told; a source over one voice's sure and unsure passages is unsure. A source
+#   that runs across two voices is cut where the voice changes, and each piece is judged on its own by every rule here
+#   (_said_pieces()): one in a turn the field may not quote, a question, one too short or only an answer is dropped,
+#   and so is an answer cut from its question that doesn't say what it is about, with a subject of its own or a word
+#   of the question's ("how long / about two weeks" doesn't; "any chest pain / no chest pain" and "what brings you in
+#   / I've had a cough" do). The value must then be supported by the pieces left, as by any source, so
+#   one whose words came from a dropped piece is refused, never trimmed. A role written before a source ("Patient:
+#   ...") is taken off first. A source outside the window is source_not_in_transcript.
 # - The common cues read as people speak (CONVERSATION_NEGATION, CONVERSATION_CERTAINTY): each common cue, and a closed
 #   class of heads people say to each other rather than dictate ("I reckon", "my guess is", "hard to say", "I'd be
 #   surprised", "nothing to suggest", "if you have"), and an opinion by its frame, "I" or "we", any one word but a
@@ -2575,6 +2578,48 @@ def _alone(sentence: list[Token]) -> bool:
     return all(word.text in ANSWER_ALONE for word in sentence)
 
 
+# Why no piece of a source survived (_said_pieces()), from the first stage a piece can fall at to the last; of several
+# occurrences of a source, the one that got furthest says why.
+PIECE_REASONS = ("source_in_unclear_passage", WRONG_SPEAKER, QUESTION_QUOTED, "source_too_short", BARE_ANSWER)
+ANSWER_SUBJECTS = frozenset("i we he she it they there".split())
+
+
+def _said_pieces(span: tuple[int, int], transcript: _Transcript, scope: Scope, name: str) -> list[tuple[int, int]] | str:
+    """The pieces of a conversation's source a field may take, the source cut where the voice changes (see above), or
+    why none survived (PIECE_REASONS)."""
+    kept: list[tuple[int, int]] = []
+    furthest = 0
+    asked: list[Token] = []  # the piece before, when it asks
+    for piece in scope.pieces(span, transcript.words):
+        said = [word for word in transcript.words if piece[0] <= word.start and word.end <= piece[1]]
+        # What an instruction takes from a question ("can you refill my inhaler") is cut as the instruction it is.
+        asks = any(_overlaps(part, question) for part in _outside_instructions(piece, transcript)
+                   for question in transcript.questions)
+        stage = next(
+            (k for k, fails in enumerate((
+                any(_overlaps(piece, passage) for passage in transcript.unclear),
+                scope.speaker(piece) not in SPEAKERS[name],
+                asks,
+                len(said) < 2 and not any(word.text[0].isdigit() for word in said),
+                all(word.text in ANSWER_WORDS for word in said) or (asked and not _about(said, asked)),
+            )) if fails),
+            None,
+        )
+        if stage is None:
+            kept.append(piece)
+        else:
+            furthest = max(furthest, stage)
+        asked = said if asks else []
+    return kept or PIECE_REASONS[furthest]
+
+
+def _about(answer: list[Token], question: list[Token]) -> bool:
+    """Whether an answer says what it is about: it has a subject of its own ("I've had a cough for two weeks"), or a
+    word of its question's other than a stopword or an answer's ("no chest pain")."""
+    said = {word.text.split("'")[0] for word in answer}
+    return bool(said & ANSWER_SUBJECTS or said & ({word.text.split("'")[0] for word in question} - STOPWORDS - ANSWER_WORDS))
+
+
 # A merged value's length at most, under the note's own limit on a field (16,000 characters, NoteContent in Ehr.Domain).
 MERGED_LIMIT = 12_000
 
@@ -2586,6 +2631,18 @@ class Scope:
 
     window: tuple[int, int]
     passages: tuple[tuple[int, int, str, int | None], ...]  # place, who and voice (conversation.Conversation.passages())
+
+    def pieces(self, span: tuple[int, int], words: list[Token]) -> list[tuple[int, int]]:
+        """The span's words cut where the voice changes, a piece each run of one voice's words."""
+        runs: list[tuple[int | None, int, int]] = []
+        for word in words:
+            if span[0] <= word.start and word.end <= span[1]:
+                voice = next((voice for start, end, _, voice in self.passages if start <= word.start < end), None)
+                if runs and runs[-1][0] == voice:
+                    runs[-1] = (voice, runs[-1][1], word.end)
+                else:
+                    runs.append((voice, word.start, word.end))
+        return [(start, end) for _, start, end in runs]
 
     def speaker(self, span: tuple[int, int]) -> str | None:
         """Who said the span: the speaker of the passages it lies in; unsure if they are one voice's, some of them unsure;
