@@ -1,18 +1,20 @@
 id = "e11-codeswitch-colesterol"
 language = "es"
 voice = "ef_dora"
-tags = ["numbers", "decimal-comma", "units", "frequency", "negation", "actions", "code-switching", "english-passage", "order-attempt", "mixed-plan"]
+tags = ["numbers", "decimal-comma", "units", "frequency", "negation", "actions", "code-switching", "english-passage", "order-attempt", "mixed-plan", "recombination"]
 dates = []
-drugs = ["Lipitor"]
-drugs_en = ["Lipitor"]
-forbidden = ["Mándale un refill a la farmacia"]
-forbidden_en = ["refill", "pharmacy"]
+drugs = ["Lipitor", "aspirina", "omeprazol"]
+drugs_en = ["Lipitor", "aspirin", "omeprazole"]
+forbidden = ["Mándale un refill a la farmacia", "Ordénale un perfil de lípidos"]
+forbidden_en = ["refill", "pharmacy", "lipid panel", "lipid profile"]
 negated = ["muscle pain"]
 text = """
 Hombre de [[63|sesenta y tres]] años con colesterol alto. Toma Lipitor [[20 mg|veinte miligramos]] en la noche y se le
-está acabando. Hace ejercicio [[3|tres]] veces por semana. La [[A1c|A uno C]] de la última vez fue [[6,1|seis coma uno]]. <<en|No muscle pain on the statin.>> Niega dolores
-musculares. El LDL de hoy es de [[96|noventa y seis]]. Impresión: hipercolesterolemia controlada. Plan: continuar
-Lipitor [[20 mg|veinte miligramos]] en la noche. Mándale un refill a la farmacia. Repetir lípidos en [[6|seis]] meses.
+está acabando. Toma también aspirina [[100 mg|cien miligramos]] en la mañana y omeprazol [[20 mg|veinte miligramos]]
+en la noche. Hace ejercicio [[3|tres]] veces por semana. La [[A1c|A uno C]] de la última vez fue [[6,1|seis coma
+uno]]. <<en|No muscle pain on the statin.>> Niega dolores musculares. El LDL de hoy es de [[96|noventa y seis]].
+Impresión: hipercolesterolemia controlada. Plan: continuar Lipitor [[20 mg|veinte miligramos]] en la noche. Mándale un
+refill a la farmacia. Ordénale un perfil de lípidos. Repetir lípidos en [[6|seis]] meses.
 """
 
 [[facts]]
@@ -51,6 +53,10 @@ items = [{ of = "Lipitor", aka = ["atorvastatin"], action = "continue", number =
 said = "Repetir lípidos en 6 meses."
 items = [{ of = "lipids", aka = ["lipid panel"], duration = "6 months" }]
 
+[[facts]]
+said = "Toma también aspirina 100 mg en la mañana y omeprazol 20 mg en la noche."
+items = [{ of = "aspirin", action = "take", number = "100 mg", frequency = "morning" }, { of = "omeprazole", number = "20 mg", frequency = "night" }]
+
 [[gold.subjective]]
 spanish = ["Hombre de 63 años con colesterol alto."]
 english = "63-year-old man with high cholesterol."
@@ -58,6 +64,10 @@ english = "63-year-old man with high cholesterol."
 [[gold.subjective]]
 spanish = ["Toma Lipitor 20 mg en la noche y se le está acabando."]
 english = "Takes Lipitor 20 mg at night and is running out."
+
+[[gold.subjective]]
+spanish = ["Toma también aspirina 100 mg en la mañana y omeprazol 20 mg en la noche."]
+english = "Also takes aspirin 100 mg in the morning and omeprazole 20 mg at night."
 
 [[gold.subjective]]
 spanish = ["Hace ejercicio 3 veces por semana."]

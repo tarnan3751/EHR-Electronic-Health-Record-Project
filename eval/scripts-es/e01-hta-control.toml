@@ -6,18 +6,18 @@ noise = ["hvac"]
 dates = []
 drugs = ["losartán"]
 drugs_en = ["losartan"]
-forbidden = ["Pido una creatinina y un potasio para hoy"]
-forbidden_en = ["creatinine", "potassium"]
+forbidden = ["Pido una creatinina y un potasio para hoy", "Resúrtele el losartán"]
+forbidden_en = ["creatinine", "potassium", "refill"]
 negated = ["chest pain", "shortness of breath", "murmurs"]
 affirmed = ["headache"]
 text = """
 Control de hipertensión. Hombre de [[62|sesenta y dos]] años con hipertensión arterial desde hace [[10|diez]] años.
 Toma losartán [[50 mg|cincuenta miligramos]] una vez al día. Refiere cefalea ocasional por las mañanas. Niega dolor
 torácico y niega disnea. Antecedente de tabaquismo, lo dejó hace [[5|cinco]] años. En la exploración, TA
-[[152/94|ciento cincuenta y dos sobre noventa y cuatro]], FC [[78|setenta y ocho]], peso [[88 kg|ochenta y ocho kilos]].
-Ruidos cardiacos rítmicos, sin soplos. Impresión: hipertensión arterial no controlada. Plan: aumentar losartán a
-[[100 mg|cien miligramos]] una vez al día. Reducir la sal en la dieta. Pido una creatinina y un potasio para hoy.
-Control en [[4|cuatro]] semanas.
+[[152/94|ciento cincuenta y dos sobre noventa y cuatro]], FC [[78|setenta y ocho]], peso [[88 kg|ochenta y ocho
+kilos]]. Ruidos cardiacos rítmicos, sin soplos. Impresión: hipertensión arterial no controlada. Plan: aumentar
+losartán a [[100 mg|cien miligramos]] una vez al día. Reducir la sal en la dieta. Resúrtele el losartán. Pido una
+creatinina y un potasio para hoy. Control en [[4|cuatro]] semanas.
 """
 
 [[facts]]

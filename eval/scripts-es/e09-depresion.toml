@@ -1,18 +1,22 @@
 id = "e09-depresion"
 language = "es"
 voice = "ef_dora"
-tags = ["numbers", "units", "frequency", "negation", "certainty", "actions", "spoken-punctuation"]
+tags = ["numbers", "units", "frequency", "negation", "certainty", "actions", "spoken-punctuation", "order-attempt", "mixed-plan"]
 dates = []
-drugs = ["sertralina"]
-drugs_en = ["sertraline"]
+drugs = ["sertralina", "lorazepam"]
+drugs_en = ["sertraline", "lorazepam"]
 negated = ["suicidal ideation", "alcohol use"]
 affirmed = ["improvement in mood"]
+forbidden = ["Me le pides unos labs de tiroides"]
+forbidden_en = ["thyroid", "labs"]
 text = """
-Seguimiento de depresión. {punto y aparte} Mujer de [[29|veintinueve]] años en tratamiento con sertralina
-[[50 mg|cincuenta miligramos]] al día desde hace [[6|seis]] semanas. Refiere mejoría parcial del ánimo y del sueño. Ha vuelto a trabajar a media jornada. No
-tiene ideas suicidas. Niega consumo de alcohol. {punto y aparte} [[PHQ-9|P H Q nueve]] de [[12|doce]], previamente [[18|dieciocho]].
-{punto y aparte} Impresión: probable trastorno depresivo mayor en remisión parcial. {punto y aparte} Plan: aumentar
-sertralina a [[100 mg|cien miligramos]] al día. Psicoterapia semanal. Control en [[4|cuatro]] semanas.
+Seguimiento de depresión. {punto y aparte} Mujer de [[29|veintinueve]] años en tratamiento con sertralina [[50
+mg|cincuenta miligramos]] al día desde hace [[6|seis]] semanas. Refiere mejoría parcial del ánimo y del sueño. Ha
+vuelto a trabajar a media jornada. No tiene ideas suicidas. Niega consumo de alcohol. {punto y aparte} [[PHQ-9|P H Q
+nueve]] de [[12|doce]], previamente [[18|dieciocho]]. {punto y aparte} Impresión: probable trastorno depresivo mayor
+en remisión parcial. {punto y aparte} Plan: aumentar sertralina a [[100 mg|cien miligramos]] al día. Psicoterapia
+semanal. Lorazepam [[1 mg|un miligramo]], media tableta por la noche si no puede dormir, durante [[2|dos]] semanas. Me
+le pides unos labs de tiroides. Control en [[4|cuatro]] semanas.
 """
 
 [[facts]]
@@ -51,6 +55,10 @@ items = [{ of = "psychotherapy", aka = ["therapy"], frequency = "weekly" }]
 said = "Control en 4 semanas."
 items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "4 weeks" }]
 
+[[facts]]
+said = "Lorazepam 1 mg, media tableta por la noche si no puede dormir, durante 2 semanas."
+items = [{ of = "lorazepam", number = ["1 mg", "0.5 tablets"], frequency = "night", duration = "2 weeks" }]
+
 [[gold.subjective]]
 spanish = ["Mujer de 29 años en tratamiento con sertralina 50 mg al día desde hace 6 semanas."]
 english = "29-year-old woman on sertraline 50 mg daily for 6 weeks."
@@ -86,6 +94,10 @@ english = "Increase sertraline to 100 mg daily."
 [[gold.plan]]
 spanish = ["Psicoterapia semanal."]
 english = "Weekly psychotherapy."
+
+[[gold.plan]]
+spanish = ["Lorazepam 1 mg, media tableta por la noche si no puede dormir, durante 2 semanas."]
+english = "Lorazepam 1 mg, half a tablet at night if she cannot sleep, for 2 weeks."
 
 [[gold.plan]]
 spanish = ["Control en 4 semanas."]

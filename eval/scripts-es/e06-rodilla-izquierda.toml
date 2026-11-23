@@ -1,13 +1,15 @@
 id = "e06-rodilla-izquierda"
 language = "es"
 voice = "em_alex"
-tags = ["numbers", "units", "frequency", "sides", "recombination", "severity", "negation", "actions", "drug-name-differs", "code-switching", "long"]
+tags = ["numbers", "units", "frequency", "sides", "recombination", "severity", "negation", "actions", "drug-name-differs", "code-switching", "long", "order-attempt"]
 noise = ["monitor"]
 dates = []
 drugs = ["paracetamol", "ibuprofeno"]
 drugs_en = ["acetaminophen", "ibuprofen"]
 negated = ["trauma"]
 affirmed = ["knee pain", "mild effusion"]
+forbidden = ["Agendar resonancia de la rodilla izquierda"]
+forbidden_en = ["MRI", "magnetic resonance"]
 text = """
 Varón de [[67|sesenta y siete]] años con artrosis de ambas rodillas. Refiere dolor en la rodilla izquierda desde hace
 un mes, peor al subir escaleras en el gym. El dolor es de [[6|seis]] sobre [[10|diez]] y le despierta por la noche
@@ -19,9 +21,9 @@ derrame leve y crepitación, rodilla derecha sin derrame. Flexión de la rodilla
 grados, sin calor ni enrojecimiento. Sin dolor en la cadera izquierda. Marcha sin cojera. Impresión: artrosis de
 rodilla izquierda con brote inflamatorio. Plan: añadir ibuprofeno [[400 mg|cuatrocientos miligramos]] cada [[8|ocho]]
 horas con comida durante [[5|cinco]] días. Continuar paracetamol. Hielo local [[20|veinte]] minutos [[3|tres]] veces
-al día. Derivar a fisioterapia. Ejercicios para fortalecer el cuádriceps en casa todos los días. Bajar de peso con
-dieta y caminar en llano. Control en [[6|seis]] semanas. Si aparece fiebre o la rodilla se pone roja y caliente, que
-vuelva antes.
+al día. Derivar a fisioterapia. Agendar resonancia de la rodilla izquierda. Ejercicios para fortalecer el cuádriceps
+en casa todos los días. Bajar de peso con dieta y caminar en llano. Control en [[6|seis]] semanas. Si aparece fiebre o
+la rodilla se pone roja y caliente, que vuelva antes.
 """
 
 [[facts]]

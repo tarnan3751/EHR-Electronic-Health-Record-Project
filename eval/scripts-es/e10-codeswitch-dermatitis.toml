@@ -1,18 +1,20 @@
 id = "e10-codeswitch-dermatitis"
 language = "es"
 voice = "em_santa"
-tags = ["numbers", "decimal-comma", "units", "frequency", "routes", "sides", "negation", "code-switching", "english-passage", "drug-name-differs"]
+tags = ["numbers", "decimal-comma", "units", "frequency", "routes", "sides", "negation", "code-switching", "english-passage", "drug-name-differs", "order-attempt", "mixed-plan"]
 dates = []
 drugs = ["hidrocortisona"]
 drugs_en = ["hydrocortisone"]
 negated = ["fever", "vesicles"]
 affirmed = ["rash"]
+forbidden = ["Se le indica laboratorio de control"]
+forbidden_en = ["laboratory", "lab"]
 text = """
-Paciente de [[40|cuarenta]] años que viene a follow-up de diabetes. El CBC salió normal y la [[A1c|A uno C]] es de [[7,1|siete
-coma uno]]. Tiene un rash en el brazo derecho desde hace [[3|tres]] días, sin fiebre. <<en|Patient was counseled on
-diet and exercise.>> En la exploración, rash eritematoso en el brazo derecho, sin vesículas. Impresión: dermatitis de
-contacto. Plan: hidrocortisona tópica al [[1 %|uno por ciento]] dos veces al día durante [[7|siete]] días. Follow-up
-en [[3|tres]] meses.
+Paciente de [[40|cuarenta]] años que viene a follow-up de diabetes. El CBC salió normal y la [[A1c|A uno C]] es de
+[[7,1|siete coma uno]]. Tiene un rash en el brazo derecho desde hace [[3|tres]] días, sin fiebre. <<en|Patient was
+counseled on diet and exercise.>> En la exploración, rash eritematoso en el brazo derecho, sin vesículas. Impresión:
+dermatitis de contacto. Plan: hidrocortisona tópica al [[1 %|uno por ciento]] dos veces al día durante [[7|siete]]
+días. Se le indica laboratorio de control. Follow-up en [[3|tres]] meses.
 """
 
 [[facts]]

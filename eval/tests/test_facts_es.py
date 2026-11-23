@@ -44,6 +44,17 @@ def test_each_fact_is_said_once_in_the_text_and_follows_the_format(script):
         assert script.display.count(entry.said) == 1, entry.said
 
 
+@pytest.mark.parametrize("script", SCRIPTS.values(), ids=lambda s: s.id)
+def test_every_gold_statement_changes_nothing_and_misfiles_nothing(script):
+    # Read straight against the facts, whether or not the checks would offer it (test_run_a.py goes through them).
+    for name, statements in script.statements.items():
+        for statement in statements:
+            spans = [(script.display.index(q), script.display.index(q) + len(q)) for q in statement.spanish]
+            changed, misfiled = scoring_es._statement_items(statement.english, spans, script.display,
+                                                            script.gold[name].value, script)
+            assert (changed, misfiled) == ([], []), statement.english
+
+
 @pytest.mark.parametrize(("fact", "says"), [
     ({"said": "x"}, "says nothing"),
     ({"said": "x", "items": [{"of": "fever", "colour": "red"}]}, "an item needs of"),
@@ -133,10 +144,60 @@ def test_a_passage_misheard_in_part_is_still_found_in_the_transcript():
     assert changes("e01", said, "BP 78/152, HR 78, weight 88 kg.", heard) == {("number", "78/152 (BP)")}
 
 
-def test_a_passage_whose_number_reads_two_ways_is_changed_by_any_statement_shown_from_it():
-    entry = facts_es.Entry("Heparina 5.000 unidades.", (), "ambiguous_number")
-    changed, _ = facts_es.compare("Heparin 5000 units.", [entry], [entry], facts_es.Lexicon())
-    assert [kind for kind, _, _ in changed] == ["number"]
+HEPARIN = "Recibe heparina 5.000 unidades subcutáneas cada 12 horas desde la cirugía de cadera."
+
+
+# The review's F8: "5.000" is five where a decimal point is written so and five thousand where a thousands one is, so
+# its field is left for the clinician; shown from a transcript that writes it so, any reading is changed. Heard as
+# "5000", it is compared as said.
+@pytest.mark.parametrize("english", ["Receives heparin 5000 units subcutaneous every 12 hours since hip surgery.",
+                                     "Receives heparin 5 units subcutaneous every 12 hours since hip surgery."])
+def test_a_passage_whose_number_reads_two_ways_is_changed_by_any_statement_shown_from_it(english):
+    assert {kind for kind, _ in changes("e16", HEPARIN, english)} == {"number"}
+
+
+def test_the_same_passage_heard_without_the_separator_is_compared_as_said():
+    heard = SCRIPTS["e16"].display.replace("5.000", "5000")
+    said = HEPARIN.replace("5.000", "5000")
+    assert changes("e16", HEPARIN, "Receives heparin 5000 units subcutaneous every 12 hours since hip surgery.",
+                   heard) == set()
+    assert changes("e16", HEPARIN, "Receives heparin 5 units subcutaneous every 12 hours since hip surgery.",
+                   heard) == {("number", "5 units (heparin)")}
+    assert said in heard
+
+
+# The review's F15: what the test set now says that the checks of 9db0821 let through translated wrongly, each seen by
+# the eval as changed (the scripts' gold, the right translation, is unchanged: test_run_a.py).
+@pytest.mark.parametrize(("key", "said", "wrong", "kind"), [
+    ("e12", "Niega mareo, palpitaciones, dolor torácico y síncope.",
+     "Denies dizziness; palpitations, chest pain and syncope.", "negation"),
+    ("e12", "Ibuprofeno: se suspende por el riesgo de sangrado.", "Ibuprofen is continued because of the risk of bleeding.",
+     "action"),
+    ("e12", "Metoprolol: continuar igual.", "Metoprolol: stop.", "action"),
+    ("e02", "Dejó de tomar la glimepirida hace un mes por hipoglucemias.",
+     "Takes glimepiride, started a month ago because of hypoglycemia.", "action"),
+    ("e08", "El cardiólogo le suspendió la espironolactona el mes pasado por el potasio alto.",
+     "The cardiologist stopped his spironolactone last month because of low potassium.", "polarity"),
+    ("e09", "Lorazepam 1 mg, media tableta por la noche si no puede dormir, durante 2 semanas.",
+     "Lorazepam 1 mg, 2 tablets at night if she cannot sleep, for 2 weeks.", "unit"),
+    ("e12", "Toma también metoprolol de 100 mg, un cuarto de tableta en la mañana.",
+     "Also takes metoprolol 100 mg, 4 tablets in the morning.", "number"),
+    ("e13", "Después, un litro y medio de solución salina en 24 horas.", "Then 1 liter of normal saline over 24 hours.",
+     "number"),
+    ("e04", "En urgencias se descartó anafilaxia.", "Anaphylaxis in the emergency department.", "negation"),
+    ("e03", "Disminución del murmullo vesicular en la base derecha y sibilancias en el campo superior izquierdo.",
+     "Decreased breath sounds at the left base and wheezes in the right upper field.", "side"),
+    ("e11", "Toma también aspirina 100 mg en la mañana y omeprazol 20 mg en la noche.",
+     "Also takes aspirin 20 mg in the morning and omeprazole 100 mg at night.", "number"),
+    ("e11", "Toma también aspirina 100 mg en la mañana y omeprazol 20 mg en la noche.",
+     "Also takes aspirin 100 mg at night and omeprazole 20 mg in the morning.", "frequency"),
+    ("e02", "Glucosa en ayunas de 162 mg/dl.", "Glucose after breakfast 162 mg/dL.", "frequency"),
+    ("e02", "Glucosa en ayunas de 162 mg/dl.", "Fasting glucose 162 mmol/L.", "unit"),
+    ("e08", "La radiografía de tórax de hoy es compatible con congestión pulmonar.",
+     "Today's chest X-ray shows pulmonary congestion.", "certainty"),
+])
+def test_what_the_new_content_says_translated_wrongly_is_changed(key, said, wrong, kind):
+    assert kind in {changed for changed, _ in changes(key, said, wrong)}
 
 
 @pytest.mark.parametrize(("english", "phrase", "negated"), [

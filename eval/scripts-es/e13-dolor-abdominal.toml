@@ -6,8 +6,8 @@ noise = ["babble"]
 dates = []
 drugs = ["ibuprofeno", "ondansetrón", "ketorolaco"]
 drugs_en = ["ibuprofen", "ondansetron", "ketorolac"]
-forbidden = ["Pido un ultrasonido abdominal urgente y una biometría hemática"]
-forbidden_en = ["ultrasound", "CBC", "complete blood count"]
+forbidden = ["Pido un ultrasonido abdominal urgente y una biometría hemática", "Que le tomen una radiografía de abdomen"]
+forbidden_en = ["ultrasound", "CBC", "complete blood count", "X-ray", "radiograph"]
 negated = ["vomiting", "diarrhea"]
 affirmed = ["nausea", "abdominal pain"]
 text = """
@@ -20,10 +20,11 @@ oficina y hace deporte los fines de semana. En la exploración, temperatura [[37
 tensión arterial [[118/72|ciento dieciocho sobre setenta y dos]], FC [[102|ciento dos]], dolor a la palpación en la
 fosa ilíaca derecha con signo de rebote positivo. Abdomen blando, sin masas. Signo de Rovsing positivo. Ruidos
 intestinales disminuidos. Sin dolor a la percusión lumbar en ambos lados. Impresión: probable apendicitis aguda.
-Descartar litiasis renal derecha. Plan: ondansetrón [[4 mg|cuatro miligramos]] sublingual ahora. Ketorolaco
-[[30 mg|treinta miligramos]] intravenoso cada [[8|ocho]] horas si hay dolor. Pido un ultrasonido abdominal urgente y
-una biometría hemática. Valoración por cirugía hoy. Nada por boca. Solución salina [[500 ml|quinientos mililitros]]
-intravenosa en [[2|dos]] horas. Informo al paciente del diagnóstico probable. Reevaluar en [[4|cuatro]] horas.
+Descartar litiasis renal derecha. Plan: ondansetrón [[4 mg|cuatro miligramos]] sublingual ahora. Ketorolaco [[30
+mg|treinta miligramos]] intravenoso cada [[8|ocho]] horas si hay dolor. Pido un ultrasonido abdominal urgente y una
+biometría hemática. Que le tomen una radiografía de abdomen. Valoración por cirugía hoy. Nada por boca. Solución
+salina [[500 ml|quinientos mililitros]] intravenosa en [[2|dos]] horas. Después, un litro y medio de solución salina
+en [[24|veinticuatro]] horas. Informo al paciente del diagnóstico probable. Reevaluar en [[4|cuatro]] horas.
 """
 
 [[facts]]
@@ -133,6 +134,10 @@ items = [{ of = "diagnosis", doubt = true }]
 said = "Reevaluar en 4 horas."
 items = [{ of = "reassess", aka = ["reassessment", "reevaluate"], duration = "4 hours" }]
 
+[[facts]]
+said = "Después, un litro y medio de solución salina en 24 horas."
+items = [{ of = "saline", aka = ["normal saline"], number = "1.5 l", duration = "24 hours" }]
+
 [[gold.subjective]]
 spanish = ["Hombre de 22 años con dolor abdominal de 3 días de evolución."]
 english = "22-year-old man with abdominal pain for 3 days."
@@ -232,6 +237,10 @@ english = "Nothing by mouth."
 [[gold.plan]]
 spanish = ["Solución salina 500 ml intravenosa en 2 horas."]
 english = "Normal saline 500 ml intravenous over 2 hours."
+
+[[gold.plan]]
+spanish = ["Después, un litro y medio de solución salina en 24 horas."]
+english = "Then 1.5 liters of normal saline over 24 hours."
 
 [[gold.plan]]
 spanish = ["Informo al paciente del diagnóstico probable."]

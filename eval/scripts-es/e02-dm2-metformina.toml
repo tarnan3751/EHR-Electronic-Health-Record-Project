@@ -1,17 +1,19 @@
 id = "e02-dm2-metformina"
 language = "es"
 voice = "ef_dora"
-tags = ["numbers", "decimal-comma", "units", "frequency", "actions", "self-correction", "experiencer", "severity"]
+tags = ["numbers", "decimal-comma", "units", "frequency", "actions", "self-correction", "experiencer", "severity", "history"]
 dates = []
-drugs = ["metformina", "semaglutida"]
-drugs_en = ["metformin", "semaglutide"]
+drugs = ["metformina", "semaglutida", "glimepirida"]
+drugs_en = ["metformin", "semaglutide", "glimepiride"]
 retracted = ["0,5 mg"]
 affirmed = ["polyuria"]
 family = [["type 2 diabetes", "mother"]]
 text = """
 Paciente de [[58|cincuenta y ocho]] años con diabetes tipo [[2|dos]]. Toma metformina [[850 mg|ochocientos cincuenta
-miligramos]] dos veces al día. Refiere poliuria leve. Su madre tiene diabetes tipo [[2|dos]]. Hemoglobina glucosilada
-de [[8,4|ocho coma cuatro]] por ciento. Peso [[96 kg|noventa y seis kilos]]. Impresión: diabetes tipo [[2|dos]] mal
+miligramos]] dos veces al día. Dejó de tomar la glimepirida hace un mes por
+hipoglucemias. Refiere poliuria leve. Su madre tiene diabetes tipo [[2|dos]]. Hemoglobina glucosilada
+de [[8,4|ocho coma cuatro]] por ciento. Glucosa en ayunas de [[162 mg/dl|ciento sesenta y dos
+miligramos por decilitro]]. Peso [[96 kg|noventa y seis kilos]]. Impresión: diabetes tipo [[2|dos]] mal
 controlada. Plan: continuar metformina [[850 mg|ochocientos cincuenta miligramos]] dos veces al día. Agregar
 semaglutida [[0,5 mg|cero coma cinco miligramos]] semanal, no, perdón, [[0,25 mg|cero coma veinticinco miligramos]]
 semanal durante el primer mes. Control en [[3|tres]] meses.
@@ -57,6 +59,14 @@ items = [{ of = "semaglutide", action = "start", number = "0.25 mg", frequency =
 said = "Control en 3 meses."
 items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "3 months" }]
 
+[[facts]]
+said = "Dejó de tomar la glimepirida hace un mes por hipoglucemias."
+items = [{ of = "glimepiride", action = "stopped", duration = "1 month", history = true }, { of = "hypoglycemia" }]
+
+[[facts]]
+said = "Glucosa en ayunas de 162 mg/dl."
+items = [{ of = "glucose", number = "162 mg/dL", frequency = "fasting" }]
+
 [[gold.subjective]]
 spanish = ["Paciente de 58 años con diabetes tipo 2."]
 english = "58-year-old patient with type 2 diabetes."
@@ -64,6 +74,10 @@ english = "58-year-old patient with type 2 diabetes."
 [[gold.subjective]]
 spanish = ["Toma metformina 850 mg dos veces al día."]
 english = "Takes metformin 850 mg twice a day."
+
+[[gold.subjective]]
+spanish = ["Dejó de tomar la glimepirida hace un mes por hipoglucemias."]
+english = "Stopped taking glimepiride a month ago because of hypoglycemia."
 
 [[gold.subjective]]
 spanish = ["Refiere poliuria leve."]
@@ -76,6 +90,10 @@ english = "Her mother has type 2 diabetes."
 [[gold.objective]]
 spanish = ["Hemoglobina glucosilada de 8,4 por ciento."]
 english = "Hemoglobin A1c 8.4 percent."
+
+[[gold.objective]]
+spanish = ["Glucosa en ayunas de 162 mg/dl."]
+english = "Fasting glucose 162 mg/dL."
 
 [[gold.objective]]
 spanish = ["Peso 96 kg."]

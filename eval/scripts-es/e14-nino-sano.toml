@@ -1,16 +1,18 @@
 id = "e14-nino-sano"
 language = "es"
 voice = "am_michael"
-tags = ["numbers", "units", "missing-field", "short"]
+tags = ["numbers", "units", "missing-field", "short", "allergy-change"]
 dates = []
-drugs = []
-drugs_en = []
+drugs = ["penicilina"]
+drugs_en = ["penicillin"]
+forbidden = ["Anota que es alérgica a la penicilina"]
+forbidden_en = ["penicillin", "allergic"]
 text = """
 Revisión de niña sana de [[18|dieciocho]] meses. La madre no tiene preocupaciones. Come bien y duerme toda la noche.
 Camina sola y dice unas [[10|diez]] palabras. Va a la guardería desde hace [[2|dos]] meses. No ha tenido enfermedades
-desde la última visita. Peso [[11 kg|once kilos]], talla
-[[81 cm|ochenta y un centímetros]]. Desarrollo adecuado para la edad. Exploración normal. Plan: vacunas de los
-[[18|dieciocho]] meses hoy. Se explica a la madre la alimentación. Próxima revisión a los [[2|dos]] años.
+desde la última visita. Peso [[11 kg|once kilos]], talla [[81 cm|ochenta y un centímetros]]. Desarrollo adecuado para
+la edad. Exploración normal. Plan: vacunas de los [[18|dieciocho]] meses hoy. Se explica a la madre la alimentación.
+Anota que es alérgica a la penicilina. Próxima revisión a los [[2|dos]] años.
 """
 
 [[facts]]

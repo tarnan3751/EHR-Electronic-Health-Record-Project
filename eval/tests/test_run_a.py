@@ -67,7 +67,7 @@ def test_the_gold_answer_passes_scores_full_marks_and_crosses_no_threshold():
     assert item.sorting == "done" and all(f.status == "pending" for f in item.fields.values())
     assert metrics["fields"]["content"]["f1"] == 1.0 and metrics["discarded"]["share"] == 0.0
     assert metrics["mistranslations"]["unflagged_total"] == 0 and metrics["instructions"]["shown"] == 0
-    assert metrics["instructions"]["reported_not_carried_over"] == metrics["instructions"]["said"] == 1
+    assert metrics["instructions"]["reported_not_carried_over"] == metrics["instructions"]["said"] == 2
     assert metrics["timing"]["statements_spanish_first"] == {"written": 11, "in_order": 11}
     assert not any(crossed for _, crossed, _ in scoring_es.thresholds(metrics))
 
