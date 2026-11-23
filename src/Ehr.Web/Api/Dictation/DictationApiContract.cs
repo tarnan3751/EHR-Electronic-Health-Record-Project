@@ -242,13 +242,9 @@ public enum WarningCode
     [JsonStringEnumMemberName("one_field_holds_dictation")]
     OneFieldHoldsDictation,
 
-    // From a dictation in Spanish (step 17): a number the value uses was said with a separator that reads two ways, a
-    // decimal point or a thousands separator ("1.000 mg"); it points at that number.
-    [JsonStringEnumMemberName("ambiguous_number")]
-    AmbiguousNumber,
-
-    // From a dictation in Spanish: a frequency that reads two ways ("cada tercer día", every other day or every third
-    // day); it points at those words.
+    // From a dictation in Spanish (step 17): a frequency that reads two ways ("cada tercer día", every other day or
+    // every third day); it points at those words. A number that reads two ways ("5.000 unidades") is no warning: the
+    // service refuses its field (ambiguous_number, a reason), so a result warning of one is a bad answer.
     [JsonStringEnumMemberName("ambiguous_frequency")]
     AmbiguousFrequency,
 }

@@ -592,6 +592,33 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
+    // From a dictation in Spanish, a number that reads two ways ("5.000 unidades") is refused by the service, not warned
+    // of (step 17): a result still carrying an ambiguous_number warning is a bad answer, as any code the API doesn't know
+    // is, while "cada tercer día"'s ambiguous_frequency is still a warning the API passes on.
+    [Theory]
+    [InlineData("ambiguous_number", 502)]
+    [InlineData("ambiguous_frequency", 200)]
+    public async Task A_spanish_result_warning_of_a_number_that_reads_two_ways_is_a_bad_answer(string code, int expected)
+    {
+        var body = JsonNode.Parse(await File.ReadAllTextAsync(ContractFile("result-200-done-es"), Cancel))!["body"]!;
+        body["fields"]!["subjective"]!["warnings"] = new JsonArray(new JsonObject { ["code"] = code, ["start"] = 0, ["end"] = 3 });
+        service.Answer = (HttpStatusCode.OK, body.ToJsonString());
+        var page = await OpenAsync(apps, apps.OnPrem);
+
+        using var response = await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result");
+
+        Assert.Equal(expected, (int)response.StatusCode);
+        var answered = await JsonAsync(response);
+        if (expected == 502)
+        {
+            Assert.Equal("bad_answer", (string?)answered["error"]);
+        }
+        else
+        {
+            Assert.Equal(code, (string?)answered["fields"]!["subjective"]!["warnings"]![0]!["code"]);
+        }
+    }
+
     public static TheoryData<string> ContractAnswers() =>
         [.. Directory.EnumerateFiles(ContractFile(""), "*.json").Select(path => System.IO.Path.GetFileNameWithoutExtension(path.AsSpan()).ToString()).Order(StringComparer.Ordinal)];
 

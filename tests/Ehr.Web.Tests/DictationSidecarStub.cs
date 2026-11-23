@@ -36,7 +36,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         "Pulmones limpios.",
         "Patient was counseled on diet.",
         "Probable cuadro viral, pido una radiografi\u0301a de tórax.",
-        "Líquidos abundantes y reposo relativo durante los próximos tres a cinco días, paracetamol 1.000 mg si tiene dolor o malestar general, hierro cada tercer día, y regresar a consulta si aparece dificultad para respirar o fiebre que no cede.",
+        "Líquidos abundantes y reposo relativo durante los próximos tres a cinco días, paracetamol 1000 mg si tiene dolor o malestar general, hierro cada tercer día, y regresar a consulta si aparece dificultad para respirar o fiebre que no cede.",
     ];
 
     // What the Spanish mode proposes from those five chunks: for each field, each English sentence with the Spanish words
@@ -426,8 +426,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     // The Spanish mode's answer: the transcript in Spanish, the order it holds not carried over, and from five chunks or
     // more, each field's English sentences, joined by a space as the value, each citing the Spanish words it was
-    // translated from; the plan's 1.000 mg and "cada tercer día" carry the warnings that they read two ways. With the
-    // model too slow or unavailable, the Spanish transcript and why, as for English.
+    // translated from; the plan's "cada tercer día" carries the warning that it reads two ways. With the model too slow
+    // or unavailable, the Spanish transcript and why, as for English.
     object SortedSpanish(StubSession session, StubSorting sorting)
     {
         var transcript = Transcript(session, SpanishSentences);
@@ -489,8 +489,6 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             var warnings = new List<object>();
             if (field == "plan")
             {
-                var number = text.IndexOf("1.000 mg", StringComparison.Ordinal);
-                warnings.Add(new { code = "ambiguous_number", start = number, end = number + "1.000 mg".Length });
                 var frequency = text.IndexOf("cada tercer día", StringComparison.Ordinal);
                 warnings.Add(new { code = "ambiguous_frequency", start = frequency, end = frequency + "cada tercer día".Length });
             }

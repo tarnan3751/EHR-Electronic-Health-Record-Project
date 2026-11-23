@@ -346,7 +346,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
         await TabToAsync(page, "[data-dictation-field=plan] .sc-translation__pair");
         Assert.Equal(plan.Spanish, await HighlightedAsync(page));
-        Assert.Contains("This number can be read two ways", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning").First.TextContentAsync());
+        Assert.Contains("can mean every other day or every third day", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning").TextContentAsync());
         // The Spanish quoted in a warning is marked as Spanish; in the Spanish transcript, an unclear passage's English
         // explanation is on an English wrapper, and the passage itself stays Spanish.
         Assert.Equal("Cada tercer día", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning span[lang=es]").TextContentAsync());

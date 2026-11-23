@@ -21,7 +21,6 @@ window.SwiftChartDictationView = class {
             possible_correction: "You may have corrected this later in the dictation: check the highlighted words.",
             near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
-            ambiguous_number: "This number can be read two ways, with a decimal point or a thousands separator: check the highlighted words.",
             // Its Spanish words are marked as Spanish where it is shown (warningNote).
             ambiguous_frequency: "“Cada tercer día” can mean every other day or every third day: check which you meant.",
         };
