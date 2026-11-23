@@ -24,7 +24,8 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   2. Finish the review.
 //   3. Set how long a transcript is kept: left out, 1, 7, 0, a half, 2.5 and 8 days.
 // Expected result: Step 1: the consent statement says the text is deleted once checked or after a week at the latest,
-//   and the guidance beneath it that the clinic's backups keep it, with nothing deleting it from them for now; the review's stored result has no transcript text;
+//   and the guidance beneath it that the clinic's backups keep it, with nothing deleting it from them for now; the review's stored result has no transcript text
+//   and none of its segments;
 //   the transcript is kept apart, and the audit log holds only its hash and length; the service was told to discard the
 //   session. Step 2: no transcript kept; no log
 //   line from the visit holds any word said in it. Step 3: 7 days when left out, and whole days from 1 to 7 as set;
@@ -45,6 +46,12 @@ public class TC_UC23_05_Nfr07_ConversationNotKept(WebApps apps) : IClassFixture<
         Assert.Contains("The clinic's backups keep a copy of everything in its database, this text included, and for now nothing deletes it from them.", consent);
 
         Assert.Equal([""], await RowsAsync(apps, "SELECT result_json #>> '{transcript,text}' FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
+        // Nor the transcript's segments: the review keeps each proposal's sources, and the transcript its own segments.
+        Assert.Equal(["0 segments in the review, 5 in the transcript"], await RowsAsync(apps, """
+            SELECT jsonb_array_length(r.result_json #> '{transcript,segments}') || ' segments in the review, '
+                || jsonb_array_length(t.transcript -> 'segments') || ' in the transcript'
+            FROM ehr.ai_note_reviews r JOIN ehr.ambient_transcripts t ON t.id = r.id WHERE r.id = @id
+            """, l.Review));
         Assert.Equal(["1"], await RowsAsync(apps, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @id", l.Review));
         Assert.Equal(["0"], await RowsAsync(apps,
             "SELECT count(*) FROM ehr.audit_events WHERE patient_id = @id AND details::text LIKE '%What brings you in today%'", l.Patient));

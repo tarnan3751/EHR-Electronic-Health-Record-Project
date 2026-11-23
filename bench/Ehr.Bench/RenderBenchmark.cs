@@ -1405,7 +1405,7 @@ internal static partial class RenderBenchmark
             [new(segments[passage].Start, segments[passage].End, segments[passage].Speaker)], []);
         var fields = new Ehr.Web.Api.Dictation.NoteFields(Field(3), Field(0), Field(6), Field(12));
         var transcript = new Ehr.Web.Api.Dictation.Transcript(text.ToString(), true, segments);
-        var result = new Ehr.Web.Api.Dictation.DictationResult(transcript with { Text = "" }, Ehr.Web.Api.Dictation.Sorting.Done, fields, [],
+        var result = new Ehr.Web.Api.Dictation.DictationResult(transcript with { Text = "", Segments = [] }, Ehr.Web.Api.Dictation.Sorting.Done, fields, [],
             new Ehr.Web.Api.Dictation.Provenance(new("synthetic", "0", "0"), null, null, "synthetic", "synthetic", "synthetic", "synthetic"));
         var trusted = new Ehr.Domain.Notes.TrustedReviewResult(JsonSerializer.Serialize(result, JsonSerializerOptions.Web),
             new Dictionary<string, string>

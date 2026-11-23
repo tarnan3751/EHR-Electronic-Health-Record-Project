@@ -236,10 +236,11 @@ public static partial class DictationApi
         var kinds = proposals.Select(p => p.Kind == ProposalKind.Order ? AiChartProposalKinds.Order : AiChartProposalKinds.AllergyAddition).ToList();
         if (ambient)
         {
-            // The visit's words go apart, and only while the review is open; the review keeps where each passage was and
-            // who said it, and its proposals.
+            // The visit's words go apart, with their segments, and only while the review is open; the review keeps its
+            // proposals, each with where its words were and who said them. Not the segments again: once the transcript is
+            // gone they point at nothing, and while it is kept, reading them twice cost the review page its render time.
             var transcript = text.Length == 0 ? null : JsonSerializer.Serialize(result.Transcript, ServiceJson);
-            var kept = JsonSerializer.Serialize(result with { Transcript = result.Transcript with { Text = "" }, Speakers = null }, ServiceJson);
+            var kept = JsonSerializer.Serialize(result with { Transcript = result.Transcript with { Text = "", Segments = [] }, Speakers = null }, ServiceJson);
             return System.Text.Encoding.UTF8.GetByteCount(kept) > 1_048_576 || transcript is not null && System.Text.Encoding.UTF8.GetByteCount(transcript) > 900_000
                 ? null : new(kept, suggestions, kinds, transcript);
         }

@@ -18,8 +18,9 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { AllowOutOfOrderMetadataProperties = true };
 
-    // A recorded visit's stored result as the page reads it: its segments, where each passage was, skipped unread, since
-    // the transcript's own say the same (or the transcript is gone, and with it what they would point at).
+    // A recorded visit's stored result as the page reads it: any segments, where each passage was, skipped unread, since
+    // the transcript's own say the same (or the transcript is gone, and with it what they would point at). One staged
+    // since step 16's third round keeps none (DictationReviewApi.TrustedResult).
     static readonly JsonSerializerOptions Visit = new(Json) { Converters = { new SegmentsUnread() } };
     public AiNoteReview Review { get; private set; } = null!;
     public ClinicalDraft Draft { get; private set; } = null!;
