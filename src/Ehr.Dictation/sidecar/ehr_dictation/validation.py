@@ -27,13 +27,16 @@ each falls, in this order, into a lead-in (okay, ok, alright, so, and, also, the
 "plan:", please, "go ahead and", I'll, I will, I'm going to, I am going to, we'll, we will, we're going to, we are
 going to, let's, let us, I'd like to, I want to, we need to, will; each maybe followed by a comma); the verb in one of
 its plain forms (order, refill, prescribe, renew, e-prescribe, place an order for, put in an order for, write a
-prescription or script for, call in, send ... to her pharmacy; ordering, refilling and the like only after I'm, I am,
+prescription or script for, call in or send ... to her pharmacy; ordering, refilling and the like only after I'm, I am,
 we're or we are; for an allergy, add or put ... to or on her allergies or allergy list, add ... as an allergy, list
 ... as an allergy, add, record, note, document or enter an allergy to ..., or a ... allergy, or "... should be added to
-her allergies"); determiners and possessives (a, an, the, her, his, their, some, another, "a new"); an item, an
-orderable for an order and an allergen for an allergy to add, as the reference data names it (is_item(): every word of
-it in one name of catalog.py, one of them distinctive); the item's quantities (numbers, doses, forms, routes,
-frequencies, durations, supply, refills: QUANTITY); and trailers (today, now, stat, please, too, as well, also), with
+her allergies"); determiners and possessives (a, an, the, her, his, their, some, another, "a new"), and before an
+order's item fasting, stat, urgent, routine or repeat; an item, an orderable for an order and an allergen for an allergy
+to add, as the reference data names it (is_item(): a run of one name of catalog.py that begins with one of its
+standalone runs whole, a generic head, an abbreviation in parentheses, a brand in brackets or a common catalog item's
+name, and never holds a negation or a number word, so "lisinopril" and "chest x-ray" are items and "no", "one",
+"morning" or "chest" alone aren't); the item's quantities (numbers, doses, forms, routes, frequencies, durations,
+supply, refills: QUANTITY); and trailers (today, now, stat, please, too, as well, also), with
 "and" or a comma joining another item. Any other word anywhere in the sentence, or any other mark (a semicolon, a dash,
 a bracket, a quote), makes it not plain, and no list of what must not be said decides it. So an instruction naming
 something the reference data doesn't know (a new drug, a misheard name, an unusual test, a test by a name the catalog
@@ -1538,48 +1541,52 @@ def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], st
 
 # ---- Items: what the reference data names (catalog.py) -----------------------------------------------------------
 
-# A word is distinctive of a kind of name (orderables, allergens) when fewer than this share of that kind's names hold
-# it, and it has two letters or more: "lisinopril", "cbc", "thyrotropin", "mammogram" are; "serum", "plasma", "blood",
-# "urine", "panel", "oral", "tablet" are not (the reference data has no "level").
-DISTINCTIVE_SHARE = 0.0075
+# Never in an item: a negation or a number word ("Order a CBC, no.", "Order another one.", though the reference data has
+# "No. 40" and "next choice one dose"). And an item never starts with a word of the closed classes (_CLOSED_WORDS, below).
+NEVER_IN_AN_ITEM = (
+    frozenset("no not none never nothing without nor neither".split()) | frozenset(UNITS) | frozenset(TENS)
+    | frozenset(ORDINAL_UNITS) | frozenset(ORDINAL_TENS) | {"hundred", "thousand"}
+)
 
 
 @functools.cache
-def _names(kind: str) -> tuple[list[tuple[str, ...]], dict[str, frozenset[int]], frozenset[str]]:
-    """The names of one kind ("order" or "allergen"), each as its words; for each word, the names that hold it; and
-    the distinctive words. Read from catalog.py the first time a proposal or a noted allergy is weighed, not at start."""
+def _names(kind: str) -> tuple[list[tuple[str, ...]], dict[str, list[tuple[int, int, int]]], frozenset[str]]:
+    """The names of one kind ("order" or "allergen"), each as its words; their standalone runs, by first word, each as
+    the name, its start and its end; and every word they hold. Read from catalog.py the first time a proposal or a noted
+    allergy is weighed, not at start."""
     from . import catalog
 
-    names = [tuple(line.split()) for line in (catalog.ORDERABLES if kind == "order" else catalog.ALLERGENS).split("\n") if line]
-    holding: dict[str, set[int]] = {}
-    for i, name in enumerate(names):
-        for word in set(name):
-            holding.setdefault(word, set()).add(i)
-    distinctive = frozenset(
-        word for word, which in holding.items()
-        if word not in STOPWORDS and len(word) >= 2 and word.isalpha() and len(which) < DISTINCTIVE_SHARE * len(names)
-    )
-    return names, {word: frozenset(which) for word, which in holding.items()}, distinctive
+    names: list[tuple[str, ...]] = []
+    runs: dict[str, list[tuple[int, int, int]]] = {}
+    for line in (catalog.ORDERABLES if kind == "order" else catalog.ALLERGENS).split("\n"):
+        marked = line.split()
+        if not marked:
+            continue
+        words = tuple(word.strip("^$") for word in marked)
+        start = None
+        for i, word in enumerate(marked):
+            start = i if word.startswith("^") else start
+            if word.endswith("$") and start is not None:
+                runs.setdefault(words[start], []).append((len(names), start, i + 1))
+        names.append(words)
+    return names, runs, frozenset(word for name in names for word in name)
 
 
 def is_item(words: list[str], kind: str) -> bool:
-    """Whether the words (lower case) name an item of one kind, as the reference data names it: every word but its
-    numbers and its stopwords is in one name of that kind, at least one of them distinctive; a stopword inside counts
-    only when the whole of the words is a run of that one name ("albumin to creatinine ratio" only if a name says it
-    so). An article, a pronoun or a word the reference data doesn't hold is never an item."""
+    """Whether the words (lower case) name an item of one kind as the reference data names it: with its numbers left
+    out, they are a run of one name's words that begins with one of its standalone runs whole (catalog.py: a generic
+    head, an abbreviation in parentheses, a brand in brackets, a common catalog item's name) and may go on along it. So
+    "lisinopril" and "lisinopril 10 mg oral tablet" are, "chest" or "morning" alone isn't; none starts with a stopword,
+    a single letter or a word of the closed classes, or holds a negation or a number word (NEVER_IN_AN_ITEM)."""
     words = [word for word in words if not word[0].isdigit()]
-    content = [word for word in words if word not in STOPWORDS]
-    if not content or words[0] in STOPWORDS or words[-1] in STOPWORDS:
+    if not words or len(words[0]) < 2 or words[0] in STOPWORDS or words[0] in _CLOSED_WORDS or any(
+        word in NEVER_IN_AN_ITEM for word in words
+    ):
         return False
-    names, holding, distinctive = _names(kind)
-    which = frozenset.intersection(*(holding.get(word, frozenset()) for word in content))
-    if not which or not any(word in distinctive for word in content):
-        return False
-    if len(content) == len(words):
-        return True
-    size = len(words)
+    names, runs, _ = _names(kind)
     return any(
-        names[i][start : start + size] == tuple(words) for i in which for start in range(len(names[i]) - size + 1)
+        end - start <= len(words) and names[i][start : start + len(words)] == tuple(words)
+        for i, start, end in runs.get(words[0], ())
     )
 
 
@@ -1590,7 +1597,8 @@ def is_item(words: list[str], kind: str) -> bool:
 # 1. lead-ins (PLAIN_LEADS), each maybe followed by a comma;
 # 2. the verb in one of its plain forms (ORDER_FORMS, ALLERGY_FORMS), an -ing form only after "I'm", "I am", "we're" or
 #    "we are";
-# 3. determiners and possessives (DETERMINERS, and "new" after "a" or "an");
+# 3. determiners and possessives (DETERMINERS, and "new" after "a" or "an"), and for an order the modifiers fasting,
+#    stat, urgent, routine and repeat (ORDER_MODIFIERS);
 # 4. an item: an orderable for an order, an allergen for an allergy to add, as the reference data names it (is_item());
 # 5. an order's quantities (QUANTITY): numbers, doses, forms, routes, frequencies, durations, supply, refills;
 # 6. trailers (TRAILERS); the allergy list for an allergy to add ("to her allergies"); the pharmacy for "send" ("to her
@@ -1612,7 +1620,7 @@ ORDER_FORMS = tuple(
         *((f"{verb} {whom}a {paper} for", f"{doing} {whom}a {paper} for", (ITEMS,))
           for verb, doing in (("write", "writing"),) for whom in ("", "her ", "him ", "them ")
           for paper in ("prescription", "script")),
-        ("call in", "calling in", (ITEMS,)), ("call in", "calling in", (ITEMS, _PHARMACY)),
+        ("call in", "calling in", (ITEMS, _PHARMACY)),
         ("send", "sending", (ITEMS, _PHARMACY)),
         ("send a prescription for", "sending a prescription for", (ITEMS, _PHARMACY)),
     )
@@ -1629,6 +1637,8 @@ ALLERGY_FORMS = (
     (ITEMS, r"(?:should|needs to|must|will) be added ", _LIST),  # "penicillin should be added to her allergies"
 )
 DETERMINERS = frozenset("a an the her his their some another".split())
+# What an order may say of its item before it, after its determiners: "a fasting lipid panel", "a stat CBC".
+ORDER_MODIFIERS = frozenset("fasting stat urgent routine repeat".split())
 JOINS = ((",", "and"), (",",), ("and",))
 TRAILERS = tuple(tuple(trailer.split()) for trailer in ("today", "now", "stat", "please", "too", "as well", "also"))
 MAX_ITEM_WORDS = 8  # at most, words of one item's name
@@ -1643,13 +1653,24 @@ QUANTITY = re.compile(
     r"(?:(?:, )?(?:"
     rf"# (?:{_DOSE_UNITS})|(?:a )?# (?:day|week|month) supply|"
     r"tablets?|capsules?|cream|ointment|gel|lotion|solution|suspension|syrup|liquid|inhaler|patch|injection|drops|spray|"
-    r"pen|tube|by mouth|po|orally|topically|iv|im|subcutaneously|sublingually|inhaled|nasally|rectally|vaginally|"
+    r"pen|tube|by mouth|po|oral|orally|topical|topically|iv|im|subcutaneously|sublingually|inhaled|nasally|rectally|vaginally|"
     r"(?:once|twice|# times) (?:a|per|every) (?:day|week|month)|(?:once|twice|# times) daily|daily|nightly|weekly|"
     r"monthly|bid|tid|qid|qhs|qd|qod|qam|qpm|hs|a day|per day|"
     rf"every # (?:hours?|{_PERIODS})|every (?:day|morning|evening|night|other day)|at (?:bedtime|night)|"
     r"in the (?:morning|evening)|(?:with|after|before) (?:meals|food|breakfast|dinner|supper)|"
     rf"for # (?:{_PERIODS})|for (?:a|another) (?:day|week|month|year)|x # (?:{_PERIODS})|(?:with )?(?:#|no) refills?"
     r") )*"
+)
+
+# Every word of the closed classes but the items: none starts an item.
+_CLOSED_WORDS = frozenset(
+    word
+    for text in (
+        *(" ".join(lead) for lead in PLAIN_LEADS), *(" ".join(verb + ing) for verb, ing, _ in ORDER_FORMS),
+        *(step for form in ALLERGY_FORMS for step in form if step != ITEMS), _PHARMACY, _LIST, " ".join(DETERMINERS),
+        " ".join(ORDER_MODIFIERS), *(" ".join(trailer) for trailer in TRAILERS), QUANTITY.pattern, "and new",
+    )
+    for word in re.findall(r"[a-z']{2,}", text)
 )
 
 
@@ -1731,6 +1752,7 @@ def _items(words: list[str], at: int, kind: str) -> set[int]:
         seen.add(start)
         while start < len(words) and (
             words[start] in DETERMINERS or (words[start] == "new" and start > at and words[start - 1] in ("a", "an"))
+            or (kind == "order" and words[start] in ORDER_MODIFIERS)
         ):
             start += 1
         for end in range(start + 1, min(len(words), start + MAX_ITEM_WORDS) + 1):
@@ -1827,7 +1849,7 @@ def _neighbours_hold_it(text: str, sentence: int, sentence_end: int, kind: str) 
     negated = any(word in _REMOVES or word.endswith("n't") for word in bare)
     doubted = any(word in _NEXT_DOUBT for word in bare)
     # Naming its item again counts as pointing back at it: "Forget about the CBC."
-    holding = _names("order" if kind == "order" else "allergen")[1]
+    holding = _names("order" if kind == "order" else "allergen")[2]
     named = {token.text for token in tokens(text[sentence:sentence_end]) if token.text not in STOPWORDS and token.text in holding}
     pointing = any(word in _POINTS_BACK or word in named for word in bare)
     # For an allergy: "that" counts only first ("That was her sister actually"), not as a conjunction ("Add a note to

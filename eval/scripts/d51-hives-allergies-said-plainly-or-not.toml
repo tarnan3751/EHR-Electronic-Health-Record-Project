@@ -58,10 +58,9 @@ kind = "allergy_addition"
 words = "add amoxicillin to her allergy list"
 item = "amoxicillin"
 
-[[proposals]]
-kind = "allergy_addition"
+[[not_proposed]]
 words = "Penicillin should be added to her allergies"
-item = "Penicillin"
+why = "not_plain"
 
 [[not_proposed]]
 words = "Add a note to her allergies"

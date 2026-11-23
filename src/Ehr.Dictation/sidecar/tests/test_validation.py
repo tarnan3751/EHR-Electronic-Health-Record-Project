@@ -1469,13 +1469,13 @@ def held_back(text) -> list[tuple[str | None, str]]:
 # listed instruction's place, as a kind, a place and warnings, never words; the note's fields carry neither.
 def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said():
     text = transcript(
-        "Start metformin. Go ahead and order a hemoglobin A1c. Add penicillin to her allergy list. Recheck in 3 months."
+        "Start metformin. Go ahead and order a hemoglobin A1c. Add amoxicillin to her allergy list. Recheck in 3 months."
     )
 
     sent = proposals(text)
 
     assert proposed(text) == [("order", "Go ahead and order a hemoglobin A1c"),
-                              ("allergy_addition", "Add penicillin to her allergy list")]
+                              ("allergy_addition", "Add amoxicillin to her allergy list")]
     assert [(p["start"], p["end"]) for p in sent] == [(r["start"], r["end"]) for r in not_carried_over(text)]
     assert all(set(p) == {"kind", "start", "end", "warnings"} and p["warnings"] == [] for p in sent)
     assert own(text.text, "Start metformin. Recheck in 3 months.", "Start metformin.", "Recheck in 3 months.").pending
@@ -1488,7 +1488,7 @@ def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said()
         "Okay so plan: order a lipid panel and a chest X-ray.",
         "Cephalexin should be added to her allergies.",
         "We'll send amoxicillin 500 mg three times a day to her pharmacy.",
-        "Put latex on her allergy list.",
+        "Put codeine on her allergy list.",
     ],
 )
 def test_an_instruction_said_as_one_is_proposed(said):

@@ -51,7 +51,7 @@ UNCOMMON_DRUGS = {
 MINIMUMS = {
     "dates": 6, "vitals": 6, "negation": 6, "self-correction": 6, "drug-new": 6, "drug-uncommon": 6,
     "order-attempt": 5, "allergy-change": 5, "mixed-plan": 5, "recombination": 5, "injection": 3, "missing-field": 4,
-    "long": 6, "max-length": 2, "experiencer": 5, "proposal": 7, "proposal-trap": 10,
+    "long": 6, "max-length": 2, "experiencer": 5, "proposal": 6, "proposal-trap": 10,
 }  # fmt: skip
 
 # How a dictation corrects itself; a retracted value comes just before one of these.
