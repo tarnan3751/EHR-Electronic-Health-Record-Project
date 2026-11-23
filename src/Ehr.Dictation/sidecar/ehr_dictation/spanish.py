@@ -741,6 +741,69 @@ def relatives(toks: list[Token]) -> list[set[str]]:
     return [RELATIVES[t.text] for t in toks if t.text in RELATIVES]
 
 
+# ---- Verbs ----------------------------------------------------------------------------------------------------------
+
+# A verb's forms, generated from its infinitive rather than listed, as keys: the present (yo, él, nosotros, ellos), the
+# imperative and subjunctive (tú, usted, ustedes), the infinitive, the gerund and the future, with the pronouns a
+# command takes after it ("suspéndala", "auméntele", "suspenderla"); and the past: the preterite, the imperfect and the
+# participle. A preterite and a present can share a key ("inició", "inicio"; "suspendí" and "suspendi"): the accent
+# tells them apart (tense()).
+PRESENT_ENDINGS = {
+    "ar": "a o as amos an e es emos en ando ar are ara aras aremos aran",
+    "er": "e o es emos en a as amos an iendo er ere era eras eremos eran",
+    "ir": "e o es imos en a as amos an iendo ir ire ira iras iremos iran",
+}
+PAST_ENDINGS = {
+    "ar": "aba abas abamos aban aste o e amos aron ado ada ados adas",
+    "er": "ia ias iamos ian iste io i imos ieron ido ida idos idas",
+    "ir": "ia ias iamos ian iste io i imos ieron ido ida idos idas",
+}
+CLITICS = "le les la las lo los me nos se sela selo selas selos sele seles".split()
+COMMANDS = {"ar": ("a", "e", "en", "ar", "ando"), "er": ("e", "a", "an", "er", "iendo"),
+            "ir": ("e", "a", "an", "ir", "iendo")}
+# Forms no rule above gives: a changed stem ("empieza", "sigue", "mantiene", "reduzca", "redujo"), by infinitive, as
+# (present, past).
+IRREGULAR = {
+    "empezar": ("empieza empiezo empiezas empiezan empiece empieces empiecen empiezale empiecele", "empece"),
+    "comenzar": ("comienza comienzo comienzas comienzan comience comiences comiencen comienzale comiencele", "comence"),
+    "seguir": ("sigue sigo sigues siguen siga sigas sigan siguiendo siguele sigale", "siguio siguieron"),
+    "mantener": ("mantiene mantengo mantienes mantienen mantenga mantengas mantengan manten mantendra mantendre "
+                 "mantendremos mantendran mantenle mantengale", "mantuvo mantuve mantuvimos mantuvieron"),
+    "reducir": ("reduzco reduzca reduzcas reduzcan reduzcale", "redujo reduje redujimos redujeron"),
+    "disminuir": ("disminuye disminuyo disminuyes disminuyen disminuya disminuyas disminuyan disminuyendo disminuyele "
+                  "disminuyale", "disminuyo disminuyeron"),
+}
+
+
+def conjugate(infinitive: str) -> tuple[frozenset[str], frozenset[str]]:
+    """The verb's forms as keys (see above), as (present, past). The infinitive is a key ("anadir" for añadir)."""
+    stem, ending = infinitive[:-2], infinitive[-2:]
+
+    def spelled(rest: str) -> str:  # "agregue", "empiece", "indique": the stem's last letter before an e
+        if rest[:1] == "e" and ending == "ar":
+            for plain, soft in (("g", "gu"), ("z", "c"), ("c", "qu")):
+                if stem.endswith(plain):
+                    return stem[: -len(plain)] + soft + rest
+        return stem + rest
+
+    present = {spelled(rest) for rest in PRESENT_ENDINGS[ending].split()}
+    past = {spelled(rest) for rest in PAST_ENDINGS[ending].split()}
+    present |= {spelled(rest) + clitic for rest in COMMANDS[ending] for clitic in CLITICS}
+    extra_present, extra_past = IRREGULAR.get(infinitive, ("", ""))
+    present |= set(extra_present.split())
+    past |= set(extra_past.split())
+    return frozenset(present), frozenset(past - present) | frozenset(extra_past.split())
+
+
+ACCENTED_END = re.compile(r"[áéíóú]$")
+
+
+def tense(token: Token, past: frozenset[str]) -> str:
+    """"past" for a preterite ("suspendió", "inicié", the accent on its last letter), an imperfect or a participle;
+    otherwise "present"."""
+    return "past" if ACCENTED_END.search(token.text) or token.key in past else "present"
+
+
 # ---- Corrections ----------------------------------------------------------------------------------------------------
 
 CORRECTIONS = _phrases(

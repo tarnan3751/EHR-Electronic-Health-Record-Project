@@ -47,8 +47,17 @@ statement:
      endings and exceptions) (drug_not_in_sources); and every drug the Spanish names must be named in the English
      (drug_dropped), so a drug no list knows can't be swapped in for one the clinician said;
    - sides, routes, severity and abbreviations: no more (side_, route_, severity_ and abbreviation_not_in_sources);
-   - medication changes (start, stop, hold, continue, increase, decrease, switch), each said of a drug, a dose or a
-     number: the same (action_changed);
+   - what is done with each drug, dose, dose's number and habit (smoking, alcohol): the verb nearest it within
+     ACTION_REACH words either side in its clause, a change (start, stop, hold, continue, increase, decrease, switch)
+     or a taking ("toma", "takes", "fuma"), said before it or after it ("Metformina: suspender", "Metformina se
+     suspende", "Metformin was stopped"), with its tense: a Spanish preterite, imperfect or participle is past
+     ("suspendió", "tomaba", "suspendido"), an English one past after "was", "had", "previously", "used to" or with
+     "ago" after it, and "either" otherwise ("stopped"). Each must be the same on both sides (action_changed): a change
+     the same change, in a tense that may be the same; a taking a taking or nothing, but one in the past ("tomaba",
+     "exfumador") a taking in the past. So "Dejó de fumar hace 10 años" is not "Smoking for 10 years", "Toma
+     metformina" not "Metformin was stopped", and "Suspendió la metformina hace un mes" not "Stop metformin". The verbs
+     are generated from their infinitives (spanish.conjugate()), with the pronouns a command takes ("suspéndala");
+     "baja" and "continua", unaccented, are adjectives ("dosis baja");
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
      validation.py reads them in English, with an English word that negates itself ("uncontrolled") a negation and a
      relative told something ("the mother is explained") not someone having it: the same (negation_dropped or
@@ -548,46 +557,211 @@ def english_abbreviations(text: str) -> set[str]:
     return found
 
 
+# Medication changes in English, each form with its kind (start, stop, hold, continue, increase, decrease, switch).
 ACTIONS = {
     "start": "start", "starts": "start", "started": "start", "starting": "start", "begin": "start",
     "begins": "start", "began": "start", "initiate": "start", "initiated": "start", "add": "start", "added": "start",
-    "adding": "start", "stop": "stop", "stops": "stop", "stopped": "stop", "stopping": "stop", "discontinue": "stop",
-    "discontinued": "stop", "withdraw": "stop", "withdrawn": "stop", "hold": "hold", "held": "hold", "pause": "hold",
-    "paused": "hold", "omit": "hold", "continue": "continue", "continues": "continue", "continued": "continue",
-    "keep": "continue", "maintain": "continue", "maintained": "continue", "increase": "increase",
-    "increased": "increase", "increasing": "increase", "raise": "increase", "raised": "increase", "uptitrate": "increase",
-    "decrease": "decrease", "decreased": "decrease", "decreasing": "decrease", "reduce": "decrease",
-    "reduced": "decrease", "lower": "decrease", "lowered": "decrease", "taper": "decrease", "tapered": "decrease",
-    "switch": "switch", "switched": "switch", "switching": "switch",
+    "adding": "start", "restart": "start", "restarted": "start", "resume": "start", "resumed": "start",
+    "stop": "stop", "stops": "stop", "stopped": "stop", "stopping": "stop", "discontinue": "stop",
+    "discontinued": "stop", "withdraw": "stop", "withdrawn": "stop", "withdrew": "stop", "quit": "stop",
+    "quits": "stop", "quitting": "stop", "cease": "stop", "ceased": "stop", "hold": "hold", "held": "hold",
+    "pause": "hold", "paused": "hold", "omit": "hold", "continue": "continue", "continues": "continue",
+    "continued": "continue", "keep": "continue", "kept": "continue", "maintain": "continue", "maintained": "continue",
+    "increase": "increase", "increased": "increase", "increasing": "increase", "raise": "increase",
+    "raised": "increase", "uptitrate": "increase", "decrease": "decrease", "decreased": "decrease",
+    "decreasing": "decrease", "reduce": "decrease", "reduced": "decrease", "lower": "decrease", "lowered": "decrease",
+    "taper": "decrease", "tapered": "decrease", "switch": "switch", "switched": "switch", "switching": "switch",
     # "Suspender" said, "suspend" written: a stop, as the prompt asks it written.
     "suspend": "stop", "suspended": "stop", "suspending": "stop",
 }
-SPANISH_ACTIONS = {
-    "start": "inicia iniciar inicio iniciamos inicie inicien iniciare iniciaremos iniciando empezar empieza empiece "
-             "empiecen empezamos empezaremos empezando comenzar comienza comience comenzamos comenzaremos agregar agrega "
-             "agrego agregue agregamos agregaremos anadir anade anado anada anadimos pautar pauto pauta paute pautamos",
-    "stop": "suspender suspende suspendo suspenda suspendemos suspenderemos retirar retira retiro retire retiramos "
-            "descontinuar descontinua descontinuo descontinue descontinuamos quitar quita quito quite quitamos parar "
-            "paramos pare",
-    "continue": "continuar continua continuo continue continuamos continuaremos seguir sigue siga seguimos seguiremos "
-                "mantener mantiene mantengo mantenga mantenemos mantendremos",
-    "increase": "aumentar aumenta aumento aumente aumentamos subir sube subo suba subimos incrementar incrementa "
-                "incremento incremente incrementamos titular",
-    "decrease": "disminuir disminuye disminuyo disminuya disminuimos bajar baja bajo baje bajamos reducir reduce reduzco "
-                "reduzca reducimos",
+# Taking a drug, or a habit, without changing it: "takes", "toma", "smokes", "fuma".
+ENGLISH_TAKES = {"take": "present", "takes": "present", "taking": "present", "took": "past", "taken": "either",
+                 "use": "present", "uses": "present", "using": "present", "smoke": "present", "smokes": "present",
+                 "smoking": "present", "smoked": "either", "drink": "present", "drinks": "present",
+                 "drinking": "present", "drank": "past"}
+# English that puts a change or a habit in the past, said before it ("was stopped", "had started", "former smoker",
+# "used to smoke"; "has been" only with a change: "has been stopped", not "has been taking"), or "ago" after it.
+ENGLISH_PAST = frozenset("was were had previously already formerly former ex".split())
+ENGLISH_HABITS = {"smoke": "smoking", "smokes": "smoking", "smoking": "smoking", "smoked": "smoking",
+                  "smoker": "smoking", "tobacco": "smoking", "cigarettes": "smoking", "cigarette": "smoking",
+                  "alcohol": "alcohol", "drink": "alcohol", "drinks": "alcohol", "drinking": "alcohol",
+                  "drank": "alcohol", "drinker": "alcohol"}
+ENGLISH_OBJECTS = {"dose": "dose", "doses": "dose", "dosage": "dose", "medication": "medication",
+                   "medications": "medication", "medicine": "medication", "medicines": "medication",
+                   "treatment": "treatment", "therapy": "treatment"}
+
+# The Spanish, from each verb's forms (spanish.conjugate()): by kind, the infinitives; and the verbs said with a word
+# after them ("dejar de", "cambiar a", "suspender temporalmente").
+SPANISH_CHANGES = {
+    "start": "iniciar empezar comenzar agregar anadir pautar reiniciar",
+    "stop": "suspender retirar descontinuar quitar interrumpir",
+    "continue": "continuar seguir mantener",
+    "increase": "aumentar subir incrementar",
+    "decrease": "disminuir bajar reducir",
+    "hold": "pausar omitir",
 }
-SPANISH_ACTION = {form: kind for kind, forms in SPANISH_ACTIONS.items() for form in forms.split()}
-# Several words: "dejar de" (stop), "suspender temporalmente" (hold), "cambiar a" (switch).
-SPANISH_ACTION_PHRASES = [
-    (("suspender", "temporalmente"), "hold"), (("suspende", "temporalmente"), "hold"),
-    (("suspendo", "temporalmente"), "hold"), (("dejar", "de"), "stop"), (("deja", "de"), "stop"), (("dejo", "de"), "stop"),
-    (("deje", "de"), "stop"), (("dejamos", "de"), "stop"), (("cambiar", "a"), "switch"), (("cambia", "a"), "switch"),
-    (("cambio", "a"), "switch"), (("cambie", "a"), "switch"), (("cambiamos", "a"), "switch"), (("pausar",), "hold"),
-    (("pausa",), "hold"), (("omitir",), "hold"), (("omita",), "hold"),
-]
-OBJECT_WORDS = frozenset("dose doses dosage medication medications treatment therapy dosis tratamiento medicamento "
-                         "medicamentos medicacion farmaco farmacos".split())
-OBJECT_REACH = 4  # words after an action within which its drug, dose or number must come
+# Forms that are adjectives as often: "dosis baja", "tos continua". Accented, they are the verb ("bajó", "continúa").
+NOT_CHANGES = frozenset("baja bajo bajas bajos continua continuo continuas continuos".split())
+SPANISH_CHANGE_PHRASES = [("dejar", "de", "stop"), ("cambiar", "a", "switch"), ("cambiar", "por", "switch"),
+                          ("suspender", "temporalmente", "hold")]
+SPANISH_TAKES = "tomar usar utilizar consumir fumar beber"
+SPANISH_HABITS = {"fumar": "smoking", "beber": "alcohol"}
+SPANISH_HABIT_WORDS = {"fumador": "smoking", "fumadora": "smoking", "exfumador": "smoking", "exfumadora": "smoking",
+                       "tabaco": "smoking", "tabaquismo": "smoking", "cigarrillos": "smoking", "cigarrillo": "smoking",
+                       "cigarros": "smoking", "alcohol": "alcohol", "alcoholicas": "alcohol", "bebedor": "alcohol"}
+SPANISH_OBJECTS = {"dosis": "dose", "medicamento": "medication", "medicamentos": "medication",
+                   "medicacion": "medication", "farmaco": "medication", "farmacos": "medication",
+                   "tratamiento": "treatment", "terapia": "treatment"}
+
+
+def _verb_table() -> tuple[dict[str, tuple[str, frozenset[str]]], dict[str, tuple[str, frozenset[str]]]]:
+    changes: dict[str, tuple[str, frozenset[str]]] = {}
+    for kind, infinitives in SPANISH_CHANGES.items():
+        for infinitive in infinitives.split():
+            present, past = spanish.conjugate(infinitive)
+            changes.update({form: (kind, past) for form in present | past})
+    takes: dict[str, tuple[str, frozenset[str]]] = {}
+    for infinitive in SPANISH_TAKES.split():
+        present, past = spanish.conjugate(infinitive)
+        takes.update({form: (SPANISH_HABITS.get(infinitive, ""), past) for form in present | past})
+    return changes, takes
+
+
+SPANISH_CHANGE, SPANISH_TAKE = _verb_table()
+PHRASE_FORMS = {verb: spanish.conjugate(verb) for verb, _, _ in SPANISH_CHANGE_PHRASES}
+ACTION_REACH = 4  # words either side of a drug, a habit, a dose or its number within which its change is said
+
+
+@dataclass(frozen=True)
+class _Mention:
+    """A drug, a habit, a dose or a dose's number, and what is done with it: a change and its tense (present, past, or
+    either, for an English "-ed" with nothing else to say which), "take", or nothing."""
+
+    what: frozenset[str]  # a drug's names, ("smoking",), ("dose",), or a number's readings
+    action: str | None
+    tense: str
+
+
+def _mentions(words: list[str], gaps: list[str], what: list[frozenset[str]], action_at, joins: frozenset[str],
+              habit_at) -> list[_Mention]:
+    """Each mention (what[i] not empty) with the verb said nearest it, a change or a taking, within ACTION_REACH words
+    either side in its clause (a colon doesn't end one: "Metformina: suspender"), the one before it first; with none,
+    the habit's own verb ("fuma"); and, with none either, the change of the mention it is listed with ("suspender
+    metformina y glibenclamida")."""
+    found: list[tuple[int, str | None, str]] = []
+    for i in (i for i, names in enumerate(what) if names):
+        action, tense = None, "present"
+        for step in [d for k in range(1, ACTION_REACH + 1) for d in (-k, k)]:
+            j = i + step
+            between = range(min(i, j) + 1, max(i, j) + 1)
+            if not 0 <= j < len(words) or any(re.search(r"[.,;!?\n]", gaps[k]) or words[k] in joins for k in between):
+                continue
+            action, tense = action_at(j)
+            if action is not None:
+                break
+        if action is None:
+            action, tense = habit_at(i) or (None, "present")
+        found.append((i, action, tense))
+    mentions = [_Mention(what[i], action, tense) for i, action, tense in found]
+    for k in range(1, len(found)):
+        listed = found[k][0] - found[k - 1][0] <= 3 and all(
+            words[j] in joins or words[j] in spanish.STOPWORDS or words[j] in STOPWORDS or not words[j].isalpha()
+            for j in range(found[k - 1][0] + 1, found[k][0]))
+        if listed and mentions[k].action is None and mentions[k - 1].action not in (None, "take"):
+            mentions[k] = _Mention(mentions[k].what, mentions[k - 1].action, mentions[k - 1].tense)
+        elif listed and mentions[k - 1].action is None and mentions[k].action not in (None, "take"):
+            mentions[k - 1] = _Mention(mentions[k - 1].what, mentions[k].action, mentions[k].tense)
+    return mentions
+
+
+def english_mentions(text: str) -> list[_Mention]:
+    words = tokens(text)
+    keys = [w.text for w in words]
+    gaps = [text[words[i - 1].end : words[i].start] if i else "" for i in range(len(words))]
+    doses = {start for _, start in english_number_items(text)
+             if (unit := ENGLISH_UNITS.match(text, start)) and UNIT_NAMES.get(unit.group(2).lower().rstrip("s"),
+                                                                              UNIT_NAMES.get(unit.group(2).lower()))
+             in DOSE_UNITS}
+    what = [frozenset({w}) if w.isalpha() and is_drug(w) else frozenset({ENGLISH_HABITS[w]}) if w in ENGLISH_HABITS
+            else frozenset({ENGLISH_OBJECTS[w]}) if w in ENGLISH_OBJECTS
+            else frozenset({w}) if words[i].start in doses else frozenset() for i, w in enumerate(keys)]
+
+    def past(j: int, change: bool) -> bool:
+        before = keys[max(0, j - 2) : j]
+        return (any(word in ENGLISH_PAST for word in before) or before == ["used", "to"] or "ago" in keys[j : j + 8]
+                or (change and "been" in before))
+
+    def action_at(j: int) -> tuple[str | None, str]:
+        word = keys[j]
+        if word in ACTIONS:
+            either = word.endswith("ed") or word in ("began", "held", "withdrawn", "withdrew", "kept", "quit")
+            return ACTIONS[word], "past" if past(j, True) else "either" if either else "present"
+        if word in ENGLISH_TAKES:
+            if j and keys[j - 1] in ACTIONS:  # "stopped taking", "quit smoking": the change
+                return action_at(j - 1)
+            return "take", "past" if past(j, False) else ENGLISH_TAKES[word]
+        return None, "present"
+
+    def habit_at(i: int) -> tuple[str, str] | None:
+        word = keys[i]
+        if word in ENGLISH_TAKES:
+            return "take", "past" if past(i, False) else ENGLISH_TAKES[word]
+        if word in ("smoker", "drinker") and past(i, False):
+            return "take", "past"
+        return None
+
+    return _mentions(keys, gaps, what, action_at, ENGLISH_PARTS | {"or"}, habit_at)
+
+
+def spanish_mentions(said: list[spanish.Token], gaps: list[str] | None = None,
+                     doses: dict[int, frozenset[str]] | None = None) -> list[_Mention]:
+    keys = [t.key for t in said]
+    gaps = gaps or [" "] * len(said)
+    doses = doses or {}
+
+    def names(i: int) -> frozenset[str]:
+        key = keys[i]
+        if key in SPANISH_HABIT_WORDS:
+            return frozenset({SPANISH_HABIT_WORDS[key]})
+        if key in SPANISH_TAKE and SPANISH_TAKE[key][0]:
+            return frozenset({SPANISH_TAKE[key][0]})
+        if key in SPANISH_OBJECTS:
+            return frozenset({SPANISH_OBJECTS[key]})
+        if i in doses:
+            return doses[i]
+        return _spanish_drug(key)
+
+    def action_at(j: int) -> tuple[str | None, str]:
+        key = keys[j]
+        after = keys[j + 1] if j + 1 < len(keys) else ""
+        before = keys[j - 1] if j else ""
+        for verb, word, kind in SPANISH_CHANGE_PHRASES:
+            present, past = PHRASE_FORMS[verb]
+            if key in present | past and after == word:
+                return kind, spanish.tense(said[j], past)
+            if key == word and before in present | past:
+                return kind, spanish.tense(said[j - 1], past)
+        if key in SPANISH_CHANGE and said[j].text not in NOT_CHANGES:
+            kind, past = SPANISH_CHANGE[key]
+            return kind, spanish.tense(said[j], past)
+        if key in SPANISH_TAKE:
+            if j >= 2 and keys[j - 1] in ("de", "a") and action_at(j - 2)[0] not in (None, "take"):
+                return action_at(j - 2)  # "dejó de tomar", "empezó a fumar": the change
+            if j and action_at(j - 1)[0] not in (None, "take"):
+                return action_at(j - 1)
+            if not SPANISH_TAKE[key][0]:
+                return "take", spanish.tense(said[j], SPANISH_TAKE[key][1])
+        return None, "present"
+
+    def habit_at(i: int) -> tuple[str, str] | None:
+        key = keys[i]
+        if key in SPANISH_TAKE and SPANISH_TAKE[key][0]:
+            return "take", spanish.tense(said[i], SPANISH_TAKE[key][1])
+        if key.startswith("ex") and key in SPANISH_HABIT_WORDS:
+            return "take", "past"
+        return None
+
+    return _mentions(keys, gaps, [names(i) for i in range(len(said))], action_at, SPANISH_PARTS | {"o"}, habit_at)
 
 
 def english_actions(text: str) -> set[str]:
@@ -595,12 +769,8 @@ def english_actions(text: str) -> set[str]:
 
 
 def english_action_items(text: str) -> list[str]:
-    words = [t.text for t in tokens(text)]
-    found = []
-    for i, word in enumerate(words):
-        if word in ACTIONS and any(w in OBJECT_WORDS or w[0].isdigit() or is_drug(w) for w in words[i + 1 : i + 1 + OBJECT_REACH]):
-            found.append(ACTIONS[word])
-    return found
+    """The changes the English makes to a drug, a dose or a habit, in order."""
+    return [m.action for m in english_mentions(text) if m.action not in (None, "take")]
 
 
 # A word just before a dose is a drug's name whether a list knows it or not ("zorbitex 20 mg", "kraxin 2 puffs"):
@@ -632,30 +802,62 @@ def dosed(text: str) -> set[str]:
             if m.group(1) not in STOPWORDS and m.group(1) not in NOT_DOSED}
 
 
-# A past tense ends in an accented vowel ("dejó de fumar", "aumentó", "suspendió"), and is what happened, not a change
-# made now; without its accent it would read as a present ("dejo de", "aumento").
-PAST = re.compile(r"[áéíóú]$")
-
-
 def spanish_actions(said: list[spanish.Token]) -> set[str]:
     return set(spanish_action_items(said))
 
 
 def spanish_action_items(said: list[spanish.Token]) -> list[str]:
-    keys = [t.key for t in said]
-    found = []
-    i = 0
-    while i < len(keys):
-        if PAST.search(said[i].text):
-            i += 1
+    """The changes the Spanish makes to a drug, a dose or a habit, in order."""
+    return [m.action for m in spanish_mentions(said) if m.action not in (None, "take")]
+
+
+def _same_action(english: _Mention, said: _Mention) -> bool:
+    """A change is the same change in a tense that may be the same ("stopped" either way); taking is taking, as now or
+    in the past, or nothing said, unless the Spanish took it in the past ("tomaba")."""
+    if english.action in (None, "take") and said.action in (None, "take"):
+        if said.action == "take" and said.tense == "past":
+            return english.action == "take" and english.tense in ("past", "either")
+        return not (english.action == "take" and said.action == "take" and "either" not in (english.tense, said.tense)
+                    and english.tense != said.tense)
+    return english.action == said.action and "either" in (english.tense, said.tense) or (
+        english.action == said.action and english.tense == said.tense)
+
+
+def _actions_changed(english: list[_Mention], said: list[_Mention]) -> bool:
+    """Whether a drug, a dose or a habit is changed differently, or now or then, in the English: each English mention
+    matched to the first Spanish one of the same thing after the last matched (or else before it: "la dosis de
+    losartán" is "the losartan dose"; the order is compared in _in_order()), and every change on either side matched;
+    but a drug
+    or a number one side says and the other doesn't is the drug or number checks' (drug_not_in_sources,
+    drug_dropped, number_not_in_sources)."""
+    j = 0
+    matched: set[int] = set()
+    said_names = {name for m in said for name in m.what}
+    english_names = {name for m in english for name in m.what}
+    changes = {m.action for m in english} - {None, "take"}, {m.action for m in said} - {None, "take"}
+
+    def unmatched(mention: _Mention, other_names: set[str], other_changes: set) -> bool:
+        if mention.action in (None, "take"):
+            return False
+        # A drug or a number the other side doesn't say is the drug or number checks' to refuse: its change need only
+        # be made there too.
+        if not mention.what & other_names:
+            return mention.action not in other_changes
+        return True
+
+    for mention in english:
+        k = next((k for k in [*range(j, len(said)), *range(j)] if k not in matched and said[k].what & mention.what),
+                 None)
+        if k is None:
+            if unmatched(mention, said_names, changes[1]):
+                return True
             continue
-        phrase = next(((words, kind) for words, kind in SPANISH_ACTION_PHRASES if tuple(keys[i : i + len(words)]) == words), None)
-        words, kind = phrase if phrase else ((keys[i],), SPANISH_ACTION.get(keys[i]))
-        after = keys[i + len(words) : i + len(words) + OBJECT_REACH]
-        if kind and any(w in OBJECT_WORDS or w[0].isdigit() or any(is_drug(c) for c in spanish.drug_candidates(w)) for w in after):
-            found.append(kind)
-        i += len(words)
-    return found
+        if not _same_action(mention, said[k]):
+            return True
+        matched.add(k)
+        j = k + 1
+    return any(unmatched(m, english_names, changes[0]) for k, m in enumerate(said) if k not in matched)
+
 
 
 def english_content(text: str) -> int:
@@ -985,15 +1187,7 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
     said = [ctx.toks[i] for i in said_index]
     said_text = " ".join(t.text for t in said)
     position = {index: k for k, index in enumerate(said_index)}
-    # Between two words of the Spanish, what the transcript has, unless only a correction and what it took back lie
-    # between them; two passages, or the two sides of a cut instruction, are two clauses.
-    gaps = []
-    for k, index in enumerate(said_index):
-        between = range(said_index[k - 1] + 1, index) if k else range(0)
-        if k and all(i in ctx.cues or i in ctx.taken_back for i in between):
-            gaps.append(" " if between else ctx.text[said[k - 1].end : said[k].start])
-        else:
-            gaps.append(". " if k else "")
+    gaps = _said_gaps(said_index, ctx)
 
     numbered = [t for t in terms if t.kind == "number"]
     spoken = {value for t in numbered for value in t.values}
@@ -1032,7 +1226,8 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
          [read for _, read in spanish.frequency_items(said_text)], lambda e, s: e <= s),
         ("relatives", [ENGLISH_RELATIVES[w] for w in english_words if w in ENGLISH_RELATIVES], spanish.relatives(said),
          lambda e, s: e in s),
-        ("actions", english_action_items(english), spanish_action_items(said), lambda e, s: e == s),
+        ("actions", english_action_items(english),
+         [m.action for m in _spanish_mentions(said_index, ctx) if m.action not in (None, "take")], lambda e, s: e == s),
         ("periods", english_periods(english), spanish_periods(said, terms, position), lambda e, s: e in s),
     ]
     if not all(_follows(english_items, said_items, same) for name, english_items, said_items, same in classes
@@ -1072,6 +1267,27 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
     if not _follows(english_parts, said_parts, same, shared=True):
         found.add("order_changed")
     return found
+
+
+def _spanish_mentions(said_index: list[int], ctx: _Context) -> list[_Mention]:
+    position = {index: k for k, index in enumerate(said_index)}
+    doses = {position[number.first]: number.readings for number, unit in ctx.measured
+             if number.first in position and unit in DOSE_UNITS}
+    return spanish_mentions([ctx.toks[i] for i in said_index], _said_gaps(said_index, ctx), doses)
+
+
+def _said_gaps(said_index: list[int], ctx: _Context) -> list[str]:
+    """Between each word of a statement's Spanish and the one before it, what the transcript has, unless only a
+    correction and what it took back lie between them; two passages, or the two sides of a cut instruction, are two
+    clauses."""
+    gaps = []
+    for k, index in enumerate(said_index):
+        between = range(said_index[k - 1] + 1, index) if k else range(0)
+        if k and all(i in ctx.cues or i in ctx.taken_back for i in between):
+            gaps.append(" " if between else ctx.text[ctx.toks[said_index[k - 1]].end : ctx.toks[index].start])
+        else:
+            gaps.append(". " if k else "")
+    return gaps
 
 
 def _spanish_drug(key: str) -> frozenset[str]:
@@ -1269,7 +1485,7 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         reasons.add("severity_not_in_sources")
     if not english_abbreviations(english) <= spanish.abbreviations(said_text):
         reasons.add("abbreviation_not_in_sources")
-    if english_actions(english) != spanish_actions(said):
+    if _actions_changed(english_mentions(english), _spanish_mentions(said_index, ctx)):
         reasons.add("action_changed")
 
     in_english = _english_qualified(english)

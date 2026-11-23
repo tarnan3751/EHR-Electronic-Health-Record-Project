@@ -558,8 +558,6 @@ SWAPS = [
     ("Losartán 50 mg en la mañana y amlodipino 10 mg en la noche.",
      "Losartan 10 mg in the morning and amlodipine 50 mg at night.",
      "Losartan 50 mg in the morning and amlodipine 10 mg at night."),
-    ("Suspender metformina e iniciar insulina.", "Start metformin and stop insulin.",
-     "Stop metformin and start insulin."),
     ("TA 142 sobre 88.", "BP 88/142.", "BP 142/88."),
     ("Glucosa 140, TA 120 sobre 80.", "Glucose 120, BP 140/80.", "Glucose 140, BP 120/80."),
     ("Potasio 5,8, sodio 135.", "Potassium 135, sodium 5.8.", "Potassium 5.8, sodium 135."),
@@ -646,3 +644,40 @@ def test_a_length_of_time_said_as_the_spanish_says_it_is_offered(text, english):
 def test_lengths_of_time_swapped_are_refused():
     text = "Control en 2 semanas y análisis en 3 meses."
     assert reasons(text, [text], "Follow-up in 3 months and tests in 2 weeks.") == ["order_changed"]
+
+
+# ---- What is done with each drug, dose and habit (sentences outside the test set) -----------------------------------
+
+
+@pytest.mark.parametrize(("text", "changed", "kept"), [
+    ("Metformina: suspender.", "Metformin: continue.", "Metformin: stop."),
+    ("Metformina se suspende.", "Metformin is continued.", "Metformin is stopped."),
+    ("Suspendió la metformina hace un mes.", "Takes metformin; started a month ago.",
+     "Stopped metformin a month ago."),
+    ("Dejó de tomar metformina.", "Takes metformin.", "Stopped taking metformin."),
+    ("Se le suspendió la metformina.", "Metformin was started.", "Metformin was stopped."),
+    ("Dejó de fumar hace 10 años.", "Smoking for 10 years.", "Quit smoking 10 years ago."),
+    ("Fuma desde hace 10 años.", "Quit smoking 10 years ago.", "Has smoked for 10 years."),
+    ("Toma metformina.", "Metformin was stopped.", "Takes metformin."),
+    ("Suspender metformina e iniciar insulina.", "Start metformin and stop insulin.",
+     "Stop metformin and start insulin."),
+    ("Suspendió la metformina hace un mes.", "Stop metformin.", "Metformin was stopped a month ago."),
+    ("Tomaba metformina.", "Takes metformin.", "Used to take metformin."),
+    ("Antecedente de tabaquismo, exfumador desde hace 5 años.", "History of smoking, smoker for 5 years.",
+     "History of smoking, former smoker for 5 years."),
+])
+def test_what_is_done_with_a_drug_or_a_habit_is_kept(text, changed, kept):
+    assert reasons(text, [text], changed) == ["action_changed"]
+    assert reasons(text, [text], kept) == []
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Suspender metformina y glibenclamida.", "Stop metformin and glyburide."),  # one verb for a list
+    ("Aumentar la dosis de losartán.", "Increase the losartan dose."),
+    ("Para la tensión toma amlodipino.", "For blood pressure takes amlodipine."),  # "para" is "for" here
+    ("Dosis baja de aspirina.", "Low-dose aspirin."),  # "baja" is low here
+    ("Bajó la dosis de metformina.", "Lowered the metformin dose."),
+    ("Toma metformina.", "On metformin."),
+])
+def test_a_drug_taken_or_changed_as_the_spanish_says_is_offered(text, english):
+    assert reasons(text, [text], english) == []
