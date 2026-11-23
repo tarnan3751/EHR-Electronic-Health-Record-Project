@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): atopic dermatitis starting lebrikizumab, with an allergy change to leave out. Format: eval/README.md.
 id = "d06-eczema-lebrikizumab"
 voice = "ef_dora"
-tags = ["numbers", "drug-new", "negation", "allergy-change", "mixed-plan", "spoken-punctuation", "proposal"]
+tags = ["numbers", "drug-new", "negation", "allergy-change", "mixed-plan", "spoken-punctuation", "proposal-trap"]
 noise = ["hvac"]
 dates = []
 drugs = ["triamcinolone", "tacrolimus", "dupilumab", "cephalexin", "lebrikizumab"]
@@ -70,7 +70,6 @@ sources = [
     "EASI score is 18.",
 ]
 
-[[proposals]]
-kind = "allergy_addition"
+[[not_proposed]]
 words = "cephalexin should be added to her allergies"
-item = "cephalexin"
+why = "not_plain"

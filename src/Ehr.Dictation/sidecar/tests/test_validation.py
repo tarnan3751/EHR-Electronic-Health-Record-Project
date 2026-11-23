@@ -1440,11 +1440,14 @@ def held_back(text) -> list[tuple[str | None, str]]:
 # TC-UC10-09: an order and an allergy to add, dictated plainly, are proposed where the clinician said them, each at its
 # listed instruction's place, as a kind, a place and warnings, never words; the note's fields carry neither.
 def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said():
-    text = transcript("Start metformin. Go ahead and order an A1c. Add sulfa to her allergy list. Recheck in 3 months.")
+    text = transcript(
+        "Start metformin. Go ahead and order a hemoglobin A1c. Add penicillin to her allergy list. Recheck in 3 months."
+    )
 
     sent = proposals(text)
 
-    assert proposed(text) == [("order", "Go ahead and order an A1c"), ("allergy_addition", "Add sulfa to her allergy list")]
+    assert proposed(text) == [("order", "Go ahead and order a hemoglobin A1c"),
+                              ("allergy_addition", "Add penicillin to her allergy list")]
     assert [(p["start"], p["end"]) for p in sent] == [(r["start"], r["end"]) for r in not_carried_over(text)]
     assert all(set(p) == {"kind", "start", "end", "warnings"} and p["warnings"] == [] for p in sent)
     assert own(text.text, "Start metformin. Recheck in 3 months.", "Start metformin.", "Recheck in 3 months.").pending
@@ -1453,11 +1456,11 @@ def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said()
 @pytest.mark.parametrize(
     "said",
     [
-        "Continue omeprazole and refill the omeprazole for 90 days.",
-        "Okay so plan: order a fasting lipid panel and a chest X-ray.",
-        "Continue the ointments, and cephalexin should be added to her allergies.",
+        "Refill the omeprazole for 90 days.",
+        "Okay so plan: order a lipid panel and a chest X-ray.",
+        "Cephalexin should be added to her allergies.",
         "We'll send amoxicillin 500 mg three times a day to her pharmacy.",
-        "Make sure latex is on her allergy list.",
+        "Put latex on her allergy list.",
     ],
 )
 def test_an_instruction_said_as_one_is_proposed(said):
@@ -1512,20 +1515,20 @@ def test_an_instruction_over_an_unclear_passage_or_in_a_transcript_not_yet_final
 
 
 def test_at_most_twenty_are_proposed_and_every_rule_is_named():
-    text = transcript(*[f"Go ahead and order test number {n}." for n in range(MAX_PROPOSALS + 1)])
+    text = transcript(*["Go ahead and order a CBC."] * (MAX_PROPOSALS + 1))
 
     assert [reason for reason, _ in held_back(text)] == [None] * MAX_PROPOSALS + ["too_many"]
     assert len(HELD_BACK) == len(set(HELD_BACK))
 
 
 def test_a_proposal_carries_a_warning_for_a_correction_or_an_unclear_passage_beside_it():
-    corrected = transcript("Order a CBC for today. No other changes to the plan.")
-    beside = transcript("Go ahead and order an A1c.", ("mumble mumble", "too_noisy"))
+    corrected = transcript("Order a CBC today. Change the dressing daily.")
+    beside = transcript("Go ahead and order a CBC.", ("mumble mumble", "too_noisy"))
 
     (warned,) = weigh(corrected)
     (near,) = weigh(beside)
 
     assert warned.held_back is None and [(code, corrected.text[s:e]) for code, s, e in warned.warnings] == [
-        ("possible_correction", "No other changes to the plan")
+        ("possible_correction", "Change the dressing daily")
     ]
     assert near.held_back is None and [code for code, _, _ in near.warnings] == ["near_unclear_passage"]

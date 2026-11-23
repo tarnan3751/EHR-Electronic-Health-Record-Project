@@ -1,9 +1,9 @@
-# Dictation test script (synthetic): an annual review with a dental abscess, whose plan proposes four things among its treatment: a prescription to the pharmacy, an allergy, a refill and two blood tests in one order. Format: eval/README.md.
+# Dictation test script (synthetic): an annual review with a dental abscess, whose plan says four things to order or add among its treatment: an allergy and a refill it proposes, and a prescription to the pharmacy after another step and two blood tests after a reason, which the closed sentence doesn't take. Format: eval/README.md.
 id = "d49-dental-abscess-annual"
 voice = "ef_dora"
 tags = [
     "long", "vitals", "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "spoken-punctuation",
-    "proposal",
+    "proposal", "proposal-trap",
 ]
 noise = ["hvac"]
 dates = []
@@ -70,10 +70,9 @@ sources = [
     "Return sooner for fever or facial swelling.",
 ]
 
-[[proposals]]
-kind = "order"
+[[not_proposed]]
 words = "send it to her usual pharmacy"
-item = ""
+why = "not_plain"
 
 [[proposals]]
 kind = "allergy_addition"
@@ -85,7 +84,6 @@ kind = "order"
 words = "Renew her albuterol inhaler"
 item = "albuterol"
 
-[[proposals]]
-kind = "order"
+[[not_proposed]]
 words = "order a CBC and a CMP"
-item = "CBC and a CMP"
+why = "not_plain"

@@ -3,7 +3,7 @@ id = "d42-new-patient-visit"
 voice = "ff_siwis"
 tags = [
     "max-length", "vitals", "numbers", "dates", "negation", "self-correction", "recombination", "order-attempt",
-    "allergy-change", "mixed-plan", "spoken-punctuation", "experiencer", "proposal",
+    "allergy-change", "mixed-plan", "spoken-punctuation", "experiencer", "proposal", "proposal-trap",
 ]
 dates = ["2021-03-03", "--12-17"]
 drugs = [
@@ -124,10 +124,9 @@ sources = [
     "ECG today shows sinus rhythm with no ischemic changes.",
 ]
 
-[[proposals]]
-kind = "order"
+[[not_proposed]]
 words = "refill the omeprazole"
-item = "omeprazole"
+why = "not_plain"
 
 [[proposals]]
 kind = "allergy_addition"

@@ -1,0 +1,95 @@
+# O. passive allergy with someone else's words in the subject
+Mom says penicillin should be added to her allergies.
+Mom thinks penicillin should be added to her allergies.
+She claims penicillin should be added to her allergies.
+I doubt penicillin should be added to her allergies.
+Dad insists sulfa should be added to her allergies.
+The pharmacist says sulfa should be added to her allergies.
+Nobody believes sulfa should be added to her allergies.
+Her chart says sulfa should be added to her allergies.
+Whether sulfa should be added to her allergies.
+Penicillin should be added to her allergies she says.
+Penicillin will be added to her allergies by the nurse.
+Penicillin must be added to her sister's allergies.
+# P. allergy additions that are something else
+Add an allergy referral.
+Add an allergy panel to her labs.
+Add a referral to allergy.
+Add a referral to allergy and immunology.
+Add her to the allergy clinic schedule.
+Put her on the allergy clinic waitlist.
+Put her in the allergy clinic.
+Add a peanut allergy letter for school.
+Add a peanut allergy action plan for school.
+Add a latex allergy sign to the door.
+Add a latex allergy band.
+Add a food allergy referral.
+Add the penicillin allergy reaction as hives.
+Add penicillin allergy details.
+Add an allergy test.
+Add an allergy consult.
+Add allergy to the problem list.
+Add penicillin to the allergy section of the note.
+Add penicillin to the allergy section of the discharge summary.
+Add the allergy to the problem list.
+Add a penicillin allergy to her sister's chart.
+Add penicillin to her allergies again.
+Add penicillin to her allergies as a side effect only.
+Add penicillin to her allergies as an intolerance.
+List penicillin as an allergy in the letter.
+List penicillin as an allergy for the surgeon.
+Make sure penicillin is on her allergy list before surgery.
+Note a sulfa allergy in the referral letter.
+Note a sulfa allergy in her mother.
+Document an allergy to penicillin in her brother.
+Record a latex allergy for the operating room.
+# Q. two sentences, the first a report
+Her daughter had one request. Order an MRI of her knee.
+Her request today. Order an MRI.
+The family has a question. Order an MRI.
+Hypothetical scenario. Order an MRI.
+Here is what I would not do. Order an MRI.
+What she wants is simple. Refill her lisinopril.
+The ED note says this. Order a CT of the head.
+From the cardiology letter. Order an echo.
+Quoting her neurologist. Order an MRI of the brain.
+Reading from the outside records. Order a repeat CT.
+# R. odd starts
+Order. A CBC.
+Order? A CBC.
+Order CBC no.
+Order CBC negative.
+Order CBC cancelled.
+Order a CBC cancelled.
+Order a CBC done.
+Order a CBC already done.
+Order a CBC was done.
+Order a CBC is pending.
+Order a CBC in progress.
+Order a CBC completed.
+Refill lisinopril completed.
+Refill lisinopril done.
+Refill lisinopril sent.
+Refill lisinopril last done in March.
+Refill lisinopril on file.
+Send amoxicillin to the pharmacy yesterday.
+Send amoxicillin to her pharmacy done.
+Renew her lisinopril done.
+Order a CBC x2 done.
+# S. send to the pharmacy, documentation
+She went to the pharmacy and they sent her home.
+They sent her to the pharmacy to pick up a nebulizer.
+Her husband sent a message to the pharmacy about her refills.
+The pharmacy sent a fax about her refill.
+We sent her down to the pharmacy for a flu shot.
+I sent her to the pharmacy for a glucometer.
+Send her to the pharmacy for a flu shot.
+Send her home with advice to stop by the pharmacy for a thermometer.
+Send her home, she can pick up ibuprofen at the pharmacy.
+Send a message to her and remind her to go to the pharmacy.
+Send her a portal message and remind her to pick up her inhaler at the pharmacy.
+Send the results to her, and she will take them to the pharmacy.
+Send the referral to dermatology and the prescription to the pharmacy.
+Send the referral to dermatology.
+Send a copy to her pharmacy.
+Send her blood pressure log to the pharmacy.

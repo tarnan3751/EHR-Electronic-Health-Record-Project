@@ -1,16 +1,30 @@
-"""The one form a dictation proposes an order or an allergy to add from (validation.py, "plain"; the expansion plan's
-step 15): the clinician's own instruction, said plainly in its sentence. Everything else is held back, and still listed
-as not carried over. The sentences that must be held back are the tier A review's, every one of them (its attack files
-and its list), with the near misses of each lead-in and trailing phrase; those proposed are its plain controls and each
-lead-in and trailing phrase said plainly. A sentence's "[unclear]" is a passage marked unclear, as the review wrote
-them."""
+"""The closed sentence a dictation proposes an order or an allergy to add from (validation.py, "plain"; the expansion
+plan's step 15): every word of the instruction's sentence is a lead-in, the verb, a determiner, an item the reference
+data names, its quantities or a trailer, in that order. Everything else is held back, and still listed as not carried
+over. The sentences that must be held back are both reviews', every one of them (the first's here, the second's in
+tests/review/held_back_*.txt), with the near misses of each lead-in and trailing phrase; those proposed are the plain
+controls and each lead-in and trailer said plainly, and the second review's plain sentences (tests/review/plain.txt)
+are each proposed or listed in tests/review/plain_not_proposed.txt with why. And as properties, so the next sentence
+no one wrote is covered too: a word from outside the closed classes and the reference data, put anywhere into a plain
+instruction, makes it not plain, and so does a word from a name its item shares nothing with. A sentence's
+"[unclear]" is a passage marked unclear, as the first review wrote them."""
 
 from __future__ import annotations
 
+import functools
+import json
+import re
+import tomllib
+from pathlib import Path
+
 import pytest
 
+from ehr_dictation import validation
 from ehr_dictation.transcript import Segment, assemble
-from ehr_dictation.validation import not_carried_over, weigh
+from ehr_dictation.validation import ALLERGY_ADDITION, closed, not_carried_over, weigh
+
+REVIEW = Path(__file__).parent / "review"
+REPOSITORY = Path(__file__).resolve().parents[4]
 
 
 def transcript(line: str):
@@ -140,8 +154,6 @@ HELD_BACK = [
     "Order a CBC or not, depending on how she feels.",
     "Order a CBC, then we'll see.",
     "Order a CBC unless she has had one.",
-    "I'd like to order a CBC.",
-    "I want to order a CBC.",
     "We can order a CBC.",
     "Add an orders field with an MRI.",
     "She is allergic to penicillin, add that to her allergies.",
@@ -289,24 +301,16 @@ HELD_BACK = [
 
 # Plain, as the review's own controls: proposed, these words.
 CONTROLS = [
-    # A sentence after it that points back at it in five words or more, or doesn't point back at all, leaves it plain.
+    # A sentence after it that doesn't point back at it, take it back or doubt it leaves it plain.
     ("Order a CBC. The labs go with that.", ["Order a CBC"]),
-    ("Order a CBC. It should be fasting today please.", ["Order a CBC"]),
     ("Order a CBC. Thanks.", ["Order a CBC"]),
     ("Order a CBC. Recheck in one week.", ["Order a CBC"]),
     ("There is no fever, chest pain, or shortness of breath. Order a CBC.", ["Order a CBC"]),
     ("Add penicillin as an allergy.", ["Add penicillin as an allergy"]),
     ("Add an allergy to codeine.", ["Add an allergy to codeine"]),
     ("Record a new allergy to latex.", ["Record a new allergy to latex"]),
-    ("Note a sulfa allergy.", ["Note a sulfa allergy"]),
-    ("Document an allergy to shellfish.", ["Document an allergy to shellfish"]),
-    ("Put shellfish on her allergy list.", ["Put shellfish on her allergy list"]),
     ("List codeine as an allergy.", ["List codeine as an allergy"]),
-    ("Make sure sulfa is on her allergy list.", ["Make sure sulfa is on her allergy list"]),
     ("Penicillin should be added to her allergies.", ["Penicillin should be added to her allergies"]),
-    ("Discontinue the lisinopril and order a BMP.", ["and order a BMP"]),
-    ("Increase lisinopril to 20 mg and renew the prescription.", ["and renew the prescription"]),
-    ("Stop lisinopril, then order a BMP.", ["then order a BMP"]),
     ("Plan: order a CBC.", ["order a CBC"]),
     ("Plan, order a CBC.", ["order a CBC"]),
     ("Okay so order a CBC.", ["order a CBC"]),
@@ -320,21 +324,41 @@ CONTROLS = [
     ("Please order a CBC.", ["Please order a CBC"]),
     ("Order a CBC now.", ["Order a CBC now"]),
     ("Order a CBC please.", ["Order a CBC please"]),
-    ("Order an urgent CT of the head.", ["Order an urgent CT of the head"]),
     ("Send a prescription for amoxicillin to her pharmacy.", ["Send a prescription for amoxicillin to her pharmacy"]),
     ("Call in amoxicillin to her pharmacy.", ["Call in amoxicillin to her pharmacy"]),
     ("Refill her lisinopril.", ["Refill her lisinopril"]),
     ("Renew her lisinopril.", ["Renew her lisinopril"]),
-    ("Give her a prescription for amoxicillin.", ["Give her a prescription for amoxicillin"]),
     ("Write her a script for amoxicillin.", ["Write her a script for amoxicillin"]),
     ("Order a CBC. She is allergic to penicillin, add that to her allergies.", ["Order a CBC"]),
-    ("Renew her lisinopril at a lower dose.", ["Renew her lisinopril at a lower dose"]),
-    ("Discontinue the old prescription and send a new prescription with the corrected dose.", ["and send a new prescription with the corrected dose"]),
-    ("Order her usual labs.", ["Order her usual labs"]),
-    ("Order a CBC two times.", ["Order a CBC two times"]),
     ("I'm not going to order a CBC. Order a BMP.", ["Order a BMP"]),
-    ("Add penicillin to her allergies and order a CBC.", ["Add penicillin to her allergies", "and order a CBC"]),
-    ("Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray.", ["Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray"]),
+]
+
+# Said plainly under the earlier form, not the closed sentence: held back, still listed, each with why.
+NOT_PLAIN_NOW = [
+    ('Order a CBC. It should be fasting today please.', 'the next sentence points back at it in its first three words'),
+    ('Note a sulfa allergy.', 'the reference data names no sulfa'),
+    ('Document an allergy to shellfish.', 'the reference data names no shellfish'),
+    ('Put shellfish on her allergy list.', 'the reference data names no shellfish'),
+    ('Make sure sulfa is on her allergy list.', "'make sure ... is on' is no plain form"),
+    ('Discontinue the lisinopril and order a BMP.', 'a second verb'),
+    ('Increase lisinopril to 20 mg and renew the prescription.', 'a second verb'),
+    ('Stop lisinopril, then order a BMP.', 'a second verb'),
+    ('Order an urgent CT of the head.', "'urgent', and 'of the head': the reference data says 'CT head without contrast'"),
+    ('Give her a prescription for amoxicillin.', "'give' is no plain form"),
+    ('Renew her lisinopril at a lower dose.', "'at a lower dose' is no quantity"),
+    ('Discontinue the old prescription and send a new prescription with the corrected dose.', 'a second verb'),
+    ('Order her usual labs.', "'usual labs' names no item"),
+    ('Order a CBC two times.', "'two times' is no quantity"),
+    ('Add penicillin to her allergies and order a CBC.', 'a second verb'),
+    ('Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray.', "'stat' before the item"),
+    ('Just order a CBC.', "'just' is no lead-in"),
+    ('Refill her metformin for her diabetes.', 'a reason'),
+    ('Order a CBC because she is tired.', 'a reason'),
+    ('Continue omeprazole and refill the omeprazole for 90 days.', 'a second verb'),
+    ('Start finerenone 10 mg daily, and send the prescription to her usual pharmacy.', 'a second verb'),
+    ('She is due for blood work, so go ahead and order a CBC.', 'a statement before it'),
+    ('Continue the ointments, and cephalexin should be added to her allergies.', 'a second verb'),
+    ('Put an order in for a vitamin B12 level today.', 'the reference data names no B12 level'),
 ]
 
 # Each lead-in and trailing phrase said plainly, and the plain forms the scripts use: one proposal each.
@@ -365,35 +389,26 @@ PLAIN = [
     "Let us order a CBC.",
     "I'm ordering a CBC.",
     "We are ordering a CBC.",
-    "Just order a CBC.",
+    "I'd like to order a CBC.",
+    "I want to order a CBC.",
+    "We need to order a CBC.",
+    "Will order a CBC.",
     "Okay, so please go ahead and order a CBC.",
     "Order a CBC today.",
     "Order a CBC now.",
     "Refill her lisinopril for 90 days.",
     "Refill her lisinopril for three months.",
     "Send amoxicillin 500 mg three times a day to her pharmacy.",
-    "Refill her metformin for her diabetes.",
     "Add penicillin to her allergy list.",
     "Renew her albuterol as well.",
     "Refill her lisinopril too.",
-    "Order a CBC because she is tired.",
     "Send metformin 500 mg twice daily before meals to her pharmacy.",
-    "Continue omeprazole and refill the omeprazole for 90 days.",
-    "Start finerenone 10 mg daily, and send the prescription to her usual pharmacy.",
-    "Stop lisinopril, then order a BMP.",
-    "She is due for blood work, so go ahead and order a CBC.",
-    "Continue the ointments, and cephalexin should be added to her allergies.",
     "Penicillin needs to be added to his allergy list.",
     "Put penicillin on his allergy list.",
     "List codeine as an allergy.",
-    "Make sure sulfa is on her allergy list.",
     "Add an allergy to codeine.",
     "Record a new allergy to latex.",
-    "Note a sulfa allergy.",
-    "Document an allergy to shellfish.",
     "Call in amoxicillin to her pharmacy.",
-    "Give her a prescription for amoxicillin.",
-    "Put an order in for a vitamin B12 level today.",
     "Place an order for a chest X-ray.",
     "E-prescribe amoxicillin.",
 ]
@@ -415,3 +430,105 @@ def test_a_plain_instruction_is_proposed(said, words):
 @pytest.mark.parametrize("said", PLAIN)
 def test_each_plain_lead_in_and_trailing_phrase_is_proposed(said):
     assert len(proposed(said)) == 1
+
+
+@pytest.mark.parametrize(("said", "why"), NOT_PLAIN_NOW)
+def test_what_the_closed_sentence_doesnt_take_is_held_back_and_still_listed(said, why):
+    text = transcript(said)
+
+    assert proposed(said) == []
+    assert len(weigh(text)) == len(not_carried_over(text)) >= 1
+
+
+def review(name: str) -> list[str]:
+    return [line for line in (REVIEW / name).read_text(encoding="utf-8").splitlines() if line.strip() and line[0] != "#"]
+
+
+# The second review's sentences, every one of which must be held back (TC-UC10-10).
+@pytest.mark.parametrize("said", [line for n in (1, 2, 3) for line in review(f"held_back_{n}.txt")])
+def test_every_sentence_the_review_found_proposed_is_held_back(said):
+    assert proposed(said) == []
+
+
+NOT_PROPOSED = dict(line.split(" ||| ") for line in review("plain_not_proposed.txt"))
+
+
+# The second review's plain sentences: each is proposed, or listed with why it isn't.
+@pytest.mark.parametrize("said", review("plain.txt"))
+def test_each_plain_sentence_of_the_review_is_proposed_or_listed_with_why(said):
+    assert bool(proposed(said)) != (said in NOT_PROPOSED), NOT_PROPOSED.get(said, "proposed, and listed as not")
+    assert NOT_PROPOSED.get(said, "why") != ""
+
+
+# ---- Properties ---------------------------------------------------------------------------------------------------
+
+# Plain instructions of each form, each with its kind.
+FIXTURES = [
+    ("Order a CBC.", "order"),
+    ("Go ahead and order a chest X-ray today.", "order"),
+    ("Refill her lisinopril 10 mg daily for 90 days.", "order"),
+    ("I'm ordering a lipid panel and a TSH.", "order"),
+    ("Send amoxicillin 500 mg three times a day to her pharmacy.", "order"),
+    ("Prescribe insulin glargine with no refills.", "order"),
+    ("Add penicillin to her allergy list.", ALLERGY_ADDITION),
+    ("Penicillin should be added to her allergies.", ALLERGY_ADDITION),
+    ("Add an allergy to codeine.", ALLERGY_ADDITION),
+]
+
+
+@functools.cache
+def closed_words() -> frozenset[str]:
+    """Every word of the closed classes but the items: lead-ins, verbs, determiners, quantities, trailers, joins."""
+    return frozenset(word for pattern in (
+        " ".join(" ".join(lead) for lead in validation.PLAIN_LEADS), " ".join(" ".join(v + i) for v, i, _ in validation.ORDER_FORMS),
+        " ".join(" ".join(step for step in form if step != validation.ITEMS) for form in validation.ALLERGY_FORMS),
+        validation.QUANTITY.pattern, validation._PHARMACY, validation._LIST, " ".join(validation.DETERMINERS), "new and",
+        " ".join(" ".join(trailer) for trailer in validation.TRAILERS), " ".join(validation._NUMBER_WORDS),
+    ) for word in re.findall(r"[a-z']+", pattern.lower()))
+
+
+@functools.cache
+def general_words() -> tuple[str, ...]:
+    """Every word of every eval script and stored transcript, but the closed classes' words, numbers and the reference
+    data's words: words none of which may be in a plain instruction."""
+    texts = [item["hypothesis"] for item in json.loads((REPOSITORY / "eval/results/latest.json").read_text())["items"]]
+    texts += [tomllib.loads(path.read_text(encoding="utf-8"))["text"] for path in (REPOSITORY / "eval/scripts").glob("*.toml")]
+    vocabulary = set(validation._names("order")[1]) | set(validation._names("allergen")[1])
+    found = {token.text for text in texts for token in validation.tokens(text)}
+    return tuple(sorted(word for word in found - closed_words() - vocabulary if not word[0].isdigit()))
+
+
+@pytest.mark.parametrize(("said", "kind"), FIXTURES)
+def test_any_other_word_anywhere_in_a_plain_instruction_makes_it_not_plain(said, kind):
+    words = said.rstrip(".").split()
+    assert closed(said.rstrip("."), kind)
+    assert len(general_words()) > 1000
+
+    let_through = [
+        " ".join(words[:at] + [word] + words[at:])
+        for word in general_words() for at in range(len(words) + 1)
+        if closed(" ".join(words[:at] + [word] + words[at:]), kind)
+    ]
+
+    assert let_through == []
+
+
+# A word from a name the item's other words share nothing with never makes an item: "lisinopril mammogram".
+@pytest.mark.parametrize(("said", "item", "kind"), [
+    ("Order a lipid panel.", "lipid panel", "order"), ("Order a chest X-ray.", "chest X-ray", "order"),
+    ("Prescribe insulin glargine.", "insulin glargine", "order"), ("Order lisinopril.", "lisinopril", "order"),
+    ("Add peanut to her allergy list.", "peanut", "allergen"),
+])
+def test_a_word_from_an_unrelated_name_never_joins_an_item(said, item, kind):
+    names, holding, distinctive = validation._names(kind)
+    words = [token.text for token in validation.tokens(item)]
+    rest = {i for word in words for i in holding[word]}
+    strangers = sorted(word for word in distinctive - closed_words() if not holding[word] & rest)[::25]
+    sentence_kind = "order" if kind == "order" else ALLERGY_ADDITION
+
+    let_through = [
+        said.replace(item, f"{item} {stranger}")
+        for stranger in strangers if closed(said.rstrip(".").replace(item, f"{item} {stranger}"), sentence_kind)
+    ]
+
+    assert strangers and let_through == []

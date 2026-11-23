@@ -286,7 +286,7 @@ def test_results_from_another_machine_than_the_baselines_fail(eval_dir):
 # and every false or misheard proposal must be accepted by the owner, a warning or not; each accepted one must still be
 # listed. The gate scores the proposals again from the stored recordings, so results that say less fail. The gates on
 # orders and allergy changes in the fields stand beside these, unchanged.
-MISHEARD = "Takes aprocitentan daily. Go ahead and order a chest X-rat."
+MISHEARD = "Takes aprocitentan daily. Go ahead and order a lumbar spine X-ray."
 FALSE = "Takes aprocitentan daily. Go ahead and order a lipid panel."
 
 
@@ -313,7 +313,7 @@ def test_results_that_dont_say_what_was_proposed_fail(eval_dir, missing):
 
 
 @pytest.mark.parametrize(("why", "heard", "shown"), [
-    ("misheard", MISHEARD, "go ahead and order a chest x rat"),
+    ("misheard", MISHEARD, "go ahead and order a lumbar spine x ray"),
     ("false", FALSE, "go ahead and order a lipid panel"),
 ])
 def test_a_false_or_misheard_proposal_fails_unless_accepted(eval_dir, why, heard, shown):
@@ -354,17 +354,17 @@ def test_results_whose_proposals_were_altered_fail_and_list_what_their_recording
 
     assert len(problems) == 2
     assert "aren't what their stored recordings give" in problems[0]
-    assert "a misheard proposal" in problems[1] and "go ahead and order a chest x rat" in problems[1]
+    assert "a misheard proposal" in problems[1] and "go ahead and order a lumbar spine x ray" in problems[1]
 
 
 def test_an_accepted_proposal_the_results_no_longer_list_is_stale(eval_dir):
-    (eval_dir / "known-limitations.toml").write_text(accepting("go ahead and order a chest x rat"), encoding="utf-8")
+    (eval_dir / "known-limitations.toml").write_text(accepting("go ahead and order a lumbar spine x ray"), encoding="utf-8")
     fresh = results(eval_dir)
     fresh["provenance"]["scoring"] = scoring_sha256(eval_dir)
     save(eval_dir, "latest.json", fresh)
 
     (problem,) = check(eval_dir / "results", eval_dir)
-    assert "no longer list" in problem and "chest x rat" in problem
+    assert "no longer list" in problem and "lumbar spine x ray" in problem
 
 
 def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
