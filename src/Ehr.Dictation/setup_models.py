@@ -9,7 +9,8 @@
 - MedASR, speech to text: google/medasr, into infra/compose/models/medasr/ for the sidecar.
 - Whisper large-v3-turbo, speech to text for dictation in Spanish (the expansion plan's step 17), only when asked:
   openai/whisper-large-v3-turbo at the commit WHISPER_REVISION pins, into infra/compose/models/whisper/. MIT, not gated:
-  set up only while Hugging Face says so (gated is False; neither "auto", "manual" nor unknown).
+  set up only while Hugging Face says so (gated is False; neither "auto", "manual" nor unknown) and its card says MIT
+  (WHISPER_LICENSE), and only at a full commit: a branch or tag such as main, which can move, is refused.
   Without it the sidecar still starts, and refuses Spanish.
 
     uv run src/Ehr.Dictation/setup_models.py                          # K2 Horizon and MedASR
@@ -60,8 +61,11 @@ LLM_QUANT = "Q4_K_M"
 MEDASR_REPO = "google/medasr"
 MEDASR_DIR = "medasr"
 WHISPER_REPO = "openai/whisper-large-v3-turbo"
-# Pinned, so every machine transcribes Spanish with the same weights the Spanish eval measured (step 17).
+# Pinned, so every machine transcribes Spanish with the same weights the Spanish eval measured (step 17), and MIT by its
+# card's front matter at that commit, as checked when it was chosen (docs/expansion/PLAN.md, step 17).
 WHISPER_REVISION = "41f01f3fe87f28c78e2fbf8b568835947dd65ed9"
+WHISPER_LICENSE = "mit"
+FULL_COMMIT = re.compile(r"[0-9a-f]{40}")
 WHISPER_DIR = "whisper"
 
 
@@ -86,6 +90,7 @@ class Repository:
     commit: str
     files: list[RemoteFile]
     gated: bool | str | None = None  # what Hugging Face says: False, "auto" or "manual", or None when it doesn't say
+    license: str | None = None  # the card's front matter, as Hugging Face reads it
 
 
 def read_repository(api: HfApi, name: str, revision: str) -> Repository:
@@ -113,9 +118,10 @@ def read_repository(api: HfApi, name: str, revision: str) -> Repository:
     ]
     if not info.sha:
         raise SetupError(f"Hugging Face didn't say which commit {name} at {revision} is.")
-    if re.fullmatch(r"[0-9a-f]{40}", revision) and info.sha != revision:
+    if FULL_COMMIT.fullmatch(revision) and info.sha != revision:
         raise SetupError(f"Hugging Face answered {name} at {revision} with another commit, {info.sha}.")
-    return Repository(name, info.sha, files, getattr(info, "gated", None))
+    card = getattr(info, "card_data", None)
+    return Repository(name, info.sha, files, getattr(info, "gated", None), getattr(card, "license", None))
 
 
 def gated_message(name: str) -> str:
@@ -327,11 +333,22 @@ def setup_medasr(api: HfApi, args: argparse.Namespace, models_dir: Path) -> dict
 
 def setup_whisper(api: HfApi, args: argparse.Namespace, models_dir: Path) -> dict | None:
     """Every file of the pinned commit but the dot files, into the whisper folder, as MedASR's are; its card, which
-    says it is MIT-licensed, comes with them."""
+    says it is MIT-licensed, comes with them. Anything but a full commit, an answer that doesn't say it isn't gated,
+    or a card that doesn't say MIT stops it before a byte is downloaded."""
+    if not FULL_COMMIT.fullmatch(args.whisper_revision):
+        raise SetupError(
+            f"--whisper-revision {args.whisper_revision!r} isn't a full commit. Whisper is pinned to a commit, so every "
+            f"machine transcribes Spanish with the weights the eval measured: leave it out to use {WHISPER_REVISION}."
+        )
     repository = read_repository(api, args.whisper_repo, args.whisper_revision)
     # Set up without a sign-in only while Hugging Face says it isn't gated: an answer that doesn't say is no answer.
     if repository.gated is not False:
         raise SetupError(gated_message(repository.name))
+    if str(repository.license or "").lower() != WHISPER_LICENSE:
+        raise SetupError(
+            f"{repository.name}'s card says its licence is {repository.license!r}, not {WHISPER_LICENSE}: nothing was "
+            "downloaded. Ask the project owner before going on."
+        )
     files = [f for f in repository.files if not f.name.startswith(".")]
     list_files(f"Whisper: {repository.name} at commit {repository.commit[:12]}", files)
     if args.dry_run:
@@ -451,7 +468,8 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
 
     whisper = parser.add_argument_group("Whisper (Spanish, step 17)")
     whisper.add_argument("--whisper-repo", default=WHISPER_REPO)
-    whisper.add_argument("--whisper-revision", default=WHISPER_REVISION, help="commit (default: the pinned one)")
+    whisper.add_argument("--whisper-revision", default=WHISPER_REVISION,
+                         help="a full commit (default: the pinned one); a branch or tag is refused")
     return parser.parse_args(argv)
 
 

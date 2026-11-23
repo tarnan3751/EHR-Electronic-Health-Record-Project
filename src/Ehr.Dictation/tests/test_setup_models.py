@@ -61,6 +61,7 @@ MEDASR = {
 
 WHISPER = {
     "sha": setup_models.WHISPER_REVISION,
+    "license": "mit",
     "files": {
         ".gitattributes": (b"*.safetensors filter=lfs", False),
         "config.json": (b'{"model_type": "whisper"}', False),
@@ -92,7 +93,8 @@ class FakeHub:
             )
             for filename, (data, lfs) in repo["files"].items()
         ]
-        return SimpleNamespace(sha=repo["sha"], siblings=siblings, gated=repo.get("gated", name in self.gated))
+        return SimpleNamespace(sha=repo["sha"], siblings=siblings, gated=repo.get("gated", name in self.gated),
+                               card_data=SimpleNamespace(license=repo.get("license")))
 
     def download(self, repo_id, filename, revision=None, local_dir=None):
         assert revision == self.repos[repo_id]["sha"], "downloads use the resolved commit"
@@ -308,3 +310,34 @@ def test_whisper_at_another_commit_than_the_one_asked_is_refused(hub, models, ca
     assert run(models, "--only", "whisper") == 1
     assert "another commit" in capsys.readouterr().err
     assert not (models / "whisper").exists()
+
+
+# The pin is enforced: a branch or tag can move, and an abbreviated commit names no commit for certain, so only a full
+# commit is asked for. Nothing is read from the Hub, downloaded or recorded.
+PINNED = setup_models.WHISPER_REVISION
+
+
+@pytest.mark.parametrize("revision", ["main", "v1.0", PINNED[:12], PINNED.upper()])
+def test_whisper_at_anything_but_a_full_commit_is_refused(hub, models, capsys, revision):
+    hub.model_info = lambda *args, **kwargs: pytest.fail("the Hub was asked")
+
+    assert run(models, "--only", "whisper", "--whisper-revision", revision) == 1
+
+    assert "isn't a full commit" in capsys.readouterr().err
+    assert not hub.downloads and not (models / "whisper").exists() and not (models / "models-manifest.json").exists()
+
+
+# The licence is the card's, as the Hub reads its front matter: MIT, in any case, is accepted (the test above with the
+# fake hub's "mit"; here "MIT"); anything else, or a card that doesn't say, stops it before a byte is downloaded.
+@pytest.mark.parametrize(("license", "accepted"), [("MIT", True), ("apache-2.0", False), ("cc-by-nc-4.0", False),
+                                                   (None, False)])
+def test_whisper_is_set_up_only_while_its_card_says_mit(hub, models, capsys, license, accepted):
+    hub.repos["openai/whisper-large-v3-turbo"] = WHISPER | {"license": license}
+
+    assert run(models, "--only", "whisper") == (0 if accepted else 1)
+
+    if accepted:
+        assert manifest(models)["whisper"]["commit"] == setup_models.WHISPER_REVISION
+    else:
+        assert f"says its licence is {license!r}, not mit" in capsys.readouterr().err
+        assert not hub.downloads and not (models / "whisper").exists()
