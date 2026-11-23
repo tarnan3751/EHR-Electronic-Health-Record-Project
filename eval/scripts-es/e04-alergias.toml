@@ -18,6 +18,39 @@ alergias. Quita el ibuprofeno de su lista de alergias. Cetirizina [[10 mg|diez m
 [[5|cinco]] días.
 """
 
+[[facts]]
+said = "Mujer de 33 años que empezó con ronchas en los brazos hace 2 días, después de tomar amoxicilina."
+items = [{ of = "age", number = "33" }, { of = "hives", negated = false, action = "started", duration = "2 days" },
+         { of = "amoxicillin", action = "take" }]
+
+[[facts]]
+said = "No tiene dificultad para respirar ni hinchazón de labios."
+items = [{ of = "difficulty breathing", negated = true }, { of = "lip swelling", negated = true }]
+
+[[facts]]
+said = "Es alérgica a la sulfa desde la infancia."
+items = [{ of = "sulfa", polarity = "allergic" }]
+
+[[facts]]
+said = "Tolera el ibuprofeno sin problema."
+items = [{ of = "ibuprofen", polarity = "tolerates" }]
+
+[[facts]]
+said = "habones en ambos brazos, sin afectación de mucosas."
+items = [{ of = "wheals", aka = ["hives"], negated = false, side = "both" }, { of = "mucosal involvement", negated = true }]
+
+[[facts]]
+said = "urticaria probablemente por amoxicilina."
+items = [{ of = "urticaria", doubt = true }, { of = "amoxicillin" }]
+
+[[facts]]
+said = "suspender amoxicilina."
+items = [{ of = "amoxicillin", action = "stop" }]
+
+[[facts]]
+said = "Cetirizina 10 mg al día durante 5 días."
+items = [{ of = "cetirizine", number = "10 mg", frequency = "daily", duration = "5 days" }]
+
 [[gold.subjective]]
 spanish = ["Mujer de 33 años que empezó con ronchas en los brazos hace 2 días, después de tomar amoxicilina."]
 english = "33-year-old woman who started with hives on the arms 2 days ago, after taking amoxicillin."

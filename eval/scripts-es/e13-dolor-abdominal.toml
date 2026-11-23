@@ -26,6 +26,113 @@ una biometría hemática. Valoración por cirugía hoy. Nada por boca. Solución
 intravenosa en [[2|dos]] horas. Informo al paciente del diagnóstico probable. Reevaluar en [[4|cuatro]] horas.
 """
 
+[[facts]]
+said = "Hombre de 22 años con dolor abdominal de 3 días de evolución."
+items = [{ of = "age", number = "22" }, { of = "abdominal pain", negated = false, duration = "3 days" }]
+
+[[facts]]
+said = "Empezó como un dolor leve alrededor del ombligo y ahora es un dolor intenso en la fosa ilíaca derecha."
+items = [{ of = "navel", aka = ["umbilicus"], severity = "mild", action = "started" },
+         { of = "iliac fossa", side = "right", severity = "severe", date = "now" }]
+
+[[facts]]
+said = "El dolor es de 8 sobre 10 y empeora al caminar y al toser."
+items = [{ of = "pain score", number = "8/10", polarity = "worse" }]
+
+[[facts]]
+said = "No tiene apetito desde ayer."
+items = [{ of = "appetite", negated = true, date = "yesterday" }]
+
+[[facts]]
+said = "Tiene náuseas."
+items = [{ of = "nausea", negated = false }]
+
+[[facts]]
+said = "Niega vómito y niega diarrea."
+items = [{ of = "vomiting", negated = true }, { of = "diarrhea", negated = true }]
+
+[[facts]]
+said = "Niega síntomas urinarios."
+items = [{ of = "urinary symptoms", negated = true }]
+
+[[facts]]
+said = "No ha tenido fiebre en casa."
+items = [{ of = "fever", negated = true }]
+
+[[facts]]
+said = "Tomó ibuprofeno 400 mg anoche sin mejoría."
+items = [{ of = "ibuprofen", action = "took", number = "400 mg", date = "last night", polarity = "better" }]
+
+[[facts]]
+said = "No toma otros medicamentos."
+items = [{ of = "other medications", aka = ["medications", "other medicines"], action = "take", negated = true }]
+
+[[facts]]
+said = "No fuma ni bebe alcohol."
+items = [{ of = "smoking", negated = true }, { of = "alcohol", negated = true }]
+
+[[facts]]
+said = "Sin antecedentes de cirugías abdominales."
+items = [{ of = "abdominal surgery", history = true, negated = true }]
+
+[[facts]]
+said = "temperatura 37,9 grados, tensión arterial 118/72, FC 102, dolor a la palpación en la fosa ilíaca derecha con signo de rebote positivo."
+items = [{ of = "temperature", number = "37.9 degrees" }, { of = "BP", number = "118/72" }, { of = "HR", number = "102" },
+         { of = "tenderness", negated = false }, { of = "iliac fossa", side = "right" },
+         { of = "rebound sign", aka = ["rebound"], polarity = "positive" }]
+
+[[facts]]
+said = "Abdomen blando, sin masas."
+items = [{ of = "masses", negated = true }]
+
+[[facts]]
+said = "Signo de Rovsing positivo."
+items = [{ of = "Rovsing sign", polarity = "positive" }]
+
+[[facts]]
+said = "Ruidos intestinales disminuidos."
+items = [{ of = "bowel sounds", polarity = "low" }]
+
+[[facts]]
+said = "Sin dolor a la percusión lumbar en ambos lados."
+items = [{ of = "lumbar percussion", side = "both", negated = true }]
+
+[[facts]]
+said = "probable apendicitis aguda."
+items = [{ of = "appendicitis", doubt = true }]
+
+[[facts]]
+said = "Descartar litiasis renal derecha."
+items = [{ of = "kidney stone", aka = ["renal stone", "nephrolithiasis", "renal lithiasis", "urolithiasis"], side = "right", doubt = true }]
+
+[[facts]]
+said = "ondansetrón 4 mg sublingual ahora."
+items = [{ of = "ondansetron", number = "4 mg", route = "sublingual", date = "now" }]
+
+[[facts]]
+said = "Ketorolaco 30 mg intravenoso cada 8 horas si hay dolor."
+items = [{ of = "ketorolac", number = "30 mg", route = "intravenous", frequency = "every 8 hours" }]
+
+[[facts]]
+said = "Valoración por cirugía hoy."
+items = [{ of = "surgical evaluation", aka = ["surgery"], date = "today" }]
+
+[[facts]]
+said = "Nada por boca."
+items = [{ of = "nothing by mouth", aka = ["npo"] }]
+
+[[facts]]
+said = "Solución salina 500 ml intravenosa en 2 horas."
+items = [{ of = "saline", aka = ["normal saline"], number = "500 ml", route = "intravenous", duration = "2 hours" }]
+
+[[facts]]
+said = "Informo al paciente del diagnóstico probable."
+items = [{ of = "diagnosis", doubt = true }]
+
+[[facts]]
+said = "Reevaluar en 4 horas."
+items = [{ of = "reassess", aka = ["reassessment", "reevaluate"], duration = "4 hours" }]
+
 [[gold.subjective]]
 spanish = ["Hombre de 22 años con dolor abdominal de 3 días de evolución."]
 english = "22-year-old man with abdominal pain for 3 days."

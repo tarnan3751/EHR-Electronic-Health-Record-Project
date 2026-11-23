@@ -15,6 +15,42 @@ tiene ideas suicidas. Niega consumo de alcohol. {punto y aparte} [[PHQ-9|P H Q n
 sertralina a [[100 mg|cien miligramos]] al día. Psicoterapia semanal. Control en [[4|cuatro]] semanas.
 """
 
+[[facts]]
+said = "Mujer de 29 años en tratamiento con sertralina 50 mg al día desde hace 6 semanas."
+items = [{ of = "age", number = "29" }, { of = "sertraline", number = "50 mg", frequency = "daily", duration = "6 weeks" }]
+
+[[facts]]
+said = "Refiere mejoría parcial del ánimo y del sueño."
+items = [{ of = "mood", polarity = "better" }, { of = "sleep", polarity = "better" }]
+
+[[facts]]
+said = "No tiene ideas suicidas."
+items = [{ of = "suicidal ideation", aka = ["suicidal thoughts"], negated = true }]
+
+[[facts]]
+said = "Niega consumo de alcohol."
+items = [{ of = "alcohol", negated = true }]
+
+[[facts]]
+said = "PHQ-9 de 12, previamente 18."
+items = [{ of = "PHQ-9", number = ["12", "18"], history = true }]
+
+[[facts]]
+said = "probable trastorno depresivo mayor en remisión parcial."
+items = [{ of = "major depressive disorder", aka = ["depression"], doubt = true }]
+
+[[facts]]
+said = "aumentar sertralina a 100 mg al día."
+items = [{ of = "sertraline", action = "increase", number = "100 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Psicoterapia semanal."
+items = [{ of = "psychotherapy", aka = ["therapy"], frequency = "weekly" }]
+
+[[facts]]
+said = "Control en 4 semanas."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "4 weeks" }]
+
 [[gold.subjective]]
 spanish = ["Mujer de 29 años en tratamiento con sertralina 50 mg al día desde hace 6 semanas."]
 english = "29-year-old woman on sertraline 50 mg daily for 6 weeks."

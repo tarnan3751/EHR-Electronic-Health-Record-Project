@@ -33,8 +33,9 @@ The Spanish test set (the expansion plan's step 17) is checked the same way, fro
 two sets share, from the Spanish set's recordings and against its gold; covering every Spanish script's recordings and
 display text and the two recordings dictated in the wrong language; every recording and text sorted; no instruction to
 order something or change the allergy list in any offered value, the wrong-language recordings included (FR-14); every
-mistranslation shown without a warning (a number, unit, drug, side, medication change, negation, certainty, history or
-relative that differs from the Spanish it cites) accepted by the owner in known-limitations.toml
+mistranslation shown without a warning (a number, unit, drug, frequency, date, duration, route, side, severity,
+abbreviation, polarity, medication change, negation, certainty, history or relative that differs from what the Spanish it
+cites says, by the script's fact list: scoring_es.py) accepted by the owner in known-limitations.toml
 ([[accepted_mistranslation]]: variant, field, kind and what was shown, as the results list it), and each accepted one
 still shown; and, once the owner has recorded eval/results/baseline-es.json on the server machine, from that machine
 and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and date accuracy. The English

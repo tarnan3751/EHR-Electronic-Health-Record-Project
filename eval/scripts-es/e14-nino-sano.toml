@@ -13,6 +13,42 @@ desde la última visita. Peso [[11 kg|once kilos]], talla
 [[18|dieciocho]] meses hoy. Se explica a la madre la alimentación. Próxima revisión a los [[2|dos]] años.
 """
 
+[[facts]]
+said = "Revisión de niña sana de 18 meses."
+items = [{ of = "age", number = "18 months" }]
+
+[[facts]]
+said = "La madre no tiene preocupaciones."
+items = [{ of = "concerns", who = "mother", negated = true }]
+
+[[facts]]
+said = "Camina sola y dice unas 10 palabras."
+items = [{ of = "words", number = "10" }]
+
+[[facts]]
+said = "Va a la guardería desde hace 2 meses."
+items = [{ of = "daycare", duration = "2 months" }]
+
+[[facts]]
+said = "No ha tenido enfermedades desde la última visita."
+items = [{ of = "illnesses", aka = ["illness"], negated = true }]
+
+[[facts]]
+said = "Peso 11 kg, talla 81 cm."
+items = [{ of = "weight", number = "11 kg" }, { of = "height", number = "81 cm" }]
+
+[[facts]]
+said = "Exploración normal."
+items = [{ of = "examination", aka = ["exam"], polarity = "normal" }]
+
+[[facts]]
+said = "vacunas de los 18 meses hoy."
+items = [{ of = "vaccines", duration = "18 months", date = "today" }]
+
+[[facts]]
+said = "Próxima revisión a los 2 años."
+items = [{ of = "checkup", aka = ["review", "visit"], duration = "2 years" }]
+
 [[gold.subjective]]
 spanish = ["Revisión de niña sana de 18 meses."]
 english = "Checkup of a healthy 18-month-old girl."

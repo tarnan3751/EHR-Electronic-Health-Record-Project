@@ -35,6 +35,107 @@ pies por podología. Vacuna de la gripe hoy. Colonoscopia de cribado por el ante
 [[3|tres]] meses.
 """
 
+[[facts]]
+said = "Hombre de 68 años con diabetes tipo 2, hipertensión arterial y EPOC."
+items = [{ of = "age", number = "68" }, { of = "diabetes", number = "2" }, { of = "hypertension" }, { of = "COPD" }]
+
+[[facts]]
+said = "Refiere que en el último mes ha tenido más tos por las mañanas con expectoración blanca, sin fiebre."
+items = [{ of = "cough", negated = false, frequency = "morning", date = "last month" },
+         { of = "sputum", aka = ["expectoration"], negated = false }, { of = "fever", negated = true }]
+
+[[facts]]
+said = "Usa el inhalador de tiotropio una vez al día y salbutamol cuando lo necesita, unas 3 veces por semana."
+items = [{ of = "tiotropium", action = "take", frequency = "daily" },
+         { of = "albuterol", aka = ["salbutamol"], frequency = ["as needed", "3 times weekly"] }]
+
+[[facts]]
+said = "Toma metformina"
+items = [{ of = "metformin", action = "take", number = "1000 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Refiere hormigueo en los pies por las noches."
+items = [{ of = "tingling", negated = false, frequency = "night" }]
+
+[[facts]]
+said = "Niega úlceras en los pies."
+items = [{ of = "foot ulcers", aka = ["ulcers"], negated = true }]
+
+[[facts]]
+said = "Para la tensión toma amlodipino 5 mg al día."
+items = [{ of = "amlodipine", action = "take", number = "5 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Toma también ácido acetilsalicílico 100 mg al día."
+items = [{ of = "aspirin", aka = ["acetylsalicylic acid"], action = "take", number = "100 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Su hermano tiene cáncer de colon, diagnosticado a los 60 años."
+items = [{ of = "colon cancer", who = "brother" }, { of = "age", number = "60" }]
+
+[[facts]]
+said = "Antecedente de gota, con el último ataque hace 2 años."
+items = [{ of = "gout", history = true }, { of = "attack", aka = ["gout attack", "flare"], duration = "2 years" }]
+
+[[facts]]
+said = "Hace un mes tuvo una reacción con la codeína, le dio mucha náusea y picor."
+items = [{ of = "codeine", duration = "1 month" }, { of = "nausea", negated = false }, { of = "itching", negated = false }]
+
+[[facts]]
+said = "TA 146/88, FC 84, SatO2 93 %, peso 91 kg."
+items = [{ of = "BP", number = "146/88" }, { of = "HR", number = "84" }, { of = "SpO2", number = "93%" },
+         { of = "weight", number = "91 kg" }]
+
+[[facts]]
+said = "Sibilancias espiratorias dispersas en ambos campos pulmonares."
+items = [{ of = "wheezes", aka = ["wheezing", "expiratory wheezes"], negated = false, side = "both" }]
+
+[[facts]]
+said = "Pies con pulsos presentes y disminución de la sensibilidad en ambos pies."
+items = [{ of = "pulses", negated = false }, { of = "sensation", polarity = "low", side = "both" }]
+
+[[facts]]
+said = "La hemoglobina glucosilada de hoy es de 7,8."
+items = [{ of = "A1c", number = "7.8", date = "today" }]
+
+[[facts]]
+said = "EPOC con empeoramiento leve, sin datos de infección."
+items = [{ of = "COPD", severity = "mild", polarity = "worse" }, { of = "infection", aka = ["signs of infection"], negated = true }]
+
+[[facts]]
+said = "Diabetes tipo 2 no controlada con probable neuropatía periférica."
+items = [{ of = "diabetes", number = "2", polarity = "uncontrolled" },
+         { of = "peripheral neuropathy", aka = ["neuropathy"], doubt = true, negated = false }]
+
+[[facts]]
+said = "Hipertensión arterial no controlada."
+items = [{ of = "hypertension", polarity = "uncontrolled" }]
+
+[[facts]]
+said = "continuar tiotropio una vez al día y salbutamol si es necesario."
+items = [{ of = "tiotropium", action = "continue", frequency = "daily" },
+         { of = "albuterol", aka = ["salbutamol"], frequency = "as needed" }]
+
+[[facts]]
+said = "Aumentar amlodipino a 10 mg al día."
+items = [{ of = "amlodipine", action = "increase", number = "10 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Continuar metformina"
+items = [{ of = "metformin", action = "continue", number = "1000 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Iniciar empagliflozina 10 mg al día."
+items = [{ of = "empagliflozin", action = "start", number = "10 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Vacuna de la gripe hoy."
+items = [{ of = "flu vaccine", aka = ["influenza vaccine"], date = "today" }]
+
+[[facts]]
+said = "Control en 3 meses."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "3 months" }]
+
 [[gold.subjective]]
 spanish = ["Hombre de 68 años con diabetes tipo 2, hipertensión arterial y EPOC."]
 english = "68-year-old man with type 2 diabetes, hypertension and COPD."

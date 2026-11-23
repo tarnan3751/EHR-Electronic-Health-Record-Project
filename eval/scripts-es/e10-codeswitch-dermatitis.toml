@@ -15,6 +15,34 @@ contacto. Plan: hidrocortisona tópica al [[1 %|uno por ciento]] dos veces al d�
 en [[3|tres]] meses.
 """
 
+[[facts]]
+said = "Paciente de 40 años que viene a follow-up de diabetes."
+items = [{ of = "age", number = "40" }, { of = "diabetes" }]
+
+[[facts]]
+said = "Tiene un rash en el brazo derecho desde hace 3 días, sin fiebre."
+items = [{ of = "rash", negated = false, side = "right", duration = "3 days" }, { of = "fever", negated = true }]
+
+[[facts]]
+said = "El CBC salió normal y la A1c es de 7,1."
+items = [{ of = "CBC", aka = ["blood count", "complete blood count"], polarity = "normal" }, { of = "A1c", number = "7.1" }]
+
+[[facts]]
+said = "rash eritematoso en el brazo derecho, sin vesículas."
+items = [{ of = "rash", negated = false, side = "right" }, { of = "vesicles", negated = true }]
+
+[[facts]]
+said = "dermatitis de contacto."
+items = [{ of = "contact dermatitis", aka = ["dermatitis"] }]
+
+[[facts]]
+said = "hidrocortisona tópica al 1 % dos veces al día durante 7 días."
+items = [{ of = "hydrocortisone", route = "topical", number = "1%", frequency = "twice daily", duration = "7 days" }]
+
+[[facts]]
+said = "Follow-up en 3 meses."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "3 months" }]
+
 [[gold.subjective]]
 spanish = ["Paciente de 40 años que viene a follow-up de diabetes."]
 english = "40-year-old patient coming for diabetes follow-up."

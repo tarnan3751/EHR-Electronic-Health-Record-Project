@@ -18,6 +18,47 @@ miligramos]] cada tercer día. Repetir INR en [[7|siete]] días, no, espera, en 
 apixabán en la próxima visita.
 """
 
+[[facts]]
+said = "Mujer de 76 años con fibrilación auricular."
+items = [{ of = "age", number = "76" }, { of = "atrial fibrillation", aka = ["afib"] }]
+
+[[facts]]
+said = "Toma warfarina 5 mg al día."
+items = [{ of = "warfarin", action = "take", number = "5 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Refiere que ha tenido sangrado de encías al cepillarse."
+items = [{ of = "gum bleeding", aka = ["bleeding gums"], negated = false }]
+
+[[facts]]
+said = "Niega sangre en la orina o en las heces."
+items = [{ of = "blood in the urine", aka = ["hematuria"], negated = true }, { of = "stool", negated = true }]
+
+[[facts]]
+said = "El INR de hoy es de 3,6."
+items = [{ of = "INR", number = "3.6", date = "today" }]
+
+[[facts]]
+said = "fibrilación auricular con INR por encima del rango."
+items = [{ of = "atrial fibrillation", aka = ["afib"] }, { of = "INR", polarity = "high" }]
+
+[[facts]]
+said = "omitir la dosis de hoy."
+items = [{ of = "dose", action = "hold", date = "today" }]
+
+# "Cada tercer día" is every other day in Mexico and every third day as written: either reading is the Spanish's.
+[[facts]]
+said = "warfarina 5 mg al día excepto 2,5 mg cada tercer día."
+items = [{ of = "warfarin", number = ["5 mg", "2.5 mg"], frequency = ["daily", "every other day", "every third day"] }]
+
+[[facts]]
+said = "Repetir INR en 7 días, no, espera, en 5 días."
+items = [{ of = "INR", duration = "5 days" }]
+
+[[facts]]
+said = "Valorar el cambio a apixabán en la próxima visita."
+items = [{ of = "apixaban", action = "switch" }]
+
 [[gold.subjective]]
 spanish = ["Mujer de 76 años con fibrilación auricular."]
 english = "76-year-old woman with atrial fibrillation."

@@ -16,6 +16,39 @@ espiratorias leves bilaterales, [[SatO2|saturación]] [[96 %|noventa y seis por 
 microgramos]] dos veces al día. Control en una semana.
 """
 
+[[facts]]
+said = "Niño de 7 años con asma."
+items = [{ of = "age", number = "7" }, { of = "asthma" }]
+
+[[facts]]
+said = "La madre refiere tos nocturna desde hace una semana."
+items = [{ of = "night cough", aka = ["nocturnal cough", "cough at night"], negated = false, duration = "1 week" }]
+
+[[facts]]
+said = "No ha tenido fiebre."
+items = [{ of = "fever", negated = true }]
+
+[[facts]]
+said = "Usa salbutamol inhalado 2 disparos cada 4 horas si es necesario."
+items = [{ of = "albuterol", aka = ["salbutamol"], action = "take", route = "inhaled", number = "2 puffs", frequency = ["every 4 hours", "as needed"] }]
+
+[[facts]]
+said = "sibilancias espiratorias leves bilaterales, SatO2 96 %."
+items = [{ of = "wheezes", aka = ["wheezing", "expiratory wheezes"], negated = false, severity = "mild", side = "both" },
+         { of = "SpO2", number = "96%" }]
+
+[[facts]]
+said = "continuar salbutamol inhalado 2 disparos cada 4 horas si es necesario."
+items = [{ of = "albuterol", aka = ["salbutamol"], action = "continue", route = "inhaled", number = "2 puffs", frequency = ["every 4 hours", "as needed"] }]
+
+[[facts]]
+said = "Iniciar budesonida inhalada 200 mcg dos veces al día."
+items = [{ of = "budesonide", action = "start", route = "inhaled", number = "200 mcg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Control en una semana."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "1 week" }]
+
 [[gold.subjective]]
 spanish = ["Niño de 7 años con asma."]
 english = "7-year-old boy with asthma."

@@ -20,6 +20,50 @@ Ruidos cardiacos rítmicos, sin soplos. Impresión: hipertensión arterial no co
 Control en [[4|cuatro]] semanas.
 """
 
+[[facts]]
+said = "Hombre de 62 años con hipertensión arterial desde hace 10 años."
+items = [{ of = "age", number = "62" }, { of = "hypertension", duration = "10 years" }]
+
+[[facts]]
+said = "Toma losartán 50 mg una vez al día."
+items = [{ of = "losartan", action = "take", number = "50 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Refiere cefalea ocasional por las mañanas."
+items = [{ of = "headache", negated = false, frequency = "morning" }]
+
+[[facts]]
+said = "Niega dolor torácico y niega disnea."
+items = [{ of = "chest pain", negated = true }, { of = "shortness of breath", aka = ["dyspnea"], negated = true }]
+
+[[facts]]
+said = "Antecedente de tabaquismo, lo dejó hace 5 años."
+items = [{ of = "smoking", history = true, action = "stopped", duration = "5 years" }]
+
+[[facts]]
+said = "TA 152/94, FC 78, peso 88 kg."
+items = [{ of = "BP", number = "152/94" }, { of = "HR", number = "78" }, { of = "weight", number = "88 kg" }]
+
+[[facts]]
+said = "Ruidos cardiacos rítmicos, sin soplos."
+items = [{ of = "heart sounds", negated = false }, { of = "murmurs", negated = true }]
+
+[[facts]]
+said = "hipertensión arterial no controlada."
+items = [{ of = "hypertension", polarity = "uncontrolled" }]
+
+[[facts]]
+said = "aumentar losartán a 100 mg una vez al día."
+items = [{ of = "losartan", action = "increase", number = "100 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Reducir la sal en la dieta."
+items = [{ of = "salt", action = "decrease" }]
+
+[[facts]]
+said = "Control en 4 semanas."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "4 weeks" }]
+
 [[gold.subjective]]
 spanish = ["Hombre de 62 años con hipertensión arterial desde hace 10 años."]
 english = "62-year-old man with hypertension for 10 years."

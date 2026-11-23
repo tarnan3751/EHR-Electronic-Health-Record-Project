@@ -15,6 +15,42 @@ musculares. El LDL de hoy es de [[96|noventa y seis]]. Impresión: hipercolester
 Lipitor [[20 mg|veinte miligramos]] en la noche. Mándale un refill a la farmacia. Repetir lípidos en [[6|seis]] meses.
 """
 
+[[facts]]
+said = "Hombre de 63 años con colesterol alto."
+items = [{ of = "age", number = "63" }, { of = "cholesterol", polarity = "high" }]
+
+[[facts]]
+said = "Toma Lipitor 20 mg en la noche y se le está acabando."
+items = [{ of = "Lipitor", aka = ["atorvastatin"], action = "take", number = "20 mg", frequency = "night" }]
+
+[[facts]]
+said = "Hace ejercicio 3 veces por semana."
+items = [{ of = "exercise", aka = ["exercises"], frequency = "3 times weekly" }]
+
+[[facts]]
+said = "Niega dolores musculares."
+items = [{ of = "muscle pain", aka = ["myalgia", "muscle aches"], negated = true }]
+
+[[facts]]
+said = "La A1c de la última vez fue 6,1."
+items = [{ of = "A1c", number = "6.1" }]
+
+[[facts]]
+said = "El LDL de hoy es de 96."
+items = [{ of = "LDL", number = "96", date = "today" }]
+
+[[facts]]
+said = "hipercolesterolemia controlada."
+items = [{ of = "hypercholesterolemia", polarity = "controlled" }]
+
+[[facts]]
+said = "continuar Lipitor 20 mg en la noche."
+items = [{ of = "Lipitor", aka = ["atorvastatin"], action = "continue", number = "20 mg", frequency = "night" }]
+
+[[facts]]
+said = "Repetir lípidos en 6 meses."
+items = [{ of = "lipids", aka = ["lipid panel"], duration = "6 months" }]
+
 [[gold.subjective]]
 spanish = ["Hombre de 63 años con colesterol alto."]
 english = "63-year-old man with high cholesterol."

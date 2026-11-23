@@ -17,6 +17,46 @@ semaglutida [[0,5 mg|cero coma cinco miligramos]] semanal, no, perdón, [[0,25 m
 semanal durante el primer mes. Control en [[3|tres]] meses.
 """
 
+[[facts]]
+said = "Paciente de 58 años con diabetes tipo 2."
+items = [{ of = "age", number = "58" }, { of = "diabetes", number = "2" }]
+
+[[facts]]
+said = "Toma metformina 850 mg dos veces al día."
+items = [{ of = "metformin", action = "take", number = "850 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Refiere poliuria leve."
+items = [{ of = "polyuria", negated = false, severity = "mild" }]
+
+[[facts]]
+said = "Su madre tiene diabetes tipo 2."
+items = [{ of = "diabetes", number = "2", who = "mother" }]
+
+[[facts]]
+said = "Hemoglobina glucosilada de 8,4 por ciento."
+items = [{ of = "A1c", number = "8.4%" }]
+
+[[facts]]
+said = "Peso 96 kg."
+items = [{ of = "weight", number = "96 kg" }]
+
+[[facts]]
+said = "diabetes tipo 2 mal controlada."
+items = [{ of = "diabetes", number = "2", polarity = "uncontrolled" }]
+
+[[facts]]
+said = "continuar metformina 850 mg dos veces al día."
+items = [{ of = "metformin", action = "continue", number = "850 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Agregar semaglutida 0,5 mg semanal, no, perdón, 0,25 mg semanal durante el primer mes."
+items = [{ of = "semaglutide", action = "start", number = "0.25 mg", frequency = "weekly" }]
+
+[[facts]]
+said = "Control en 3 meses."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "3 months" }]
+
 [[gold.subjective]]
 spanish = ["Paciente de 58 años con diabetes tipo 2."]
 english = "58-year-old patient with type 2 diabetes."

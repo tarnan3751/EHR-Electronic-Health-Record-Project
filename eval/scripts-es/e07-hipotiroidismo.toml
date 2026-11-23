@@ -16,6 +16,46 @@ insuficiente de levotiroxina. Plan: aumentar levotiroxina a [[75 microgramos|set
 ayunas. Repetir TSH en [[6|seis]] semanas.
 """
 
+[[facts]]
+said = "Mujer de 51 años con hipotiroidismo."
+items = [{ of = "age", number = "51" }, { of = "hypothyroidism" }]
+
+[[facts]]
+said = "Antecedente de tiroidectomía total en 2019 por bocio."
+items = [{ of = "thyroidectomy", history = true, date = "2019" }, { of = "goiter" }]
+
+[[facts]]
+said = "Toma levotiroxina 50 microgramos al día en ayunas."
+items = [{ of = "levothyroxine", action = "take", number = "50 mcg", frequency = ["daily", "fasting"] }]
+
+[[facts]]
+said = "Refiere cansancio y aumento de peso."
+items = [{ of = "fatigue", aka = ["tiredness"], negated = false }, { of = "weight gain", negated = false }]
+
+[[facts]]
+said = "Niega palpitaciones."
+items = [{ of = "palpitations", negated = true }]
+
+[[facts]]
+said = "Analítica del 3 de marzo de 2026: TSH 6,2."
+items = [{ of = "TSH", number = "6.2", date = "March 3, 2026" }]
+
+[[facts]]
+said = "Peso 71 kg."
+items = [{ of = "weight", number = "71 kg" }]
+
+[[facts]]
+said = "hipotiroidismo con dosis insuficiente de levotiroxina."
+items = [{ of = "hypothyroidism" }, { of = "levothyroxine" }]
+
+[[facts]]
+said = "aumentar levotiroxina a 75 microgramos al día en ayunas."
+items = [{ of = "levothyroxine", action = "increase", number = "75 mcg", frequency = ["daily", "fasting"] }]
+
+[[facts]]
+said = "Repetir TSH en 6 semanas."
+items = [{ of = "TSH", duration = "6 weeks" }]
+
 [[gold.subjective]]
 spanish = ["Mujer de 51 años con hipotiroidismo."]
 english = "51-year-old woman with hypothyroidism."

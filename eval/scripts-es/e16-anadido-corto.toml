@@ -13,6 +13,42 @@ miligramos]] al día. Repetir función renal en [[1|una]] semana, no, perdón, e
 los síntomas de hipoglucemia. Avisar a la paciente por teléfono hoy. Cita en consulta en [[1|un]] mes.
 """
 
+[[facts]]
+said = "La analítica de esta mañana muestra un filtrado glomerular de 28 y una creatinina de 2,1."
+items = [{ of = "GFR", number = "28" }, { of = "creatinine", number = "2.1" }]
+
+[[facts]]
+said = "suspender metformina."
+items = [{ of = "metformin", action = "stop" }]
+
+[[facts]]
+said = "Iniciar linagliptina 5 mg al día."
+items = [{ of = "linagliptin", action = "start", number = "5 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Repetir función renal en 1 semana, no, perdón, en 2 semanas."
+items = [{ of = "kidney function", aka = ["renal function"], duration = "2 weeks" }]
+
+[[facts]]
+said = "Mantener el resto de la medicación igual."
+items = [{ of = "medication", aka = ["medications", "medicines"], action = "continue" }]
+
+[[facts]]
+said = "Evitar antiinflamatorios."
+items = [{ of = "NSAIDs", aka = ["nsaid", "anti-inflammatories", "anti-inflammatory drugs"] }]
+
+[[facts]]
+said = "Explicar los síntomas de hipoglucemia."
+items = [{ of = "hypoglycemia" }]
+
+[[facts]]
+said = "Avisar a la paciente por teléfono hoy."
+items = [{ of = "phone", aka = ["telephone"], date = "today" }]
+
+[[facts]]
+said = "Cita en consulta en 1 mes."
+items = [{ of = "appointment", aka = ["visit"], duration = "1 month" }]
+
 [[gold.objective]]
 spanish = ["La analítica de esta mañana muestra un filtrado glomerular de 28 y una creatinina de 2,1."]
 english = "This morning's labs show a GFR of 28 and a creatinine of 2.1."

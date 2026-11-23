@@ -83,14 +83,14 @@ def test_a_changed_number_the_checks_discard_is_counted_as_discarded_not_shown()
 
 def test_a_mistranslation_the_checks_let_through_is_shown_and_crosses_the_first_threshold():
     # "Niega dolor torácico" translated "denies headache": the negation is kept, the finding swapped. The checks don't
-    # check the meaning of every word (translation.py), so it is offered; the eval sees a finding the script says is
-    # present ("headache") shown negated, and the step stops.
+    # check the meaning of every word (translation.py), so it is offered; the eval sees a finding the script's facts
+    # say is present ("headache", said in another passage) shown negated, and the step stops.
     wrong = [{"spanish": ["Niega dolor torácico y niega disnea."], "english": "Denies headache and denies shortness of breath."}]
     item = run("e01-hta-control", gold_answer("e01-hta-control", subjective=wrong))
     metrics = scoring_es.score([item], SCRIPTS)
 
     assert item.fields["subjective"].status == "pending"
-    assert metrics["mistranslations"]["unflagged"]["negation_added"] == 1
+    assert metrics["mistranslations"]["unflagged"]["negation"] == 1
     crossed = dict((name, over) for name, over, _ in scoring_es.thresholds(metrics))
     assert crossed[next(iter(crossed))] is True
     assert "STOP" in run_a.summary(metrics)
@@ -155,10 +155,11 @@ def test_what_a_statement_changes_from_the_spanish_it_cites_is_marked_moved_when
     text = script.display
     start = text.index("PHQ-9 de 12")
     span = (start, start + len("PHQ-9 de 12, previamente 18"))
-    changed, misfiled = scoring_es._statement_items("Increase sertraline to 100 mg daily.", [span],
-                                                    scoring_es._reading(text), script.gold["objective"].value, script)
+    changed, misfiled = scoring_es._statement_items("Increase sertraline to 100 mg daily.", [span], text,
+                                                    script.gold["objective"].value, script)
     assert {(kind, what, moved) for kind, what, moved in changed} == {
-        ("number", "100 mg", True), ("drug", "sertraline", True), ("action", "increase", True)}
+        ("number", "100 mg (sertraline)", True), ("drug", "sertraline", True), ("action", "increase (sertraline)", True),
+        ("frequency", "daily (sertraline)", True)}
     assert misfiled == []
 
 

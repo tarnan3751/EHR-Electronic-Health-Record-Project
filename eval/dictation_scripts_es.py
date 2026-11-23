@@ -18,8 +18,10 @@ punctuation as marks, and marked up only where speech and writing differ:
 
 The gold is a list of statements per field: the passages of the display text a statement comes from, word for word,
 and the English a careful clinician would accept, which must pass the sidecar's Spanish checks (translation.py;
-eval/tests/test_gold_es.py). All of it is synthetic and needs a Spanish-speaking clinician's reading before any real
-use.
+eval/tests/test_gold_es.py). Beside it, `facts` lists what each passage of the text says, written by hand, for the
+scoring to compare each statement shown with what the Spanish it cites says without the checks' own readers
+(ehr_eval/facts_es.py says the format; this reader keeps them as written). All of it is synthetic and needs a
+Spanish-speaking clinician's reading before any real use.
 
 Five more scripts, eval/scripts-es-holdout/h01 to h05, in the same format, are held out: written once the checks of run
 A's first round were settled and never used to tune them, they are run only when asked (run_a.py --holdout), so the
@@ -49,7 +51,7 @@ MARKUP = re.compile(r"\{([^{}]*)\}|\[\[([^\[\]|]*)\|([^\[\]|]*)\]\]")
 ENGLISH = re.compile(r"<<en\|([^<>]*)>>")
 WORD = re.compile(r"[^\W\d_]+(?:['-][^\W\d_]+)*")
 KEYS = {"id", "language", "voice", "tags", "noise", "dates", "drugs", "drugs_en", "forbidden", "forbidden_en",
-        "retracted", "negated", "affirmed", "family", "text", "gold"}
+        "retracted", "negated", "affirmed", "family", "facts", "text", "gold"}
 REQUIRED = {"id", "language", "voice", "tags", "dates", "drugs", "drugs_en", "text", "gold"}
 
 
@@ -91,6 +93,7 @@ class Script:
     text: str
     statements: dict[str, tuple[Statement, ...]]
     path: Path
+    facts: tuple[dict, ...] = ()  # what each passage says, as written (ehr_eval/facts_es.py reads them)
 
     @property
     def gold(self) -> dict[str, Gold]:
@@ -185,6 +188,9 @@ def load_script(path: Path) -> Script:
             raise ScriptError(f"{path.name}: {key} must be a list of non-empty strings")
         return tuple(value)
 
+    facts = data.get("facts", [])
+    if not isinstance(facts, list) or not all(isinstance(fact, dict) for fact in facts):
+        raise ScriptError(f"{path.name}: facts must be a list of tables")
     family = data.get("family", [])
     if not isinstance(family, list) or not all(
         isinstance(pair, list) and len(pair) == 2 and all(isinstance(x, str) and x for x in pair) for pair in family
@@ -217,7 +223,7 @@ def load_script(path: Path) -> Script:
         dates=strings("dates"), drugs=drugs, drugs_en=drugs_en, forbidden=strings("forbidden"),
         forbidden_en=strings("forbidden_en"), retracted=strings("retracted"), negated=strings("negated"),
         affirmed=strings("affirmed"), family=tuple((pair[0], pair[1]) for pair in family), text=data["text"],
-        statements=statements, path=path,
+        statements=statements, path=path, facts=tuple(facts),
     )
     try:
         spoken_text(script.text)

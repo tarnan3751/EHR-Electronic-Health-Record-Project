@@ -27,6 +27,81 @@ día. Continuar enalapril [[10 mg|diez miligramos]] dos veces al día. Pido un e
 sal y control de peso diario. Revisión en una semana.
 """
 
+[[facts]]
+said = "Hombre de 72 años con insuficiencia cardiaca con fracción de eyección reducida."
+items = [{ of = "age", number = "72" }, { of = "heart failure" }, { of = "LVEF", polarity = "low" }]
+
+[[facts]]
+said = "Antecedente de infarto en 2018."
+items = [{ of = "MI", aka = ["heart attack", "myocardial infarction", "infarction"], history = true, date = "2018" }]
+
+[[facts]]
+said = "Su padre tuvo un infarto a los 55 años."
+items = [{ of = "MI", aka = ["heart attack", "myocardial infarction", "infarction"], who = "father" },
+         { of = "age", number = "55" }]
+
+[[facts]]
+said = "Refiere disnea al subir un piso de escaleras y edema en los tobillos por las tardes."
+items = [{ of = "dyspnea", aka = ["shortness of breath"], negated = false },
+         { of = "edema", aka = ["ankle edema", "ankle swelling"], negated = false, frequency = "afternoon" }]
+
+[[facts]]
+said = "Duerme con 2 almohadas."
+items = [{ of = "pillows", number = "2" }]
+
+[[facts]]
+said = "Niega dolor torácico."
+items = [{ of = "chest pain", negated = true }]
+
+[[facts]]
+said = "Ha estado tomando ibuprofeno para el dolor de espalda."
+items = [{ of = "ibuprofen", action = "take" }, { of = "back pain" }]
+
+[[facts]]
+said = "furosemida 40 mg al día, bisoprolol 5 mg al día y enalapril 10 mg dos veces al día."
+items = [{ of = "furosemide", number = "40 mg", frequency = "daily" }, { of = "bisoprolol", number = "5 mg", frequency = "daily" },
+         { of = "enalapril", number = "10 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "TA 108/64, FC 62, peso 84 kg, 2 kg más que en la última visita."
+items = [{ of = "BP", number = "108/64" }, { of = "HR", number = "62" }, { of = "weight", number = ["84 kg", "2 kg"] }]
+
+[[facts]]
+said = "Crepitantes en ambas bases y edema con fóvea hasta media pierna."
+items = [{ of = "crackles", negated = false, side = "both" }, { of = "edema", aka = ["pitting edema"], negated = false }]
+
+[[facts]]
+said = "El último ecocardiograma muestra una FEVI de 35 %."
+items = [{ of = "LVEF", number = "35%" }, { of = "echocardiogram", aka = ["echo"] }]
+
+[[facts]]
+said = "insuficiencia cardiaca descompensada, probablemente por el ibuprofeno."
+items = [{ of = "heart failure" }, { of = "ibuprofen", doubt = true }]
+
+[[facts]]
+said = "suspender ibuprofeno."
+items = [{ of = "ibuprofen", action = "stop" }]
+
+[[facts]]
+said = "Aumentar furosemida a 80 mg al día durante 3 días y luego volver a 40 mg."
+items = [{ of = "furosemide", action = "increase", number = ["80 mg", "40 mg"], frequency = "daily", duration = "3 days" }]
+
+[[facts]]
+said = "Disminuir bisoprolol a 2,5 mg al día."
+items = [{ of = "bisoprolol", action = "decrease", number = "2.5 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Continuar enalapril 10 mg dos veces al día."
+items = [{ of = "enalapril", action = "continue", number = "10 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Restricción de sal y control de peso diario."
+items = [{ of = "salt" }, { of = "weight", frequency = "daily" }]
+
+[[facts]]
+said = "Revisión en una semana."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "1 week" }]
+
 [[gold.subjective]]
 spanish = ["Hombre de 72 años con insuficiencia cardiaca con fracción de eyección reducida."]
 english = "72-year-old man with heart failure with reduced ejection fraction."

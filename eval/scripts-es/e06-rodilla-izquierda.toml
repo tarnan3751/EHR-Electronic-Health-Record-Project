@@ -24,6 +24,102 @@ dieta y caminar en llano. Control en [[6|seis]] semanas. Si aparece fiebre o la 
 vuelva antes.
 """
 
+[[facts]]
+said = "Varón de 67 años con artrosis de ambas rodillas."
+items = [{ of = "age", number = "67" }, { of = "osteoarthritis" }, { of = "knee", side = "both" }]
+
+[[facts]]
+said = "Refiere dolor en la rodilla izquierda desde hace un mes, peor al subir escaleras en el gym."
+items = [{ of = "knee", side = "left", polarity = "worse" }, { of = "pain", negated = false, duration = "1 month" }]
+
+[[facts]]
+said = "El dolor es de 6 sobre 10 y le despierta por la noche 2 veces por semana."
+items = [{ of = "pain", number = "6/10", frequency = ["night", "2 times weekly"] }]
+
+[[facts]]
+said = "Tiene rigidez por la mañana de unos 15 minutos."
+items = [{ of = "stiffness", aka = ["morning stiffness"], negated = false, duration = "15 minutes" }]
+
+[[facts]]
+said = "No ha notado bloqueos ni fallos de la rodilla."
+items = [{ of = "locking", negated = true }, { of = "giving way", negated = true }]
+
+[[facts]]
+said = "Ha probado una rodillera sin mucha mejoría."
+items = [{ of = "knee brace", polarity = "better" }]
+
+[[facts]]
+said = "La rodilla derecha está bien."
+items = [{ of = "knee", side = "right" }]
+
+[[facts]]
+said = "Niega traumatismo."
+items = [{ of = "trauma", negated = true }]
+
+[[facts]]
+said = "Niega fiebre."
+items = [{ of = "fever", negated = true }]
+
+[[facts]]
+said = "Toma paracetamol 1 g cada 8 horas."
+items = [{ of = "acetaminophen", aka = ["paracetamol"], action = "take", number = "1 g", frequency = "every 8 hours" }]
+
+[[facts]]
+said = "No toma otros medicamentos."
+items = [{ of = "other medications", aka = ["medications", "other medicines"], action = "take", negated = true }]
+
+[[facts]]
+said = "Trabaja de pie como camarero 8 horas al día."
+items = [{ of = "work", aka = ["works"], duration = "8 hours", frequency = "daily" }]
+
+[[facts]]
+said = "peso 94 kg, rodilla izquierda con derrame leve y crepitación, rodilla derecha sin derrame."
+items = [{ of = "weight", number = "94 kg" }, { of = "knee", side = ["left", "right"] },
+         { of = "effusion", negated = false, severity = "mild" }, { of = "effusion", negated = true },
+         { of = "crepitus", negated = false }]
+
+[[facts]]
+said = "Flexión de la rodilla izquierda hasta 110 grados, sin calor ni enrojecimiento."
+items = [{ of = "knee", side = "left" }, { of = "flexion", number = "110 degrees" }, { of = "warmth", negated = true },
+         { of = "redness", negated = true }]
+
+[[facts]]
+said = "Sin dolor en la cadera izquierda."
+items = [{ of = "hip", side = "left", negated = true }, { of = "pain", negated = true }]
+
+[[facts]]
+said = "Marcha sin cojera."
+items = [{ of = "limp", negated = true }]
+
+[[facts]]
+said = "artrosis de rodilla izquierda con brote inflamatorio."
+items = [{ of = "knee", side = "left" }, { of = "osteoarthritis" }]
+
+[[facts]]
+said = "añadir ibuprofeno 400 mg cada 8 horas con comida durante 5 días."
+items = [{ of = "ibuprofen", action = "start", number = "400 mg", frequency = ["every 8 hours", "with food"], duration = "5 days" }]
+
+[[facts]]
+said = "Continuar paracetamol."
+items = [{ of = "acetaminophen", aka = ["paracetamol"], action = "continue" }]
+
+[[facts]]
+said = "Hielo local 20 minutos 3 veces al día."
+items = [{ of = "ice", duration = "20 minutes", frequency = "3 times daily" }]
+
+[[facts]]
+said = "Ejercicios para fortalecer el cuádriceps en casa todos los días."
+items = [{ of = "exercises", frequency = "daily" }]
+
+[[facts]]
+said = "Control en 6 semanas."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "6 weeks" }]
+
+# A condition: fever is neither said nor denied here.
+[[facts]]
+said = "Si aparece fiebre o la rodilla se pone roja y caliente, que vuelva antes."
+items = [{ of = "fever" }, { of = "knee" }]
+
 [[gold.subjective]]
 spanish = ["Varón de 67 años con artrosis de ambas rodillas."]
 english = "67-year-old man with osteoarthritis of both knees."
