@@ -4,6 +4,7 @@ The review's and the owner's cases are here verbatim."""
 
 from __future__ import annotations
 
+import random
 import re
 
 import pytest
@@ -1217,6 +1218,49 @@ def test_each_side_of_a_cut_is_a_sentence_of_its_own():
     checked = own(said, said)
 
     assert checked.pending and checked.value == "We discussed. she would rather wait."
+
+
+# A long order list cut by the reach goes on over what it lists, so no tail of it is left in the note: the review's
+# sentence, said without punctuation and with it past MARKED_REACH words.
+@pytest.mark.parametrize(("said", "value", "sources"), [
+    ("Plan order a cbc a bmp a lipid panel a tsh an a1c a urinalysis a chest x ray and an ecg and recheck in two weeks",
+     "Urinalysis, chest x ray and an ECG.", ["urinalysis a chest x ray and an ecg"]),
+    ("Plan: Order a CBC, a BMP, a lipid panel, a TSH, an A1c, a urinalysis, a chest x-ray, an ECG, a urine culture, a PSA, "
+     "a vitamin D level, a B12 level, a ferritin, an iron panel, a magnesium, a phosphate, a uric acid.",
+     "Urinalysis, chest x-ray, ECG, urine culture, PSA.", ["urinalysis, a chest x-ray, an ECG, a urine culture, a PSA"]),
+])
+def test_the_tail_of_a_long_order_list_is_listed_and_kept_out_of_the_note(said, value, sources):
+    text = transcript(said)
+
+    (listed,) = not_carried_over(text)
+
+    assert sources[0].lower() in text.text[listed["start"] : listed["end"]].lower()
+    assert "order_or_allergy_change" in field(value, *sources, name="plan", text=text).reasons
+    assert "recheck in two weeks" not in text.text[listed["start"] : listed["end"]]
+
+
+LIST_ITEMS = ["CBC", "BMP", "CMP", "lipid panel", "TSH", "urinalysis", "chest x-ray", "hemoglobin A1c", "vitamin D",
+              "ferritin", "magnesium", "uric acid", "lisinopril", "metformin", "amlodipine", "atorvastatin"]
+
+
+# As a property: a list of 2 to 25 items the reference data names, after "order", said with or without punctuation, with
+# "and" or without, leaves no word of any item outside what is listed.
+def test_no_item_of_an_order_list_is_left_outside_what_is_listed():
+    rng = random.Random(15)
+    said = 0
+    for count in range(2, 26):
+        for joined in ("{} ", "{}, ", "{} and "):
+            for end in ("", ".", " and recheck in two weeks", ", recheck in two weeks."):
+                items = [rng.choice(LIST_ITEMS) for _ in range(count)]
+                text = "order " + "".join(joined.format("a " + item) for item in items[:-1]) + "a " + items[-1] + end
+                spans = directive_spans(text)
+                at = len("order ")
+                for item in items:
+                    at = text.index(item, at)
+                    assert any(s <= at and at + len(item) <= e for s, e in spans), (text, item)
+                    at += len(item)
+                said += 1
+    assert said == 24 * 3 * 4
 
 
 # What is cut from a value is what is listed, never the rest of its sentence.

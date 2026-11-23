@@ -980,9 +980,12 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
     another clause, a new subject or step of the plan (NEXT_CLAUSE), or a heading (HEADINGS); so a long one is cut and
     listed whole when punctuation ends it ("Order a CBC and a BMP and a lipid panel and a TSH and a urinalysis and a
     chest x-ray."). It reaches at most DIRECTIVE_REACH words past its verb, unless its sentence's punctuation ends it
-    within MARKED_REACH: speech recognition that wrote no punctuation never makes a paragraph one instruction. One that
-    already names the allergy list or the pharmacy it goes to stops there ("take amoxicillin off her allergy list"),
-    unless a word carries it on."""
+    within MARKED_REACH: speech recognition that wrote no punctuation never makes a paragraph one instruction. Where the
+    reach cuts it, it goes on while it lists more of what is ordered (a determiner and up to three words after it, "and",
+    a number, a quantity or a word of a reference name: "... a urinalysis a chest x ray and an ecg"), so no tail of an
+    order is left in the note.
+    One that already names the allergy list or the pharmacy it goes to stops there ("take amoxicillin off her allergy
+    list"), unless a word carries it on."""
     stop = min(_sentence_end(text, end), (text.find(";", end) + 1 or len(text) + 1) - 1)
     end += len(re.match(r"[\w'’]*", text[end:]).group())  # the whole of the word the match ended in ("allergies")
     following = [word for word in words if word.start >= end and word.end <= stop]
@@ -990,19 +993,61 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
         end, following = following[0].end, following[1:]
     if TARGET.search(text[:end]) and not (following and following[0].text in CARRIES_ON):
         return end
+    beyond: list[Token] = []
     if not (stop < len(text) and len(following) <= MARKED_REACH):
-        following = following[:DIRECTIVE_REACH]
+        following, beyond = following[:DIRECTIVE_REACH], following[DIRECTIVE_REACH:]
     joined = conditional = False
     for word in following:
         if word.text in CLAUSE_STARTS or word.text in HEADINGS or (not conditional and (
             (word.text in NEXT_CLAUSE and (joined or word is not following[0]))
             or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start]))
         )):
-            break
+            return end
         conditional = conditional or word.text in CONDITION_WORDS
         joined = word.text == "and"
         if not joined:
             end = word.end
+    if not beyond:
+        return end
+    # From the last article or "and" before the cut, so an item the cut fell inside is read whole ("a vitamin | D").
+    back = max((i for i, word in enumerate(following) if word.text in ARTICLES or word.text == "and"), default=len(following))
+    return max(end, _listing_end(text, following[back:] + beyond, following[back - 1].end if back else end))
+
+
+ARTICLES = frozenset("a an the some another".split())
+
+
+def _listing_end(text: str, words: list[Token], end: int) -> int:
+    """Where a list of what is ordered, cut by the reach, ends: it goes on over items (is_item()), articles and up to
+    three words after one that aren't stopwords ("an ecg", "a vitamin d level"), "and", numbers and words of an order's
+    quantities, and stops at the first other word, or a word after a comma that is none of these."""
+    i, after_article, last = 0, None, end
+    while i < len(words):
+        word = words[i].text
+        if "," in text[last : words[i].start]:
+            after_article = None
+        size = next((k for k in range(min(MAX_ITEM_WORDS, len(words) - i), 0, -1)
+                     if is_item([w.text for w in words[i : i + k]], "order")), 0)
+        if size:
+            after_article = None if after_article is None else after_article + size
+            end = last = words[i + size - 1].end
+            i += size
+            continue
+        if word in ARTICLES:
+            after_article = 0
+        elif word == "and":
+            after_article = None
+        elif word[0].isdigit() or word in _NUMBER_WORDS or word in _QUANTITY_WORDS:
+            after_article = None if after_article is None else after_article + 1
+        elif (after_article is not None and after_article < 3 and word not in STOPWORDS
+              and word not in NEXT_CLAUSE | CLAUSE_STARTS | HEADINGS):
+            after_article += 1
+        else:
+            break
+        if word != "and":
+            end = words[i].end
+        last = words[i].end
+        i += 1
     return end
 
 
@@ -1662,6 +1707,8 @@ QUANTITY = re.compile(
     r") )*"
 )
 
+# Every word an order's quantities may hold.
+_QUANTITY_WORDS = frozenset(re.findall(r"[a-z]{2,}", QUANTITY.pattern))
 # Every word of the closed classes but the items: none starts an item.
 _CLOSED_WORDS = frozenset(
     word
