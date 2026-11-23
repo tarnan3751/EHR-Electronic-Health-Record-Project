@@ -81,8 +81,8 @@ public sealed record DictationResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<SpeakerVoice>? Speakers = null)
 {
     public const string UnsortedMessage = "The fields couldn't be sorted, so the transcript is kept as plain text.";
-    public const string BusyMessage =
-        "The dictation server was too busy to draft this visit, so the transcript is kept as plain text.";
+    public const string BusyMessage = "The dictation service was busy for too long to draft this visit. The conversation is kept "
+        + "with this review until you finish it: write the note from it, or discard it.";
 
     // Ours, never the service's, and only when the fields couldn't be sorted (UC 10): a visit left undrafted because
     // dictations had K2 Horizon all along (model_busy) says so.
@@ -110,10 +110,9 @@ public enum Sorting
     Unavailable,
 }
 
-// Why the fields couldn't be sorted. A new reason from the service (one is coming for a visit ended undrafted because the
-// service was busy too long, such as service_busy) is added here, with its JsonStringEnumMemberName, and in the one other
-// place, the list of reasons in ehr.ambient_result_is_bare (db/policies/56-ambient-listening.sql, marked there):
-// DictationApiTests fails until the two lists are the same.
+// Why the fields couldn't be sorted. A new reason from the service is added here, with its JsonStringEnumMemberName, and in
+// the one other place, the list of reasons in ehr.ambient_result_is_bare (db/policies/56-ambient-listening.sql, marked
+// there): DictationApiTests fails until the two lists are the same.
 [JsonConverter(typeof(JsonStringEnumConverter<SortingFailure>))]
 public enum SortingFailure
 {

@@ -182,9 +182,9 @@ public sealed partial class DictationSidecarStub
             return new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver = Array.Empty<object>(), provenance };
         }
 
-        if (sorting is StubSorting.Timeout or StubSorting.Unavailable)
+        if (sorting is StubSorting.Timeout or StubSorting.Unavailable or StubSorting.Busy)
         {
-            return new { transcript, sorting = "unavailable", reason = "model_timeout", fields = (object?)null, notCarriedOver = Array.Empty<object>(), provenance };
+            return new { transcript, sorting = "unavailable", reason = sorting == StubSorting.Busy ? "model_busy" : "model_timeout", fields = (object?)null, notCarriedOver = Array.Empty<object>(), provenance };
         }
 
         // Who said it decides where it may go: the first thing the patient said, then the clinician's last three.

@@ -418,6 +418,9 @@ public enum StubSorting
 
     Unavailable,
 
+    // A recorded visit the service was too busy to draft: unavailable, with model_busy (step 16).
+    Busy,
+
     Discarded,
 }
 

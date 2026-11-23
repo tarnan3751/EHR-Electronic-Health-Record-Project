@@ -51,7 +51,8 @@ CREATE OR REPLACE TRIGGER ambient_consents_guard
 --   provenance: null, or the service's names for its models and code: speech, language and speaker, each null or
 --     {repository, commit, file, sha256}, and llamaServer, prompt, schema, structuring and code, each null or a string;
 --     every string short and code-shaped (letters, digits and . _ : / + -, at most 128);
---   message: none, null, or the app's own sentence for a result that couldn't be sorted (DictationResult.UnsortedMessage).
+--   message: none, null, or the app's own sentence for a result that couldn't be sorted: for model_busy, that the
+--     service was too busy (DictationResult.BusyMessage), and otherwise DictationResult.UnsortedMessage.
 -- So the one place left for words is a pending field's value: the words a proposal offers, kept as a dictation's are.
 -- Every comparison here is null-safe: what isn't there, or isn't of its type, fails.
 CREATE OR REPLACE FUNCTION ehr.ambient_result_is_bare(result jsonb) RETURNS boolean
@@ -73,10 +74,10 @@ AS $$
                             OR e.key = 'final' AND jsonb_typeof(e.value) = 'boolean'
                             OR e.key = 'unclear' AND e.value IN ('null', '"too_quiet"', '"too_noisy"', '"low_confidence"')
                             OR e.key = 'speaker' AND e.value IN ('"clinician"', '"patient"', '"other"', '"unsure"'))))
-        -- SortingFailure's codes (DictationApiContract.cs), and only those: a new one from the service (service_busy, say)
-        -- is added there and here, the one place in this file; DictationApiTests fails until the two lists are the same.
+        -- SortingFailure's codes (DictationApiContract.cs), and only those: a new one from the service is added there and
+        -- here; DictationApiTests fails until the two lists are the same.
         AND (result -> 'reason' IS NULL OR result -> 'reason' IN ('"model_unavailable"', '"model_timeout"',
-             '"model_output_invalid"', '"transcript_too_long"', '"transcription_failed"'))
+             '"model_output_invalid"', '"transcript_too_long"', '"transcription_failed"', '"model_busy"'))
         -- The fields: the note's four at most, each with its status, and only what that status has.
         AND coalesce(jsonb_typeof(result -> 'fields'), 'null') IN ('object', 'null')
         AND NOT EXISTS (
@@ -89,14 +90,15 @@ AS $$
                     OR e.key = 'value' AND f.value -> 'status' = '"pending"' AND jsonb_typeof(e.value) = 'string'
                     OR e.key IN ('sources', 'warnings') AND f.value -> 'status' = '"pending"' AND jsonb_typeof(e.value) = 'array'
                     OR e.key = 'reasons' AND f.value -> 'status' = '"empty"' AND jsonb_typeof(e.value) = 'array'
-                       AND jsonb_array_length(e.value) <= 20
+                       AND jsonb_array_length(e.value) <= 23
                        AND (SELECT count(DISTINCT r) = count(*) FROM jsonb_array_elements(e.value) r)
                        AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(e.value) r WHERE r NOT IN (
                            '"unknown_field"', '"not_dictated"', '"too_long"', '"bad_format"', '"order_or_allergy_change"',
                            '"no_sources"', '"source_too_short"', '"source_not_in_transcript"', '"source_in_unclear_passage"',
-                           '"wrong_speaker"', '"source_superseded"', '"number_not_in_sources"', '"date_not_in_sources"',
-                           '"drug_not_in_sources"', '"negation_dropped"', '"experiencer_dropped"', '"certainty_dropped"',
-                           '"history_dropped"', '"words_out_of_order"', '"unsupported_content"'))))
+                           '"wrong_speaker"', '"source_is_a_question"', '"bare_answer"', '"source_superseded"',
+                           '"number_not_in_sources"', '"date_not_in_sources"', '"drug_not_in_sources"', '"negation_dropped"',
+                           '"experiencer_dropped"', '"certainty_dropped"', '"history_dropped"', '"reported_dropped"',
+                           '"words_out_of_order"', '"unsupported_content"'))))
                OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(f.value -> 'sources') = 'array' THEN f.value -> 'sources' ELSE '[]' END) x
                           WHERE jsonb_typeof(x) <> 'object' OR EXISTS (SELECT 1 FROM jsonb_each(x) e WHERE NOT (
                               e.key IN ('start', 'end') AND jsonb_typeof(e.value) = 'number'
@@ -130,8 +132,12 @@ AS $$
                              SELECT 1 FROM jsonb_each(p.value) m
                              WHERE m.key NOT IN ('repository', 'commit', 'file', 'sha256') OR jsonb_typeof(m.value) <> 'string'
                                 OR m.value #>> '{}' !~ '^[A-Za-z0-9._:/+-]{1,128}$'))))
+        -- The app's own sentence, the one for its reason (DictationResult.Message).
         AND (result -> 'message' IS NULL OR result -> 'message' = 'null'
-             OR result ->> 'message' = 'The fields couldn''t be sorted, so the transcript is kept as plain text.'),
+             OR result ->> 'message' = CASE WHEN result ->> 'reason' = 'model_busy'
+                 THEN 'The dictation service was busy for too long to draft this visit. The conversation is kept with this '
+                      || 'review until you finish it: write the note from it, or discard it.'
+                 ELSE 'The fields couldn''t be sorted, so the transcript is kept as plain text.' END),
         false)
 $$;
 REVOKE ALL ON FUNCTION ehr.ambient_result_is_bare(jsonb) FROM PUBLIC;

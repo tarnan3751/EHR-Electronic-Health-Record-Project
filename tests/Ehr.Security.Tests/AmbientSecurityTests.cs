@@ -314,7 +314,8 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
     // the transcript's other keys and whether it was final; the fields, each with its status and only that status's
     // keys, never a history; the sorting failure's code; an empty field's reasons, the service's own codes, each once;
     // the instructions not carried over, each with its speaker; proposals; provenance's keys and code-shaped strings; and
-    // message, the app's own sentence. Each refused, staged as ehr_app; then an unsorted result as the app stores one.
+    // message, the app's own sentence for its reason. Each refused, staged as ehr_app; then an unsorted result as the app
+    // stores one, and one the service was too busy to draft.
     [Fact]
     public async Task Every_part_of_a_conversations_stored_result_is_held_to_its_type_keys_and_codes()
     {
@@ -323,6 +324,8 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         const string Transcript = "\"transcript\":{\"text\":\"\",\"final\":true,\"segments\":[]}";
         const string Done = Transcript + ",\"sorting\":\"done\"";
         const string Unsorted = Transcript + ",\"sorting\":\"unavailable\",\"reason\":\"model_timeout\",\"fields\":null,\"notCarriedOver\":[]";
+        const string NotSorted = "The fields couldn't be sorted, so the transcript is kept as plain text.";
+        const string Busy = "The dictation service was busy for too long to draft this visit. The conversation is kept with this review until you finish it: write the note from it, or discard it.";
         string[] variants =
         [
             "{" + Transcript.Replace("\"final\":true", $"\"final\":\"{Said}\"", StringComparison.Ordinal) + ",\"sorting\":\"done\"}",
@@ -334,7 +337,7 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
             "{" + Done + $",\"fields\":{{\"subjective\":{{\"value\":\"{Said}\",\"sources\":[],\"warnings\":[]}}}}}}",
             "{" + Done + $",\"fields\":{{\"subjective\":{{\"status\":\"pending\",\"value\":\"Synthetic proposal\",\"sources\":[],\"warnings\":[],\"said\":\"{Said}\"}}}}}}",
             "{" + Done + ",\"fields\":{\"objective\":{\"status\":\"empty\",\"reasons\":[\"the_patient_said_cough_for_three_days\"]}}}",
-            "{" + Done + ",\"fields\":{\"objective\":{\"status\":\"empty\",\"reasons\":[" + string.Join(",", Enumerable.Repeat("\"not_dictated\"", 21)) + "]}}}",
+            "{" + Done + ",\"fields\":{\"objective\":{\"status\":\"empty\",\"reasons\":[" + string.Join(",", Enumerable.Repeat("\"not_dictated\"", 24)) + "]}}}",
             "{" + Done + ",\"fields\":{\"objective\":{\"status\":\"empty\",\"reasons\":[\"not_dictated\",\"not_dictated\"]}}}",
             "{" + Transcript + ",\"sorting\":\"unavailable\",\"reason\":\"the_patient_said_cough\"}",
             "{" + Done + $",\"notCarriedOver\":\"{Said}\"}}",
@@ -347,6 +350,8 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
             "{" + Done + $",\"provenance\":{{\"speech\":{{\"repository\":\"synthetic\",\"words\":\"{Said}\"}}}}}}",
             "{" + Done + ",\"message\":5}",
             "{" + Done + $",\"message\":\"{Said}\"}}",
+            "{" + Unsorted + $",\"message\":\"{Busy}\"}}",
+            "{" + Unsorted.Replace("model_timeout", "model_busy", StringComparison.Ordinal) + $",\"message\":\"{NotSorted}\"}}",
         ];
         const string StageOnly = """
             UPDATE ehr.ai_note_reviews SET state = 'pending', result_json = @variant::jsonb WHERE id = @review;
@@ -363,6 +368,12 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
             """;
         await Accounts.ExecuteAsync(App, visit.Actor, StageOnly, [.. Parameters(visit), ("variant", unsorted)]);
         Assert.Equal(["pending"], await Query(visit, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
+
+        // And a visit the service was too busy to draft, with the sentence for that reason.
+        var busy = await RecordingAsync();
+        var busyResult = "{" + Unsorted.Replace("model_timeout", "model_busy", StringComparison.Ordinal) + $",\"message\":\"{Busy}\"}}";
+        await Accounts.ExecuteAsync(App, busy.Actor, StageOnly, [.. Parameters(busy), ("variant", busyResult)]);
+        Assert.Equal(["pending"], await Query(busy, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
     }
 
     // An edit of a proposal reads as the words it offered, or not, as the app reads it (OfferedWords): one table of cases

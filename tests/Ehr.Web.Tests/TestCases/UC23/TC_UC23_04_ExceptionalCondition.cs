@@ -271,13 +271,16 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("Listen to the visit into this draft", await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/notes/drafts/{draft}", Cancel));
     }
 
-    // A visit whose fields couldn't be sorted is staged as the app stores it, with the app's own sentence, which the
-    // database's guard on stored results holds it to, and the review says it.
-    [Fact]
-    public async Task A_visit_whose_fields_couldnt_be_sorted_is_staged_with_the_apps_own_sentence()
+    // A visit whose fields couldn't be sorted is staged as the app stores it, with the app's own sentence for why, which
+    // the database's guard on stored results holds it to, and the review says it: the service too busy to draft it
+    // (model_busy) has a sentence of its own, saying the conversation is kept with the review.
+    [Theory]
+    [InlineData(StubSorting.Unavailable, Ehr.Web.Api.Dictation.DictationResult.UnsortedMessage)]
+    [InlineData(StubSorting.Busy, Ehr.Web.Api.Dictation.DictationResult.BusyMessage)]
+    public async Task A_visit_whose_fields_couldnt_be_sorted_is_staged_with_the_apps_own_sentence(StubSorting sorting, string sentence)
     {
         var sidecar = apps.Dictation.Reset();
-        sidecar.Sorting = StubSorting.Unavailable;
+        sidecar.Sorting = sorting;
         var l = await StartAsync(apps);
         using (var stop = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/stop"))
         using (var named = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/speakers",
@@ -288,8 +291,12 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
 
         using var staged = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version });
         Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
-        Assert.Equal([Ehr.Web.Api.Dictation.DictationResult.UnsortedMessage], await RowsAsync(apps,
+        Assert.Equal([sentence], await RowsAsync(apps,
             "SELECT result_json ->> 'message' FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
+        var review = await l.Session.Client.GetStringAsync((await Json(staged)).GetProperty("url").GetString(), Cancel);
+        var snapshot = System.Text.Json.JsonDocument.Parse(WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Match(review,
+            "<script type=\"application/json\" data-review-snapshot>(.*?)</script>", System.Text.RegularExpressions.RegexOptions.Singleline).Groups[1].Value));
+        Assert.Equal(sentence, snapshot.RootElement.GetProperty("result").GetProperty("message").GetString());
     }
 
     [Fact]
