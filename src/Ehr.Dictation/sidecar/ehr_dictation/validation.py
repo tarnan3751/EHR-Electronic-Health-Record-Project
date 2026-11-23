@@ -958,7 +958,9 @@ NEW_CLAUSE = frozenset(
     review encourage advise advised explained recommend recommended come""".split()
 )
 # After the allergy list or a pharmacy, these carry an instruction on ("add an allergy to codeine"); anything else ends it.
-CARRIES_ON = frozenset("to for of include includes including with as".split())
+CARRIES_ON = frozenset("to for of from include includes including with as that".split())
+# A condition said in an instruction is part of it, subject and all: "order an MRI if he gets worse".
+CONDITION_WORDS = frozenset("if unless when whenever once until till".split())
 TARGET = re.compile(r"(?:allerg\w*|list|record|pharmacy)$", re.IGNORECASE)
 # What can follow "allergy" and still name the list: "allergy list", "allergy record".
 LIST_WORDS = frozenset("list record".split())
@@ -983,15 +985,14 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
         return end
     if not (stop < len(text) and len(following) <= MARKED_REACH):
         following = following[:DIRECTIVE_REACH]
-    joined = False
+    joined = conditional = False
     for word in following:
-        if (
-            word.text in CLAUSE_STARTS
-            or word.text in HEADINGS
-            or (word.text in NEXT_CLAUSE and (joined or word is not following[0]))
+        if word.text in CLAUSE_STARTS or word.text in HEADINGS or (not conditional and (
+            (word.text in NEXT_CLAUSE and (joined or word is not following[0]))
             or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start]))
-        ):
+        )):
             break
+        conditional = conditional or word.text in CONDITION_WORDS
         joined = word.text == "and"
         if not joined:
             end = word.end
@@ -1022,11 +1023,18 @@ def _without_instructions(value: str) -> tuple[str, int]:
         for i, piece in enumerate(pieces):
             piece = TRAILING_CONNECTOR.sub("", piece) if i < len(pieces) - 1 else piece
             piece = (LEADING_CONNECTOR.sub("", piece) if i else piece).strip()
-            if piece:
-                rest += (" " if rest and piece[0].isalnum() else "") + piece
-        if any(token.text not in LEAD_IN and token.text not in STOPWORDS for token in tokens(rest)):
+            if piece and rest and piece[0].isalnum():  # each side of a cut is a sentence of its own, as its source is
+                rest += (". " if _says_something(rest) and _says_something(piece) else " ") + piece
+            elif piece:
+                rest += piece
+        if _says_something(rest):
             kept.append(rest if rest[-1] in ".!?;" else rest + ".")
     return " ".join(kept).strip(), cut
+
+
+def _says_something(text: str) -> bool:
+    """Whether the text holds a word that isn't a stopword or a lead-in."""
+    return any(token.text not in LEAD_IN and token.text not in STOPWORDS for token in tokens(text))
 
 
 # ---- Grounding -----------------------------------------------------------------------------------------------------
@@ -1752,8 +1760,10 @@ def _trailers(words: list[str], at: int) -> bool:
 # sentence they don't catch is taken as unrelated). After it, it is held back when the next sentence:
 # - has BARE_SENTENCE words or fewer and a negation, a doubt or a retraction word (_NEXT_DOUBT), or points back at it
 #   (_POINTS_BACK);
-# - opens with "no", "not", "or", "instead", "actually", "hold" or "wait" (_NEXT_OPENING), or points back within its first
-#   three words ("Nix that, she had one Friday", a retraction misheard: "Cancer that order for now");
+# - opens with "no", "not", "or", "instead", "actually", "hold" or "wait", or goes on with what the instruction's
+#   sentence said ("with", "for", "because", "since", "which", "to": "Add nitrofurantoin to her allergy list. with a
+#   reaction rash", a full stop heard where none was said) (_NEXT_OPENING); or points back within its first three words
+#   ("Nix that, she had one Friday", a retraction misheard: "Cancer that order for now");
 # - points back and holds a negation or a word of removing it (_REMOVES: "We don't really need that one", "Take that out
 #   of the plan", "She had one done two days ago");
 # - for an allergy to add, speaks of an allergy or a reaction with a negation, someone else or a word pointing back ("She
@@ -1767,7 +1777,7 @@ _NEXT_DOUBT = frozenset(
     "likely unlikely might could would may".split()
 )
 _BARE_BEFORE = frozenset("no not nothing none never sure probably perhaps possibly maybe likely unlikely might could would may".split())
-_NEXT_OPENING = frozenset("no not nope never or instead rather actually hold wait".split())
+_NEXT_OPENING = frozenset("no not nope never or instead rather actually hold wait with for because since which to".split())
 _POINTS_BACK = frozenset("that it this these those them one".split())
 _A_NUMBER_OF = frozenset("day days week weeks month months year years hour hours time times more".split())  # "one week"
 _REMOVES = frozenset(

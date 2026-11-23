@@ -1191,6 +1191,30 @@ def test_the_instructions_next_to_them_are_still_listed_whole(said):
     assert text.text[listed["start"] : listed["end"]] == said.rstrip(".").removeprefix("No, ")
 
 
+# What an instruction says is listed and cut with it: its condition, subject and all, where it is removed from, and
+# what a note to the allergy list says.
+@pytest.mark.parametrize(("said", "instruction"), [
+    ("Order an MRI of the sinuses if he gets worse.", "Order an MRI of the sinuses if he gets worse"),
+    ("Remove the amiodarone allergy from his chart.", "Remove the amiodarone allergy from his chart"),
+    ("Add a note to her allergies that the reaction was hives.", "Add a note to her allergies that the reaction was hives"),
+])
+def test_an_instruction_is_listed_with_its_condition_and_what_it_takes(said, instruction):
+    text = transcript(said)
+
+    (listed,) = not_carried_over(text)
+    assert text.text[listed["start"] : listed["end"]] == instruction
+    assert own(said, said).reasons == ["order_or_allergy_change"]
+
+
+# What is left on each side of an instruction cut from the middle of a sentence is a sentence of its own, as its
+# sources are, so it still reads where it was said.
+def test_each_side_of_a_cut_is_a_sentence_of_its_own():
+    said = "We discussed ordering a sleep study, and she would rather wait."
+    checked = own(said, said)
+
+    assert checked.pending and checked.value == "We discussed. she would rather wait."
+
+
 # What is cut from a value is what is listed, never the rest of its sentence.
 def test_a_value_keeps_the_rest_of_a_sentence_an_instruction_is_cut_from():
     said = "Order a CBC and recheck in 3 months, she prefers mornings."
