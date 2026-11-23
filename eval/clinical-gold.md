@@ -2,13 +2,13 @@
 
 Written by `uv run --project eval python -m ehr_eval.goldreport` (`ehr_eval/goldreport.py`); don't edit it. Each script's display text is read as its transcript, and its clinical gold (`[gold.*]`), what a careful clinician would accept, is checked by the dictation service's own checks (`validation.py` in the sidecar). These are the values they would discard, with why, and the rule-following gold (`[gold_rules.*]`) that the eval measures the pipeline against instead. See README.md, Two gold sets.
 
-64 of 195 clinical gold values would be discarded. By reason (a value can have more than one):
+63 of 195 clinical gold values would be discarded. By reason (a value can have more than one):
 
 | Reason | Values |
 |---|---|
 | `words_out_of_order` | 37 |
 | `unsupported_content` | 26 |
-| `negation_dropped` | 4 |
+| `negation_dropped` | 3 |
 | `certainty_dropped` | 1 |
 | `drug_not_in_sources` | 1 |
 | `experiencer_dropped` | 1 |
@@ -243,13 +243,6 @@ Reasons: `unsupported_content`
 
 - Clinical gold: Episodic migraine without aura, improving, with good response to zavegepant for acute attacks.
 - Rule-following gold: Episodic migraine without aura, improving, good response to zavegepant for acute attacks.
-
-## d21-iga-sparsentan: subjective
-
-Reasons: `negation_dropped`
-
-- Clinical gold: 41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. On losartan 100 mg daily and dapagliflozin 10 mg daily. Feels well. No visible blood in the urine since the first episode, no swelling, no rashes, no joint pains. Does not smoke, drinks very little. Father needed dialysis in his sixties; mother has high blood pressure. Works as a teacher and wants to keep working full time.
-- Rule-following gold: 41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily. He feels well. No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains. He does not smoke and drinks very little. His father needed dialysis in his sixties and his mother has high blood pressure. He works as a teacher and wants to keep working full time.
 
 ## d21-iga-sparsentan: objective
 

@@ -97,8 +97,24 @@ def test_a_negation_within_3_words_makes_an_instruction_not_to_one_again():
     three = transcript("No b c not order an MRI.")
     four = transcript("No b c d not order an MRI.")
 
-    assert [three.text[r["start"] : r["end"]] for r in not_carried_over(three)] == ["order an MRI"]
+    assert [three.text[r["start"] : r["end"]] for r in not_carried_over(three)] == ["No b c not order an MRI"]
     assert not_carried_over(four) == []
+
+
+def test_a_negation_carries_through_a_list_for_30_words():
+    listed = [f"sign{a}{b}" for a in "ab" for b in "abcdefghijklmnop"][:31]
+    said = "Denies " + ", ".join(listed) + "."
+
+    reached = validation._qualifiers(said, validation.tokens(said))["negation_dropped"]
+    assert 30 in reached and 31 not in reached
+
+
+def test_a_piece_of_up_to_10_words_that_says_nothing_without_its_instruction_is_listed_with_it():
+    ten = "Do not start metformin or insulin or anything else until we order an A1c."
+    eleven = "Do not start metformin or insulin or anything else today until we order an A1c."
+
+    assert validation.directive_spans(ten) == [(0, len(ten) - 1)]
+    assert [eleven[s:e] for s, e in validation.directive_spans(eleven)] == ["we order an A1c"]
 
 
 def test_a_possible_correction_is_flagged_within_8_words():

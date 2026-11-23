@@ -93,7 +93,7 @@ class Instructing(FakeRecognizer):
 
     def recognize(self, samples: np.ndarray) -> Recognition:
         return Recognition(
-            "Start metformin {period} Go ahead and order a hemoglobin A1c {period} Add penicillin to her allergy list "
+            "Start metformin {period} Go ahead and order a hemoglobin A1c {period} Add amoxicillin to her allergy list "
             "{period}", 0.9
         )
 

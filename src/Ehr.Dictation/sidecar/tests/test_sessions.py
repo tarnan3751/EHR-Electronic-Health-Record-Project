@@ -584,7 +584,7 @@ class Ordering(FakeRecognizer):
     def recognize(self, samples):
         if self.failing:
             raise RuntimeError("Go ahead and order a hemoglobin A1c")  # what an exception might say: it must not be logged
-        return Recognition("Go ahead and order a hemoglobin A1c {period} Add penicillin to her allergy list {period}",
+        return Recognition("Go ahead and order a hemoglobin A1c {period} Add amoxicillin to her allergy list {period}",
                            0.9)
 
 
@@ -606,10 +606,10 @@ def test_a_result_proposes_only_from_a_final_transcript_and_logs_no_words(settin
 
     text = final["transcript"]["text"]
     assert final["transcript"]["final"] and {(p["kind"], text[p["start"] : p["end"]]) for p in final["proposals"]} == {
-        ("order", "Go ahead and order a hemoglobin A1c"), ("allergy_addition", "Add penicillin to her allergy list")}
+        ("order", "Go ahead and order a hemoglobin A1c"), ("allergy_addition", "Add amoxicillin to her allergy list")}
     assert len(final["proposals"]) == len(final["notCarriedOver"])
     assert not live["transcript"]["final"] and live["notCarriedOver"] and live["proposals"] == []
-    assert "proposals" in caplog.text and "order a hemoglobin A1c" not in caplog.text and "penicillin" not in caplog.text
+    assert "proposals" in caplog.text and "order a hemoglobin A1c" not in caplog.text and "amoxicillin" not in caplog.text
 
 
 # A kind of session that must propose nothing (Session.proposes) still lists every instruction, and proposes none.

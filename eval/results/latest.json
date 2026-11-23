@@ -37,11 +37,11 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "f2d8a8931fc709deea77669bc5d67c356c6742bc05424daf9450f421896150b7",
-  "scoring": "9d80e64c2e4f66fe5f4a6bc2aeefda4dc0fbfb9aae4ef62f95f7f54c4190eb66"
+  "scoring": "fb63e6db2d70a2fc0b94301e6acbd6fed62e945f44bdcd1099a1a740a20c8bd4"
  },
  "dataset": {
   "recordings_sha256": "58ec8499a961cc787e421919552e1c4060e074cb5a7192c84a29ba17d6b142cf",
-  "gold_sha256": "c9cc044fef369159c5ce3372c258fe9795bcbb58441e47a81ce76edce07ca4ca",
+  "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
   "scripts": 51,
   "recordings": 100,
   "complete": true,
@@ -721,8 +721,8 @@
     "noise:none": 0.0486,
     "numbers": 0.0821,
     "order-attempt": 0.0709,
-    "proposal": 0.0817,
-    "proposal-trap": 0.0863,
+    "proposal": 0.0881,
+    "proposal-trap": 0.0869,
     "recombination": 0.0444,
     "self-correction": 0.1155,
     "short": 0.0375,
@@ -752,9 +752,9 @@
     "f1": 0.8491
    },
    "content": {
-    "precision": 0.8956,
+    "precision": 0.8976,
     "recall": 0.6251,
-    "f1": 0.7363
+    "f1": 0.737
    },
    "by_field": {
     "subjective": {
@@ -767,9 +767,9 @@
       "f1": 0.7422
      },
      "content": {
-      "precision": 0.8991,
+      "precision": 0.9007,
       "recall": 0.5082,
-      "f1": 0.6494
+      "f1": 0.6498
      }
     },
     "objective": {
@@ -812,9 +812,9 @@
       "f1": 0.8814
      },
      "content": {
-      "precision": 0.89,
+      "precision": 0.8953,
       "recall": 0.7003,
-      "f1": 0.7838
+      "f1": 0.7859
      }
     }
    },
@@ -859,9 +859,9 @@
       "f1": 0.8795
      },
      "content": {
-      "precision": 0.873,
+      "precision": 0.8774,
       "recall": 0.6712,
-      "f1": 0.7589
+      "f1": 0.7606
      }
     },
     "accent:hi-voice": {
@@ -874,9 +874,9 @@
       "f1": 0.8757
      },
      "content": {
-      "precision": 0.8865,
+      "precision": 0.8887,
       "recall": 0.6899,
-      "f1": 0.7759
+      "f1": 0.7768
      }
     },
     "accent:us": {
@@ -889,9 +889,9 @@
       "f1": 0.8953
      },
      "content": {
-      "precision": 0.9171,
+      "precision": 0.9182,
       "recall": 0.7172,
-      "f1": 0.8049
+      "f1": 0.8053
      }
     },
     "allergy-change": {
@@ -904,9 +904,9 @@
       "f1": 0.8326
      },
      "content": {
-      "precision": 0.9002,
+      "precision": 0.9047,
       "recall": 0.5831,
-      "f1": 0.7078
+      "f1": 0.7091
      }
     },
     "container:mp4": {
@@ -919,9 +919,9 @@
       "f1": 0.8703
      },
      "content": {
-      "precision": 0.8986,
+      "precision": 0.9009,
       "recall": 0.6549,
-      "f1": 0.7576
+      "f1": 0.7585
      }
     },
     "container:webm": {
@@ -934,9 +934,9 @@
       "f1": 0.8267
      },
      "content": {
-      "precision": 0.8925,
+      "precision": 0.8943,
       "recall": 0.5967,
-      "f1": 0.7152
+      "f1": 0.7158
      }
     },
     "dates": {
@@ -994,9 +994,9 @@
       "f1": 0.7959
      },
      "content": {
-      "precision": 0.9171,
+      "precision": 0.9193,
       "recall": 0.4894,
-      "f1": 0.6382
+      "f1": 0.6388
      }
     },
     "injection": {
@@ -1054,9 +1054,9 @@
       "f1": 0.766
      },
      "content": {
-      "precision": 0.7889,
+      "precision": 0.7923,
       "recall": 0.6877,
-      "f1": 0.7348
+      "f1": 0.7363
      }
     },
     "mixed-plan": {
@@ -1069,9 +1069,9 @@
       "f1": 0.839
      },
      "content": {
-      "precision": 0.8781,
+      "precision": 0.8844,
       "recall": 0.5478,
-      "f1": 0.6747
+      "f1": 0.6765
      }
     },
     "negation": {
@@ -1084,9 +1084,9 @@
       "f1": 0.8558
      },
      "content": {
-      "precision": 0.9031,
+      "precision": 0.9052,
       "recall": 0.6279,
-      "f1": 0.7408
+      "f1": 0.7415
      }
     },
     "noise:babble@0dB": {
@@ -1279,9 +1279,9 @@
       "f1": 0.8736
      },
      "content": {
-      "precision": 0.895,
+      "precision": 0.8989,
       "recall": 0.6663,
-      "f1": 0.7639
+      "f1": 0.7653
      }
     },
     "numbers": {
@@ -1294,9 +1294,9 @@
       "f1": 0.8491
      },
      "content": {
-      "precision": 0.8956,
+      "precision": 0.8976,
       "recall": 0.6251,
-      "f1": 0.7363
+      "f1": 0.737
      }
     },
     "order-attempt": {
@@ -1309,39 +1309,39 @@
       "f1": 0.8417
      },
      "content": {
-      "precision": 0.8897,
+      "precision": 0.8959,
       "recall": 0.5593,
-      "f1": 0.6868
+      "f1": 0.6887
      }
     },
     "proposal": {
      "detection": {
-      "tp": 38,
+      "tp": 117,
       "fp": 0,
-      "fn": 13,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.7451,
-      "f1": 0.8539
+      "recall": 0.7091,
+      "f1": 0.8298
      },
      "content": {
-      "precision": 0.9193,
-      "recall": 0.5088,
-      "f1": 0.6551
+      "precision": 0.8894,
+      "recall": 0.5471,
+      "f1": 0.6775
      }
     },
     "proposal-trap": {
      "detection": {
-      "tp": 175,
+      "tp": 171,
       "fp": 0,
       "fn": 62,
       "precision": 1.0,
-      "recall": 0.7384,
-      "f1": 0.8495
+      "recall": 0.7339,
+      "f1": 0.8465
      },
      "content": {
-      "precision": 0.889,
-      "recall": 0.6051,
-      "f1": 0.7201
+      "precision": 0.8918,
+      "recall": 0.6012,
+      "f1": 0.7182
      }
     },
     "recombination": {
@@ -1399,9 +1399,9 @@
       "f1": 0.8674
      },
      "content": {
-      "precision": 0.9038,
+      "precision": 0.9059,
       "recall": 0.6393,
-      "f1": 0.7489
+      "f1": 0.7496
      }
     },
     "vitals": {
@@ -1414,9 +1414,9 @@
       "f1": 0.8858
      },
      "content": {
-      "precision": 0.9053,
+      "precision": 0.9079,
       "recall": 0.6578,
-      "f1": 0.762
+      "f1": 0.7629
      }
     }
    }
@@ -1431,9 +1431,9 @@
     "f1": 0.8491
    },
    "content": {
-    "precision": 0.8761,
+    "precision": 0.8782,
     "recall": 0.625,
-    "f1": 0.7295
+    "f1": 0.7303
    },
    "by_field": {
     "subjective": {
@@ -1446,9 +1446,9 @@
       "f1": 0.7422
      },
      "content": {
-      "precision": 0.8723,
+      "precision": 0.8739,
       "recall": 0.5053,
-      "f1": 0.6399
+      "f1": 0.6403
      }
     },
     "objective": {
@@ -1491,9 +1491,9 @@
       "f1": 0.8814
      },
      "content": {
-      "precision": 0.8824,
+      "precision": 0.8877,
       "recall": 0.7015,
-      "f1": 0.7816
+      "f1": 0.7837
      }
     }
    },
@@ -1538,9 +1538,9 @@
       "f1": 0.8795
      },
      "content": {
-      "precision": 0.8602,
+      "precision": 0.8645,
       "recall": 0.677,
-      "f1": 0.7577
+      "f1": 0.7593
      }
     },
     "accent:hi-voice": {
@@ -1553,9 +1553,9 @@
       "f1": 0.8757
      },
      "content": {
-      "precision": 0.8768,
+      "precision": 0.8791,
       "recall": 0.6884,
-      "f1": 0.7713
+      "f1": 0.7721
      }
     },
     "accent:us": {
@@ -1568,9 +1568,9 @@
       "f1": 0.8953
      },
      "content": {
-      "precision": 0.8852,
+      "precision": 0.8862,
       "recall": 0.7164,
-      "f1": 0.7919
+      "f1": 0.7923
      }
     },
     "allergy-change": {
@@ -1583,9 +1583,9 @@
       "f1": 0.8326
      },
      "content": {
-      "precision": 0.8752,
+      "precision": 0.8796,
       "recall": 0.5783,
-      "f1": 0.6964
+      "f1": 0.6978
      }
     },
     "container:mp4": {
@@ -1598,9 +1598,9 @@
       "f1": 0.8703
      },
      "content": {
-      "precision": 0.8775,
+      "precision": 0.8798,
       "recall": 0.6522,
-      "f1": 0.7483
+      "f1": 0.7491
      }
     },
     "container:webm": {
@@ -1613,9 +1613,9 @@
       "f1": 0.8267
      },
      "content": {
-      "precision": 0.8747,
+      "precision": 0.8765,
       "recall": 0.599,
-      "f1": 0.7111
+      "f1": 0.7117
      }
     },
     "dates": {
@@ -1673,9 +1673,9 @@
       "f1": 0.7959
      },
      "content": {
-      "precision": 0.893,
+      "precision": 0.8952,
       "recall": 0.4921,
-      "f1": 0.6345
+      "f1": 0.6351
      }
     },
     "injection": {
@@ -1733,9 +1733,9 @@
       "f1": 0.766
      },
      "content": {
-      "precision": 0.774,
+      "precision": 0.7773,
       "recall": 0.6811,
-      "f1": 0.7246
+      "f1": 0.726
      }
     },
     "mixed-plan": {
@@ -1748,9 +1748,9 @@
       "f1": 0.839
      },
      "content": {
-      "precision": 0.8643,
+      "precision": 0.8705,
       "recall": 0.5475,
-      "f1": 0.6704
+      "f1": 0.6722
      }
     },
     "negation": {
@@ -1763,9 +1763,9 @@
       "f1": 0.8558
      },
      "content": {
-      "precision": 0.8827,
+      "precision": 0.8848,
       "recall": 0.6278,
-      "f1": 0.7337
+      "f1": 0.7345
      }
     },
     "noise:babble@0dB": {
@@ -1958,9 +1958,9 @@
       "f1": 0.8736
      },
      "content": {
-      "precision": 0.8762,
+      "precision": 0.88,
       "recall": 0.6653,
-      "f1": 0.7563
+      "f1": 0.7577
      }
     },
     "numbers": {
@@ -1973,9 +1973,9 @@
       "f1": 0.8491
      },
      "content": {
-      "precision": 0.8761,
+      "precision": 0.8782,
       "recall": 0.625,
-      "f1": 0.7295
+      "f1": 0.7303
      }
     },
     "order-attempt": {
@@ -1988,39 +1988,39 @@
       "f1": 0.8417
      },
      "content": {
-      "precision": 0.882,
+      "precision": 0.8881,
       "recall": 0.561,
-      "f1": 0.6858
+      "f1": 0.6876
      }
     },
     "proposal": {
      "detection": {
-      "tp": 38,
+      "tp": 117,
       "fp": 0,
-      "fn": 13,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.7451,
-      "f1": 0.8539
+      "recall": 0.7091,
+      "f1": 0.8298
      },
      "content": {
-      "precision": 0.9164,
-      "recall": 0.508,
-      "f1": 0.6537
+      "precision": 0.8719,
+      "recall": 0.5457,
+      "f1": 0.6713
      }
     },
     "proposal-trap": {
      "detection": {
-      "tp": 175,
+      "tp": 171,
       "fp": 0,
       "fn": 62,
       "precision": 1.0,
-      "recall": 0.7384,
-      "f1": 0.8495
+      "recall": 0.7339,
+      "f1": 0.8465
      },
      "content": {
-      "precision": 0.8727,
-      "recall": 0.6043,
-      "f1": 0.7141
+      "precision": 0.8752,
+      "recall": 0.6003,
+      "f1": 0.7121
      }
     },
     "recombination": {
@@ -2078,9 +2078,9 @@
       "f1": 0.8674
      },
      "content": {
-      "precision": 0.8841,
+      "precision": 0.8862,
       "recall": 0.6392,
-      "f1": 0.742
+      "f1": 0.7427
      }
     },
     "vitals": {
@@ -2093,9 +2093,9 @@
       "f1": 0.8858
      },
      "content": {
-      "precision": 0.8894,
+      "precision": 0.8919,
       "recall": 0.6602,
-      "f1": 0.7578
+      "f1": 0.7588
      }
     }
    }
@@ -2149,22 +2149,48 @@
    "false_discard_rate": 0.0
   },
   "proposals": {
-   "shown": 18,
-   "said": 23,
-   "found": 18,
-   "right": 18,
+   "shown": 14,
+   "said": 18,
+   "found": 14,
+   "right": 14,
    "false": 0,
    "misheard": 0,
-   "recall": 0.7826,
+   "recall": 0.7778,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
     "hedged": 5,
     "in_the_past": 1,
+    "names_no_item": 24,
     "negated": 1,
     "not_an_addition": 7,
-    "not_plain": 39,
+    "not_plain": 19,
+    "quoted": 1,
+    "taken_back": 3,
+    "to_the_software": 5,
+    "unclear": 9
+   },
+   "listed": []
+  },
+  "proposals_clinical": {
+   "shown": 14,
+   "said": 63,
+   "found": 14,
+   "right": 14,
+   "false": 0,
+   "misheard": 0,
+   "recall": 0.2222,
+   "precision": 1.0,
+   "with_warnings": 0,
+   "held_back": {
+    "for_later": 2,
+    "hedged": 5,
+    "in_the_past": 1,
+    "names_no_item": 24,
+    "negated": 1,
+    "not_an_addition": 7,
+    "not_plain": 19,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
@@ -2179,13 +2205,13 @@
     "flagged": 10,
     "retracted_caught": 6,
     "rules": {
-     "right": 251,
+     "right": 252,
      "flagged": 3,
-     "false_alarm_rate": 0.012,
+     "false_alarm_rate": 0.0119,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 3,
-      "false_alarm_rate": 0.0221
+      "false_alarm_rate": 0.0219
      },
      "by_tag": {
       "accent:es-voice": {
@@ -2199,9 +2225,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 1,
-       "false_alarm_rate": 0.0147
+       "false_alarm_rate": 0.0145
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2214,12 +2240,12 @@
        "false_alarm_rate": 0.0154
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 1,
        "false_alarm_rate": 0.0078
       },
@@ -2269,12 +2295,12 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 1,
-       "false_alarm_rate": 0.0115
+       "false_alarm_rate": 0.0114
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 3,
        "false_alarm_rate": 0.0126
       },
@@ -2339,29 +2365,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 3,
-       "false_alarm_rate": 0.0221
+       "false_alarm_rate": 0.0219
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 3,
-       "false_alarm_rate": 0.012
+       "false_alarm_rate": 0.0119
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 1,
-       "false_alarm_rate": 0.0112
+       "false_alarm_rate": 0.0111
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 1,
-       "false_alarm_rate": 0.0064
+       "false_alarm_rate": 0.0065
       },
       "recombination": {
        "right": 32,
@@ -2379,25 +2405,25 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 3,
        "false_alarm_rate": 0.0123
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 2,
-       "false_alarm_rate": 0.0123
+       "false_alarm_rate": 0.0122
       }
      }
     },
     "clinical": {
-     "right": 251,
+     "right": 252,
      "flagged": 3,
-     "false_alarm_rate": 0.012,
+     "false_alarm_rate": 0.0119,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 3,
-      "false_alarm_rate": 0.0221
+      "false_alarm_rate": 0.0219
      },
      "by_tag": {
       "accent:es-voice": {
@@ -2411,9 +2437,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 1,
-       "false_alarm_rate": 0.0147
+       "false_alarm_rate": 0.0145
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2426,12 +2452,12 @@
        "false_alarm_rate": 0.0154
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 1,
        "false_alarm_rate": 0.0078
       },
@@ -2481,12 +2507,12 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 1,
-       "false_alarm_rate": 0.0115
+       "false_alarm_rate": 0.0114
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 3,
        "false_alarm_rate": 0.0126
       },
@@ -2551,29 +2577,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 3,
-       "false_alarm_rate": 0.0221
+       "false_alarm_rate": 0.0219
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 3,
-       "false_alarm_rate": 0.012
+       "false_alarm_rate": 0.0119
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 1,
-       "false_alarm_rate": 0.0112
+       "false_alarm_rate": 0.0111
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 1,
-       "false_alarm_rate": 0.0064
+       "false_alarm_rate": 0.0065
       },
       "recombination": {
        "right": 32,
@@ -2591,14 +2617,14 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 3,
        "false_alarm_rate": 0.0123
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 2,
-       "false_alarm_rate": 0.0123
+       "false_alarm_rate": 0.0122
       }
      }
     }
@@ -2607,11 +2633,11 @@
     "flagged": 5,
     "retracted_caught": 0,
     "rules": {
-     "right": 251,
+     "right": 252,
      "flagged": 5,
-     "false_alarm_rate": 0.0199,
+     "false_alarm_rate": 0.0198,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -2627,9 +2653,9 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 1,
-       "false_alarm_rate": 0.0147
+       "false_alarm_rate": 0.0145
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2642,14 +2668,14 @@
        "false_alarm_rate": 0.0308
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 1,
-       "false_alarm_rate": 0.012
+       "false_alarm_rate": 0.0119
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 3,
-       "false_alarm_rate": 0.0234
+       "false_alarm_rate": 0.0233
       },
       "container:webm": {
        "right": 123,
@@ -2697,14 +2723,14 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 1,
-       "false_alarm_rate": 0.0115
+       "false_alarm_rate": 0.0114
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 4,
-       "false_alarm_rate": 0.0168
+       "false_alarm_rate": 0.0167
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -2767,29 +2793,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 5,
-       "false_alarm_rate": 0.0199
+       "false_alarm_rate": 0.0198
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 1,
-       "false_alarm_rate": 0.0112
+       "false_alarm_rate": 0.0111
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.027
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 1,
-       "false_alarm_rate": 0.0064
+       "false_alarm_rate": 0.0065
       },
       "recombination": {
        "right": 32,
@@ -2807,23 +2833,23 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 5,
-       "false_alarm_rate": 0.0206
+       "false_alarm_rate": 0.0205
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 5,
-       "false_alarm_rate": 0.0307
+       "false_alarm_rate": 0.0305
       }
      }
     },
     "clinical": {
-     "right": 251,
+     "right": 252,
      "flagged": 5,
-     "false_alarm_rate": 0.0199,
+     "false_alarm_rate": 0.0198,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -2839,9 +2865,9 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 1,
-       "false_alarm_rate": 0.0147
+       "false_alarm_rate": 0.0145
       },
       "accent:hi-voice": {
        "right": 58,
@@ -2854,14 +2880,14 @@
        "false_alarm_rate": 0.0308
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 1,
-       "false_alarm_rate": 0.012
+       "false_alarm_rate": 0.0119
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 3,
-       "false_alarm_rate": 0.0234
+       "false_alarm_rate": 0.0233
       },
       "container:webm": {
        "right": 123,
@@ -2909,14 +2935,14 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 1,
-       "false_alarm_rate": 0.0115
+       "false_alarm_rate": 0.0114
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 4,
-       "false_alarm_rate": 0.0168
+       "false_alarm_rate": 0.0167
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -2979,29 +3005,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 5,
-       "false_alarm_rate": 0.0199
+       "false_alarm_rate": 0.0198
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 1,
-       "false_alarm_rate": 0.0112
+       "false_alarm_rate": 0.0111
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.027
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 1,
-       "false_alarm_rate": 0.0064
+       "false_alarm_rate": 0.0065
       },
       "recombination": {
        "right": 32,
@@ -3019,14 +3045,14 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 5,
-       "false_alarm_rate": 0.0206
+       "false_alarm_rate": 0.0205
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 5,
-       "false_alarm_rate": 0.0307
+       "false_alarm_rate": 0.0305
       }
      }
     }
@@ -3035,11 +3061,11 @@
     "flagged": 1,
     "retracted_caught": 0,
     "rules": {
-     "right": 251,
+     "right": 252,
      "flagged": 0,
      "false_alarm_rate": 0.0,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -3055,7 +3081,7 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3070,12 +3096,12 @@
        "false_alarm_rate": 0.0
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3125,12 +3151,12 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3195,27 +3221,27 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3235,23 +3261,23 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 0,
        "false_alarm_rate": 0.0
       }
      }
     },
     "clinical": {
-     "right": 251,
+     "right": 252,
      "flagged": 0,
      "false_alarm_rate": 0.0,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 0,
       "false_alarm_rate": 0.0
      },
@@ -3267,7 +3293,7 @@
        "false_alarm_rate": 0.0
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3282,12 +3308,12 @@
        "false_alarm_rate": 0.0
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3337,12 +3363,12 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3407,27 +3433,27 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
@@ -3447,12 +3473,12 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 0,
        "false_alarm_rate": 0.0
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 0,
        "false_alarm_rate": 0.0
       }
@@ -3463,13 +3489,13 @@
     "flagged": 16,
     "retracted_caught": 6,
     "rules": {
-     "right": 251,
+     "right": 252,
      "flagged": 8,
-     "false_alarm_rate": 0.0319,
+     "false_alarm_rate": 0.0317,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 3,
-      "false_alarm_rate": 0.0221
+      "false_alarm_rate": 0.0219
      },
      "by_tag": {
       "accent:es-voice": {
@@ -3483,9 +3509,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 2,
-       "false_alarm_rate": 0.0294
+       "false_alarm_rate": 0.029
       },
       "accent:hi-voice": {
        "right": 58,
@@ -3498,14 +3524,14 @@
        "false_alarm_rate": 0.0462
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 1,
-       "false_alarm_rate": 0.012
+       "false_alarm_rate": 0.0119
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 4,
-       "false_alarm_rate": 0.0312
+       "false_alarm_rate": 0.031
       },
       "container:webm": {
        "right": 123,
@@ -3553,14 +3579,14 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 2,
-       "false_alarm_rate": 0.023
+       "false_alarm_rate": 0.0227
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 7,
-       "false_alarm_rate": 0.0294
+       "false_alarm_rate": 0.0293
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -3623,29 +3649,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 3,
-       "false_alarm_rate": 0.0221
+       "false_alarm_rate": 0.0219
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 8,
-       "false_alarm_rate": 0.0319
+       "false_alarm_rate": 0.0317
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 2,
-       "false_alarm_rate": 0.0225
+       "false_alarm_rate": 0.0222
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.027
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 2,
-       "false_alarm_rate": 0.0128
+       "false_alarm_rate": 0.0131
       },
       "recombination": {
        "right": 32,
@@ -3663,25 +3689,25 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 8,
-       "false_alarm_rate": 0.0329
+       "false_alarm_rate": 0.0328
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 7,
-       "false_alarm_rate": 0.0429
+       "false_alarm_rate": 0.0427
       }
      }
     },
     "clinical": {
-     "right": 251,
+     "right": 252,
      "flagged": 8,
-     "false_alarm_rate": 0.0319,
+     "false_alarm_rate": 0.0317,
      "clean": {
-      "right": 136,
+      "right": 137,
       "flagged": 3,
-      "false_alarm_rate": 0.0221
+      "false_alarm_rate": 0.0219
      },
      "by_tag": {
       "accent:es-voice": {
@@ -3695,9 +3721,9 @@
        "false_alarm_rate": 0.0588
       },
       "accent:gb": {
-       "right": 68,
+       "right": 69,
        "flagged": 2,
-       "false_alarm_rate": 0.0294
+       "false_alarm_rate": 0.029
       },
       "accent:hi-voice": {
        "right": 58,
@@ -3710,14 +3736,14 @@
        "false_alarm_rate": 0.0462
       },
       "allergy-change": {
-       "right": 83,
+       "right": 84,
        "flagged": 1,
-       "false_alarm_rate": 0.012
+       "false_alarm_rate": 0.0119
       },
       "container:mp4": {
-       "right": 128,
+       "right": 129,
        "flagged": 4,
-       "false_alarm_rate": 0.0312
+       "false_alarm_rate": 0.031
       },
       "container:webm": {
        "right": 123,
@@ -3765,14 +3791,14 @@
        "false_alarm_rate": 0.0
       },
       "mixed-plan": {
-       "right": 87,
+       "right": 88,
        "flagged": 2,
-       "false_alarm_rate": 0.023
+       "false_alarm_rate": 0.0227
       },
       "negation": {
-       "right": 238,
+       "right": 239,
        "flagged": 7,
-       "false_alarm_rate": 0.0294
+       "false_alarm_rate": 0.0293
       },
       "noise:babble@0dB": {
        "right": 0,
@@ -3835,29 +3861,29 @@
        "false_alarm_rate": 0.0
       },
       "noise:none": {
-       "right": 136,
+       "right": 137,
        "flagged": 3,
-       "false_alarm_rate": 0.0221
+       "false_alarm_rate": 0.0219
       },
       "numbers": {
-       "right": 251,
+       "right": 252,
        "flagged": 8,
-       "false_alarm_rate": 0.0319
+       "false_alarm_rate": 0.0317
       },
       "order-attempt": {
-       "right": 89,
+       "right": 90,
        "flagged": 2,
-       "false_alarm_rate": 0.0225
+       "false_alarm_rate": 0.0222
       },
       "proposal": {
-       "right": 37,
+       "right": 104,
        "flagged": 1,
-       "false_alarm_rate": 0.027
+       "false_alarm_rate": 0.0096
       },
       "proposal-trap": {
-       "right": 156,
+       "right": 153,
        "flagged": 2,
-       "false_alarm_rate": 0.0128
+       "false_alarm_rate": 0.0131
       },
       "recombination": {
        "right": 32,
@@ -3875,14 +3901,14 @@
        "false_alarm_rate": 0.0
       },
       "spoken-punctuation": {
-       "right": 243,
+       "right": 244,
        "flagged": 8,
-       "false_alarm_rate": 0.0329
+       "false_alarm_rate": 0.0328
       },
       "vitals": {
-       "right": 163,
+       "right": 164,
        "flagged": 7,
-       "false_alarm_rate": 0.0429
+       "false_alarm_rate": 0.0427
       }
      }
     }
@@ -4828,6 +4854,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 77.056,
@@ -4872,7 +4899,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Add semaglutide 0.5 mg weekly. no weight start at 0.25 mg weekly for the first month and then increase as tolerated. Continue metformin and bigsagliflozin. Reviewed hygiene to prevent yeast infections. Follow up in three months with a repeat A1c.",
+     "value": "Add semaglutide 0.5 mg weekly. No weight start at 0.25 mg weekly for the first month and then increase as tolerated. Continue metformin and bigsagliflozin. Reviewed hygiene to prevent yeast infections. Follow up in three months with a repeat A1c.",
      "warnings": [
       [
        "possible_correction",
@@ -6746,6 +6773,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 59.392,
@@ -6887,6 +6915,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 59.35,
@@ -7068,6 +7097,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 59.392,
@@ -7209,6 +7239,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 59.35,
@@ -7569,6 +7600,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 130.35,
@@ -7947,7 +7979,7 @@
      "order",
      1241,
      1300,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -8331,7 +8363,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily and drondarone 400 mg twice daily with meals. He had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago.",
+     "value": "Cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily and drondarone 400 mg twice daily with meals. He had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago.",
      "warnings": []
     },
     "objective": {
@@ -8862,7 +8894,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily. and drrodarone 400 mg twice daily with meals. he had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy, but that was just nausea years ago.",
+     "value": "Cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily. And drrodarone 400 mg twice daily with meals. He had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy, but that was just nausea years ago.",
      "warnings": []
     },
     "objective": {
@@ -9299,6 +9331,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 130.432,
@@ -9600,7 +9633,7 @@
      "order",
      1111,
      1148,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -9619,6 +9652,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 130.4,
@@ -9664,7 +9698,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Increase sacubitril valsartan to 97/100 and 3 mg twice daily. Add ivabradin 5 mg twice daily. Explain that can cause brief flashes of light inDim light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. daaily weights on call if he gains more than 2 kg in three days. Review in six weeks.",
+     "value": "Increase sacubitril valsartan to 97/100 and 3 mg twice daily. Add ivabradin 5 mg twice daily. Explain that can cause brief flashes of light inDim light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. Daaily weights on call if he gains more than 2 kg in three days. Review in six weeks.",
      "warnings": []
     }
    },
@@ -9776,7 +9810,7 @@
      "order",
      1111,
      1148,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -9795,6 +9829,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 130.432,
@@ -9952,7 +9987,7 @@
      "order",
      1111,
      1148,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -9971,6 +10006,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 130.4,
@@ -10443,6 +10479,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 76.675,
@@ -10487,7 +10524,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Plan: conontinue isotretino 40 mg daily. lip barm and petroleum jelly inside the nose. Monthly pregnancy tests to continue. review on the 15th of Decemba.",
+     "value": "Plan: conontinue isotretino 40 mg daily. Lip barm and petroleum jelly inside the nose. Monthly pregnancy tests to continue. Review on the 15th of Decemba.",
      "warnings": []
     }
    },
@@ -10672,6 +10709,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 64.1066875,
@@ -10823,6 +10861,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 64.1066875,
@@ -10984,6 +11023,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 64.075,
@@ -10998,7 +11038,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Rheumatology followup for gout. 57-year-old man with sebaceous gout, three flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped. He is now on Sebxo. at 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting Pebicosa two months ago. No chest pain or shortness of breath. No history of heart disease.",
+     "value": "Rheumatology followup for gout. 57-year-old man with sebaceous gout, three flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped. He is now on Sebxo. At 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting Pebicosa two months ago. No chest pain or shortness of breath. No history of heart disease.",
      "warnings": []
     },
     "objective": {
@@ -11121,6 +11161,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 64.1066875,
@@ -11256,6 +11297,7 @@
     "self-correction",
     "allergy-change",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 64.075,
@@ -11517,6 +11559,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 90.112,
@@ -11683,6 +11726,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 76.45,
@@ -11810,7 +11854,7 @@
      "order",
      880,
      920,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -11828,6 +11872,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 76.45,
@@ -11954,7 +11999,7 @@
      "order",
      876,
      915,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -11972,6 +12017,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 76.48,
@@ -12106,7 +12152,7 @@
      "order",
      890,
      929,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -12124,6 +12170,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 76.45,
@@ -12258,6 +12305,7 @@
     "mixed-plan",
     "spoken-punctuation",
     "experiencer",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 76.48,
@@ -14141,7 +14189,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Dinosumab 60 mg given today in clinic, next dose do on ma six 20/27, and it must not be delayed because of the risk of rebound fractures. Continue calcium and vitamin D. balance exercises and a home safety check.",
+     "value": "Dinosumab 60 mg given today in clinic, next dose do on ma six 20/27, and it must not be delayed because of the risk of rebound fractures. Continue calcium and vitamin D. Balance exercises and a home safety check.",
      "warnings": []
     }
    },
@@ -15697,6 +15745,7 @@
     "allergy-change",
     "spoken-punctuation",
     "experiencer",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 66.7306875,
@@ -15838,6 +15887,7 @@
     "mixed-plan",
     "missing-field",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 44.25,
@@ -15970,7 +16020,7 @@
      "allergy_addition",
      481,
      519,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -18256,6 +18306,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 174.575,
@@ -18641,7 +18692,7 @@
      "order",
      2110,
      2157,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -18728,7 +18779,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "exercise stress echo in the next two weeks. Start aspirin 81 mg daily. He is not to drive the bus if he gets chest tightness at work and he knows to call 911 if it comes on at rest. Stop hydrochlorothiazide and start losartan 50 mg daily. Increase atorvastatin to 40 mg and allopurinol to 200 mg. Continue omeprazole. Return on December 17 with home blood pressure readings.",
+     "value": "Exercise stress echo in the next two weeks. Start aspirin 81 mg daily. He is not to drive the bus if he gets chest tightness at work and he knows to call 911 if it comes on at rest. Stop hydrochlorothiazide and start losartan 50 mg daily. Increase atorvastatin to 40 mg and allopurinol to 200 mg. Continue omeprazole. Return on December 17 with home blood pressure readings.",
      "warnings": []
     }
    },
@@ -19047,20 +19098,19 @@
     0.16679087502416223,
     0.17172458302229643
    ],
-   "proposals": [
-    [
-     "allergy_addition",
-     2028,
-     2062,
-     []
-    ]
-   ],
+   "proposals": [],
    "held_back": [
     [
      "order",
      1989,
      2026,
      "not_plain"
+    ],
+    [
+     "allergy_addition",
+     2028,
+     2062,
+     "names_no_item"
     ]
    ]
   },
@@ -19077,8 +19127,7 @@
     "order-attempt",
     "mixed-plan",
     "spoken-punctuation",
-    "proposal",
-    "proposal-trap"
+    "proposal"
    ],
    "seconds": 59.225,
    "hypothesis": "Okay this is a followup for a 67-year-old woman who quit smoking three years ago. She has had a dry cough for about six weeks, worse at night, with no fever, No weight loss and no blood in the sputum. She takes amlodipine 5 mg daily for blood pressure.\n\nOn examination, blood pressure is 138/84, heartar rate 76, oxygen saturation 97% on room air. Chest is clear with no wheeze.\n\nAssessment: Persistent cough and a former smoker, and raised cardiovascular risk.\n\nPlan: Start atorvastatin 20 mg at night. Go ahead and order a fasting lipid panel. Also order a chest x-ray today. Continue amlodipine. Review in clinic with the results.",
@@ -19214,19 +19263,18 @@
    "proposals": [
     [
      "order",
+     504,
+     544,
+     []
+    ],
+    [
+     "order",
      546,
      576,
      []
     ]
    ],
-   "held_back": [
-    [
-     "order",
-     504,
-     544,
-     "not_plain"
-    ]
-   ]
+   "held_back": []
   },
   {
    "variant": "d44-cystitis-nitrofurantoin-rash--clean",
@@ -19240,6 +19288,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 58.5173125,
@@ -19388,6 +19437,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 58.5173125,
@@ -19592,6 +19642,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 58.475,
@@ -19732,6 +19783,7 @@
     "allergy-change",
     "missing-field",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 58.5173125,
@@ -19858,6 +19910,7 @@
     "allergy-change",
     "mixed-plan",
     "spoken-punctuation",
+    "proposal",
     "proposal-trap"
    ],
    "seconds": 73.075,
@@ -19902,7 +19955,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Continue ibuprofen with food and start physiotherapy. actually no, . hold off on that until he has tried physiotherapy.",
+     "value": "Continue ibuprofen with food and start physiotherapy. Actually no, . Hold off on that until he has tried physiotherapy.",
      "warnings": []
     }
    },
@@ -20074,7 +20127,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Plan: There is no need to order a chest x-ray. I don't think. If the rash comes back after amoxicillin. cononsider. We discussed. she would rather wait. moisturizer as needed.",
+     "value": "Plan: There is no need to order a chest x-ray. She would rather wait. Moisturizer as needed.",
      "warnings": []
     }
    },
@@ -20082,22 +20135,22 @@
    "not_carried_over": [
     [
      "order",
-     538,
+     524,
      575
     ],
     [
      "allergy_change",
-     619,
+     577,
      654
     ],
     [
      "order",
-     667,
+     656,
      709
     ],
     [
      "order",
-     724,
+     711,
      746
     ]
    ],
@@ -20231,25 +20284,25 @@
    "held_back": [
     [
      "order",
-     538,
+     524,
      575,
      "negated"
     ],
     [
      "allergy_addition",
-     619,
+     577,
      654,
      "hedged"
     ],
     [
      "order",
-     667,
+     656,
      709,
      "taken_back"
     ],
     [
      "order",
-     724,
+     711,
      746,
      "hedged"
     ]
@@ -20286,7 +20339,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "This is a 58-year-old woman with hypothyroidism, on levothyroxine 75 mcg daily. She feels well, her energy is good and her weight is stable. Her mother asked whether. We already. She asked.",
+     "value": "This is a 58-year-old woman with hypothyroidism, on levothyroxine 75 mcg daily. She feels well, her energy is good and her weight is stable.",
      "warnings": []
     },
     "objective": {
@@ -20327,17 +20380,17 @@
    "not_carried_over": [
     [
      "order",
-     237,
+     212,
      281
     ],
     [
      "order",
-     294,
+     283,
      337
     ],
     [
      "order",
-     350,
+     339,
      382
     ],
     [
@@ -20416,19 +20469,19 @@
    "held_back": [
     [
      "order",
-     237,
+     212,
      281,
      "hedged"
     ],
     [
      "order",
-     294,
+     283,
      337,
      "in_the_past"
     ],
     [
      "order",
-     350,
+     339,
      382,
      "quoted"
     ],
@@ -20898,7 +20951,7 @@
      "order",
      730,
      759,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -21219,12 +21272,6 @@
    "chunk_seconds": [],
    "proposals": [
     [
-     "allergy_addition",
-     1179,
-     1215,
-     []
-    ],
-    [
      "order",
      1262,
      1297,
@@ -21236,7 +21283,13 @@
      "order",
      1083,
      1116,
-     "not_plain"
+     "names_no_item"
+    ],
+    [
+     "allergy_addition",
+     1179,
+     1215,
+     "names_no_item"
     ],
     [
      "order",
@@ -21513,12 +21566,6 @@
    "chunk_seconds": [],
    "proposals": [
     [
-     "allergy_addition",
-     1176,
-     1212,
-     []
-    ],
-    [
      "order",
      1259,
      1294,
@@ -21530,7 +21577,13 @@
      "order",
      1081,
      1114,
-     "not_plain"
+     "names_no_item"
+    ],
+    [
+     "allergy_addition",
+     1176,
+     1212,
+     "names_no_item"
     ],
     [
      "order",
@@ -21607,7 +21660,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Start amoxicillin 500 mg three times a day for seven days. Ibuprofen 400 mg with food up to three times a day for pain. Continue budesonide. formoterol and losartan. She is due for routine blood work. Salt water rinses after meals. Return sooner for fever or facial swelling.",
+     "value": "Start amoxicillin 500 mg three times a day for seven days. Ibuprofen 400 mg with food up to three times a day for pain. Continue budesonide. Formoterol and losartan. She is due for routine blood work. Salt water rinses after meals. Return sooner for fever or facial swelling.",
      "warnings": []
     }
    },
@@ -21698,12 +21751,6 @@
    "chunk_seconds": [],
    "proposals": [
     [
-     "allergy_addition",
-     1175,
-     1211,
-     []
-    ],
-    [
      "order",
      1259,
      1294,
@@ -21715,7 +21762,13 @@
      "order",
      1079,
      1112,
-     "not_plain"
+     "names_no_item"
+    ],
+    [
+     "allergy_addition",
+     1175,
+     1211,
+     "names_no_item"
     ],
     [
      "order",
@@ -21968,7 +22021,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Saline rinses twice a day. he insisted. sskip that. Recheck in one week.",
+     "value": "Saline rinses twice a day. Sskip that. Recheck in one week.",
      "warnings": []
     }
    },
@@ -21986,7 +22039,7 @@
     ],
     [
      "order",
-     424,
+     420,
      449
     ],
     [
@@ -22002,7 +22055,7 @@
     [
      "order",
      525,
-     541
+     554
     ],
     [
      "order",
@@ -22095,7 +22148,7 @@
     ],
     [
      "order",
-     424,
+     420,
      449,
      "not_plain"
     ],
@@ -22103,19 +22156,19 @@
      "order",
      451,
      488,
-     "not_plain"
+     "names_no_item"
     ],
     [
      "order",
      525,
-     541,
-     "not_plain"
+     554,
+     "names_no_item"
     ],
     [
      "order",
      556,
      579,
-     "not_plain"
+     "names_no_item"
     ]
    ]
   },
@@ -22179,7 +22232,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Assistant. possibly. She will call if the hives come back.",
+     "value": "She will call if the hives come back.",
      "warnings": []
     }
    },
@@ -22202,7 +22255,7 @@
     ],
     [
      "allergy_change",
-     534,
+     523,
      567
     ],
     [
@@ -22213,7 +22266,7 @@
     [
      "allergy_change",
      614,
-     640
+     650
     ]
    ],
    "unclear_passages": 0,
@@ -22292,12 +22345,6 @@
      367,
      409,
      []
-    ],
-    [
-     "allergy_addition",
-     569,
-     612,
-     []
     ]
    ],
    "held_back": [
@@ -22305,32 +22352,38 @@
      "allergy_addition",
      411,
      466,
-     "not_plain"
+     "names_no_item"
     ],
     [
      "order",
      468,
      521,
-     "not_plain"
+     "names_no_item"
     ],
     [
      "allergy_addition",
-     534,
+     523,
      567,
      "to_the_software"
     ],
     [
      "allergy_addition",
+     569,
+     612,
+     "names_no_item"
+    ],
+    [
+     "allergy_addition",
      614,
-     640,
-     "not_plain"
+     650,
+     "names_no_item"
     ]
    ]
   }
  ],
  "rescored_from": {
-  "scoring": "f2af5efa9275d31389b80de586042d44af7705c774e650785ba0ba8f71fbda88",
-  "gold_sha256": "f1e4a483e9e39acf4e553c5fb54fda9e6fae039d2a86f9a3a40ffd2b30a5cb63",
+  "scoring": "ba9c453fdc71edab81914a4f8394cce535211fc12e1b915d32c72de98b12ce86",
+  "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
   "structuring_outputs_reused": true
  }
 }

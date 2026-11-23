@@ -20,7 +20,9 @@ someone committed instead:
    excuse one. Each accepted there still occurs, so the list stays true. The gate doesn't take the results' word for
    what was proposed: it scores the proposals again from the stored recordings (each transcript rebuilt from its
    passages, the checks run over it, against this commit's gold; no model needed), fails results whose proposals
-   block says anything else in any of its measures, and reports only the numbers it scored again. The two gates above on orders and allergy
+   blocks, against the rule-following gold and against the clinical gold (proposals, proposals_clinical), say
+   anything else in any of their measures, and reports only the numbers it scored again. What is false or misheard is
+   judged against the rule-following gold, which every clinical one is in. The two gates above on orders and allergy
    changes in the note's fields are unchanged beside it.
 5. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
@@ -74,8 +76,9 @@ RUN_IT = (
     "the eval/results/latest.json it writes."
 )
 
-# What the results must say about proposals.
+# What the results must say about proposals, against each gold.
 PROPOSAL_METRICS = ("shown", "said", "found", "false", "misheard", "listed")
+PROPOSAL_BLOCKS = ("proposals", "proposals_clinical")
 
 # metric path, higher is better
 GATED = [
@@ -160,9 +163,9 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                 f"none. Tighten the prompt (src/Ehr.Dictation/schema) or the checks (validation.py), then: {RUN_IT}"
             )
         problems += _unaccepted(order_allergy["unflagged"], eval_dir / KNOWN_LIMITATIONS)
-    proposals = latest.get("metrics", {}).get("proposals", {})
-    if any(key not in proposals for key in PROPOSAL_METRICS):
-        problems.append(f"The results don't say what the dictation proposed. {RUN_IT}")
+    proposals = {block: latest.get("metrics", {}).get(block, {}) for block in PROPOSAL_BLOCKS}
+    if any(key not in measures for measures in proposals.values() for key in PROPOSAL_METRICS):
+        problems.append(f"The results don't say what the dictation proposed, against both golds. {RUN_IT}")
     else:
         again = _proposals_again(latest, eval_dir)
         if proposals != again:
@@ -171,7 +174,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                 "and gold. Score the stored answers again: "
                 "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
             )
-        problems += _unaccepted_proposals(again["listed"], eval_dir / KNOWN_LIMITATIONS)
+        problems += _unaccepted_proposals(again["proposals"]["listed"], eval_dir / KNOWN_LIMITATIONS)
     warnings = latest.get("metrics", {}).get("warnings", {})
     if "shown" not in warnings or any("flagged" not in warnings.get(key, {}) for key in (*WARNING_CODES, "any")):
         problems.append(f"The results don't say which offered values carry a warning. {RUN_IT}")
@@ -223,9 +226,9 @@ def _unaccepted(unflagged: list[dict], known: Path) -> list[str]:
 
 
 def _proposals_again(latest: dict, eval_dir: Path) -> dict:
-    """The proposals' measures, scored again from the stored recordings: each transcript rebuilt from MedASR's passages
-    as heard, the checks run over it (scoring.weigh_proposals()), and the scripts' gold. Items of a script the test set
-    no longer has are left out (the coverage check reports them)."""
+    """The proposals' measures against each gold (PROPOSAL_BLOCKS), scored again from the stored recordings: each
+    transcript rebuilt from MedASR's passages as heard, the checks run over it (scoring.weigh_proposals()), and the
+    gold. Items of a script the test set no longer has are left out (the coverage check reports them)."""
     scripts = load_all(eval_dir / "scripts")
     items = []
     for stored in latest.get("items", []):
@@ -234,7 +237,7 @@ def _proposals_again(latest: dict, eval_dir: Path) -> dict:
         item = scoring.Item(**{key: value for key, value in stored.items() if key != "fields"})
         scoring.weigh_proposals(item, assemble([Segment(**segment) for segment in item.segments], final=True))
         items.append(item)
-    return scoring._proposals(items, scripts)
+    return scoring.proposal_scores(items, scripts)
 
 
 def _unaccepted_proposals(listed: list[dict], known: Path) -> list[str]:
@@ -424,7 +427,8 @@ def main() -> int:
         return 1
     latest = json.loads((RESULTS_DIR / "latest.json").read_text(encoding="utf-8"))
     metrics = latest["metrics"]
-    proposals = _proposals_again(latest, EVAL_DIR)
+    again = _proposals_again(latest, EVAL_DIR)
+    proposals, clinical = again["proposals"], again["proposals_clinical"]
     baseline = "against the accepted baseline" if (RESULTS_DIR / "baseline.json").is_file() else "(no accepted baseline yet)"
     print(
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
@@ -432,7 +436,8 @@ def main() -> int:
         f"every recording sorted, no order or allergy change shown and no retracted value without a warning, "
         f"{metrics['warnings']['any']['flagged']} of {metrics['warnings']['shown']} offered values carry a warning, "
         f"{proposals['shown']} proposals scored again from the recordings ({proposals['right']} right, recall "
-        f"{proposals['recall']}, precision {proposals['precision']}, every false or misheard one accepted). "
+        f"{proposals['recall']} against the rule-following gold and {clinical['recall']} against the clinical gold, "
+        f"precision {proposals['precision']}, every false or misheard one accepted). "
         f"Run on {latest['run']['machine']['label']}."
     )
     spanish = json.loads((RESULTS_DIR / "latest-es.json").read_text(encoding="utf-8"))

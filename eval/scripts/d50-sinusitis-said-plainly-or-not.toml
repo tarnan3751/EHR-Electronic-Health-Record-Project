@@ -62,11 +62,11 @@ why = "not_plain"
 
 [[not_proposed]]
 words = "Order a flu test for his wife"
-why = "not_plain"
+why = "names_no_item"
 
 [[not_proposed]]
 words = "Order a sinus CT"
-why = "not_plain"
+why = "names_no_item"
 
 [[not_proposed]]
 words = "order a sed rate"
