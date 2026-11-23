@@ -126,7 +126,7 @@ def qualified(text: str) -> dict[str, list[str]]:
     ("Infarto previo.", {"history": ["infarto"]}),
     ("Su padre tuvo un infarto.", {"experiencer": ["tuvo", "infarto"]}),
     ("Cáncer de mama en su madre.", {"experiencer": ["cáncer", "mama"]}),
-    # Over a list, item by item, to its sentence's end or an item that says something of its own.
+    # Over a list, past its commas, to the word that ends it, and not into a clause of its own.
     ("Niega fiebre, tos, disnea, dolor torácico y síncope.",
      {"negation": ["fiebre", "tos", "disnea", "dolor", "torácico", "síncope"]}),
     ("Antecedentes de hipertensión, diabetes, dislipidemia.",
@@ -134,6 +134,13 @@ def qualified(text: str) -> dict[str, list[str]]:
     ("Niega fiebre, refiere tos.", {"negation": ["fiebre"]}),
     ("Sin fiebre, la tos ha mejorado.", {"negation": ["fiebre"]}),
     ("Sin edema. Tos, disnea.", {"negation": ["edema"]}),
+    # As validation.py carries an English negation's list: up to the word that ends it, not into a clause of its own,
+    # and not past a new paragraph.
+    ("Niega fiebre, escalofríos o sudoración nocturna pero refiere pérdida de peso.",
+     {"negation": ["fiebre", "escalofríos", "sudoración", "nocturna"]}),
+    ("Niega fiebre, escalofríos y refiere pérdida de peso.", {"negation": ["fiebre", "escalofríos"]}),
+    ("Sin fiebre, la tos está mejor.", {"negation": ["fiebre"]}),
+    ("Niega fiebre, escalofríos,\nsudoración nocturna.", {"negation": ["fiebre", "escalofríos"]}),
     ("Se descartó neumonía.", {"negation": ["neumonía"]}),
     ("Imagen compatible con neumonía.", {"certainty": ["neumonía"]}),
     ("Infarto hace años.", {"history": ["infarto"]}),
@@ -270,6 +277,21 @@ def test_an_instruction_said_in_an_everyday_form_is_found(text, kind):
 ])
 def test_the_past_someone_elses_request_and_a_plan_are_not_instructions(text):
     assert instructions(text) == []
+
+
+# An instruction not to, read over an aside, or after a clause that says never, as validation.py reads English.
+@pytest.mark.parametrize("text", [
+    "No, bajo ninguna circunstancia, pidas una tomografía.",
+    "Bajo ninguna circunstancia, pidas una tomografía con contraste.",
+    "No, dados sus riñones, pidas una tomografía con contraste.",
+    "No hace falta, dada su función renal, pedir una tomografía.",
+])
+def test_an_instruction_not_to_is_read_over_an_aside(text):
+    assert instructions(text) == []
+
+
+def test_a_bare_no_before_an_aside_answers_something():
+    assert instructions("No, espera, pide una biometría hemática.") == [("pide una biometría hemática", "order")]
 
 
 def test_two_negations_make_an_instruction_again():

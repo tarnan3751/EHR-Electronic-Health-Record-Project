@@ -73,9 +73,12 @@ statement:
      validation.py reads them in English, with an English word that negates itself ("uncontrolled") a negation and a
      relative told something ("the mother is explained") not someone having it: the same (negation_dropped or
      negation_added, and so on), and the relatives named the same (experiencer_changed). A qualifier carries over a
-     list, item by item past its commas, in both languages, until its sentence ends or an item says something of its
-     own (spanish.carry_over_list()): "Niega fiebre, tos, disnea y síncope" negates the four. And it is read in the
-     whole transcript, so a passage quoting the tail of a negated list ("tos, disnea y síncope") takes the negation
+     list past its commas, in both languages, as validation.py carries an English negation (spanish.carry_over_list()):
+     up to the word that ends it (a contrast, a word starting a clause, a step of the plan, the end of its sentence),
+     not into a clause of its own (a new subject, a verb of having or telling: "sin fiebre, la tos está mejor"), and
+     not past a new paragraph, which ends every cue's reach: "Niega fiebre, tos, disnea y síncope" negates the four,
+     "Niega fiebre, escalofríos o sudoración nocturna pero refiere pérdida de peso" the first three. And it is read in
+     the whole transcript, so a passage quoting the tail of a negated list ("tos, disnea y síncope") takes the negation
      with it. A doubt is the clinician's whether it comes before what it doubts ("creo que", "quizá", "tal vez", "a lo
      mejor", "puede que", "podría tener") or closes its clause, after a comma or not, reaching back over its sentence
      ("creo", "probablemente"), as validation.py hears one in English ("I think she has", "maybe", "she might have",
@@ -1421,6 +1424,7 @@ ENGLISH_LIST_STOPS = validation.REPORTING | frozenset(
     "has have had is are was were with shows showed presents presented endorses endorsed complains persists".split()
 )
 ENGLISH_LIST_JOINS = frozenset("and or nor".split())
+ENGLISH_CONTRASTS = frozenset("but however although though except apart aside yet whereas".split())
 
 
 def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, set[int]], dict[str, set[int]]]:
@@ -1433,9 +1437,10 @@ def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, 
     for qualifier in validation.QUALIFIERS:
         read = _without_told_relatives(text) if qualifier.reason == "experiencer_dropped" else text
         reached, cue_words = validation._reach(read, tokens(read), qualifier)
-        stops = qualifier.ends | validation.NEXT_CLAUSE | ENGLISH_LIST_STOPS
-        reached = spanish.carry_over_list(text, words, [w.text for w in words], reached - cue_words, stops,
-                                          ENGLISH_LIST_JOINS)
+        reached = spanish.carry_over_list(
+            text, words, [w.text for w in words], reached - cue_words,
+            ENGLISH_CONTRASTS | validation.NEXT_CLAUSE | validation.CLAUSE_STARTS,
+            (qualifier.ends - ENGLISH_CONTRASTS) | validation.LIST_ENDS | ENGLISH_LIST_STOPS, ENGLISH_LIST_JOINS)
         flagged[names[qualifier.reason]] = set(reached)
         cues[names[qualifier.reason]] = set(cue_words) if reached else set()
     for kind, reached, cue_words in _more_english(text):

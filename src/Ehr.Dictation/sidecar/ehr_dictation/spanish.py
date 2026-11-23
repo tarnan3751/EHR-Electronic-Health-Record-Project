@@ -666,15 +666,17 @@ NEXT_CLAUSE = frozenset(
     seguir sigue control cita derivar derivo interconsulta exploracion examen impresion plan revisar regresar volver
     recomiendo recomendar indico""".split()
 )
-# A qualifier carries over a list, item by item past its commas ("Niega fiebre, tos, disnea y síncope"), up to the end
-# of its sentence, a contrast, or an item that says something of its own: a verb of having, seeing or telling
-# ("refiere", "presenta", "tiene", "con", "hay", "ha"), the next step of the plan, or more than LIST_ITEM words.
+# A qualifier carries over a list past its commas ("Niega fiebre, tos, disnea y síncope"), as validation.py carries an
+# English negation (carry_over_list()): up to the first word that ends it (LIST_ENDS), and not into a clause of its own,
+# one with a new subject or a verb of having, seeing or telling (LIST_STOPS: "refiere", "presenta", "tiene", "con",
+# "hay", "ha"; a pronoun before a verb, "le dio náusea"); at most LIST_SCOPE words.
 LIST_STOPS = frozenset(
     """refiere refirio presenta presento tiene tenia tuvo con hay es son esta estan era fue ha han he muestra mostro
     aqueja persiste persisten se observa aprecia nota le les me nos te""".split()
 )  # a pronoun before a verb starts a clause: "le dio náusea"
 LIST_JOINS = frozenset("y e o u ni".split())
-LIST_ITEM = 5
+CONTRASTS = frozenset("pero aunque embargo excepto salvo mientras sino".split())
+LIST_SCOPE = 30  # as validation.LIST_SCOPE
 SCOPE = 6  # words after a cue it can reach, within its clause
 POST_SCOPE = 4  # words before a cue that follows what it qualifies
 
@@ -707,7 +709,9 @@ def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: l
     reached: set[int] = set()
     cues: set[int] = set()
     for first, last in before:
-        last = _to_the_finding(text, toks, last) if past_the_subject else last
+        passed = _to_the_finding(text, toks, last) if past_the_subject else last
+        # Not past a new paragraph, as validation.py's reach: "No creo que {new paragraph} La paciente tiene neumonía."
+        last = passed if "\n" not in text[toks[last].end : toks[passed].end] else last
         cues |= set(range(first, last + 1))
         edge = toks[last].end
         for k, i in enumerate(range(last + 1, min(len(toks), last + 1 + SCOPE))):
@@ -762,40 +766,49 @@ def _to_the_finding(text: str, toks: list[Token], last: int) -> int:
     return i - 1 if i - 1 > last else last
 
 
-def carry_over_list(text: str, toks: list, words: list[str], reached: set[int], stops: frozenset[str],
-                    joins: frozenset[str]) -> set[int]:
-    """The words a qualifier reaches (reached), with the items of a list it reaches the first of, after a comma (see
-    LIST_STOPS). toks have the text's positions; words are what stops and joins are read on. English is read the same
-    way, with its own words (translation.py)."""
+def carry_over_list(text: str, toks: list, words: list[str], reached: set[int], ends: frozenset[str],
+                    clauses: frozenset[str], joins: frozenset[str], scope: int = LIST_SCOPE) -> set[int]:
+    """The words a qualifier reaches (reached), with the list it carries through after a comma, as validation.py's
+    _reach() carries an English negation: only from something named; each piece after a comma, up to the next one, is
+    more of the list up to the first word that ends it, a contrast, a word starting a clause or a step of the plan
+    (ends: "escalofríos o sudoración nocturna pero refiere…" carries to "pero"); a piece opening with an ending word, or
+    holding a new subject or a word saying something is there or someone told it (clauses) other than right after "y"
+    or "o", is a clause of its own and isn't carried ("sin fiebre, la tos está mejor"); a list ends at its sentence's
+    end or a new paragraph, and takes at most `scope` words. toks have the text's positions; words are what ends,
+    clauses and joins are read on. English is read the same way, with its own words (translation.py)."""
     carried = set(reached)
-    i = 0
-    while i < len(toks):
-        if i not in carried or i + 1 >= len(toks) or i + 1 in carried:
-            i += 1
+    marks = ".;:?!\n"
+    for i in sorted(reached):
+        if i + 1 >= len(toks) or i + 1 in carried:
             continue
         gap = text[toks[i].end : toks[i + 1].start]
-        if "," not in gap or any(mark in gap for mark in ".;:?!\n"):
-            i += 1
+        if "," not in gap or any(mark in gap for mark in marks):
             continue
-        j = i + 1
-        while j < len(toks):
-            item = []
-            k = j
-            while k < len(toks) and (k == j or not any(m in text[toks[k - 1].end : toks[k].start] for m in ",.;:?!\n")):
-                if k > j and words[k] in joins:
-                    break
-                item.append(k)
-                k += 1
-            if not item or len(item) > LIST_ITEM or any(words[m] in stops for m in item):
+        # Only from something named: "124 wait no 118, blood pressure 104/72" carries nothing.
+        run = [i]
+        while run[-1] - 1 in carried and not any(
+                mark in text[toks[run[-1] - 1].end : toks[run[-1]].start] for mark in marks + ","):
+            run.append(run[-1] - 1)
+        if not any(words[m].isalpha() and len(words[m]) > 1 for m in run):
+            continue
+        j, taken = i + 1, 0
+        while j < len(toks) and taken < scope:
+            piece = [j]
+            while piece[-1] + 1 < len(toks) and not any(
+                    mark in text[toks[piece[-1]].end : toks[piece[-1] + 1].start] for mark in marks + ","):
+                piece.append(piece[-1] + 1)
+            stop = next((k for k, m in enumerate(piece) if words[m] in ends or words[m] in clauses), None)
+            if stop == 0:
                 break
-            carried |= {m for m in item if words[m] not in joins}
-            between = text[toks[k - 1].end : toks[k].start] if k < len(toks) else "."
-            if k >= len(toks) or any(mark in between for mark in ".;:?!\n"):
+            if stop is not None and words[piece[stop]] in clauses and words[piece[stop - 1]] not in joins:
+                break  # a clause of its own
+            keep = piece if stop is None else piece[:stop]
+            carried |= {m for m in keep[: scope - taken] if words[m] not in joins}
+            taken += len(keep)
+            after = text[toks[piece[-1]].end : toks[piece[-1] + 1].start] if piece[-1] + 1 < len(toks) else "."
+            if stop is not None or any(mark in after for mark in marks):
                 break
-            j = k + 1 if words[k] in joins and "," not in between else k
-            if j < len(toks) and words[j] in joins:
-                j += 1
-        i = j
+            j = piece[-1] + 1
     return carried
 
 
@@ -854,6 +867,7 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
         if token.text not in RELATIVES:
             continue
         relative = WHO_HAS.match(fold(text), token.end)
+        relative = None if relative and "\n" in relative.group() else relative
         j = i - 1
         if j >= 0 and toks[j].key in POSSESSIVES:
             j -= 1
@@ -879,7 +893,8 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
         if kind == "certainty":
             reached |= _questions(text, toks) - cues
         reached = carry_over_list(text, toks, [t.key for t in toks], reached - cues,
-                                  ends | NEXT_CLAUSE | REPORTING | LIST_STOPS, LIST_JOINS)
+                                  CONTRASTS | NEXT_CLAUSE | CLAUSE_STARTS,
+                                  (ends - CONTRASTS) | REPORTING | LIST_STOPS, LIST_JOINS)
         out[kind] = {i for i in reached if _is_content(toks[i])}
         cue_words[kind] = cues
     return out, cue_words
@@ -1069,6 +1084,15 @@ NEGATED_INSTRUCTION = re.compile(
     r"no debe|no se necesita|no vamos a|no voy a)\s+(?:(?:le|les|lo|la|los|las|se|me|te|nos|a|que|hay)\s+){0,3}$"
 )
 ANY_NEGATION = frozenset("no nunca nada ningun ninguno ninguna sin razon".split())
+# As validation.py reads English: an instruction not to is read over an aside between commas ("no hace falta, dada su
+# función renal, pedir una tomografía"), and a clause before it that says never is one ("bajo ninguna circunstancia,
+# pidas una tomografía"). A bare "no" before an aside answers something ("no, espera, pide una biometría"), unless the
+# verb is a command not to, a subjunctive's second person ("no, dados sus riñones, pidas una tomografía").
+ASIDE_BEFORE = re.compile(r",[^,.;:!?\n]{1,80},\s*$")
+NEVER_BEFORE = re.compile(
+    r"\b(?:bajo|en|por|de)\s+(?:ninguna|ningun)\s+(?:circunstancia|caso|concepto|motivo|manera|modo|forma)\s*,"
+    r"(?:[^,.;:!?\n]{1,80},)?\s*$"
+)
 UNDOES_REACH = 3  # words before an instruction not to within which another negation makes it an instruction again
 # A sentence about something sent already is documentation: "las recetas se enviaron a la farmacia la semana pasada".
 PAST = re.compile(r"\b(?:ayer|la semana pasada|el mes pasado|el ano pasado|hace|ya|previamente|anteriormente)\b|"
@@ -1122,6 +1146,10 @@ def _acts(folded: str, toks: list[Token]) -> list[tuple[int, int, str]]:
     return found
 
 
+def _is_act(key: str) -> bool:
+    return key in ORDERING_FORMS or key in DOING_FORMS or key in ALLERGY_FORMS
+
+
 def _sentence_bounds(folded: str, at: int) -> tuple[int, int]:
     start = max((m.end() for m in SENTENCE_MARK.finditer(folded, 0, at)), default=0)
     found = SENTENCE_MARK.search(folded, at)
@@ -1162,6 +1190,16 @@ def directives(text: str) -> list[tuple[int, int, str]]:
         negated = NEGATED_INSTRUCTION.search(before)
         if negated and not any(t.key in ANY_NEGATION for t in tokens(before[: negated.start()])[-UNDOES_REACH:]):
             continue
+        if NEVER_BEFORE.search(folded, 0, clause):
+            continue
+        aside = None if negated else ASIDE_BEFORE.search(folded, 0, clause)
+        if aside:
+            base = max((m.end() for m in CLAUSE_MARK.finditer(folded, 0, aside.start())), default=0)
+            lead = folded[base : aside.start()].strip()
+            verb = next((t.key for t in toks if start <= t.start < end and _is_act(t.key)), "")
+            if (lead == "no" and verb.endswith(("as", "es")) and len(verb) > 3) or (
+                    lead != "no" and NEGATED_INSTRUCTION.search(f"{lead} {before}")):
+                continue
         # Someone else asking: a verb that may be the third person ("pide", "receta", "solicitan") with another subject
         # before it in its clause, or asking the doctor after it ("le pide al médico"); or someone wanting it.
         _, clause_end = _clause_bounds(folded, end)

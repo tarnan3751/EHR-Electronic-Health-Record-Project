@@ -910,3 +910,23 @@ def test_an_opposite_or_a_finding_the_spanish_doesnt_say_is_refused(text, englis
 ])
 def test_an_opposite_or_a_finding_the_spanish_says_is_offered(text, english):
     assert reasons(text, [text], english) == []
+
+
+# ---- A negation's list, as step 15 reads it in English (sentences outside the test set) ----------------------------
+
+BUT = "Niega fiebre, escalofríos o sudoración nocturna pero refiere pérdida de peso."
+AND = "Niega fiebre, escalofríos y refiere pérdida de peso."
+
+
+@pytest.mark.parametrize(("text", "quote", "english", "expected"), [
+    (BUT, "escalofríos o sudoración nocturna", "Chills or night sweats.", ["negation_dropped"]),
+    (BUT, "escalofríos o sudoración nocturna", "No chills or night sweats.", []),
+    (BUT, "refiere pérdida de peso", "Reports weight loss.", []),  # the list ends at "pero"
+    (AND, "fiebre, escalofríos", "Fever, chills.", ["negation_dropped"]),
+    (AND, "refiere pérdida de peso", "Reports weight loss.", []),
+    ("Sin fiebre, la tos está mejor.", "la tos está mejor", "The cough is better.", []),  # a clause of its own
+    # A new paragraph ends a cue's reach, as it does in English ("I don't think {new paragraph} She has pneumonia.").
+    ("No creo que\nla paciente tenga neumonía.", "la paciente tenga neumonía", "The patient has pneumonia.", []),
+])
+def test_a_negation_carries_its_list_to_the_word_that_ends_it_and_no_further(text, quote, english, expected):
+    assert reasons(text, [quote], english) == expected
