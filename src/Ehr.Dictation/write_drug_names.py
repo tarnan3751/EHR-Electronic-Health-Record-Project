@@ -24,6 +24,11 @@ Botanical and chemical words stay ("arnica", "belladonna"): no translation of a 
 does. The 4-letter suffix of a biologic's name ("adalimumab-aaty") is left out. WORD_STOP is ours, read word by word
 from what the rules above give; a word missing from it is a right proposal discarded, never a wrong one shown.
 
+The proposals' catalog (sidecar/ehr_dictation/catalog.py) holds these RxNorm names too, but as whole names among the
+order catalog's tests and procedures, with nothing to tell a drug's words from the others: its words, even through
+STOP and WORD_STOP, read "pain", "follow", "hours", "cough" and "chest" in the Spanish scripts' gold as drugs. So this
+list is kept apart from it.
+
     uv run src/Ehr.Dictation/write_drug_names.py            # write it
     uv run src/Ehr.Dictation/write_drug_names.py --check    # fail if it is out of date
 
