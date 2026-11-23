@@ -479,6 +479,44 @@ def test_a_word_that_isnt_an_answer_or_an_answer_after_an_answer_asks_nothing():
     assert validation.conversation_questions(text.text, text.passages()) == []
 
 
+# Questions as the visits' transcripts show them asked, each found by its shape: (who asked, what MedASR heard, who
+# answered and how, the question's words).
+ASKED = [
+    ("clinician", "does the medicine taste yucky", ("patient", "it tastes like bubble gum"), "does the medicine taste yucky"),
+    ("patient", "is anything serious", ("clinician", "I don't think you have pneumonia"), "is anything serious"),
+    ("clinician", "great has anyone else at home been sick", ("other", "a few kids in her class"),
+     "has anyone else at home been sick"),
+    ("clinician", "that must have been frightening what did they tell you was going on", ("patient", "they said my heart"),
+     "did they tell you was going on"),
+    ("clinician", "no never have {period} and alcohol {period}", ("patient", "a couple of pints at the weekend"),
+     "and alcohol"),
+    ("clinician", "Name about the blood test {period}", ("patient", "the nurse took it last week"),
+     "Name about the blood test"),
+    ("patient", "okay W I need an operation", ("clinician", "I doubt it most of these settle with exercises"),
+     "okay W I need an operation"),
+    ("patient", "so nothing serious then", ("clinician", "nothing that worries me today"), "so nothing serious then"),
+]
+
+
+@pytest.mark.parametrize(("asker", "asked", "answer", "question"), ASKED)
+def test_a_question_is_found_by_its_shape_however_it_was_heard(asker, asked, answer, question):
+    text = heard((asker, asked), answer)
+
+    spans = [text.text[s:e] for s, e in validation.conversation_questions(text.text, text.passages())]
+
+    assert any(question in span for span in spans), spans
+
+
+def test_a_statement_the_next_voice_goes_on_from_is_still_a_statement():
+    text = heard(("patient", "no fever at all"), ("clinician", "no fever on exam today"),
+                 ("clinician", "the cough is the worst part {period} have the bloods done before you go {period}"),
+                 ("patient", "is a little tender just above the pubic bone {period} and then some {period}"),
+                 ("clinician", "okay {period}"), ("patient", "it hurts here"), ("clinician", "okay {period}"),
+                 ("patient", "it started on tuesday"))
+
+    assert validation.conversation_questions(text.text, text.passages()) == []
+
+
 @pytest.mark.parametrize("verb", ["recogn", "recog", "reckon", "bet", "suppose", "expect", "gather", "imagine", "hope"])
 def test_an_opinion_is_a_hedge_by_its_frame_whatever_its_verb_was_heard_as(verb):
     said = f"I {verb} you got allergic rhinitis on top of the asthma"

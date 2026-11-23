@@ -2295,8 +2295,10 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #   "anything", a wh-word run on after "and", "but", "so" or "or" with its auxiliary and subject, or its subject and an
 #   -ing verb where the auxiliary wasn't heard ("until the pain is gone and how you holding up"), the sentence before
 #   one that is only an answer in the same line ("so I read you the last week. yes please.", where the answer was too
-#   short to be a turn of its own), and the clinician's turn, or its last words from such an opener, when the next
-#   speaker answers it ("no", "not really", "a bit"). bare_answer: an answer alone ("not really") is never a value's
+#   short to be a turn of its own), a sentence opening with an auxiliary before a determiner or an indefinite ("does the
+#   medicine taste yucky", "is anything serious"), a short follow-up ("and alcohol", "what about the blood test"), and
+#   a turn, whoever's, or its last words from such an opener, when the next speaker answers it ("no", "not really", "a
+#   bit", "I doubt it", "nothing that worries me"). bare_answer: an answer alone ("not really") is never a value's
 #   source (the prompt's rule 5).
 # - The value is read as the transcript is: without commas, which nobody says.
 # - Instructions said to the patient as well as dictated ones (conversation_directives(), beside directives()): talk of
@@ -2434,18 +2436,31 @@ CONVERSATION_QUALIFIERS = (
 # auxiliary or modal followed by its subject ("have you had any fever", "do I need a tablet"), or, at the start of a
 # turn or a sentence, with a wh-word or "any", "ever", "anything" ("any chest pain", "how long has it been"), or after
 # a conjunction with a wh-word and its auxiliary and subject or its subject and an -ing verb
-# (QUESTION_AFTER_A_CONJUNCTION); the sentence before one that is only an answer in the same line (ANSWER, ANSWER_ALONE);
-# and the clinician's last words in a turn when the other speaker's next turn opens with an answer (ANSWER). A question is
+# (QUESTION_AFTER_A_CONJUNCTION); a sentence opening with an auxiliary before a determiner or an indefinite ("does the
+# medicine taste yucky", "is anything serious"), a follow-up of at most three words opening with "and" or "or" ("and
+# alcohol"), one of at most five whose second word is "about" ("what about the blood test", whatever its first word was
+# heard as); the sentence before one that is only an answer in the same line (ANSWER, ANSWER_ALONE); and a turn's last
+# words when the next speaker's turn opens with an answer: any answer to the clinician's (ANSWER, "I doubt it" and
+# "nothing" among them), and to anyone else's a reply that is nothing else (REPLY) or a sentence that is only an
+# answer, since "no fever on exam today" after a patient's words is the clinician's finding, not a reply. A question is
 # never a finding's source, in any field (source_is_a_question), and an answer that is only "yes", "no" or the like is
 # never a value's source on its own (bare_answer): the conversation prompt's rule 5, checked.
 _AUXILIARY = r"do|does|did|have|has|had|is|are|was|were|can|could|will|would|should|shall|may|might|am"
 QUESTION_INVERSION = re.compile(
-    rf"\b(?:{_AUXILIARY})(?:n['’]t)?[^\S\n]+(?:you|i|he|she|it|they|we|there)\b(?!['’])", re.IGNORECASE
+    rf"\b(?:{_AUXILIARY})(?:n['’]t)?[^\S\n]+(?:you|i|he|she|it|they|we|there|anyone|anybody|anything)\b(?!['’])",
+    re.IGNORECASE,
 )
 # Before an auxiliary, words that make it a statement's ("I'll have you", "the thing is it hurts", "to have it").
 _STATEMENT_BEFORE = frozenset(
-    """i we you they he she it to will would 'll can could should must thing problem point trouble issue fact truth
-    worry question what which that never not no guess hunch feeling suspicion impression""".split()
+    """i we you they he she it there to will would 'll can could should must thing problem point trouble issue fact
+    truth worry question which that never not no guess hunch feeling suspicion impression""".split()
+)
+# Opening a sentence, an auxiliary that can't be an order ("have the bloods done" can) before a determiner or an
+# indefinite: "does the medicine taste yucky", "is anything serious", "are your feet swelling".
+_ASKING_AUXILIARIES = frozenset("is are was were does did has can could will would should shall may might am".split())
+_ASKED_ABOUT = frozenset(
+    """the your my her his their our this that these those anything anyone anybody everything everyone something
+    someone""".split()
 )
 QUESTION_AFTER_A_CONJUNCTION = re.compile(
     rf"\b(?:and|but|so|or)[^\S\n]+((?:what|when|where|which|who|whom|whose|why|how)[^\S\n]+"
@@ -2457,7 +2472,15 @@ QUESTION_OPENER = re.compile(r"\A(?:what|when|where|which|who|whom|whose|why|how
 _TURN_OPENERS = frozenset("and so okay ok alright right now um uh er erm well also then oh but".split())
 ANSWER = re.compile(
     r"\A\W*(?:(?:um+|uh+|er+|erm|oh|well)\W+)*(?:yes|yeah|yep|yup|no|nope|nah|not\s+really|not\s+at\s+all|never|a\s+bit"
-    r"|a\s+little|sometimes|occasionally|i\s+think\s+so|i\s+don['’]t\s+think\s+so|mm+|mhm|uh[\s-]huh)\b",
+    r"|a\s+little|sometimes|occasionally|i\s+think\s+so|i\s+don['’]t\s+think\s+so|mm+|mhm|uh[\s-]huh|i\s+doubt\s+it"
+    r"|probably\s+not|hopefully\s+not|afraid\s+(?:so|not)|not\s+that\s+i|nothing)\b",
+    re.IGNORECASE,
+)
+# What answers a turn not the clinician's: a reply that is nothing else ("I doubt it", "nothing that worries me"), or a
+# sentence that is only an answer. A "no" that goes on to say what is absent ("no fever on exam today") doesn't.
+REPLY = re.compile(
+    r"\A\W*(?:i\s+doubt\s+it|probably\s+not|hopefully\s+not|afraid\s+(?:so|not)|not\s+that\s+i|nothing|i\s+think\s+so"
+    r"|i\s+don['’]t\s+think\s+so)\b",
     re.IGNORECASE,
 )
 ANSWER_WORDS = frozenset(
@@ -2508,20 +2531,32 @@ def conversation_questions(text: str, passages: tuple[tuple[int, int, str, int |
             found.append(stretch(i))
     for match in QUESTION_AFTER_A_CONJUNCTION.finditer(text):
         found.append(stretch(next(k for k, word in enumerate(words) if word.start >= match.start(1))))
-    # A sentence that is only an answer answers the sentence before it in its line, however that one was heard.
+    # Sentence by sentence in each line: one opening with an auxiliary asked of something; a follow-up asked with a noun
+    # alone ("and alcohol", "and the weighing") or about something ("what about the blood test", however its first word
+    # was heard); and the sentence before one that is only an answer, however that one was heard.
     for line in re.finditer(r"[^\n]+", text):
         sentences = [(m.start() + line.start(), m.end() + line.start()) for m in re.finditer(r"[^.!?]+[.!?]*", line.group())]
         said = [[word for word in words if start <= word.start and word.end <= end] for start, end in sentences]
+        for sentence in said:
+            lead = next((k for k, word in enumerate(sentence) if word.text not in _TURN_OPENERS), len(sentence))
+            if (len(sentence) > lead + 1 and sentence[lead].text in _ASKING_AUXILIARIES
+                    and sentence[lead + 1].text in _ASKED_ABOUT
+                    or 1 < len(sentence) <= 3 and sentence[0].text in ("and", "or")
+                    and any(word.text not in STOPWORDS for word in sentence[1:])
+                    or 2 < len(sentence) <= 5 and sentence[1].text == "about"):
+                found.append((sentence[0].start, sentence[-1].end))
         for before, answer in zip(said, said[1:], strict=False):
             if before and answer and ANSWER.match(text[answer[0].start :]) and _alone(answer) and not _alone(before):
                 found.append((before[0].start, before[-1].end))
-    # Turn-taking: the clinician's turn answered by the next speaker. Its question is the whole turn when the turn is no
-    # longer than QUESTION_TAIL words ("chest pain at all"), or else from an opener among its last QUESTION_TAIL words
-    # ("your chest is clear any fever"); a statement answered "yes" is still a statement.
-    for (start, end, who, _), (next_start, _, next_who, _) in zip(passages, passages[1:], strict=False):
-        if who != "clinician" or next_who == "clinician" or "\n" not in text[end : next_start + 1]:
+    # Turn-taking: a turn answered by the next speaker, whoever said it. Its question is the whole turn when the turn is
+    # no longer than QUESTION_TAIL words ("chest pain at all", "so nothing serious then"), or else from an opener among
+    # its last QUESTION_TAIL words ("your chest is clear any fever"); a statement answered "yes" is still a statement.
+    for (start, end, who, _), (next_start, _, _, _) in zip(passages, passages[1:], strict=False):
+        if "\n" not in text[end : next_start + 1]:
             continue
-        if not ANSWER.match(text[next_start:]):
+        reply = text[next_start : _sentence_end(text, next_start)]
+        if not (ANSWER.match(reply) if who == "clinician"
+                else REPLY.match(reply) or ANSWER.match(reply) and _alone(tokens(reply))):
             continue
         line_start = text.rfind("\n", 0, end) + 1
         turn = [word for word in words if line_start <= word.start and word.end <= end]
