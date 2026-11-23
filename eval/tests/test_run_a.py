@@ -1,6 +1,7 @@
 """run_a.py and scoring_es.py, run A of the expansion plan's step 17, with a stand-in for K2 Horizon: a script's text
 goes through the Spanish prompt and checks as the sidecar's own code, comes back scored, each stop threshold says
-whether it was crossed, each statement is compared with the Spanish it cites, and stored answers can be scored again."""
+whether it was crossed, each statement is compared with the Spanish it cites, stored answers can be scored again, and a
+run writes its results as it goes."""
 
 from __future__ import annotations
 
@@ -12,8 +13,9 @@ import httpx2
 import pytest
 
 from dictation_scripts_es import HOLDOUT_DIR, load_scripts
-from ehr_dictation import prompt
+from ehr_dictation import prompt, translation
 from ehr_dictation.llama import LlamaServer, Structurer
+from ehr_dictation.provenance import Models
 from ehr_eval import run_a, scoring_es
 
 SCRIPTS = {script.id: script for script in load_scripts() + load_scripts(HOLDOUT_DIR)}  # the held-out ones too
@@ -246,3 +248,49 @@ def test_scoring_again_needs_somewhere_to_write(tmp_path):
 def test_a_run_of_the_held_out_scripts_is_scored_again_against_them():
     assert run_a.stored_scripts_dir({"dataset": {"holdout": True}}) == HOLDOUT_DIR
     assert run_a.stored_scripts_dir({"dataset": {"scripts": 16}}) != HOLDOUT_DIR
+
+
+# ---- The results file, written as the run goes ----------------------------------------------------------------------
+
+
+def run_a_with(tmp_path, monkeypatch, fault: str) -> dict:  # noqa: ANN001
+    """Run A on e14 alone, with a stand-in for llama-server and a fault in the checks or the scoring: what it left."""
+    content = gold_answer("e14-nino-sano")
+    monkeypatch.setattr(run_a, "LlamaServer", lambda url, key: llama_server(content))
+    monkeypatch.setattr(run_a.provenance, "load", lambda models_dir, verify: Models(
+        {"repository": "google/medasr", "commit": "a" * 40, "sha256": "b" * 64},
+        {"repository": "IFM/K2-Horizon-7B-GGUF", "commit": "c" * 40, "file": "K2.gguf", "sha256": "d" * 64}))
+    monkeypatch.setenv("LLAMA_API_KEY", "key")
+
+    def fails(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        raise RuntimeError(f"a fault in the {fault}")
+
+    monkeypatch.setattr(*{"scoring": (scoring_es, "score"), "checks": (translation, "check")}[fault], fails)
+    out = tmp_path / "run-a.json"
+    with pytest.raises(RuntimeError, match=f"a fault in the {fault}"):
+        run_a.main(["--llama-url", "http://llama.test", "--models-dir", str(tmp_path), "--only", "e14",
+                    "--machine", "stand-ins", "--out", str(out)])
+    monkeypatch.undo()
+    return json.loads(out.read_text(encoding="utf-8"))
+
+
+def test_a_fault_in_the_scoring_leaves_every_answer_for_rescore_to_finish(tmp_path, monkeypatch, capsys):
+    stored = run_a_with(tmp_path, monkeypatch, "scoring")
+    (item,) = stored["items"]
+    assert "metrics" not in stored and "thresholds" not in stored and item["fields"]["objective"]["status"] == "pending"
+
+    (tmp_path / "stopped.json").write_text(json.dumps(stored), encoding="utf-8")
+    assert run_a.main(["--rescore", str(tmp_path / "stopped.json"), "--out", str(tmp_path / "finished.json")]) == 0
+    finished = json.loads((tmp_path / "finished.json").read_text(encoding="utf-8"))
+    assert finished["metrics"]["fields"]["content"]["f1"] == 1.0 and len(finished["thresholds"]) == 5
+    assert "discarded before: not scored" in capsys.readouterr().out
+
+
+def test_a_fault_in_the_checks_leaves_the_answer_as_k2_horizon_gave_it(tmp_path, monkeypatch):
+    stored = run_a_with(tmp_path, monkeypatch, "checks")
+    (item,) = stored["items"]
+    assert item["sorting"] == "done" and item["fields"]["objective"]["statements"]
+    assert item["fields"]["objective"]["status"] == "empty" and not item["fields"]["objective"]["shown_statements"]
+
+    results, items = run_a.rescore(stored, SCRIPTS)
+    assert items[0].fields["objective"].status == "pending" and results["metrics"]["fields"]["content"]["f1"] == 1.0

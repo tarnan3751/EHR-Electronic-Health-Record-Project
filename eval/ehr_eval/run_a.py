@@ -14,7 +14,9 @@ the network but llama-server, and nothing is written but the results file, which
 held-out scripts (eval/scripts-es-holdout) are left out unless --holdout is given, which runs only them.
 
 It prints each stop threshold of the plan (scoring_es.thresholds()) and whether it was crossed: any crossed stops the
-step until the owner decides.
+step until the owner decides. The results file is written as the run goes, as run.py and run_es.py write theirs: each
+script's answer as K2 Horizon gave it, before any check, then checked, and the measures and thresholds only once every
+script is in, so a fault in the checks or the scoring leaves every answer so far for --rescore to finish.
 
 Two options are for diagnosing a run, never for the run itself: --timeout gives K2 Horizon longer (or less) than the
 sidecar's 90 seconds, so an answer the sidecar would cancel can be seen to its end, and --keep-answers stores each
@@ -25,8 +27,9 @@ says so in its first line, so it can't be taken for the run.
 
 checks and scores a run's stored answers again with the current checks, scoring and scripts, running no model, and
 prints, for each script, what the first threshold counted before (as stored) and after, what is misfiled, the fields
-discarded and why, and the content F1, before and after. Answers stored by field, before the answer was one list, are
-checked field by field. It refuses a script whose text has changed since the run.
+discarded and why, and the content F1, before and after ("not scored" before, for a run that stopped before its
+measures). Answers stored by field, before the answer was one list, are checked field by field. It refuses a script
+whose text has changed since the run.
 """
 
 from __future__ import annotations
@@ -233,22 +236,13 @@ async def main_async(args: argparse.Namespace) -> int:
     scripts_dir = HOLDOUT_DIR if args.holdout else SCRIPTS_DIR
     scripts = {s.id: s for s in load_scripts(scripts_dir)}
     chosen = [s for s in scripts.values() if not args.only or any(s.id == w or s.id.startswith(f"{w}-") for w in args.only)]
-    started_at = datetime.now(UTC).isoformat(timespec="seconds")
-    items = []
-    for number, script in enumerate(chosen, 1):
-        item = await run_script(script, structurer, llama if args.keep_answers else None)
-        items.append(item)
-        print(f"[{number}/{len(chosen)}] {script.id}: {item.sorting}{f' ({item.reason})' if item.reason else ''}, "
-              f"{item.timings.get('structure', 0):.1f} s", flush=True)
-    await llama.aclose()
-    metrics = scoring_es.score(items, scripts)
-    results = {
+    header = {
         "run": "A: K2 Horizon on the Spanish test set's text, no speech recognition (the expansion plan's step 17)",
         "diagnostic": diagnosed,
-        "started_at": started_at,
-        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "finished_at": None,
         "machine": machine(args.machine, "none"),
-        "llama_server": structurer.build,
+        "llama_server": None,
         "parameters": structuring.parameters,
         "timeout_seconds": args.timeout,
         "provenance": {"language": models.language, "prompt": structuring.prompt_sha256,
@@ -256,13 +250,29 @@ async def main_async(args: argparse.Namespace) -> int:
                        "checks": CHECKS_CODE_SHA256, "pipeline": PIPELINE_CODE_SHA256},
         "dataset": {"scripts_sha256": scripts_sha256(scripts_dir), "scripts": len(chosen), "complete": not args.only,
                     "holdout": args.holdout},
-        "metrics": metrics,
-        "thresholds": [{"threshold": name, "crossed": over, "measured": measured}
-                       for name, over, measured in scoring_es.thresholds(metrics)],
-        "items": [dataclasses.asdict(item) for item in items],
     }
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def save(items: list[scoring_es.SpanishItem], metrics: dict | None = None) -> None:
+        """The results file as it stands: every script answered so far, and the measures once there are some."""
+        header.update(finished_at=datetime.now(UTC).isoformat(timespec="seconds"), llama_server=structurer.build)
+        scored = {} if metrics is None else {"metrics": metrics, "thresholds": [
+            {"threshold": name, "crossed": over, "measured": measured}
+            for name, over, measured in scoring_es.thresholds(metrics)]}
+        results = header | scored | {"items": [dataclasses.asdict(item) for item in items]}
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    items: list[scoring_es.SpanishItem] = []
+    for number, script in enumerate(chosen, 1):
+        item = await run_script(script, structurer, llama if args.keep_answers else None,
+                                raw=lambda answered: save([*items, answered]))
+        items.append(item)
+        save(items)
+        print(f"[{number}/{len(chosen)}] {script.id}: {item.sorting}{f' ({item.reason})' if item.reason else ''}, "
+              f"{item.timings.get('structure', 0):.1f} s", flush=True)
+    await llama.aclose()
+    metrics = scoring_es.score(items, scripts)
+    save(items, metrics)
     print(summary(metrics, diagnosed))
     print(f"Wrote {args.out}")
     return 0
@@ -335,21 +345,23 @@ def rescore_table(stored: dict, results: dict, scripts: dict[str, Script]) -> st
         return "; ".join(f"{name}: {', '.join(outcome.reasons)}" for name, outcome in item.fields.items()
                          if outcome.proposed.strip() and outcome.status != "pending") or "none"
 
-    before, after = unflagged(stored["metrics"]), unflagged(results["metrics"])
+    scored = "metrics" in stored  # a run that stopped before its measures has none
+    before, after = unflagged(stored["metrics"]) if scored else {}, unflagged(results["metrics"])
     misfiled: dict[str, int] = {}
     for entry in results["metrics"]["mistranslations"]["misfiled"]["listed"]:
         misfiled[entry["variant"]] = misfiled.get(entry["variant"], 0) + 1
     lines = ["item                          first threshold  misfiled  content F1",
              "                              before  after    after     before  after"]
     for old, new in zip((stored_item(e) for e in stored["items"]), (stored_item(e) for e in results["items"])):
-        lines.append(f"{old.script:30}{before.get(old.variant, 0):>6}  {after.get(new.variant, 0):>5}    "
-                     f"{misfiled.get(new.variant, 0):>8}     {f1(old)!s:>6}  {f1(new)!s:>6}")
-        lines.append(f"    discarded before: {discarded(old)}")
+        was = before.get(old.variant, 0) if scored else "-"
+        lines.append(f"{old.script:30}{was:>6}  {after.get(new.variant, 0):>5}    "
+                     f"{misfiled.get(new.variant, 0):>8}     {f1(old) if scored else '-'!s:>6}  {f1(new)!s:>6}")
+        lines.append(f"    discarded before: {discarded(old) if scored else 'not scored'}")
         lines.append(f"    discarded after:  {discarded(new)}")
     lines.append("")
-    for (name, was, measured_before), now in zip(
-            ((t["threshold"], t["crossed"], t["measured"]) for t in stored["thresholds"]), results["thresholds"]):
-        lines.append(f"{name}:\n    before {'CROSSED' if was else 'ok'} ({measured_before}); after "
+    for was, now in zip(stored.get("thresholds") or [None] * len(results["thresholds"]), results["thresholds"]):
+        before_text = f"{'CROSSED' if was['crossed'] else 'ok'} ({was['measured']})" if was else "not scored"
+        lines.append(f"{now['threshold']}:\n    before {before_text}; after "
                      f"{'CROSSED' if now['crossed'] else 'ok'} ({now['measured']})")
     return "\n".join(lines)
 
