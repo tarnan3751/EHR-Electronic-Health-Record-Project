@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   2. Finish the review.
 //   3. Set how long a transcript is kept: left out, 1, 7, 0, a half, 2.5 and 8 days.
 // Expected result: Step 1: the consent statement says the text is deleted once checked or after a week at the latest,
-//   and the guidance beneath it that the clinic's backups keep it, with nothing deleting it from them for now; the review's stored result has no transcript text
+//   and the guidance beneath it that the clinic's backups keep it for up to 7 days; the review's stored result has no transcript text
 //   and none of its segments;
 //   the transcript is kept apart, and the audit log holds only its hash and length; the service was told to discard the
 //   session. Step 2: no transcript kept; no log
@@ -43,7 +43,7 @@ public class TC_UC23_05_Nfr07_ConversationNotKept(WebApps apps) : IClassFixture<
         var l = d.Listening;
         var consent = Browser.Words(await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/listen", TestContext.Current.CancellationToken));
         Assert.Contains("I check everything before it goes in your record. The text is deleted once I've checked it, or after a week at the latest, except what it suggested for the note.", consent);
-        Assert.Contains("The clinic's backups keep a copy of everything in its database, this text included, and for now nothing deletes it from them.", consent);
+        Assert.Contains("The clinic's backups keep the database, this text included, for up to 7 days.", consent);
 
         Assert.Equal([""], await RowsAsync(apps, "SELECT result_json #>> '{transcript,text}' FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
         // Nor the transcript's segments: the review keeps each proposal's sources, and the transcript its own segments.
