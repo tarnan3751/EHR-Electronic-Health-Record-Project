@@ -28,8 +28,11 @@ statement:
    correction cue and what it took back.
 4. The English is compared with that Spanish, class by class. "No more" means the English may leave something out, as
    an English value may, but may not add or change it; "the same" means both ways.
-   - numbers, as digits (Spanish decimal commas, number words, both readings of "1.000", and 1 for "un", "una" or
-     "uno" even as an article): no more (number_not_in_sources), and none the clinician took back (source_superseded);
+   - numbers, as digits (Spanish decimal commas, number words, both readings of "1.000", 1 for "un", "una" or "uno"
+     even as an article, and halves and quarters however said: "un gramo y medio" 1.5, "un cuarto de tableta" 0.25,
+     "1/2 tableta" 0.5, "half a tablet" 0.5): no more (number_not_in_sources), and none the clinician took back
+     (source_superseded); a fraction with no exact decimal ("un tercio", "a third") can't be compared
+     (number_unreadable);
    - a dose unit with its number ("50 mcg" is not "50 mg"): no more (unit_not_in_sources). A unit of measurement
      (mmHg, beats a minute, degrees, percent) may be added to a number said without one, never changed;
    - how often (times a day, a week, as needed, at bedtime): no more (frequency_not_in_sources);
@@ -77,6 +80,7 @@ from dataclasses import dataclass, field
 
 from . import drugnames, prompt, spanish, validation
 from .prompt import FIELDS
+from . import textnorm
 from .textnorm import STOPWORDS, numbers, tokens
 from .transcript import Transcript, utf16_offset
 
@@ -112,6 +116,7 @@ REASONS = (
     "source_repeated",
     "source_superseded",
     "number_not_in_sources",
+    "number_unreadable",
     "unit_not_in_sources",
     "frequency_not_in_sources",
     "date_not_in_sources",
@@ -226,8 +231,8 @@ class _Context:
 GLUE = frozenset({"sobre", "de", "el", "la", "los", "las", "un", "una"}) | spanish.UNIT_WORDS
 
 
-def _terms(toks: list[spanish.Token]) -> list[_Term]:
-    found = [_Term("number", n.readings, n.first, n.last, n.ambiguous) for n in spanish.numbers(toks)]
+def _terms(toks: list[spanish.Token], text: str | None = None) -> list[_Term]:
+    found = [_Term("number", n.readings, n.first, n.last, n.ambiguous) for n in spanish.numbers(toks, text)]
     for i, token in enumerate(toks):
         if (token.key.isalpha() and len(token.key) >= 4 and token.key not in spanish.NOT_DRUGS
                 and any(is_drug(name) for name in spanish.drug_candidates(token.key))):
@@ -280,7 +285,7 @@ def _corrections(text: str, toks: list[spanish.Token], terms: list[_Term]) -> tu
 def _context(transcript: Transcript) -> _Context:
     text = transcript.text
     toks = spanish.tokens(text)
-    terms = _terms(toks)
+    terms = _terms(toks, text)
     cues, taken_back = _corrections(text, toks, terms)
     return _Context(
         text=text,
@@ -312,9 +317,40 @@ ALPHANUMERIC = re.compile(r"\b(?=\w*[A-Za-z])(?=\w*\d)\w+\b")
 
 
 def english_numbers(text: str) -> list[str]:
-    """The numbers in English text, as digits, a comma before three digits read as a thousands separator. The digit in
-    an abbreviation ("A1c", "SpO2", "T2DM") is part of its name, which the abbreviation check compares."""
-    return numbers(ALPHANUMERIC.sub(" ", re.sub(r"(?<=\d),(?=\d{3}\b)", "", text)))
+    """The numbers in English text, as digits, a comma before three digits read as a thousands separator, and a half or
+    a quarter as its decimal (english_fractions()). The digit in an abbreviation ("A1c", "SpO2", "T2DM") is part of its
+    name, which the abbreviation check compares."""
+    return numbers(ALPHANUMERIC.sub(" ", english_fractions(re.sub(r"(?<=\d),(?=\d{3}\b)", "", text))))
+
+
+_EN_WHOLE = r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)"
+_EN_WHOLES = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+# Each fraction English writes, and its decimal: "one and a half" is 1.5, "1 1/2" 1.5, "half a tablet" 0.5, "a
+# quarter" 0.25, "three quarters" 0.75, "1/2 tablet" 0.5. A third has no exact decimal: UNREADABLE stands in for it.
+UNREADABLE = "\u2047"
+_EN_FRACTIONS = [
+    (re.compile(rf"\b{_EN_WHOLE}\s+and\s+a\s+half\b", re.I), lambda m: str(_whole(m.group(1)) + 0.5)),
+    (re.compile(r"\b(\d+)\s+([13])/4\b"), lambda m: str(int(m.group(1)) + int(m.group(2)) / 4)),
+    (re.compile(r"\b(\d+)\s+1/2\b"), lambda m: str(int(m.group(1)) + 0.5)),
+    (re.compile(r"\bthree[\s-]+quarters?\b|\b3/4\b", re.I), lambda m: "0.75"),
+    (re.compile(r"\b(?:an?|one)[\s-]+(?:quarter|fourth)\b|\bquarter\s+of\b|\b1/4\b", re.I), lambda m: "0.25"),
+    (re.compile(r"\b(?:an?|one)[\s-]+half\b|\bhalf\s+(?:an?|of|the)\b|\b1/2\b", re.I), lambda m: "0.5"),
+    (re.compile(r"\b(?:an?|one|two)[\s-]+thirds?\b|\b[12]/3\b", re.I), lambda m: UNREADABLE),
+]
+
+
+def _whole(word: str) -> int:
+    return int(word) if word.isdigit() else _EN_WHOLES[word.lower()]
+
+
+def english_fractions(text: str) -> str:
+    for pattern, decimal in _EN_FRACTIONS:
+        text = pattern.sub(lambda m, d=decimal: f" {normalize_decimal(d(m))} ", text)
+    return text
+
+
+def normalize_decimal(value: str) -> str:
+    return value if value == UNREADABLE else textnorm.normalize_number(value)
 
 
 DOSE_UNITS = frozenset({"mg", "mcg", "g", "kg", "ml", "l", "unit", "mg/dl"})  # never added to a number said without
@@ -726,7 +762,15 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         return {value for term in group if term.kind == kind for value in term.values}
 
     english_nums = set(english_numbers(english))
-    missing = english_nums - said_numbers(said, terms)
+    # A fraction with no exact decimal ("un tercio", "a third") can't be compared: refused, for the clinician to write.
+    if any(term.kind == "number" and not term.values for term in terms) or UNREADABLE in english_fractions(english):
+        reasons.add("number_unreadable")
+    said_nums = said_numbers(said, terms)
+    # "Una" read as part of a number ("una tableta y media", 1.5) is no 1 of its own.
+    if not any(ctx.toks[i].key in spanish.ARTICLE_NUMBERS
+               and not any(t.kind == "number" and t.first <= i <= t.last for t in terms) for i in said_index):
+        said_nums = {value for term in terms if term.kind == "number" for value in term.values}
+    missing = english_nums - said_nums
     if missing & values("number", back):
         reasons.add("source_superseded")
     elif missing:

@@ -94,6 +94,10 @@ ORDINALS = {
     "cuarto": 4, "quinto": 5, "sexto": 6, "septimo": 7, "octavo": 8, "noveno": 9, "decimo": 10,
 }
 DECIMAL_WORDS = frozenset({"coma", "punto"})
+# A fraction said after a number: "un cuarto" is 0.25, "tres cuartos" 0.75, "un octavo" 0.125. A third has no exact
+# decimal for the English to be compared with: it is read as nothing (Number.readings empty), which the checks refuse.
+FRACTIONS = {"cuarto": 4, "cuartos": 4, "octavo": 8, "octavos": 8, "tercio": 3, "tercios": 3}
+HALVES = (("y", "medio"), ("y", "media"))
 
 
 @dataclass(frozen=True)
@@ -103,7 +107,7 @@ class Number:
 
     first: int
     last: int
-    readings: frozenset[str]
+    readings: frozenset[str]  # empty for a fraction that can't be read exactly ("un tercio", "1/3")
     ambiguous: bool = False
 
 
@@ -134,7 +138,8 @@ def _word_number(keys: list[str], i: int) -> tuple[int, int] | None:
         return None
     if keys[i] in ARTICLE_NUMBERS:
         after = keys[i + 1] if i + 1 < len(keys) else ""
-        if after not in COUNTED and after not in UNIT_WORDS and not (after == "y" and keys[i + 2 : i + 3] in (["medio"], ["media"])):
+        if (after not in COUNTED and after not in UNIT_WORDS and after not in FRACTIONS
+                and not (after == "y" and keys[i + 2 : i + 3] in (["medio"], ["media"]))):
             return None
     total = group = 0
     last = i - 1
@@ -164,15 +169,23 @@ def _word_number(keys: list[str], i: int) -> tuple[int, int] | None:
     return (total + group, last) if last >= i else None
 
 
-def numbers(toks: list[Token]) -> list[Number]:
+def numbers(toks: list[Token], text: str | None = None) -> list[Number]:
     """Every number in the words, in order: digits ("37,8", "142"), words ("treinta y siete coma ocho"), a half after
-    one ("uno y medio" is 1.5), "medio" or "media" before a unit or dose form (0.5), and an ordinal ("primero de marzo"
-    is 1, "el primer mes" 1), as the English reading counts "first"."""
+    one ("uno y medio" is 1.5), or after its unit or dose form ("un gramo y medio" 1.5, "una tableta y media" 1.5),
+    "medio" or "media" before a unit or dose form (0.5), a fraction after one ("un cuarto" 0.25, "tres cuartos" 0.75),
+    a fraction in digits before a unit or dose form, given the text ("1/2 tableta" 0.5; "120/80" is two numbers), and an
+    ordinal ("primero de marzo" is 1, "el primer mes" 1, "el cuarto día" 4), as the English reading counts "first". A
+    fraction with no exact decimal ("un tercio", "1/3 de tableta") has no reading."""
     keys = [t.key for t in toks]
     found: list[Number] = []
     i = 0
     while i < len(toks):
         key = keys[i]
+        fraction = _digit_fraction(toks, keys, i, text) if text is not None else None
+        if fraction is not None:
+            found.append(fraction)
+            i = fraction.last + 1
+            continue
         if key[0].isdigit():
             readings, ambiguous = digit_readings(key)
             first, last, value = i, i, None
@@ -182,6 +195,8 @@ def numbers(toks: list[Token]) -> list[Number]:
             said = _word_number(keys, i)
             if said is None:
                 if key in ("medio", "media") and i + 1 < len(keys) and (keys[i + 1] in UNIT_WORDS or keys[i + 1] in COUNTED):
+                    found.append(Number(i, i, frozenset({"0.5"})))
+                elif key == "mitad":  # "la mitad de la dosis", half the dose
                     found.append(Number(i, i, frozenset({"0.5"})))
                 elif key in ORDINALS:
                     found.append(Number(i, i, frozenset({str(ORDINALS[key])})))
@@ -203,9 +218,30 @@ def numbers(toks: list[Token]) -> list[Number]:
         elif value is not None and last + 2 < len(keys) and keys[last + 1] == "y" and keys[last + 2] in ("medio", "media"):
             readings = frozenset({normalize_number(str(float(value) + 0.5))})
             last += 2
+        elif value is not None and last + 1 < len(keys) and keys[last + 1] in FRACTIONS:
+            parts = FRACTIONS[keys[last + 1]]
+            readings = frozenset() if parts == 3 else frozenset({normalize_number(str(float(value) / parts))})
+            last += 1
+        elif (value is not None and last + 3 < len(keys) and (keys[last + 1] in UNIT_WORDS or keys[last + 1] in COUNTED)
+              and tuple(keys[last + 2 : last + 4]) in HALVES):
+            readings = frozenset({normalize_number(str(float(value) + 0.5))})
         found.append(Number(first, last, readings, ambiguous))
         i = last + 1
     return found
+
+
+def _digit_fraction(toks: list[Token], keys: list[str], i: int, text: str) -> Number | None:
+    """A fraction written in digits before a unit or a dose form ("1/2 tableta"): smaller over 2, 3, 4 or 8."""
+    if not (i + 1 < len(toks) and keys[i].isdigit() and keys[i + 1].isdigit()
+            and text[toks[i].end : toks[i + 1].start].strip() == "/"):
+        return None
+    numerator, denominator = int(keys[i]), int(keys[i + 1])
+    after = keys[i + 2] if i + 2 < len(keys) else ""
+    after = keys[i + 3] if after == "de" and i + 3 < len(keys) else after
+    if not (0 < numerator < denominator and denominator in (2, 3, 4, 8) and (after in UNIT_WORDS or after in COUNTED)):
+        return None
+    readings = frozenset() if denominator == 3 else frozenset({normalize_number(str(numerator / denominator))})
+    return Number(i, i + 1, readings)
 
 
 def readings(toks: list[Token]) -> set[str]:
@@ -244,7 +280,7 @@ def measured(text: str, toks: list[Token]) -> list[tuple[Number, str]]:
     """Each number said with a unit, and the unit."""
     keys = [t.key for t in toks]
     pairs: list[tuple[Number, str]] = []
-    for number in numbers(toks):
+    for number in numbers(toks, text):
         after = number.last + 1
         unit = None
         if after < len(keys) and keys[after] in UNIT_NAMES:

@@ -494,3 +494,41 @@ def test_a_word_of_doubt_inside_a_clause_doesnt_close_it():
     assert reasons("Tiene neumonía, creo que es leve.", ["Tiene neumonía, creo que es leve."],
                    "She has pneumonia, I think it is mild.") == []
     assert reasons("Podría iniciar amoxicilina.", ["Podría iniciar amoxicilina."], "Could start amoxicillin.") == []
+
+
+# ---- Halves, quarters and thirds (F2; sentences outside the test set) -----------------------------------------------
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Paracetamol un gramo y medio.", "Acetaminophen 1.5 g."),
+    ("Una tableta y media al día.", "One and a half tablets a day."),
+    ("Un cuarto de tableta al día.", "A quarter tablet a day."),
+    ("Tres cuartos de tableta al día.", "Three quarters of a tablet a day."),
+    ("Tomar 1/2 tableta al día.", "Take 1/2 tablet a day."),
+    ("Tomar 1/2 tableta al día.", "Take half a tablet a day."),
+    ("Tomar la mitad de la dosis.", "Take half the dose."),
+    ("TA 120/80.", "BP 120/80."),
+])
+def test_a_half_or_a_quarter_is_read_as_its_decimal(text, english):
+    assert reasons(text, [text], english) == []
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Paracetamol un gramo y medio.", "Acetaminophen 1 g."),
+    ("Una tableta y media al día.", "One tablet a day."),
+    ("Un cuarto de tableta al día.", "Four tablets a day."),
+    ("Tres cuartos de tableta al día.", "Three tablets a day."),
+    ("Tomar 1/2 tableta al día.", "Take 2 tablets a day."),
+    ("Tomar 1/2 tableta al día.", "Take 1 tablet a day."),
+])
+def test_a_half_or_a_quarter_misread_is_refused(text, english):
+    assert {"number_not_in_sources", "unit_not_in_sources"} & set(reasons(text, [text], english))
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Un tercio de tableta al día.", "A third of a tablet a day."),
+    ("Tomar 1/3 de tableta al día.", "Take 0.33 tablet a day."),
+    ("Una tableta al día.", "Two thirds of a tablet a day."),
+])
+def test_a_fraction_with_no_exact_decimal_is_refused(text, english):
+    assert "number_unreadable" in reasons(text, [text], english)
