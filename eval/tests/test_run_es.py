@@ -144,7 +144,7 @@ def test_every_passage_of_a_code_switching_recording_is_reported_with_how_likely
     metrics = scoring_es.score_audio([item, dataclasses.replace(item, variant="e14-nino-sano--clean",
                                                                 script="e14-nino-sano")], SCRIPTS, ENGLISH)
 
-    assert item.heard_as_spanish == [0.93, 0.62] and len(item.segments) == 2
+    assert [heard["spanish"] for heard in item.heard] == [0.93, 0.62] and len(item.segments) == 2
     assert metrics["code_switching"] == {"passages": 2, "items": [{
         "variant": "e10-codeswitch-dermatitis--clean", "passages": [
             {"text": "Tiene un rash en el brazo derecho.", "spanish": 0.93, "unclear": None},
@@ -168,12 +168,64 @@ def test_the_english_script_dictated_as_spanish_is_reported_too_and_a_passage_he
     assert [(p["spanish"], p["unclear"]) for p in listed["passages"]] == [(0.31, OTHER_LANGUAGE), (0.12, OTHER_LANGUAGE)]
 
 
-def test_a_live_dictation_in_spanish_is_timed_chunk_by_chunk(tmp_path):
+def test_a_live_dictation_in_spanish_is_timed_chunk_by_chunk_with_the_transcription_locks_holds(tmp_path):
     data = webm(speech(6))
 
-    times = asyncio.run(answers_es.live_chunks(data, 6.0, pipeline("Tos seca.", {})))
+    live = asyncio.run(answers_es.live_chunks(data, 6.0, pipeline("Tos seca.", {"statements": []})))
 
-    assert len(times) >= 6 and all(t < 15 for t in times)
+    assert len(live.chunk_seconds) >= 6 and all(t < 15 for t in live.chunk_seconds)
+    assert live.longest_live_hold is not None and 0 <= live.longest_live_hold < 15
+    assert live.final_hold is not None and 0 <= live.final_hold < 15
+
+
+def test_how_long_spanish_held_the_lock_says_what_an_english_dictation_waits():
+    timed = [scoring_es.SpanishItem(variant=f"{id}--clean", script=id, tags=[], hypothesis="", sorting="done",
+                                    lock_seconds=held)
+             for id, held in [("e09-depresion", {"longest_live": 1.25, "final": 4.5}),
+                              ("e14-nino-sano", {"longest_live": 6.75, "final": 2.0})]]
+
+    metrics = scoring_es.score_audio(timed, SCRIPTS, ENGLISH)
+
+    assert metrics["live"]["lock"]["longest_hold"] == 6.75
+    assert "English live updates paused for up to 6.8 s; an English stop waits up to 6.8 s" in run_es.english_waits(
+        json.loads(json.dumps(metrics)), "cpu")
+
+
+class Unsure:
+    """A stand-in for Whisper that hears each passage as it is told, with the probabilities its verdict read."""
+
+    def __init__(self, *heard: Heard) -> None:
+        self.heard = list(heard)
+
+    def hear(self, samples) -> Heard:  # noqa: ANN001
+        return self.heard.pop(0)
+
+
+# The review's W3: P(no speech) over 0.6 alone marks a passage, where Whisper's own decoding also wants a mean
+# log-probability under -1.0, so speech may be left out. Run B lists each passage marked so, and nothing else.
+@pytest.mark.parametrize(("mean", "spanish", "listed"), [
+    (-0.4, 0.95, True),  # the no-speech rule alone
+    (-1.4, 0.95, False),  # the log-probability marks it too
+    (-0.4, 0.30, False),  # it wasn't heard as Spanish either
+])
+def test_a_passage_left_out_by_the_no_speech_rule_alone_is_listed(tmp_path, mean, spanish, listed):
+    (tmp_path / "e14.webm").write_bytes(webm(speech(4)))  # two passages
+    whisper = Unsure(Heard(Recognition("Revisión de niña sana de 18 meses.", None), 0.97, 0.05, -0.2),
+                     Heard(Recognition("La madre no tiene preocupaciones.", None, "low_confidence"), spanish, 0.72, mean))
+    piped = dataclasses.replace(pipeline("", {"statements": []}), whisper=whisper)
+
+    item, _, _ = asyncio.run(answers_es.answer(variant(file="e14.webm"), tmp_path, piped, list(E14.tags)))
+    found = scoring_es.score_audio([item], SCRIPTS, ENGLISH)["no_speech_only"]
+
+    if not listed:
+        assert found == {"passages": 0, "seconds": 0, "words": 0, "items": []}
+        return
+    (entry,) = found["items"]
+    (passage,) = entry["passages"]
+    assert entry["variant"] == "e14-nino-sano--clean" and passage["text"] == "La madre no tiene preocupaciones."
+    assert (passage["no_speech"], passage["mean_log_probability"]) == (0.72, -0.4) and passage["end"] > passage["start"]
+    assert (found["passages"], found["words"]) == (1, 5) and found["seconds"] == round(passage["end"] - passage["start"], 2)
+    assert "La madre no tiene preocupaciones." in run_es.no_speech_only({"no_speech_only": found})
 
 
 @pytest.mark.parametrize(("said", "written"), [

@@ -40,7 +40,15 @@ The audio run (run_es.py, score_audio()) adds, over the recordings dictated in S
   and of the English script dictated as Spanish, as the transcript shows it, with the probability that it was Spanish
   (Whisper's language check) and what it was marked: Spanish is forced on every passage, so English heard as Spanish
   can come out written in Spanish nobody said, and only reading these shows it. Reported, never a stop;
-- live: the time to answer each one-second chunk of a dictation in Spanish (the sidecar's 15-second budget, NFR-14);
+- no_speech_only: every passage marked low_confidence by Whisper's no-speech rule alone (P(no speech) over
+  whisper_asr.NO_SPEECH, while its words' mean log-probability is not under MIN_LOG_PROBABILITY and nothing else would
+  mark it), with its time span, both probabilities and the words Whisper heard; and how many such passages there were,
+  and how many seconds and words of speech they left out. Whisper's own decoding applies that rule only with a low
+  log-probability too, so these may be real speech the sidecar leaves out (it fails closed). Reported, never a stop;
+- live: the time to answer each one-second chunk of a dictation in Spanish (the sidecar's 15-second budget, NFR-14),
+  and how long Spanish passes held the one transcription lock English dictations share: its longest hold while the
+  chunks came in and its hold for the final pass after stop, each recording's and the longest of all, which is how
+  long an English dictation on that machine skips its live updates, and how long its stop waits, at most;
 - wrong_language: the two recordings dictated in the wrong language, for what was marked and for no instruction
   carried into a field (FR-14), never for the fields' content;
 - text: the measures above that don't need speech recognition, on each script's display text alone (run A's).
@@ -59,8 +67,10 @@ import jiwer
 
 from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import HOLDOUT_DIR, Script, load_scripts
-from ehr_dictation import spanish
+from ehr_dictation import spanish, whisper_asr
+from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.prompt import FIELDS
+from ehr_dictation.quality import LOW_CONFIDENCE
 from ehr_dictation.transcript import Segment
 
 from . import facts_es
@@ -109,9 +119,12 @@ class SpanishItem:
     segments: list[dict] = field(default_factory=list)
     chunk_seconds: list[float] = field(default_factory=list)
     run_as: str | None = None
-    # For each passage in segments, the probability that it was Spanish, as Whisper's language check read it (None when
-    # it gave none); empty for a recording run as English and for a display text.
-    heard_as_spanish: list[float | None] = field(default_factory=list)
+    # For each passage in segments, the probabilities Whisper's verdict read: spanish, no_speech and
+    # mean_log_probability (each None when it gave none); empty for a recording run as English and for a display text.
+    heard: list[dict] = field(default_factory=list)
+    # The live run's (answers_es.live_chunks()): the transcription lock's longest hold while the chunks came in, and
+    # its hold for the final pass after stop, in seconds.
+    lock_seconds: dict[str, float | None] = field(default_factory=dict)
 
 
 def score(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
@@ -322,6 +335,7 @@ def score_audio(items: list[SpanishItem], scripts: dict[str, Script], english: d
         **score(spoken, scripts),
         "unclear": dict(sorted(Counter(s["unclear"] for item in spoken for s in item.segments if s["unclear"]).items())),
         "code_switching": _code_switching(spoken + [item for item in wrong if item.run_as == "es"], scripts),
+        "no_speech_only": _no_speech_only(spoken + [item for item in wrong if item.run_as == "es"]),
         "live": _live(spoken),
         "wrong_language": shown_wrong,
         "text": score(text, scripts),
@@ -409,7 +423,36 @@ def _live(items: list[SpanishItem]) -> dict:
         out |= {"p50": round(statistics.median(chunks), 3), "p95": round(chunks[int(0.95 * (len(chunks) - 1))], 3),
                 "max": round(chunks[-1], 3)}
     stages = {stage: [i.timings[stage] for i in items if stage in i.timings] for stage in ("decode", "transcribe")}
-    return out | {stage: _stats(values) for stage, values in stages.items() if values}
+    held = [{"variant": item.variant, "longest_live_hold": _rounded(item.lock_seconds.get("longest_live")),
+             "final_hold": _rounded(item.lock_seconds.get("final"))} for item in items if item.lock_seconds]
+    holds = [hold for entry in held for hold in (entry["longest_live_hold"], entry["final_hold"]) if hold is not None]
+    return out | {stage: _stats(values) for stage, values in stages.items() if values} | {
+        "lock": {"items": held, "longest_hold": max(holds, default=None)}}
+
+
+def _rounded(value: float | None, places: int = 4) -> float | None:
+    return None if value is None else round(value, places)
+
+
+def _no_speech_only(items: list[SpanishItem]) -> dict:
+    """Each passage the no-speech rule alone marked (the module's header), recording by recording, and the totals."""
+    listed = []
+    for item in items:
+        found = []
+        for segment, heard in zip(item.segments, item.heard or [{}] * len(item.segments), strict=True):
+            no_speech, mean = heard.get("no_speech"), heard.get("mean_log_probability")
+            if segment["unclear"] != LOW_CONFIDENCE or no_speech is None or mean is None or not segment["raw"].strip():
+                continue
+            # Marked, with no speech likely; and nothing else would have marked it.
+            if no_speech > whisper_asr.NO_SPEECH and whisper_asr.verdict(segment["raw"], heard["spanish"], 0.0, mean) is None:
+                found.append({"start": round(segment["start_sample"] / SAMPLE_RATE, 2),
+                              "end": round(segment["end_sample"] / SAMPLE_RATE, 2), "no_speech": _rounded(no_speech),
+                              "mean_log_probability": _rounded(mean), "text": Segment(**segment).text})
+        if found:
+            listed.append({"variant": item.variant, "passages": found})
+    passages = [passage for entry in listed for passage in entry["passages"]]
+    return {"passages": len(passages), "seconds": round(sum(p["end"] - p["start"] for p in passages), 2),
+            "words": sum(len(p["text"].split()) for p in passages), "items": listed}
 
 
 def _code_switching(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
@@ -419,11 +462,11 @@ def _code_switching(items: list[SpanishItem], scripts: dict[str, Script]) -> dic
     for item in items:
         if item.run_as != "es" and "code-switching" not in scripts[item.script].tags:
             continue
-        heard = item.heard_as_spanish or [None] * len(item.segments)
+        heard = item.heard or [{}] * len(item.segments)
         listed.append({"variant": item.variant, "passages": [
-            {"text": Segment(**segment).text, "spanish": None if spanish is None else round(spanish, 4),
+            {"text": Segment(**segment).text, "spanish": _rounded(probabilities.get("spanish")),
              "unclear": segment["unclear"]}
-            for segment, spanish in zip(item.segments, heard, strict=True)]})
+            for segment, probabilities in zip(item.segments, heard, strict=True)]})
     return {"items": listed, "passages": sum(len(entry["passages"]) for entry in listed)}
 
 

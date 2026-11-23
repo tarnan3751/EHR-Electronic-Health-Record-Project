@@ -15,9 +15,14 @@ model), the Spanish prompt, schema and parameters hash, the pipeline and scoring
 set, the Spanish test set's own recordings and gold hashes, and the machine. The file is written as the run goes, as
 run.py writes the English one: each recording's and text's answer as K2 Horizon gave it, before any check, then
 checked, and the measures only once every item is in, so a fault in the checks or the scoring leaves every answer so
-far for --rescore to finish without the models. At the end it prints every passage of the scripts that mix English
-into Spanish, and of the English script dictated as Spanish, as Whisper wrote it, with the probability that it was
-Spanish (scoring_es.py's code_switching), for someone to read for Spanish nobody said.
+far for --rescore to finish without the models. At the end it prints, for someone to read (scoring_es.py's header):
+every passage of the scripts that mix English into Spanish, and of the English script dictated as Spanish, as Whisper
+wrote it, with the probability that it was Spanish (code_switching), for Spanish nobody said; every passage the
+no-speech rule alone left out, with its time span, both probabilities and words, and their total (no_speech_only); and
+how long Spanish passes held the transcription lock English dictations share, each clean recording's longest hold
+while its chunks came in and its final pass's after stop, and what that means for an English dictation on that machine
+(live.lock). Every clean recording dictated in Spanish is fed in one-second chunks and stopped for that (--no-live skips
+it): the CPU timing step is run with --device cpu --only e09 e14 e15.
 
     uv run --project eval python -m ehr_eval.run --set es --rescore eval/results/latest-es.json --out eval/results/latest-es.json
 
@@ -40,7 +45,7 @@ from ehr_dictation import validation
 from ehr_dictation.transcript import Segment, assemble
 
 from . import scoring_es
-from .answers_es import LIVE_SECONDS, answer, live_chunks, open_pipeline
+from .answers_es import answer, live_chunks, open_pipeline
 from .run import machine
 from .run_a import check, run_script, spanish_first, text_transcript, unchecked
 from .scripts import EVAL_DIR, gold_es_sha256, pipeline_sha256, recordings_es_sha256, scoring_sha256
@@ -123,9 +128,10 @@ async def main_async(args: argparse.Namespace, api_key: str) -> int:
             check_english(item, proposal.fields, proposal.unknown, transcript)
         elif proposal is not None:
             check(item, proposal.fields, proposal.unknown, transcript)
-        if item.seconds >= LIVE_SECONDS and not variant.get("noise") and not variant.get("run_as") and not args.no_live:
-            data = (args.audio / variant["file"]).read_bytes()
-            item.chunk_seconds = await live_chunks(data, item.seconds, pipeline)
+        if not variant.get("noise") and not variant.get("run_as") and not args.no_live:
+            live = await live_chunks((args.audio / variant["file"]).read_bytes(), item.seconds, pipeline)
+            item.chunk_seconds = live.chunk_seconds
+            item.lock_seconds = {"longest_live": live.longest_live_hold, "final": live.final_hold}
         items.append(item)
         save(items)
         print(f"[{number}/{len(variants)}] {variant['id']}: {item.sorting}{f' ({item.reason})' if item.reason else ''}"
@@ -139,9 +145,38 @@ async def main_async(args: argparse.Namespace, api_key: str) -> int:
     await pipeline.llama.aclose()
 
     save(items, scoring_es.score_audio(items, scripts, english))
-    print(code_switching(json.loads(args.out.read_text(encoding="utf-8"))["metrics"]))
+    metrics = json.loads(args.out.read_text(encoding="utf-8"))["metrics"]
+    print("\n".join([code_switching(metrics), no_speech_only(metrics), english_waits(metrics, args.device)]))
     print(f"Wrote {args.out}")
     return 0
+
+
+def no_speech_only(metrics: dict) -> str:
+    """Every passage the no-speech rule alone left out, and their total."""
+    found = metrics["no_speech_only"]
+    lines = ["", f"Passages left out by the no-speech rule alone (P(no speech) over 0.6, the words' mean log-probability "
+                 f"not under -1.0): {found['passages']}, {found['seconds']} s and {found['words']} words of speech. "
+                 "Read them for real speech the sidecar left out (start-end s, P(no speech), mean log-probability, text):"]
+    for entry in found["items"]:
+        lines.append(f"  {entry['variant']}")
+        for passage in entry["passages"]:
+            lines.append(f"    {passage['start']:.1f}-{passage['end']:.1f} s  {passage['no_speech']:.3f}  "
+                         f"{passage['mean_log_probability']:.3f}  {passage['text']}")
+    return "\n".join(lines)
+
+
+def english_waits(metrics: dict, device: str) -> str:
+    """How long Spanish passes held the transcription lock, recording by recording, and what that means for English."""
+    lock = metrics["live"]["lock"]
+    lines = ["", "How long Spanish passes held the transcription lock English dictations share (longest hold while the "
+                 "chunks came in; the final pass's after stop):"]
+    for entry in lock["items"]:
+        lines.append(f"  {entry['variant']}: live {entry['longest_live_hold']} s, final pass {entry['final_hold']} s")
+    if lock["longest_hold"] is None:
+        return "\n".join([*lines, "  (no recording was timed live)"])
+    longest = lock["longest_hold"]
+    return "\n".join([*lines, f"On this machine ({device}): English live updates paused for up to {longest:.1f} s; an "
+                               f"English stop waits up to {longest:.1f} s."])
 
 
 def answered(item: scoring_es.SpanishItem, proposal, english_way: bool) -> None:  # noqa: ANN001
