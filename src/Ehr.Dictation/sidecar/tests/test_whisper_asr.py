@@ -97,6 +97,21 @@ def test_a_passage_not_heard_as_spanish_is_other_language():
     assert recognition.unclear == OTHER_LANGUAGE and recognition.text == "Tos seca desde hace 3 días."
 
 
+@pytest.mark.parametrize(("first", "unclear"), [(SURE_OF_SPANISH, None),
+                                                ({SPANISH: 0.0, ENGLISH: 1.0}, OTHER_LANGUAGE)])
+def test_hear_gives_what_recognize_does_with_the_probabilities_its_verdict_read(first, unclear):
+    model = Model(first, [*PROMPT, *TEXT, END])
+
+    heard = whisper(model).hear(SPEECH)
+
+    assert heard.recognition == whisper(model).recognize(SPEECH) and heard.recognition.unclear == unclear
+    assert heard.spanish == pytest.approx(np.exp(first[SPANISH]) / (np.exp(first[SPANISH]) + np.exp(first[ENGLISH])))
+    assert heard.no_speech == pytest.approx(1 / (np.exp(first[SPANISH]) + np.exp(first[ENGLISH]) + SIZE - 2))
+    assert heard.mean_log_probability == pytest.approx(0, abs=1e-6)  # every token written with logit 20
+    too_short = np.zeros(SAMPLE_RATE // 20, np.float32)
+    assert whisper(model).hear(too_short) == whisper_asr.Heard(whisper_asr.Recognition("", None))
+
+
 @pytest.mark.parametrize("model", [
     Model({**SURE_OF_SPANISH, NO_SPEECH: 12.0}, [*PROMPT, *TEXT, END]),  # most likely no speech at all
     Model(SURE_OF_SPANISH, [*PROMPT, *TEXT, END], confidence=0.0),  # every token a guess among 47

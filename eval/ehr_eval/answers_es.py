@@ -3,7 +3,10 @@ own code as a dictation in Spanish goes, ffmpeg decoding, Whisper transcription 
 Spanish prompt and schema, timed stage by stage; a recording dictated as English the English way instead (MedASR and
 the English prompt); the recordings of a minute and a half or more also fed in one-second chunks through the sidecar's
 sessions, as a live Spanish dictation is; and each script's display text alone (run_a.py), to measure the
-translation without speech recognition.
+translation without speech recognition. Each passage Whisper transcribes keeps the probability that it was Spanish,
+as its language check read it (whisper_asr.Whisper.hear()), so the results can show every passage of the scripts that
+mix English into Spanish beside it: Spanish is forced on every passage, so English heard as Spanish may come out
+written in Spanish nobody said.
 
 Its hash is part of the pipeline hash (scripts.py), shared with the English set: a change to it means running both
 evals again. What run_es.py does with the answers, the checks and the scoring, may be redone without the models.
@@ -23,8 +26,8 @@ from ehr_dictation.llama import LlamaServer, Proposal, StructuringFailed, Struct
 from ehr_dictation.sessions import Sessions, Spanish
 from ehr_dictation.settings import Settings
 from ehr_dictation.transcriber import Progress, advance
-from ehr_dictation.transcript import Transcript, assemble
-from ehr_dictation.whisper_asr import Whisper
+from ehr_dictation.transcript import Segment, Transcript, assemble
+from ehr_dictation.whisper_asr import Heard, Whisper
 
 from .scoring_es import SpanishItem
 
@@ -58,6 +61,32 @@ def open_pipeline(args: argparse.Namespace, api_key: str) -> Pipeline:
     )
 
 
+class Listening:
+    """Whisper, keeping each passage it hears with the probability that it was Spanish. A stand-in without hear()
+    gives none."""
+
+    def __init__(self, whisper: Recognizer) -> None:
+        self.whisper = whisper
+        self.heard: list[tuple[int, Heard]] = []
+
+    def recognize(self, samples):  # noqa: ANN001, ANN201
+        hear = getattr(self.whisper, "hear", None)
+        heard = hear(samples) if hear else Heard(self.whisper.recognize(samples))
+        self.heard.append((samples.size, heard))
+        return heard.recognition
+
+    def spanish(self, segments: list[Segment]) -> list[float | None]:
+        """For each passage of the transcript, in order, the probability that it was Spanish."""
+        found, at = [], 0
+        for segment in segments:
+            while at < len(self.heard) and (self.heard[at][0], self.heard[at][1].recognition.text) != (
+                    segment.end_sample - segment.start_sample, segment.raw):
+                at += 1
+            found.append(self.heard[at][1].spanish if at < len(self.heard) else None)
+            at += 1
+        return found
+
+
 def variant_tags(variant: dict, script_tags: list[str]) -> list[str]:
     noise = f"noise:{variant['noise']}@{variant['snr_db']}dB" if variant.get("noise") else "noise:none"
     tags = [f"accent:{variant.get('accent', 'unknown')}", noise, f"container:{variant.get('container', 'unknown')}"]
@@ -77,7 +106,8 @@ async def answer(variant: dict, audio_dir: Path, pipeline: Pipeline,
     timings["decode"] = time.perf_counter() - started
 
     started = time.perf_counter()
-    progress = advance(samples, Progress(), pipeline.medasr if english else pipeline.whisper, final=True)
+    listening = Listening(pipeline.whisper)
+    progress = advance(samples, Progress(), pipeline.medasr if english else listening, final=True)
     transcript = assemble(progress.segments, final=True)
     timings["transcribe"] = time.perf_counter() - started
 
@@ -87,6 +117,7 @@ async def answer(variant: dict, audio_dir: Path, pipeline: Pipeline,
         sorting="done", not_carried_over=[(kind, start, end) for start, end, kind in found], timings=timings,
         seconds=samples.size / audio.SAMPLE_RATE, run_as=variant.get("run_as"),
         segments=[dataclasses.asdict(placed.segment) for placed in transcript.placed],
+        heard_as_spanish=[] if english else listening.spanish([placed.segment for placed in transcript.placed]),
     )
     started = time.perf_counter()
     try:

@@ -28,6 +28,11 @@ The thresholds are those Whisper's own decoding uses to try again; here they mar
 starting values, not yet measured on Spanish recordings: the Spanish eval's run B is the first to measure them. There
 is no confidence for quality.py's MedASR threshold to read (None): the verdict above takes its place.
 
+Spanish is forced on every passage, whatever the language check says, so a passage mixing English with Spanish and
+heard as Spanish (MIN_SPANISH or more) can come out with its English written in Spanish words nobody said. hear() gives
+the probabilities the verdict read beside it, so the Spanish eval can show each passage of its code-switching scripts
+with how likely it was Spanish (eval/ehr_eval/answers_es.py); the sidecar itself only recognizes.
+
 Spanish needs no spoken punctuation, since Whisper writes it. Only "punto y aparte" and "nuevo párrafo" (a full stop and
 a new paragraph) and "punto y seguido" (a full stop) are read as punctuation; "punto", "coma" and "dos puntos" stay
 words (a decimal point, a clinical coma, "two points"). The text goes out in the form transcript.py formats, as MedASR's
@@ -41,6 +46,7 @@ import re
 import threading
 import unicodedata
 import zlib
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -59,6 +65,17 @@ STOCK_PHRASES = (
     "Gracias por ver el video",
     "¡Suscríbete!",
 )
+
+
+@dataclass(frozen=True)
+class Heard:
+    """A passage as Whisper heard it: what recognize() gives, and the probabilities its verdict read (None when the
+    passage was too short to transcribe)."""
+
+    recognition: Recognition
+    spanish: float | None = None
+    no_speech: float | None = None
+    mean_log_probability: float | None = None
 
 
 class Whisper:
@@ -95,8 +112,11 @@ class Whisper:
         self._lock = threading.Lock()
 
     def recognize(self, samples: np.ndarray) -> Recognition:
+        return self.hear(samples).recognition
+
+    def hear(self, samples: np.ndarray) -> Heard:
         if samples.size < SAMPLE_RATE // 10:
-            return Recognition("", None)
+            return Heard(Recognition("", None))
         torch = self._torch
         with self._lock, torch.inference_mode():
             features = self._processor(samples, sampling_rate=SAMPLE_RATE, return_tensors="pt").input_features
@@ -112,7 +132,8 @@ class Whisper:
             logits = self._model(encoder_outputs=encoded, decoder_input_ids=read).logits[0, len(self._prompt) - 1 :].float()
             mean = mean_log_probability(logits, torch.tensor(words + [self._end], device=self._device))
             text = without_stock_ending(self._processor.tokenizer.decode(words, skip_special_tokens=True).strip())
-        return Recognition(punctuated(text), None, verdict(text, spanish, no_speech, mean))
+        recognition = Recognition(punctuated(text), None, verdict(text, spanish, no_speech, mean))
+        return Heard(recognition, spanish, no_speech, mean)
 
 
 def language_and_no_speech(logits, languages: list[int], spanish: int, no_speech: int) -> tuple[float, float]:  # noqa: ANN001

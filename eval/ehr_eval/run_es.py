@@ -12,7 +12,9 @@ its own, as run A did (run_a.py). Nothing reaches the network but llama-server.
 
 The results go to eval/results/latest-es.json (--out), stamped with the models' hashes (Whisper's as the speech
 model), the Spanish prompt, schema and parameters hash, the pipeline and scoring hashes it shares with the English
-set, the Spanish test set's own recordings and gold hashes, and the machine.
+set, the Spanish test set's own recordings and gold hashes, and the machine. At the end it prints every passage of the
+scripts that mix English into Spanish, and of the English script dictated as Spanish, as Whisper wrote it, with the
+probability that it was Spanish (scoring_es.py's code_switching), for someone to read for Spanish nobody said.
 
     uv run --project eval python -m ehr_eval.run --set es --rescore eval/results/latest-es.json --out eval/results/latest-es.json
 
@@ -128,8 +130,22 @@ async def main_async(args: argparse.Namespace, api_key: str) -> int:
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(code_switching(results["metrics"]))
     print(f"Wrote {args.out}")
     return 0
+
+
+def code_switching(metrics: dict) -> str:
+    """Every passage of the code-switching recordings as Whisper wrote it, with the probability that it was Spanish and
+    what it was marked."""
+    lines = ["", "Passages of the scripts that mix English into Spanish, and of the English script dictated as Spanish, "
+                 "as Whisper wrote them (P(Spanish), mark, text): read them for Spanish nobody said."]
+    for entry in metrics["code_switching"]["items"]:
+        lines.append(f"  {entry['variant']}")
+        for passage in entry["passages"]:
+            spanish = "  -  " if passage["spanish"] is None else f"{passage['spanish']:.3f}"
+            lines.append(f"    {spanish}  {passage['unclear'] or '':14}  {passage['text']}")
+    return "\n".join(lines)
 
 
 def stored_item(entry: dict) -> scoring_es.SpanishItem:

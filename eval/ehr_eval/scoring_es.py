@@ -33,6 +33,10 @@ The audio run (run_es.py, score_audio()) adds, over the recordings dictated in S
 - drugs and dates: the share of the drugs each script names that the transcript has word for word, accents aside (and
   within two letters), and of its dates said with their day and month;
 - unclear: the passages marked, by why (other_language among them);
+- code_switching: every passage of each recording of a script that mixes English into Spanish (tagged code-switching),
+  and of the English script dictated as Spanish, as the transcript shows it, with the probability that it was Spanish
+  (Whisper's language check) and what it was marked: Spanish is forced on every passage, so English heard as Spanish
+  can come out written in Spanish nobody said, and only reading these shows it. Reported, never a stop;
 - live: the time to answer each one-second chunk of a dictation in Spanish (the sidecar's 15-second budget, NFR-14);
 - wrong_language: the two recordings dictated in the wrong language, for what was marked and for no instruction
   carried into a field (FR-14), never for the fields' content;
@@ -52,7 +56,7 @@ from dictation_scripts_es import Script
 from ehr_dictation import spanish, translation, validation
 from ehr_dictation.prompt import FIELDS
 from ehr_dictation.textnorm import tokens
-from ehr_dictation.transcript import Transcript
+from ehr_dictation.transcript import Segment, Transcript
 
 from .scoring import FieldOutcome, _edits, _fields, _ratio, _stats, _validation
 
@@ -97,6 +101,9 @@ class SpanishItem:
     segments: list[dict] = field(default_factory=list)
     chunk_seconds: list[float] = field(default_factory=list)
     run_as: str | None = None
+    # For each passage in segments, the probability that it was Spanish, as Whisper's language check read it (None when
+    # it gave none); empty for a recording run as English and for a display text.
+    heard_as_spanish: list[float | None] = field(default_factory=list)
 
 
 def score(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
@@ -353,6 +360,7 @@ def score_audio(items: list[SpanishItem], scripts: dict[str, Script], english: d
         "dates": _dates(spoken, scripts),
         **score(spoken, scripts),
         "unclear": dict(sorted(Counter(s["unclear"] for item in spoken for s in item.segments if s["unclear"]).items())),
+        "code_switching": _code_switching(spoken + [item for item in wrong if item.run_as == "es"], scripts),
         "live": _live(spoken),
         "wrong_language": shown_wrong,
         "text": score(text, scripts),
@@ -441,6 +449,21 @@ def _live(items: list[SpanishItem]) -> dict:
                 "max": round(chunks[-1], 3)}
     stages = {stage: [i.timings[stage] for i in items if stage in i.timings] for stage in ("decode", "transcribe")}
     return out | {stage: _stats(values) for stage, values in stages.items() if values}
+
+
+def _code_switching(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
+    """Every passage of each recording of a code-switching script, and of the English script dictated as Spanish (the
+    module's header)."""
+    listed = []
+    for item in items:
+        if item.run_as != "es" and "code-switching" not in scripts[item.script].tags:
+            continue
+        heard = item.heard_as_spanish or [None] * len(item.segments)
+        listed.append({"variant": item.variant, "passages": [
+            {"text": Segment(**segment).text, "spanish": None if spanish is None else round(spanish, 4),
+             "unclear": segment["unclear"]}
+            for segment, spanish in zip(item.segments, heard, strict=True)]})
+    return {"items": listed, "passages": sum(len(entry["passages"]) for entry in listed)}
 
 
 def _wrong_language(items: list[SpanishItem], scripts: dict) -> dict:

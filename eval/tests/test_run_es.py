@@ -16,7 +16,10 @@ from test_run import speech, webm
 from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import load_scripts
 from ehr_eval import answers_es, run_es, scoring_es
+from ehr_dictation.asr import Recognition
 from ehr_dictation.provenance import Models
+from ehr_dictation.quality import OTHER_LANGUAGE
+from ehr_dictation.whisper_asr import Heard
 from ehr_eval.run_a import check, run_script
 
 MODELS = Models(
@@ -112,6 +115,57 @@ def test_stored_answers_are_scored_again_without_a_model(tmp_path):
     stored["items"][0]["hypothesis"] = "Not what was heard."
     with pytest.raises(SystemExit, match="can't be rebuilt"):
         run_es.rescore(json.loads(json.dumps(stored)))
+
+
+class Hearing:
+    """A stand-in for Whisper that hears each passage in turn as it is told, with how likely it was Spanish."""
+
+    def __init__(self, *passages: tuple[str, float, str | None]) -> None:
+        self.passages = list(passages)
+
+    def hear(self, samples) -> Heard:  # noqa: ANN001
+        text, spanish, unclear = self.passages.pop(0)
+        return Heard(Recognition(text, None, unclear), spanish, 0.01, -0.2)
+
+    def recognize(self, samples) -> Recognition:  # noqa: ANN001
+        raise AssertionError("the eval asks Whisper what it heard, with its probabilities")
+
+
+# Decision 6 as built: Spanish is forced on every passage, so English heard as Spanish can come out in Spanish nobody
+# said. Run B lists every passage of the code-switching scripts, word for word, with its probability of being Spanish.
+def test_every_passage_of_a_code_switching_recording_is_reported_with_how_likely_it_was_spanish(tmp_path):
+    (tmp_path / "e10.webm").write_bytes(webm(speech(4)))  # two passages, a second's pause between them
+    whisper = Hearing(("Tiene un rash en el brazo derecho.", 0.93, None),
+                      ("Se aconsejó al paciente sobre dieta y ejercicio.", 0.62, None))
+    piped = dataclasses.replace(pipeline("", {"statements": []}), whisper=whisper)
+    e10 = variant(id="e10-codeswitch-dermatitis--clean", script="e10-codeswitch-dermatitis", file="e10.webm")
+
+    item, _, _ = asyncio.run(answers_es.answer(e10, tmp_path, piped, list(SCRIPTS["e10-codeswitch-dermatitis"].tags)))
+    metrics = scoring_es.score_audio([item, dataclasses.replace(item, variant="e14-nino-sano--clean",
+                                                                script="e14-nino-sano")], SCRIPTS, ENGLISH)
+
+    assert item.heard_as_spanish == [0.93, 0.62] and len(item.segments) == 2
+    assert metrics["code_switching"] == {"passages": 2, "items": [{
+        "variant": "e10-codeswitch-dermatitis--clean", "passages": [
+            {"text": "Tiene un rash en el brazo derecho.", "spanish": 0.93, "unclear": None},
+            {"text": "Se aconsejó al paciente sobre dieta y ejercicio.", "spanish": 0.62, "unclear": None}]}]}
+    printed = run_es.code_switching(metrics)
+    assert "0.620" in printed and "Se aconsejó al paciente sobre dieta y ejercicio." in printed
+
+
+def test_the_english_script_dictated_as_spanish_is_reported_too_and_a_passage_heard_as_english_is_marked(tmp_path):
+    (tmp_path / "d43.webm").write_bytes(webm(speech(4)))
+    whisper = Hearing(("Tos desde hace dos semanas.", 0.31, OTHER_LANGUAGE),
+                      ("Pido un perfil de lípidos.", 0.12, OTHER_LANGUAGE))
+    piped = dataclasses.replace(pipeline("", {"statements": []}), whisper=whisper)
+    d43 = variant(id="d43-cough-lipids-orders--clean--as-es", script="d43-cough-lipids-orders", file="d43.webm",
+                  run_as="es")
+
+    item, transcript, _ = asyncio.run(answers_es.answer(d43, tmp_path, piped, []))
+    (listed,) = scoring_es.score_audio([item], SCRIPTS, ENGLISH)["code_switching"]["items"]
+
+    assert len(transcript.unclear_ranges()) == 2
+    assert [(p["spanish"], p["unclear"]) for p in listed["passages"]] == [(0.31, OTHER_LANGUAGE), (0.12, OTHER_LANGUAGE)]
 
 
 def test_a_live_dictation_in_spanish_is_timed_chunk_by_chunk(tmp_path):
