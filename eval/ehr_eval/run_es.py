@@ -154,11 +154,12 @@ def stored_item(entry: dict) -> scoring_es.SpanishItem:
                                      "not_carried_over": [tuple(found) for found in entry["not_carried_over"]]})
 
 
-def rescore(stored: dict) -> dict:
+def rescore(stored: dict, eval_dir: Path = EVAL_DIR) -> dict:
     """The stored answers through the current checks and scoring, against the current gold and tags: each recording's
-    transcript rebuilt from its passages as heard, each display text from its script, nothing run but the checks."""
-    scripts = {s.id: s for s in load_scripts()}
-    english = {s.id: s for s in load_english()}
+    transcript rebuilt from its passages as heard, each display text from its script, nothing run but the checks. The
+    gate (gate.py) scores them so too, and trusts no measure the results file states."""
+    scripts = {s.id: s for s in load_scripts(eval_dir / "scripts-es")}
+    english = {s.id: s for s in load_english(eval_dir / "scripts")}
     items = []
     for entry in stored["items"]:
         old = stored_item(entry)
@@ -176,8 +177,8 @@ def rescore(stored: dict) -> dict:
         elif old.sorting == "done":
             check(item, {name: f.statements for name, f in old.fields.items()}, old.unknown, transcript)
         items.append(item)
-    out = {**stored, "provenance": stored["provenance"] | {"scoring": scoring_sha256()},
-           "dataset": stored["dataset"] | {"gold_sha256": gold_es_sha256()},
+    out = {**stored, "provenance": stored["provenance"] | {"scoring": scoring_sha256(eval_dir)},
+           "dataset": stored["dataset"] | {"gold_sha256": gold_es_sha256(eval_dir)},
            "metrics": scoring_es.score_audio(items, scripts, english),
            "items": [dataclasses.asdict(item) for item in items]}
     out["rescored"] = {"at": datetime.now(UTC).isoformat(timespec="seconds"),

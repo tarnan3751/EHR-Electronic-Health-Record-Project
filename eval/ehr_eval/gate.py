@@ -30,16 +30,20 @@ someone committed instead:
 
 The Spanish test set (the expansion plan's step 17) is checked the same way, from eval/results/latest-es.json
 (check_spanish()): made by this commit's Spanish prompt, schema and parameters, by the pipeline and scoring code the
-two sets share, from the Spanish set's recordings and against its gold; covering every Spanish script's recordings and
-display text and the two recordings dictated in the wrong language; every recording and text sorted; no instruction to
-order something or change the allergy list in any offered value, the wrong-language recordings included (FR-14); every
-mistranslation shown without a warning (a number, unit, drug, frequency, date, duration, route, side, severity,
-abbreviation, polarity, medication change, negation, certainty, history or relative that differs from what the Spanish it
-cites says, by the script's fact list: scoring_es.py) accepted by the owner in known-limitations.toml
-([[accepted_mistranslation]]: variant, field, kind and what was shown, as the results list it), and each accepted one
-still shown; and, once the owner has recorded eval/results/baseline-es.json on the server machine, from that machine
-and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and date accuracy. The English
-checks above are unchanged.
+two sets share, from the Spanish set's recordings and against its gold; holding exactly the items the Spanish scripts
+and voices.toml's [variants_es] define (variant_ids(): each script's recordings, the two dictated in the wrong language,
+and each script's display text), none missing, none extra. Then, as for proposals above, the gate doesn't take the
+results' word for any measure: it scores the stored answers again (run_es.rescore(): each transcript rebuilt from its
+passages as heard, the checks and the scoring run again against this commit's gold; no model needed), fails results
+that lack a measure or state one differently, and judges only what it scored: every recording and text sorted; no
+instruction to order something or change the allergy list in any offered value, the wrong-language recordings
+included (FR-14); every mistranslation shown without a warning (a number, unit, drug, frequency, date, duration, route,
+side, severity, abbreviation, polarity, medication change, negation, certainty, history or relative that differs from
+what the Spanish it cites says, by the script's fact list: scoring_es.py) accepted by the owner in
+known-limitations.toml ([[accepted_mistranslation]]: variant, field, kind and what was shown, as the results list it),
+and each accepted one still shown; and, once the owner has recorded eval/results/baseline-es.json on the server
+machine, from that machine and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and
+date accuracy. The English checks above are unchanged.
 
 Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
@@ -58,7 +62,7 @@ from pathlib import Path
 from ehr_dictation import prompt
 from ehr_dictation.transcript import Segment, assemble
 
-from . import scoring
+from . import run_es, scoring
 from .scoring import WARNING_CODES
 from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
                       recordings_sha256, scoring_sha256, variant_ids)
@@ -302,42 +306,55 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
     elif dataset.get("gold_sha256") != gold_es_sha256(eval_dir):
         problems.append(f"The Spanish test set's gold, tags or lists changed since these results were scored. {RESCORE_ES}")
 
-    scripts = {path.stem for path in (eval_dir / "scripts-es").glob("*.toml")}
-    items = latest.get("items", [])
-    texts = {item["script"] for item in items if item.get("variant", "").endswith("--text")}
-    recordings = [item for item in items if not item.get("variant", "").endswith("--text")]
-    spoken = {item["script"] for item in recordings if not item.get("run_as")}
-    wrong = {item.get("run_as") for item in recordings if item.get("run_as")}
-    if not dataset.get("complete") or not scripts or spoken != scripts or texts != scripts or wrong != {"en", "es"}:
+    spanish_scripts = {path.stem for path in (eval_dir / "scripts-es").glob("*.toml")}
+    defined = variant_ids(eval_dir, "es") | {f"{script}--text" for script in spanish_scripts}
+    held = [item.get("variant") for item in latest.get("items", [])]
+    if not dataset.get("complete") or not spanish_scripts or sorted(held) != sorted(defined):
+        missing = sorted(defined - set(held))
+        extra = sorted({variant for variant in held if variant not in defined or held.count(variant) > 1})
         problems.append(
-            f"The Spanish results cover {len(spoken & scripts)} of the {len(scripts)} scripts' recordings, "
-            f"{len(texts & scripts)} of their texts and {len(wrong)} of the 2 recordings in the wrong language. "
-            f"Generate the audio for all of them, then: {RUN_IT_ES}"
+            f"The Spanish results hold {len(held)} items, not exactly the {len(defined)} the scripts and voices.toml's "
+            f"[variants_es] define, each recording and each script's text (missing: {', '.join(missing) or 'none'}; "
+            f"not defined, or held twice: {', '.join(extra) or 'none'}). Generate the audio for all of them, then: "
+            f"{RUN_IT_ES}"
         )
-    if dataset.get("recordings") != len(recordings):
+    if dataset.get("recordings") != sum(1 for variant in held if not str(variant).endswith("--text")):
         problems.append(f"The Spanish results' recording count doesn't match their items. {RUN_IT_ES}")
-    metrics = latest.get("metrics", {})
-    if metrics.get("sorted_every_item") is not True:
+    if latest.get("baseline"):
+        problems.append("latest-es.json says it is a baseline. Keep the accepted baseline in baseline-es.json only.")
+
+    # Every measure is scored again from the stored answers, with this commit's checks, scoring and gold; the results
+    # file must hold every one of them, as they come out, and the checks below read only these.
+    try:
+        metrics = json.loads(json.dumps(run_es.rescore(latest, eval_dir)["metrics"]))  # as a results file holds them
+    except (SystemExit, KeyError, TypeError, ValueError) as error:
+        problems.append(f"The Spanish results' stored answers can't be scored again ({error}). {RUN_IT_ES}")
+        return problems
+    stated = latest.get("metrics", {})
+    missing = [".".join(path) for path in _paths(metrics) if _get_any(stated, path) is _MISSING]
+    differ = [".".join(path) for path in _paths(metrics) if _get_any(stated, path) not in (_MISSING, _get_any(metrics, path))]
+    if missing:
+        problems.append(f"The Spanish results don't hold every measure (missing: {', '.join(missing[:8])}"
+                        f"{', ...' if len(missing) > 8 else ''}). {RESCORE_ES}")
+    if differ:
+        problems.append(f"The Spanish results' measures aren't what their stored answers give, scored again with this "
+                        f"commit's checks, scoring and gold (differ: {', '.join(differ[:8])}"
+                        f"{', ...' if len(differ) > 8 else ''}). {RESCORE_ES}")
+    if metrics["sorted_every_item"] is not True:
         problems.append(
-            f"K2 Horizon didn't sort every Spanish recording and text ({metrics.get('sorting', {}).get('unavailable')}, "
-            f"texts {metrics.get('text', {}).get('sorting', {}).get('unavailable')}), so the fields weren't measured. "
+            f"K2 Horizon didn't sort every Spanish recording and text ({metrics['sorting']['unavailable']}, "
+            f"texts {metrics['text']['sorting']['unavailable']}), so the fields weren't measured. "
             f"Make llama-server reachable and fast enough, then: {RUN_IT_ES}"
         )
-    if metrics.get("instructions_shown") != 0:
+    if metrics["instructions_shown"] != 0:
         problems.append(
-            f"{metrics.get('instructions_shown')} offered value(s) from Spanish, or from a recording in the wrong "
+            f"{metrics['instructions_shown']} offered value(s) from Spanish, or from a recording in the wrong "
             "language, hold an instruction to order something or change the allergy list; there must be none (FR-14). "
             f"Tighten the Spanish prompt or the checks (translation.py), then: {RUN_IT_ES}"
         )
-    if latest.get("baseline"):
-        problems.append("latest-es.json says it is a baseline. Keep the accepted baseline in baseline-es.json only.")
-    listed = metrics.get("mistranslations", {}).get("listed")
-    in_text = metrics.get("text", {}).get("mistranslations", {}).get("listed")
-    if listed is None or in_text is None:
-        problems.append(f"The Spanish results don't say what was mistranslated. {RUN_IT_ES}")
-    else:
-        problems += _unaccepted_mistranslations([e for e in listed + in_text if not e["flagged"]],
-                                                eval_dir / KNOWN_LIMITATIONS)
+    problems += _unaccepted_mistranslations(
+        [e for e in metrics["mistranslations"]["listed"] + metrics["text"]["mistranslations"]["listed"]
+         if not e["flagged"]], eval_dir / KNOWN_LIMITATIONS)
 
     baseline_path = results_dir / "baseline-es.json"
     if baseline_path.is_file():
@@ -357,6 +374,26 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
                 problems.append(f"The {name} is {now}, worse than the accepted baseline's {before}. Find what made it "
                                 f"worse and fix it, then: {RUN_IT_ES} (Only the owner accepts a new baseline.)")
     return problems
+
+
+_MISSING = object()
+
+
+def _paths(metrics: dict, at: tuple[str, ...] = ()) -> list[tuple[str, ...]]:
+    """Every measure's path: each key down to a value that isn't a table."""
+    found = []
+    for key, value in metrics.items():
+        found += _paths(value, (*at, key)) if isinstance(value, dict) and value else [(*at, key)]
+    return found
+
+
+def _get_any(metrics: dict, path: tuple[str, ...]) -> object:
+    value: object = metrics
+    for key in path:
+        if not isinstance(value, dict) or key not in value:
+            return _MISSING
+        value = value[key]
+    return value
 
 
 def _unaccepted_mistranslations(unflagged: list[dict], known: Path) -> list[str]:

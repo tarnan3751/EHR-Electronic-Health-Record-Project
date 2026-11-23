@@ -36,6 +36,7 @@ from dictation_scripts import (  # noqa: F401 (re-exported for the eval)
 from ehr_dictation.provenance import CHECKS_CODE_SHA256, PIPELINE_CODE_SHA256
 from dictation_scripts import display_text as render_display  # noqa: F401
 from dictation_scripts import spoken_text as render_spoken  # noqa: F401
+from dictation_scripts_es import load_scripts as load_spanish
 
 EVAL_DIR = Path(__file__).resolve().parents[1]
 DATASET_FILES = ("dictation_scripts.py", "voices.toml", "generate_audio.py")
@@ -75,16 +76,22 @@ def recordings_sha256(eval_dir: Path = EVAL_DIR) -> str:
     return digest.hexdigest()
 
 
-def variant_ids(eval_dir: Path = EVAL_DIR) -> set[str]:
+def variant_ids(eval_dir: Path = EVAL_DIR, language: str = "en") -> set[str]:
     """The recordings the test set defines, by id, as generate_audio.py names them: each script's clean one, each of
-    its noises at each SNR in voices.toml, and one more for each script voices.toml calls unusable."""
-    variants = tomllib.loads((eval_dir / "voices.toml").read_text(encoding="utf-8")).get("variants", {})
+    its noises at each SNR in voices.toml, and one more for each script voices.toml calls unusable. For the Spanish
+    set (language "es"), the same from scripts-es and [variants_es], and the two dictated in the wrong language: the
+    English script it reads as Spanish, and its Spanish script run as English."""
+    voices = tomllib.loads((eval_dir / "voices.toml").read_text(encoding="utf-8"))
+    variants = voices.get("variants" if language == "en" else "variants_es", {})
+    scripts = load_all(eval_dir / "scripts").values() if language == "en" else load_spanish(eval_dir / "scripts-es")
     ids = set()
-    for script in load_all(eval_dir / "scripts").values():
+    for script in scripts:
         ids.add(f"{script.id}--clean")
         ids |= {f"{script.id}--{noise}-{snr}db" for snr in variants.get("snr_db", []) for noise in script.noise}
         if script.id in variants.get("unusable", []):
             ids.add(f"{script.id}--{script.noise[0]}-{variants['unusable_snr_db']}db")
+    if language == "es":
+        ids |= {f"{variants['english_as_spanish']}--clean--as-es", f"{variants['spanish_as_english']}--clean--as-en"}
     return ids
 
 
