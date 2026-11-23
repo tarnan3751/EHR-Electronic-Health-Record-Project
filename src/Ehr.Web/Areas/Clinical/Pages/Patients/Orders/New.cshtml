@@ -24,6 +24,10 @@
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to the chart</a></p>
 </div>
 <h1>@heading: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Proposed is { } proposed)
+{
+    <partial name="~/Areas/Clinical/Pages/Patients/Notes/_ProposedFromDictation.cshtml" model="proposed" />
+}
 
 @if (replaced is null && Model.Form.Refill is null)
 {
@@ -34,6 +38,10 @@
             var route = Model.Search.RouteData();
             route["id"] = patient.Id.ToString();
             route["type"] = type;
+            if (Model.Proposal is { } fromDictation)
+            {
+                route["proposal"] = fromDictation.ToString();
+            }
             <li><a asp-page="New" asp-all-route-data="route" aria-current="@(type == Model.KnownType ? "page" : null)">@name</a></li>
         }
     </ul>
@@ -57,6 +65,11 @@ else
             <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved:</span> @(refused == SignRefusal.Answered
                 ? "someone answered this refill request first. Nothing was ordered."
                 : "this refill request can't be approved: its medication is no longer active, or this isn't the same medication. Nothing was ordered.") <a asp-page="/Patients/Refills/Review" asp-route-patientId="@patient.Id" asp-route-requestId="@Model.Refill">Go back to the request</a>.</p>
+        }
+        else if (Model.ProposalDecided)
+        {
+            @* Step 15: nothing was ordered, so nothing waits to be undone. *@
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved:</span> this proposal was decided first, in another tab or window. Nothing was ordered. <a href="@Model.ReviewLink">Go back to the review</a>.</p>
         }
         else
         {
@@ -174,7 +187,14 @@ else
         }
         <div class="sc-actions">
             <button type="submit" class="sc-btn sc-btn--primary" data-order-sign autofocus="@Model.ShowingNotes">@(replaced is null ? "Sign order" : "Sign changed order")</button>
-            <a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Cancel</a>
+            @if (Model.ReviewLink is { } review)
+            {
+                <a href="@review">Cancel</a>
+            }
+            else
+            {
+                <a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Cancel</a>
+            }
         </div>
     </form>
 }

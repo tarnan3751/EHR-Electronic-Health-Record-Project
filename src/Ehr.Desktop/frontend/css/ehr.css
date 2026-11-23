@@ -1654,6 +1654,16 @@
         max-width: var(--width-reading);
     }
 
+    /* The orders and allergies a dictation proposes, as a list of the same rows: no numbers, and no gap between them. */
+    ol.sc-proposals {
+        list-style: none;
+        padding: 0;
+    }
+
+    ol.sc-proposals > li + li {
+        margin-top: 0;
+    }
+
     .sc-proposal dd {
         margin: 0;
     }
@@ -1697,6 +1707,22 @@
         line-height: 20px;
         color: var(--warning);
         font-weight: 600;
+    }
+
+    /* In the notice on a form opened from a proposal, its words and warnings keep the notice's paragraph gap. */
+    .sc-notice > .sc-proposal__value,
+    .sc-notice > .sc-proposal__warning {
+        margin: 0 0 var(--space-4);
+    }
+
+    /* An order or allergy proposed: its quiet button sits on its text, so when it wraps under the other it lines up with
+       that one's edge. */
+    .sc-proposal > .sc-actions {
+        column-gap: var(--space-4);
+    }
+
+    .sc-proposal > .sc-actions .sc-btn--quiet {
+        padding-inline: 0;
     }
 
     /* The decision's buttons, and under them the way to correct the text first. */

@@ -22,6 +22,10 @@ window.SwiftChartDictationView = class {
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
         };
         const instructionWords = { order: "Order", allergy_change: "Allergy change" };
+        // Those the dictation proposes (the expansion plan's step 15). The review lists them apart, with their actions, and
+        // its not-carried-over list leaves them out; the dictation page marks them in its list, read-only.
+        const proposalWords = { order: "Proposed order", allergy_addition: "Proposed allergy to add" };
+        const listedApart = root.querySelector("[data-chart-proposals]") !== null;
 
         // A field's status as a tag (docs/brand: Tag): the words say it, the tone only supports them.
         function setStatus(status, text, tone) {
@@ -108,12 +112,14 @@ window.SwiftChartDictationView = class {
                 renderField(name, result.fields?.[name], result.sorting);
             }
 
-            const items = result.notCarriedOver ?? [];
+            const proposed = new Map((result.proposals ?? []).map((proposal) => [`${proposal.start}:${proposal.end}`, proposal.kind]));
+            const items = (result.notCarriedOver ?? []).filter((item) => !(listedApart && proposed.has(`${item.start}:${item.end}`)));
             notCarried.hidden = items.length === 0;
             notCarriedList.replaceChildren(...items.map((item) => {
                 const text = (result.transcript?.text ?? "").slice(item.start, item.end);
+                const kind = proposed.get(`${item.start}:${item.end}`);
                 const li = element("li");
-                li.append(element("strong", `${instructionWords[item.reason] ?? "Instruction"}: `), document.createTextNode(`“${text}”`));
+                li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), document.createTextNode(`“${text}”`));
                 highlightOnFocus(li, [item]);
                 return li;
             }));
@@ -166,6 +172,13 @@ window.SwiftChartDictationView = class {
             node.addEventListener("mouseleave", off);
             node.addEventListener("blur", off);
         }
+
+        // The review's proposed orders and allergies: moving into one's actions shows its words in the transcript.
+        root.querySelectorAll("[data-chart-proposal-start]").forEach((node) => {
+            const ranges = [{ start: Number(node.dataset.chartProposalStart), end: Number(node.dataset.chartProposalEnd) }];
+            node.addEventListener("focusin", () => renderTranscript(state.transcript, ranges));
+            node.addEventListener("focusout", () => renderTranscript(state.transcript));
+        });
 
         this.renderTranscript = renderTranscript;
         this.renderResult = renderResult;

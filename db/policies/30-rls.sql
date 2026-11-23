@@ -1004,3 +1004,11 @@ DROP POLICY IF EXISTS ai_field_proposals_own ON ehr.ai_field_proposals;
 CREATE POLICY ai_field_proposals_own ON ehr.ai_field_proposals FOR ALL
     USING ((SELECT ehr.is_clinician()) AND EXISTS (SELECT 1 FROM ehr.ai_note_reviews r
         WHERE r.id = ai_field_proposals.review_id AND r.patient_id = ai_field_proposals.patient_id));
+
+-- The expansion plan's step 15: the orders and allergies to add a dictation proposes are as private as its review.
+ALTER TABLE ehr.ai_chart_proposals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.ai_chart_proposals FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS ai_chart_proposals_own ON ehr.ai_chart_proposals;
+CREATE POLICY ai_chart_proposals_own ON ehr.ai_chart_proposals FOR ALL
+    USING ((SELECT ehr.is_clinician()) AND EXISTS (SELECT 1 FROM ehr.ai_note_reviews r
+        WHERE r.id = ai_chart_proposals.review_id AND r.patient_id = ai_chart_proposals.patient_id));

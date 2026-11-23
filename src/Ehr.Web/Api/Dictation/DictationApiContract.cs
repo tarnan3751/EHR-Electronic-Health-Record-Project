@@ -36,14 +36,18 @@ public enum Unclear
 
 // After stop, and from result. Fields is null until the model has sorted the transcript, or when it couldn't.
 // NotCarriedOver lists every instruction in the transcript to order something or change the allergy list, which no field
-// carries (FR-14), so the screen can say what still has to be placed in Orders or the allergy list.
+// carries (FR-14), so the screen can say what still has to be placed in Orders or the allergy list. Proposals are those of
+// them the dictation proposes (the expansion plan's step 15; FR-14 as reworded): each an order or an allergy to add,
+// dictated plainly, at the place of its listed instruction. Null from a service older than step 15, and in a result
+// stored before it: none. Never written when it is null.
 public sealed record DictationResult(
     Transcript Transcript,
     Sorting Sorting,
     NoteFields? Fields,
     IReadOnlyList<NotCarriedOver> NotCarriedOver,
     Provenance Provenance,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SortingFailure? Reason = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SortingFailure? Reason = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ChartProposal>? Proposals = null)
 {
     public const string UnsortedMessage = "The fields couldn't be sorted, so the transcript is kept as plain text.";
 
@@ -100,6 +104,25 @@ public enum Instruction
 
     [JsonStringEnumMemberName("allergy_change")]
     AllergyChange,
+}
+
+// An instruction the dictation proposes (the expansion plan's step 15): an order, or an allergy to add, which the clinician
+// dictated plainly. Where they said it, the place of its listed instruction (offsets as in TranscriptSegment), and where
+// something may have changed it: possible_correction and near_unclear_passage, as on a field. Never anything the model
+// wrote. It is proposed, never placed or saved: only the clinician who dictated it may open it in the order form or the
+// allergy form, which fill in nothing from it, or dismiss it.
+public sealed record ChartProposal(ProposalKind Kind, int Start, int End, IReadOnlyList<FieldWarning> Warnings);
+
+[JsonConverter(typeof(JsonStringEnumConverter<ProposalKind>))]
+public enum ProposalKind
+{
+    // An order of any type the order form takes: the clinician picks its type and item there.
+    [JsonStringEnumMemberName("order")]
+    Order,
+
+    // An allergy to add. Nothing that removes, resolves or changes one is ever proposed.
+    [JsonStringEnumMemberName("allergy_addition")]
+    AllergyAddition,
 }
 
 // The four fields (the expansion plan's step 14). History is the first of the three a dictation was sorted into before

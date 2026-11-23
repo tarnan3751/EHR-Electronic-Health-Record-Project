@@ -12,6 +12,7 @@ using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Data.Orders;
+using Ehr.Data.Patients;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Patients;
 using Ehr.Seed;
@@ -189,6 +190,11 @@ internal static partial class RenderBenchmark
                     var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
                     return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
                 }));
+                // What a dictation proposes beyond the note (step 15): for each of those patients, a new draft dictated with an
+                // order and an allergy to add, staged through the app's own service. Its review; the order form and the
+                // allergy form opened from them; and its editor, which says they wait. A generator of its own.
+                var proposed = await DictateProposalsAsync(app, clinicianId, noted);
+                results.AddRange(await MeasureProposalsAsync(client, times, "", proposed));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -279,7 +285,7 @@ internal static partial class RenderBenchmark
                     {
                         await SettleAsync(database);
                         results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills, forms, drafted));
+                            refills, forms, drafted, proposed));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -472,7 +478,7 @@ internal static partial class RenderBenchmark
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
         CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms,
-        List<(Guid Patient, Guid Draft)> drafted)
+        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -527,6 +533,8 @@ internal static partial class RenderBenchmark
                 return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
             }));
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
+            // A dictation's proposals (step 15), read from the cloud copy: opening or dismissing one says why it can't.
+            results.AddRange(await MeasureProposalsAsync(client, times, "Off-site, ", proposed));
             // Pre-visit forms (step 13e): the clinician's pages, read from the cloud copy; asking says why it can't.
             results.AddRange(await MeasureFormsAsync(client, times, "Off-site, ", forms));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
@@ -1303,6 +1311,87 @@ internal static partial class RenderBenchmark
 
         await transaction.CommitAsync();
         return drafted;
+    }
+
+    // A dictation of a new draft for a patient, and its two proposals (step 15).
+    sealed record Proposed(Guid Patient, Guid Draft, Guid Review, Guid Order, Guid Allergy);
+
+    // Step 15: for each patient, a new draft dictated with an order and an allergy to add, begun and staged through the app's
+    // own service and the database's rules, as the dictation page does after Stop. The result is the one the service would
+    // give: its transcript, no field, the two instructions it lists, and the two it proposes.
+    static async Task<List<Proposed>> DictateProposalsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        const string text = "Synthetic: blood pressure is fine today. Go ahead and order a lipid panel. Add penicillin to her allergy list.";
+        const string order = "Go ahead and order a lipid panel", allergy = "Add penicillin to her allergy list";
+        var (orderAt, allergyAt) = (text.IndexOf(order, StringComparison.Ordinal), text.IndexOf(allergy, StringComparison.Ordinal));
+        var empty = new Ehr.Web.Api.Dictation.EmptyField(["not_dictated"]);
+        var result = new Ehr.Web.Api.Dictation.DictationResult(
+            new Ehr.Web.Api.Dictation.Transcript(text, true, [new Ehr.Web.Api.Dictation.TranscriptSegment(0, text.Length, 0, 9000, true)]),
+            Ehr.Web.Api.Dictation.Sorting.Done, new Ehr.Web.Api.Dictation.NoteFields(empty, empty, empty, empty),
+            [new(Ehr.Web.Api.Dictation.Instruction.Order, orderAt, orderAt + order.Length),
+                new(Ehr.Web.Api.Dictation.Instruction.AllergyChange, allergyAt, allergyAt + allergy.Length)],
+            new Ehr.Web.Api.Dictation.Provenance(new("synthetic", "0", "0"), null, null, "synthetic", "synthetic", "synthetic", "synthetic"),
+            Proposals:
+            [
+                new(Ehr.Web.Api.Dictation.ProposalKind.Order, orderAt, orderAt + order.Length, []),
+                new(Ehr.Web.Api.Dictation.ProposalKind.AllergyAddition, allergyAt, allergyAt + allergy.Length, []),
+            ]);
+        var trusted = new Ehr.Domain.Notes.TrustedReviewResult(JsonSerializer.Serialize(result, JsonSerializerOptions.Web), new Dictionary<string, string>(),
+            [AiChartProposalKinds.Order, AiChartProposalKinds.AllergyAddition]);
+
+        var proposed = new List<Proposed>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var reviews = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.NoteReviews>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, _) in noted)
+        {
+            var begun = await reviews.BeginAsync(Guid.NewGuid(), patient, null, null, Guid.NewGuid().ToString("N"), 180, 1024 * 1024, CancellationToken.None);
+            if (begun.Status != 201 || begun.Review is not { } review)
+            {
+                throw new InvalidOperationException("The benchmark's dictation was refused.");
+            }
+
+            if ((await reviews.StageAsync(review.Id, begun.Version!.Value, trusted, CancellationToken.None)).Status != 200)
+            {
+                throw new InvalidOperationException("The benchmark's dictation was not staged.");
+            }
+
+            var rows = await db.AiChartProposals.AsNoTracking().Where(p => p.ReviewId == review.Id).OrderBy(p => p.Ordinal).Select(p => p.Id).ToListAsync();
+            proposed.Add(new(patient, review.DraftId, review.Id, rows[0], rows[1]));
+        }
+
+        await transaction.CommitAsync();
+        return proposed;
+    }
+
+    static async Task<List<Result>> MeasureProposalsAsync(HttpClient client, DatabaseTimes times, string site, List<Proposed> proposed)
+    {
+        var random = new Random(20261127);
+        return
+        [
+            await MeasureAsync(client, times, $"{site}Note review with dictation proposals, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/notes/drafts/{one.Draft}/review/{one.Review}";
+            }),
+            await MeasureAsync(client, times, $"{site}Order form from a dictation proposal, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/orders/new?type=lab&proposal={one.Order}";
+            }),
+            await MeasureAsync(client, times, $"{site}Allergy form from a dictation proposal, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/allergies?proposal={one.Allergy}";
+            }),
+            await MeasureAsync(client, times, $"{site}Note editor with dictation proposals waiting, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/notes/drafts/{one.Draft}";
+            }),
+        ];
     }
 
     // Step 13a: for each patient, six signed notes and a visit summary of each, through the app's own service and the

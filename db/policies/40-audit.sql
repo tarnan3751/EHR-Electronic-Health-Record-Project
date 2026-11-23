@@ -205,6 +205,11 @@ CREATE OR REPLACE TRIGGER ai_note_reviews_audit
 CREATE OR REPLACE TRIGGER ai_field_proposals_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.ai_field_proposals
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+-- Step 15's proposed orders and allergies hold no text (their words are their review's), so nothing of theirs is
+-- marked with a sensitive note above.
+CREATE OR REPLACE TRIGGER ai_chart_proposals_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.ai_chart_proposals
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
 CREATE OR REPLACE TRIGGER chart_history_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.chart_history

@@ -4,6 +4,7 @@ change that fails here first (and changes the code hash the eval's results are t
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from conftest import noise, speech_and_pauses, tone
 from test_validation import field, own, transcript
 
@@ -18,7 +19,8 @@ def test_the_values():
     assert (quality.SILENCE_DBFS, quality.MIN_SOUND_FRAMES) == (-60.0, 50)
     assert (segmenter.MIN_PAUSE, segmenter.KEEP, segmenter.MAX_SEGMENT) == (40, 300, 2000)
     assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 30, 600)
-    assert (validation.DIRECTIVE_REACH, validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (14, 5, 3)
+    assert (validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (5, 3)
+    assert (validation.DIRECTIVE_REACH, validation.MARKED_REACH) == (14, 30)
     assert validation.WHOLE_DICTATION == 0.9
     assert validation.LIMITS == {"subjective": 3000, "objective": 3000, "assessment": 2000, "plan": 2000}
     limits = settings.Settings(api_key="k", llama_api_key="k")
@@ -80,20 +82,39 @@ def test_a_correction_counts_when_its_value_starts_within_three_words_of_the_cue
     assert own("Fever 3 days, sorry, it was only 2 days.", "Fever 3 days.", "Fever 3 days").pending
 
 
-def test_an_instruction_reaches_at_most_14_words_when_nothing_ends_its_clause():
-    words = " ".join(f"item{chr(97 + i)}" for i in range(20))
-    text = transcript(f"order {words}")
+# An instruction reaches DIRECTIVE_REACH words past its verb, or to the punctuation that ends its sentence within
+# MARKED_REACH, so a long one said with punctuation is listed whole and one said without never takes a paragraph.
+@pytest.mark.parametrize(("count", "mark", "reached"), [(20, ".", 20), (30, ".", 30), (31, ".", 14), (20, "", 14), (14, "", 14)])
+def test_an_instruction_reaches_14_words_unless_punctuation_ends_it_within_30(count, mark, reached):
+    words = [f"item{chr(97 + i // 26)}{chr(97 + i % 26)}" for i in range(count)]
+    text = transcript(f"order {' '.join(words)}{mark}")
 
     (instruction,) = not_carried_over(text)
-    assert text.text[instruction["start"] : instruction["end"]].split() == ["order"] + words.split()[:14]
+    assert text.text[instruction["start"] : instruction["end"]].split() == ["order", *words[:reached]]
 
 
 def test_a_negation_within_3_words_makes_an_instruction_not_to_one_again():
     three = transcript("No b c not order an MRI.")
     four = transcript("No b c d not order an MRI.")
 
-    assert [three.text[r["start"] : r["end"]] for r in not_carried_over(three)] == ["order an MRI"]
+    assert [three.text[r["start"] : r["end"]] for r in not_carried_over(three)] == ["No b c not order an MRI"]
     assert not_carried_over(four) == []
+
+
+def test_a_negation_carries_through_a_list_for_30_words():
+    listed = [f"sign{a}{b}" for a in "ab" for b in "abcdefghijklmnop"][:31]
+    said = "Denies " + ", ".join(listed) + "."
+
+    reached = validation._qualifiers(said, validation.tokens(said))["negation_dropped"]
+    assert 30 in reached and 31 not in reached
+
+
+def test_a_piece_of_up_to_10_words_that_says_nothing_without_its_instruction_is_listed_with_it():
+    ten = "Do not start metformin or insulin or anything else until we order an A1c."
+    eleven = "Do not start metformin or insulin or anything else today until we order an A1c."
+
+    assert validation.directive_spans(ten) == [(0, len(ten) - 1)]
+    assert [eleven[s:e] for s, e in validation.directive_spans(eleven)] == ["we order an A1c"]
 
 
 def test_a_possible_correction_is_flagged_within_8_words():

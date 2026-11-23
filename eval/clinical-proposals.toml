@@ -1,0 +1,148 @@
+# The clinical gold for proposals (the expansion plan's step 15): every order, or allergy to add, the test set's
+# scripts dictate that a clinician would expect the dictation to propose, as the scripts' [[proposals]] said before the
+# closed sentence (fe3c3b8). Each script's own [[proposals]] is the rule-following gold, what the checks' rules allow
+# (validation.py's closed sentence), and every one of them is here too; the rest here are held back by those rules,
+# each a [[not_proposed]] of its script with the rule. The eval scores the dictation against both, as the fields have
+# two golds (README.md, Two gold sets): metrics.proposals against the rule-following gold, metrics.proposals_clinical
+# against this one. It is part of the gold hash. Each entry: the kind (order, or allergy_addition), the words (one of
+# the script's forbidden passages) and the item they name, "" when they name it only by referring back.
+
+[[d02-t2dm-bexagliflozin]]
+kind = "order"
+words = "I'm ordering a urine albumin to creatinine ratio"
+item = "urine albumin to creatinine ratio"
+
+[[d06-eczema-lebrikizumab]]
+kind = "allergy_addition"
+words = "cephalexin should be added to her allergies"
+item = "cephalexin"
+
+[[d09-mash-resmetirom]]
+kind = "order"
+words = "order a hepatitis B surface antibody"
+item = "hepatitis B surface antibody"
+
+[[d12-hfref-ivabradine]]
+kind = "order"
+words = "call that in to his usual pharmacy"
+item = ""
+
+[[d15-acne-isotretinoin]]
+kind = "order"
+words = "renew her isotretinoin prescription"
+item = "isotretinoin"
+
+[[d16-gout-febuxostat]]
+kind = "allergy_addition"
+words = "add allopurinol to his allergy list"
+item = "allopurinol"
+
+[[d18-alzheimers-donanemab]]
+kind = "order"
+words = "put an order in for a vitamin B12 level"
+item = "vitamin B12 level"
+
+[[d19-migraine-zavegepant]]
+kind = "order"
+words = "refill her atogepant"
+item = "atogepant"
+
+[[d32-alopecia-ritlecitinib]]
+kind = "allergy_addition"
+words = "put doxycycline on her allergy list"
+item = "doxycycline"
+
+[[d33-addendum-potassium]]
+kind = "allergy_addition"
+words = "make sure sulfa is on his allergy list"
+item = "sulfa"
+
+[[d41-multiproblem-followup]]
+kind = "order"
+words = "send the prescription to her usual pharmacy"
+item = ""
+
+[[d42-new-patient-visit]]
+kind = "order"
+words = "refill the omeprazole"
+item = "omeprazole"
+
+[[d42-new-patient-visit]]
+kind = "allergy_addition"
+words = "Put penicillin on his allergy list"
+item = "penicillin"
+
+[[d43-cough-lipids-orders]]
+kind = "order"
+words = "order a fasting lipid panel"
+item = "fasting lipid panel"
+
+[[d43-cough-lipids-orders]]
+kind = "order"
+words = "order a chest X-ray"
+item = "chest X-ray"
+
+[[d44-cystitis-nitrofurantoin-rash]]
+kind = "allergy_addition"
+words = "add nitrofurantoin to her allergy list"
+item = "nitrofurantoin"
+
+[[d45-back-pain-taken-back]]
+kind = "order"
+words = "order a CBC"
+item = "CBC"
+
+[[d47-hypothyroid-said-by-others]]
+kind = "order"
+words = "refill her levothyroxine"
+item = "levothyroxine"
+
+[[d48-eczema-sound-alikes]]
+kind = "order"
+words = "Refill his hydroxyzine"
+item = "hydroxyzine"
+
+[[d48-eczema-sound-alikes]]
+kind = "order"
+words = "order a TSH"
+item = "TSH"
+
+[[d49-dental-abscess-annual]]
+kind = "order"
+words = "send it to her usual pharmacy"
+item = ""
+
+[[d49-dental-abscess-annual]]
+kind = "allergy_addition"
+words = "add latex to her allergy list"
+item = "latex"
+
+[[d49-dental-abscess-annual]]
+kind = "order"
+words = "Renew her albuterol inhaler"
+item = "albuterol"
+
+[[d49-dental-abscess-annual]]
+kind = "order"
+words = "order a CBC and a CMP"
+item = "CBC and a CMP"
+
+[[d50-sinusitis-said-plainly-or-not]]
+kind = "order"
+words = "order a CBC today"
+item = "CBC"
+
+[[d50-sinusitis-said-plainly-or-not]]
+kind = "order"
+words = "Refill his lisinopril"
+item = "lisinopril"
+
+[[d51-hives-allergies-said-plainly-or-not]]
+kind = "allergy_addition"
+words = "add amoxicillin to her allergy list"
+item = "amoxicillin"
+
+[[d51-hives-allergies-said-plainly-or-not]]
+kind = "allergy_addition"
+words = "Penicillin should be added to her allergies"
+item = "Penicillin"

@@ -19,6 +19,17 @@
   carried over, so the screen can say they still need placing (recall against the scripts' forbidden items); and what
   the order-and-allergy rule threw away that the gold says was legitimate (false discards), so the owner can judge where
   that rule draws its line.
+- proposals (the expansion plan's step 15): what the dictation proposed, each an order or an allergy to add at the
+  place of a listed instruction, against each script's gold proposals, the rule-following gold (proposals), and again
+  against the clinical gold (proposals_clinical, clinical-proposals.toml: every one a clinician would expect proposed,
+  those the closed sentence holds back included): found where its gold words are, as said or as
+  heard (_as_heard()), and of the same kind; right when the item it names was heard word for word, misheard when not;
+  false when it matches no gold proposal. Each false or misheard one is listed (listed: the recording, the kind and the
+  words shown, normalized), for the gate to require the owner's acceptance of. A proposal is matched by where it was
+  said, not by its words alone: it must overlap where the gold proposal's words were heard (the alignment _as_heard()
+  uses), so the same words said elsewhere, in a passage that mustn't be proposed, never count as it. Recall,
+  precision, how many carry a
+  warning, and why the others were held back (the rule, validation.HELD_BACK) are reported beside them.
 - warnings: for each warning code and for any warning, how many offered values carry it, how many of those holding a
   retracted value it caught, and of the right ones (matching the gold, holding nothing retracted), the share flagged
   anyway: its false-alarm rate, overall, on clean recordings and per tag, against each gold set.
@@ -36,12 +47,14 @@ from dataclasses import dataclass, field
 
 import jiwer
 
+from ehr_dictation import validation
 from ehr_dictation.prompt import FIELDS
 from ehr_dictation.textnorm import STOPWORDS, numbers
+from ehr_dictation.transcript import Transcript
 
 from .dates import said_right
 from .normalize import normalize, words
-from .scripts import Gold, Script
+from .scripts import Gold, Proposal, Script, clinical_proposals
 
 TWO_MINUTES = 110.0  # seconds: the scripts written to run about two minutes
 AT_THE_LIMIT = 165.0  # seconds: the max-length scripts, near the 3-minute limit
@@ -85,6 +98,17 @@ class Item:
     # checked again offline (rescore.py) without running the models.
     segments: list[dict] = field(default_factory=list)
     chunk_seconds: list[float] = field(default_factory=list)
+    # What the dictation proposed, each [kind, start, end, warnings] (warnings as a field's), and each listed
+    # instruction it held back, [reason, start, end, rule]: code points in the hypothesis (weigh_proposals()).
+    proposals: list[list] = field(default_factory=list)
+    held_back: list[list] = field(default_factory=list)
+
+
+def weigh_proposals(item: Item, transcript: Transcript) -> None:
+    """What the dictation proposes from the item's transcript, and what it holds back and why (validation.weigh())."""
+    weighed = validation.weigh(transcript)
+    item.proposals = [[w.kind, w.start, w.end, [list(x) for x in w.warnings]] for w in weighed if w.held_back is None]
+    item.held_back = [[w.kind, w.start, w.end, w.held_back] for w in weighed if w.held_back is not None]
 
 
 def score(items: list[Item], scripts: dict[str, Script]) -> dict:
@@ -97,6 +121,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "validation": _validation(items),
         "unsupported_content": _unsupported(items),
         "order_allergy": _order_allergy(items, scripts),
+        **proposal_scores(items, scripts),
         "warnings": _warnings(items, scripts),
         "sorting": _sorting(items),
         "timing": _timing(items),
@@ -241,6 +266,16 @@ def _as_heard(item: Item, script: Script, phrases: list[str]) -> list[list[str]]
     his usual pharmacy", heard as "call that into his usual pharmacy", is still found in what was shown or reported,
     and words heard in its place that share little with it are not taken for it: not "add an" for "add an orders
     field", nor "duies penicillin rash me" for "low risk penicillin rash only". An empty phrase gives nothing."""
+    return [
+        ([phrase] if phrase else []) + [text for text, _, _ in places]
+        for phrase, places in zip(phrases, _heard_at(item, script, phrases), strict=True)
+    ]
+
+
+def _heard_at(item: Item, script: Script, phrases: list[str]) -> list[list[tuple[str, int, int]]]:
+    """Where each phrase (normalized) was heard, as _as_heard() reads it: for each place the script says it whose words
+    were heard right enough, the words the transcript has there, and the first and the end of their words' indexes
+    among the hypothesis's words (normalize.words())."""
     reference, heard = words(script.display), words(item.hypothesis)
     placed: dict[int, int] = {}
     right: set[int] = set()
@@ -255,15 +290,15 @@ def _as_heard(item: Item, script: Script, phrases: list[str]) -> list[list[str]]
     for phrase in phrases:
         wanted = phrase.split()
         meaning = set(content_words(phrase)) or set(wanted)
-        variants = [phrase] if wanted else []
+        places = []
         for i in range(len(reference) - len(wanted) + 1):
             if wanted and reference[i : i + len(wanted)] == wanted:
                 there = [placed[j] for j in range(i, i + len(wanted)) if j in placed]
                 counted = [j for j in range(i, i + len(wanted)) if reference[j] in meaning]
                 if there and all(len(right.intersection(share)) >= HEARD_RIGHT * len(share)
                                  for share in (range(i, i + len(wanted)), counted)):
-                    variants.append(" ".join(heard[min(there) : max(there) + 1]))
-        found.append(variants)
+                    places.append((" ".join(heard[min(there) : max(there) + 1]), min(there), max(there) + 1))
+        found.append(places)
     return found
 
 
@@ -321,6 +356,58 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
         "legitimate_fields_lost": lost,
         "lost_where_nothing_was_attempted": lost_without_attempt,
         "false_discard_rate": _ratio(lost, legitimate),
+    }
+
+
+def proposal_scores(items: list[Item], scripts: dict[str, Script]) -> dict:
+    """The proposals' measures against the rule-following gold (each script's [[proposals]]) and against the clinical
+    gold (clinical-proposals.toml, beside the scripts)."""
+    clinical = clinical_proposals(next(iter(scripts.values())).path.parents[1]) if scripts else {}
+    return {
+        "proposals": _proposals(items, scripts, lambda script: script.proposals),
+        "proposals_clinical": _proposals(items, scripts, lambda script: clinical.get(script.id, ())),
+    }
+
+
+def _proposals(items: list[Item], scripts: dict[str, Script], gold: Callable[[Script], tuple[Proposal, ...]]) -> dict:
+    shown = said = found = right = with_warnings = 0
+    listed: list[dict] = []
+    held_back: Counter[str] = Counter()
+    for item in items:
+        script = scripts[item.script]
+        golds = list(gold(script))
+        places = _heard_at(item, script, [normalize(gold.words) for gold in golds])
+        said += len(golds)
+        matched: set[int] = set()
+        for kind, start, end, warnings in item.proposals:
+            shown += 1
+            with_warnings += bool(warnings)
+            text = normalize(item.hypothesis[start:end])
+            # Matched by where it was said: its words among the hypothesis's overlap where a gold proposal's were heard.
+            first, last = len(words(item.hypothesis[:start])), len(words(item.hypothesis[:end]))
+            match = next((k for k, gold in enumerate(golds) if k not in matched and gold.kind == kind
+                          and any(first < there_end and there < last for _, there, there_end in places[k])), None)
+            if match is not None:
+                matched.add(match)
+                if _contains(text, normalize(golds[match].item)) or not golds[match].item.strip():
+                    right += 1
+                    continue
+            listed.append({"variant": item.variant, "kind": kind, "shown": text,
+                           "why": "false" if match is None else "misheard"})
+        found += len(matched)
+        held_back.update(rule for *_, rule in item.held_back)
+    return {
+        "shown": shown,
+        "said": said,
+        "found": found,
+        "right": right,
+        "false": sum(1 for entry in listed if entry["why"] == "false"),
+        "misheard": sum(1 for entry in listed if entry["why"] == "misheard"),
+        "recall": _ratio(found, said),
+        "precision": _ratio(right, shown),
+        "with_warnings": with_warnings,
+        "held_back": dict(sorted(held_back.items())),
+        "listed": listed,
     }
 
 

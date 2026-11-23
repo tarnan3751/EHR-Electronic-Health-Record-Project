@@ -176,6 +176,14 @@ public static partial class DictationApi
             && !(end < text.Length && char.IsLowSurrogate(text[end]) && char.IsHighSurrogate(text[end - 1]));
         if (result.Transcript.Segments.Any(s => !Range(s.Start, s.End))
             || result.NotCarriedOver.Any(s => !Range(s.Start, s.End))) return null;
+        // What a dictation proposes (the expansion plan's step 15) is one of its listed instructions, of the same kind, each
+        // once, at most AiChartProposal.MaxPerReview, from a final transcript, with a proposal's warnings only.
+        var proposals = result.Proposals ?? [];
+        if (proposals.Count > AiChartProposal.MaxPerReview || proposals.Count > 0 && !result.Transcript.Final
+            || proposals.DistinctBy(p => (p.Start, p.End)).Count() != proposals.Count
+            || proposals.Any(p => !result.NotCarriedOver.Any(i => i.Start == p.Start && i.End == p.End
+                    && i.Reason == (p.Kind == ProposalKind.Order ? Instruction.Order : Instruction.AllergyChange))
+                || p.Warnings.Any(w => w.Code == WarningCode.OneFieldHoldsDictation || !Range(w.Start, w.End)))) return null;
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
         if (result.Fields?.History is not null) return null;
@@ -192,6 +200,7 @@ public static partial class DictationApi
             }
         }
         var json = JsonSerializer.Serialize(result, ServiceJson);
-        return System.Text.Encoding.UTF8.GetByteCount(json) > 1_048_576 ? null : new(json, suggestions);
+        var kinds = proposals.Select(p => p.Kind == ProposalKind.Order ? AiChartProposalKinds.Order : AiChartProposalKinds.AllergyAddition).ToList();
+        return System.Text.Encoding.UTF8.GetByteCount(json) > 1_048_576 ? null : new(json, suggestions, kinds);
     }
 }

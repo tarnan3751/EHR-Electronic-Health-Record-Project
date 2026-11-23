@@ -42,6 +42,20 @@ public sealed class DictationSidecarStub : HttpMessageHandler
     // The whole transcript sorted into Subjective, the other three not dictated, with the warning the service puts on it.
     public bool WholeDictation { get; set; }
 
+    // Two plain instructions said after the chunks' sentences, once the dictation has stopped: an order and an allergy to
+    // add, each listed as not carried over and proposed (the expansion plan's step 15), the allergy with a warning. Both
+    // kinds, so a test that follows a proposal to a signed order or a saved allergy has one of each to follow.
+    public bool Proposals { get; set; }
+
+    // Said before the order, in its sentence, when set: a long one, for a page to wrap.
+    public string? ProposalLead { get; set; }
+
+    public const string OrderSaid = "Go ahead and order a lipid panel";
+
+    public const string AllergySaid = "Add penicillin to her allergy list";
+
+    string ProposalsSaid => (ProposalLead is null ? "" : ProposalLead + " ") + OrderSaid + ". " + AllergySaid + ".";
+
     public StubSorting Sorting { get; set; }
 
     // Every request fails to connect.
@@ -65,6 +79,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         IncludeObjective = false;
         LiveHistory = false;
         WholeDictation = false;
+        Proposals = false;
+        ProposalLead = null;
         Unreachable = false;
         Slow = false;
         Undecodable = false;
@@ -157,7 +173,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     static string Text(StubSession session) => string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => Sentences[chunk % Sentences.Length]));
 
-    static object Transcript(StubSession session)
+    object Transcript(StubSession session)
     {
         var text = new StringBuilder();
         var segments = new List<object>();
@@ -173,6 +189,13 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             // The last chunk's words may still change until the dictation stops.
             var final = session.Stopped || chunk < session.Chunks - 1;
             segments.Add(new { start, end = text.Length, startMs = chunk * 2000, endMs = chunk * 2000 + 1800, final, unclear = chunk == 2 ? "too_noisy" : null, confidence = 0.42 });
+        }
+
+        if (Proposals && session.Stopped)
+        {
+            var start = text.Append(' ').Length;
+            text.Append(ProposalsSaid);
+            segments.Add(new { start, end = text.Length, startMs = session.Chunks * 2000, endMs = session.Chunks * 2000 + 1800, final = true, unclear = (string?)null, confidence = 0.9 });
         }
 
         return new { text = text.ToString(), final = session.Stopped, segments, words = new[] { "extra" } };
@@ -206,9 +229,22 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         };
         // The clinician's own instruction, in the transcript: where to find it, never the words themselves.
         var notCarriedOver = new[] { new { reason = "order", start = 0, end = 5 } };
+        object? proposals = null;
+        if (Proposals && session.Stopped)
+        {
+            var at = Text(session).Length + 1 + (ProposalLead is null ? 0 : ProposalLead.Length + 1);
+            var (order, allergy) = ((Start: at, End: at + OrderSaid.Length), (Start: at + OrderSaid.Length + 2, End: at + OrderSaid.Length + 2 + AllergySaid.Length));
+            notCarriedOver = [new { reason = "order", start = order.Start, end = order.End }, new { reason = "allergy_change", start = allergy.Start, end = allergy.End }];
+            proposals = new object[]
+            {
+                new { kind = "order", start = order.Start, end = order.End, warnings = Array.Empty<object>() },
+                new { kind = "allergy_addition", start = allergy.Start, end = allergy.End, warnings = new[] { new { code = "possible_correction", start = allergy.Start + 4, end = allergy.Start + 14 } } },
+            };
+        }
+
         return sorting switch
         {
-            StubSorting.Pending => new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver, provenance },
+            StubSorting.Pending => new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver, proposals, provenance },
             StubSorting.Done when WholeDictation => new
             {
                 transcript,
@@ -227,6 +263,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     plan = new { status = "empty", reasons = new[] { "not_dictated" } },
                 },
                 notCarriedOver,
+                proposals,
                 provenance,
             },
             StubSorting.Done => new
@@ -251,6 +288,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     plan = IncludePlan ? Offered(4) : new { status = "empty", reasons = new[] { "not_dictated" } },
                 },
                 notCarriedOver,
+                proposals,
                 provenance,
             },
             StubSorting.Timeout => new
@@ -262,6 +300,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                 message = "llama-server took longer than 60 seconds",
                 fields = (object?)null,
                 notCarriedOver,
+                proposals,
                 provenance,
             },
             StubSorting.Unavailable => new
@@ -277,6 +316,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     plan = new { status = "empty", reasons = new[] { "model_unavailable" } },
                 },
                 notCarriedOver,
+                proposals,
                 provenance,
             },
             // What validation discarded, where a careless copy would pass it on: beside the reasons, and in
@@ -300,6 +340,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     plan = new { status = "empty", reasons = new[] { "not_in_transcript" }, value = DiscardedText, discarded = new[] { DiscardedText } },
                 },
                 notCarriedOver,
+                proposals,
                 provenance,
                 debug = new { modelOutput = DiscardedText },
             },

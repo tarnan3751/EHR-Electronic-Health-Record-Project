@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): bone health clinic on denosumab, with a scan order to leave out. Format: eval/README.md.
 id = "d27-osteoporosis-denosumab"
 voice = "ff_siwis"
-tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer"]
+tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer", "proposal-trap"]
 dates = ["2026-05-06", "2027-05-06"]
 drugs = ["denosumab"]
 forbidden = ["order a bone density scan"]
@@ -67,3 +67,7 @@ sources = [
     "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip.",
     "Calcium 9.4, vitamin D 38.",
 ]
+
+[[not_proposed]]
+words = "order a bone density scan"
+why = "for_later"

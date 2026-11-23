@@ -3,7 +3,7 @@ id = "d42-new-patient-visit"
 voice = "ff_siwis"
 tags = [
     "max-length", "vitals", "numbers", "dates", "negation", "self-correction", "recombination", "order-attempt",
-    "allergy-change", "mixed-plan", "spoken-punctuation", "experiencer",
+    "allergy-change", "mixed-plan", "spoken-punctuation", "experiencer", "proposal", "proposal-trap",
 ]
 dates = ["2021-03-03", "--12-17"]
 drugs = [
@@ -123,3 +123,11 @@ sources = [
     "Results he brought: LDL 132, A1c 6.4, uric acid 8.9.",
     "ECG today shows sinus rhythm with no ischemic changes.",
 ]
+
+[[not_proposed]]
+words = "refill the omeprazole"
+why = "not_plain"
+
+[[not_proposed]]
+words = "Put penicillin on his allergy list"
+why = "names_no_item"

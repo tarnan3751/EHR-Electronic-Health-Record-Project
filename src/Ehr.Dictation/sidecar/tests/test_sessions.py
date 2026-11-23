@@ -12,6 +12,7 @@ from conftest import MODELS, FakeLlama, FakeRecognizer, answer, raw_decoder, spe
 import threading
 import time
 
+from ehr_dictation.asr import Recognition
 from ehr_dictation.audio import SAMPLE_RATE, AudioError, DecodeTimeout
 from ehr_dictation.provenance import CODE_SHA256
 from ehr_dictation.sessions import SessionError, Sessions
@@ -569,3 +570,55 @@ def test_every_result_lists_the_instructions_not_carried_over(settings):
         return await sessions.stop(await dictate(sessions), ALICE)
 
     assert asyncio.run(run())["notCarriedOver"] == []
+
+
+class Ordering(FakeRecognizer):
+    """Hears an order and an allergy to add in every passage; fails from when it is told to."""
+
+    failing = False
+
+    def recognize(self, samples):
+        if self.failing:
+            raise RuntimeError("Go ahead and order a hemoglobin A1c")  # what an exception might say: it must not be logged
+        return Recognition("Go ahead and order a hemoglobin A1c {period} Add amoxicillin to her allergy list {period}",
+                           0.9)
+
+
+# TC-UC10-09 and TC-UC10-10 (the expansion plan's step 15): a result proposes the orders and allergies to add only from
+# the final transcript, as kinds and places, and the log has their count and never their words.
+def test_a_result_proposes_only_from_a_final_transcript_and_logs_no_words(settings, caplog):
+    async def run(fail_final: bool):
+        recognizer = Ordering()
+        sessions = Sessions(settings, recognizer, FakeLlama(GROUNDED).structurer(), MODELS, decoder=raw_decoder)
+        session = sessions.start(ALICE)
+        for seq, chunk in enumerate(chunks()):
+            await sessions.add_audio(session.id, ALICE, seq, chunk)
+        recognizer.failing = fail_final
+        await sessions.stop(session.id, ALICE)
+        return await sessions.result(session.id, ALICE, wait=5)
+
+    with caplog.at_level("INFO", logger="ehr_dictation"):
+        final, live = asyncio.run(run(False)), asyncio.run(run(True))
+
+    text = final["transcript"]["text"]
+    assert final["transcript"]["final"] and {(p["kind"], text[p["start"] : p["end"]]) for p in final["proposals"]} == {
+        ("order", "Go ahead and order a hemoglobin A1c"), ("allergy_addition", "Add amoxicillin to her allergy list")}
+    assert len(final["proposals"]) == len(final["notCarriedOver"])
+    assert not live["transcript"]["final"] and live["notCarriedOver"] and live["proposals"] == []
+    assert "proposals" in caplog.text and "order a hemoglobin A1c" not in caplog.text and "amoxicillin" not in caplog.text
+
+
+# A kind of session that must propose nothing (Session.proposes) still lists every instruction, and proposes none.
+def test_a_session_switched_off_proposes_nothing_and_still_lists_every_instruction(settings):
+    async def run():
+        sessions = Sessions(settings, Ordering(), FakeLlama(GROUNDED).structurer(), MODELS, decoder=raw_decoder)
+        session = sessions.start(ALICE)
+        session.proposes = False
+        for seq, chunk in enumerate(chunks()):
+            await sessions.add_audio(session.id, ALICE, seq, chunk)
+        await sessions.stop(session.id, ALICE)
+        return await sessions.result(session.id, ALICE, wait=5)
+
+    result = asyncio.run(run())
+
+    assert result["transcript"]["final"] and result["notCarriedOver"] and result["proposals"] == []

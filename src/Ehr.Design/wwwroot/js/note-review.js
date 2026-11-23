@@ -114,6 +114,8 @@
     });
     render();
     if (!errors.hidden) errors.focus();
-    else (root.querySelector('[data-review-state="pending"] [name="Decision"][value="accepted"]')
+    // Back from deciding a proposed order or allergy (step 15): the next one waiting, as the page marked it.
+    else (root.querySelector("[data-chart-proposals] [autofocus]")
+        || root.querySelector('[data-review-state="pending"] [name="Decision"][value="accepted"]')
         || root.querySelector("[data-review-complete] button"))?.focus();
 })();

@@ -12,7 +12,8 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Notes;
 // Off-site with the clinic's server unreachable, a save without JavaScript shows the four sections again on the "Not
 // saved" page (UC 2); with it, note-editor.js keeps them on screen.
 [ShownIfNotSaved(nameof(Subjective), nameof(Objective), nameof(Assessment), nameof(Plan))]
-public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, ClinicalNotes notes, Ehr.Domain.Time.ClinicTime clinic)
+public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, ClinicalNotes notes, Ehr.Domain.Time.ClinicTime clinic,
+    Ehr.Web.Forwarding.OnPremStatus onPrem)
     : PatientNotePage(phi, assignments, breakGlass)
 {
     // Only content, the visit type and an optimistic version are accepted. Identity, timestamps, review status and
@@ -29,6 +30,9 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
     public IReadOnlyList<Ehr.Data.Reference.NoteTemplate> Templates { get; private set; } = [];
     public Guid? ActiveReviewId { get; private set; }
     public IReadOnlyList<AiNoteReview> CompletedReviews { get; private set; } = [];
+
+    // The orders and allergies to add its dictations propose that still wait for a decision (the expansion plan's step 15).
+    public IReadOnlyList<AiChartProposal> WaitingProposals { get; private set; } = [];
 
     // Where the text in the sections came from (step 14): an earlier draft's History, or the desktop app's plain text,
     // is put in Subjective for its author to sort, and the page says so. The draft itself changes only when saved.
@@ -61,6 +65,11 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         var reviews = await Phi.AiReviewsAsync(draftId, AuditParts.NoteDraft, HttpContext.RequestAborted);
         ActiveReviewId = reviews.FirstOrDefault(r => r.State is AiReviewStates.Pending or AiReviewStates.Recording)?.Id;
         CompletedReviews = reviews.Where(r => r.State == AiReviewStates.Completed).ToList();
+        // Step 15: the proposals still waiting, shown only while the draft can be changed, so read only then: off-site with
+        // the clinic's server cut off, the draft is shown as last saved, and nothing it doesn't show is read.
+        WaitingProposals = onPrem.IsReachable
+            ? await Phi.WaitingChartProposalsAsync([.. reviews.Select(r => r.Id)], AuditParts.NoteDraft, HttpContext.RequestAborted)
+            : [];
         var content = NoteContent.From(draft);
         (Subjective, Objective, Assessment, Plan, Version) = (content.Subjective, content.Objective, content.Assessment, content.Plan, draft.Version);
         (Origin, Saved) = (NoteContent.OriginOf(draft), NoteSections.AsSaved(draft));

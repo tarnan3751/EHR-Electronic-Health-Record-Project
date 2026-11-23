@@ -13,10 +13,65 @@ can't come from "left knee pain, right knee normal", nor "continue lisinopril 50
 and metformin 500 mg". A source with a correction in it is read as corrected.
 
 An instruction to order something or to change the allergy list is never carried into the note (FR-14), but the rest of
-a field is: each sentence of a value holding one is cut where the instruction starts, and a source quoting one counts
-only for its words outside it. Separately, not_carried_over() lists every such instruction in the transcript, with its
+a field is: each sentence of a value holding one is cut where the instruction starts, with all of the sentence after
+it, and a source quoting one counts only for its words outside it, the instruction reaching to the end of its clause
+however long it is. Separately, not_carried_over() lists every such instruction in the transcript, with its
 kind and where the clinician said it, so the review screen can say what still has to be placed in Orders or the
 allergy list.
+
+Some of those the dictation proposes (the expansion plan's step 15; FR-14 as reworded): an instruction to place an
+order, or to add an allergy, said in a closed sentence, which the clinician may open in the order form or the allergy
+form, which fill in nothing from it. proposals() is the one place they are made; a session that must propose none
+doesn't ask (sessions.py). An instruction is proposed only when every word of its sentence is accounted for (closed()):
+each falls, in this order, into a lead-in (okay, ok, alright, so, and, also, then, now, next, finally, lastly, plan,
+"plan:", please, "go ahead and", I'll, I will, I'm going to, I am going to, we'll, we will, we're going to, we are
+going to, let's, let us, I'd like to, I want to, we need to, will; each maybe followed by a comma); the verb in one of
+its plain forms (order, refill, prescribe, renew, e-prescribe, place an order for, put in an order for, write a
+prescription or script for, call in or send ... to her pharmacy; ordering, refilling and the like only after I'm, I am,
+we're or we are; for an allergy, add or put ... to or on her allergies or allergy list, add ... as an allergy, list
+... as an allergy, add, record, note, document or enter an allergy to ..., or a ... allergy, or "... should be added to
+her allergies"); determiners and possessives (a, an, the, her, his, their, some, another, "a new"), and before an
+order's item fasting, stat, urgent, routine or repeat; an item, an orderable for an order (a medication for refill,
+prescribe, renew, e-prescribe, a prescription or script, call in and send: "Refill a CBC" isn't plain) and an allergen
+for an allergy to add, as the reference data names it (is_item(): a run of one name of catalog.py that begins with one
+of its standalone runs whole, a generic head, an abbreviation in parentheses, a brand in brackets or a common catalog
+item's name, and never holds a negation or a number word, nor a number but between two of its words, so "lisinopril"
+and "chest x-ray" are items and "no", "one", "morning", "chest" alone or "CBC 2019" aren't); the item's quantities
+(numbers in doses, frequencies, durations, supply or refills, never a zero; forms, routes: QUANTITY); and trailers
+(today, now, stat, please, too, as well, also), with "and" or a comma joining another item the verb takes. Any other word anywhere in the sentence, or any other mark (a semicolon, a dash,
+a bracket, a quote), makes it not plain, and no list of what must not be said decides it. So an instruction naming
+something the reference data doesn't know (a new drug, a misheard name, an unusual test, a test by a name the catalog
+doesn't hold) is never proposed, only listed: the clinician still sees it, and the dictation proposes only what it has
+read whole. The sentences next to it are read only for cues, the one place a list still decides (see "The sentences next
+to a plain instruction" below): after it, a short sentence that doubts, retracts or points back at it, one that opens
+with "no", "not", "or", "instead", "actually", "hold" or "wait", one that points back in its first three words, one that
+points back or names its item again with a negation, a doubt or a word of removing it, one that is only a condition,
+a time for later or says it was done already, ordered or sent, or, for an allergy, one that denies it; and any sentence
+after it, while none holds an instruction of its own, within TAKEN_BACK_REACH words, that retracts it or opens like a
+retraction ("Order a CBC. She is anxious about needles. Actually, let's not."); before it, a bare negation or doubt, a
+condition said as a sentence of its own, a heading line but Plan, Orders or Labs, or a report or list of what not to do
+(quoting, per, according to, says, a request, the following, avoid, not to do). A proposal can still be wrong, and is the clinician's to dismiss.
+Every rule below holds it back too, a second layer, and weigh() names the first that applies (HELD_BACK): not_final (the transcript isn't final yet); to_the_software (its
+sentence tells the software to ignore, disregard or forget its rules, instructions or directions, calls on it
+("Assistant, ...", "Dear model, ..."), or is a note to the assistant, the AI or the system); mixed_kinds (an order and an allergy change run together); not_an_addition (an orders section, or an allergy
+change other than adding one: removing, taking off, clearing, updating, changing, marking); negated (a negation before
+it in its clause: "I don't think we need to order"); hedged (if, unless, when, once, consider, maybe, perhaps,
+probably, might, could, would, discuss, think, whether, or "may" that isn't a date, before it in its clause; a sentence
+opening with a condition; or if, unless, in case, once, when or depending on after it); for_later (its sentence says
+next visit, week, month, year or season, at the follow-up, later, eventually, in the future, down the line, or in so
+many days, weeks, months or years); taken_back (a correction cue, or hold off, never mind, forget that, cancel that,
+on second thought, let's not or not yet; ignore, disregard, delete, strike, undo, skip, cancel, scratch, drop,
+retract or rescind; hold or forget that or it; take that back; wait, no; declined or refused; don't need it; no longer
+needed; changed my mind: from its start to the end of the next sentence, within TAKEN_BACK_REACH words after it); in_the_past (a word of the past in its clause, as for the pharmacy: already, last week, ago); unclear (it
+overlaps a passage marked unclear); question (its sentence ends in a question mark); quoted (the clause before it ends
+in a word of telling: "she asked, can you order an MRI"); not_imperative (anything but an opener, from the start of
+its clause or the last "and" or word starting a clause, up to its lead-in or subject: "capillary refill under 2
+seconds"); names_no_item (no run of its words is an item the reference data names: "call that in", "send the
+prescription", "send it", or "add penicillin", which the reference data names only as penicillin G or V); not_plain
+(not said in the closed sentence, or a sentence next to it holds a cue, as above); too_many (past
+MAX_PROPOSALS). A proposal is its kind (order or allergy_addition), the place of its listed
+instruction, and its warnings, never words: possible_correction, pointing from a correction-like word said after the
+instruction, in its words or within WARNING_REACH words after them; and near_unclear_passage, as for a value.
 
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
@@ -29,11 +84,23 @@ and every check reads the cleaned text. The checks, each with the reason code re
   (a look-alike from another alphabet), markup, a link, code or JSON.
 - order_or_allergy_change (FR-14): nothing was left of the value once its instructions were cut, or nothing was left of
   its sources once the instructions they quote were cut out of them. An instruction says to place an order, or that one
-  is being placed now ("I'm ordering"), to write, send, refill or renew a prescription, to call in anything ("call in
-  something for her nausea", not "call in sick"), to send something to the pharmacy, to make an orders section, or to
-  change the allergy list (add, remove, record, clear, update); hyphens are ignored ("re-fill"). A plan stays a plan:
+  is being placed now ("I'm ordering"), to write, send, refill, renew or sort out a prescription, to have or get one
+  refilled ("have her lisinopril refilled", not "it was refilled"), to call in anything ("call in something for her
+  nausea", not "call in sick"), to send something to the pharmacy (anywhere on in the sentence: "send amoxicillin 500
+  mg by mouth three times a day for 7 days to her pharmacy"), to make an orders section, or to change the allergy list
+  (add, remove, record, clear, update; or note, record, document or flag that the patient is allergic or reacts to
+  something: "note that she's allergic to penicillin", not "she is allergic to penicillin"), whoever's list it is
+  called ("her", "his", "their", "my", "your": "I'll add penicillin to your allergies", as said to the patient);
+  hyphens are ignored ("re-fill"). A word
+  before the verb makes it a noun only right before it ("no order", "the lab order"): after a comma or a full stop the
+  verb starts an instruction ("No, order a chest X-ray", "Check the lab. Order a CBC"). A plan stays a plan:
   "start", "continue", "increase" or "stop" a drug, orders in the past or by someone else ("her cardiologist ordered an
-  echo last year"), and an instruction not to ("don't order an A1c", "no need to order labs"), pass.
+  echo last year"), and an instruction not to ("don't order an A1c", "no need to order labs"), pass. A piece of the
+  sentence that says nothing once the instruction is cut is listed with it ("Do not start metformin until we order an
+  A1c", "We discussed ordering a sleep study", "No, order a CBC"), and a condition before it is kept with what follows
+  it ("If her ferritin is low, order an iron panel and continue omeprazole" keeps "If her ferritin is low, continue
+  omeprazole."); what is cut from a value is only what the transcript lists, so a sentence the transcript reads in
+  context as no instruction stays ("Any problems with refills? No. Refill history is regular.").
 - no_sources, source_too_short (under two words, without a number), source_not_in_transcript (compared word by word,
   ignoring case and punctuation), source_in_unclear_passage.
 - source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "no correction", "I mean",
@@ -56,7 +123,26 @@ and every check reads the cleaned text. The checks, each with the reason code re
   (four back, for one that follows what it qualifies, such as "denied"), and stops at its clause: punctuation, a
   contrast ("but"), a new subject ("she", "patient"), a step of the plan or a heading after its first word ("no further
   pancreatitis continue monthly olezarsen"), and for someone else, a word of telling ("mom says the rash started
-  Monday" is the patient's rash).
+  Monday" is the patient's rash); no cue reaches past a line break, a spoken new paragraph, forwards or back. A
+  negation of something named carries on through a list after a comma, up to LIST_SCOPE words, to the first word that
+  ends it: a full stop, a semicolon, a word that stops a cue ("but"), a step of the plan, or a word saying something is
+  there or someone told it after "and" or "or" ("denies fever, chills or night sweats but reports weight loss"); never
+  into a clause of its own after the comma ("no fever, the cough is better"). A negation or a doubt passes over a subject and its verb instead of stopping there
+  (TO_THE_FINDING), and over a "that", "if" or "whether", "think" or "believe", and a clause between commas: "I don't
+  think, given her normal oxygen, that she has pneumonia", "no evidence she has a fracture", "I think her knee pain is
+  from arthritis", "it doesn't look like she has cellulitis". The subject is a pronoun (you included), "this", "there",
+  "the patient" or a possessive and up to three words; the verb a form of "have" or "be", negated or not, or "does",
+  "did" or "do" with "have". "I don't think", "doubt" and "unlikely" are doubt as well as negation, so "She doesn't
+  have asthma." from "I don't think she doesn't have asthma" is refused. Uncertainty is also: "maybe", "perhaps",
+  "presumably", "think", "believe", "suspect", "wonder", "not sure", "not certain", "not convinced", "either", "a
+  chance", "concern that", "worried", "can't exclude" or "rule out"; she, he, it, they, you, this or the patient with
+  "might", "may" or "could" and "have" or "be" ("she may have ibuprofen as needed" is read as doubt too, a known false
+  refusal); doubt said after the finding, closing its clause with a comma or without ("she has gout, I think",
+  "pneumonia probably", "..., most likely", "..., I guess"), or an alternative offered ("she has pneumonia, or maybe
+  bronchitis"), which reaches back over all of its sentence to a word that ends a reach; and a question, a sentence
+  that ends with a question mark or opens with a verb and its subject ("does she have", "is this") or "any". A number a
+  doubt reaches counts ("her temperature was maybe 38"). A source said both hedged and plainly is read where it was
+  said plainly ("I think she has a viral infection. Assessment: viral infection.").
 - words_out_of_order: the value's words are all in its sources, but not in order within one of them.
 - unsupported_content: any other word of the value isn't in its sources.
 
@@ -81,13 +167,15 @@ checks, so a change to any rule asks for the stored answers to be scored again (
 from __future__ import annotations
 
 import bisect
+import functools
 import re
 import string
 import unicodedata
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 from .prompt import FIELDS
-from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, STOPWORDS, TENS, UNITS, Token, numbers, stem, tokens
+from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, STOPWORDS, TENS, UNITS, WORD, Token, numbers, stem, tokens
 from .transcript import Transcript, utf16_offset
 
 # As the schema says (a test checks): a field can hold all a three-minute dictation says, which is about 2,500
@@ -105,9 +193,11 @@ WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
     "no wait sorry scratch mean correction actually rather make change".split()
 )
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
+LIST_SCOPE = 30  # words after a negation that a list it carries through may take, past its commas
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
-DIRECTIVE_REACH = 14  # at most, words after an instruction that still belong to it, when nothing ends its clause sooner
 UNDOES_REACH = 3  # words before an instruction not to within which another negation makes it an instruction again
+DIRECTIVE_REACH = 14  # at most, words an instruction reaches past its verb when nothing ends it sooner...
+MARKED_REACH = 30  # ...unless a full stop, question mark, semicolon or line break ends it within this many
 LEAD_IN_REACH = 5  # words before an instruction that can be its lead-in ("go ahead and"), or its subject ("penicillin
 # should be added to her allergies")
 MAX_GAP = 1  # a source's own words allowed between two of a value's words (articles and doses are free)
@@ -284,7 +374,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         or any(c not in transcript.letters and c not in NEUTRAL_CHARACTERS for c in value.casefold())
     ):
         reasons.add("bad_format")
-    value, _ = _without_instructions(value)
+    value, _ = _without_instructions(value, transcript.text, transcript.directives)
     if not value:
         return Checked(name, value, quotes, [r for r in REASONS if r in reasons | {"order_or_allergy_change"}])
     if not quotes:
@@ -336,7 +426,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
     if ordered:
         return Checked(name, value, quotes, ordered)
     warnings = [(POSSIBLE_CORRECTION, start, end) for start, end in _possible_corrections(value, spans, transcript)]
-    warnings += [(NEAR_UNCLEAR_PASSAGE, start, end) for start, end in _near_unclear(spans, transcript)]
+    warnings += [(NEAR_UNCLEAR_PASSAGE, start, end) for start, end in _near_unclear(spans, transcript.unclear, transcript.words)]
     return Checked(name, value, quotes, ordered, spans, warnings)
 
 
@@ -348,7 +438,10 @@ UNCLEAR_QUOTE = re.compile(r"\[\s*unclear\s*\]", re.IGNORECASE)
 def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int, int]]) -> tuple[int, int] | str:
     """The quote's place in the transcript, word for word, outside unclear passages. A passage said more than once
     goes to the first occurrence after the field's previous source that no earlier source took, so each is highlighted
-    where it was said (FR-08)."""
+    where it was said (FR-08). Only a plain restatement under a heading is preferred to it: when that occurrence is
+    reached by a qualifier and a later one is the whole of its clause after a heading and no qualifier reaches it ("I
+    think she has a viral infection. Assessment: viral infection."). Never someone else's sentence that happens to say
+    the same words ("I doubt she has shingles. The patient in the next bed has shingles.")."""
     size, words = len(quote), transcript.words
     wanted = [token.text for token in quote]
     found = [
@@ -363,7 +456,23 @@ def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int
         return "source_in_unclear_passage"
     unused = [span for span in clear if span not in earlier]
     after = earlier[-1][1] if earlier else 0
-    return next((span for span in unused if span[0] >= after), unused[0] if unused else clear[0])
+    ordered = [span for span in unused if span[0] >= after] + [span for span in unused if span[0] < after] or clear
+    qualified = {i for reached in transcript.qualified.values() for i in reached}
+    plain = lambda span: not any(span[0] <= words[i].start and words[i].end <= span[1] for i in qualified)  # noqa: E731
+    if plain(ordered[0]):
+        return ordered[0]
+    return next((span for span in ordered[1:] if plain(span) and _under_a_heading(span, transcript.text)), ordered[0])
+
+
+HEADING_BEFORE = re.compile(r"\s*[A-Za-z][A-Za-z /&-]{0,40}:\s*$")
+
+
+def _under_a_heading(span: tuple[int, int], text: str) -> bool:
+    """Whether a passage is the whole of its clause after a heading: "Assessment: viral infection."."""
+    start = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, span[0])), default=0)
+    return bool(HEADING_BEFORE.fullmatch(text, start, span[0])) and not text[span[1] : _sentence_end(text, span[1])].strip(
+        " ,;:"
+    )
 
 
 def _outside_instructions(span: tuple[int, int], transcript: _Transcript) -> list[tuple[int, int]]:
@@ -551,11 +660,11 @@ def _possible_corrections(value: str, spans: list[tuple[int, int]], transcript: 
     return sorted(found)
 
 
-def _near_unclear(spans: list[tuple[int, int]], transcript: _Transcript) -> list[tuple[int, int]]:
-    """Each unclear passage within NEAR_UNCLEAR words of one of the value's sources (see the module's header)."""
-    words = transcript.words
+def _near_unclear(spans: list[tuple[int, int]], unclear: list[tuple[int, int]], words: list[Token]) -> list[tuple[int, int]]:
+    """Each unclear passage within NEAR_UNCLEAR words of one of the spans, a value's sources or a proposal's words (see
+    the module's header)."""
     found = []
-    for start, end in transcript.unclear:
+    for start, end in unclear:
         unclear = [i for i, word in enumerate(words) if start <= word.start < end]
         for span in spans:
             source = [i for i, word in enumerate(words) if span[0] <= word.start and word.end <= span[1]]
@@ -597,54 +706,78 @@ def _sentence_end(text: str, start: int) -> int:
 
 # ---- Orders and allergy-list changes (FR-14) ----------------------------------------------------------------------
 
-_DET = r"(?:an?|the|her|his|their|this|that|my|our|its)"
+_DET = r"(?:an?|the|her|his|their|this|that|my|our|its|your)"
+# Each instruction is an order or an allergy change (its reason in notCarriedOver), and, finer, which a dictation may
+# propose: an order, unless it asks the software for an orders section, and an allergy added (ALLERGY_ADDITION).
+ORDERS_SECTION = "orders_section"
+ALLERGY_ADDITION = "allergy_addition"
+REASON = {"order": "order", ORDERS_SECTION: "order", "allergy_change": "allergy_change", ALLERGY_ADDITION: "allergy_change"}
 _SAME_SENTENCE = r"(?:(?![.\n]).)"
+# Sent to the pharmacy, said however far on in its clause (not past what ends its sentence, as SENTENCE_MARK reads it:
+# "2.5 mg" doesn't; nor past a comma or a new subject, "she went straight to the pharmacy"): "send amoxicillin 500 mg by
+# mouth three times a day for 7 days to her pharmacy". Within a few words, the pharmacy is enough without "to".
+_NO_NEW_SUBJECT = r"(?!\b(?:she|he|they|i|we|you)\b)"
+_TO_THE_PHARMACY = (
+    rf"(?:{_NO_NEW_SUBJECT}[^.,;!?\n]|(?<=\d)\.(?=\d))*?\b(?:to|into)\s+(?:{_DET}\s+)?(?:\w+\s+){{0,2}}pharmacy\b"
+)
+# Within a few words, as before, but not past a comma or a new subject either.
+_NEAR_THE_PHARMACY = rf"(?:{_NO_NEW_SUBJECT}[^.,;!?\n]){{0,60}}?\bpharmacy\b"
+# Sending the patient somewhere is not an order: "send her home", "send her to the pharmacy for a flu shot".
+_NOT_THE_PATIENT = r"(?!\s+(?:her|him|them|me|us|the\s+patient|patient)\s+(?:home|to|back|down|over|away|out|off|up|in)\b)"
 # Placing an order, or a prescription, now: the verb as an instruction ("order", "renew") or under way ("ordering").
 _ORDER_VERB = re.compile(
     r"\b(?:order|ordering|e-?prescribe|prescribe|prescribing|refill|refilling|renew|renewing|e-?rx)\b", re.IGNORECASE
 )
-# Words that make the verb a noun or an adjective ("the order", "a refill", "the ordering physician"), or "in order to".
+# Words that make the verb a noun or an adjective ("the order", "a refill", "the ordering physician", "capillary refill
+# under 2 seconds"), or "in order to", when nothing but a space comes between: "No, order a chest X-ray" and "...the
+# lab. Order a CBC" are instructions.
 _NOUN_BEFORE = frozenset(
-    "a an the this that her his their its my our your no any standing verbal written phone telephone in of lab".split()
+    "a an the this that her his their its my our your no any standing verbal written phone telephone in of lab capillary"
+    .split()
 )
+# After such a word and a comma or a full stop, the verb is still a noun when one of these follows it: "No, refill
+# history shows she picks up every month".
+_COMPOUND_AFTER = frozenset("history number entry request requests status".split())
 _ORDERS = [
     re.compile(
         rf"\b(?:place|put in|putting in|enter|send in|send over|send|call in|phone in|fax|write|writing|give|giving)\s+"
-        rf"(?:(?:{_DET}|him|them|me|us)\s+)?(?:{_DET}\s+)?(?:\w+\s+)?(?:order|prescription|script|rx|refill)s?\b",
+        rf"(?:(?:{_DET}|him|them|me|us|you)\s+)?(?:{_DET}\s+)?(?:\w+\s+)?(?:order|prescription|script|rx|refill)s?\b",
         re.IGNORECASE,
     ),
     re.compile(rf"\b(?:put|putting|get|getting)\s+(?:{_DET}\s+)?(?:\w+\s+)?orders?\s+in\b", re.IGNORECASE),
     # "In to" as speech recognition often writes it: "call that into his usual pharmacy".
     re.compile(r"\b(?:call|phone)\s+(?:it|that|this|them|those|these)\s+in(?:to)?\b", re.IGNORECASE),
-    re.compile(rf"\b(?:send|sending)\b{_SAME_SENTENCE}{{0,60}}?\bpharmacy\b", re.IGNORECASE),
-    # The model told to make an orders section: "add an orders field with an MRI".
-    re.compile(
-        rf"\b(?:add|create|make|include|insert|start|open|put)\b{_SAME_SENTENCE}{{0,30}}?\borders?\s+"
-        r"(?:section|field|tab|entry)\b",
-        re.IGNORECASE,
-    ),
+    re.compile(rf"\b(?:send|sending)\b{_NOT_THE_PATIENT}(?:{_NEAR_THE_PHARMACY}|{_TO_THE_PHARMACY})", re.IGNORECASE),
 ]
-_ALLERGY_CHANGES = [
+# The model told to make an orders section: "add an orders field with an MRI". Never proposed.
+_ORDERS_SECTION = re.compile(
+    rf"\b(?:add|create|make|include|insert|start|open|put)\b{_SAME_SENTENCE}{{0,30}}?\borders?\s+"
+    r"(?:section|field|tab|entry)\b",
+    re.IGNORECASE,
+)
+# Adding to the allergy list, which a dictation may propose (the expansion plan's step 15), and every other change to
+# it, which it never does.
+_ALLERGY_ADDITIONS = [
     re.compile(rf"\badd\b{_SAME_SENTENCE}{{0,40}}?\b(?:to|as|on)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.I),
     re.compile(rf"\badd\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
-    re.compile(rf"\b(?:remove|delete|take)\b{_SAME_SENTENCE}{{0,40}}?\b(?:from|off)\s+(?:{_DET}\s+)?(?:drug\s+)?allerg", re.I),
-    re.compile(rf"\b(?:remove|delete)\s+(?:{_DET}\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
-    re.compile(rf"\b(?:update|change|edit|correct|amend)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
-    re.compile(rf"\b(?:mark|flag)\b{_SAME_SENTENCE}{{0,40}}?\ballerg", re.IGNORECASE),
-    re.compile(
-        rf"\b(?:enter|document|discontinue|inactivate|deactivate)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg",
-        re.IGNORECASE,
-    ),
-    re.compile(rf"\bclear\s+{_DET}\s+(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
-    re.compile(r"\ballerg\w*(?:\s+list)?\s*[:,-]\s*(?:add|remove|update|change|delete)\b", re.IGNORECASE),
-    # "Not allergic to sulfa after all, please update that": the instruction is the update, not what precedes it.
-    re.compile(rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,120}}?\b(?P<at>(?:please\s+)?update\s+(?:that|this|it))\b", re.I),
+    re.compile(rf"\b(?:enter|document)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\blist\b{_SAME_SENTENCE}{{0,40}}?\bas\s+(?:an?\s+)?allerg", re.IGNORECASE),
     re.compile(rf"\bput\b{_SAME_SENTENCE}{{0,40}}?\b(?:on|in|into)\s+(?:{_DET}\s+)?allerg", re.IGNORECASE),
     re.compile(
         rf"\b(?:make sure|ensure|confirm|check that)\b{_SAME_SENTENCE}{{0,40}}?\bon\s+(?:{_DET}\s+)?(?:drug\s+)?allerg\w*\s+list",
         re.IGNORECASE,
     ),
+]
+_ALLERGY_CHANGES = [
+    re.compile(rf"\b(?:remove|delete|take)\b{_SAME_SENTENCE}{{0,40}}?\b(?:from|off)\s+(?:{_DET}\s+)?(?:drug\s+)?allerg", re.I),
+    re.compile(rf"\b(?:remove|delete)\s+(?:{_DET}\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
+    re.compile(rf"\b(?:update|change|edit|correct|amend)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
+    re.compile(rf"\b(?:mark|flag)\b{_SAME_SENTENCE}{{0,40}}?\ballerg", re.IGNORECASE),
+    re.compile(rf"\b(?:discontinue|inactivate|deactivate)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE),
+    re.compile(rf"\bclear\s+{_DET}\s+(?:drug\s+|medication\s+)?allerg", re.IGNORECASE),
+    re.compile(r"\ballerg\w*(?:\s+list)?\s*[:,-]\s*(?:add|remove|update|change|delete)\b", re.IGNORECASE),
+    # "Not allergic to sulfa after all, please update that": the instruction is the update, not what precedes it.
+    re.compile(rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,120}}?\b(?P<at>(?:please\s+)?update\s+(?:that|this|it))\b", re.I),
     re.compile(rf"\ballerg\w*\s+list\b{_SAME_SENTENCE}{{0,30}}?\b(?:add|remove|update|change|delete)\b", re.IGNORECASE),
 ]
 # Instructions only in some places, each with the test of its place:
@@ -653,9 +786,11 @@ _ALLERGY_CHANGES = [
 #   when ("she will call in sick", "mom will call in tomorrow about the rash"); nor someone else calling in, in the past
 #   ("her husband did call in", "she was calling in from work"), though someone asked to is an instruction ("the nurse
 #   was asked to call in amoxicillin");
-# - "note" or "record" an allergy as an instruction: at the start of its clause, or after asking for it ("we need to
-#   record", "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy", "I note
-#   a penicillin allergy in her chart" are documentation).
+# - "note" or "record" an allergy, or note, record, document or flag (or make a note) that the patient is allergic or
+#   reacts to something, as an instruction: at the start of its clause, or after asking for it ("we need to record",
+#   "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy", "I note a
+#   penicillin allergy in her chart" are documentation), and never the statement alone ("she is allergic to
+#   penicillin").
 _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
 _NOT_AN_ORDER = re.compile(
     r"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|about|yesterday|to say|for an? appointment)\b",
@@ -663,7 +798,28 @@ _NOT_AN_ORDER = re.compile(
 )
 _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|was|were|had been)\s+$", re.IGNORECASE)
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
-_NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
+# "Note" or "record" an allergy, not "note that" (a conjunction, not a determiner: "note that her allergic rhinitis...").
+_NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?!that\b)(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
+# Noting that the patient is allergic or reacts to something, with nothing after it but the reaction: "note that she's
+# allergic to penicillin", "record that she reacts to sulfa with hives". Not her allergic rhinitis, no known allergies,
+# a negation ("she is not allergic"), or a sentence that goes on ("..., so we avoided amoxicillin").
+# A word that would say more than the substance and its reaction: a joined clause, or when.
+_NOT_MORE = (
+    r"(?!(?:and|but|or|so|which|because|since|while|when|before|after|during|last|ago|yesterday|previously|years?|months?|"
+    r"weeks?|days?)\b)"
+)
+_NOTED_ALLERGIC = re.compile(
+    r"\b(?:note|record|document|flag|make\s+a\s+note)\s+that\s+(?:she|he|they|the\s+patient)"
+    r"(?:['’]s\s+allergic|\s+(?:is|are|was|were)\s+allergic|\s+(?:reacts|reacted|(?:has\s+)?had\s+a\s+reaction))\s+to"
+    rf"(?:\s+{_NOT_MORE}[\w'’-]+){{1,4}}?(?:\s+with(?:\s+{_NOT_MORE}[\w'’-]+){{1,4}})?\s*(?=[.;!?\n]|$)",
+    re.IGNORECASE,
+)
+# Having it refilled, not that it was or someone is trying to: "have her lisinopril refilled", "get that refilled"; and
+# sorting out a refill or a prescription, not that the pharmacy will.
+_REFILLED = re.compile(rf"\b(?:have|get)\s+(?:(?:{_DET}|him|them|it)\s+)?(?:\w+\s+){{0,3}}?refilled\b", re.I)
+_SORT_OUT = re.compile(
+    rf"\bsort(?:ing)? out\s+(?:{_DET}\s+)?(?:\w+\s+)?(?:order|prescription|script|rx|refill)s?\b", re.IGNORECASE
+)
 _ASKING = re.compile(r"\b(?:need to|make sure(?: to)?|remember to|be sure to|don't forget to|do not forget to)\b", re.I)
 _NOTING = frozenset({"i", "we"})
 
@@ -697,19 +853,25 @@ def _not_in_the_past(text: str, match: re.Match, clause: int) -> bool:
 
 _PLACED = [
     ("order", _CALL_IN, _calls_in_an_order),
-    ("allergy_change", _NOTE_ALLERGY, _at_clause_start),
+    ("order", _REFILLED, _at_clause_start),
+    ("order", _SORT_OUT, _at_clause_start),
+    (ALLERGY_ADDITION, _NOTE_ALLERGY, _at_clause_start),
+    (ALLERGY_ADDITION, _NOTED_ALLERGIC, _at_clause_start),
 ]
 # Instructions whose subject comes first ("penicillin should be added to her allergies"): their span starts with it.
 _PASSIVE = [
+    (ALLERGY_ADDITION, re.compile(
+        rf"\b(?:added|listed|put)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg",
+        re.IGNORECASE,
+    )),
     ("allergy_change", re.compile(
-        rf"\b(?:added|removed|deleted|listed|taken|put)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?"
-        r"(?:drug\s+|medication\s+)?allerg",
+        rf"\b(?:removed|deleted|taken)\s+(?:to|from|on|as|off|in|into)\s+(?:{_DET}\s+)?(?:drug\s+|medication\s+)?allerg",
         re.IGNORECASE,
     )),
     ("allergy_change", re.compile(
         rf"\ballerg\w*\b{_SAME_SENTENCE}{{0,40}}?\b(?:come|comes|coming|go|goes|be taken|be removed)\s+off\b", re.I
     )),
-    ("order", re.compile(rf"\bsent\b{_SAME_SENTENCE}{{0,40}}?\bpharmacy\b", re.IGNORECASE)),
+    ("order", re.compile(rf"\bsent\b{_NOT_THE_PATIENT}(?:{_NEAR_THE_PHARMACY}|{_TO_THE_PHARMACY})", re.IGNORECASE)),
 ]
 _PASSIVE_PLACES = {"order": _not_in_the_past}
 # What can lead up to an instruction ("go ahead and", "please", "I'll"); anything else ends its span, so the plan said
@@ -726,32 +888,113 @@ def directive_spans(text: str) -> list[tuple[int, int]]:
 def directives(text: str) -> list[tuple[int, int, str]]:
     """Each instruction to place an order ("order") or change the allergy list ("allergy_change"), from its lead-in, or
     its subject when that comes first, to the end of its clause (see _directive_end()). Overlapping ones are merged, an
-    allergy change winning. Hyphens are ignored ("re-fill")."""
+    allergy change winning, and each with any piece of its sentence that says nothing once it is cut
+    (_with_fragments()). Hyphens are ignored ("re-fill")."""
+    return [(start, end, reason) for start, end, reason, _, _, _ in _instructions(text)]
+
+
+Instruction = tuple[int, int, str, frozenset[str], int, int]
+
+
+def _instructions(text: str) -> list[Instruction]:
+    """directives(), each with the finer kinds of the instructions merged into it (REASON's keys), where the first of
+    them was matched, which is after its lead-in or subject, and where it starts without the pieces of its sentence
+    listed with it (_with_fragments()), which is where its rules read it from (weigh())."""
     found = _directives(text)
     letters = [i for i, character in enumerate(text) if character != "-"]
     if len(letters) < len(text):
         plain = "".join(text[i] for i in letters)
-        found += [(letters[start], letters[end - 1] + 1, kind) for start, end, kind in _directives(plain)]
-    merged: list[tuple[int, int, str]] = []
-    for start, end, kind in sorted(found):
+        found += [(letters[start], letters[end - 1] + 1, kind, letters[at]) for start, end, kind, at in _directives(plain)]
+    merged: list[Instruction] = []
+    for start, end, kind, at in sorted(found):
         if merged and start < merged[-1][1]:
-            last = merged[-1]
-            merged[-1] = (last[0], max(last[1], end), "allergy_change" if "allergy_change" in (kind, last[2]) else kind)
+            merged[-1] = _joined(merged[-1], (start, end, REASON[kind], frozenset({kind}), at, start))
         else:
-            merged.append((start, end, kind))
-    return merged
+            merged.append((start, end, REASON[kind], frozenset({kind}), at, start))
+    return _with_fragments(text, merged)
 
 
-def _directives(text: str) -> list[tuple[int, int, str]]:
+def _joined(first: Instruction, second: Instruction) -> Instruction:
+    """Two instructions listed as one, an allergy change winning."""
+    reason = "allergy_change" if "allergy_change" in (first[2], second[2]) else first[2]
+    return (min(first[0], second[0]), max(first[1], second[1]), reason, first[3] | second[3], min(first[4], second[4]),
+            min(first[5], second[5]))
+
+
+def _with_fragments(text: str, found: list[Instruction]) -> list[Instruction]:
+    """The instructions, each listed with any piece of its sentence beside it that says nothing once it is cut
+    (_fragment()), so what is cut is still what is listed: "Do not start metformin until we order an A1c", "We
+    discussed ordering a sleep study", "Order a CBC, no". A condition before an instruction goes with it only when
+    nothing else follows in its sentence ("If her hemoglobin drops below 7, order a transfusion"); otherwise it stays
+    with what follows (_without_instructions())."""
+    listed: list[Instruction] = []
+    for instruction in found:
+        opening = max((mark.end() for mark in PIECE_MARK.finditer(text, 0, instruction[0])), default=0)
+        if listed and listed[-1][1] > opening and _fragment(text[listed[-1][1] : instruction[0]]):
+            instruction = _joined(listed.pop(), instruction)
+        listed.append(instruction)
+    for k, (start, end, reason, kinds, at, own) in enumerate(listed):
+        opening = max((mark.end() for mark in PIECE_MARK.finditer(text, 0, start)), default=0)
+        closing = next((mark.start() for mark in PIECE_MARK.finditer(text, end)), len(text))
+        if k + 1 < len(listed) and listed[k + 1][0] < closing:
+            closing = None  # another instruction follows in the sentence
+        after = text[end:closing] if closing is not None else ""
+        if closing is not None and _fragment(after):
+            end, after = closing - (len(after) - len(after.rstrip())), ""
+        if not (k and listed[k - 1][1] > opening):
+            before = text[opening:start]
+            if _fragment(before) or (_condition(before) and closing is not None and not _says_something(after)):
+                start = opening + len(before) - len(before.lstrip())
+        listed[k] = (start, end, reason, kinds, at, own)
+    return listed
+
+
+def _fragment(piece: str) -> bool:
+    """Whether a piece of a sentence beside an instruction says nothing of its own once the instruction is cut: it ends
+    in a subordinator or "but" ("Do not start metformin until", "Stop warfarin only after"), its last negation is bare
+    ("No", "I don't think"), or it is under three words and doesn't start a step of the plan ("We discussed", not "Avoid
+    NSAIDs"). A heading is none of these, nor a piece that holds nothing but stopwords, lead-ins or the words a step
+    of the plan opens with ("Okay so", "Next"), nor one over FRAGMENT_REACH words, which says something of its own
+    (and is all a transcript without punctuation has before an instruction)."""
+    if piece.rstrip().endswith(":"):
+        return False
+    words = [token.text for token in tokens(LEADING_CONNECTOR.sub("", TRAILING_CONNECTOR.sub("", piece)))]
+    if (
+        not _says_something(" ".join(words)) or len(words) > FRAGMENT_REACH or words[-1] in HEADINGS
+        or all(word in OPENERS for word in words)
+    ):
+        return False
+    negations = [i for i, word in enumerate(words) if ANY_NEGATION.search(word)]
+    return (
+        words[-1] in DANGLING
+        or bool(negations) and all(
+            word in STOPWORDS or word in LEAD_IN or word in BARE_AFTER_NEGATION for word in words[negations[-1] + 1 :]
+        )
+        or (len(words) < 3 and words[0] not in STEP_VERBS)
+    )
+
+
+def _condition(piece: str) -> bool:
+    """Whether a piece of a sentence opens with a condition: "If her ferritin is low"."""
+    words = [token.text for token in tokens(piece)]
+    return bool(words) and words[0] in CONDITION_WORDS
+
+
+def _directives(text: str) -> list[tuple[int, int, str, int]]:
     words = tokens(text)
     matches: list[tuple[int, int, str]] = []
     for match in _ORDER_VERB.finditer(text):
-        before = [token.text for token in words if token.end <= match.start()][-1:]
+        before = [token for token in words if token.end <= match.start()][-1:]
         after = text[match.end() : match.end() + 4].lower()
-        if (before and before[0] in _NOUN_BEFORE) or after.startswith(" of"):
+        following = next((token.text for token in words if token.start >= match.end()), "")
+        if (
+            before and before[0].text in _NOUN_BEFORE
+            and (not text[before[0].end : match.start()].strip() or following in _COMPOUND_AFTER)
+        ) or after.startswith(" of"):
             continue
         matches.append((match.start(), match.end(), "order"))
-    for kind, patterns in (("order", _ORDERS), ("allergy_change", _ALLERGY_CHANGES)):
+    for kind, patterns in (("order", _ORDERS), (ORDERS_SECTION, [_ORDERS_SECTION]), (ALLERGY_ADDITION, _ALLERGY_ADDITIONS),
+                           ("allergy_change", _ALLERGY_CHANGES)):
         for pattern in patterns:
             matches += [(match.start("at" if "at" in pattern.groupindex else 0), match.end(), kind)
                         for match in pattern.finditer(text)]
@@ -770,8 +1013,15 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
     spans = []
     for start, end, kind in sorted(matches + passive):
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
-        negated = NEGATED_INSTRUCTION.search(text[clause:start])
-        before = text[clause : clause + negated.start()] if negated else ""
+        negated, base = NEGATED_INSTRUCTION.search(text[clause:start]), clause
+        aside = None if negated else ASIDE_BEFORE.search(text, 0, clause)
+        if aside:  # read over an aside between commas: "do not, under any circumstances, order a CT"
+            base = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, aside.start())), default=0)
+            negated = NEGATED_INSTRUCTION.search(f"{text[base : aside.start()]} {text[clause:start]}")
+            negated = negated if negated and negated.group().split()[0].lower() != "no" else None
+        if not negated and NEVER_BEFORE.search(text, 0, clause) and not text[clause:start].strip():
+            continue  # "under no circumstances, order a CT"
+        before = text[base : base + negated.start()] if negated else ""
         if negated and not NO_REASON.search(before) and not any(
             ANY_NEGATION.search(token.text) for token in tokens(before)[-UNDOES_REACH:]
         ):
@@ -782,12 +1032,20 @@ def _directives(text: str) -> list[tuple[int, int, str]]:
             if token.start < clause or (token.text in CLAUSE_STARTS | {"and"} if subject else token.text not in LEAD_IN):
                 break
             span_start = token.start
-        spans.append((span_start, _directive_end(text, words, end), kind))
+        # Asking for it is part of it, so it is listed and cut together: "we need to record the new codeine allergy".
+        asking = None if subject else re.search(rf"(?:{_ASKING.pattern})\s*$", text[clause:span_start], re.IGNORECASE)
+        if asking:
+            span_start = clause + asking.start()
+            for token in reversed([token for token in words if clause <= token.start and token.end <= span_start]):
+                if token.text not in LEAD_IN:
+                    break
+                span_start = token.start
+        spans.append((span_start, _directive_end(text, words, end), kind, start))
     return spans
 
 
 # An instruction not to: "don't order an A1c", "no need to order labs", "hold off on ordering an MRI", "sulfa should not
-# be added". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value. Unless
+# be added", "do not, under any circumstances, order a CT", "under no circumstances, order a CT". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value. Unless
 # another negation comes right before it, within UNDOES_REACH words, which makes it one again: "no reason not to order
 # an MRI", "I can't not order an MRI" (ANY_NEGATION), or "no reason" with whoever should do it ("there's no reason we
 # should not order an MRI", NO_REASON); not one further back that negates something else ("she has no chest pain so no
@@ -798,6 +1056,11 @@ NEGATED_INSTRUCTION = re.compile(
     re.IGNORECASE,
 )
 ANY_NEGATION = re.compile(r"\b(?:no|not|never|nothing|none|cannot)\b|n't\b", re.IGNORECASE)
+# An aside between commas just before an instruction's clause, which a negation before it is read over (not a bare
+# "no", which answers something: "no, wait, order a CBC").
+ASIDE_BEFORE = re.compile(r",[^,.;:!?\n]{1,80},\s*$")
+# A clause of its own before it that says never: "under no circumstances, order a CT".
+NEVER_BEFORE = re.compile(r"\b(?:under|in|on|by)\s+no\s+(?:circumstances|case|account|means)\s*,\s*$", re.IGNORECASE)
 NO_REASON = re.compile(
     r"\bno (?:good |real )?reason\s+(?:\w+\s+){0,3}(?:should|would|could|can)\s+$", re.IGNORECASE
 )
@@ -811,16 +1074,35 @@ NEW_CLAUSE = frozenset(
     review encourage advise advised explained recommend recommended come""".split()
 )
 # After the allergy list or a pharmacy, these carry an instruction on ("add an allergy to codeine"); anything else ends it.
-CARRIES_ON = frozenset("to for of include includes including with as".split())
+CARRIES_ON = frozenset("to for of from include includes including with as that".split())
+# A condition said in an instruction is part of it, subject and all: "order an MRI if he gets worse".
+CONDITION_WORDS = frozenset("if unless when whenever once until till".split())
 TARGET = re.compile(r"(?:allerg\w*|list|record|pharmacy)$", re.IGNORECASE)
 # What can follow "allergy" and still name the list: "allergy list", "allergy record".
 LIST_WORDS = frozenset("list record".split())
+# A note's headings, which end an instruction said without punctuation before them.
+HEADINGS = frozenset("assessment plan impression exam examination observations vitals subjective objective".split())
+# Where a piece of a sentence beside an instruction ends: the sentence's end or a semicolon.
+PIECE_MARK = re.compile(r"[!?;\n]|\.(?!\d)|(?<!\d)\.")
+# Words a piece can't end in and say something of its own: "until", "only after", "but".
+DANGLING = frozenset("after before until till unless if when whenever once because since while whether that than but".split())
+# Words after a negation that leave it bare: "I don't think", "not sure".
+BARE_AFTER_NEGATION = frozenset("think believe sure know want".split())
+# The words a step of the plan starts with, which make two words a sentence: "Avoid NSAIDs".
+STEP_VERBS = NEW_CLAUSE - frozenset("i we she he they you patient let's i'll we'll i'm we're she's he's".split())
 
 
 def _directive_end(text: str, words: list[Token], end: int) -> int:
-    """Where an instruction matched up to `end` stops: at the end of its sentence or a semicolon, at a word that starts
-    another clause, or DIRECTIVE_REACH words on, whichever comes first. One that already names the allergy list or the
-    pharmacy it goes to stops there ("take amoxicillin off her allergy list"), unless a word carries it on."""
+    """Where an instruction matched up to `end` stops: at the end of its sentence or a semicolon; at a word that starts
+    another clause, a new subject or step of the plan (NEXT_CLAUSE), or a heading (HEADINGS); so a long one is cut and
+    listed whole when punctuation ends it ("Order a CBC and a BMP and a lipid panel and a TSH and a urinalysis and a
+    chest x-ray."). It reaches at most DIRECTIVE_REACH words past its verb, unless its sentence's punctuation ends it
+    within MARKED_REACH: speech recognition that wrote no punctuation never makes a paragraph one instruction. Where the
+    reach cuts it, it goes on while it lists more of what is ordered (a determiner and up to three words after it, "and",
+    a number, a quantity or a word of a reference name: "... a urinalysis a chest x ray and an ecg"), so no tail of an
+    order is left in the note.
+    One that already names the allergy list or the pharmacy it goes to stops there ("take amoxicillin off her allergy
+    list"), unless a word carries it on."""
     stop = min(_sentence_end(text, end), (text.find(";", end) + 1 or len(text) + 1) - 1)
     end += len(re.match(r"[\w'’]*", text[end:]).group())  # the whole of the word the match ended in ("allergies")
     following = [word for word in words if word.start >= end and word.end <= stop]
@@ -828,45 +1110,132 @@ def _directive_end(text: str, words: list[Token], end: int) -> int:
         end, following = following[0].end, following[1:]
     if TARGET.search(text[:end]) and not (following and following[0].text in CARRIES_ON):
         return end
-    joined = False
-    for word in following[:DIRECTIVE_REACH]:
-        if word.text in CLAUSE_STARTS or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start])):
-            break
+    beyond: list[Token] = []
+    if not (stop < len(text) and len(following) <= MARKED_REACH):
+        following, beyond = following[:DIRECTIVE_REACH], following[DIRECTIVE_REACH:]
+    joined = conditional = False
+    for word in following:
+        if word.text in CLAUSE_STARTS or word.text in HEADINGS or (not conditional and (
+            (word.text in NEXT_CLAUSE and (joined or word is not following[0]))
+            or (word.text in NEW_CLAUSE and (joined or "," in text[end : word.start]))
+        )):
+            return end
+        conditional = conditional or word.text in CONDITION_WORDS
         joined = word.text == "and"
         if not joined:
             end = word.end
+    if not beyond:
+        return end
+    # From the last article or "and" before the cut, so an item the cut fell inside is read whole ("a vitamin | D").
+    back = max((i for i, word in enumerate(following) if word.text in ARTICLES or word.text == "and"), default=len(following))
+    return max(end, _listing_end(text, following[back:] + beyond, following[back - 1].end if back else end))
+
+
+ARTICLES = frozenset("a an the some another".split())
+
+
+def _listing_end(text: str, words: list[Token], end: int) -> int:
+    """Where a list of what is ordered, cut by the reach, ends: it goes on over items (is_item()), articles and up to
+    three words after one that aren't stopwords ("an ecg", "a vitamin d level"), "and", numbers and words of an order's
+    quantities, and stops at the first other word, or a word after a comma that is none of these."""
+    i, after_article, last = 0, None, end
+    while i < len(words):
+        word = words[i].text
+        if "," in text[last : words[i].start]:
+            after_article = None
+        size = next((k for k in range(min(MAX_ITEM_WORDS, len(words) - i), 0, -1)
+                     if is_item([w.text for w in words[i : i + k]], "order")), 0)
+        if size:
+            after_article = None if after_article is None else after_article + size
+            end = last = words[i + size - 1].end
+            i += size
+            continue
+        if word in ARTICLES:
+            after_article = 0
+        elif word == "and":
+            after_article = None
+        elif word[0].isdigit() or word in _NUMBER_WORDS or word in _QUANTITY_WORDS:
+            after_article = None if after_article is None else after_article + 1
+        elif (after_article is not None and after_article < 3 and word not in STOPWORDS
+              and word not in NEXT_CLAUSE | CLAUSE_STARTS | HEADINGS):
+            after_article += 1
+        else:
+            break
+        if word != "and":
+            end = words[i].end
+        last = words[i].end
+        i += 1
     return end
 
 
 SENTENCE = re.compile(r"(?<=[.!?;\n])\s+")
 TRAILING_CONNECTOR = re.compile(r"(?:[\s,;:-]|\b(?:and|or|then|also|so)\b)+$", re.IGNORECASE)
-# Words a cut sentence can't end on: what came before them depends on the instruction cut after them ("Do not start
-# metformin until we order an A1c" is not "Do not start metformin"), so the whole sentence goes.
-DANGLING = frozenset(
-    """until till before after unless if when whenever once because since while as that which who whom whose where to
-    for of with without by from than about not no never""".split()
-)
+LEADING_CONNECTOR = re.compile(r"^(?:[\s,;:-]|\b(?:and|or|then|also|so)\b)+", re.IGNORECASE)
 
 
-def _without_instructions(value: str) -> tuple[str, int]:
-    """The value with each instruction cut out: a sentence is cut where its instruction starts ("Start metformin, and
-    order an A1c." keeps "Start metformin."), and dropped if the instruction is all it holds or what is left would end
-    on a word that needs it (DANGLING). Also how many were cut."""
+def _without_instructions(value: str, text: str, listed: list[tuple[int, int]]) -> tuple[str, int]:
+    """The value with exactly its instructions cut out, each as not_carried_over() lists it (directives()): what is cut
+    is what is listed, never the rest of its sentence ("Order a CBC and recheck in 3 months." keeps "Recheck in 3
+    months."). One the transcript `text` says word for word, but only outside what it lists (`listed`), stays: the
+    transcript reads it in context as no instruction ("Any problems with refills? No. Refill history is regular."). A
+    joining word or comma left at a cut ("and", "then") goes with it, and a sentence left with no word that says
+    anything (only stopwords and lead-ins) goes too. Each side of a cut is a sentence of its own, as its source is, but
+    a condition before it stays with what follows ("If her ferritin is low, order an iron panel and continue
+    omeprazole." keeps "If her ferritin is low, continue omeprazole."). Once something is cut, what starts the value or
+    follows a full stop starts with a capital ("Order a CBC; if it is low, start iron." keeps "If it is low, start
+    iron."), and what follows a semicolon keeps its case ("Continue apixaban; do not stop it."). Also how many were
+    cut."""
+    said = tokens(text)
     kept: list[str] = []
     cut = 0
     for sentence in SENTENCE.split(value):
-        found = directives(sentence)
+        found = [
+            (start, end, kind) for start, end, kind in directives(sentence)
+            if not _said_outside(tokens(sentence[start:end]), said, listed)
+        ]
         if not found:
             kept.append(sentence)
             continue
         cut += len(found)
-        head = TRAILING_CONNECTOR.sub("", sentence[: found[0][0]])
-        words = tokens(head)
-        if words and words[-1].text not in DANGLING and any(
-            token.text not in LEAD_IN and token.text not in STOPWORDS for token in words
-        ):
-            kept.append(head + ".")
+        bounds = [0, *(edge for start, end, _ in found for edge in (start, end)), len(sentence)]
+        pieces = [sentence[bounds[i] : bounds[i + 1]] for i in range(0, len(bounds), 2)]
+        rest = ""
+        for i, piece in enumerate(pieces):
+            piece = TRAILING_CONNECTOR.sub("", piece) if i < len(pieces) - 1 else piece
+            piece = (LEADING_CONNECTOR.sub("", piece) if i else piece).strip()
+            if piece and rest and piece[0].isalnum():
+                if not (_says_something(rest) and _says_something(piece)):
+                    rest += " " + piece
+                elif _condition(rest):
+                    rest += ", " + piece
+                else:
+                    rest += ". " + piece[0].upper() + piece[1:]
+            elif piece:
+                rest += piece
+        if _says_something(rest):
+            kept.append(rest if rest[-1] in ".!?;" else rest + ".")
+    if cut:  # what now starts the value or follows a full stop starts with a capital; after a semicolon, as said
+        kept = [
+            piece[:1].upper() + piece[1:] if not i or kept[i - 1].rstrip()[-1:] in (".", "!", "?") else piece
+            for i, piece in enumerate(kept)
+        ]
     return " ".join(kept).strip(), cut
+
+
+def _said_outside(words: list[Token], said: list[Token], listed: list[tuple[int, int]]) -> bool:
+    """Whether the words are said in the transcript, word for word, and never inside what it lists."""
+    run = [word.text for word in words]
+    found = [
+        (said[i].start, said[i + len(run) - 1].end)
+        for i in range(len(said) - len(run) + 1)
+        if run and [word.text for word in said[i : i + len(run)]] == run
+    ]
+    return bool(found) and not any(start < last and first < end for first, last in found for start, end in listed)
+
+
+def _says_something(text: str) -> bool:
+    """Whether the text holds a word that isn't a stopword or a lead-in."""
+    return any(token.text not in LEAD_IN and token.text not in STOPWORDS for token in tokens(text))
 
 
 # ---- Grounding -----------------------------------------------------------------------------------------------------
@@ -1028,10 +1397,27 @@ def _in_order(wanted: list[str], source: list[str]) -> bool:
 
 # ---- Negation, who has it, and how sure ----------------------------------------------------------------------------
 
+# A subject with its verb (have, be or do, negated or not), which a negation or a doubt passes over rather than stop at
+# it: "she has", "she's", "the patient has", "this is", "her knee pain is", "she doesn't have".
+SUBJECT = r"(?:she|he|it|they|you|this|that|there|the\s+patient|(?:her|his|their|the|this|your)(?:\s+[a-z][\w'’-]*){1,3}?)"
+_SUBJECT_AND_VERB = (
+    rf"\b{SUBJECT}(?:['’](?:s|re|ve)\b|\s+(?:(?:has|have|had|is|are|was|were)(?:n['’]t|\s+not)?|"
+    r"(?:does|did|do)(?:n['’]t|\s+not)?\s+have)\b)"
+)
+# What a negation or a doubt passes over, in this order, before the words it qualifies: "think" or "believe"; "that",
+# "if" or "whether"; a clause between commas; "think" or "believe" again; "that", "if" or "whether"; a subject and its
+# verb. "I don't think, given her normal oxygen, that she has pneumonia", "we do not, after reviewing the x-ray, believe
+# she has pneumonia", "I wonder, since she was camping, if she has Lyme disease", "no evidence she has a fracture".
+TO_THE_FINDING = re.compile(
+    r"(?:\s*\b(?:think|believe)\b)?(?:\s*\b(?:that|if|whether)\b)?(?:\s*,[^,.;:!?\n]{1,80},)?(?:\s*\b(?:think|believe)\b)?"
+    rf"(?:\s*\b(?:that|if|whether)\b)?(?:\s*{_SUBJECT_AND_VERB})?",
+    re.IGNORECASE,
+)
 NEGATION = re.compile(
-    r"\b(?:no(?![\s,]+(?:sorry|wait|correction)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
+    r"\b(?:no\s+(?:evidence|signs?)(?:\s+of)?|doubt|doubtful|doesn't\s+look\s+like|does\s+not\s+look\s+like|"
+    r"no(?![\s,]+(?:sorry|wait|correction)\b)(?!\s*,)|not|denies|denied|deny|without|never|none|negative for|absence of|"
     r"free of|ruled out|rules out|doesn't|does not|didn't|did not|isn't|is not|wasn't|was not|hasn't|has not|haven't|"
-    r"have not|don't|do not|won't|will not|shouldn't|should not|non)\b",
+    r"have not|don't|do not|won't|will not|shouldn't|should not|can't|cannot|non)\b",
     re.IGNORECASE,
 )
 # Cues that negate what comes before them: "chest pain denied", "fracture ruled out".
@@ -1049,14 +1435,31 @@ EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
 )
-# Not certain: "possible community acquired pneumonia", "rule out appendicitis", "pneumonia suspected".
+# Not certain: "possible community acquired pneumonia", "maybe pneumonia", "rule out appendicitis", "pneumonia
+# suspected", "I think she has gout", "she might have gout", "cannot exclude a PE", "either pneumonia or bronchitis"; and
+# a question, whose sentence opens with a verb and its subject ("does she have", "is this") or with "any".
+QUESTION_OPENING = r"(?:^|(?<=[.!?\n]))\s*(?:(?:does|do|did|is|are|was|were|has|have|had|can|could|will|would|should)\s+" \
+    r"(?:she|he|it|they|there|this|that|you|the\s+patient)|any)\b"
 CERTAINTY = re.compile(
-    r"\b(?:possible|possibly|probable|probably|suspected|suspect|suspicious for|suspicion of|likely|unlikely|"
-    r"rule out|r/o|risk of|risk for|concern for|concerning for|questionable|presumed)\b",
+    rf"{QUESTION_OPENING}|\b(?:(?:she|he|it|they|you|this|the\s+patient)\s+(?:might|may|could)\s+(?:have|be)|"
+    r"maybe|perhaps|possible|possibly|probable|probably|presumably|suspected|suspects?|suspicious for|suspicion of|likely|"
+    r"unlikely|think|thinks|believe|believes|wonder|wondering|doubt|doubtful|not\s+sure|not\s+certain|not\s+convinced|"
+    r"either|(?:a|some)\s+chance|concern(?:ed)?\s+that|worried|worry|doesn't\s+look\s+like|does\s+not\s+look\s+like|"
+    r"(?:can't|cannot)\s+(?:exclude|rule\s+out)|rule out|r/o|risk of|risk for|concern for|concerning for|questionable|"
+    r"presumed)\b",
     re.IGNORECASE,
 )
 POST_CERTAINTY = re.compile(
     r"\b(?:suspected|likely|possible|probable|unlikely|questionable|presumed)\b(?=\s*(?:[.,;:!?\n]|$))", re.IGNORECASE
+)
+# Doubt said after what it qualifies, which reaches back over all of the sentence before it (commas included, to a
+# word that ends a cue's reach): closing a clause, after a comma or not ("she has gout, I think", "pneumonia
+# probably", "..., most likely", "gout, pseudogout, septic arthritis, possibly"); an alternative offered ("she has
+# pneumonia, or maybe bronchitis"); or a question mark.
+CLOSING_HEDGE = re.compile(
+    r"(?:,\s*|\s+)(?:(?:i|we)\s+(?:think|believe|suspect|guess|would\s+say)|probably(?:\s+not)?|possibly|maybe|perhaps|"
+    r"presumably|(?:most\s+)?(?:un)?likely)(?=\s*(?:[.,;:!?\n]|$))|,?\s+or\s+(?:maybe|possibly|perhaps|probably)\b|\?",
+    re.IGNORECASE,
 )
 # In the past: "a history of MI in 2019", "status post appendectomy".
 # Not the heading "history of present illness", said without its colon.
@@ -1065,6 +1468,14 @@ HISTORY = re.compile(r"(?<!family )\b(?:history of(?! present illness)|hx of|h/o
 TERMINATORS = frozenset(
     """but however although though except apart aside yet which who whereas he she they i we you patient he's she's
     they're i'm we're i've""".split()
+)
+# After a comma, words that end a negation's list: something said to be there, how it is going, or someone telling it
+# ("denies fever, reports a cough", "no rash, the cough is better", "negative for nausea, positive for headache",
+# "without aura, improving", "no orthostatic hypotension, still symptomatic").
+LIST_ENDS = frozenset(
+    """has have had is are was were with notes noted endorses endorsed reports reported complains complaining admits
+    admitted positive says said states stated feels felt improving improved worsening worse better stable unchanged
+    resolved resolving well still otherwise""".split()
 )
 # Someone telling, not having: "mom says the rash started Monday".
 REPORTING = frozenset(
@@ -1075,35 +1486,66 @@ REPORTING = frozenset(
 # monthly olezarsen", "no other injury on exam swelling"). Not right after the cue or "to", where the word is what it
 # negates ("not take aspirin", "not able to take aspirin").
 NEXT_CLAUSE = (NEW_CLAUSE - {"patient"}) | frozenset("exam examination assessment impression plan vitals".split())
-# Each kind of qualifier, with its reason code: cues before the words they qualify, cues after them, and what ends
-# their reach.
+class Qualifier(NamedTuple):
+    """One kind of qualifier: its reason code; its cues before the words they qualify, cues after them, and cues closing
+    a sentence that reach back over all of it; whether a cue before passes over a subject and its verb
+    (TO_THE_FINDING); and the words that end its reach."""
+
+    reason: str
+    before: re.Pattern
+    after: re.Pattern | None
+    closing: re.Pattern | None
+    past_the_subject: bool
+    ends: frozenset[str]
+
+
 QUALIFIERS = (
-    ("negation_dropped", NEGATION, POST_NEGATION, TERMINATORS),
-    ("experiencer_dropped", EXPERIENCER, POST_EXPERIENCER, TERMINATORS | REPORTING),
-    ("certainty_dropped", CERTAINTY, POST_CERTAINTY, TERMINATORS),
-    ("history_dropped", HISTORY, None, TERMINATORS),
+    Qualifier("negation_dropped", NEGATION, POST_NEGATION, None, True, TERMINATORS),
+    Qualifier("experiencer_dropped", EXPERIENCER, POST_EXPERIENCER, None, False, TERMINATORS | REPORTING),
+    Qualifier("certainty_dropped", CERTAINTY, POST_CERTAINTY, CLOSING_HEDGE, True, TERMINATORS),
+    Qualifier("history_dropped", HISTORY, None, None, False, TERMINATORS),
 )
 
 
-def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern | None,
-           ends: frozenset[str]) -> tuple[set[int], set[int]]:
+def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int], set[int]]:
     """The words the text's cues of one kind reach, and the cues' own words (which are neither reached nor plain:
-    "mother" in "mother had a stroke" is who had it)."""
+    "mother" in "mother had a stroke" is who had it; "she has" in "I think she has gout"). No cue reaches past a line
+    break, forwards or back, over its subject or a relative clause included: in dictation a line break is a spoken new
+    paragraph, which ends a cue's reach as a full stop does ("I don't think {new paragraph} She has pneumonia.")."""
+    before, after, closing, ends = qualifier.before, qualifier.after, qualifier.closing, qualifier.ends
     reached: set[int] = set()
     cue_words: set[int] = set()
 
-    def stops(between: str, word: str) -> bool:
-        return word in ends or any(mark in between for mark in ".,;:?!\n")
+    def stops(between: str, word: str, marks: str = ".,;:?!\n") -> bool:
+        return word in ends or any(mark in between for mark in marks)
 
     for cue in before.finditer(text):
+        # A negation carries through a list after a comma ("denies fever, chills, night sweats"), up to the word that
+        # ends it ("... but reports weight loss"), and not into a clause that says something else ("no fever, the cough
+        # is better", "no fever, reports a cough").
+        listing = before is NEGATION
         relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
+        relative = None if relative and "\n" in relative.group() else relative
         if before is EXPERIENCER and not relative and _object_of_a_preposition(text, cue.start()):
             continue
-        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
-        edge = relative.end() if relative else cue.end()
-        for k, i in enumerate([i for i, token in enumerate(words) if token.start >= edge][:NEGATION_SCOPE]):
+        edge = relative.end() if relative else TO_THE_FINDING.match(text, cue.end()).end() if qualifier.past_the_subject else cue.end()
+        if "\n" in text[cue.end() : edge]:  # a new paragraph ends a cue's reach, as a full stop does
+            edge = cue.end()
+        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < edge}
+        ahead = [i for i, token in enumerate(words) if token.start >= edge]
+        crossed = False  # a comma, into more of the list
+        for k, i in enumerate(ahead[: LIST_SCOPE if listing else NEGATION_SCOPE]):
             next_clause = k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"
-            if stops(text[edge : words[i].start], words[i].text) or next_clause:
+            between = text[edge : words[i].start]
+            if listing and k and "," in between and not stops(between, words[i].text, ".;:?!\n"):
+                # Only a negation of something named ("no fever, chills"), not of a number ("124 wait no 118, ...").
+                if not any(_is_content(words[j].text) for j in reached & set(ahead[:k])) or not _more_of_the_list(
+                    text, words, i, ends
+                ):
+                    break
+                crossed = True
+            elif stops(between, words[i].text) or next_clause or (crossed and words[i].text in LIST_ENDS | CLAUSE_STARTS) or (
+                    listing and k >= NEGATION_SCOPE and "," not in text[cue.end() : words[i].start]):
                 break
             reached.add(i)
             edge = words[i].end
@@ -1115,7 +1557,43 @@ def _reach(text: str, words: list[Token], before: re.Pattern, after: re.Pattern 
                 break
             reached.add(i)
             edge = words[i].start
+    for cue in closing.finditer(text) if closing else ():
+        cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
+        edge = text.rfind("\n", cue.start(), cue.end()) + 1 or cue.start()  # not back past a new paragraph
+        for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()]):
+            if stops(text[words[i].end : edge], words[i].text, ".;:?!\n"):
+                break
+            reached.add(i)
+            edge = words[i].start
     return reached, cue_words
+
+
+def _more_of_the_list(text: str, words: list[Token], first: int, ends: frozenset[str]) -> bool:
+    """Whether what follows a comma is more of a list a negation carries through, up to the first word that ends it
+    (_reach() stops there): it doesn't open with one, and the first of them before the next comma, semicolon or full
+    stop is a contrast ("but", "except"), a word starting a clause ("so", "because") or a step of the plan, or else a
+    new subject (_SUBJECTS) or a word saying something is there or someone told it (LIST_ENDS: "has", "is", "with",
+    "reports", "endorses") after "and" or "or". So "denies fever, chills or night sweats but reports weight loss"
+    carries to "but"; "no fever, the cough is better" and "without high steroid doses, so 3 months ago we added ..."
+    don't cross the comma, what follows being a clause of its own."""
+    end = min(
+        _sentence_end(text, words[first].start),
+        *((text.find(mark, words[first].start) + 1 or len(text) + 1) - 1 for mark in ",;"),
+    )
+    piece = [word for word in words[first:] if word.end <= end]
+    for k, word in enumerate(piece):
+        if not (word.text in ends or word.text in NEXT_CLAUSE or word.text in CLAUSE_STARTS or word.text in LIST_ENDS):
+            continue
+        if not k:
+            return False
+        if word.text in _SUBJECTS or word.text in LIST_ENDS:
+            return piece[k - 1].text in ("and", "or")
+        return True
+    return True
+
+
+# The words a new subject starts with, which end a negation's list only after "and" or "or": "chills and she ...".
+_SUBJECTS = frozenset("i we you he she they patient which who he's she's they're i'm we're i've let's i'll we'll".split())
 
 
 def _object_of_a_preposition(text: str, start: int) -> bool:
@@ -1128,7 +1606,7 @@ def _object_of_a_preposition(text: str, start: int) -> bool:
 
 def _qualifiers(text: str, words: list[Token]) -> dict[str, set[int]]:
     """For each kind of qualifier, by its reason code, the words its cues reach in the text."""
-    return {reason: _reach(text, words, before, after, ends)[0] for reason, before, after, ends in QUALIFIERS}
+    return {qualifier.reason: _reach(text, words, qualifier)[0] for qualifier in QUALIFIERS}
 
 
 def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) -> set[str]:
@@ -1137,14 +1615,16 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
     in the transcript, so a source can't leave its qualifier out ("chest pain" quoted from "no chest pain")."""
     words = tokens(value)
     found = set()
-    for reason, before, after, ends in QUALIFIERS:
-        reached, cues = _reach(value, words, before, after, ends)
-        plain = {stem(word.text) for i, word in enumerate(words) if _is_content(word.text) and i not in reached | cues}
-        plain -= {stem(words[i].text) for i in reached if _is_content(words[i].text)}
+    for qualifier in QUALIFIERS:
+        reason = qualifier.reason
+        reached, cues = _reach(value, words, qualifier)
+        content = lambda word: _is_content(word, numbers=reason == "certainty_dropped")  # noqa: E731
+        plain = {stem(word.text) for i, word in enumerate(words) if content(word.text) and i not in reached | cues}
+        plain -= {stem(words[i].text) for i in reached if content(words[i].text)}
         qualified = {
             stem(transcript.words[i].text)
             for i in transcript.qualified[reason]
-            if _is_content(transcript.words[i].text)
+            if content(transcript.words[i].text)
             and any(start <= transcript.words[i].start and transcript.words[i].end <= end for start, end in spans)
         }
         if qualified & plain:
@@ -1152,6 +1632,587 @@ def _dropped(value: str, spans: list[tuple[int, int]], transcript: _Transcript) 
     return found
 
 
-def _is_content(word: str) -> bool:
-    """A word a qualifier can apply to: not a number or a function word, but "MI" or "PE" is one."""
-    return word.isalpha() and len(word) >= 2 and word not in STOPWORDS
+def _is_content(word: str, numbers: bool = False) -> bool:
+    """A word a qualifier can apply to: not a function word, but "MI" or "PE" is one; a number only for a doubt ("her
+    temperature was maybe 38")."""
+    return (word.isalpha() and len(word) >= 2 and word not in STOPWORDS) or (numbers and word[0].isdigit())
+
+
+# ---- Proposals (the expansion plan's step 15; FR-14 as reworded) --------------------------------------------------
+
+MAX_PROPOSALS = 20  # at most, in one dictation, as the on-prem app stages them
+TAKEN_BACK_REACH = 25  # at most, words after an instruction in which taking it back holds it back
+FRAGMENT_REACH = 10  # at most, words of a piece of an instruction's sentence that may be listed with it
+# Why a listed instruction isn't proposed, in the order the rules are tried: the first that applies is the one given.
+HELD_BACK = (
+    "not_final", "to_the_software", "mixed_kinds", "not_an_addition", "negated", "hedged", "for_later", "taken_back",
+    "in_the_past", "unclear", "question", "quoted", "not_imperative", "names_no_item", "not_plain", "too_many",
+)  # fmt: skip
+# What may come between the start of an instruction's clause and the instruction: its lead-in (LEAD_IN) and the words
+# a clinician starts a step of the plan with.
+OPENERS = LEAD_IN | frozenset("okay ok alright so plan next finally lastly first second third going to now i'd like want need".split())
+HEDGE = re.compile(
+    r"\b(?:if|unless|when|whenever|once|consider|considering|maybe|perhaps|possibly|probably|might|could|would|"
+    r"discuss|discussed|discussing|think|thinking|wonder|wondering|whether)\b",
+    re.IGNORECASE,
+)
+CONDITIONS = frozenset("if unless when whenever once".split())
+CONDITION_AFTER = re.compile(r"\b(?:if|unless|in case|once|when|whenever|depending on)\b", re.IGNORECASE)
+_UNITS = "|".join(sorted(UNITS, key=len, reverse=True))
+_COUNT = rf"\d+|a|a few|a couple of|several|(?:{'|'.join(TENS)})(?:[\s-](?:{_UNITS}))?|{_UNITS}"
+FOR_LATER = re.compile(
+    r"\bnext\s+(?:visit|time|appointment|week|month|year|spring|summer|fall|autumn|winter)\b"
+    r"|\bat\s+(?:the\s+|her\s+|his\s+|their\s+)?(?:next\s+)?(?:follow[\s-]?up|visit|review|appointment)\b"
+    r"|\b(?:later|eventually|in the future|down the line)\b"
+    rf"|\bin\s+(?:{_COUNT})\s+(?:days?|weeks?|months?|years?)\b",
+    re.IGNORECASE,
+)
+TAKEN_BACK = re.compile(
+    CORRECTION.pattern + r"|\b(?:hold off|never ?mind|forget (?:that|it|about it)|cancel that|on second thought|"
+    r"let's not|let us not|not yet)\b"
+    r"|\b(?:hold|forget)\s+(?:that|it|this|those|them)\b"
+    r"|\b(?:ignore|disregard|delete|strike|undo|skip|cancel|cancelled|scratch|drop|retract|rescind)\b"
+    r"|\btake\s+(?:that|it)\s+back\b|\bwait\s*,?\s*no\b|\b(?:declined|declines|refused|refuses)\b"
+    r"|\b(?:don't|doesn't|do not|does not|won't|will not)\s+(?:need|want)\s+(?:it|that|this|one|them)\b"
+    r"|\bno longer need\w*|\bchanged? (?:my|our|her|his) minds?\b",
+    re.IGNORECASE,
+)
+TO_THE_SOFTWARE = re.compile(
+    rf"\b(?:ignore|disregard|forget)\b{_SAME_SENTENCE}{{0,60}}?\b(?:rules|instructions|prompt|guidelines|directions)\b"
+    r"|\b(?:note|instruction|message|request)s?\s+(?:to|for)\s+(?:the\s+)?(?:\w+\s+)?"
+    r"(?:assistant|ai|model|system|software|scribe|computer)\b",
+    re.IGNORECASE,
+)
+# The software called on, at the start of a sentence: "Assistant, order a CT", "Dear model, ...".
+VOCATIVE = re.compile(r"(?:dear\s+)?(?:assistant|ai|model|system|computer|scribe|software|chatbot)\s*[,:]", re.IGNORECASE)
+QUOTING = REPORTING | frozenset("wondered wonders wondering asking saying".split())
+
+
+@dataclass(frozen=True)
+class Weighed:
+    """One listed instruction (not_carried_over()) weighed as a proposal: what it would propose (order or
+    allergy_addition), or the listed reason when it is neither; the rule that holds it back (HELD_BACK), None when it is
+    proposed; and its warnings, as for a value. Code points in the transcript."""
+
+    start: int
+    end: int
+    kind: str
+    held_back: str | None
+    warnings: tuple[tuple[str, int, int], ...] = ()
+
+
+def proposals(transcript: Transcript) -> list[dict]:
+    """What the dictation proposes (see the module's header): each order or allergy to add the clinician dictated
+    plainly, as its kind, the place of its listed instruction and its warnings, in UTF-16 offsets. Never words."""
+    text = transcript.text
+    return [
+        {
+            "kind": weighed.kind,
+            "start": utf16_offset(text, weighed.start),
+            "end": utf16_offset(text, weighed.end),
+            "warnings": [
+                {"code": code, "start": utf16_offset(text, start), "end": utf16_offset(text, end)}
+                for code, start, end in weighed.warnings
+            ],
+        }
+        for weighed in weigh(transcript)
+        if weighed.held_back is None
+    ]
+
+
+def weigh(transcript: Transcript) -> list[Weighed]:
+    """Every listed instruction, in order, as proposed or held back (see the module's header)."""
+    text = transcript.text
+    words = tokens(text)
+    unclear = transcript.unclear_ranges()
+    weighed: list[Weighed] = []
+    for start, end, reason, kinds, at, own in _instructions(text):
+        kind = "order" if kinds == {"order"} else ALLERGY_ADDITION if kinds == {ALLERGY_ADDITION} else reason
+        held_back = "not_final" if not transcript.final else _held_back(text, words, unclear, own, end, kinds, at)
+        if held_back is None and sum(1 for w in weighed if w.held_back is None) == MAX_PROPOSALS:
+            held_back = "too_many"
+        warnings = () if held_back else _proposal_warnings(text, words, unclear, start, end, at)
+        weighed.append(Weighed(start, end, kind, held_back, warnings))
+    return weighed
+
+
+def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], start: int, end: int,
+               kinds: frozenset[str], at: int) -> str | None:
+    """The first rule that holds an instruction back from being proposed (HELD_BACK), or None. `at` is where it was
+    matched: what comes before it in its clause is its lead-in or subject."""
+    clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
+    clause_end = next((mark.start() for mark in CLAUSE_MARK.finditer(text, at)), len(text))
+    sentence = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, start)), default=0)
+    sentence_end = _sentence_end(text, at)
+    lead = [token for token in words if clause <= token.start and token.end <= at]
+    if TO_THE_SOFTWARE.search(text, sentence, sentence_end) or VOCATIVE.match(text[sentence:sentence_end].lstrip()):
+        return "to_the_software"
+    if kinds & {"order", ORDERS_SECTION} and kinds & {"allergy_change", ALLERGY_ADDITION}:
+        return "mixed_kinds"
+    if kinds not in ({"order"}, {ALLERGY_ADDITION}):
+        return "not_an_addition"
+    if NEGATION.search(text, clause, at):
+        return "negated"
+    sentence_words = [token.text for token in words if sentence <= token.start < sentence_end]
+    dates = set(_date_words([token.text for token in lead]))
+    if (
+        HEDGE.search(text, clause, at)
+        or any(token.text == "may" and i not in dates for i, token in enumerate(lead))
+        or (sentence_words and sentence_words[0] in CONDITIONS)
+        or text[sentence:sentence_end].lstrip().lower().startswith("in case")
+        or CONDITION_AFTER.search(text, at, sentence_end)
+    ):
+        return "hedged"
+    if FOR_LATER.search(text, sentence, sentence_end):
+        return "for_later"
+    after = [token for token in words if token.start >= end][:TAKEN_BACK_REACH]
+    next_sentence_end = _sentence_end(text, sentence_end + 1) if sentence_end < len(text) else len(text)
+    reach = min(next_sentence_end, after[-1].end if len(after) == TAKEN_BACK_REACH else len(text))
+    if TAKEN_BACK.search(text, start, max(reach, end)):
+        return "taken_back"
+    if PAST.search(text, clause, clause_end):
+        return "in_the_past"
+    if any(_overlaps((start, end), passage) for passage in unclear):
+        return "unclear"
+    if sentence_end < len(text) and text[sentence_end] == "?":
+        return "question"
+    previous = [token.text for token in words if token.end <= clause]
+    if clause and previous and previous[-1] in QUOTING:
+        return "quoted"
+    # Said as an instruction: from the start of its clause, or the last "and" or word starting a clause before it,
+    # nothing but openers up to its lead-in or subject (not "capillary refill under 2 seconds").
+    joins = [i for i, token in enumerate(lead) if token.text in CLAUSE_STARTS or token.text == "and"]
+    if any(token.text not in OPENERS for token in lead[joins[-1] + 1 if joins else 0 :] if token.start < start):
+        return "not_imperative"
+    kind = "order" if kinds == {"order"} else ALLERGY_ADDITION
+    said = [token.text for token in words if start <= token.start and token.end <= end]
+    of = "order" if kind == "order" else "allergen"
+    if not any(is_item(said[i : i + size], of) for i in range(len(said)) for size in range(1, MAX_ITEM_WORDS + 1)):
+        return "names_no_item"
+    if not closed(text[sentence:sentence_end], kind) or _neighbours_hold_it(text, sentence, sentence_end, kind):
+        return "not_plain"
+    return None
+
+
+# ---- Items: what the reference data names (catalog.py) -----------------------------------------------------------
+
+# Never in an item: a negation or a number word ("Order a CBC, no.", "Order another one.", though the reference data has
+# "No. 40" and "next choice one dose"). And an item never starts with a word of the closed classes (_CLOSED_WORDS, below).
+NEVER_IN_AN_ITEM = (
+    frozenset("no not none never nothing without nor neither".split()) | frozenset(UNITS) | frozenset(TENS)
+    | frozenset(ORDINAL_UNITS) | frozenset(ORDINAL_TENS) | {"hundred", "thousand"}
+)
+
+
+@functools.cache
+def _names(kind: str) -> tuple[list[tuple[str, ...]], dict[str, list[tuple[int, int, int]]], frozenset[str], frozenset[int]]:
+    """The names of one kind ("order" or "allergen"), each as its words; their standalone runs, by first word, each as
+    the name, its start and its end; every word they hold; and which of them are medications (marked "+"). Read from
+    catalog.py the first time a proposal or a noted allergy is weighed, not at start."""
+    from . import catalog
+
+    names: list[tuple[str, ...]] = []
+    runs: dict[str, list[tuple[int, int, int]]] = {}
+    medications: set[int] = set()
+    for line in (catalog.ORDERABLES if kind == "order" else catalog.ALLERGENS).split("\n"):
+        if line.startswith("+"):
+            medications.add(len(names))
+        marked = line.lstrip("+").split()
+        if not marked:
+            continue
+        words = tuple(word.strip("^$") for word in marked)
+        start = None
+        for i, word in enumerate(marked):
+            start = i if word.startswith("^") else start
+            if word.endswith("$") and start is not None:
+                runs.setdefault(words[start], []).append((len(names), start, i + 1))
+        names.append(words)
+    return names, runs, frozenset(word for name in names for word in name), frozenset(medications)
+
+
+def is_item(words: list[str], kind: str) -> bool:
+    """Whether the words (lower case) name an item of one kind as the reference data names it: with its numbers left
+    out, they are a run of one name's words that begins with one of its standalone runs whole (catalog.py: a generic
+    head, an abbreviation in parentheses, a brand in brackets, a common catalog item's name) and may go on along it. So
+    "lisinopril" and "lisinopril 10 mg oral tablet" are, "chest" or "morning" alone isn't; none starts with a stopword,
+    a single letter or a word of the closed classes, or holds a negation or a number word (NEVER_IN_AN_ITEM), and a
+    number is part of one only between two of its words, and never a zero ("lisinopril 10 mg", not "CBC 2019" or
+    "lisinopril 0 mg"). Of kind "order" any
+    orderable, MEDICATION only a medication, and otherwise an allergen."""
+    if not words or words[0][0].isdigit() or words[-1][0].isdigit() or any(_is_zero(word) for word in words):
+        return False
+    words = [word for word in words if not word[0].isdigit()]
+    if len(words[0]) < 2 or words[0] in STOPWORDS or words[0] in _CLOSED_WORDS or any(
+        word in NEVER_IN_AN_ITEM for word in words
+    ):
+        return False
+    names, runs, _, medications = _names("order" if kind in ("order", MEDICATION) else "allergen")
+    return any(
+        end - start <= len(words) and names[i][start : start + len(words)] == tuple(words)
+        and (kind != MEDICATION or i in medications)
+        for i, start, end in runs.get(words[0], ())
+    )
+
+
+# ---- A plain instruction: the closed sentence a proposal is made from ---------------------------------------------
+
+# An instruction is proposed only when every word of its sentence falls, in this order, into one of these closed
+# classes (closed()); no list of what must not be said decides it:
+# 1. lead-ins (PLAIN_LEADS), each maybe followed by a comma;
+# 2. the verb in one of its plain forms (ORDER_FORMS, ALLERGY_FORMS), an -ing form only after "I'm", "I am", "we're" or
+#    "we are";
+# 3. determiners and possessives (DETERMINERS, and "new" after "a" or "an"), and for an order the modifiers fasting,
+#    stat, urgent, routine and repeat (ORDER_MODIFIERS);
+# 4. an item: an orderable for an order, but a medication for refill, prescribe, renew, e-prescribe, write a prescription
+#    or script for, call in and send (MEDICINES), and an allergen for an allergy to add, as the reference data names it
+#    (is_item()); every item of a joined list one the verb takes;
+# 5. an order's quantities (QUANTITY): numbers, doses, forms, routes, frequencies, durations, supply, refills; a number
+#    only in one of them or between two words of the item's name ("Order a CBC 2019" isn't plain), never a zero ("0
+#    times a day"; "no refills" is a phrase of its own);
+# 6. trailers (TRAILERS); the allergy list for an allergy to add ("to her allergies"); the pharmacy for "send" ("to her
+#    pharmacy"); and "and" or a comma joining another item, with its own determiners and quantities.
+PLAIN_LEADS = tuple(tuple(lead.split()) for lead in (
+    "okay", "ok", "alright", "so", "and", "also", "then", "now", "next", "finally", "lastly", "please", "plan", "plan :",
+    "go ahead and", "i'll", "i will", "i'm going to", "i am going to", "we'll", "we will", "we're going to",
+    "we are going to", "let's", "let us", "i'd like to", "i want to", "we need to", "will",
+))
+DOING = (("i'm",), ("i", "am"), ("we're",), ("we", "are"))
+ITEMS = "items"  # where a form takes its items
+MEDICINES = "medicines"  # where a form takes its items, medications only
+MEDICATION = "medication"  # the kind of item a refill, a prescription or the pharmacy takes
+# Each plain form of an order's verb, and its -ing form, with what it takes: its items (any orderable for an order,
+# medications only for the rest), and for "send" and "call in" the pharmacy.
+_PHARMACY = r"(?:to|into) (?:her|his|their|the) (?:usual )?pharmacy "
+ORDER_FORMS = tuple(
+    (tuple(verb.split()), tuple(doing.split()), steps) for verb, doing, steps in (
+        ("order", "ordering", (ITEMS,)), ("refill", "refilling", (MEDICINES,)),
+        ("prescribe", "prescribing", (MEDICINES,)), ("renew", "renewing", (MEDICINES,)),
+        ("e prescribe", "e prescribing", (MEDICINES,)),
+        ("place an order for", "placing an order for", (ITEMS,)), ("put in an order for", "putting in an order for", (ITEMS,)),
+        *((f"{verb} {whom}a {paper} for", f"{doing} {whom}a {paper} for", (MEDICINES,))
+          for verb, doing in (("write", "writing"),) for whom in ("", "her ", "him ", "them ")
+          for paper in ("prescription", "script")),
+        ("call in", "calling in", (MEDICINES, _PHARMACY)),
+        ("send", "sending", (MEDICINES, _PHARMACY)),
+        ("send a prescription for", "sending a prescription for", (MEDICINES, _PHARMACY)),
+    )
+)
+# Each plain form of adding to the allergy list, as what follows the lead-ins: words (a pattern) or the items.
+_LIST = r"(?:to|on) (?:(?:her|his|their|the) )?(?:(?:drug|medication) )?(?:allergies|allergy list|list of allergies) "
+_ALLERGY_VERB = r"(?:add|record|note|document|enter) (?:an? )?(?:new )?"
+ALLERGY_FORMS = (
+    (r"(?:add|put) ", ITEMS, _LIST),  # "add penicillin to her allergies"
+    (r"add ", ITEMS, r"as an? allergy "),  # "add penicillin as an allergy"
+    (r"list ", ITEMS, r"as (?:an? )?allergy "),  # "list penicillin as an allergy"
+    (_ALLERGY_VERB + r"allergy to ", ITEMS),  # "add an allergy to codeine"
+    (_ALLERGY_VERB, ITEMS, r"allergy "),  # "record a penicillin allergy"
+    (ITEMS, r"(?:should|needs to|must|will) be added ", _LIST),  # "penicillin should be added to her allergies"
+)
+DETERMINERS = frozenset("a an the her his their some another".split())
+# What an order may say of its item before it, after its determiners: "a fasting lipid panel", "a stat CBC".
+ORDER_MODIFIERS = frozenset("fasting stat urgent routine repeat".split())
+JOINS = ((",", "and"), (",",), ("and",))
+TRAILERS = tuple(tuple(trailer.split()) for trailer in ("today", "now", "stat", "please", "too", "as well", "also"))
+MAX_ITEM_WORDS = 8  # at most, words of one item's name
+_NUMBER_WORDS = frozenset(UNITS) | frozenset(TENS) | {"hundred"}
+# An order's quantities, each a run of words as said, with a number as "#" (closed lists: no other word counts).
+_PERIODS = r"days?|weeks?|months?|years?"
+_DOSE_UNITS = (
+    r"mg|mcg|micrograms?|milligrams?|g|grams?|ml|milliliters?|units?|percent|puffs?|tablets?|tabs?|capsules?|caps?|drops?|"
+    r"sprays?|patch(?:es)?|doses?|inhalers?|pens?|vials?|bottles?|tubes?"
+)
+QUANTITY = re.compile(
+    r"(?:(?:, )?(?:"
+    rf"# (?:{_DOSE_UNITS})|(?:a )?# (?:day|week|month) supply|"
+    r"tablets?|capsules?|cream|ointment|gel|lotion|solution|suspension|syrup|liquid|inhaler|patch|injection|drops|spray|"
+    r"pen|tube|by mouth|po|oral|orally|topical|topically|iv|im|subcutaneously|sublingually|inhaled|nasally|rectally|vaginally|"
+    r"(?:once|twice|# times) (?:a|per|every) (?:day|week|month)|(?:once|twice|# times) daily|daily|nightly|weekly|"
+    r"monthly|bid|tid|qid|qhs|qd|qod|qam|qpm|hs|a day|per day|"
+    rf"every # (?:hours?|{_PERIODS})|every (?:day|morning|evening|night|other day)|at (?:bedtime|night)|"
+    r"in the (?:morning|evening)|(?:with|after|before) (?:meals|food|breakfast|dinner|supper)|"
+    rf"for # (?:{_PERIODS})|for (?:a|another) (?:day|week|month|year)|x # (?:{_PERIODS})|(?:with )?(?:#|no) refills?"
+    r") )*"
+)
+
+# Every word an order's quantities may hold.
+_QUANTITY_WORDS = frozenset(re.findall(r"[a-z]{2,}", QUANTITY.pattern))
+# Every word of the closed classes but the items: none starts an item.
+_CLOSED_WORDS = frozenset(
+    word
+    for text in (
+        *(" ".join(lead) for lead in PLAIN_LEADS), *(" ".join(verb + ing) for verb, ing, _ in ORDER_FORMS),
+        *(step for form in ALLERGY_FORMS for step in form if step != ITEMS), _PHARMACY, _LIST, " ".join(DETERMINERS),
+        " ".join(ORDER_MODIFIERS), *(" ".join(trailer) for trailer in TRAILERS), QUANTITY.pattern, "and new",
+    )
+    for word in re.findall(r"[a-z']{2,}", text)
+)
+
+
+def closed(sentence: str, kind: str) -> bool:
+    """Whether a sentence is a plain instruction (see above), every word of it accounted for: an order (kind "order")
+    or an allergy to add (ALLERGY_ADDITION)."""
+    words = _closed_words(sentence)
+    if words is None:
+        return False
+    for at in _past_the_lead_ins(words):
+        if kind == "order":
+            doing = next((at + len(lead) for lead in DOING if tuple(words[at : at + len(lead)]) == lead), None)
+            forms = [
+                (start + len(form), steps)
+                for verb, ing, steps in ORDER_FORMS
+                for form, start in ((verb, at), (ing, doing))
+                if start is not None and tuple(words[start : start + len(form)]) == form
+            ]
+        else:
+            forms = [(at, form) for form in ALLERGY_FORMS]
+        if any(_trailers(words, end) for start, steps in forms for end in _steps(words, start, steps, kind)):
+            return True
+    return False
+
+
+def _closed_words(sentence: str) -> list[str] | None:
+    """The sentence's words in lower case, a comma and the colon after "plan" each a word of its own; None when any
+    other mark comes between two words (a semicolon, a dash, a bracket, a quote...)."""
+    words: list[str] = []
+    last = 0
+    for match in WORD.finditer(sentence):
+        raw = sentence[last : match.start()]
+        between = raw.strip()
+        if between in (",", ":") and words and (between == "," or words[-1] == "plan"):
+            words.append(between)
+        elif between and raw != "-":
+            return None
+        words.append(match.group().lower().replace("’", "'"))
+        last = match.end()
+    return words if sentence[last:].strip() in ("", ".", "!") else None
+
+
+def _past_the_lead_ins(words: list[str]) -> list[int]:
+    """Where the verb may start: after any run of lead-ins, each maybe followed by a comma."""
+    reached, todo = {0}, [0]
+    while todo:
+        at = todo.pop()
+        for lead in PLAIN_LEADS:
+            end = at + len(lead)
+            if tuple(words[at:end]) == lead:
+                for after in (end, end + 1) if words[end : end + 1] == [","] else (end,):
+                    if after not in reached:
+                        reached.add(after)
+                        todo.append(after)
+    return sorted(reached)
+
+
+def _steps(words: list[str], at: int, steps: tuple, kind: str) -> set[int]:
+    """Where the words from `at` may end, having said each step in turn: words (a pattern) or the items."""
+    ends = {at}
+    for step in steps:
+        if step in (ITEMS, MEDICINES):
+            of = MEDICATION if step == MEDICINES else "order" if kind == "order" else "allergen"
+            ends = {end for start in ends for end in _items(words, start, of)}
+        else:
+            ends = {start + len(match.group().split()) for start in ends
+                    if (match := re.match(step, " ".join(words[start:]) + " "))}
+    return ends
+
+
+def _items(words: list[str], at: int, kind: str) -> set[int]:
+    """Where a run of items of one kind said from `at` may end: each with its determiners and an order's quantities,
+    joined by "and" or a comma."""
+    ends: set[int] = set()
+    todo, seen = [at], set()
+    while todo:
+        start = todo.pop()
+        if start in seen:
+            continue
+        seen.add(start)
+        while start < len(words) and (
+            words[start] in DETERMINERS or (words[start] == "new" and start > at and words[start - 1] in ("a", "an"))
+            or (kind == "order" and words[start] in ORDER_MODIFIERS)
+        ):
+            start += 1
+        for end in range(start + 1, min(len(words), start + MAX_ITEM_WORDS) + 1):
+            if "," in words[start:end] or not is_item(words[start:end], kind):
+                continue
+            end = _quantities(words, end) if kind != "allergen" else end
+            ends.add(end)
+            todo += [end + len(join) for join in JOINS if tuple(words[end : end + len(join)]) == join]
+    return ends
+
+
+def _quantities(words: list[str], at: int) -> int:
+    """Where an order's quantities said from `at` end (QUANTITY). A zero is no number of them ("0 times a day", "for
+    zero days"); "no refills" is a phrase of its own."""
+    shape = ["0" if _is_zero(word) else "#" if word[0].isdigit() or word in _NUMBER_WORDS else word for word in words[at:]]
+    return at + QUANTITY.match(" ".join(shape) + " ").group().count(" ")
+
+
+def _is_zero(word: str) -> bool:
+    """Whether a word is a zero: "zero", "0", "0.0"."""
+    return word == "zero" or (word[0].isdigit() and not word.strip("0."))
+
+
+def _trailers(words: list[str], at: int) -> bool:
+    """Whether nothing but trailers, each maybe after a comma, follows `at`."""
+    while at < len(words):
+        if words[at] == ",":
+            at += 1
+        trailer = next((t for t in TRAILERS if tuple(words[at : at + len(t)]) == t), None)
+        if trailer is None:
+            return False
+        at += len(trailer)
+    return True
+
+
+# The sentences next to a plain instruction are read only for these cues (lists, the one place one still decides; a
+# sentence they don't catch is taken as unrelated). After it, it is held back when the next sentence:
+# - has BARE_SENTENCE words or fewer and a negation, a doubt or a retraction word (_NEXT_DOUBT), or points back at it
+#   (_POINTS_BACK);
+# - opens with "no", "not", "or", "instead", "actually", "hold" or "wait", or goes on with what the instruction's
+#   sentence said ("with", "for", "because", "since", "which", "to": "Add nitrofurantoin to her allergy list. with a
+#   reaction rash", a full stop heard where none was said) (_NEXT_OPENING); or points back within its first three words
+#   ("Nix that, she had one Friday", a retraction misheard: "Cancer that order for now");
+# - points back and holds a negation or a word of removing it (_REMOVES: "We don't really need that one", "Take that out
+#   of the plan", "She had one done two days ago");
+# - for an allergy to add, speaks of an allergy or a reaction with a negation, someone else or a word pointing back ("She
+#   is not truly allergic to penicillin", "It was her mother who reacted", "Turns out it was a viral rash").
+# - is only a condition, a time for later, or says it was done already, ordered or sent ("Order a CBC. In two weeks.",
+#   "Already done."), unless it opens a step of the plan of its own ("Recheck in one week.");
+# and any later sentence, while none holds an instruction of its own, within TAKEN_BACK_REACH words, that retracts it
+# or opens like a retraction (_later_sentences_hold_it()). Before it, when the previous sentence is a bare negation or
+# doubt of BARE_SENTENCE words or fewer, a condition said as a sentence of its own ("If her potassium is low."), a
+# heading line but Plan, Orders or Labs (PROPOSAL_HEADINGS), or introduces a report or a list of what not to do
+# (_REPORT_BEFORE: quoting, reading from, per, according to, says, a request, a question, the following, avoid, not to
+# do).
+BARE_SENTENCE = 4
+_NEXT_DOUBT = frozenset(
+    "no nope not never none nothing sure maybe or wrong hold wait think instead rather actually probably perhaps possibly "
+    "likely unlikely might could would may".split()
+)
+_BARE_BEFORE = frozenset("no not nothing none never sure probably perhaps possibly maybe likely unlikely might could would may".split())
+_NEXT_OPENING = frozenset("no not nope never or instead rather actually hold wait with for because since which to".split())
+_POINTS_BACK = frozenset("that it this these those them one".split())
+_A_NUMBER_OF = frozenset("day days week weeks month months year years hour hours time times more".split())  # "one week"
+_REMOVES = frozenset(
+    "no not never none nothing remove erase omit withdraw leave out forget against bother need necessary prefer wrong done "
+    "already ago yesterday".split()
+)
+_ALLERGY_WORDS = frozenset("allergy allergies allergic react reacts reacted reaction tolerate tolerated tolerates rash hives".split())
+_REPORT_BEFORE = re.compile(
+    r"\b(?:quoting|quote|reading from|according to|says|said|states|stated|request|requests|requested|question|"
+    r"hypothetical(?:ly)?|the following|avoid|not to do|not do|not be doing|do not|decided against|would not|wants|"
+    r"(?:not|n't) want|"
+    r"letter|records)\b|^\s*per\b",
+    re.IGNORECASE,
+)
+
+
+def _neighbours_hold_it(text: str, sentence: int, sentence_end: int, kind: str) -> bool:
+    """Whether the sentences before or after a plain instruction may take it back, doubt it, put it off or report it
+    (see above)."""
+    previous_end = len(text[:sentence].rstrip())  # back over the blank lines between paragraphs
+    previous_start = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, max(previous_end - 1, 0))), default=0)
+    previous = [token.text for token in tokens(text[previous_start:previous_end])]
+    said_before = text[previous_start:previous_end].strip()
+    # A heading line it stands under, but Plan, Orders or Labs ("Next visit:", "Declined:", "If symptoms persist:"); a
+    # condition said as a sentence of its own ("If her potassium is low. Then order a BMP.").
+    if said_before.endswith(":") and said_before[:-1].strip().lower() not in PROPOSAL_HEADINGS:
+        return True
+    if said_before and _CONDITION_OPENING.match(said_before) and not directives(said_before):
+        return True
+    if _later_sentences_hold_it(text, sentence_end):
+        return True
+    if previous and len(previous) <= BARE_SENTENCE and any(
+        word in _BARE_BEFORE or word.endswith("n't") for word in previous
+    ):
+        return True
+    # A report or a list introduced before a run of instructions holds each of them: "Things not to do today. Order a
+    # CT of the head. Refill her oxycodone."
+    end = sentence
+    while end:
+        start = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, max(end - 1, 0))), default=0)
+        if _REPORT_BEFORE.search(text[start:end]):
+            return True
+        if not directives(text[start:end]):
+            break
+        end = start
+    following = [token.text for token in tokens(text[sentence_end + 1 : _sentence_end(text, sentence_end + 1)])] if (
+        sentence_end < len(text)) else []
+    if not following:
+        return False
+    bare = [
+        "1" if word == "one" and following[i + 1 : i + 2] and following[i + 1] in _A_NUMBER_OF else word.removesuffix("'s")
+        for i, word in enumerate(following)
+    ]
+    negated = any(word in _REMOVES or word.endswith("n't") for word in bare)
+    doubted = any(word in _NEXT_DOUBT for word in bare)
+    # Naming its item again counts as pointing back at it: "Forget about the CBC."
+    holding = _names("order" if kind == "order" else "allergen")[2]
+    named = {token.text for token in tokens(text[sentence:sentence_end]) if token.text not in STOPWORDS and token.text in holding}
+    pointing = any(word in _POINTS_BACK or word in named for word in bare)
+    # For an allergy: "that" counts only first ("That was her sister actually"), not as a conjunction ("Add a note to
+    # her allergies that the reaction was hives").
+    pointing_at_allergy = bare[0] == "that" or any(word in _POINTS_BACK - {"that"} or word in named for word in bare)
+    return (
+        (len(following) <= BARE_SENTENCE and any(word in _NEXT_DOUBT | _POINTS_BACK or word.endswith("n't") for word in bare))
+        or bare[0] in _NEXT_OPENING
+        or any(word in _POINTS_BACK for word in bare[:3])
+        or (pointing and (negated or doubted))
+        or (kind == ALLERGY_ADDITION and any(word in _ALLERGY_WORDS for word in bare) and (
+            negated or pointing_at_allergy or _SOMEONE_ELSE.search(" ".join(bare)) is not None))
+    )
+
+
+_SOMEONE_ELSE = re.compile(rf"\b(?:{FAMILY})\b", re.IGNORECASE)
+# The headings a proposal may stand under, on a line before it.
+PROPOSAL_HEADINGS = frozenset({"plan", "orders", "labs", "assessment and plan"})
+# A sentence that opens with a condition: "If her fever returns.", "Only if...", "In case...", "Depending on...".
+_CONDITION_OPENING = re.compile(
+    r"\s*(?:(?:only|but|and)\s+)?(?:if|unless|when|whenever|once|should|in case|provided|assuming|depending|until|after|"
+    r"before|pending)\b",
+    re.IGNORECASE,
+)
+_DONE = re.compile(r"\b(?:done|ordered|sent)\b", re.IGNORECASE)
+# How a later sentence opens that takes it back: "No, just the BMP.", "Actually, let's not.", "Wait, that was her sister."
+_LATER_OPENING = frozenset("no not nope never or instead rather actually hold wait".split())
+
+
+def _later_sentences_hold_it(text: str, sentence_end: int) -> bool:
+    """Whether the sentences after a plain instruction that hold no instruction of their own, within TAKEN_BACK_REACH
+    words, take it back or put it off: the first by opening with a condition, or saying a time for later, that it was
+    done already, ordered or sent (unless it opens a step of the plan of its own, "Recheck in one week."); any of them
+    with a retraction (TAKEN_BACK) or opening like one (_LATER_OPENING)."""
+    at, left, first = sentence_end, TAKEN_BACK_REACH, True
+    while at < len(text) and left > 0:
+        end = _sentence_end(text, at + 1)
+        said = text[at + 1 : end]
+        words = [token.text for token in tokens(said)]
+        if not words:
+            if end <= at + 1:
+                break
+            at = end
+            continue
+        if directives(said):
+            return False
+        if first and words[0] not in NEXT_CLAUSE and (
+            _CONDITION_OPENING.match(said) or FOR_LATER.search(said) or PAST.search(said) or _DONE.search(said)
+        ):
+            return True
+        if not first and (TAKEN_BACK.search(said) or words[0] in _LATER_OPENING):
+            return True
+        left -= len(words)
+        at, first = end, False
+    return False
+
+
+def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, int]], start: int, end: int,
+                       at: int) -> tuple[tuple[str, int, int], ...]:
+    """A proposal's warnings: possible_correction, pointing from a correction-like word (WARNING_GAP_WORDS) said after
+    the instruction, in its words or within WARNING_REACH words after them, to the end of those or of its sentence; and
+    near_unclear_passage, as for a value."""
+    warnings: list[tuple[str, int, int]] = []
+    reach = [token for token in words if at < token.start < end] + [token for token in words if token.start >= end][:WARNING_REACH]
+    cue = next((token for token in reach if token.text in (WARNING_GAP_WORDS or ())), None)
+    if cue is not None:
+        warnings.append((POSSIBLE_CORRECTION, cue.start, max(cue.end, min(reach[-1].end, _sentence_end(text, cue.start)))))
+    warnings += [(NEAR_UNCLEAR_PASSAGE, first, last) for first, last in _near_unclear([(start, end)], unclear, words)]
+    return tuple(warnings)

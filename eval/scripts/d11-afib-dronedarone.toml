@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): atrial fibrillation on dronedarone, with an allergy change to leave out. Format: eval/README.md.
 id = "d11-afib-dronedarone"
 voice = "am_michael"
-tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation"]
+tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation", "proposal-trap"]
 noise = ["monitor"]
 dates = []
 drugs = ["apixaban", "dronedarone", "amiodarone"]
@@ -73,3 +73,7 @@ sources = [
     "ECG today shows sinus rhythm with a QTc of 468 no correction 448 milliseconds.",
     "Creatinine 1.1.",
 ]
+
+[[not_proposed]]
+words = "remove the amiodarone allergy"
+why = "not_an_addition"

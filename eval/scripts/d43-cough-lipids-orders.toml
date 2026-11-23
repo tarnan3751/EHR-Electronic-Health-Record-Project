@@ -1,0 +1,58 @@
+# Dictation test script (synthetic): a cough in a former smoker, with two plain orders to propose, one with "fasting" before its item, and a statin started in the plan. Format: eval/README.md.
+id = "d43-cough-lipids-orders"
+voice = "af_heart"
+tags = ["vitals", "numbers", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal"]
+dates = []
+drugs = ["amlodipine", "atorvastatin"]
+forbidden = ["order a fasting lipid panel", "order a chest X-ray"]
+text = """
+Okay this is a follow-up for a [[67-year-old|sixty-seven-year-old]] woman who quit smoking
+[[3 years|three years]] ago {period} She has had a dry cough for about [[6 weeks|six weeks]] {comma} worse at night
+{comma} with no fever {comma} no weight loss and no blood in the sputum {period} She takes amlodipine
+[[5 mg|five milligrams]] daily for blood pressure {period} {new paragraph}
+On examination blood pressure is [[138/84|one thirty-eight over eighty-four]] {comma} heart rate
+[[76|seventy-six]] {comma} oxygen saturation [[97%|ninety-seven percent]] on room air {period} Chest is clear with no
+wheeze {period} {new paragraph}
+Assessment {colon} persistent cough in a former smoker {comma} and raised cardiovascular risk {period}
+{new paragraph}
+Plan {colon} start atorvastatin [[20 mg|twenty milligrams]] at night {period} Go ahead and order a fasting lipid
+panel {period} Also order a chest X-ray today {period} Continue amlodipine {period} Review in clinic with the results
+{period}
+"""
+
+[gold.subjective]
+value = "A 67-year-old woman who quit smoking 3 years ago. She has had a dry cough for about 6 weeks, worse at night, with no fever, no weight loss and no blood in the sputum. She takes amlodipine 5 mg daily for blood pressure."
+sources = [
+    "a 67-year-old woman who quit smoking 3 years ago.",
+    "She has had a dry cough for about 6 weeks, worse at night, with no fever, no weight loss and no blood in the sputum.",
+    "She takes amlodipine 5 mg daily for blood pressure.",
+]
+
+[gold.objective]
+value = "Blood pressure is 138/84, heart rate 76, oxygen saturation 97% on room air. Chest is clear with no wheeze."
+sources = [
+    "blood pressure is 138/84, heart rate 76, oxygen saturation 97% on room air.",
+    "Chest is clear with no wheeze.",
+]
+
+[gold.assessment]
+value = "Persistent cough in a former smoker, and raised cardiovascular risk."
+sources = ["persistent cough in a former smoker, and raised cardiovascular risk."]
+
+[gold.plan]
+value = "Start atorvastatin 20 mg at night. Continue amlodipine. Review in clinic with the results."
+sources = [
+    "start atorvastatin 20 mg at night.",
+    "Continue amlodipine.",
+    "Review in clinic with the results.",
+]
+
+[[proposals]]
+kind = "order"
+words = "order a fasting lipid panel"
+item = "fasting lipid panel"
+
+[[proposals]]
+kind = "order"
+words = "order a chest X-ray"
+item = "chest X-ray"

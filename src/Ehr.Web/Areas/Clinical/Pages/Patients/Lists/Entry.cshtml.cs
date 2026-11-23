@@ -15,6 +15,14 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Lists;
 // before there were codes keeps its name until it is changed. Nothing is deleted: an entry that no longer applies is
 // given another status. The database keeps every change (ehr.chart_history) and records the write.
 //
+// An allergy the clinician's dictation proposed (the expansion plan's step 15) is added with this form too
+// (allergies?proposal=<proposal>), from the dictation's review: the clinician's words are shown at the top, marked in the
+// sentence they were said in, and nothing is filled in from them; the substance, picked from the codes, the reaction and
+// the rest are the clinician's, and the allergy is active. "Save allergy" adds it and decides the proposal with it, in
+// one transaction, and goes back to the review; the database holds the proposal to a coded allergy added now by this
+// clinician. If the proposal was decided first, in another tab, nothing is saved, the allergy included, and the form
+// says so. A sign-in drops the proposal's ID, as it drops any query: the clinician opens it from the review again.
+//
 // The order form's rule: only for a patient on the clinician's panel; anyone else, a clinician under emergency access
 // included, is sent back to the chart before anything is read. Off-site, the cloud app forwards the post; when it
 // can't, its "Not saved" page shows what was typed again (UC 2, ShownIfNotSaved).
@@ -75,6 +83,20 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
 
     public ChartEntryForm Form { get; private set; } = null!;
 
+    // Step 15: the allergy the clinician's dictation proposed, from the query string, and how its review shows it.
+    [BindProperty(SupportsGet = true)]
+    public Guid? Proposal { get; set; }
+
+    public Notes.ProposedFromDictation? Proposed { get; private set; }
+
+    // Set when the proposal was decided first, in another tab: nothing was saved.
+    public bool ProposalDecided { get; private set; }
+
+    // Where the proposal's review is, to go back to it.
+    public string? ReviewLink => Proposed is { } proposed
+        ? Url.Page("/Patients/Notes/Review", new { patientId = proposed.Row.PatientId, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId })
+        : null;
+
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
     public (string Table, string Kind, string One, string Label) About => Lists[List];
@@ -82,8 +104,10 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
     public bool IsNew => EntryId is null;
 
     // The statuses a form offers, with the words the chart uses for them.
+    // An allergy a dictation proposed is added as one the patient has (step 15).
     public IReadOnlyList<(string Code, string Name)> Statuses => List switch
     {
+        "allergies" when Proposal is not null => [(AllergyClinicalStatus.Active, "Active")],
         "allergies" => [(AllergyClinicalStatus.Active, "Active"), (AllergyClinicalStatus.Inactive, "Inactive"), (AllergyClinicalStatus.Resolved, "Resolved")],
         "medications" =>
         [
@@ -197,6 +221,31 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         }
 
         var entryId = EntryId ?? Guid.CreateVersion7();
+        if (Proposed is { } proposed)
+        {
+            var added = await lists.AddProposedAsync(new AllergyIntolerance
+            {
+                Id = entryId,
+                PatientId = id,
+                Code = code!.Code,
+                CodeSystem = code.System,
+                Display = code.Display,
+                ClinicalStatus = AllergyClinicalStatus.Active,
+                Category = code.Category,
+                Criticality = Criticality,
+                Reaction = Blank(Reaction),
+                Severity = Severity,
+                RecordedAt = DateTimeOffset.UtcNow,
+            }, proposed.Row.Id, HttpContext.RequestAborted);
+            return added switch
+            {
+                ProposedAllergy.Saved => Redirect(Url.Page("/Patients/Notes/Review",
+                    new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId, decided = proposed.Row.Id })!),
+                ProposedAllergy.Decided => ProposalNotDecided(),
+                _ => RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id)),
+            };
+        }
+
         var saved = List switch
         {
             "allergies" => await lists.SaveAsync(new AllergyIntolerance
@@ -244,6 +293,14 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         return Redirect(Url.Page("/Patients/Chart", Search.ChartRouteValues(id)) + $"#chart-{List}");
     }
 
+    // Nothing saved, the allergy included: the dictation's proposal was decided first, in another tab.
+    PageResult ProposalNotDecided()
+    {
+        ProposalDecided = true;
+        Response.StatusCode = StatusCodes.Status409Conflict;
+        return Page();
+    }
+
     static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     static string? Date(DateOnly? date) => date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -278,12 +335,34 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
             return RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
         }
 
-        if (await phi.ChartEntryAsync(id, About.Table, EntryId, HttpContext.RequestAborted) is not { } form)
+        // An allergy a dictation proposed is a new allergy (step 15).
+        if (Proposal is not null && (List != "allergies" || EntryId is not null))
+        {
+            return BadRequest();
+        }
+
+        if (await phi.ChartEntryAsync(id, About.Table, EntryId, HttpContext.RequestAborted, Proposal) is not { } form)
         {
             return NotFound();
         }
 
         Form = form;
+        if (Proposal is not null)
+        {
+            if (form.Proposal is null || Notes.ProposedFromDictation.From(form.Proposal) is not { } proposed)
+            {
+                // Not an allergy proposed from this clinician's dictation of this patient: nothing to open.
+                return HttpMethods.IsPost(Request.Method) ? NotFound() : RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
+            }
+
+            Proposed = proposed;
+            if (!proposed.Waiting)
+            {
+                // Decided already: a post says so; a link goes back to the review, which shows the decision.
+                return HttpMethods.IsPost(Request.Method) ? ProposalNotDecided() : Redirect(ReviewLink!);
+            }
+        }
+
         // An entry that isn't this patient's, or doesn't exist: back to the chart, which lists what does.
         return EntryId is not null && form.Allergy is null && form.Medication is null && form.Condition is null
             ? RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id))

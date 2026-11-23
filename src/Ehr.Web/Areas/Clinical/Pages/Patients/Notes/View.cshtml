@@ -31,6 +31,7 @@ else
 {
     <p class="sc-notice sc-notice--success" role="status">This note is signed and permanently saved to the clinical record.</p>
 }
+<partial name="_WaitingProposals" model="(Model.Note.DraftId, Model.WaitingProposals, true)" />
 @if (Model.Note.Sensitive)
 {
     <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive note:</span> your view of it is recorded.</p>

@@ -104,9 +104,14 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
     // while the request waits and the medication is active (77-refill-requests.sql). Answered when someone answered the request
     // first, NotRenewable when its medication is no longer active or the order isn't one that renews it; nothing is
     // saved then, not the order either.
+    //
+    // An order the clinician's dictation proposed (`proposal`, step 15) is signed as any order is, every rule and check
+    // with it, and decides the proposal, in the same savepoint: the database holds the proposal to an order signed now,
+    // by this clinician (55-ai-review.sql). ProposalDecided when the proposal was decided first; nothing is saved then,
+    // not the order either.
     public async Task<(Order? Order, SignRefusal? Refusal)> SignAsync(
         Guid patient, OrderCatalogItem item, string details, string? duplicateReason, CancellationToken cancellationToken,
-        Guid? replaces = null, string? changeReason = null, string? safetyReason = null, Guid? refill = null)
+        Guid? replaces = null, string? changeReason = null, string? safetyReason = null, Guid? refill = null, Guid? proposal = null)
     {
         var order = new Order
         {
@@ -136,6 +141,11 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
             if (refusal is null && refill is { } request)
             {
                 refusal = await AnswerRefillAsync(request, patient, order.Id, cancellationToken);
+            }
+
+            if (refusal is null && proposal is { } proposed)
+            {
+                refusal = await DecideProposalAsync(proposed, patient, order.Id, cancellationToken);
             }
         }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
@@ -190,6 +200,33 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.CheckViolation or PostgresErrorCodes.UniqueViolation } refusal)
         {
             return refusal.ConstraintName == "refill_requests_answered" ? SignRefusal.Answered : SignRefusal.NotRenewable;
+        }
+        finally
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
+    // Decides the dictation's proposal with the order just signed for it (step 15): the two columns the apps may write for
+    // it, on the row only while it waits. Null when decided; ProposalDecided when it was decided first.
+    async Task<SignRefusal?> DecideProposalAsync(Guid proposal, Guid patient, Guid order, CancellationToken cancellationToken)
+    {
+        // A stand-in for the row, with its key and the state it must still be in: only the decision is sent.
+        var row = new AiChartProposal { Id = proposal, PatientId = patient, Kind = AiChartProposalKinds.Order, State = AiChartProposalStates.Pending };
+        var entry = db.Attach((object)row);
+        row.State = AiChartProposalStates.Ordered;
+        row.OrderId = order;
+        entry.Property(nameof(AiChartProposal.State)).IsModified = true;
+        entry.Property(nameof(AiChartProposal.OrderId)).IsModified = true;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return null;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // No waiting proposal this clinician may decide: decided first, in another tab.
+            return SignRefusal.ProposalDecided;
         }
         finally
         {
@@ -272,4 +309,7 @@ public enum SignRefusal
 
     // The refill request's medication is no longer active, or the order doesn't renew it (step 13d).
     NotRenewable,
+
+    // The dictation's proposal the order was signed for was decided first, in another tab (step 15).
+    ProposalDecided,
 }

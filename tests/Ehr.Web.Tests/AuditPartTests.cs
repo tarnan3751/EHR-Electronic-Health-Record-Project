@@ -117,6 +117,11 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("refill order form", "patients refills")]
     [InlineData("note editor", "clinical_drafts note-draft", "patients note-draft")]
     [InlineData("note vital signs", "patients vitals")]
+    [InlineData("dictation review", "ai_chart_proposals note-draft", "ai_field_proposals note-draft", "ai_note_reviews note-draft", "clinical_drafts note-draft", "patients note-draft")]
+    [InlineData("proposed order form", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "patients orders")]
+    [InlineData("proposed allergy form", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "patients lists")]
+    [InlineData("note editor with proposals", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "clinical_drafts note-draft", "patients note-draft")]
+    [InlineData("signed note with proposals", "ai_chart_proposals visit-note", "ai_note_reviews visit-note", "clinical_notes visit-note", "patients visit-note")]
     public async Task Each_api_and_page_that_needs_an_entry_records_its_part(string what, params string[] reads)
     {
         var (clinician, session, patient) = await PatientAsync();
@@ -165,6 +170,22 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
                 var refill = await RefillRequestTests.RequestIdAsync(apps, patient.Patient);
                 var refillPath = what == "refill review" ? RefillRequestTests.ReviewPath(patient.Patient, refill) : RefillRequestTests.ApprovePath(patient.Patient, refill);
                 request = () => session.Client.GetAsync(refillPath, Cancel);
+                break;
+            case "dictation review" or "proposed order form" or "proposed allergy form" or "note editor with proposals":
+                // Step 15: what a dictation proposes, read on its review, on the forms opened from it, and on its note.
+                var dictated = await DictationProposalTests.DictateAsync(apps, session, patient.Patient);
+                var proposed = what switch
+                {
+                    "dictation review" => dictated.ReviewPath,
+                    "proposed order form" => DictationProposalTests.OrderFormPath(patient.Patient, dictated.Order),
+                    "proposed allergy form" => DictationProposalTests.AllergyFormPath(patient.Patient, dictated.Allergy),
+                    _ => $"{chart}/notes/drafts/{dictated.Draft}",
+                };
+                request = () => session.Client.GetAsync(proposed, Cancel);
+                break;
+            case "signed note with proposals":
+                var signedNote = await DictationProposalTests.SignNoteAsync(apps, await DictationProposalTests.DictateAsync(apps, session, patient.Patient));
+                request = () => session.Client.GetAsync(signedNote, Cancel);
                 break;
             case "note editor" or "note vital signs":
                 // A draft's editor, and the vital signs it offers for Objective when asked (step 14).

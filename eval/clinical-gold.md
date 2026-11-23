@@ -2,13 +2,14 @@
 
 Written by `uv run --project eval python -m ehr_eval.goldreport` (`ehr_eval/goldreport.py`); don't edit it. Each script's display text is read as its transcript, and its clinical gold (`[gold.*]`), what a careful clinician would accept, is checked by the dictation service's own checks (`validation.py` in the sidecar). These are the values they would discard, with why, and the rule-following gold (`[gold_rules.*]`) that the eval measures the pipeline against instead. See README.md, Two gold sets.
 
-63 of 161 clinical gold values would be discarded. By reason (a value can have more than one):
+63 of 195 clinical gold values would be discarded. By reason (a value can have more than one):
 
 | Reason | Values |
 |---|---|
-| `words_out_of_order` | 36 |
+| `words_out_of_order` | 37 |
 | `unsupported_content` | 26 |
-| `negation_dropped` | 4 |
+| `negation_dropped` | 3 |
+| `certainty_dropped` | 1 |
 | `drug_not_in_sources` | 1 |
 | `experiencer_dropped` | 1 |
 
@@ -112,7 +113,7 @@ Reasons: `words_out_of_order`
 
 ## d09-mash-resmetirom: subjective
 
-Reasons: `unsupported_content`
+Reasons: `certainty_dropped`, `unsupported_content`
 
 - Clinical gold: 58-year-old man referred with metabolic dysfunction associated steatohepatitis. Type 2 diabetes, high blood pressure and obesity. Drinks alcohol rarely, about one beer a month. No jaundice, no confusion, no swelling of the abdomen, no bleeding. Medications: metformin, semaglutide 1 mg weekly, lisinopril, rosuvastatin 40 mg. Lost 7 kg since starting semaglutide. No gallbladder problems.
 - Rule-following gold: This is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis. He has type 2 diabetes, high blood pressure and obesity. He drinks alcohol rarely, maybe one beer a month. No jaundice, no confusion, no swelling of the abdomen and no bleeding. His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg. He has lost 7 kg since starting semaglutide. No gallbladder problems.
@@ -242,13 +243,6 @@ Reasons: `unsupported_content`
 
 - Clinical gold: Episodic migraine without aura, improving, with good response to zavegepant for acute attacks.
 - Rule-following gold: Episodic migraine without aura, improving, good response to zavegepant for acute attacks.
-
-## d21-iga-sparsentan: subjective
-
-Reasons: `negation_dropped`
-
-- Clinical gold: 41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. On losartan 100 mg daily and dapagliflozin 10 mg daily. Feels well. No visible blood in the urine since the first episode, no swelling, no rashes, no joint pains. Does not smoke, drinks very little. Father needed dialysis in his sixties; mother has high blood pressure. Works as a teacher and wants to keep working full time.
-- Rule-following gold: 41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily. He feels well. No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains. He does not smoke and drinks very little. His father needed dialysis in his sixties and his mother has high blood pressure. He works as a teacher and wants to keep working full time.
 
 ## d21-iga-sparsentan: objective
 
@@ -452,3 +446,10 @@ Reasons: `unsupported_content`
 
 - Clinical gold: Blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today: sinus rhythm with no ischemic changes.
 - Rule-following gold: Examination: blood pressure 152/94 and 148/90 on a repeat check, heart rate 84 and regular, BMI 33. Heart sounds normal with no murmur. Chest clear. No edema. Results he brought: LDL 132, A1c 6.4, uric acid 8.9. ECG today shows sinus rhythm with no ischemic changes.
+
+## d51-hives-allergies-said-plainly-or-not: subjective
+
+Reasons: `words_out_of_order`
+
+- Clinical gold: A 41-year-old woman with a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year.
+- Rule-following gold: A 41-year-old woman about a rash after amoxicillin. She developed hives on her arms on the third day of the course, with no lip swelling and no trouble breathing. The hives settled within two days of stopping it. Her daughter had a similar rash with penicillin last year.
