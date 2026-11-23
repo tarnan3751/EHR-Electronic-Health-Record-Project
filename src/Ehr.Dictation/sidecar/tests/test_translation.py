@@ -876,3 +876,37 @@ def test_what_the_english_says_in_a_way_the_checks_cant_compare_is_refused(text,
 ])
 def test_what_the_english_says_as_the_spanish_does_is_offered(text, english):
     assert reasons(text, [text], english) == []
+
+
+# ---- Opposites, and findings the allowance mustn't add (sentences outside the test set) -----------------------------
+
+
+@pytest.mark.parametrize(("text", "english", "reason"), [
+    ("Paciente tranquila, sin cambios.", "Calm patient, no changes, suicidal ideation.", "finding_not_in_sources"),
+    ("Tos seca de una semana.", "Dry cough for a week, cancer diagnosed.", "finding_not_in_sources"),
+    ("Dolor abdominal leve.", "Mild abdominal pain, pregnancy confirmed.", "finding_not_in_sources"),
+    ("Disnea en reposo.", "Dyspnea at rest, intubate now.", "finding_not_in_sources"),
+    ("Exantema en el tronco.", "Rash on the trunk, sulfa allergy.", "polarity_changed"),
+    ("Hipotensión ortostática.", "Orthostatic hypertension.", "polarity_changed"),
+    ("Taquicardia sinusal.", "Sinus bradycardia.", "polarity_changed"),
+    ("Glucosa baja esta mañana.", "High glucose this morning.", "polarity_changed"),
+    ("La tos está peor.", "The cough is better.", "polarity_changed"),
+    ("Diabetes mal controlada.", "Controlled diabetes.", "polarity_changed"),
+    ("Tolera la penicilina.", "Allergic to penicillin.", "polarity_changed"),
+])
+def test_an_opposite_or_a_finding_the_spanish_doesnt_say_is_refused(text, english, reason):
+    assert reason in reasons(text, [text], english)
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Glucosa alta esta mañana.", "High glucose this morning."),
+    ("Hipotensión ortostática.", "Orthostatic hypotension."),
+    ("La tos está mejor.", "The cough is better."),
+    ("Diabetes mal controlada.", "Poorly controlled diabetes."),
+    ("Dolor lumbar.", "Low back pain."),  # anatomy, not a level
+    ("Solución salina 500 ml.", "Normal saline 500 ml."),
+    ("Disminución de la sensibilidad.", "Decreased sensation."),
+    ("Prueba de embarazo hoy.", "Pregnancy test today."),
+])
+def test_an_opposite_or_a_finding_the_spanish_says_is_offered(text, english):
+    assert reasons(text, [text], english) == []

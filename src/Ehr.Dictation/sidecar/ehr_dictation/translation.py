@@ -101,8 +101,14 @@ statement:
      that says the Spanish in another order is refused as well ("Amlodipino y losartán" as "Losartan and amlodipine"):
      the checks can't tell a reordering from a swap. A frequency read two ways may be written both ways in its place
      ("cada tercer día" as "every other day or every third day");
+   - opposites (POLARITY: high, low or normal; better or worse; controlled or not; allergic or tolerating; positive or
+     negative; hyper- or hypo-, tachy- or brady-): no more (polarity_changed), so "hipotensión" is not "hypertension",
+     nor "mal controlada" "controlled"; and pregnancy, suicide, cancer and intubation (FINDINGS): no more
+     (finding_not_in_sources), so the words the next check allows can't add "suicidal ideation" or "cancer
+     diagnosed";
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
-     model added ("continue metformin and check kidney function" from "continuar metformina").
+     model added ("continue metformin and check kidney function" from "continuar metformina"). Any other content word
+     is unchecked: what it means is the clinician's to compare.
 5. If any statement fails, the whole field is discarded, as an English value is.
 
 What these don't check: the meaning of every other word. "dolor abdominal leve" translated "mild chest pain" passes
@@ -143,7 +149,10 @@ MAX_QUOTES = _SCHEMA["spanish"]["maxItems"]
 MAX_QUOTE = _SCHEMA["spanish"]["items"]["maxLength"]
 MAX_ENGLISH = _SCHEMA["english"]["maxLength"]
 MAX_SPANISH = 400  # UTF-16 code units of the transcript a statement's sources cover, as the on-prem app counts them
-EXTRA_WORDS = 2  # content words the English of a statement may have beyond its Spanish
+# Content words the English of a statement may have beyond its Spanish: the most the gold needs, 1 in the scripts and 2
+# in the hold-outs ("Lasègue positivo" is "Positive Lasègue sign"). What those words may say that matters most is
+# compared on its own: opposites (POLARITY), findings (FINDINGS), what can be ordered (ORDERABLES).
+EXTRA_WORDS = 2
 CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected value starts
 WARNING_REACH = validation.WARNING_REACH
 NEAR_UNCLEAR = validation.NEAR_UNCLEAR
@@ -192,6 +201,8 @@ REASONS = (
     "experiencer_dropped",
     "experiencer_added",
     "experiencer_changed",
+    "polarity_changed",
+    "finding_not_in_sources",
     "translation_adds_words",
 )
 LOCATING = frozenset({"source_too_short", "source_not_in_transcript", "source_in_unclear_passage"})
@@ -1328,6 +1339,81 @@ def english_orderables(text: str) -> set[str]:
     return {name for name, pattern in ENGLISH_ORDERABLES if pattern.search(text)}
 
 
+# Opposites, each class with its English and its Spanish words (keys): an English one the Spanish doesn't say is
+# refused (polarity_changed): "hipotensión" is not "hypertension", nor "peor" "better", "mal controlada" "controlled",
+# "negativo" "positive". Matched longest first, so "poorly controlled" is not "controlled".
+POLARITY = {
+    "level": {"high": (r"high|elevated|raised", "alta alto altas altos elevada elevado elevadas elevados aumentada "
+                       "aumentado aumentadas aumentados aumento elevacion"),
+              "low": (r"low(?! back)|lowered|decreased|reduced|diminished",
+                      "baja bajo bajas bajos disminuida disminuido disminuidas disminuidos reducida reducido descendida "
+                      "descendido disminucion descenso reduccion"),
+              "normal": (r"normal(?! saline)|unremarkable|within normal limits", "normal normales")},
+    "course": {"better": (r"better|improved|improving|improvement|improves", "mejor mejora mejoria mejorado mejorada "
+                          "mejorando mejoro mejoran"),
+               "worse": (r"worse|worsened|worsening|deteriorated|deteriorating|worsens", "peor empeora empeoramiento "
+                         "empeorado empeorada empeorando empeoro empeoran")},
+    "control": {
+        "uncontrolled": (r"poorly controlled|not controlled|uncontrolled|badly controlled|out of control",
+                         "mal controlada|mal controlado|no controlada|no controlado|descontrolada|descontrolado"),
+        "controlled": (r"(?:well[- ])?controlled|under control",
+                       "controlada|controlado|controladas|controlados|bajo control"),
+    },
+    "tolerance": {"allergic": (r"allergic|allerg(?:y|ies)", "alergico alergica alergicos alergicas alergia alergias"),
+                  "tolerates": (r"tolerates|tolerated|tolerating|tolerance|tolerating", "tolera toleran tolero "
+                                "tolerado tolerada tolerancia")},
+    "result": {"positive": (r"positive", "positivo positiva positivos positivas"),
+               "negative": (r"negative", "negativo negativa negativos negativas")},
+    "prefix": {"hyper": (r"hyper\w+", "hiper"), "hypo": (r"hypo\w+", "hipo"), "tachy": (r"tachy\w+", "taqui"),
+               "brady": (r"brady\w+", "bradi")},
+}
+# Findings an English statement may never add: what the Spanish it cites doesn't say (finding_not_in_sources).
+FINDINGS = {
+    "pregnancy": (r"pregnan\w*|gestation\w*|gravid", "embarazada embarazadas embarazo embarazos gestacion gestante "
+                  "gestantes encinta"),
+    "suicide": (r"suicid\w*", "suicida suicidas suicidio suicidios autolitica autolitico"),
+    "cancer": (r"cancers?|malignan\w*|carcinomas?|neoplasm\w*|tumou?rs?|metasta\w*|oncolog\w*",
+               "cancer canceres maligno maligna malignidad carcinoma carcinomas neoplasia neoplasias tumor tumores "
+               "tumoracion metastasis oncologico oncologica"),
+    "intubation": (r"intubat\w*", "intubar intubacion intubado intubada intubele intubarlo intubarla"),
+}
+
+
+def _polarities(english: str, said: list[spanish.Token]) -> tuple[set[str], set[str]]:
+    """The opposites (POLARITY) the English says, and those the Spanish does, as "class:value"."""
+    lowered = english.lower()
+    keys = [t.key for t in said]
+    written, spoken = set(), set()
+    for name, values in POLARITY.items():
+        taken: list[tuple[int, int]] = []
+        for value, (english_words, _) in sorted(values.items(), key=lambda v: -len(v[1][0])):
+            for match in re.finditer(rf"\b(?:{english_words})\b", lowered):
+                if not any(start <= match.start() < end for start, end in taken):
+                    taken.append(match.span())
+                    written.add(f"{name}:{value}")
+        if name == "prefix":
+            spoken |= {f"{name}:{value}" for value, (_, prefix) in values.items()
+                       if any(key.startswith(prefix) and len(key) >= len(prefix) + 4 for key in keys)}
+            continue
+        phrases = [(tuple(phrase.split()), value) for value, (_, words) in values.items()
+                   for phrase in words.split("|" if "|" in words else " ")]
+        for first, last in _phrase_spans(keys, [phrase for phrase, _ in phrases]):
+            spoken |= {f"{name}:{value}" for phrase, value in phrases if tuple(keys[first : last + 1]) == phrase}
+    return written, spoken
+
+
+def _phrase_spans(keys: list[str], phrases: list[tuple[str, ...]]) -> list[tuple[int, int]]:
+    """Where the phrases are said, longest first, none overlapping ("mal controlada" before "controlada")."""
+    return spanish._matches(keys, sorted(set(phrases), key=len, reverse=True))
+
+
+def _findings(english: str, said: list[spanish.Token]) -> bool:
+    """Whether the English names a finding of FINDINGS the Spanish doesn't."""
+    keys = {t.key for t in said}
+    return any(re.search(rf"\b(?:{english_words})\b", english, re.IGNORECASE) and not keys & set(spanish_words.split())
+               for english_words, spanish_words in FINDINGS.values())
+
+
 HAVING_NOW = re.compile(r"\b(?:is|are|am) having\b|\bcurrent(?:ly)?\b|\bnow\b|\bongoing\b|\bactive\b", re.IGNORECASE)
 # What ends a qualifier's carrying over an English list, as spanish.LIST_STOPS does the Spanish: "No fever, cough or
 # dyspnea" carries, "No fever, has a cough" doesn't.
@@ -1730,6 +1816,14 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         reasons.add("experiencer_changed")
 
     reasons |= _in_order(english, said_index, terms, ctx, set(reasons))
+
+    written, spoken = _polarities(english, said)
+    # "Uncontrolled", "negative": a negation, which the negation check compares.
+    negated = {"control", "result"} if reasons & {"negation_added", "negation_dropped"} else set()
+    if any(said_as.split(":")[0] not in negated for said_as in written - spoken):
+        reasons.add("polarity_changed")
+    if _findings(english, said):
+        reasons.add("finding_not_in_sources")
 
     if english_content(english) > spanish_content(said) + EXTRA_WORDS:
         reasons.add("translation_adds_words")
