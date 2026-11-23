@@ -18,8 +18,9 @@ checked, and the measures only once every item is in, so a fault in the checks o
 far for --rescore to finish without the models. At the end it prints, for someone to read (scoring_es.py's header):
 every passage of the scripts that mix English into Spanish, and of the English script dictated as Spanish, as Whisper
 wrote it, with the probability that it was Spanish (code_switching), for Spanish nobody said; every passage the
-no-speech rule alone left out, with its time span, both probabilities and words, and their total (no_speech_only); and
-how long Spanish passes held the transcription lock English dictations share, each clean recording's longest hold
+no-speech rule alone left out, with its time span, both probabilities and words, and their total (no_speech_only); every
+statement offered from a passage whose number reads two ways, with the passage (ambiguous_offered); and how long
+Spanish passes held the transcription lock English dictations share, each clean recording's longest hold
 while its chunks came in and its final pass's after stop, and what that means for an English dictation on that machine
 (live.lock). Every clean recording dictated in Spanish is fed in one-second chunks and stopped for that (--no-live skips
 it): the CPU timing step is run with --device cpu --only e09 e14 e15.
@@ -146,7 +147,8 @@ async def main_async(args: argparse.Namespace, api_key: str) -> int:
 
     save(items, scoring_es.score_audio(items, scripts, english))
     metrics = json.loads(args.out.read_text(encoding="utf-8"))["metrics"]
-    print("\n".join([code_switching(metrics), no_speech_only(metrics), english_waits(metrics, args.device)]))
+    print("\n".join([code_switching(metrics), no_speech_only(metrics), ambiguous_offered(metrics),
+                     english_waits(metrics, args.device)]))
     print(f"Wrote {args.out}")
     return 0
 
@@ -162,6 +164,17 @@ def no_speech_only(metrics: dict) -> str:
         for passage in entry["passages"]:
             lines.append(f"    {passage['start']:.1f}-{passage['end']:.1f} s  {passage['no_speech']:.3f}  "
                          f"{passage['mean_log_probability']:.3f}  {passage['text']}")
+    return "\n".join(lines)
+
+
+def ambiguous_offered(metrics: dict) -> str:
+    """Every statement offered from a passage whose number reads two ways ("heparina 5.000 unidades", e16), recordings
+    and texts, with the passage as heard."""
+    listed = metrics["ambiguous_offered"]["listed"] + metrics["text"]["ambiguous_offered"]["listed"]
+    lines = ["", f"Statements offered from a passage whose number reads two ways, a field e16's gold leaves for the "
+                 f"clinician: {len(listed)} (variant, field, written two ways in the transcript, statement, passage):"]
+    lines += [f"  {entry['variant']} {entry['field']} {'yes' if entry['written_two_ways'] else 'no'}: "
+              f"{entry['statement']}  <-  {entry['passage']}" for entry in listed]
     return "\n".join(lines)
 
 

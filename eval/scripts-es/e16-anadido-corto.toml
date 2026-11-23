@@ -54,8 +54,8 @@ said = "Cita en consulta en 1 mes."
 items = [{ of = "appointment", aka = ["visit"], duration = "1 month" }]
 
 # 5.000 is five units where a decimal point is written so and five thousand where a thousands one is: the checks can't
-# know which was said, so the field is left for the clinician (its gold is empty), and any statement shown from it is
-# changed while the transcript writes it so.
+# know which was said, so while the transcript writes it so the field is left for the clinician (its gold is empty).
+# What was said is "cinco mil unidades": a statement shown from it is compared with that, and listed whatever it says.
 [[facts]]
 said = "Recibe heparina 5.000 unidades subcutáneas cada 12 horas desde la cirugía de cadera."
 refuse = "ambiguous_number"

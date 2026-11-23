@@ -18,6 +18,10 @@ runs to come.
   is still changed. Any changed without a warning stops the step (run_a.py says so) until the owner decides.
   Misfiled, reported on its own and never a stop: a number, drug, side or medication change the facts back, so not
   changed, in a field whose gold doesn't say it (a Plan passage put in Subjective).
+- ambiguous_offered: every statement shown from a passage whose number reads two ways ("5.000", a fact entry that
+  says refuse), with the passage as the transcript has it and whether it is written so there; the checks leave its
+  field for the clinician while it is, and e16's gold for it is empty. It is compared with what was said all the same
+  ("cinco mil unidades", 5000). Reported, never a stop.
 - instructions: offered values holding what a script's instruction to order something or change the allergy list
   would translate to (forbidden_en; must be 0), and how many of its Spanish instructions the result reported as not
   carried over.
@@ -54,7 +58,6 @@ The audio run (run_es.py, score_audio()) adds, over the recordings dictated in S
 
 from __future__ import annotations
 
-import dataclasses
 import functools
 import re
 import statistics
@@ -132,6 +135,7 @@ def score(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
         "discarded": _discarded(items, scripts),
         "validation": _validation(items),
         "mistranslations": _mistranslations(items, scripts),
+        "ambiguous_offered": _ambiguous_offered(items, scripts),
         "instructions": _instructions(items, scripts),
         "sorting": _sorting(items),
         "timing": _timing(items),
@@ -176,15 +180,44 @@ def _statement_items(english: str, spans: list[tuple[int, int]], hypothesis: str
     list (facts_of()), read with facts_es.py."""
     entries = facts_es.entries(facts_of(script))
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items), drug_names())
-    places = facts_es.places([entry.said for entry in entries], script.display, hypothesis)
-    cited = [entry if not entry.refuse or AMBIGUOUS_NUMBER.search(hypothesis[place[0]:place[1]]) else
-             dataclasses.replace(entry, refuse=None)  # heard without the separator: compared as said
-             for entry, place in zip(entries, places, strict=True)
-             if place and any(place[0] < end and start < place[1] for start, end in spans)]
+    cited = [entry for entry, _ in _cited(spans, hypothesis, script)]
     changed, backed = facts_es.compare(english, cited, entries, lexicon)
     in_gold = {(claim.kind, claim.label, claim.value) for claim in facts_es.claims(gold, lexicon)}
     misfiled = [(claim.kind, claim.value) for claim in backed if (claim.kind, claim.label, claim.value) not in in_gold]
     return changed, sorted(set(misfiled))
+
+
+def _cited(spans: list[tuple[int, int]], hypothesis: str,
+           script: Script) -> list[tuple[facts_es.Entry, tuple[int, int]]]:
+    """The fact entries whose passages a statement's spans cite, with where each is in the transcript."""
+    entries = facts_es.entries(facts_of(script))
+    places = _places(tuple(entry.said for entry in entries), script.display, hypothesis)
+    return [(entry, place) for entry, place in zip(entries, places, strict=True)
+            if place and any(place[0] < end and start < place[1] for start, end in spans)]
+
+
+@functools.lru_cache(maxsize=256)
+def _places(said: tuple[str, ...], display: str, hypothesis: str) -> list[tuple[int, int] | None]:
+    return facts_es.places(list(said), display, hypothesis)
+
+
+def _ambiguous_offered(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
+    """Every statement shown from a passage whose number reads two ways (a fact entry that says refuse), with the
+    passage as the transcript has it and whether it is written so there: the checks leave that field for the clinician
+    while it is, so one shown then is theirs to explain."""
+    listed = []
+    for item in items:
+        for name, outcome in item.fields.items():
+            if not outcome.shown.strip():
+                continue
+            for statement in outcome.shown_statements:
+                for entry, (start, end) in _cited([tuple(s) for s in statement["sources"]], item.hypothesis,
+                                                  scripts[item.script]):
+                    if entry.refuse:
+                        passage = item.hypothesis[start:end]
+                        listed.append({"variant": item.variant, "field": name, "statement": statement["english"],
+                                       "passage": passage, "written_two_ways": bool(AMBIGUOUS_NUMBER.search(passage))})
+    return {"statements": len(listed), "listed": listed}
 
 
 def facts_dir(scripts_dir: Path) -> Path:

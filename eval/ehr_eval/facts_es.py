@@ -20,10 +20,10 @@ polarity (POLARITY's keys: "high", "uncontrolled", "better"...; a hyper- or hypo
 (ACTIONS' keys, in a past form, "stopped", "took", when it was said in the past), negated (true for a finding said to
 be absent, false for one said to be present), doubt (true when it is said with doubt: "posible", "probable",
 "compatible con", "descartar"), history (true when it is the patient's past), who (the relative who has it). An entry
-whose passage holds a number written so that it reads two ways ("5.000") also says refuse = "ambiguous_number": while
-the transcript writes the number so, no statement citing it may be shown at all (scoring_es.py), since the checks
-can't know which reading was said and leave the field for the clinician; heard without the separator, its items are
-compared as any others.
+whose passage holds a number written so that it reads two ways ("5.000") also says refuse = "ambiguous_number": the
+checks can't know which reading was said and leave its field for the clinician while the transcript writes it so. Its
+items say what was said ("cinco mil unidades", 5000 units), and a statement shown from it is compared with them as any
+other, however the transcript writes the number; scoring_es.py lists every one shown (ambiguous_offered).
 
 The reading of a statement's English (claims()): it is cut into clauses at commas, semicolons, full stops and "and",
 "or", "but", "then"; each name of an item (the script's, VITALS', the drug list's) is found in it; each number with
@@ -585,8 +585,6 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
             lexicon: Lexicon) -> tuple[list[tuple[str, str, bool]], list[Claim]]:
     """What the English changes from the items of the entries it cites, each (kind, what, said elsewhere in the
     script); and what it says that they back, of the kinds a misfiling is told by (drug, number, side, action)."""
-    if any(entry.refuse for entry in cited):
-        return [("number", f"{entry.refuse}: {entry.said}", False) for entry in cited if entry.refuse], []
     items = [item for entry in cited for item in entry.items]
     everywhere = [item for entry in script for item in entry.items]
     said = claims(english, lexicon)

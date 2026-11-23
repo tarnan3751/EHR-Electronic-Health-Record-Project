@@ -12,7 +12,7 @@ import sys
 import pytest
 
 from dictation_scripts_es import HOLDOUT_DIR, load_scripts
-from ehr_eval import facts_es, scoring_es
+from ehr_eval import facts_es, run_es, scoring_es
 from ehr_eval.scripts import EVAL_DIR
 
 HOLDOUT = load_scripts(HOLDOUT_DIR)
@@ -172,22 +172,42 @@ HEPARIN = "Recibe heparina 5.000 unidades subcutáneas cada 12 horas desde la ci
 
 
 # The review's F8: "5.000" is five where a decimal point is written so and five thousand where a thousands one is, so
-# its field is left for the clinician; shown from a transcript that writes it so, any reading is changed. Heard as
-# "5000", it is compared as said.
-@pytest.mark.parametrize("english", ["Receives heparin 5000 units subcutaneous every 12 hours since hip surgery.",
-                                     "Receives heparin 5 units subcutaneous every 12 hours since hip surgery."])
-def test_a_passage_whose_number_reads_two_ways_is_changed_by_any_statement_shown_from_it(english):
-    assert {kind for kind, _ in changes("e16", HEPARIN, english)} == {"number"}
+# while the transcript writes it so the checks leave its field for the clinician. What was said is "cinco mil
+# unidades": a statement shown from it is compared with that, however the transcript writes it.
+@pytest.mark.parametrize("written", ["5.000", "5000"])
+def test_the_dose_said_as_five_thousand_is_compared_as_said_however_it_is_written(written):
+    heard = SCRIPTS["e16"].display.replace("5.000", written)
+    said = "Receives heparin {} units subcutaneous every 12 hours since hip surgery."
+    assert changes("e16", HEPARIN, said.format(5000), heard) == set()
+    assert changes("e16", HEPARIN, said.format(5), heard) == {("number", "5 units (heparin)")}
 
 
-def test_the_same_passage_heard_without_the_separator_is_compared_as_said():
-    heard = SCRIPTS["e16"].display.replace("5.000", "5000")
-    said = HEPARIN.replace("5.000", "5000")
-    assert changes("e16", HEPARIN, "Receives heparin 5000 units subcutaneous every 12 hours since hip surgery.",
-                   heard) == set()
-    assert changes("e16", HEPARIN, "Receives heparin 5 units subcutaneous every 12 hours since hip surgery.",
-                   heard) == {("number", "5 units (heparin)")}
-    assert said in heard
+def offered(written: str, english: str, quote: str) -> dict:
+    """e16 with one statement shown in Subjective, citing `quote`, from a transcript that writes the dose `written`."""
+    script = SCRIPTS["e16"]
+    heard = script.display.replace("5.000", written)
+    at = heard.index(quote.replace("5.000", written))
+    shown = {"english": english, "sources": [[at, at + len(quote.replace("5.000", written))]]}
+    item = scoring_es.SpanishItem(variant="e16-anadido-corto--clean", script=script.id, tags=[], hypothesis=heard,
+                                  sorting="done", fields={"subjective": scoring_es.SpanishOutcome(
+                                      status="pending", value=english, shown_statements=[shown])})
+    return scoring_es.score([item], {script.id: script})["ambiguous_offered"]
+
+
+# Its gold is empty, so a statement shown from it is reported, with the passage as heard, whatever it says; one shown
+# from another passage is not.
+@pytest.mark.parametrize(("written", "two_ways"), [("5.000", True), ("5000", False)])
+def test_a_statement_offered_from_the_dose_that_reads_two_ways_is_reported_with_its_passage(written, two_ways):
+    found = offered(written, "Receives heparin 5000 units subcutaneous every 12 hours.", HEPARIN)
+
+    assert found == {"statements": 1, "listed": [{
+        "variant": "e16-anadido-corto--clean", "field": "subjective",
+        "statement": "Receives heparin 5000 units subcutaneous every 12 hours.",
+        # Heard otherwise than written, the passage is found word by word, to its last word.
+        "passage": HEPARIN if two_ways else HEPARIN.replace("5.000", written).rstrip("."), "written_two_ways": two_ways}]}
+    assert offered(written, "Labs show a GFR of 28.", "un filtrado glomerular de 28") == {"statements": 0, "listed": []}
+    printed = run_es.ambiguous_offered({"ambiguous_offered": found, "text": {"ambiguous_offered": {"listed": []}}})
+    assert "Receives heparin 5000 units" in printed and "Recibe heparina" in printed
 
 
 # The review's F15: what the test set now says that the checks of 9db0821 let through translated wrongly, each seen by
