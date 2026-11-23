@@ -1329,6 +1329,16 @@ def test_an_instruction_is_listed_with_its_condition_and_what_it_takes(said, ins
 
 # What is left on each side of an instruction cut from the middle of a sentence is a sentence of its own, as its
 # sources are, so it still reads where it was said.
+# Once something is cut, what starts the value or follows a full stop starts with a capital; after a semicolon, as said.
+@pytest.mark.parametrize(("said", "rest"), [
+    ("Order a CBC; if it is low, start iron.", "If it is low, start iron."),
+    ("Continue apixaban; do not stop it, and order a CBC.", "Continue apixaban; do not stop it."),
+    ("Order a CBC. recheck in 3 months.", "Recheck in 3 months."),
+])
+def test_what_is_kept_beside_a_cut_starts_with_the_right_case(said, rest):
+    assert own(said, said).value == rest
+
+
 def test_each_side_of_a_cut_is_a_sentence_of_its_own():
     said = "Hold the lisinopril, order a BMP, and recheck in a week."
     checked = own(said, said)

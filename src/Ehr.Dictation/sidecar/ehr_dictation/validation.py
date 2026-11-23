@@ -1181,7 +1181,10 @@ def _without_instructions(value: str, text: str, listed: list[tuple[int, int]]) 
     joining word or comma left at a cut ("and", "then") goes with it, and a sentence left with no word that says
     anything (only stopwords and lead-ins) goes too. Each side of a cut is a sentence of its own, as its source is, but
     a condition before it stays with what follows ("If her ferritin is low, order an iron panel and continue
-    omeprazole." keeps "If her ferritin is low, continue omeprazole."). Also how many were cut."""
+    omeprazole." keeps "If her ferritin is low, continue omeprazole."). Once something is cut, what starts the value or
+    follows a full stop starts with a capital ("Order a CBC; if it is low, start iron." keeps "If it is low, start
+    iron."), and what follows a semicolon keeps its case ("Continue apixaban; do not stop it."). Also how many were
+    cut."""
     said = tokens(text)
     kept: list[str] = []
     cut = 0
@@ -1210,8 +1213,12 @@ def _without_instructions(value: str, text: str, listed: list[tuple[int, int]]) 
             elif piece:
                 rest += piece
         if _says_something(rest):
-            rest = rest[0].upper() + rest[1:]
             kept.append(rest if rest[-1] in ".!?;" else rest + ".")
+    if cut:  # what now starts the value or follows a full stop starts with a capital; after a semicolon, as said
+        kept = [
+            piece[:1].upper() + piece[1:] if not i or kept[i - 1].rstrip()[-1:] in (".", "!", "?") else piece
+            for i, piece in enumerate(kept)
+        ]
     return " ".join(kept).strip(), cut
 
 
