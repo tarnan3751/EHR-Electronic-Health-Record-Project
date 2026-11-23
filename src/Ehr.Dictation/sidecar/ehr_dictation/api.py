@@ -35,7 +35,7 @@ correction the checks didn't hear, near_unclear_passage, pointing at a passage m
 value's sources, or one_field_holds_dictation, on the only value offered when it quotes nearly the whole transcript,
 pointing at what it quotes (validation.py). A result in Spanish also has "spokenLanguage": "es"; its pending fields
 are English, each with statements, [{start, end, sources: [{start, end}]}], each sentence's UTF-16 place in the value
-and the Spanish passages it was translated from, and may also warn ambiguous_number or ambiguous_frequency; its
+and the Spanish passages it was translated from, and may also warn ambiguous_frequency; its
 notCarriedOver lists the Spanish instructions, its proposals are always empty, and its provenance names Whisper and
 the Spanish prompt, schema and structuring (translation.py).
 

@@ -78,11 +78,29 @@ def test_an_english_instruction_is_cut_from_the_translation_as_from_an_english_v
     assert field.pending and field.value == "Continue metformin."
 
 
-def test_a_number_written_two_ways_is_offered_with_a_warning_pointing_at_it():
-    text = "Metformina 1.000 mg al día."
-    field = one(text, ["Metformina 1.000 mg al día"], "Metformin 1000 mg daily.")
-    at = text.index("1.000")
-    assert field.pending and (translation.AMBIGUOUS_NUMBER, at, at + 5) in field.warnings
+# A point or a comma before exactly three digits (F8; sentences outside the test set): a thousand times apart.
+@pytest.mark.parametrize(("text", "english"), [
+    ("Heparina 5.000 unidades.", "Heparin 5 units."),
+    ("Heparina 5.000 unidades.", "Heparin 5000 units."),
+    ("Heparina 5.000 unidades.", "Heparin."),
+    ("Metformina 1.000 mg al día.", "Metformin 1000 mg daily."),
+    ("Metformina 1.000 mg al día.", "Metformin 1 mg daily."),
+    ("Warfarina 2,500 mg.", "Warfarin 2.5 mg."),
+])
+def test_a_number_that_reads_two_ways_is_refused(text, english):
+    field = one(text, [text], english)
+    assert not field.pending and translation.AMBIGUOUS_NUMBER in field.reasons
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Metformina 1000 mg al día.", "Metformin 1000 mg daily."),
+    ("Metformina mil miligramos al día.", "Metformin 1000 mg daily."),
+    ("Temperatura 37,8.", "Temperature 37.8."),
+    ("Warfarina 2,5 mg.", "Warfarin 2.5 mg."),
+    ("Heparina 5.000.000 unidades.", "Heparin 5000000 units."),
+])
+def test_a_number_that_reads_one_way_is_offered(text, english):
+    assert one(text, [text], english).pending
 
 
 def test_every_third_day_is_offered_with_a_warning():

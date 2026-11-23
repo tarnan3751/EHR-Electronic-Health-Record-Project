@@ -16,7 +16,7 @@ from ehr_eval.scripts import EVAL_DIR
 
 SCRIPTS = load_scripts()
 HOLDOUT = load_scripts(HOLDOUT_DIR)
-MEANT = {translation.AMBIGUOUS_NUMBER, translation.AMBIGUOUS_FREQUENCY}
+MEANT = {translation.AMBIGUOUS_FREQUENCY}
 
 
 @pytest.mark.parametrize("script", SCRIPTS + HOLDOUT, ids=lambda s: s.id)
@@ -41,7 +41,7 @@ def test_the_meant_warnings_are_shown():
                   for name, statements in script.statements.items()}
         checks = translation.check(fields, [], goldreport.transcript(script.display))
         warned |= {(script.id[:3], code) for f in checks.fields.values() for code, _, _ in f.warnings}
-    assert ("e12", translation.AMBIGUOUS_FREQUENCY) in warned and ("e15", translation.AMBIGUOUS_NUMBER) in warned
+    assert ("e12", translation.AMBIGUOUS_FREQUENCY) in warned
 
 
 def test_the_english_prompt_and_schema_are_the_committed_english_results():

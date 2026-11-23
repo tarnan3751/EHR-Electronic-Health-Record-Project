@@ -28,11 +28,13 @@ statement:
    correction cue and what it took back.
 4. The English is compared with that Spanish, class by class. "No more" means the English may leave something out, as
    an English value may, but may not add or change it; "the same" means both ways.
-   - numbers, as digits (Spanish decimal commas, number words, both readings of "1.000", 1 for "un", "una" or "uno"
-     even as an article, and halves and quarters however said: "un gramo y medio" 1.5, "un cuarto de tableta" 0.25,
-     "1/2 tableta" 0.5, "half a tablet" 0.5): no more (number_not_in_sources), and none the clinician took back
-     (source_superseded); a fraction with no exact decimal ("un tercio", "a third") can't be compared
-     (number_unreadable);
+   - numbers, as digits (Spanish decimal commas, number words, 1 for "un", "una" or "uno" even as an article, and
+     halves and quarters however said: "un gramo y medio" 1.5, "un cuarto de tableta" 0.25, "1/2 tableta" 0.5, "half
+     a tablet" 0.5): no more (number_not_in_sources), and none the clinician took back (source_superseded); a fraction
+     with no exact decimal ("un tercio", "a third") can't be compared (number_unreadable); and a number written with a
+     point or a comma before exactly three digits ("5.000", "2,500") is refused whatever the English writes
+     (ambiguous_number), since Spain writes 2.500 for two thousand five hundred and Mexico for two and a half, and the
+     checks can't know which was meant;
    - a dose unit with its number ("50 mcg" is not "50 mg"): no more (unit_not_in_sources). A unit of measurement
      (mmHg, beats a minute, degrees, percent) may be added to a number said without one, never changed;
    - how often (times a day, a week, as needed, at bedtime): no more (frequency_not_in_sources);
@@ -69,9 +71,8 @@ review shows each English statement beside its Spanish for the clinician to comp
 
 Warnings, each a code and a place in the transcript, never text, as validation.py's: possible_correction (a later
 number, date or drug of the same kind just after one the value uses, with a Spanish correction-like word between),
-near_unclear_passage, one_field_holds_dictation, and two of their own: ambiguous_number, on a value using a number
-written with a separator that reads two ways ("1.000"), pointing at it; and ambiguous_frequency, on a value from
-"cada tercer día" (every other day in Mexico, every third day literally), pointing at it.
+near_unclear_passage, one_field_holds_dictation, and one of their own: ambiguous_frequency, on a value from "cada
+tercer día" (every other day in Mexico, every third day literally), pointing at it.
 """
 
 from __future__ import annotations
@@ -100,10 +101,10 @@ CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected
 WARNING_REACH = validation.WARNING_REACH
 NEAR_UNCLEAR = validation.NEAR_UNCLEAR
 
-AMBIGUOUS_NUMBER = "ambiguous_number"
+AMBIGUOUS_NUMBER = "ambiguous_number"  # a reason: a number that reads two ways is refused
 AMBIGUOUS_FREQUENCY = "ambiguous_frequency"
 WARNINGS = (validation.POSSIBLE_CORRECTION, validation.NEAR_UNCLEAR_PASSAGE, validation.ONE_FIELD_HOLDS_DICTATION,
-            AMBIGUOUS_NUMBER, AMBIGUOUS_FREQUENCY)
+            AMBIGUOUS_FREQUENCY)
 
 REASONS = (
     "unknown_field",
@@ -119,6 +120,7 @@ REASONS = (
     "source_superseded",
     "number_not_in_sources",
     "number_unreadable",
+    "ambiguous_number",
     "unit_not_in_sources",
     "frequency_not_in_sources",
     "date_not_in_sources",
@@ -777,9 +779,8 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         reasons.add("source_superseded")
     elif missing:
         reasons.add("number_not_in_sources")
-    for term in terms:
-        if term.kind == "number" and term.ambiguous and term.values & english_nums:
-            result.warnings.append((AMBIGUOUS_NUMBER, ctx.toks[term.first].start, ctx.toks[term.last].end))
+    if any(term.kind == "number" and term.ambiguous for term in terms):
+        reasons.add(AMBIGUOUS_NUMBER)
 
     spanish_units = {(reading, unit) for number, unit in ctx.measured if number.first in said_index
                      for reading in number.readings}
