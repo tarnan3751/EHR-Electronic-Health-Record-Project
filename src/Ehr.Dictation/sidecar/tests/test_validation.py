@@ -492,6 +492,38 @@ def test_a_family_member_who_is_the_subject_still_has_it():
     assert own("She has a history of MI in 2019.", "MI in 2019.").reasons == ["history_dropped"]
 
 
+# A negation carries through a list after a comma, to a full stop, "but", "except", a new subject or a clause that says
+# something is there or someone told it.
+@pytest.mark.parametrize(("said", "value", "source"), [
+    ("Denies fever, chills, night sweats.", "Chills, night sweats.", "chills, night sweats"),
+    ("She denies fever, chills, nausea, vomiting.", "Chills, nausea.", "chills, nausea"),
+    ("No fever, chills, or night sweats.", "Night sweats.", "or night sweats"),
+    ("No fever, cough, or shortness of breath.", "Cough.", "cough, or shortness"),
+    ("Negative for chest pain, palpitations, syncope.", "Palpitations, syncope.", "palpitations, syncope"),
+    ("Review of systems negative for headache, vision changes, weakness.", "Vision changes, weakness.",
+     "vision changes, weakness"),
+    ("She has no rash, joint pain, or mouth ulcers.", "Joint pain.", "joint pain, or mouth"),
+    ("Denies chest pain, shortness of breath, or leg swelling.", "Leg swelling.", "or leg swelling"),
+    ("Without fever, rigors, or dysuria.", "Rigors.", "rigors, or dysuria"),
+    ("She does not have diabetes, hypertension, or asthma.", "Hypertension.", "hypertension, or asthma"),
+])
+def test_a_negation_carries_through_a_list_after_a_comma(said, value, source):
+    assert own(said, value, source).reasons == ["negation_dropped"]
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("No fever, the cough is better.", "The cough is better."),
+    ("Denies fever, reports a cough.", "Reports a cough."),
+    ("Negative for nausea, positive for headache.", "Positive for headache."),
+    ("No fever, she is eating well.", "She is eating well."),
+    ("No rash, but has joint pain.", "Has joint pain."),
+    ("No fever, chills, or night sweats, has a cough.", "Has a cough."),
+    ("Denies fever, chills, night sweats. Cough for two weeks.", "Cough for two weeks."),
+])
+def test_a_negations_list_ends_where_something_else_is_said(said, value):
+    assert own(said, value, value.rstrip(".")).pending
+
+
 def test_a_qualifier_stops_at_a_new_subject():
     assert own("No fever she is eating well.", "She is eating well.").pending
     assert own("Mother had a stroke patient has hypertension.", "Patient has hypertension.").pending
@@ -1284,6 +1316,20 @@ def test_no_item_of_an_order_list_is_left_outside_what_is_listed():
                     at += len(item)
                 said += 1
     assert said == 24 * 3 * 4
+
+
+# A negation before an aside between commas still makes what follows it an instruction not to.
+@pytest.mark.parametrize("said", [
+    "Do not, under any circumstances, order a CT; start antibiotics.",
+    "Under no circumstances, order a CT with contrast. Start antibiotics.",
+])
+def test_an_instruction_not_to_is_read_over_an_aside(said):
+    text = transcript(said)
+
+    assert not directive_spans(said)
+    assert not not_carried_over(text)
+    assert not proposals(text)
+    assert directive_spans("No, wait, order a CBC.")
 
 
 # What is cut from a value is what is listed, never the rest of its sentence.

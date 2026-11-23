@@ -181,6 +181,7 @@ WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
     "no wait sorry scratch mean correction actually rather make change".split()
 )
 NEGATION_SCOPE = 6  # words after a negation, experiencer, certainty or history cue, within its clause
+LIST_SCOPE = 30  # words after a negation that a list it carries through may take, past its commas
 POST_SCOPE = 4  # words before a cue that qualifies what precedes it ("chest pain denied")
 UNDOES_REACH = 3  # words before an instruction not to within which another negation makes it an instruction again
 DIRECTIVE_REACH = 14  # at most, words an instruction reaches past its verb when nothing ends it sooner...
@@ -931,8 +932,15 @@ def _directives(text: str) -> list[tuple[int, int, str, int]]:
     spans = []
     for start, end, kind in sorted(matches + passive):
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
-        negated = NEGATED_INSTRUCTION.search(text[clause:start])
-        before = text[clause : clause + negated.start()] if negated else ""
+        negated, base = NEGATED_INSTRUCTION.search(text[clause:start]), clause
+        aside = None if negated else ASIDE_BEFORE.search(text, 0, clause)
+        if aside:  # read over an aside between commas: "do not, under any circumstances, order a CT"
+            base = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, aside.start())), default=0)
+            negated = NEGATED_INSTRUCTION.search(f"{text[base : aside.start()]} {text[clause:start]}")
+            negated = negated if negated and negated.group().split()[0].lower() != "no" else None
+        if not negated and NEVER_BEFORE.search(text, 0, clause) and not text[clause:start].strip():
+            continue  # "under no circumstances, order a CT"
+        before = text[base : base + negated.start()] if negated else ""
         if negated and not NO_REASON.search(before) and not any(
             ANY_NEGATION.search(token.text) for token in tokens(before)[-UNDOES_REACH:]
         ):
@@ -956,7 +964,7 @@ def _directives(text: str) -> list[tuple[int, int, str, int]]:
 
 
 # An instruction not to: "don't order an A1c", "no need to order labs", "hold off on ordering an MRI", "sulfa should not
-# be added". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value. Unless
+# be added", "do not, under any circumstances, order a CT", "under no circumstances, order a CT". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value. Unless
 # another negation comes right before it, within UNDOES_REACH words, which makes it one again: "no reason not to order
 # an MRI", "I can't not order an MRI" (ANY_NEGATION), or "no reason" with whoever should do it ("there's no reason we
 # should not order an MRI", NO_REASON); not one further back that negates something else ("she has no chest pain so no
@@ -967,6 +975,11 @@ NEGATED_INSTRUCTION = re.compile(
     re.IGNORECASE,
 )
 ANY_NEGATION = re.compile(r"\b(?:no|not|never|nothing|none|cannot)\b|n't\b", re.IGNORECASE)
+# An aside between commas just before an instruction's clause, which a negation before it is read over (not a bare
+# "no", which answers something: "no, wait, order a CBC").
+ASIDE_BEFORE = re.compile(r",[^,.;:!?\n]{1,80},\s*$")
+# A clause of its own before it that says never: "under no circumstances, order a CT".
+NEVER_BEFORE = re.compile(r"\b(?:under|in|on|by)\s+no\s+(?:circumstances|case|account|means)\s*,\s*$", re.IGNORECASE)
 NO_REASON = re.compile(
     r"\bno (?:good |real )?reason\s+(?:\w+\s+){0,3}(?:should|would|could|can)\s+$", re.IGNORECASE
 )
@@ -1335,6 +1348,14 @@ TERMINATORS = frozenset(
     """but however although though except apart aside yet which who whereas he she they i we you patient he's she's
     they're i'm we're i've""".split()
 )
+# After a comma, words that end a negation's list: something said to be there, how it is going, or someone telling it
+# ("denies fever, reports a cough", "no rash, the cough is better", "negative for nausea, positive for headache",
+# "without aura, improving", "no orthostatic hypotension, still symptomatic").
+LIST_ENDS = frozenset(
+    """has have had is are was were with notes noted endorses endorsed reports reported complains complaining admits
+    admitted positive says said states stated feels felt improving improved worsening worse better stable unchanged
+    resolved resolving well still otherwise""".split()
+)
 # Someone telling, not having: "mom says the rash started Monday".
 REPORTING = frozenset(
     "says said reports reported states stated notes noted thinks feels felt tells told mentions mentioned asks asked "
@@ -1376,14 +1397,26 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
         return word in ends or any(mark in between for mark in marks)
 
     for cue in before.finditer(text):
+        # A negation carries through a list after a comma ("denies fever, chills, night sweats"), but not into a
+        # clause that says something else ("no fever, the cough is better", "no fever, reports a cough").
+        listing = before is NEGATION
         relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
         if before is EXPERIENCER and not relative and _object_of_a_preposition(text, cue.start()):
             continue
         edge = relative.end() if relative else TO_THE_FINDING.match(text, cue.end()).end() if qualifier.past_the_subject else cue.end()
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < edge}
-        for k, i in enumerate([i for i, token in enumerate(words) if token.start >= edge][:NEGATION_SCOPE]):
+        ahead = [i for i, token in enumerate(words) if token.start >= edge]
+        for k, i in enumerate(ahead[: LIST_SCOPE if listing else NEGATION_SCOPE]):
             next_clause = k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"
-            if stops(text[edge : words[i].start], words[i].text) or next_clause:
+            between = text[edge : words[i].start]
+            if listing and k and "," in between and not stops(between, words[i].text, ".;:?!\n"):
+                # Only a negation of something named ("no fever, chills"), not of a number ("124 wait no 118, ...").
+                if not any(_is_content(words[j].text) for j in reached & set(ahead[:k])) or not _more_of_the_list(
+                    text, words, i, ends
+                ):
+                    break
+            elif stops(between, words[i].text) or next_clause or (listing and k >= NEGATION_SCOPE and "," not in text[
+                    cue.end() : words[i].start]):
                 break
             reached.add(i)
             edge = words[i].end
@@ -1404,6 +1437,18 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
             reached.add(i)
             edge = words[i].start
     return reached, cue_words
+
+
+def _more_of_the_list(text: str, words: list[Token], first: int, ends: frozenset[str]) -> bool:
+    """Whether what follows a comma, to the next comma or full stop, is more of a list a negation carries through: no
+    word in it ends the negation's reach, starts a step of the plan, or says something is there or someone told it
+    (LIST_ENDS: "has", "is", "with", "reports", "endorses", "complains")."""
+    end = min(_sentence_end(text, words[first].start), (text.find(",", words[first].start) + 1 or len(text) + 1) - 1)
+    return not any(
+        word.text in ends or word.text in NEXT_CLAUSE or word.text in LIST_ENDS
+        for word in words[first:]
+        if word.end <= end
+    )
 
 
 def _object_of_a_preposition(text: str, start: int) -> bool:

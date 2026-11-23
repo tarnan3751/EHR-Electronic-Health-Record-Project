@@ -101,6 +101,14 @@ def test_a_negation_within_3_words_makes_an_instruction_not_to_one_again():
     assert not_carried_over(four) == []
 
 
+def test_a_negation_carries_through_a_list_for_30_words():
+    listed = [f"sign{a}{b}" for a in "ab" for b in "abcdefghijklmnop"][:31]
+    said = "Denies " + ", ".join(listed) + "."
+
+    reached = validation._qualifiers(said, validation.tokens(said))["negation_dropped"]
+    assert 30 in reached and 31 not in reached
+
+
 def test_a_possible_correction_is_flagged_within_8_words():
     assert validation.WARNING_GAP_WORDS == frozenset(
         "no wait sorry scratch mean correction actually rather make change".split())
