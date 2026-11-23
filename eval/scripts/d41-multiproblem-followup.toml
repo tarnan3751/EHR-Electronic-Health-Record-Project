@@ -3,7 +3,7 @@ id = "d41-multiproblem-followup"
 voice = "ef_dora"
 tags = [
     "max-length", "vitals", "numbers", "dates", "drug-new", "drug-uncommon", "negation", "self-correction",
-    "recombination", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal-trap",
+    "recombination", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap",
 ]
 dates = ["--10-22", "--10-24", "--10-30", "--12-10"]
 drugs = [

@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): gout on febuxostat, with an allergy change to leave out. Format: eval/README.md.
 id = "d16-gout-febuxostat"
 voice = "ef_dora"
-tags = ["numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation", "proposal-trap"]
+tags = ["numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation", "proposal", "proposal-trap"]
 noise = ["babble"]
 dates = []
 drugs = ["allopurinol", "febuxostat", "colchicine"]

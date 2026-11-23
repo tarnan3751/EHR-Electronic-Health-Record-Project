@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): type 2 diabetes review on bexagliflozin, with an order to leave out. Format: eval/README.md.
 id = "d02-t2dm-bexagliflozin"
 voice = "am_michael"
-tags = ["numbers", "vitals", "drug-new", "negation", "self-correction", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal-trap"]
+tags = ["numbers", "vitals", "drug-new", "negation", "self-correction", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
 dates = []
 drugs = ["metformin", "bexagliflozin", "semaglutide"]
 forbidden = ["I'm ordering a urine albumin to creatinine ratio"]

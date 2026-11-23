@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): heart failure clinic adding ivabradine, with a prescription order to leave out. Format: eval/README.md.
 id = "d12-hfref-ivabradine"
 voice = "hf_alpha"
-tags = ["long", "vitals", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal-trap"]
+tags = ["long", "vitals", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
 noise = ["hvac"]
 dates = []
 drugs = ["sacubitril", "valsartan", "bisoprolol", "eplerenone", "dapagliflozin", "furosemide", "ivabradine"]

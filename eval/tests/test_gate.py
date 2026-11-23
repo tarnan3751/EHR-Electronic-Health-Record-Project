@@ -39,7 +39,7 @@ def stored(variant: str, script: str, heard: str) -> dict:
 
 def results(eval_dir, heard: str = HEARD, **overrides) -> dict:
     items = [stored("d01--clean", "d01", "Cough for 3 days. Seen on March 3. Plan: rest."), stored("d02--clean", "d02", heard)]
-    proposals = scoring.score([scoring.Item(**item) for item in items], load_all(eval_dir / "scripts"))["proposals"]
+    proposals = scoring.proposal_scores([scoring.Item(**item) for item in items], load_all(eval_dir / "scripts"))
     data = {
         "baseline": False,
         "run": {"machine": {"label": "the server"}},
@@ -52,7 +52,7 @@ def results(eval_dir, heard: str = HEARD, **overrides) -> dict:
                     "order_allergy": {"shown": 0, "retracted_shown": 2, "retracted_shown_unflagged": 0,
                                       "drug_not_in_gold_shown": 1, "drug_not_in_gold_shown_unflagged": 0,
                                       "unflagged": []},
-                    "proposals": proposals,
+                    **proposals,
                     "warnings": {"shown": 3, "possible_correction": {"flagged": 1}, "near_unclear_passage": {"flagged": 0},
                                  "one_field_holds_dictation": {"flagged": 0}, "any": {"flagged": 1}},
                     "sorting": {"done": 2, "unavailable": {}}},
@@ -163,8 +163,8 @@ def test_results_that_hold_other_recordings_than_the_scripts_define_fail(eval_di
         other["items"][1]["script"] = "d02"
     else:
         other["items"][1] = dict(other["items"][1], variant="d02--hvac-20db")
-    other["metrics"]["proposals"] = scoring.score(
-        [scoring.Item(**item) for item in other["items"]], load_all(eval_dir / "scripts"))["proposals"]
+    other["metrics"] |= scoring.proposal_scores(
+        [scoring.Item(**item) for item in other["items"]], load_all(eval_dir / "scripts"))
     save(eval_dir, "latest.json", other)
 
     problems = check(eval_dir / "results", eval_dir)
@@ -302,10 +302,11 @@ by = "the owner"
 """
 
 
+@pytest.mark.parametrize("block", ["proposals", "proposals_clinical"])
 @pytest.mark.parametrize("missing", ["shown", "said", "found", "false", "misheard", "listed"])
-def test_results_that_dont_say_what_was_proposed_fail(eval_dir, missing):
+def test_results_that_dont_say_what_was_proposed_fail(eval_dir, block, missing):
     silent = results(eval_dir)
-    del silent["metrics"]["proposals"][missing]
+    del silent["metrics"][block][missing]
     save(eval_dir, "latest.json", silent)
 
     (problem,) = check(eval_dir / "results", eval_dir)
@@ -331,12 +332,13 @@ def test_a_false_or_misheard_proposal_fails_unless_accepted(eval_dir, why, heard
     assert check(eval_dir / "results", eval_dir) == []
 
 
-# Every measure of the proposals block is scored again, not only the ones the owner's list is checked against.
+# Every measure of both proposals blocks is scored again, not only the ones the owner's list is checked against.
+@pytest.mark.parametrize("block", ["proposals", "proposals_clinical"])
 @pytest.mark.parametrize("altered", [{"right": 0}, {"recall": 0.5}, {"precision": 0.5}, {"with_warnings": 7},
                                      {"held_back": {"not_plain": 3}}])
-def test_results_whose_proposals_block_says_anything_else_fail(eval_dir, altered):
+def test_results_whose_proposals_block_says_anything_else_fail(eval_dir, block, altered):
     tampered = results(eval_dir)
-    tampered["metrics"]["proposals"] |= altered
+    tampered["metrics"][block] |= altered
     save(eval_dir, "latest.json", tampered)
 
     (problem,) = check(eval_dir / "results", eval_dir)

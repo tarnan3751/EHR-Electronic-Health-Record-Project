@@ -4,7 +4,9 @@ is the reference transcript and what gold sources quote; the spoken text is what
 read. All of it is synthetic: no script is about a real person.
 
 The recordings hash covers what makes the audio (each script's text, voice and noise, their renderer, the voices and
-the audio generator), and the gold hash the rest of each script, both gold sets included, so results from a different
+the audio generator), and the gold hash the rest of each script, both gold sets included, and the clinical gold for
+proposals (clinical-proposals.toml, which lives beside the scripts because their format is part of what makes the
+audio), so results from a different
 test set, or scored against different gold, are told apart (gate.py); only the gold may change without recording again
 (rescore.py). The pipeline hash covers what makes a run's answers (the sidecar's code apart from
 its checks, the eval's answers.py, and both lockfiles), and the scoring hash what checks and scores them (the sidecar's checks and the eval's
@@ -46,6 +48,18 @@ def load_all(directory: Path = SCRIPTS_DIR) -> dict[str, Script]:
     return {script.id: script for script in load_scripts(directory)}
 
 
+# The clinical gold for proposals, by script id: every order or allergy to add a clinician would expect proposed.
+CLINICAL_PROPOSALS = "clinical-proposals.toml"
+
+
+def clinical_proposals(eval_dir: Path = EVAL_DIR) -> dict[str, tuple[Proposal, ...]]:
+    """The clinical gold for proposals (clinical-proposals.toml), by script id; each script's [[proposals]] is the
+    rule-following gold. None when the file isn't there."""
+    path = eval_dir / CLINICAL_PROPOSALS
+    data = tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    return {script: tuple(Proposal(**row) for row in rows) for script, rows in data.items()}
+
+
 # What makes a script's recordings: what it says, and who says it how.
 SPOKEN = ("id", "voice", "noise", "text")
 
@@ -79,13 +93,16 @@ def variant_ids(eval_dir: Path = EVAL_DIR) -> set[str]:
 
 def gold_sha256(eval_dir: Path = EVAL_DIR) -> str:
     """One hash over the rest of every script, what it is scored against: both gold sets, tags, dates, drugs, forbidden,
-    retracted, and what should and shouldn't be proposed. A change means scoring the stored answers again
-    (rescore.py)."""
+    retracted, and what should and shouldn't be proposed; and the clinical gold for proposals. A change means scoring
+    the stored answers again (rescore.py)."""
     digest = hashlib.sha256()
     for path in sorted((eval_dir / "scripts").glob("*.toml")):
         data = tomllib.loads(path.read_text(encoding="utf-8"))
         rest = {key: value for key, value in data.items() if key not in SPOKEN}
         digest.update(path.name.encode() + b"\0" + json.dumps(rest, sort_keys=True).encode() + b"\0")
+    clinical = eval_dir / CLINICAL_PROPOSALS
+    digest.update(CLINICAL_PROPOSALS.encode() + b"\0" + (clinical.read_bytes().replace(b"\r\n", b"\n") if clinical.is_file()
+                                                         else b"") + b"\0")
     return digest.hexdigest()
 
 
