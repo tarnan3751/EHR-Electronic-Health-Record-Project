@@ -1497,7 +1497,9 @@ QUALIFIERS = (
 
 def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int], set[int]]:
     """The words the text's cues of one kind reach, and the cues' own words (which are neither reached nor plain:
-    "mother" in "mother had a stroke" is who had it; "she has" in "I think she has gout")."""
+    "mother" in "mother had a stroke" is who had it; "she has" in "I think she has gout"). No cue reaches past a line
+    break, forwards or back, over its subject or a relative clause included: in dictation a line break is a spoken new
+    paragraph, which ends a cue's reach as a full stop does ("I don't think {new paragraph} She has pneumonia.")."""
     before, after, closing, ends = qualifier.before, qualifier.after, qualifier.closing, qualifier.ends
     reached: set[int] = set()
     cue_words: set[int] = set()
@@ -1510,9 +1512,12 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
         # clause that says something else ("no fever, the cough is better", "no fever, reports a cough").
         listing = before is NEGATION
         relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
+        relative = None if relative and "\n" in relative.group() else relative
         if before is EXPERIENCER and not relative and _object_of_a_preposition(text, cue.start()):
             continue
         edge = relative.end() if relative else TO_THE_FINDING.match(text, cue.end()).end() if qualifier.past_the_subject else cue.end()
+        if "\n" in text[cue.end() : edge]:  # a new paragraph ends a cue's reach, as a full stop does
+            edge = cue.end()
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < edge}
         ahead = [i for i, token in enumerate(words) if token.start >= edge]
         for k, i in enumerate(ahead[: LIST_SCOPE if listing else NEGATION_SCOPE]):
@@ -1539,7 +1544,7 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
             edge = words[i].start
     for cue in closing.finditer(text) if closing else ():
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < cue.end()}
-        edge = cue.start()
+        edge = text.rfind("\n", cue.start(), cue.end()) + 1 or cue.start()  # not back past a new paragraph
         for i in reversed([i for i, token in enumerate(words) if token.end <= cue.start()]):
             if stops(text[words[i].end : edge], words[i].text, ".;:?!\n"):
                 break

@@ -524,6 +524,21 @@ def test_a_negations_list_ends_where_something_else_is_said(said, value):
     assert own(said, value, value.rstrip(".")).pending
 
 
+# In dictation a line break is a spoken new paragraph: a cue reaches no further than one, as no further than a full stop,
+# before what it qualifies (over a subject and its verb, or a relative clause, included) or back over it.
+@pytest.mark.parametrize(("said", "value"), [
+    ("I don't think {new paragraph} She has pneumonia.", "She has pneumonia."),
+    ("Not sure {new paragraph} She has gout.", "She has gout."),
+    ("Seen with her mother {new paragraph} who has diabetes.", "Who has diabetes."),
+    ("She has pneumonia {new paragraph} Probably.", "She has pneumonia."),
+    ("She has pneumonia {new paragraph} or maybe bronchitis.", "She has pneumonia."),
+    ("No fever {new paragraph} cough for two days.", "Cough for two days."),
+])
+def test_a_cue_stops_at_a_new_paragraph(said, value):
+    assert field(value, value.rstrip("."), text=transcript(said)).pending
+    assert not field(value, value.rstrip("."), text=transcript(said.replace(" {new paragraph}", ""))).pending
+
+
 def test_a_qualifier_stops_at_a_new_subject():
     assert own("No fever she is eating well.", "She is eating well.").pending
     assert own("Mother had a stroke patient has hypertension.", "Patient has hypertension.").pending
