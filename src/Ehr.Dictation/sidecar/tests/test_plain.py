@@ -339,6 +339,28 @@ HELD_BACK = [
     # Penicillin and latex: the reference data names only "Penicillin G", "Penicillin V" and "Natural latex rubber".
     "Add penicillin to her allergy list.",
     "Add latex to her allergy list.",
+    # A verb takes only what it can: refill, prescribe, renew, a prescription, call in and send a medication, and every
+    # item of a joined list.
+    "Refill a CBC.",
+    "Prescribe a CBC.",
+    "Renew her lipid panel.",
+    "Write a prescription for a TSH.",
+    "Call in a chest x-ray to her pharmacy.",
+    "Send a CBC to her pharmacy.",
+    "Send a prescription for a lipid panel to her pharmacy.",
+    "Refill lisinopril and a CBC.",
+    "Prescribe amoxicillin and a urinalysis.",
+    # A number only in a quantity or between two words of the item's name, and never a zero.
+    "Order a CBC 2019.",
+    "Order a CBC 12.",
+    "Order a CBC 50 50.",
+    "Order a 2019 CBC.",
+    "Refill lisinopril 10.",
+    "Order a CBC 0 times a day.",
+    "Order a CBC zero times a day.",
+    "Refill lisinopril 10 mg for zero days.",
+    "Refill lisinopril 10 mg with 0 refills.",
+    "Refill lisinopril 0 mg.",
     # Having it refilled, or sorting it out, is listed but isn't the plain form.
     "Have her lisinopril refilled.",
     "Please get her metformin 500 mg refilled for 90 days.",
@@ -380,6 +402,18 @@ CONTROLS = [
     ("Write her a script for amoxicillin.", ["Write her a script for amoxicillin"]),
     ("Order a CBC. She is allergic to penicillin, add that to her allergies.", ["Order a CBC"]),
     ("I'm not going to order a CBC. Order a BMP.", ["Order a BMP"]),
+    # An order takes any orderable, medications too; a refill or a prescription a medication, with its numbers in its
+    # quantities or its name; "no refills" is a phrase of its own.
+    ("Order lisinopril 10 mg daily.", ["Order lisinopril 10 mg daily"]),
+    ("Order a CBC and lisinopril.", ["Order a CBC and lisinopril"]),
+    ("Refill lisinopril and metformin.", ["Refill lisinopril and metformin"]),
+    ("Refill her lisinopril 10 mg oral tablet.", ["Refill her lisinopril 10 mg oral tablet"]),
+    ("Refill lisinopril 10.5 mg.", ["Refill lisinopril 10.5 mg"]),
+    ("Prescribe amoxicillin 500 mg three times a day for 7 days.",
+     ["Prescribe amoxicillin 500 mg three times a day for 7 days"]),
+    ("Refill her lisinopril with no refills.", ["Refill her lisinopril with no refills"]),
+    ("Refill lisinopril with 3 refills.", ["Refill lisinopril with 3 refills"]),
+    ("Order vitamin D 1000 units daily.", ["Order vitamin D 1000 units daily"]),
 ]
 
 # Said plainly under the earlier form, not the closed sentence: held back, still listed, each with why.
@@ -563,7 +597,7 @@ def test_any_other_word_anywhere_in_a_plain_instruction_makes_it_not_plain(said,
     ("Add peanut to her allergy list.", "peanut", "allergen"),
 ])
 def test_a_word_from_an_unrelated_name_never_joins_an_item(said, item, kind):
-    names, runs, _ = validation._names(kind)
+    names, runs, *_ = validation._names(kind)
     holding: dict[str, set[int]] = {}
     for i, name in enumerate(names):
         for word in set(name):

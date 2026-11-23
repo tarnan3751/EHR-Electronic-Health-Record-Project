@@ -31,13 +31,14 @@ prescription or script for, call in or send ... to her pharmacy; ordering, refil
 we're or we are; for an allergy, add or put ... to or on her allergies or allergy list, add ... as an allergy, list
 ... as an allergy, add, record, note, document or enter an allergy to ..., or a ... allergy, or "... should be added to
 her allergies"); determiners and possessives (a, an, the, her, his, their, some, another, "a new"), and before an
-order's item fasting, stat, urgent, routine or repeat; an item, an orderable for an order and an allergen for an allergy
-to add, as the reference data names it (is_item(): a run of one name of catalog.py that begins with one of its
-standalone runs whole, a generic head, an abbreviation in parentheses, a brand in brackets or a common catalog item's
-name, and never holds a negation or a number word, so "lisinopril" and "chest x-ray" are items and "no", "one",
-"morning" or "chest" alone aren't); the item's quantities (numbers, doses, forms, routes, frequencies, durations,
-supply, refills: QUANTITY); and trailers (today, now, stat, please, too, as well, also), with
-"and" or a comma joining another item. Any other word anywhere in the sentence, or any other mark (a semicolon, a dash,
+order's item fasting, stat, urgent, routine or repeat; an item, an orderable for an order (a medication for refill,
+prescribe, renew, e-prescribe, a prescription or script, call in and send: "Refill a CBC" isn't plain) and an allergen
+for an allergy to add, as the reference data names it (is_item(): a run of one name of catalog.py that begins with one
+of its standalone runs whole, a generic head, an abbreviation in parentheses, a brand in brackets or a common catalog
+item's name, and never holds a negation or a number word, nor a number but between two of its words, so "lisinopril"
+and "chest x-ray" are items and "no", "one", "morning", "chest" alone or "CBC 2019" aren't); the item's quantities
+(numbers in doses, frequencies, durations, supply or refills, never a zero; forms, routes: QUANTITY); and trailers
+(today, now, stat, please, too, as well, also), with "and" or a comma joining another item the verb takes. Any other word anywhere in the sentence, or any other mark (a semicolon, a dash,
 a bracket, a quote), makes it not plain, and no list of what must not be said decides it. So an instruction naming
 something the reference data doesn't know (a new drug, a misheard name, an unusual test, a test by a name the catalog
 doesn't hold) is never proposed, only listed: the clinician still sees it, and the dictation proposes only what it has
@@ -1755,7 +1756,8 @@ def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], st
         return "not_imperative"
     kind = "order" if kinds == {"order"} else ALLERGY_ADDITION
     said = [token.text for token in words if start <= token.start and token.end <= end]
-    if not any(is_item(said[i : i + size], kind) for i in range(len(said)) for size in range(1, MAX_ITEM_WORDS + 1)):
+    of = "order" if kind == "order" else "allergen"
+    if not any(is_item(said[i : i + size], of) for i in range(len(said)) for size in range(1, MAX_ITEM_WORDS + 1)):
         return "names_no_item"
     if not closed(text[sentence:sentence_end], kind) or _neighbours_hold_it(text, sentence, sentence_end, kind):
         return "not_plain"
@@ -1773,16 +1775,19 @@ NEVER_IN_AN_ITEM = (
 
 
 @functools.cache
-def _names(kind: str) -> tuple[list[tuple[str, ...]], dict[str, list[tuple[int, int, int]]], frozenset[str]]:
+def _names(kind: str) -> tuple[list[tuple[str, ...]], dict[str, list[tuple[int, int, int]]], frozenset[str], frozenset[int]]:
     """The names of one kind ("order" or "allergen"), each as its words; their standalone runs, by first word, each as
-    the name, its start and its end; and every word they hold. Read from catalog.py the first time a proposal or a noted
-    allergy is weighed, not at start."""
+    the name, its start and its end; every word they hold; and which of them are medications (marked "+"). Read from
+    catalog.py the first time a proposal or a noted allergy is weighed, not at start."""
     from . import catalog
 
     names: list[tuple[str, ...]] = []
     runs: dict[str, list[tuple[int, int, int]]] = {}
+    medications: set[int] = set()
     for line in (catalog.ORDERABLES if kind == "order" else catalog.ALLERGENS).split("\n"):
-        marked = line.split()
+        if line.startswith("+"):
+            medications.add(len(names))
+        marked = line.lstrip("+").split()
         if not marked:
             continue
         words = tuple(word.strip("^$") for word in marked)
@@ -1792,7 +1797,7 @@ def _names(kind: str) -> tuple[list[tuple[str, ...]], dict[str, list[tuple[int, 
             if word.endswith("$") and start is not None:
                 runs.setdefault(words[start], []).append((len(names), start, i + 1))
         names.append(words)
-    return names, runs, frozenset(word for name in names for word in name)
+    return names, runs, frozenset(word for name in names for word in name), frozenset(medications)
 
 
 def is_item(words: list[str], kind: str) -> bool:
@@ -1800,15 +1805,21 @@ def is_item(words: list[str], kind: str) -> bool:
     out, they are a run of one name's words that begins with one of its standalone runs whole (catalog.py: a generic
     head, an abbreviation in parentheses, a brand in brackets, a common catalog item's name) and may go on along it. So
     "lisinopril" and "lisinopril 10 mg oral tablet" are, "chest" or "morning" alone isn't; none starts with a stopword,
-    a single letter or a word of the closed classes, or holds a negation or a number word (NEVER_IN_AN_ITEM)."""
+    a single letter or a word of the closed classes, or holds a negation or a number word (NEVER_IN_AN_ITEM), and a
+    number is part of one only between two of its words, and never a zero ("lisinopril 10 mg", not "CBC 2019" or
+    "lisinopril 0 mg"). Of kind "order" any
+    orderable, MEDICATION only a medication, and otherwise an allergen."""
+    if not words or words[0][0].isdigit() or words[-1][0].isdigit() or any(_is_zero(word) for word in words):
+        return False
     words = [word for word in words if not word[0].isdigit()]
-    if not words or len(words[0]) < 2 or words[0] in STOPWORDS or words[0] in _CLOSED_WORDS or any(
+    if len(words[0]) < 2 or words[0] in STOPWORDS or words[0] in _CLOSED_WORDS or any(
         word in NEVER_IN_AN_ITEM for word in words
     ):
         return False
-    names, runs, _ = _names(kind)
+    names, runs, _, medications = _names("order" if kind in ("order", MEDICATION) else "allergen")
     return any(
         end - start <= len(words) and names[i][start : start + len(words)] == tuple(words)
+        and (kind != MEDICATION or i in medications)
         for i, start, end in runs.get(words[0], ())
     )
 
@@ -1822,8 +1833,12 @@ def is_item(words: list[str], kind: str) -> bool:
 #    "we are";
 # 3. determiners and possessives (DETERMINERS, and "new" after "a" or "an"), and for an order the modifiers fasting,
 #    stat, urgent, routine and repeat (ORDER_MODIFIERS);
-# 4. an item: an orderable for an order, an allergen for an allergy to add, as the reference data names it (is_item());
-# 5. an order's quantities (QUANTITY): numbers, doses, forms, routes, frequencies, durations, supply, refills;
+# 4. an item: an orderable for an order, but a medication for refill, prescribe, renew, e-prescribe, write a prescription
+#    or script for, call in and send (MEDICINES), and an allergen for an allergy to add, as the reference data names it
+#    (is_item()); every item of a joined list one the verb takes;
+# 5. an order's quantities (QUANTITY): numbers, doses, forms, routes, frequencies, durations, supply, refills; a number
+#    only in one of them or between two words of the item's name ("Order a CBC 2019" isn't plain), never a zero ("0
+#    times a day"; "no refills" is a phrase of its own);
 # 6. trailers (TRAILERS); the allergy list for an allergy to add ("to her allergies"); the pharmacy for "send" ("to her
 #    pharmacy"); and "and" or a comma joining another item, with its own determiners and quantities.
 PLAIN_LEADS = tuple(tuple(lead.split()) for lead in (
@@ -1833,19 +1848,23 @@ PLAIN_LEADS = tuple(tuple(lead.split()) for lead in (
 ))
 DOING = (("i'm",), ("i", "am"), ("we're",), ("we", "are"))
 ITEMS = "items"  # where a form takes its items
-# Each plain form of an order's verb, and its -ing form, with what it takes: its items, and for "send" the pharmacy.
+MEDICINES = "medicines"  # where a form takes its items, medications only
+MEDICATION = "medication"  # the kind of item a refill, a prescription or the pharmacy takes
+# Each plain form of an order's verb, and its -ing form, with what it takes: its items (any orderable for an order,
+# medications only for the rest), and for "send" and "call in" the pharmacy.
 _PHARMACY = r"(?:to|into) (?:her|his|their|the) (?:usual )?pharmacy "
 ORDER_FORMS = tuple(
     (tuple(verb.split()), tuple(doing.split()), steps) for verb, doing, steps in (
-        ("order", "ordering", (ITEMS,)), ("refill", "refilling", (ITEMS,)), ("prescribe", "prescribing", (ITEMS,)),
-        ("renew", "renewing", (ITEMS,)), ("e prescribe", "e prescribing", (ITEMS,)),
+        ("order", "ordering", (ITEMS,)), ("refill", "refilling", (MEDICINES,)),
+        ("prescribe", "prescribing", (MEDICINES,)), ("renew", "renewing", (MEDICINES,)),
+        ("e prescribe", "e prescribing", (MEDICINES,)),
         ("place an order for", "placing an order for", (ITEMS,)), ("put in an order for", "putting in an order for", (ITEMS,)),
-        *((f"{verb} {whom}a {paper} for", f"{doing} {whom}a {paper} for", (ITEMS,))
+        *((f"{verb} {whom}a {paper} for", f"{doing} {whom}a {paper} for", (MEDICINES,))
           for verb, doing in (("write", "writing"),) for whom in ("", "her ", "him ", "them ")
           for paper in ("prescription", "script")),
-        ("call in", "calling in", (ITEMS, _PHARMACY)),
-        ("send", "sending", (ITEMS, _PHARMACY)),
-        ("send a prescription for", "sending a prescription for", (ITEMS, _PHARMACY)),
+        ("call in", "calling in", (MEDICINES, _PHARMACY)),
+        ("send", "sending", (MEDICINES, _PHARMACY)),
+        ("send a prescription for", "sending a prescription for", (MEDICINES, _PHARMACY)),
     )
 )
 # Each plain form of adding to the allergy list, as what follows the lead-ins: words (a pattern) or the items.
@@ -1957,8 +1976,9 @@ def _steps(words: list[str], at: int, steps: tuple, kind: str) -> set[int]:
     """Where the words from `at` may end, having said each step in turn: words (a pattern) or the items."""
     ends = {at}
     for step in steps:
-        if step == ITEMS:
-            ends = {end for start in ends for end in _items(words, start, "order" if kind == "order" else "allergen")}
+        if step in (ITEMS, MEDICINES):
+            of = MEDICATION if step == MEDICINES else "order" if kind == "order" else "allergen"
+            ends = {end for start in ends for end in _items(words, start, of)}
         else:
             ends = {start + len(match.group().split()) for start in ends
                     if (match := re.match(step, " ".join(words[start:]) + " "))}
@@ -1966,8 +1986,8 @@ def _steps(words: list[str], at: int, steps: tuple, kind: str) -> set[int]:
 
 
 def _items(words: list[str], at: int, kind: str) -> set[int]:
-    """Where a run of items said from `at` may end: each with its determiners and an order's quantities, joined by "and"
-    or a comma."""
+    """Where a run of items of one kind said from `at` may end: each with its determiners and an order's quantities,
+    joined by "and" or a comma."""
     ends: set[int] = set()
     todo, seen = [at], set()
     while todo:
@@ -1983,16 +2003,22 @@ def _items(words: list[str], at: int, kind: str) -> set[int]:
         for end in range(start + 1, min(len(words), start + MAX_ITEM_WORDS) + 1):
             if "," in words[start:end] or not is_item(words[start:end], kind):
                 continue
-            end = _quantities(words, end) if kind == "order" else end
+            end = _quantities(words, end) if kind != "allergen" else end
             ends.add(end)
             todo += [end + len(join) for join in JOINS if tuple(words[end : end + len(join)]) == join]
     return ends
 
 
 def _quantities(words: list[str], at: int) -> int:
-    """Where an order's quantities said from `at` end (QUANTITY)."""
-    shape = ["#" if word[0].isdigit() or word in _NUMBER_WORDS else word for word in words[at:]]
+    """Where an order's quantities said from `at` end (QUANTITY). A zero is no number of them ("0 times a day", "for
+    zero days"); "no refills" is a phrase of its own."""
+    shape = ["0" if _is_zero(word) else "#" if word[0].isdigit() or word in _NUMBER_WORDS else word for word in words[at:]]
     return at + QUANTITY.match(" ".join(shape) + " ").group().count(" ")
+
+
+def _is_zero(word: str) -> bool:
+    """Whether a word is a zero: "zero", "0", "0.0"."""
+    return word == "zero" or (word[0].isdigit() and not word.strip("0."))
 
 
 def _trailers(words: list[str], at: int) -> bool:
