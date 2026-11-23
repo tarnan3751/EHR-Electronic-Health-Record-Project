@@ -173,10 +173,28 @@ REVOKE ALL ON FUNCTION ehr.guard_ambient_review() FROM PUBLIC;
 CREATE OR REPLACE TRIGGER ai_note_reviews_ambient
     BEFORE INSERT OR UPDATE ON ehr.ai_note_reviews FOR EACH ROW EXECUTE FUNCTION ehr.guard_ambient_review();
 
+-- The words a value reads as, for telling an edit from the words a proposal offered: read as 52-visit-summaries.sql reads
+-- a summary (the code points that show nothing taken out: zero-width spaces and joiners, the soft hyphen, direction
+-- marks, variation selectors, the byte order mark; then compatibility forms folded, NFKC: fullwidth letters, ligatures,
+-- the no-break space; dashes among the rest), with case ignored and every run of anything but letters and digits read
+-- as one space, so punctuation and spacing don't count. A speed bump against putting a proposal's words into the note
+-- unchanged, not proof that the clinician rewrote them: a look-alike letter of another alphabet (Cyrillic "о" for "o")
+-- still reads as itself, and one word changed is enough. Ehr.Domain's OfferedWords reads them the same way, and both
+-- are checked against one table of cases (AmbientWordsCases in Ehr.Testing).
+CREATE OR REPLACE FUNCTION ehr.ambient_words(value text) RETURNS text
+    LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT btrim(regexp_replace(lower(normalize(regexp_replace(value,
+        '[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFF8\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0000-\U000E0FFF]',
+        '', 'g'), NFKC)), '[^[:alnum:]]+', ' ', 'g'))
+$$;
+REVOKE ALL ON FUNCTION ehr.ambient_words(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ehr.ambient_words(text) TO ehr_app;
+
 -- A proposal is as sensitive as its review, for good. Once the conversation's transcript of a review still open is gone
 -- (ehr.purge_ambient_transcripts), nobody can check a proposal against what was said, so none goes into the note as
--- offered: not accepted, nor edited back to the words offered (the same once trimmed, with every run of whitespace one
--- space), which the review page would otherwise have offered ready to approve.
+-- offered: not accepted, nor edited back to the words offered (the same as read by ehr.ambient_words, above), which the
+-- review page would otherwise have offered ready to approve.
 CREATE OR REPLACE FUNCTION ehr.guard_ambient_proposal() RETURNS trigger
     LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
 AS $$
@@ -193,8 +211,7 @@ BEGIN
     END IF;
     IF review.mode = 'ambient' AND NEW.state IS DISTINCT FROM OLD.state
        AND (NEW.state = 'accepted'
-            OR NEW.state = 'edited' AND btrim(regexp_replace(NEW.approved_value, '[[:space:]]+', ' ', 'g'))
-                                      = btrim(regexp_replace(NEW.original_value, '[[:space:]]+', ' ', 'g')))
+            OR NEW.state = 'edited' AND ehr.ambient_words(NEW.approved_value) = ehr.ambient_words(NEW.original_value))
        AND NOT EXISTS (SELECT 1 FROM ehr.ambient_transcripts t WHERE t.id = review.id) THEN
         RAISE EXCEPTION 'The conversation''s transcript was deleted: reject this proposal, or edit it into your own words'
             USING ERRCODE = '23514';

@@ -365,6 +365,22 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         Assert.Equal(["pending"], await Query(visit, "SELECT state FROM ehr.ai_note_reviews WHERE id = @review"));
     }
 
+    // An edit of a proposal reads as the words it offered, or not, as the app reads it (OfferedWords): one table of cases
+    // for both (AmbientWordsCases), the database's reading here, as the on-site app's role calls it in the guard.
+    [Fact]
+    public async Task An_edit_reads_as_the_words_offered_or_not_as_the_app_reads_it()
+    {
+        await using var connection = new NpgsqlConnection(App);
+        await connection.OpenAsync(Cancel);
+        foreach (var (name, offered, edited, same) in AmbientWordsCases.All)
+        {
+            await using var command = new NpgsqlCommand("SELECT ehr.ambient_words(@edited) = ehr.ambient_words(@offered)", connection);
+            command.Parameters.AddWithValue("edited", edited);
+            command.Parameters.AddWithValue("offered", offered);
+            Assert.True(same == (bool)(await command.ExecuteScalarAsync(Cancel))!, $"{name}: expected {(same ? "the same" : "different")}.");
+        }
+    }
+
     // Two rules step 16 widened for a visit's review (db/policies/55-ai-review.sql) and no further: a review is staged
     // pending with nothing proposed only if it is a visit's, so its transcript can be read; and a visit's review holds no
     // proposal beyond its note, even with one planted in its stored result (as by the database's owner).
@@ -506,13 +522,17 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         await Refused("23514", () => Execute(visit, "INSERT INTO ehr.ambient_transcripts (id, patient_id, transcript) VALUES (@review, @patient, @transcript::jsonb)"));
 
         // Its proposals can't go into the note as offered any more: not accepted, nor edited back to the words offered
-        // (trimmed, every run of whitespace one space); rejected, or edited into the clinician's own words.
+        // (as ehr.ambient_words reads them: case, punctuation, spacing and what shows nothing ignored); rejected, or edited
+        // into the clinician's own words.
         await Refused("23514", () => Execute(visit,
             "UPDATE ehr.ai_field_proposals SET state = 'accepted', approved_value = original_value, decision_key = gen_random_uuid() WHERE id = @proposal"));
         await Refused("23514", () => Execute(visit,
             "UPDATE ehr.ai_field_proposals SET state = 'edited', approved_value = original_value, decision_key = gen_random_uuid() WHERE id = @proposal"));
         await Refused("23514", () => Execute(visit,
             "UPDATE ehr.ai_field_proposals SET state = 'edited', approved_value = E' Synthetic \\n\\t  proposal  ', decision_key = gen_random_uuid() WHERE id = @proposal"));
+        await Refused("23514", () => Accounts.ExecuteAsync(App, visit.Actor,
+            "UPDATE ehr.ai_field_proposals SET state = 'edited', approved_value = @edited, decision_key = gen_random_uuid() WHERE id = @proposal",
+            [.. Parameters(visit), ("edited", "SYNTHETIC,\u00A0pro\u200Bposal!")]));
         await Execute(visit,
             "UPDATE ehr.ai_field_proposals SET state = 'edited', approved_value = 'Synthetic words of the clinician', decision_key = gen_random_uuid() WHERE id = @proposal");
         await Execute(visit, "UPDATE ehr.ai_note_reviews SET state = 'completed', imported_version = 1 WHERE id = @review");

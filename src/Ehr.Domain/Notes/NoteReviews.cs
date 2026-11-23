@@ -151,7 +151,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         // into the note as offered: not accepted, nor edited back to the same words (the database refuses the same,
         // db/policies/56-ambient-listening.sql).
         if (review.Mode == AiReviewModes.Ambient
-            && (decision == AiProposalStates.Accepted || decision == AiProposalStates.Edited && Words(approved!) == Words(proposal.OriginalValue))
+            && (decision == AiProposalStates.Accepted || decision == AiProposalStates.Edited && OfferedWords.Same(approved!, proposal.OriginalValue))
             && !await phi.AmbientTranscriptKeptAsync(review.Id, cancel))
             return ReviewResult.Invalid(TranscriptGone(keep));
         var values = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
@@ -284,9 +284,6 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         var draft = await phi.LockDraftAsync(snapshot.DraftId, snapshot.PatientId, cancel);
         return draft is null ? (null, null) : (await phi.AiReviewAsync(id, cancel, tracking: true), draft);
     }
-
-    // A value's words, trimmed, with every run of whitespace one space.
-    static string Words(string value) => string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     static void Advance(ClinicalDraft draft)
     {
