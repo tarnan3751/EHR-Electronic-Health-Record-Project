@@ -37,7 +37,7 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "f2d8a8931fc709deea77669bc5d67c356c6742bc05424daf9450f421896150b7",
-  "scoring": "ba9c453fdc71edab81914a4f8394cce535211fc12e1b915d32c72de98b12ce86"
+  "scoring": "fb63e6db2d70a2fc0b94301e6acbd6fed62e945f44bdcd1099a1a740a20c8bd4"
  },
  "dataset": {
   "recordings_sha256": "58ec8499a961cc787e421919552e1c4060e074cb5a7192c84a29ba17d6b142cf",
@@ -4899,7 +4899,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Add semaglutide 0.5 mg weekly. no weight start at 0.25 mg weekly for the first month and then increase as tolerated. Continue metformin and bigsagliflozin. Reviewed hygiene to prevent yeast infections. Follow up in three months with a repeat A1c.",
+     "value": "Add semaglutide 0.5 mg weekly. No weight start at 0.25 mg weekly for the first month and then increase as tolerated. Continue metformin and bigsagliflozin. Reviewed hygiene to prevent yeast infections. Follow up in three months with a repeat A1c.",
      "warnings": [
       [
        "possible_correction",
@@ -8363,7 +8363,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily and drondarone 400 mg twice daily with meals. He had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago.",
+     "value": "Cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily and drondarone 400 mg twice daily with meals. He had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago.",
      "warnings": []
     },
     "objective": {
@@ -8894,7 +8894,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily. and drrodarone 400 mg twice daily with meals. he had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy, but that was just nausea years ago.",
+     "value": "Cardiology followup for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily. And drrodarone 400 mg twice daily with meals. He had two short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy, but that was just nausea years ago.",
      "warnings": []
     },
     "objective": {
@@ -9698,7 +9698,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Increase sacubitril valsartan to 97/100 and 3 mg twice daily. Add ivabradin 5 mg twice daily. Explain that can cause brief flashes of light inDim light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. daaily weights on call if he gains more than 2 kg in three days. Review in six weeks.",
+     "value": "Increase sacubitril valsartan to 97/100 and 3 mg twice daily. Add ivabradin 5 mg twice daily. Explain that can cause brief flashes of light inDim light that usually settle, and to avoid grapefruit juice. Repeat potassium and kidney function in two weeks. Continue the other medications. Daaily weights on call if he gains more than 2 kg in three days. Review in six weeks.",
      "warnings": []
     }
    },
@@ -10524,7 +10524,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Plan: conontinue isotretino 40 mg daily. lip barm and petroleum jelly inside the nose. Monthly pregnancy tests to continue. review on the 15th of Decemba.",
+     "value": "Plan: conontinue isotretino 40 mg daily. Lip barm and petroleum jelly inside the nose. Monthly pregnancy tests to continue. Review on the 15th of Decemba.",
      "warnings": []
     }
    },
@@ -11038,7 +11038,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Rheumatology followup for gout. 57-year-old man with sebaceous gout, three flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped. He is now on Sebxo. at 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting Pebicosa two months ago. No chest pain or shortness of breath. No history of heart disease.",
+     "value": "Rheumatology followup for gout. 57-year-old man with sebaceous gout, three flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped. He is now on Sebxo. At 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting Pebicosa two months ago. No chest pain or shortness of breath. No history of heart disease.",
      "warnings": []
     },
     "objective": {
@@ -14189,7 +14189,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Dinosumab 60 mg given today in clinic, next dose do on ma six 20/27, and it must not be delayed because of the risk of rebound fractures. Continue calcium and vitamin D. balance exercises and a home safety check.",
+     "value": "Dinosumab 60 mg given today in clinic, next dose do on ma six 20/27, and it must not be delayed because of the risk of rebound fractures. Continue calcium and vitamin D. Balance exercises and a home safety check.",
      "warnings": []
     }
    },
@@ -18779,7 +18779,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "exercise stress echo in the next two weeks. Start aspirin 81 mg daily. He is not to drive the bus if he gets chest tightness at work and he knows to call 911 if it comes on at rest. Stop hydrochlorothiazide and start losartan 50 mg daily. Increase atorvastatin to 40 mg and allopurinol to 200 mg. Continue omeprazole. Return on December 17 with home blood pressure readings.",
+     "value": "Exercise stress echo in the next two weeks. Start aspirin 81 mg daily. He is not to drive the bus if he gets chest tightness at work and he knows to call 911 if it comes on at rest. Stop hydrochlorothiazide and start losartan 50 mg daily. Increase atorvastatin to 40 mg and allopurinol to 200 mg. Continue omeprazole. Return on December 17 with home blood pressure readings.",
      "warnings": []
     }
    },
@@ -19955,7 +19955,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Continue ibuprofen with food and start physiotherapy. actually no, . hold off on that until he has tried physiotherapy.",
+     "value": "Continue ibuprofen with food and start physiotherapy. Actually no, . Hold off on that until he has tried physiotherapy.",
      "warnings": []
     }
    },
@@ -20127,7 +20127,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Plan: There is no need to order a chest x-ray. She would rather wait. moisturizer as needed.",
+     "value": "Plan: There is no need to order a chest x-ray. She would rather wait. Moisturizer as needed.",
      "warnings": []
     }
    },
@@ -21660,7 +21660,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Start amoxicillin 500 mg three times a day for seven days. Ibuprofen 400 mg with food up to three times a day for pain. Continue budesonide. formoterol and losartan. She is due for routine blood work. Salt water rinses after meals. Return sooner for fever or facial swelling.",
+     "value": "Start amoxicillin 500 mg three times a day for seven days. Ibuprofen 400 mg with food up to three times a day for pain. Continue budesonide. Formoterol and losartan. She is due for routine blood work. Salt water rinses after meals. Return sooner for fever or facial swelling.",
      "warnings": []
     }
    },
@@ -22021,7 +22021,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "Saline rinses twice a day. sskip that. Recheck in one week.",
+     "value": "Saline rinses twice a day. Sskip that. Recheck in one week.",
      "warnings": []
     }
    },
@@ -22382,8 +22382,8 @@
   }
  ],
  "rescored_from": {
-  "scoring": "9d80e64c2e4f66fe5f4a6bc2aeefda4dc0fbfb9aae4ef62f95f7f54c4190eb66",
-  "gold_sha256": "c9cc044fef369159c5ce3372c258fe9795bcbb58441e47a81ce76edce07ca4ca",
+  "scoring": "ba9c453fdc71edab81914a4f8394cce535211fc12e1b915d32c72de98b12ce86",
+  "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
   "structuring_outputs_reused": true
  }
 }
