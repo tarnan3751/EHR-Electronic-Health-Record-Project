@@ -68,4 +68,4 @@ sources = [
 
 [[not_proposed]]
 words = "refill under 2 seconds"
-why = "not_imperative"
+why = "not_an_instruction"

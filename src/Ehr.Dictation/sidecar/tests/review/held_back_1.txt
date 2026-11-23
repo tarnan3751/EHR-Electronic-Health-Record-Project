@@ -1,0 +1,315 @@
+# A. reports as lead-ins
+She says please order a lipid panel.
+Per the patient, order a lipid panel.
+Per her daughter: refill the albuterol.
+According to cardiology, order an echo.
+The family requests we order an MRI.
+Patient states order an MRI.
+Her words were order the MRI now.
+Mom's request is refill the inhaler.
+Daughter says order the MRI.
+Refill her inhaler per her wishes.
+Order an echo per cardiology.
+Order an echo per the cardiology note.
+Order a CBC as the ED recommended.
+Order a CBC like the urgent care said.
+Refill the inhaler as mom asked.
+# B. questions without question marks
+Can we order a CBC.
+Should I refill her lisinopril.
+Order a CBC right.
+Order a CBC or what.
+Order a CBC yeah.
+Order a CBC correct.
+Order a CBC okay.
+Did we order a CBC.
+Order a CBC, right?
+Order a CBC yes or no.
+# C. inside a list of things not to do
+Things to avoid: order a CT, add penicillin to her allergies.
+Not doing the following today. Order a CT of the head.
+We discussed what we will not do. Order a CT of the head.
+Avoid ordering a CT.
+Things we decided against. Order a CT of the abdomen.
+Neither order a CT nor an MRI.
+None of the following. Order a CT.
+She does not want any of these. Order an MRI.
+# D. hold off
+Hold off and order a CBC.
+Hold off, then order a CBC.
+Hold the lisinopril and order a BMP.
+Hold, and order a CBC.
+# E. for later
+Order a CBC next visit.
+Order a CBC next week.
+Order a CBC at follow-up.
+Order a CBC before her next visit.
+Order a CBC in a fortnight.
+Order a CBC prior to the next appointment.
+Order a CBC for next Tuesday.
+Order a CBC in the spring.
+Order a CBC around Christmas.
+Order a CBC at her annual physical.
+Order a CBC three months from now.
+Order a CBC by the end of the month.
+Order a CBC in six weeks' time.
+Order a CBC in December.
+Order a CBC six weeks out.
+Order a CBC after her next visit.
+Order a CBC on her return.
+Order a CBC at three months.
+Order a CBC at the six month mark.
+Order a CBC at her next physical.
+Order a lipid panel for her next annual exam.
+Order a lipid panel before she comes back.
+Order a CBC the next time she is here.
+Order a CBC when she comes back.
+Order a CBC once she is back from vacation.
+Order a CBC in a month or two.
+Order a CBC sometime this summer.
+Order a CBC in the new year.
+Order a CBC at the following appointment.
+Order a CBC for the subsequent visit.
+# F. quoted or hypothetical
+The plan would be to order a CBC.
+The plan is to order a CBC.
+My usual approach is to order a CBC.
+Typically I order a CBC.
+Normally we order a CBC.
+In a case like this you order a CBC.
+The guideline says to order a CBC.
+Standard practice: order a CBC.
+Hypothetically, order a CBC.
+In theory, order a CBC.
+For teaching purposes, order a CBC.
+Let's say we order a CBC.
+Usually order a CBC here.
+Ordering a CBC is unnecessary.
+Ordering an MRI is pointless.
+Ordering a CBC seems excessive.
+Prescribing antibiotics is inappropriate here.
+Refilling her opioids is unsafe.
+Ordering a D-dimer is low yield.
+Prescribing an antibiotic is unwarranted.
+Renewing her benzodiazepine is risky.
+Ordering a CT exposes her to radiation.
+Ordering imaging was discussed with her.
+Ordering a CBC costs her a copay.
+Refilling early is against our policy.
+# G. instructions for the patient
+Order your refills through the portal.
+Order your refills online.
+Refill your pill box every Sunday.
+Renew your prescriptions through the app.
+Order compression stockings online.
+Order a pill organizer from the pharmacy.
+Add salt to your diet.
+Add penicillin to the list of things to avoid.
+Add penicillin to your allergy list.
+Send your readings to the pharmacy.
+Send her to the pharmacy to pick up a spacer.
+Send her down to the pharmacy to buy a thermometer.
+Send her home and tell her to go to the pharmacy for a thermometer.
+Prescribe her rest and fluids.
+Prescribe plenty of rest.
+Write down her readings every day.
+Give her a prescription for physical therapy.
+# H. refill as a noun or past
+Refill history reviewed.
+Refill was due last week.
+Refill delays explain the missed doses.
+Refill adherence is poor.
+Refill timing reviewed with the pharmacy.
+Refill counts look right.
+Refills remaining two.
+Refill denied by insurance.
+Refill due Friday.
+Refill too soon per insurance.
+Refill gap noted.
+Order status pending.
+Order history reviewed.
+Order details confirmed with the lab.
+Order entry is down today.
+Order sets were reviewed.
+Order placed this morning for a CBC.
+Order confirmation received from the lab.
+Prescribe information reviewed.
+Renew date is in June.
+Refill authorization faxed.
+Refill reminder sent.
+Order number is 4471.
+Order was cancelled by radiology.
+# I. order as sequence
+Order the problems by severity.
+Order the differential by likelihood.
+Order the medication list alphabetically.
+Order her problems by priority.
+Order of events: she fell, then hit her head.
+Order matters here.
+Order them by date.
+Order the results chronologically.
+# J. allergy addition that is a denial or a question
+Add penicillin to her allergies? No.
+Add penicillin to her allergies. No.
+Add penicillin to her allergies. Nope.
+Add penicillin to her allergies. She is not truly allergic to penicillin.
+Add penicillin to her allergies. Turns out it was a viral rash.
+Add penicillin to her allergies or not.
+Add penicillin to her allergies, not.
+Add penicillin to her allergies. Not needed.
+Add penicillin allergy to family history.
+Add penicillin allergy history to the HPI.
+Add latex allergy to the surgical checklist.
+Add an allergy to the chart.
+Add an allergy to her record.
+Add a new allergy to her profile.
+Document an allergy to her file.
+Record an allergy to the same thing.
+Add an allergy to unknown antibiotic.
+Add penicillin to her allergies for her sister.
+Add penicillin to her allergies for the baby.
+Add penicillin to her son's allergies.
+# K. two instructions one hedged
+Order a CBC and maybe a BMP.
+Refill her lisinopril and maybe order a lipid panel.
+Refill her lisinopril and possibly order a lipid panel.
+Order a CBC, and possibly a BMP.
+Order a CBC and a BMP if needed.
+Refill the lisinopril, and order a BMP if her potassium is high.
+Order a CBC and consider a BMP.
+Order a CBC and think about a BMP.
+Possibly refill her lisinopril and order a BMP.
+Order a CBC and probably a smear.
+# L. retraction after, five words or more, or mishearings
+Order a CBC. Actually skip that one please.
+Order a CBC. No.
+Order a CBC. Nope.
+Order a CBC. Not needed.
+Order a CBC. Not today.
+Order a CBC. Maybe not.
+Order a CBC. Or not.
+Order a CBC. Hmm, no.
+Order a CBC. On hold.
+Order a CBC. Not necessary after all.
+Order a CBC. That one is not needed.
+Order a CBC. That is not necessary today.
+Order a CBC. We don't really need that one.
+Order a CBC. No need for it after all.
+Order a CBC. There's no need for that test.
+Order a CBC. Don't bother with that one.
+Order a CBC. Remove that one from the list.
+Order a CBC. Erase that last bit please.
+Order a CBC. Take that out of the plan.
+Order a CBC. Leave that one out please.
+Order a CBC. Forget about the CBC.
+Order a CBC. We've decided against it.
+Order a CBC. We decided against that after talking.
+Order a CBC. That won't be necessary after all.
+Order a CBC. Let's leave that for now.
+Order a CBC. Nix that, she had one Friday.
+Order a CBC. She had one done two days ago.
+Order a CBC. Cancer that order for now please.
+Order a CBC. Disco guard that last one please.
+Order a CBC. Scrap that one, she had it.
+Order a CBC. Strife that, she just had one.
+Order a CBC. Withdraw that order, she had one.
+Order a CBC. Omit that from the orders please.
+Order a CBC. Belay that last order please.
+Order a CBC. Not that one, the other one.
+Order a CBC. Not the CBC, a BMP.
+Order a CBC. Not a CBC but a BMP.
+Order a CBC. Instead, a BMP.
+Order a CBC. She would prefer not to have it.
+Order a CBC. That's wrong, she had one.
+Order a CBC. Wrong patient, sorry.
+Order a CBC. Wrong chart.
+Order a CBC. Wrong patient.
+Order a CBC. This is the wrong patient.
+Order a CBC. Oops, wrong patient.
+Add penicillin to her allergies. Wrong patient.
+Add penicillin to her allergies. That was her sister actually.
+Add penicillin to her allergies. That was her sister.
+Add penicillin to her allergies. It was her mother who reacted.
+Add penicillin to her allergies. It is her sister who is allergic.
+# M. persons not in the list
+Order a CBC for her baby.
+Order a CBC for the baby.
+Order a strep test for her kids.
+Order a strep test for her children.
+Order a CBC for her child.
+Order a flu shot for the boyfriend.
+Refill her fiance's inhaler.
+Order a CBC for Jane.
+Refill his stepmother's metformin.
+Order labs for the whole family.
+Order a CBC for the infant.
+Order a CBC for her newborn.
+Order a CBC for her grandson.
+Order a CBC for the twins.
+Refill the inhaler for her roommate.
+Refill the inhaler for her stepson.
+Order a lipid panel for both of them.
+Order a lipid panel for the other one too.
+Order a CBC for Mister Lopez.
+Order a CBC on Lopez.
+Order a CBC on the next one.
+Order a CBC on bed three.
+Refill the albuterol for her caregiver.
+Refill the albuterol for her household.
+Order an MRI for her colleague.
+Refill the lisinopril for her spouse.
+Order a CBC for the other patient.
+Order a CBC for the boy.
+Order a CBC for the girl.
+Order a CBC for the man in bay two.
+# N. conditions and hedges not in the lists
+Order a CBC as long as she agrees.
+Order a CBC so long as she consents.
+Order a CBC as indicated.
+Order a CBC as clinically indicated.
+Order a CBC as necessary.
+Order a CBC as required.
+Order a CBC as appropriate.
+Order a CBC upon return of symptoms.
+Order a CBC on worsening.
+Order a CBC with worsening symptoms.
+Order a CBC in the absence of improvement.
+Order a CBC absent improvement.
+Order a CBC barring improvement.
+Order a CBC failing improvement.
+Order a CBC without improvement.
+Order a CBC should it be needed.
+Order a CBC for fever over 101.
+Order a CBC for recurrent fever.
+Order a CBC perchance.
+Order a CBC potentially.
+Order a CBC conceivably.
+Order a CBC I guess.
+Order a CBC presumably.
+Order a CBC ideally.
+Order a CBC optionally.
+Order a CBC hopefully.
+Order a CBC tentatively.
+Order a CBC provisionally.
+Order a CBC as an option.
+Order a CBC versus a BMP.
+Order a CBC vs a BMP.
+Order a CBC and/or a BMP.
+Order a CBC alternatively a BMP.
+Order a CBC in lieu of the BMP.
+Order a CBC rather than a BMP.
+Order a CBC instead of a BMP.
+Order a CBC as a last resort.
+Order a CBC if possible.
+Order a CBC where possible.
+Order a CBC as feasible.
+Order a CBC pending insurance approval.
+Order a CBC contingent on insurance approval.
+Order a CBC subject to insurance approval.
+Order a CBC unless already done.
+Order a CBC except if she refuses.
+Order a CBC in case.
+Order a CBC just in case.
+Order a CBC to be safe maybe.
+Order a CBC kind of.
+Order a CBC sort of.

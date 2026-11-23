@@ -153,6 +153,28 @@ def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):
     assert any("didn't sort every recording" in p for p in problems)
 
 
+# The review's case: recordings dropped and the counts made to agree still fail, as do a recording held twice or one no
+# script defines.
+@pytest.mark.parametrize("change", ["drop", "twice", "undefined"])
+def test_results_that_hold_other_recordings_than_the_scripts_define_fail(eval_dir, change):
+    other = results(eval_dir)
+    if change == "drop":
+        other["items"] = other["items"][:1]
+        other["dataset"]["recordings"] = 1
+    elif change == "twice":
+        other["items"][1] = dict(other["items"][0])
+        other["items"][1]["script"] = "d02"
+    else:
+        other["items"][1] = dict(other["items"][1], variant="d02--hvac-20db")
+    other["metrics"]["proposals"] = scoring.score(
+        [scoring.Item(**item) for item in other["items"]], load_all(eval_dir / "scripts"))["proposals"]
+    save(eval_dir, "latest.json", other)
+
+    problems = check(eval_dir / "results", eval_dir)
+
+    assert any("not exactly the 2 the scripts define" in p for p in problems)
+
+
 def test_results_that_dont_say_what_was_shown_fail(eval_dir):
     silent = results(eval_dir)
     silent["metrics"]["order_allergy"] = {}
@@ -267,7 +289,7 @@ def test_results_from_another_machine_than_the_baselines_fail(eval_dir):
 # and every false or misheard proposal must be accepted by the owner, a warning or not; each accepted one must still be
 # listed. The gate scores the proposals again from the stored recordings, so results that say less fail. The gates on
 # orders and allergy changes in the fields stand beside these, unchanged.
-MISHEARD = "Takes aprocitentan daily. Go ahead and order a chest X-rat."
+MISHEARD = "Takes aprocitentan daily. Go ahead and order a lumbar spine X-ray."
 FALSE = "Takes aprocitentan daily. Go ahead and order a lipid panel."
 
 
@@ -294,7 +316,7 @@ def test_results_that_dont_say_what_was_proposed_fail(eval_dir, missing):
 
 
 @pytest.mark.parametrize(("why", "heard", "shown"), [
-    ("misheard", MISHEARD, "go ahead and order a chest x rat"),
+    ("misheard", MISHEARD, "go ahead and order a lumbar spine x ray"),
     ("false", FALSE, "go ahead and order a lipid panel"),
 ])
 def test_a_false_or_misheard_proposal_fails_unless_accepted(eval_dir, why, heard, shown):
@@ -312,6 +334,18 @@ def test_a_false_or_misheard_proposal_fails_unless_accepted(eval_dir, why, heard
     assert check(eval_dir / "results", eval_dir) == []
 
 
+# Every measure of the proposals block is scored again, not only the ones the owner's list is checked against.
+@pytest.mark.parametrize("altered", [{"right": 0}, {"recall": 0.5}, {"precision": 0.5}, {"with_warnings": 7},
+                                     {"held_back": {"not_plain": 3}}])
+def test_results_whose_proposals_block_says_anything_else_fail(eval_dir, altered):
+    tampered = results(eval_dir)
+    tampered["metrics"]["proposals"] |= altered
+    save(eval_dir, "latest.json", tampered)
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "aren't what their stored recordings give" in problem
+
+
 # The review's case: a results file that says it listed nothing, its proposals altered, still lists the misheard one.
 @pytest.mark.parametrize("altered", [{"listed": []}, {"listed": [], "misheard": 0, "right": 1}])
 def test_results_whose_proposals_were_altered_fail_and_list_what_their_recordings_give(eval_dir, altered):
@@ -323,17 +357,17 @@ def test_results_whose_proposals_were_altered_fail_and_list_what_their_recording
 
     assert len(problems) == 2
     assert "aren't what their stored recordings give" in problems[0]
-    assert "a misheard proposal" in problems[1] and "go ahead and order a chest x rat" in problems[1]
+    assert "a misheard proposal" in problems[1] and "go ahead and order a lumbar spine x ray" in problems[1]
 
 
 def test_an_accepted_proposal_the_results_no_longer_list_is_stale(eval_dir):
-    (eval_dir / "known-limitations.toml").write_text(accepting("go ahead and order a chest x rat"), encoding="utf-8")
+    (eval_dir / "known-limitations.toml").write_text(accepting("go ahead and order a lumbar spine x ray"), encoding="utf-8")
     fresh = results(eval_dir)
     fresh["provenance"]["scoring"] = scoring_sha256(eval_dir)
     save(eval_dir, "latest.json", fresh)
 
     (problem,) = check(eval_dir / "results", eval_dir)
-    assert "no longer list" in problem and "chest x rat" in problem
+    assert "no longer list" in problem and "lumbar spine x ray" in problem
 
 
 def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):

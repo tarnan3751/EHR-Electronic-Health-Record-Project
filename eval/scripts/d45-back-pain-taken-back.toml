@@ -1,8 +1,8 @@
-# Dictation test script (synthetic): low back pain, with an order to propose and an order and an allergy taken back just after they are said. Format: eval/README.md.
+# Dictation test script (synthetic): low back pain, with an order said with its reason (listed, not proposed), and an order and an allergy taken back just after they are said. Format: eval/README.md.
 id = "d45-back-pain-taken-back"
 voice = "am_michael"
 tags = [
-    "vitals", "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "spoken-punctuation", "proposal",
+    "vitals", "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "spoken-punctuation",
     "proposal-trap",
 ]
 dates = []
@@ -50,10 +50,9 @@ sources = [
     "hold off on that until he has tried physiotherapy.",
 ]
 
-[[proposals]]
-kind = "order"
+[[not_proposed]]
 words = "order a CBC"
-item = "CBC"
+why = "not_plain"
 
 [[not_proposed]]
 words = "Order an MRI of the lumbar spine"

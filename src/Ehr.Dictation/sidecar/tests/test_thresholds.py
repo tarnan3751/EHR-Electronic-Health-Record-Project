@@ -4,6 +4,7 @@ change that fails here first (and changes the code hash the eval's results are t
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from conftest import noise, speech_and_pauses, tone
 from test_validation import field, own, transcript
 
@@ -19,6 +20,7 @@ def test_the_values():
     assert (segmenter.MIN_PAUSE, segmenter.KEEP, segmenter.MAX_SEGMENT) == (40, 300, 2000)
     assert (validation.CORRECTION_WINDOW, validation.MAX_GAP, validation.MAX_SOURCES, validation.MAX_QUOTE) == (3, 1, 30, 600)
     assert (validation.LEAD_IN_REACH, validation.UNDOES_REACH) == (5, 3)
+    assert (validation.DIRECTIVE_REACH, validation.MARKED_REACH) == (14, 30)
     assert validation.WHOLE_DICTATION == 0.9
     assert validation.LIMITS == {"subjective": 3000, "objective": 3000, "assessment": 2000, "plan": 2000}
     limits = settings.Settings(api_key="k", llama_api_key="k")
@@ -80,14 +82,15 @@ def test_a_correction_counts_when_its_value_starts_within_three_words_of_the_cue
     assert own("Fever 3 days, sorry, it was only 2 days.", "Fever 3 days.", "Fever 3 days").pending
 
 
-# No threshold since the expansion plan's step 15: an instruction reaches to the end of its clause however long, so no
-# tail of it is left to ground a value; a word that starts another clause still ends it.
-def test_an_instruction_reaches_to_the_end_of_its_clause_however_long():
-    words = " ".join(f"item{chr(97 + i)}" for i in range(20))
-    text = transcript(f"order {words} then recheck in three months")
+# An instruction reaches DIRECTIVE_REACH words past its verb, or to the punctuation that ends its sentence within
+# MARKED_REACH, so a long one said with punctuation is listed whole and one said without never takes a paragraph.
+@pytest.mark.parametrize(("count", "mark", "reached"), [(20, ".", 20), (30, ".", 30), (31, ".", 14), (20, "", 14), (14, "", 14)])
+def test_an_instruction_reaches_14_words_unless_punctuation_ends_it_within_30(count, mark, reached):
+    words = [f"item{chr(97 + i // 26)}{chr(97 + i % 26)}" for i in range(count)]
+    text = transcript(f"order {' '.join(words)}{mark}")
 
     (instruction,) = not_carried_over(text)
-    assert text.text[instruction["start"] : instruction["end"]].split() == ["order"] + words.split()
+    assert text.text[instruction["start"] : instruction["end"]].split() == ["order", *words[:reached]]
 
 
 def test_a_negation_within_3_words_makes_an_instruction_not_to_one_again():

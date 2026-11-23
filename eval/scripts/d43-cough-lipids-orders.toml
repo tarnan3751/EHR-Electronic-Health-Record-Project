@@ -1,7 +1,7 @@
-# Dictation test script (synthetic): a cough in a former smoker, with two plain orders to propose and a statin started in the plan. Format: eval/README.md.
+# Dictation test script (synthetic): a cough in a former smoker, with an order to propose, an order with "fasting" before its item that the closed sentence doesn't take, and a statin started in the plan. Format: eval/README.md.
 id = "d43-cough-lipids-orders"
 voice = "af_heart"
-tags = ["vitals", "numbers", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal"]
+tags = ["vitals", "numbers", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
 dates = []
 drugs = ["amlodipine", "atorvastatin"]
 forbidden = ["order a fasting lipid panel", "order a chest X-ray"]
@@ -47,10 +47,9 @@ sources = [
     "Review in clinic with the results.",
 ]
 
-[[proposals]]
-kind = "order"
+[[not_proposed]]
 words = "order a fasting lipid panel"
-item = "fasting lipid panel"
+why = "not_plain"
 
 [[proposals]]
 kind = "order"

@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): nodular acne on isotretinoin, with a prescription renewal to leave out. Format: eval/README.md.
 id = "d15-acne-isotretinoin"
 voice = "bf_emma"
-tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal"]
+tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal-trap"]
 dates = ["--08-18", "--12-15"]
 drugs = ["isotretinoin"]
 forbidden = ["renew her isotretinoin prescription"]
@@ -75,7 +75,6 @@ sources = [
     "Her fasting triglycerides last month were 1.9 and liver tests were normal.",
 ]
 
-[[proposals]]
-kind = "order"
+[[not_proposed]]
 words = "renew her isotretinoin prescription"
-item = "isotretinoin"
+why = "not_plain"
