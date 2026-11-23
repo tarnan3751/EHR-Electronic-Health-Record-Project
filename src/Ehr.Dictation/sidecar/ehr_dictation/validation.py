@@ -92,7 +92,12 @@ and every check reads the cleaned text. The checks, each with the reason code re
   before the verb makes it a noun only right before it ("no order", "the lab order"): after a comma or a full stop the
   verb starts an instruction ("No, order a chest X-ray", "Check the lab. Order a CBC"). A plan stays a plan:
   "start", "continue", "increase" or "stop" a drug, orders in the past or by someone else ("her cardiologist ordered an
-  echo last year"), and an instruction not to ("don't order an A1c", "no need to order labs"), pass.
+  echo last year"), and an instruction not to ("don't order an A1c", "no need to order labs"), pass. A piece of the
+  sentence that says nothing once the instruction is cut is listed with it ("Do not start metformin until we order an
+  A1c", "We discussed ordering a sleep study", "No, order a CBC"), and a condition before it is kept with what follows
+  it ("If her ferritin is low, order an iron panel and continue omeprazole" keeps "If her ferritin is low, continue
+  omeprazole."); what is cut from a value is only what the transcript lists, so a sentence the transcript reads in
+  context as no instruction stays ("Any problems with refills? No. Refill history is regular.").
 - no_sources, source_too_short (under two words, without a number), source_not_in_transcript (compared word by word,
   ignoring case and punctuation), source_in_unclear_passage.
 - source_superseded: the value uses what the clinician corrected ("sorry", "no sorry", "no correction", "I mean",
@@ -362,7 +367,7 @@ def _check_field(name: str, raw_value: str, raw_quotes: list[str], transcript: _
         or any(c not in transcript.letters and c not in NEUTRAL_CHARACTERS for c in value.casefold())
     ):
         reasons.add("bad_format")
-    value, _ = _without_instructions(value)
+    value, _ = _without_instructions(value, transcript.text, transcript.directives)
     if not value:
         return Checked(name, value, quotes, [r for r in REASONS if r in reasons | {"order_or_allergy_change"}])
     if not quotes:
@@ -876,27 +881,96 @@ def directive_spans(text: str) -> list[tuple[int, int]]:
 def directives(text: str) -> list[tuple[int, int, str]]:
     """Each instruction to place an order ("order") or change the allergy list ("allergy_change"), from its lead-in, or
     its subject when that comes first, to the end of its clause (see _directive_end()). Overlapping ones are merged, an
-    allergy change winning. Hyphens are ignored ("re-fill")."""
-    return [(start, end, reason) for start, end, reason, _, _ in _instructions(text)]
+    allergy change winning, and each with any piece of its sentence that says nothing once it is cut
+    (_with_fragments()). Hyphens are ignored ("re-fill")."""
+    return [(start, end, reason) for start, end, reason, _, _, _ in _instructions(text)]
 
 
-def _instructions(text: str) -> list[tuple[int, int, str, frozenset[str], int]]:
-    """directives(), each with the finer kinds of the instructions merged into it (REASON's keys) and where the first
-    of them was matched, which is after its lead-in or subject."""
+Instruction = tuple[int, int, str, frozenset[str], int, int]
+
+
+def _instructions(text: str) -> list[Instruction]:
+    """directives(), each with the finer kinds of the instructions merged into it (REASON's keys), where the first of
+    them was matched, which is after its lead-in or subject, and where it starts without the pieces of its sentence
+    listed with it (_with_fragments()), which is where its rules read it from (weigh())."""
     found = _directives(text)
     letters = [i for i, character in enumerate(text) if character != "-"]
     if len(letters) < len(text):
         plain = "".join(text[i] for i in letters)
         found += [(letters[start], letters[end - 1] + 1, kind, letters[at]) for start, end, kind, at in _directives(plain)]
-    merged: list[tuple[int, int, str, frozenset[str], int]] = []
+    merged: list[Instruction] = []
     for start, end, kind, at in sorted(found):
         if merged and start < merged[-1][1]:
-            first, last, reason, kinds, matched = merged[-1]
-            reason = "allergy_change" if "allergy_change" in (REASON[kind], reason) else reason
-            merged[-1] = (first, max(last, end), reason, kinds | {kind}, min(matched, at))
+            merged[-1] = _joined(merged[-1], (start, end, REASON[kind], frozenset({kind}), at, start))
         else:
-            merged.append((start, end, REASON[kind], frozenset({kind}), at))
-    return merged
+            merged.append((start, end, REASON[kind], frozenset({kind}), at, start))
+    return _with_fragments(text, merged)
+
+
+def _joined(first: Instruction, second: Instruction) -> Instruction:
+    """Two instructions listed as one, an allergy change winning."""
+    reason = "allergy_change" if "allergy_change" in (first[2], second[2]) else first[2]
+    return (min(first[0], second[0]), max(first[1], second[1]), reason, first[3] | second[3], min(first[4], second[4]),
+            min(first[5], second[5]))
+
+
+def _with_fragments(text: str, found: list[Instruction]) -> list[Instruction]:
+    """The instructions, each listed with any piece of its sentence beside it that says nothing once it is cut
+    (_fragment()), so what is cut is still what is listed: "Do not start metformin until we order an A1c", "We
+    discussed ordering a sleep study", "Order a CBC, no". A condition before an instruction goes with it only when
+    nothing else follows in its sentence ("If her hemoglobin drops below 7, order a transfusion"); otherwise it stays
+    with what follows (_without_instructions())."""
+    listed: list[Instruction] = []
+    for instruction in found:
+        opening = max((mark.end() for mark in PIECE_MARK.finditer(text, 0, instruction[0])), default=0)
+        if listed and listed[-1][1] > opening and _fragment(text[listed[-1][1] : instruction[0]]):
+            instruction = _joined(listed.pop(), instruction)
+        listed.append(instruction)
+    for k, (start, end, reason, kinds, at, own) in enumerate(listed):
+        opening = max((mark.end() for mark in PIECE_MARK.finditer(text, 0, start)), default=0)
+        closing = next((mark.start() for mark in PIECE_MARK.finditer(text, end)), len(text))
+        if k + 1 < len(listed) and listed[k + 1][0] < closing:
+            closing = None  # another instruction follows in the sentence
+        after = text[end:closing] if closing is not None else ""
+        if closing is not None and _fragment(after):
+            end, after = closing - (len(after) - len(after.rstrip())), ""
+        if not (k and listed[k - 1][1] > opening):
+            before = text[opening:start]
+            if _fragment(before) or (_condition(before) and closing is not None and not _says_something(after)):
+                start = opening + len(before) - len(before.lstrip())
+        listed[k] = (start, end, reason, kinds, at, own)
+    return listed
+
+
+def _fragment(piece: str) -> bool:
+    """Whether a piece of a sentence beside an instruction says nothing of its own once the instruction is cut: it ends
+    in a subordinator or "but" ("Do not start metformin until", "Stop warfarin only after"), its last negation is bare
+    ("No", "I don't think"), or it is under three words and doesn't start a step of the plan ("We discussed", not "Avoid
+    NSAIDs"). A heading is none of these, nor a piece that holds nothing but stopwords, lead-ins or the words a step
+    of the plan opens with ("Okay so", "Next"), nor one over FRAGMENT_REACH words, which says something of its own
+    (and is all a transcript without punctuation has before an instruction)."""
+    if piece.rstrip().endswith(":"):
+        return False
+    words = [token.text for token in tokens(LEADING_CONNECTOR.sub("", TRAILING_CONNECTOR.sub("", piece)))]
+    if (
+        not _says_something(" ".join(words)) or len(words) > FRAGMENT_REACH or words[-1] in HEADINGS
+        or all(word in OPENERS for word in words)
+    ):
+        return False
+    negations = [i for i, word in enumerate(words) if ANY_NEGATION.search(word)]
+    return (
+        words[-1] in DANGLING
+        or bool(negations) and all(
+            word in STOPWORDS or word in LEAD_IN or word in BARE_AFTER_NEGATION for word in words[negations[-1] + 1 :]
+        )
+        or (len(words) < 3 and words[0] not in STEP_VERBS)
+    )
+
+
+def _condition(piece: str) -> bool:
+    """Whether a piece of a sentence opens with a condition: "If her ferritin is low"."""
+    words = [token.text for token in tokens(piece)]
+    return bool(words) and words[0] in CONDITION_WORDS
 
 
 def _directives(text: str) -> list[tuple[int, int, str, int]]:
@@ -1001,6 +1075,14 @@ TARGET = re.compile(r"(?:allerg\w*|list|record|pharmacy)$", re.IGNORECASE)
 LIST_WORDS = frozenset("list record".split())
 # A note's headings, which end an instruction said without punctuation before them.
 HEADINGS = frozenset("assessment plan impression exam examination observations vitals subjective objective".split())
+# Where a piece of a sentence beside an instruction ends: the sentence's end or a semicolon.
+PIECE_MARK = re.compile(r"[!?;\n]|\.(?!\d)|(?<!\d)\.")
+# Words a piece can't end in and say something of its own: "until", "only after", "but".
+DANGLING = frozenset("after before until till unless if when whenever once because since while whether that than but".split())
+# Words after a negation that leave it bare: "I don't think", "not sure".
+BARE_AFTER_NEGATION = frozenset("think believe sure know want".split())
+# The words a step of the plan starts with, which make two words a sentence: "Avoid NSAIDs".
+STEP_VERBS = NEW_CLAUSE - frozenset("i we she he they you patient let's i'll we'll i'm we're she's he's".split())
 
 
 def _directive_end(text: str, words: list[Token], end: int) -> int:
@@ -1084,15 +1166,23 @@ TRAILING_CONNECTOR = re.compile(r"(?:[\s,;:-]|\b(?:and|or|then|also|so)\b)+$", r
 LEADING_CONNECTOR = re.compile(r"^(?:[\s,;:-]|\b(?:and|or|then|also|so)\b)+", re.IGNORECASE)
 
 
-def _without_instructions(value: str) -> tuple[str, int]:
+def _without_instructions(value: str, text: str, listed: list[tuple[int, int]]) -> tuple[str, int]:
     """The value with exactly its instructions cut out, each as not_carried_over() lists it (directives()): what is cut
-    is what is listed, never the rest of its sentence ("Order a CBC and recheck in 3 months." keeps "recheck in 3
-    months."). A joining word or comma left at a cut ("and", "then") goes with it, and a sentence left with no word that
-    says anything (only stopwords and lead-ins) goes too. Also how many were cut."""
+    is what is listed, never the rest of its sentence ("Order a CBC and recheck in 3 months." keeps "Recheck in 3
+    months."). One the transcript `text` says word for word, but only outside what it lists (`listed`), stays: the
+    transcript reads it in context as no instruction ("Any problems with refills? No. Refill history is regular."). A
+    joining word or comma left at a cut ("and", "then") goes with it, and a sentence left with no word that says
+    anything (only stopwords and lead-ins) goes too. Each side of a cut is a sentence of its own, as its source is, but
+    a condition before it stays with what follows ("If her ferritin is low, order an iron panel and continue
+    omeprazole." keeps "If her ferritin is low, continue omeprazole."). Also how many were cut."""
+    said = tokens(text)
     kept: list[str] = []
     cut = 0
     for sentence in SENTENCE.split(value):
-        found = directives(sentence)
+        found = [
+            (start, end, kind) for start, end, kind in directives(sentence)
+            if not _said_outside(tokens(sentence[start:end]), said, listed)
+        ]
         if not found:
             kept.append(sentence)
             continue
@@ -1103,13 +1193,30 @@ def _without_instructions(value: str) -> tuple[str, int]:
         for i, piece in enumerate(pieces):
             piece = TRAILING_CONNECTOR.sub("", piece) if i < len(pieces) - 1 else piece
             piece = (LEADING_CONNECTOR.sub("", piece) if i else piece).strip()
-            if piece and rest and piece[0].isalnum():  # each side of a cut is a sentence of its own, as its source is
-                rest += (". " if _says_something(rest) and _says_something(piece) else " ") + piece
+            if piece and rest and piece[0].isalnum():
+                if not (_says_something(rest) and _says_something(piece)):
+                    rest += " " + piece
+                elif _condition(rest):
+                    rest += ", " + piece
+                else:
+                    rest += ". " + piece[0].upper() + piece[1:]
             elif piece:
                 rest += piece
         if _says_something(rest):
+            rest = rest[0].upper() + rest[1:]
             kept.append(rest if rest[-1] in ".!?;" else rest + ".")
     return " ".join(kept).strip(), cut
+
+
+def _said_outside(words: list[Token], said: list[Token], listed: list[tuple[int, int]]) -> bool:
+    """Whether the words are said in the transcript, word for word, and never inside what it lists."""
+    run = [word.text for word in words]
+    found = [
+        (said[i].start, said[i + len(run) - 1].end)
+        for i in range(len(said) - len(run) + 1)
+        if run and [word.text for word in said[i : i + len(run)]] == run
+    ]
+    return bool(found) and not any(start < last and first < end for first, last in found for start, end in listed)
 
 
 def _says_something(text: str) -> bool:
@@ -1497,6 +1604,7 @@ def _is_content(word: str, numbers: bool = False) -> bool:
 
 MAX_PROPOSALS = 20  # at most, in one dictation, as the on-prem app stages them
 TAKEN_BACK_REACH = 25  # at most, words after an instruction in which taking it back holds it back
+FRAGMENT_REACH = 10  # at most, words of a piece of an instruction's sentence that may be listed with it
 # Why a listed instruction isn't proposed, in the order the rules are tried: the first that applies is the one given.
 HELD_BACK = (
     "not_final", "to_the_software", "mixed_kinds", "not_an_addition", "negated", "hedged", "for_later", "taken_back",
@@ -1580,9 +1688,9 @@ def weigh(transcript: Transcript) -> list[Weighed]:
     words = tokens(text)
     unclear = transcript.unclear_ranges()
     weighed: list[Weighed] = []
-    for start, end, reason, kinds, at in _instructions(text):
+    for start, end, reason, kinds, at, own in _instructions(text):
         kind = "order" if kinds == {"order"} else ALLERGY_ADDITION if kinds == {ALLERGY_ADDITION} else reason
-        held_back = "not_final" if not transcript.final else _held_back(text, words, unclear, start, end, kinds, at)
+        held_back = "not_final" if not transcript.final else _held_back(text, words, unclear, own, end, kinds, at)
         if held_back is None and sum(1 for w in weighed if w.held_back is None) == MAX_PROPOSALS:
             held_back = "too_many"
         warnings = () if held_back else _proposal_warnings(text, words, unclear, start, end, at)

@@ -936,17 +936,18 @@ def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_document
     assert own(said, said).value == "She is not allergic to sulfa after all."
 
 
-@pytest.mark.parametrize(("said", "instruction"), [
-    ("There's no reason not to order an MRI of the knee.", "order an MRI of the knee"),
-    ("I can't not order an MRI.", "order an MRI"),
-    ("There's no good reason not to order an MRI.", "order an MRI"),
-    ("There's no reason we should not order an MRI.", "order an MRI"),
-    ("There is no good reason that we can not order a CT today.", "order a CT today"),
-    ("No real reason why the team would not order labs.", "order labs"),
-    ("There's no reason she could not order a lipid panel.", "order a lipid panel"),
+# Listed whole: what comes before the instruction says nothing once it is cut.
+@pytest.mark.parametrize("said", [
+    "There's no reason not to order an MRI of the knee.",
+    "I can't not order an MRI.",
+    "There's no good reason not to order an MRI.",
+    "There's no reason we should not order an MRI.",
+    "There is no good reason that we can not order a CT today.",
+    "No real reason why the team would not order labs.",
+    "There's no reason she could not order a lipid panel.",
 ])
-def test_two_negations_make_an_instruction_again(said, instruction):
-    assert said_instructions(said) == [instruction]
+def test_two_negations_make_an_instruction_again(said):
+    assert said_instructions(said) == [said.rstrip(".")]
     assert "MRI" not in own(said, said).value
 
 
@@ -999,15 +1000,38 @@ def test_an_instruction_inside_a_source_splits_it_in_two():
     assert own(said, "MRI, recheck in 3 months.").reasons == ["unsupported_content"]
 
 
-# What is cut is what is listed, never more: a sentence whose rest needs the instruction keeps its rest, ending on the
-# word that shows it is unfinished, and the instruction is listed.
-@pytest.mark.parametrize(("said", "rest"), [("Do not start metformin until we order an A1c.", "Do not start metformin until."),
-                                            ("There's no reason not to order an MRI of the knee.", "There's no reason not to.")])
-def test_a_sentence_whose_rest_needs_the_instruction_keeps_its_rest_unfinished(said, rest):
+# What is cut is what is listed, never more, and nothing is left that says nothing without it: a piece of the sentence
+# that ends in a subordinator, whose negation is bare, or that is under three words, is listed with the instruction; a
+# condition before it goes with it when nothing else follows, and stays with what does.
+@pytest.mark.parametrize(("said", "listed", "rest"), [
+    ("Stop warfarin only after we order an INR and it is above 3.",
+     "Stop warfarin only after we order an INR and it is above 3", ""),
+    ("Do not start metformin until we order an A1c.", "Do not start metformin until we order an A1c", ""),
+    ("There's no reason not to order an MRI of the knee.", "There's no reason not to order an MRI of the knee", ""),
+    ("No, order a CBC.", "No, order a CBC", ""),
+    ("I don't think we need to order a skin biopsy either.", "I don't think we need to order a skin biopsy either", ""),
+    ("If her hemoglobin drops below 7, order a transfusion.", "If her hemoglobin drops below 7, order a transfusion", ""),
+    ("We discussed ordering a sleep study, and she would rather wait.", "We discussed ordering a sleep study",
+     "She would rather wait."),
+    ("If her ferritin is low, order an iron panel and continue omeprazole.", "order an iron panel",
+     "If her ferritin is low, continue omeprazole."),
+    ("Avoid NSAIDs, order a CBC, and recheck.", "order a CBC", "Avoid NSAIDs. Recheck."),
+])
+def test_a_piece_that_says_nothing_without_its_instruction_is_listed_with_it(said, listed, rest):
     checked = own(said, said)
 
+    assert [said[s:e] for s, e in directive_spans(said)] == [listed]
     assert checked.value == rest
-    assert [said[s:e] for s, e in directive_spans(said)] == [said[len(rest) - 1 :].strip().rstrip(".")]
+    assert checked.pending == bool(rest)
+
+
+# Only what the transcript lists is cut from a value: a sentence it reads in context as no instruction stays.
+def test_a_value_keeps_what_the_transcript_does_not_list():
+    text = transcript("Any problems with refills? No. Refill history is regular.")
+
+    assert not not_carried_over(text)
+    assert field("Refill history is regular.", "Refill history is regular", text=text).pending
+    assert "order_or_allergy_change" in field("Refill her lisinopril.", "Refill history is regular", text=text).reasons
 
 
 def test_an_instruction_after_and_is_cut_where_it_starts():
@@ -1248,7 +1272,7 @@ def test_the_instructions_next_to_them_are_still_listed_whole(said):
     text = transcript(said)
 
     (listed,) = not_carried_over(text)
-    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".").removeprefix("No, ")
+    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".")
 
 
 # What an instruction says is listed and cut with it: its condition, subject and all, where it is removed from, and
@@ -1269,10 +1293,10 @@ def test_an_instruction_is_listed_with_its_condition_and_what_it_takes(said, ins
 # What is left on each side of an instruction cut from the middle of a sentence is a sentence of its own, as its
 # sources are, so it still reads where it was said.
 def test_each_side_of_a_cut_is_a_sentence_of_its_own():
-    said = "We discussed ordering a sleep study, and she would rather wait."
+    said = "Hold the lisinopril, order a BMP, and recheck in a week."
     checked = own(said, said)
 
-    assert checked.pending and checked.value == "We discussed. she would rather wait."
+    assert checked.pending and checked.value == "Hold the lisinopril. Recheck in a week."
 
 
 # A long order list cut by the reach goes on over what it lists, so no tail of it is left in the note: the review's
@@ -1337,7 +1361,7 @@ def test_a_value_keeps_the_rest_of_a_sentence_an_instruction_is_cut_from():
     said = "Order a CBC and recheck in 3 months, she prefers mornings."
     checked = own(said, said)
 
-    assert checked.pending and checked.value == "recheck in 3 months, she prefers mornings."
+    assert checked.pending and checked.value == "Recheck in 3 months, she prefers mornings."
 
 
 # Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
