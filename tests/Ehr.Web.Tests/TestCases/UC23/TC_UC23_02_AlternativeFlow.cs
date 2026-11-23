@@ -94,7 +94,8 @@ public class TC_UC23_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
         var html = await l.Session.Client.GetStringAsync((await Json(staged)).GetProperty("url").GetString(), Cancel);
         Assert.Contains(DictationSidecarStub.FragmentSaid, html);
-        Assert.Contains("\"speakerGroup\":3,\"speaker\":\"unsure\"", html);
+        Assert.All(TranscriptOn(html).GetProperty("segments").EnumerateArray().Where(s => s.GetProperty("speakerGroup").GetInt32() == 3),
+            s => Assert.Equal("unsure", s.GetProperty("speaker").GetString()));
         // The order said in that passage is listed, with who said it: no one who could be told.
         Assert.Matches("\"notCarriedOver\":\\[\\{\"reason\":\"order\",\"start\":\\d+,\"end\":\\d+,\"speaker\":\"unsure\"\\}\\]", html);
     }

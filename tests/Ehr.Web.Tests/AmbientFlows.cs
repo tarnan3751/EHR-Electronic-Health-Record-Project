@@ -111,6 +111,12 @@ static class AmbientFlows
         return await client.SendAsync(request, Cancel);
     }
 
+    // A visit's transcript as its review page writes it, beside the snapshot, when the page read it.
+    public static JsonElement TranscriptOn(string html) =>
+        JsonDocument.Parse(System.Text.RegularExpressions.Regex.Match(html,
+            "<script type=\"application/json\" data-review-transcript>(.*?)</script>", System.Text.RegularExpressions.RegexOptions.Singleline)
+            .Groups[1].Value).RootElement.Clone();
+
     public static async Task<JsonElement> Json(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync(Cancel)).RootElement.Clone();
 

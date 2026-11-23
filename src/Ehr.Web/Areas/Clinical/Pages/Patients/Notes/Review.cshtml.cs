@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
@@ -16,6 +17,10 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     : PatientNotePage(phi, assignments, breakGlass)
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { AllowOutOfOrderMetadataProperties = true };
+
+    // A recorded visit's stored result as the page reads it: its segments, where each passage was, skipped unread, since
+    // the transcript's own say the same (or the transcript is gone, and with it what they would point at).
+    static readonly JsonSerializerOptions Visit = new(Json) { Converters = { new SegmentsUnread() } };
     public AiNoteReview Review { get; private set; } = null!;
     public ClinicalDraft Draft { get; private set; } = null!;
     public IReadOnlyList<AiFieldProposal> Proposals { get; private set; } = [];
@@ -40,9 +45,16 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     public Guid? NextProposal => Decided is not { } decided ? null
         : (ChartProposals.SkipWhile(p => p.Row.Id != decided).FirstOrDefault(p => p.Waiting) ?? ChartProposals.FirstOrDefault(p => p.Waiting))?.Row.Id;
 
-    // A recorded visit's result has the transcript this page read, or none (null), which the page's script then leaves
-    // as it is shown: the stored result keeps no word of it.
+    // A recorded visit's result has no transcript (null): the stored result keeps no word of it, so the page's script leaves
+    // what the page shows.
     public object Snapshot => new { Review.State, version = Draft.Version, result = Result, proposals = Proposals };
+
+    // A recorded visit's transcript as this page read it, at the clinic: its JSON, as it was stored and checked, which the
+    // page writes in as it is, beside the snapshot, never read into objects and written out again, every "<" escaped so
+    // nothing in it can end its script element; and its text, which the page shows without its script. None otherwise.
+    public string? ConversationJson { get; private set; }
+
+    public string? ConversationText { get; private set; }
 
     // A recorded visit's review (the expansion plan's step 16). Its transcript is kept apart, only while it is open and for
     // 7 days at most, and read only at the clinic: the review shows it from there, or says where it went. While it is kept,
@@ -138,7 +150,8 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
         if (draft is null) return NotFound();
         Review = review;
         Draft = draft;
-        Result = review.ResultJson is null ? null : JsonSerializer.Deserialize<DictationResult>(review.ResultJson, Json);
+        Result = review.ResultJson is null ? null
+            : JsonSerializer.Deserialize<DictationResult>(review.ResultJson, review.Mode == AiReviewModes.Ambient ? Visit : Json);
         if (Ambient && Result is not null)
         {
             // At the clinic, for a page that shows it, the transcript itself, a recorded read, its JSON read once; otherwise,
@@ -147,7 +160,12 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
             var transcript = AtTheClinic && read ? await Phi.AmbientTranscriptAsync(reviewId, HttpContext.RequestAborted) : null;
             TranscriptKept = transcript is not null
                 || !(AtTheClinic && read) && await Phi.AmbientTranscriptKeptAsync(reviewId, HttpContext.RequestAborted);
-            Result = Result with { Transcript = transcript is null ? null! : JsonSerializer.Deserialize<Transcript>(transcript.Transcript, Json)! };
+            Result = Result with { Transcript = null! };
+            if (transcript is not null)
+            {
+                ConversationJson = transcript.Transcript.Replace("<", "\\u003C", StringComparison.Ordinal);
+                ConversationText = TextOf(transcript.Transcript);
+            }
         }
 
         var proposals = await Phi.AiProposalsAsync(reviewId, HttpContext.RequestAborted);
@@ -157,5 +175,47 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
             .Select(row => ProposedFromDictation.From(row, review, Result)).OfType<ProposedFromDictation>().ToList();
         Signed = await Phi.SignedDraftAsync(draftId, patientId, HttpContext.RequestAborted) is not null;
         return null;
+    }
+
+    // A transcript's text alone, read past nothing it doesn't need (as stored, it comes first), from a buffer borrowed for
+    // the purpose rather than a copy made for each page.
+    static string TextOf(string transcript)
+    {
+        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(System.Text.Encoding.UTF8.GetMaxByteCount(transcript.Length));
+        try
+        {
+            var reader = new Utf8JsonReader(buffer.AsSpan(0, System.Text.Encoding.UTF8.GetBytes(transcript, buffer)));
+            reader.Read();
+            while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+            {
+                var text = reader.ValueTextEquals("text"u8);
+                reader.Read();
+                if (text)
+                {
+                    return reader.GetString() ?? "";
+                }
+
+                reader.Skip();
+            }
+
+            return "";
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    // Reads a list of segments as none, skipping them.
+    sealed class SegmentsUnread : JsonConverter<IReadOnlyList<TranscriptSegment>>
+    {
+        public override IReadOnlyList<TranscriptSegment> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            reader.Skip();
+            return [];
+        }
+
+        public override void Write(Utf8JsonWriter writer, IReadOnlyList<TranscriptSegment> value, JsonSerializerOptions options) =>
+            throw new NotSupportedException();
     }
 }

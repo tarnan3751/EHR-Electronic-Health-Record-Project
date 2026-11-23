@@ -87,4 +87,48 @@ public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("transcript was deleted when its review was finished.", after);
         Assert.DoesNotContain("What brings you in today?", after);
     }
+
+    // The review shows the transcript without its script, and gives its script the transcript as it was stored, beside
+    // the snapshot: words that look like markup stay words, in both, and can't end the script element they are in.
+    [Fact]
+    public async Task A_transcript_that_looks_like_markup_stays_words_on_the_review()
+    {
+        var sidecar = apps.Dictation.Reset();
+        var l = await StartAsync(apps);
+        using (var stop = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/stop"))
+        using (var named = await Post(l.Session.Client, l.Token, $"{ListenApi}/{l.SessionId}/speakers",
+            new { speakers = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient" } }))
+        {
+            Assert.Equal(HttpStatusCode.OK, named.StatusCode);
+        }
+
+        const string Said = "Synthetic words </script><script>alert(1)</script> said twice.";
+        object Empty() => new { status = "empty", reasons = new[] { "not_dictated" } };
+        sidecar.Answer = (HttpStatusCode.OK, System.Text.Json.JsonSerializer.Serialize(new
+        {
+            transcript = new { text = Said, final = true, segments = new[] { new { start = 0, end = Said.Length, startMs = 0, endMs = 3000, final = true, speakerGroup = 2, speaker = "patient" } } },
+            sorting = "done",
+            notCarriedOver = Array.Empty<object>(),
+            fields = new
+            {
+                subjective = new
+                {
+                    status = "pending",
+                    value = Said,
+                    sources = new[] { new { start = 0, end = Said.Length, speaker = "patient" } },
+                    warnings = new[] { new { code = "patients_own_words", start = 0, end = Said.Length } },
+                },
+                objective = Empty(),
+                assessment = Empty(),
+                plan = Empty(),
+            },
+            provenance = new { speech = new { repository = "google/medasr", commit = "1111111", sha256 = "aaaa" }, language = (object?)null, llamaServer = (string?)null, prompt = "p", schema = "s", structuring = "t", code = "c" },
+        }));
+        using var staged = await Post(l.Session.Client, l.Token, $"{DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version });
+        Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
+        var html = await l.Session.Client.GetStringAsync((await Json(staged)).GetProperty("url").GetString(), Cancel);
+        Assert.DoesNotContain("<script>alert(1)", html);
+        Assert.Contains("Synthetic words &lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt; said twice.", html);
+        Assert.Equal(Said, TranscriptOn(html).GetProperty("text").GetString());
+    }
 }
