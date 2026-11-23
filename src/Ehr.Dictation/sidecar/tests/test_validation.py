@@ -689,6 +689,29 @@ def test_a_doubt_after_the_finding_or_a_question_is_refused_as_doubt_itself(said
     assert "certainty_dropped" in field(value, said, name="plan", text=transcript(said)).reasons
 
 
+# A source said both hedged and plainly is read where it was said plainly only when that is the whole of its clause after
+# a heading; never someone else's sentence that says the same words.
+@pytest.mark.parametrize(("said", "value", "source"), [
+    ("Possible pulmonary embolism. Pulmonary embolism protocol reviewed.", "Pulmonary embolism.", "Pulmonary embolism"),
+    ("I doubt she has shingles. The patient in the next bed has shingles.", "Shingles.", "has shingles"),
+    ("I think she has strep throat. Her classmate has strep throat.", "Strep throat.", "strep throat"),
+    ("Maybe a urinary tract infection. Her roommate had a urinary tract infection.", "A urinary tract infection.",
+     "a urinary tract infection"),
+    ("No chest pain today. The paramedics were told chest pain today.", "Chest pain today.", "chest pain today"),
+    ("Probable gout of the left toe. Gout of the left toe runs in her family.", "Gout of the left toe.",
+     "Gout of the left toe"),
+])
+def test_a_hedged_finding_is_never_grounded_on_someone_elses_sentence(said, value, source):
+    assert not field(value, source, name="plan", text=transcript(said)).pending
+
+
+def test_a_hedged_finding_restated_plainly_under_a_heading_is_read_there():
+    said = "I think she has a viral upper respiratory infection. Assessment: viral upper respiratory infection."
+
+    assert field("Viral upper respiratory infection.", "viral upper respiratory infection", name="plan",
+                 text=transcript(said)).pending
+
+
 def test_without_punctuation_a_qualifier_stops_at_the_next_step_or_heading():
     said = "no further pancreatitis continue monthly olezarsen no other injury on exam swelling below the malleolus"
 

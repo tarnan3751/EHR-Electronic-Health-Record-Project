@@ -422,8 +422,10 @@ UNCLEAR_QUOTE = re.compile(r"\[\s*unclear\s*\]", re.IGNORECASE)
 def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int, int]]) -> tuple[int, int] | str:
     """The quote's place in the transcript, word for word, outside unclear passages. A passage said more than once
     goes to the first occurrence after the field's previous source that no earlier source took, so each is highlighted
-    where it was said (FR-08); but to one no qualifier reaches before one a qualifier does, so a plain restatement is
-    read as said plainly ("I think she has a viral infection. Assessment: viral infection.")."""
+    where it was said (FR-08). Only a plain restatement under a heading is preferred to it: when that occurrence is
+    reached by a qualifier and a later one is the whole of its clause after a heading and no qualifier reaches it ("I
+    think she has a viral infection. Assessment: viral infection."). Never someone else's sentence that happens to say
+    the same words ("I doubt she has shingles. The patient in the next bed has shingles.")."""
     size, words = len(quote), transcript.words
     wanted = [token.text for token in quote]
     found = [
@@ -440,11 +442,21 @@ def _locate(quote: list[Token], transcript: _Transcript, earlier: list[tuple[int
     after = earlier[-1][1] if earlier else 0
     ordered = [span for span in unused if span[0] >= after] + [span for span in unused if span[0] < after] or clear
     qualified = {i for reached in transcript.qualified.values() for i in reached}
-    plain = [
-        span for span in ordered
-        if not any(span[0] <= words[i].start and words[i].end <= span[1] for i in qualified)
-    ]
-    return (plain or ordered)[0]
+    plain = lambda span: not any(span[0] <= words[i].start and words[i].end <= span[1] for i in qualified)  # noqa: E731
+    if plain(ordered[0]):
+        return ordered[0]
+    return next((span for span in ordered[1:] if plain(span) and _under_a_heading(span, transcript.text)), ordered[0])
+
+
+HEADING_BEFORE = re.compile(r"\s*[A-Za-z][A-Za-z /&-]{0,40}:\s*$")
+
+
+def _under_a_heading(span: tuple[int, int], text: str) -> bool:
+    """Whether a passage is the whole of its clause after a heading: "Assessment: viral infection."."""
+    start = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, span[0])), default=0)
+    return bool(HEADING_BEFORE.fullmatch(text, start, span[0])) and not text[span[1] : _sentence_end(text, span[1])].strip(
+        " ,;:"
+    )
 
 
 def _outside_instructions(span: tuple[int, int], transcript: _Transcript) -> list[tuple[int, int]]:
