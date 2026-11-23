@@ -37,17 +37,24 @@ statement:
      (ambiguous_number), since Spain writes 2.500 for two thousand five hundred and Mexico for two and a half, and the
      checks can't know which was meant;
    - a dose unit with its number ("50 mcg" is not "50 mg"): no more (unit_not_in_sources). A unit of measurement
-     (mmHg, beats a minute, degrees, percent) may be added to a number said without one, never changed;
+     (mmHg, beats a minute, degrees, percent) may be added to a number said without one, never changed; a dose's, a
+     result's (mg/dL, mmol/L, mEq) or one a Spanish dictation doesn't use (lb, oz, °F, inches) must be said
+     (SAID_UNITS);
    - how long, a number with its hours, days, weeks, months or years ("por cinco días" is not "for 5 months", "hace
      una semana" is "a week ago"): no more (period_not_in_sources);
-   - how often (times a day, a week, as needed, at bedtime): no more (frequency_not_in_sources);
+   - how often (times a day, a week, as needed, at bedtime): no more (frequency_not_in_sources), and English that
+     looks like how often but isn't read ("twice", "every 8 minutes", "after breakfast": LOOKS_LIKE_FREQUENCY) is
+     refused, since it can't be compared;
    - dates ("hace una semana" is a week ago, or the past week): no more (date_not_in_sources);
    - drug names, failing closed both ways: every English word a list knows as a drug (a USAN stem, drugnames.py's
      RxNorm ingredients, the words of their names and brand names) or that comes just before a dose ("zorbitex 20
      mg", whether a list knows it or not) must be a word of the Spanish or an English name one gives (spanish.py's
      endings and exceptions) (drug_not_in_sources); and every drug the Spanish names must be named in the English
      (drug_dropped), so a drug no list knows can't be swapped in for one the clinician said;
-   - sides, routes, severity and abbreviations: no more (side_, route_, severity_ and abbreviation_not_in_sources);
+   - sides (a capital R or L and "rt", "lt" too), routes (intrathecal, epidural, "IV push" and the others too),
+     severity, dose forms (tablets, syrup, a patch: spanish.DOSE_FORMS) and abbreviations, however they are written
+     ("hiv", "nsaids": CLINICAL_ABBREVIATIONS): no more (side_, route_, severity_, dose_form_ and
+     abbreviation_not_in_sources);
    - what can be ordered (an X-ray, labs, a culture, a referral, a prescription, a refill: ORDERABLES): no more
      (orderable_not_in_sources), so an instruction cut from the note can't come back in a neighbouring statement
      ("Continuar losartán 50 mg al día" as "Continue losartan 50 mg daily; chest X-ray.");
@@ -169,6 +176,7 @@ REASONS = (
     "drug_dropped",
     "side_not_in_sources",
     "route_not_in_sources",
+    "dose_form_not_in_sources",
     "orderable_not_in_sources",
     "severity_not_in_sources",
     "abbreviation_not_in_sources",
@@ -463,24 +471,35 @@ def normalize_decimal(value: str) -> str:
 
 
 DOSE_UNITS = frozenset({"mg", "mcg", "g", "kg", "ml", "l", "unit", "mg/dl"})  # never added to a number said without
+# Units a Spanish dictation doesn't use, or that are a dose or a result's: an English one must be said, never added to a
+# number said without it ("70 kilos" is not "70 lb", "250 mg/dl" not "250 mmol/L", "38 grados" not "38 °F").
+SAID_UNITS = DOSE_UNITS | frozenset({"lb", "oz", "fahrenheit", "celsius", "mmol/l", "meq", "inch", "ft", "cm", "mm"})
 ENGLISH_UNITS = re.compile(
-    r"(\d+(?:\.\d+)?)\s*(mg/dl|micrograms?|mcg|μg|µg|milligrams?|mg|grams?|g|kilograms?|kilos?|kg|milliliters?|"
-    r"millilitres?|ml|cc|liters?|litres?|l|units?|iu|percent|%|degrees?|°|mmhg|bpm|beats (?:a|per) minute|"
-    r"breaths (?:a|per) minute)(?![a-z])",
+    r"(\d+(?:\.\d+)?)\s*(mg/dl|mmol/l|mmol|meq/l|meq|micrograms?|mcg|μg|µg|milligrams?|mg|grams?|g|kilograms?|kilos?|"
+    r"kg|milliliters?|millilitres?|ml|cc|liters?|litres?|l|units?|iu|percent|%|°\s*f|°\s*c|degrees? fahrenheit|"
+    r"degrees? celsius|fahrenheit|celsius|degrees?|°|mmhg|bpm|beats (?:a|per) minute|breaths (?:a|per) minute|"
+    r"pounds?|lbs?|ounces?|oz|inch(?:es)?|feet|foot|ft|centimeters?|centimetres?|cm|millimeters?|millimetres?|mm)"
+    r"(?![a-z])",
     re.IGNORECASE,
 )
 UNIT_NAMES = {
     "microgram": "mcg", "mcg": "mcg", "μg": "mcg", "µg": "mcg", "milligram": "mg", "mg": "mg", "gram": "g", "g": "g",
     "kilogram": "kg", "kilo": "kg", "kg": "kg", "milliliter": "ml", "millilitre": "ml", "ml": "ml", "cc": "ml",
     "liter": "l", "litre": "l", "l": "l", "unit": "unit", "iu": "unit", "percent": "percent", "%": "percent",
-    "degree": "degree", "°": "degree", "mmhg": "mmhg", "bpm": "bpm", "mg/dl": "mg/dl",
+    "degree": "degree", "°": "degree", "mmhg": "mmhg", "bpm": "bpm", "mg/dl": "mg/dl", "mmol/l": "mmol/l",
+    "mmol": "mmol/l", "meq/l": "meq", "meq": "meq", "pound": "lb", "lb": "lb", "ounce": "oz", "oz": "oz",
+    "°f": "fahrenheit", "degree fahrenheit": "fahrenheit", "degrees fahrenheit": "fahrenheit",
+    "fahrenheit": "fahrenheit", "°c": "degree", "degree celsius": "degree", "degrees celsius": "degree",
+    "celsius": "degree", "inche": "inch", "inch": "inch", "feet": "ft",
+    "foot": "ft", "ft": "ft", "centimeter": "cm", "centimetre": "cm", "cm": "cm", "millimeter": "mm",
+    "millimetre": "mm", "mm": "mm",
 }
 
 
 def english_units(text: str) -> set[tuple[str, str]]:
     found = set()
     for match in ENGLISH_UNITS.finditer(re.sub(r"(?<=\d),(?=\d{3}\b)", "", text)):
-        unit = match.group(2).lower()
+        unit = re.sub(r"\s+", " ", match.group(2).lower()).replace("° ", "°")
         name = "bpm" if unit.startswith("beats") else "rpm" if unit.startswith("breaths") else UNIT_NAMES.get(unit.rstrip("s"), UNIT_NAMES.get(unit))
         if name:
             found.add((numbers(match.group(1))[0], name))
@@ -524,6 +543,24 @@ ENGLISH_FREQUENCIES = [
 ]
 
 
+# Words that say how often, which a reading of ENGLISH_FREQUENCIES must take in: one it doesn't ("twice", "every 8
+# minutes", "after breakfast", "hourly") can't be compared, and is refused.
+LOOKS_LIKE_FREQUENCY = re.compile(
+    r"\b(?:twice|thrice|once|hourly|every|daily|weekly|monthly|nightly|q\d+\s*h|q\d+\s*hrs?|qd|bid|tid|qid|qhs|qod|qam|"
+    r"qpm|prn|b\.i\.d\.|t\.i\.d\.)\b|\b(?:before|after|with)\s+(?:breakfast|lunch|dinner|supper|meals?|food|eating)\b"
+    r"|\b(?:\d+|one|two|three|four|five|six)\s+times\b",
+    re.IGNORECASE,
+)
+
+
+def unread_frequencies(text: str) -> bool:
+    """Whether the English says how often in a way ENGLISH_FREQUENCIES doesn't read (LOOKS_LIKE_FREQUENCY)."""
+    lowered = text.lower()
+    read = [match.span() for pattern, _ in ENGLISH_FREQUENCIES for match in pattern.finditer(lowered)]
+    return any(not any(start <= m.start() and m.end() <= end for start, end in read)
+               for m in LOOKS_LIKE_FREQUENCY.finditer(lowered))
+
+
 def english_frequencies(text: str) -> set[str]:
     return {value for _, read in english_frequency_items(text) for value in read}
 
@@ -554,6 +591,15 @@ ENGLISH_ROUTES = [
     ("ophthalmic", re.compile(r"\b(?:ophthalmic|eye drops?)\b")),
     ("otic", re.compile(r"\b(?:otic|ear drops?)\b")),
     ("nasal", re.compile(r"\b(?:nasal(?:ly)?|intranasal(?:ly)?)\b")),
+    ("intrathecal", re.compile(r"\bintrathecal(?:ly)?\b")),
+    ("epidural", re.compile(r"\bepidural(?:ly)?\b")),
+    ("intradermal", re.compile(r"\bintradermal(?:ly)?\b")),
+    ("intraosseous", re.compile(r"\b(?:intraosseous(?:ly)?|io)\b")),
+    ("intra-articular", re.compile(r"\bintra-?articular(?:ly)?\b")),
+    ("transdermal", re.compile(r"\b(?:transdermal(?:ly)?|patch(?:es)?)\b")),
+    ("buccal", re.compile(r"\bbuccal(?:ly)?\b")),
+    ("enteral", re.compile(r"\b(?:enteral(?:ly)?|nasogastric|ng tube|peg tube|per tube|via tube|g-tube)\b")),
+    ("iv", re.compile(r"\b(?:iv push|iv piggyback|ivpb|infusion)\b")),
 ]
 
 
@@ -566,8 +612,33 @@ def english_route_items(text: str) -> list[tuple[int, str]]:
     return sorted((match.start(), name) for name, pattern in ENGLISH_ROUTES for match in pattern.finditer(lowered))
 
 
-ENGLISH_SIDES = {"left": "left", "right": "right", "bilateral": "bilateral", "bilaterally": "bilateral", "both": "bilateral"}
+ENGLISH_SIDES = {"left": "left", "right": "right", "bilateral": "bilateral", "bilaterally": "bilateral",
+                 "both": "bilateral", "rt": "right", "lt": "left", "bilat": "bilateral"}
+# A side written as its capital letter: "R knee pain", "L ankle" (not a number's liters: "2 L").
+SIDE_LETTER = re.compile(r"(?<![\d.]\s)(?<![\d./])\b([RL])\b(?!\s*/)")
+
+
+def english_sides(text: str) -> list[str]:
+    """Each side the English names, in order: the words, and a capital R or L."""
+    found = [(w.start, ENGLISH_SIDES[w.text]) for w in tokens(text) if w.text in ENGLISH_SIDES]
+    found += [(m.start(), "right" if m.group(1) == "R" else "left") for m in SIDE_LETTER.finditer(text)]
+    return [side for _, side in sorted(found)]
 ENGLISH_SEVERITY = frozenset({"mild", "moderate", "severe", "intense", "critical"})
+# Dose forms, by spanish.DOSE_FORMS' names: an English one must be one the Spanish says ("inhalado" is not "tablets").
+ENGLISH_DOSE_FORMS = {
+    "tablet": "tablet", "tablets": "tablet", "tab": "tablet", "tabs": "tablet", "pill": "tablet", "pills": "tablet",
+    "capsule": "capsule", "capsules": "capsule", "cap": "capsule", "caps": "capsule", "syrup": "syrup",
+    "patch": "patch", "patches": "patch", "suppository": "suppository", "suppositories": "suppository",
+    "drops": "drops", "drop": "drops", "spray": "spray", "sprays": "spray", "injection": "injection",
+    "injections": "injection", "injectable": "injection", "cream": "cream", "ointment": "ointment", "gel": "gel",
+    "lozenge": "lozenge", "lozenges": "lozenge", "inhaler": "inhaler", "inhalers": "inhaler", "puff": "inhaler",
+    "puffs": "inhaler", "solution": "solution", "suspension": "suspension", "powder": "powder", "sachet": "powder",
+    "sachets": "powder",
+}
+
+
+def english_dose_forms(text: str) -> set[str]:
+    return {ENGLISH_DOSE_FORMS[w.text] for w in tokens(text) if w.text in ENGLISH_DOSE_FORMS}
 ENGLISH_RELATIVES = {
     "mother": "mother", "mom": "mother", "mum": "mother", "father": "father", "dad": "father", "parent": "parent",
     "parents": "parent", "brother": "brother", "brothers": "brother", "sister": "sister", "sisters": "sister",
@@ -586,12 +657,24 @@ NOT_ABBREVIATIONS = frozenset(
 ABBREVIATION = re.compile(r"\b[A-Za-z][A-Za-z0-9]*[A-Za-z0-9]\b")
 
 
+# Clinical abbreviations, read however they are written ("hiv positive", "avoid nsaids"): every one the Spanish lists
+# give (spanish.ABBREVIATIONS), and these. Not "hr" in lower case, which is an hour as often.
+CLINICAL_ABBREVIATIONS = frozenset(
+    a for names in spanish.ABBREVIATIONS.values() for a in names
+) | frozenset(
+    """HIV NSAID NSAIDS COPD CHF CKD HTN AMI DVT UTI CBC MRI ECG EKG SPO2 BMI LDL HDL TSH INR AFIB GERD OSA BPH CAD PCI
+    CABG TIA CVA ARDS AKI CRP ESR PSA A1C HBA1C GFR EGFR LVEF HFREF HFPEF T2DM DM2 IBS IBD PTSD ADHD URI ICU BP DM MI PE
+    AF EF HF RR CT""".split()
+)
+
+
 def english_abbreviations(text: str) -> set[str]:
     found = set()
     for match in ABBREVIATION.finditer(text):
         word = match.group()
         capitals = sum(1 for c in word if c.isupper())
-        if (capitals >= 2 or (capitals and any(c.isdigit() for c in word))) and word.upper() not in NOT_ABBREVIATIONS:
+        written = capitals >= 2 or (capitals and any(c.isdigit() for c in word))
+        if (written or word.upper() in CLINICAL_ABBREVIATIONS) and word.upper() not in NOT_ABBREVIATIONS:
             found.add(word.upper())
     return found
 
@@ -1334,7 +1417,7 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
     severity = [spanish.SEVERITY[t.key] for t in said if t.key in spanish.SEVERITY]
     classes = [
         ("drugs", [w for w in english_words if w in named], drugs, lambda e, s: e in s.values),
-        ("sides", [ENGLISH_SIDES[w] for w in english_words if w in ENGLISH_SIDES], sides, lambda e, s: e in s.values),
+        ("sides", english_sides(english), sides, lambda e, s: e in s.values),
         ("routes", [name for _, name in english_route_items(english)],
          [name for _, name in spanish.route_items(said_text)], lambda e, s: e == s),
         ("severity", [w for w in english_words if w in ENGLISH_SEVERITY], severity, lambda e, s: e in s),
@@ -1582,7 +1665,7 @@ def _compare(result: _Statement, ctx: _Context) -> None:
     for reading, unit in english_units(english):
         if (reading, unit) in spanish_units or reading in missing:  # a number not said is the number check's
             continue
-        if unit in DOSE_UNITS or reading in with_a_unit:
+        if unit in SAID_UNITS or reading in with_a_unit:
             reasons.add("unit_not_in_sources")
 
     position = {index: k for k, index in enumerate(said_index)}
@@ -1591,7 +1674,7 @@ def _compare(result: _Statement, ctx: _Context) -> None:
            for number, period in english_periods(english)):
         reasons.add("period_not_in_sources")
 
-    if not english_frequencies(english) <= spanish.frequencies(said_text):
+    if not english_frequencies(english) <= spanish.frequencies(said_text) or unread_frequencies(english):
         reasons.add("frequency_not_in_sources")
     if spanish.AMBIGUOUS_FREQUENCY.search(spanish.fold(said_text)):
         found = spanish.AMBIGUOUS_FREQUENCY.search(spanish.fold(ctx.text), min(s for s, _ in result.spans))
@@ -1611,8 +1694,11 @@ def _compare(result: _Statement, ctx: _Context) -> None:
     if any(term.kind == "drug" and not term.values & set(english_words) for term in terms):
         reasons.add("drug_dropped")
 
-    if not {ENGLISH_SIDES[w] for w in english_words if w in ENGLISH_SIDES} <= values("side", terms):
+    if not set(english_sides(english)) <= values("side", terms):
         reasons.add("side_not_in_sources")
+    said_forms = {name for t in said for name in spanish.DOSE_FORM_WORDS.get(t.key, ())}
+    if not english_dose_forms(english) <= said_forms:
+        reasons.add("dose_form_not_in_sources")
     if not english_orderables(english) <= {name for t in said for name in SPANISH_ORDERABLES.get(t.key, ())}:
         reasons.add("orderable_not_in_sources")
     if not english_routes(english) <= spanish.routes(said_text):

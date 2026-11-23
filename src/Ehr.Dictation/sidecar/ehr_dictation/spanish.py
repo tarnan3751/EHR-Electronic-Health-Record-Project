@@ -262,6 +262,8 @@ UNIT_NAMES = {
     "ui": "unit", "u": "unit", "unidad": "unit", "unidades": "unit",
     "grado": "degree", "grados": "degree",
     "mmhg": "mmhg", "lpm": "bpm", "rpm": "rpm",
+    "mmol": "mmol/l", "milimoles": "mmol/l", "meq": "meq", "miliequivalentes": "meq", "cm": "cm", "centimetros": "cm",
+    "mm": "mm", "milimetros": "mm",
 }
 UNIT_WORDS = frozenset(UNIT_NAMES)
 # Said as several words: "milímetros de mercurio", "latidos por minuto", "por ciento".
@@ -381,7 +383,27 @@ ROUTES = [
     ("ophthalmic", re.compile(r"\b(?:oftalmic[oa]s?|colirio)\b")),
     ("otic", re.compile(r"\botic[oa]s?\b")),
     ("nasal", re.compile(r"\b(?:nasal(?:es)?|intranasal(?:es)?)\b")),
+    ("intrathecal", re.compile(r"\bintratecal(?:es)?\b")),
+    ("epidural", re.compile(r"\bepidural(?:es)?\b")),
+    ("intradermal", re.compile(r"\bintradermic[oa]s?\b")),
+    ("intraosseous", re.compile(r"\bintraose[oa]s?\b")),
+    ("intra-articular", re.compile(r"\bintraarticular(?:es)?\b|\bintra-articular(?:es)?\b")),
+    ("transdermal", re.compile(r"\btransdermic[oa]s?\b|\bparches?\b")),
+    ("buccal", re.compile(r"\bbucal(?:es)?\b")),
+    ("enteral", re.compile(r"\b(?:sonda nasogastrica|nasogastric[oa]|gastrostomia|enteral)\b")),
 ]
+# Dose forms, by the English name translation.py compares: "tabletas" are tablets.
+DOSE_FORMS = {
+    "tablet": "tableta tabletas comprimido comprimidos pastilla pastillas", "capsule": "capsula capsulas",
+    "syrup": "jarabe jarabes", "patch": "parche parches", "suppository": "supositorio supositorios ovulo ovulos",
+    "drops": "gota gotas colirio", "spray": "spray aerosol nebulizador",
+    "injection": "inyeccion inyecciones inyectable inyectables ampolla ampollas vial", "cream": "crema cremas", "ointment": "pomada pomadas unguento", "gel": "gel",
+    "lozenge": "pastilla pastillas", "inhaler": "inhalador inhaladores inhalado inhalada inhalacion inhalaciones puff "
+    "puffs disparo disparos",
+    "solution": "solucion suero", "suspension": "suspension", "powder": "polvo sobre sobres",
+}
+DOSE_FORM_WORDS = {word: {name for name, words in DOSE_FORMS.items() if word in words.split()}
+                   for words in DOSE_FORMS.values() for word in words.split()}
 
 
 def routes(text: str) -> set[str]:

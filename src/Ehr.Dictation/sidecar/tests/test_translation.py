@@ -839,3 +839,40 @@ def test_something_to_order_the_cited_spanish_doesnt_say_is_refused(text, quote,
 ])
 def test_something_ordered_the_spanish_says_is_offered(text, english):
     assert reasons(text, [text], english) == []
+
+
+# ---- What the English side doesn't know fails closed (sentences outside the test set) -----------------------------
+
+
+@pytest.mark.parametrize(("text", "english", "reason"), [
+    ("Pesa 70 kilos.", "Weighs 70 lb.", "unit_not_in_sources"),
+    ("Glucosa de 250 mg/dl.", "Glucose 250 mmol/L.", "unit_not_in_sources"),
+    ("Temperatura de 38 grados.", "Temperature 38 °F.", "unit_not_in_sources"),
+    ("Tomar en ayunas.", "Take after breakfast.", "frequency_not_in_sources"),
+    ("Paracetamol cada 8 horas.", "Acetaminophen every 8 minutes.", "frequency_not_in_sources"),
+    ("Metformina dos veces al día.", "Metformin twice.", "frequency_not_in_sources"),
+    ("Dolor en rodilla izquierda.", "R knee pain.", "side_not_in_sources"),
+    ("Dolor en rodilla izquierda.", "Rt knee pain.", "side_not_in_sources"),
+    ("Ceftriaxona intramuscular.", "Ceftriaxone intrathecal.", "route_not_in_sources"),
+    ("Ceftriaxona intramuscular.", "Ceftriaxone IV push.", "route_not_in_sources"),
+    ("Salbutamol inhalado.", "Albuterol tablets.", "dose_form_not_in_sources"),
+    ("Prueba negativa.", "hiv negative test.", "abbreviation_not_in_sources"),
+    ("Evitar el ibuprofeno.", "Avoid nsaids and ibuprofen.", "abbreviation_not_in_sources"),
+])
+def test_what_the_english_says_in_a_way_the_checks_cant_compare_is_refused(text, english, reason):
+    assert reason in reasons(text, [text], english)
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Pesa 70 kilos.", "Weighs 70 kg."),
+    ("Glucosa en ayunas de 162 mg/dl.", "Fasting glucose 162 mg/dL."),
+    ("Tomar en ayunas.", "Take fasting."),
+    ("Metformina dos veces al día.", "Metformin twice a day."),
+    ("Dolor en rodilla izquierda.", "L knee pain."),
+    ("Salbutamol inhalado.", "Albuterol inhaler."),
+    ("VIH positivo.", "hiv positive."),
+    ("Evitar antiinflamatorios.", "Avoid nsaids."),
+    ("Suero 2 litros.", "Saline 2 L."),  # a liter, not the left side
+])
+def test_what_the_english_says_as_the_spanish_does_is_offered(text, english):
+    assert reasons(text, [text], english) == []
