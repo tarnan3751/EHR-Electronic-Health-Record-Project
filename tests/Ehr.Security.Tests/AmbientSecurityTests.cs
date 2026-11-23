@@ -410,6 +410,48 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         Assert.Equal(["0"], await Query(visit, "SELECT count(*) FROM ehr.ai_chart_proposals WHERE review_id = @review"));
     }
 
+    // The functions that run as the transcripts' owner and name them, as LabSecurityTests lists those that name the lab
+    // door's tables: the purge alone, the one way a transcript goes while its review is open.
+    const string NamesTheTranscripts = """
+        SELECT p.proname FROM pg_proc p
+        WHERE p.prosecdef AND p.proowner = 'ehr_owner'::regrole
+          AND CASE WHEN p.prosqlbody IS NOT NULL THEN EXISTS (
+                  SELECT FROM pg_depend d
+                  WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.refclassid = 'pg_class'::regclass
+                    AND d.refobjid = 'ehr.ambient_transcripts'::regclass)
+              ELSE pg_get_functiondef(p.oid) ~* '"?ehr"?\s*\.\s*"?ambient_transcripts\M'
+                OR (EXISTS (SELECT FROM unnest(p.proconfig) AS c WHERE c ~* '^search_path=.*\mehr\M')
+                    AND pg_get_functiondef(p.oid) ~* '\m"?ambient_transcripts\M')
+              END
+        ORDER BY p.proname
+        """;
+
+    // A transcript is written only by the transaction that staged its review: one written later than this transaction
+    // began, by another that has committed since, is refused like one written long before.
+    [Fact]
+    public async Task A_transcript_is_written_only_while_the_staging_transaction_is_in_progress()
+    {
+        var visit = await RecordingAsync();
+        await using var earlier = new NpgsqlConnection(App);
+        await earlier.OpenAsync(Cancel);
+        await using var transaction = await earlier.BeginTransactionAsync(Cancel);
+        await using (var start = new NpgsqlCommand($"SELECT set_config('app.user_id', '{visit.Actor}', true), pg_current_xact_id()", earlier, transaction))
+        {
+            await start.ExecuteNonQueryAsync(Cancel);
+        }
+
+        // Staged by another transaction after this one began, committed, and its transcript then purged.
+        await Execute(visit, Stage);
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "SET LOCAL session_replication_role = replica; DELETE FROM ehr.ambient_transcripts WHERE id = @review", Parameters(visit));
+        await using var insert = new NpgsqlCommand(
+            "INSERT INTO ehr.ambient_transcripts (id, patient_id, transcript) VALUES (@review, @patient, @transcript::jsonb)", earlier, transaction);
+        insert.Parameters.AddWithValue("review", visit.Review);
+        insert.Parameters.AddWithValue("patient", visit.Patient);
+        insert.Parameters.AddWithValue("transcript", Transcript);
+        Assert.Equal("23514", (await Assert.ThrowsAsync<PostgresException>(() => insert.ExecuteNonQueryAsync(Cancel))).SqlState);
+    }
+
     // The writes of listening to a visit, among a patient's events: the consent, the review, its proposals, the transcript.
     const string Ours = "action IN ('insert', 'update', 'delete') AND table_name IN ('ambient_consents', 'ai_note_reviews', 'ai_field_proposals', 'ambient_transcripts')";
 
@@ -465,6 +507,12 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
             await using var command = new NpgsqlCommand(Purge, connection, transaction);
             command.Parameters.AddWithValue("keep", keep);
             var row = ((string)(await command.ExecuteScalarAsync(Cancel))!).Split(' ');
+            // Its owner's switch is closed again once it returns.
+            await using (var after = new NpgsqlCommand("SELECT coalesce(current_setting('app.ambient_purge', true), '')", connection, transaction))
+            {
+                Assert.Equal("", (string)(await after.ExecuteScalarAsync(Cancel))!);
+            }
+
             await transaction.CommitAsync(Cancel);
             return (int.Parse(row[0], System.Globalization.CultureInfo.InvariantCulture),
                 DateTimeOffset.Parse(row[1], System.Globalization.CultureInfo.InvariantCulture));
@@ -478,6 +526,8 @@ public class AmbientSecurityTests(MigratedDatabase database) : IClassFixture<Mig
         // role that opens the purge's switch itself gains nothing.
         Assert.Equal(["0"], await Accounts.QueryAsync(database.OwnerConnectionString, null, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @review", Parameters(visit)));
         await Accounts.ExecuteAsync(database.OwnerConnectionString, null, "DELETE FROM ehr.ambient_transcripts WHERE id = @review", Parameters(visit));
+        await Accounts.ExecuteAsync(database.OwnerConnectionString, null, "DELETE FROM ehr.ambient_transcripts");
+        Assert.Equal(["purge_ambient_transcripts"], await Accounts.QueryAsync(database.SuperuserConnectionString, null, NamesTheTranscripts));
         await using (var connection = new NpgsqlConnection(App))
         {
             await connection.OpenAsync(Cancel);
