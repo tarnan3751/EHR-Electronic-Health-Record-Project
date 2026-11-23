@@ -710,3 +710,57 @@ def test_a_negation_carries_over_its_list_and_into_a_quote_of_its_tail(text, quo
 ])
 def test_a_negation_stops_at_an_item_that_says_something_of_its_own(text, quote, english):
     assert reasons(text, [quote], english) == []
+
+
+# ---- Cues the Spanish says that were missed, and step 15's English cues read in Spanish (sentences outside the test
+# set) -------------------------------------------------------------------------------------------------------------
+
+CUES = [
+    ("Se descartó neumonía.", "Pneumonia confirmed.", "Pneumonia was ruled out.", ["negation_dropped"]),
+    ("Imagen compatible con neumonía.", "Image showing pneumonia.", "Image consistent with pneumonia.",
+     ["certainty_dropped"]),
+    ("Hallazgos sugestivos de apendicitis.", "Findings of appendicitis.", "Findings suggestive of appendicitis.",
+     ["certainty_dropped"]),
+    ("Infarto hace años.", "Acute infarction now.", "Infarction years ago.", ["history_dropped"]),
+    ("Tuvo un infarto.", "Is having an infarction.", "Had an infarction.", ["history_dropped"]),
+    ("Neumonía el año pasado.", "Pneumonia.", "Pneumonia last year.", ["history_dropped"]),
+    ("Infarto antiguo.", "Infarction.", "Old infarction.", ["history_dropped"]),
+    ("Hay diabetes en la familia.", "Has diabetes.", "Diabetes in the family.", ["experiencer_dropped"]),
+    ("¿Tiene fiebre?", "Has a fever.", "Does she have a fever?", ["certainty_dropped"]),
+    ("Tiene neumonía probablemente.", "Has pneumonia.", "Has pneumonia, probably.", ["certainty_dropped"]),
+    ("No creo que la paciente tenga neumonía.", "The patient has pneumonia.",
+     "I don't think the patient has pneumonia.", ["negation_dropped", "certainty_dropped"]),
+    ("No estoy seguro de que tenga neumonía.", "She has pneumonia.", "I'm not sure she has pneumonia.",
+     ["negation_dropped", "certainty_dropped"]),
+    ("No se puede descartar apendicitis.", "Appendicitis.", "Cannot rule out appendicitis.",
+     ["negation_dropped", "certainty_dropped"]),
+]
+
+
+@pytest.mark.parametrize(("text", "plain", "kept", "dropped"), CUES)
+def test_a_cue_the_spanish_says_is_kept_and_never_dropped(text, plain, kept, dropped):
+    assert reasons(text, [text], plain) == dropped
+    assert reasons(text, [text], kept) == []
+
+
+@pytest.mark.parametrize(("english", "added"), [
+    ("Old myocardial infarction.", "history_added"),
+    ("Remote myocardial infarction.", "history_added"),
+    ("Myocardial infarction in the past.", "history_added"),
+    ("Prior myocardial infarction.", "history_added"),
+    ("Findings consistent with myocardial infarction.", "certainty_added"),
+    ("Myocardial infarction in the family.", "experiencer_added"),
+])
+def test_an_english_cue_the_spanish_doesnt_say_is_never_added(english, added):
+    assert added in reasons("Infarto de miocardio.", ["Infarto de miocardio."], english)
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Caída hace 3 días.", "Fall in the past 3 days."),  # a period, not the past
+    ("Dejó de fumar hace 10 años.", "Quit smoking 10 years ago."),  # a date, as "hace 10 años" is
+    ("Mujer de 68 años.", "68-year-old woman."),
+    ("PHQ-9 de 12, previamente 18.", "PHQ-9 of 12, previously 18."),  # a cue that reaches no finding
+    ("Ha tenido tos desde hace 3 días.", "Has had a cough for 3 days."),  # goes on
+])
+def test_what_only_looks_like_a_cue_isnt_one(text, english):
+    assert reasons(text, [text], english) == []

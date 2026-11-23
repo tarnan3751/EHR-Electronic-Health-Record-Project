@@ -120,7 +120,8 @@ def qualified(text: str) -> dict[str, list[str]]:
     ("COVID negativo.", {"negation": ["covid"]}),
     ("Posible neumonía.", {"certainty": ["neumonía"]}),
     ("Descartar apendicitis.", {"certainty": ["apendicitis"]}),
-    ("No se puede descartar apendicitis.", {"certainty": ["apendicitis"]}),
+    # A negation and a doubt, as validation.py reads "cannot rule out".
+    ("No se puede descartar apendicitis.", {"negation": ["apendicitis"], "certainty": ["apendicitis"]}),
     ("Antecedente de infarto en 2019.", {"history": ["infarto"]}),
     ("Infarto previo.", {"history": ["infarto"]}),
     ("Su padre tuvo un infarto.", {"experiencer": ["tuvo", "infarto"]}),
@@ -133,6 +134,13 @@ def qualified(text: str) -> dict[str, list[str]]:
     ("Niega fiebre, refiere tos.", {"negation": ["fiebre"]}),
     ("Sin fiebre, la tos ha mejorado.", {"negation": ["fiebre"]}),
     ("Sin edema. Tos, disnea.", {"negation": ["edema"]}),
+    ("Se descartó neumonía.", {"negation": ["neumonía"]}),
+    ("Imagen compatible con neumonía.", {"certainty": ["neumonía"]}),
+    ("Infarto hace años.", {"history": ["infarto"]}),
+    ("Hay diabetes en la familia.", {"experiencer": ["diabetes"]}),
+    ("¿Tiene fiebre?", {"certainty": ["tiene", "fiebre"]}),
+    ("Tiene neumonía probablemente.", {"certainty": ["tiene", "neumonía"]}),
+    ("No creo que la paciente tenga neumonía.", {"negation": ["neumonía"], "certainty": ["neumonía"]}),
 ])
 def test_each_cue_reaches_what_it_qualifies(text, expected):
     assert qualified(text) == expected

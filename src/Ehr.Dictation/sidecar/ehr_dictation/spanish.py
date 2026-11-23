@@ -557,7 +557,10 @@ def _phrases(text: str) -> list[tuple[str, ...]]:
 NEGATION_BEFORE = _phrases(
     """no; ni; niega; nego; niegan; negaba; sin; nunca; jamas; ningun; ninguno; ninguna; tampoco; negativo para;
     negativa para; negativos para; ausencia de; libre de; no presenta; no refiere; no hay; no se observa; no se observan;
-    no se palpa; no se palpan; se descarta; se descartan; descarta; dudo que; dudamos que"""
+    no se palpa; no se palpan; se descarta; se descartan; descarta; dudo que; dudamos que; se descarto; se
+    descartaron; descarto; descartaron; fue descartado; fue descartada; fueron descartados; fueron descartadas; ha sido
+    descartado; ha sido descartada; se ha descartado; no se puede descartar; no se descarta; no se descartan; no estoy
+    seguro; no estoy segura; no estamos seguros; no es seguro"""
 )
 NEGATION_AFTER = _phrases("negativo; negativa; negativos; negativas; ausente; ausentes; descartado; descartada; descartados; descartadas")
 CERTAINTY_BEFORE = _phrases(
@@ -566,20 +569,32 @@ CERTAINTY_BEFORE = _phrases(
     no se puede descartar; no se descarta; riesgo de; creo que; creemos que; pienso que; pensamos que; me parece que;
     quiza; quizas; tal vez; a lo mejor; puede que; podria tener; podria ser; podria haber; podria tratarse de;
     dudo que; dudamos que; me pregunto si; nos preguntamos si; preocupa; preocupado; preocupada; preocupados;
-    preocupadas; posibilidad de; presuntamente"""
+    preocupadas; posibilidad de; presuntamente; compatible con; compatibles con; sugestivo de; sugestiva de;
+    sugestivos de; sugestivas de; sugerente de; sugerentes de; no estoy seguro; no estoy segura; no estamos seguros; no
+    es seguro"""
 )
 CERTAINTY_AFTER = _phrases("probable; posible; a descartar; en estudio; dudoso; dudosa")
 # As validation.py reads English: "No creo que tenga neumonía" is a negation and a doubt, as "I don't think she has
-# pneumonia" is ("no" and "creo que" are each read), and "dudo que", as "I doubt", is both; "le preocupa", "me pregunto
-# si", "posibilidad de" and "presuntamente" are doubt, as "worried", "wonder", "a chance" and "presumably" are. A
-# negation inside a doubt that isn't one ("no se descarta") is the doubt alone.
+# pneumonia" is ("no" and "creo que" are each read), and "dudo que", "no estoy seguro", "no se puede descartar" and "no
+# se descarta", as "I doubt", "not sure", "cannot rule out" and "not ruled out", are both; "le preocupa", "me pregunto
+# si", "posibilidad de" and "presuntamente" are doubt, as "worried", "wonder", "a chance" and "presumably" are; and
+# "compatible con" and "sugestivo de" are doubt, as "consistent with" and "suggestive of" are (translation.py). Each
+# of these is listed in both lists. A sentence that is a question is doubt throughout, as validation.py reads one.
 # A doubt said once what it qualifies is said, set off by a comma at the end of its clause: "tiene neumonía, creo."
 CERTAINTY_CLOSING = _phrases("creo; creemos; me parece; supongo; probablemente; posiblemente; quiza; quizas; tal vez")
+# The past: a history, an operation, and when ("hace años", "el año pasado", "en el pasado"), as translation.py reads
+# "previous", "old", "remote", "in the past", "years ago" and "last year" in English.
 HISTORY_BEFORE = _phrases(
     """antecedente de; antecedentes de; antecedentes personales de; historia de; historial de; con antecedente de;
-    operado de; operada de; postoperado de; postoperada de; intervenido de; intervenida de"""
+    operado de; operada de; postoperado de; postoperada de; intervenido de; intervenida de; en el pasado; hace anos; el
+    ano pasado; previamente"""
 )
-HISTORY_AFTER = _phrases("previo; previa; previos; previas; antiguo; antigua")
+# Having had something, as a preterite or imperfect ("tuvo un infarto", "tenía fiebre"; not "ha tenido tos", which goes
+# on), and saying it is now ("actualmente"): translation.py refuses the one written as the other.
+HAD = frozenset("tuvo tuve tuvimos tuvieron tenía tenían padeció padecía sufrió sufría".split())
+NOW = frozenset("actualmente ahora activo activa actual".split())
+HISTORY_AFTER = _phrases("previo; previa; previos; previas; antiguo; antigua; hace anos; el ano pasado; en el pasado; "
+                         "previamente")
 # Not "historia de la enfermedad actual", the heading.
 HISTORY_HEADING = ("historia", "de", "la", "enfermedad", "actual")
 
@@ -600,6 +615,15 @@ RELATIVES = {
 }
 EXPERIENCER_BEFORE = _phrases(
     "antecedentes familiares de; antecedentes familiares; antecedente familiar de; historia familiar de; familiares; familiar"
+)
+EXPERIENCER_AFTER = _phrases("en la familia; en su familia")  # "hay diabetes en la familia"
+# A negation or a doubt passes over a subject and its verb, as validation.py's TO_THE_FINDING does in English: "no
+# creo que la paciente tenga neumonía", "dudo que su rodilla tenga una fractura".
+SUBJECTS = frozenset("ella ellos ellas usted esto este esta".split())
+THINKING = frozenset("creo creemos pienso pensamos cree piensa".split())
+HAVING = frozenset(
+    "tiene tenga tenia tuviera tienen tengan es sea era fuera son sean esta este estaba haya hay padece padezca "
+    "presenta presente".split()
 )
 # A relative after one of these (and maybe "su", "el", "la") is someone the patient is with or speaks to: "acompañado
 # de su madre", "se informa al padre" ("al" is "a el"). Unless a relative clause says what they have: "su madre, que
@@ -625,8 +649,8 @@ NEXT_CLAUSE = frozenset(
 # ("refiere", "presenta", "tiene", "con", "hay", "ha"), the next step of the plan, or more than LIST_ITEM words.
 LIST_STOPS = frozenset(
     """refiere refirio presenta presento tiene tenia tuvo con hay es son esta estan era fue ha han he muestra mostro
-    aqueja persiste persisten se observa aprecia nota""".split()
-)
+    aqueja persiste persisten se observa aprecia nota le les me nos te""".split()
+)  # a pronoun before a verb starts a clause: "le dio náusea"
 LIST_JOINS = frozenset("y e o u ni".split())
 LIST_ITEM = 5
 SCOPE = 6  # words after a cue it can reach, within its clause
@@ -652,13 +676,16 @@ def _stops(text: str, toks: list[Token], i: int, edge: int, k: int, ends: frozen
 
 
 def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: list[tuple[int, int]],
-           ends: frozenset[str] = TERMINATORS, closing: list[tuple[int, int]] = ()) -> tuple[set[int], set[int]]:
-    """The words the cues reach, and the cues' own words: SCOPE words on from a cue before what it qualifies, POST_SCOPE
-    back from one after it, each stopping at its clause; and back from a closing cue, over the comma before it, through
-    the clause it closes."""
+           ends: frozenset[str] = TERMINATORS, closing: list[tuple[int, int]] = (),
+           past_the_subject: bool = False) -> tuple[set[int], set[int]]:
+    """The words the cues reach, and the cues' own words: SCOPE words on from a cue before what it qualifies (past a
+    subject and its verb, if past_the_subject: _to_the_finding()), POST_SCOPE back from one after it, each stopping at
+    its clause; and back from a closing cue over all of its sentence, its commas included, as validation.py reads a
+    closing doubt."""
     reached: set[int] = set()
     cues: set[int] = set()
     for first, last in before:
+        last = _to_the_finding(text, toks, last) if past_the_subject else last
         cues |= set(range(first, last + 1))
         edge = toks[last].end
         for k, i in enumerate(range(last + 1, min(len(toks), last + 1 + SCOPE))):
@@ -666,15 +693,51 @@ def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: l
                 break
             reached.add(i)
             edge = toks[i].end
-    for first, last in [*after, *closing]:
+    for first, last in after:
         cues |= set(range(first, last + 1))
-        edge = toks[first - 1].end if (first, last) in closing else toks[first].start
+        edge = toks[first].start
         for i in range(first - 1, max(-1, first - 1 - POST_SCOPE), -1):
             if toks[i].key in ends or any(mark in text[toks[i].end : edge] for mark in ".,;:?!\n"):
                 break
             reached.add(i)
             edge = toks[i].start
+    for first, last in closing:
+        cues |= set(range(first, last + 1))
+        edge = toks[first].start
+        for i in range(first - 1, -1, -1):
+            if toks[i].key in ends or any(mark in text[toks[i].end : edge] for mark in ".;:?!¿¡\n"):
+                break
+            reached.add(i)
+            edge = toks[i].start
     return reached - cues, cues
+
+
+def _to_the_finding(text: str, toks: list[Token], last: int) -> int:
+    """The last word of a cue with what it passes over before the words it qualifies: "creo" or "pienso", "que" or
+    "si", a clause between commas, a subject ("la paciente", "ella", "su rodilla") and its verb of having or being
+    ("tenga", "es")."""
+    i = last + 1
+    if i < len(toks) and toks[i].key in THINKING:
+        i += 1
+    if i < len(toks) and toks[i].key in ("que", "si"):
+        i += 1
+    if i < len(toks) and text[toks[i - 1].end : toks[i].start].strip() == ",":
+        close = next((k for k in range(i, min(len(toks), i + 15)) if "," in text[toks[k].end : toks[k + 1].start]
+                      if k + 1 < len(toks)), None)
+        if close is not None and not any(m in text[toks[i].start : toks[close].end] for m in ".;:?!\n"):
+            i = close + 1
+            if i < len(toks) and toks[i].key in ("que", "si"):
+                i += 1
+    if i + 1 < len(toks) and toks[i].key in ("el", "la") and toks[i + 1].key == "paciente":
+        i += 2
+    elif i < len(toks) and (toks[i].key in SUBJECTS or toks[i].text == "él"):
+        i += 1
+    elif i < len(toks) and toks[i].key in ("su", "sus"):
+        verb = next((k for k in range(i + 1, min(len(toks), i + 5)) if toks[k].key in HAVING), None)
+        i = verb if verb is not None else i
+    if i < len(toks) and toks[i].key in HAVING:
+        return i
+    return i - 1 if i - 1 > last else last
 
 
 def carry_over_list(text: str, toks: list, words: list[str], reached: set[int], stops: frozenset[str],
@@ -715,13 +778,25 @@ def carry_over_list(text: str, toks: list, words: list[str], reached: set[int], 
 
 
 def _closing(text: str, toks: list[Token], phrases: list[tuple[str, ...]]) -> list[tuple[int, int]]:
-    """Where the phrases close a clause: after a comma and before its end (a full stop, a semicolon, a question or an
-    exclamation mark, a line break, or the end of the text)."""
+    """Where the phrases close a clause, after a comma or not, before its end (a full stop, a comma, a semicolon, a
+    question or an exclamation mark, a line break, or the end of the text): "tiene neumonía, creo", "neumonía
+    probablemente"."""
     found = []
     for first, last in _matches([t.key for t in toks], phrases):
         after = text[toks[last].end :].lstrip(" ")
-        if first and text[toks[first - 1].end : toks[first].start].strip() == "," and (not after or after[0] in ".;?!\n"):
+        if first and (not after or after[0] in ".,;?!\n"):
             found.append((first, last))
+    return found
+
+
+QUESTION = re.compile(r"[^.;:!?\n]*\?|¿[^.;:!?\n]*")
+
+
+def _questions(text: str, toks: list[Token]) -> set[int]:
+    """The words of each sentence that is a question: one that ends with a question mark, or opens with one."""
+    found: set[int] = set()
+    for question in QUESTION.finditer(text):
+        found |= {k for k, token in enumerate(toks) if question.start() <= token.start and token.end <= question.end()}
     return found
 
 
@@ -768,6 +843,7 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
             continue
         relatives.append((i, i))
     closing = {"certainty": _closing(text, toks, CERTAINTY_CLOSING)}
+    relatives_after += _matches(keys, EXPERIENCER_AFTER)
     out: dict[str, set[int]] = {}
     cue_words: dict[str, set[int]] = {}
     for kind, before, after, ends in (
@@ -776,7 +852,10 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
         ("history", history, _matches(keys, HISTORY_AFTER), TERMINATORS),
         ("experiencer", sorted(_matches(keys, EXPERIENCER_BEFORE) + relatives), relatives_after, TERMINATORS | REPORTING),
     ):
-        reached, cues = _reach(text, toks, before, after, ends, closing.get(kind, []))
+        reached, cues = _reach(text, toks, before, after, ends, closing.get(kind, []),
+                               past_the_subject=kind in ("negation", "certainty"))
+        if kind == "certainty":
+            reached |= _questions(text, toks) - cues
         reached = carry_over_list(text, toks, [t.key for t in toks], reached - cues,
                                   ends | NEXT_CLAUSE | REPORTING | LIST_STOPS, LIST_JOINS)
         out[kind] = {i for i in reached if _is_content(toks[i])}

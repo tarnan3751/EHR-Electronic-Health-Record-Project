@@ -65,13 +65,20 @@ statement:
      list, item by item past its commas, in both languages, until its sentence ends or an item says something of its
      own (spanish.carry_over_list()): "Niega fiebre, tos, disnea y síncope" negates the four. And it is read in the
      whole transcript, so a passage quoting the tail of a negated list ("tos, disnea y síncope") takes the negation
-     with it. A doubt is the clinician's
-     whether it comes before what it doubts ("creo que", "quizá", "tal vez", "a lo mejor", "puede que", "podría
-     tener") or closes its clause (", creo", ", probablemente"), as validation.py hears one in English ("I think she
-     has", "maybe", "she might have", "probably", a closing ", I think"); "no creo que tenga" and "dudo que" are a
-     negation and a doubt, as validation.py reads "I don't think she has" and "I doubt"; and "le preocupa", "me
-     pregunto si", "posibilidad de" and "presuntamente" are doubt, as "worried", "wonder", "a chance" and
-     "presumably" are;
+     with it. A doubt is the clinician's whether it comes before what it doubts ("creo que", "quizá", "tal vez", "a lo
+     mejor", "puede que", "podría tener") or closes its clause, after a comma or not, reaching back over its sentence
+     ("creo", "probablemente"), as validation.py hears one in English ("I think she has", "maybe", "she might have",
+     "probably", a closing "I think"); a question is doubt throughout; and a negation or a doubt passes over "creo",
+     "que", a subject and its verb ("no creo que la paciente tenga"), as validation.py's TO_THE_FINDING does. "No creo
+     que tenga", "dudo que", "no estoy seguro", "no se puede descartar" and "no se descarta" are a negation and a
+     doubt, as validation.py reads "I don't think she has", "I doubt", "not sure" and "cannot rule out"; "le preocupa",
+     "me pregunto si", "posibilidad de", "presuntamente", "compatible con" and "sugestivo de" are doubt, as "worried",
+     "wonder", "a chance", "presumably", "consistent with" and "suggestive of" are; "se descartó" and "descartado" are
+     a negation, as "ruled out" is; "hace años", "el año pasado", "en el pasado", "previamente", "previo" and "antiguo"
+     are the past, as "years ago", "last year", "in the past", "previously", "prior", "previous", "old" and "remote"
+     are (MORE_ENGLISH, read as validation.py's own cues are); and "en la familia" is someone else, as "in the family"
+     is. Having had something ("tuvo", "tenía", "padeció") written as having it now ("is having", "currently", "now",
+     "active") is history_dropped, unless the Spanish says now too ("actualmente");
    - in order, and paired: numbers, how long, drugs, sides, routes, severity, how often, relatives and medication
      changes each come in the English in the Spanish's order, some left out but none moved (order_changed): "TA 142
      sobre 88" is not "BP 88/142", nor "Suspender metformina e iniciar insulina" "Start metformin and stop insulin"; a
@@ -873,14 +880,45 @@ def spanish_content(said: list[spanish.Token]) -> int:
     return sum(1 for t in said if spanish._is_content(t))
 
 
-# English for what spanish.py's lists say that validation.py's English cues don't: "infarto previo" is a prior MI,
-# "neumonía en estudio" pneumonia under investigation, "no se puede descartar" can't be ruled out.
-MORE_ENGLISH = {
-    "history": re.compile(r"\b(?:prior|previous)\b", re.IGNORECASE),
-    "certainty": re.compile(
-        r"\b(?:under (?:investigation|study)|cannot (?:be )?ruled? out|can't (?:be )?ruled? out|not ruled out|"
-        r"doubtful|presumed|presumptive)\b", re.IGNORECASE),
-}
+# English for what spanish.py's lists say that validation.py's English cues don't, read as validation.py reads its own
+# (Qualifier rows): "infarto previo" is a prior, old or remote MI, "infarto hace años" an MI years ago or in the past,
+# "el año pasado" last year; "neumonía en estudio" pneumonia under investigation, "no se puede descartar" can't be
+# ruled out, "compatible con neumonía" consistent with pneumonia; "diabetes en la familia" diabetes in the family. Not
+# "old" in "68-year-old", "in the past" in "in the past 3 days", nor "years ago" after a number ("10 years ago" is a
+# date, as "hace 10 años" is). A cue counts only where it reaches a word ("previously 18" doesn't).
+_NEVER = re.compile(r"(?!)")
+_PERIOD = r"(?:days?|weeks?|months?|years?|hours?)"
+MORE_ENGLISH = (
+    validation.Qualifier(
+        "history_dropped", re.compile(r"\b(?:prior|previous|previously|remote)\b|(?<![-\w])old\b(?!-)", re.I),
+        re.compile(rf"\bin the past\b(?!\s+(?:\d|\w+\s+{_PERIOD}\b|{_PERIOD}\b|few|several|couple))|\blast year\b"
+                   r"|\bpreviously\b|(?<!\d )\byears ago\b", re.I),
+        None, False, validation.TERMINATORS),
+    validation.Qualifier(
+        "certainty_dropped", re.compile(
+            r"\b(?:doubtful|presumed|presumptive|consistent with|compatible with|suggestive of|suggesting|"
+            r"in keeping with)\b", re.I),
+        re.compile(r"\b(?:under (?:investigation|study)|cannot (?:be )?ruled? out|can't (?:be )?ruled? out|"
+                   r"not ruled out|doubtful|presumed)\b", re.I),
+        None, False, validation.TERMINATORS),
+    validation.Qualifier("experiencer_dropped", _NEVER,
+                         re.compile(r"\b(?:in (?:the|her|his|their) family|runs in the family)\b", re.I),
+                         None, False, validation.TERMINATORS | validation.REPORTING),
+)
+_NAMES = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", "certainty_dropped": "certainty",
+          "history_dropped": "history"}
+
+
+def _more_english(text: str) -> list[tuple[str, set[int], set[int]]]:
+    """For each MORE_ENGLISH row, its kind, the content words its cues reach in the text, and the cues' words."""
+    words = tokens(text)
+    found = []
+    for qualifier in MORE_ENGLISH:
+        reached, cues = validation._reach(text, words, qualifier)
+        content = {i for i in reached if words[i].text.isalpha() and len(words[i].text) >= 2
+                   and words[i].text not in STOPWORDS}
+        found.append((_NAMES[qualifier.reason], content, set(cues) if content else set()))
+    return found
 
 
 # English words that are a negation of their own, as Spanish says "no" and the word: "no controlada" is
@@ -909,14 +947,13 @@ def _without_told_relatives(text: str) -> str:
 
 
 def _english_qualified(text: str) -> dict[str, bool]:
-    names = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", "certainty_dropped": "certainty",
-             "history_dropped": "history"}
+    names = _NAMES
     found = {}
     for qualifier in validation.QUALIFIERS:
         read = _without_told_relatives(text) if qualifier.reason == "experiencer_dropped" else text
         found[names[qualifier.reason]] = bool(validation._reach(read, tokens(read), qualifier)[0])
-    for kind, pattern in MORE_ENGLISH.items():
-        found[kind] = found[kind] or bool(pattern.search(text))
+    for kind, reached, _ in _more_english(text):
+        found[kind] = found[kind] or bool(reached)
     found["negation"] = found["negation"] or any(t.text in NEGATED_WORDS for t in tokens(text))
     return found
 
@@ -1144,6 +1181,7 @@ def _parts(words: list[str], gaps: list[str], content: list[bool], flagged: dict
     return found
 
 
+HAVING_NOW = re.compile(r"\b(?:is|are|am) having\b|\bcurrent(?:ly)?\b|\bnow\b|\bongoing\b|\bactive\b", re.IGNORECASE)
 # What ends a qualifier's carrying over an English list, as spanish.LIST_STOPS does the Spanish: "No fever, cough or
 # dyspnea" carries, "No fever, has a cough" doesn't.
 ENGLISH_LIST_STOPS = validation.REPORTING | frozenset(
@@ -1154,10 +1192,9 @@ ENGLISH_LIST_JOINS = frozenset("and or nor".split())
 
 def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, set[int]], dict[str, set[int]]]:
     """For each kind, the English words a qualifier reaches (as _english_qualified() reads them), and its cues' words,
-    with the words of MORE_ENGLISH and NEGATED_WORDS among the cues. Cues of a kind that reach nothing in the statement
-    ("either" closing it) say nothing of their clause, and aren't counted."""
-    names = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", "certainty_dropped": "certainty",
-             "history_dropped": "history"}
+    MORE_ENGLISH's read the same way, with NEGATED_WORDS among the cues. Cues of a kind that reach nothing in the
+    statement ("either" closing it) say nothing of their clause, and aren't counted."""
+    names = _NAMES
     flagged: dict[str, set[int]] = {}
     cues: dict[str, set[int]] = {}
     for qualifier in validation.QUALIFIERS:
@@ -1168,9 +1205,9 @@ def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, 
                                           ENGLISH_LIST_JOINS)
         flagged[names[qualifier.reason]] = set(reached)
         cues[names[qualifier.reason]] = set(cue_words) if reached else set()
-    for kind, pattern in MORE_ENGLISH.items():
-        for match in pattern.finditer(text):
-            cues[kind] |= {i for i, w in enumerate(words) if w.end > match.start() and w.start < match.end()}
+    for kind, reached, cue_words in _more_english(text):
+        flagged[kind] |= reached
+        cues[kind] |= cue_words
     cues["negation"] |= {i for i, w in enumerate(words) if w.text in NEGATED_WORDS}
     return flagged, cues
 
@@ -1519,6 +1556,10 @@ def _compare(result: _Statement, ctx: _Context) -> None:
             reasons.add(f"{kind}_dropped")
         elif in_english[kind] and not in_spanish:
             reasons.add(f"{kind}_added")
+    # Had, written as having it now: "Tuvo un infarto" as "Is having an MI", "MI now".
+    if (any(t.text in spanish.HAD for t in said) and not any(t.key in spanish.NOW for t in said)
+            and HAVING_NOW.search(english)):
+        reasons.add("history_dropped")
     english_relatives = {ENGLISH_RELATIVES[w] for w in english_words if w in ENGLISH_RELATIVES}
     spanish_relatives = spanish.relatives(said)
     if not english_relatives <= {who for whos in spanish_relatives for who in whos} or any(
