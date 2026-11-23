@@ -429,7 +429,7 @@ def test_a_quote_ending_between_words_is_found():
 
 
 DOUBTS = [
-    ("No creo que tenga neumonía.", "I don't think she has pneumonia.", ["negation_dropped"]),
+    ("No creo que tenga neumonía.", "I don't think she has pneumonia.", ["negation_dropped", "certainty_dropped"]),
     ("Creo que tiene neumonía.", "I think she has pneumonia.", ["certainty_dropped"]),
     ("Quizá tiene neumonía.", "Maybe she has pneumonia.", ["certainty_dropped"]),
     ("Quizás tiene neumonía.", "Perhaps she has pneumonia.", ["certainty_dropped"]),
@@ -452,6 +452,24 @@ def test_a_doubt_said_in_spanish_is_kept_and_never_dropped(text, english, droppe
 @pytest.mark.parametrize(("text", "english", "dropped"), DOUBTS)
 def test_a_doubt_the_spanish_doesnt_say_is_never_added(text, english, dropped):
     assert reasons("Tiene neumonía.", ["Tiene neumonía."], english) == [r.replace("dropped", "added") for r in dropped]
+
+
+# What validation.py reads as doubt in English, the Spanish reads in its words: "I doubt" is a negation as well.
+DOUBT_WORDS = [
+    ("Dudo que tenga faringitis.", "I doubt she has pharyngitis.", ["negation_dropped", "certainty_dropped"]),
+    ("Le preocupa que tenga neumonía.", "She is worried she has pneumonia.", ["certainty_dropped"]),
+    ("Me pregunto si tiene neumonía.", "I wonder if she has pneumonia.", ["certainty_dropped"]),
+    ("Posibilidad de neumonía.", "A chance of pneumonia.", ["certainty_dropped"]),
+    ("Presuntamente tiene neumonía.", "Presumably she has pneumonia.", ["certainty_dropped"]),
+]
+
+
+@pytest.mark.parametrize(("text", "english", "dropped"), DOUBT_WORDS)
+def test_a_doubt_word_english_reads_is_read_in_spanish_both_ways(text, english, dropped):
+    plain = "Tiene faringitis." if "faringitis" in text else "Tiene neumonía."
+    assert reasons(text, [text], english) == []
+    assert reasons(text, [text], "She has pharyngitis." if "faringitis" in text else "She has pneumonia.") == dropped
+    assert reasons(plain, [plain], english) == [r.replace("dropped", "added") for r in dropped]
 
 
 def test_a_word_of_doubt_inside_a_clause_doesnt_close_it():

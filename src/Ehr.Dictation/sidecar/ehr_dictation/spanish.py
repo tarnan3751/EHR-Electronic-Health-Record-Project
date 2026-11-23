@@ -511,19 +511,22 @@ def _phrases(text: str) -> list[tuple[str, ...]]:
 NEGATION_BEFORE = _phrases(
     """no; ni; niega; nego; niegan; negaba; sin; nunca; jamas; ningun; ninguno; ninguna; tampoco; negativo para;
     negativa para; negativos para; ausencia de; libre de; no presenta; no refiere; no hay; no se observa; no se observan;
-    no se palpa; no se palpan; se descarta; se descartan; descarta"""
+    no se palpa; no se palpan; se descarta; se descartan; descarta; dudo que; dudamos que"""
 )
 NEGATION_AFTER = _phrases("negativo; negativa; negativos; negativas; ausente; ausentes; descartado; descartada; descartados; descartadas")
 CERTAINTY_BEFORE = _phrases(
     """posible; posibles; posiblemente; probable; probables; probablemente; sospecha de; se sospecha; sospechoso de;
     sospechosa de; sospecho; a descartar; descartar; dudoso; dudosa; en estudio; impresiona de; presunto; presunta;
     no se puede descartar; no se descarta; riesgo de; creo que; creemos que; pienso que; pensamos que; me parece que;
-    quiza; quizas; tal vez; a lo mejor; puede que; podria tener; podria ser; podria haber; podria tratarse de"""
+    quiza; quizas; tal vez; a lo mejor; puede que; podria tener; podria ser; podria haber; podria tratarse de;
+    dudo que; dudamos que; me pregunto si; nos preguntamos si; preocupa; preocupado; preocupada; preocupados;
+    preocupadas; posibilidad de; presuntamente"""
 )
 CERTAINTY_AFTER = _phrases("probable; posible; a descartar; en estudio; dudoso; dudosa")
-# "No creo que tenga neumonía" is a negation, as validation.py reads "I don't think she has pneumonia": after "no",
-# these aren't a doubt.
-DENIED_DOUBTS = frozenset(_phrases("creo que; creemos que; pienso que; pensamos que; me parece que"))
+# As validation.py reads English: "No creo que tenga neumonía" is a negation and a doubt, as "I don't think she has
+# pneumonia" is ("no" and "creo que" are each read), and "dudo que", as "I doubt", is both; "le preocupa", "me pregunto
+# si", "posibilidad de" and "presuntamente" are doubt, as "worried", "wonder", "a chance" and "presumably" are. A
+# negation inside a doubt that isn't one ("no se descarta") is the doubt alone.
 # A doubt said once what it qualifies is said, set off by a comma at the end of its clause: "tiene neumonía, creo."
 CERTAINTY_CLOSING = _phrases("creo; creemos; me parece; supongo; probablemente; posiblemente; quiza; quizas; tal vez")
 HISTORY_BEFORE = _phrases(
@@ -637,9 +640,10 @@ def _is_content(token: Token) -> bool:
 def qualified(text: str, toks: list[Token]) -> dict[str, set[int]]:
     """For each kind of qualifier (negation, certainty, history, experiencer), the content words its cues reach."""
     keys = [t.key for t in toks]
-    certainty_before = [(first, last) for first, last in _matches(keys, CERTAINTY_BEFORE)
-                        if not (first and keys[first - 1] == "no" and tuple(keys[first : last + 1]) in DENIED_DOUBTS)]
-    taken = {i for first, last in certainty_before for i in range(first, last + 1)}
+    certainty_before = _matches(keys, CERTAINTY_BEFORE)
+    both = set(NEGATION_BEFORE)
+    taken = {i for first, last in certainty_before if tuple(keys[first : last + 1]) not in both
+             for i in range(first, last + 1)}
     corrections = {i for first, last in correction_cues(text, toks) for i in range(first, last + 1)}
 
     def free(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:

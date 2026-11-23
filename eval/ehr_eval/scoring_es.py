@@ -131,8 +131,8 @@ def negated(text: str, phrase: str) -> list[bool]:
     """For each place the phrase is in the English text, whether an English negation (validation.py's) reaches one of
     its words there."""
     words = tokens(text)
-    _, before, after, closing, ends = validation.QUALIFIERS[0]
-    reached = validation._reach(text, words, before, after, closing, ends)[0]
+    negation = next(qualifier for qualifier in validation.QUALIFIERS if qualifier.reason == "negation_dropped")
+    reached = validation._reach(text, words, negation)[0]
     return [any(i in reached for i, word in enumerate(words) if m.start() <= word.start < m.end())
             for m in re.finditer(rf"(?<![\w]){re.escape(phrase.lower())}(?![\w])", text.lower())]
 

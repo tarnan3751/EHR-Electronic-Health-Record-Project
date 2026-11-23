@@ -590,9 +590,9 @@ def _english_qualified(text: str) -> dict[str, bool]:
     names = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", "certainty_dropped": "certainty",
              "history_dropped": "history"}
     found = {}
-    for reason, before, after, closing, ends in validation.QUALIFIERS:
-        read = _without_told_relatives(text) if reason == "experiencer_dropped" else text
-        found[names[reason]] = bool(validation._reach(read, tokens(read), before, after, closing, ends)[0])
+    for qualifier in validation.QUALIFIERS:
+        read = _without_told_relatives(text) if qualifier.reason == "experiencer_dropped" else text
+        found[names[qualifier.reason]] = bool(validation._reach(read, tokens(read), qualifier)[0])
     for kind, pattern in MORE_ENGLISH.items():
         found[kind] = found[kind] or bool(pattern.search(text))
     found["negation"] = found["negation"] or any(t.text in NEGATED_WORDS for t in tokens(text))
