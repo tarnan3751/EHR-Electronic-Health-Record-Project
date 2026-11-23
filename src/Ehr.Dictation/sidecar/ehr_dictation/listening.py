@@ -231,7 +231,8 @@ class Listening(Sessions):
                         said = await asyncio.to_thread(
                             transcriber.passages, samples, levels, floor, turn.start, turn.end, self._recognizer
                         )
-                    passages += [(p, turn.voice, found.unsure(p.start_sample, p.end_sample, turn.voice)) for p in said]
+                    passages += [(p, turn.voice, found.unsure(p.start_sample, p.end_sample, turn.voice, conversation.words(p)))
+                                 for p in said]
             except Exception as error:  # noqa: BLE001 (nothing is drafted; the reason goes back)
                 self._unfinished(session, type(error).__name__)
                 return

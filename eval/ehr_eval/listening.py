@@ -97,14 +97,26 @@ def hear(data: bytes, speakers: int, turns: list[dict], recognizer, embedder) ->
     passages = []
     for turn in found.turns:
         for passage in transcriber.passages(samples, levels, floor, turn.start, turn.end, recognizer):
-            passages.append((passage, turn.voice, found.unsure(passage.start_sample, passage.end_sample, turn.voice)))
+            passages.append((passage, turn.voice, found.unsure(passage.start_sample, passage.end_sample, turn.voice,
+                                                               conversation.words(passage))))
     heard = conversation.assemble(passages)
     timings["transcribe"] = time.perf_counter() - started
-    doubts = [found.doubts(p.segment.start_sample, p.segment.end_sample, voice) if voice is not None else None
-              for p, voice in zip(heard.placed, heard.voices, strict=True)]
+    doubts = [doubted(found, p.segment, voice) for p, voice in zip(heard.placed, heard.voices, strict=True)]
     heard = heard.numbered()  # as the sidecar lists them, once each passage's doubts are read with diarize.py's numbers
     names = name_voices(heard, turns)
     return Heard(heard.named(names) if names else heard, doubts, names, timings=timings)
+
+
+def doubted(found: diarize.Diarization, segment, voice: int | None) -> dict | None:  # noqa: ANN001
+    """What diarize.unsure() weighed for a passage, and each window over it, numbers only, so other ways of judging a
+    passage (the median window, or the windows away from a change of voice) can be measured from the stored run: its
+    first and last frame, the voice it was first put with, its margin, similarity and drop, and whether it was
+    relabelled."""
+    doubts = found.doubts(segment.start_sample, segment.end_sample, voice) if voice is not None else None
+    if doubts is None:
+        return None
+    return doubts | {"windows": [[w.start, w.end, w.group, round(w.margin, 4), round(w.similarity, 4), round(w.drop, 4),
+                                  int(w.relabelled)] for w in found.over(segment.start_sample, segment.end_sample)]}
 
 
 async def draft(heard: Heard, structurer: Structurer) -> Heard:

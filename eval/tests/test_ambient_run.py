@@ -165,6 +165,8 @@ def test_the_run_scores_every_kind_of_visit_and_the_gate_reads_it(run_dir, monke
     assert items["c02-run--clean"]["sorting"] == "unavailable" and items["c02-run--clean"]["reason"] == "model_unavailable"
     assert items["c03-run--clean"]["names"] == {"1": "clinician", "2": "patient", "3": "other"}
     assert any(any(item["unsure"]) for item in data["items"]), "a passage whose speaker is unsure"
+    stored_windows = [w for item in data["items"] for doubts in item["doubts"] if doubts for w in doubts["windows"]]
+    assert stored_windows and all(len(w) == 7 and all(isinstance(n, (int, float)) for n in w) for w in stored_windows)
     listed = [entry for item in data["items"] for entry in item["not_carried_over"]]
     assert listed and all(entry[3] in ("clinician", "unsure") for entry in listed)
     assert data["metrics"]["safety"]["requests_as_instructions"] == []

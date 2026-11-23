@@ -17,9 +17,10 @@ not labelled right (missed_at_turn_change), since that is where a short answer g
 - attribution: of the heard words paired with a word said, and the words dropped at a change of speaker, the share
   labelled with the role that said it, the share left unsure (an Unsure passage, or a voice named "unsure"), and the
   words and the passages labelled with another role with confidence; each again over a range of each of diarize.py's
-  thresholds, the others as they are, to tune them (by_margin, by_floor, by_drop); the share of each recording's heard
-  words in Unsure passages (unsure_by_recording); and how often the voices told apart were as many as spoke and could be
-  named.
+  thresholds, the others as they are, to tune them (by_margin, by_floor, and by_drop, which turns on the rule the
+  sidecar leaves off; each passage's windows are stored too, for other ways of judging it); the share of each
+  recording's heard words in Unsure passages (unsure_by_recording); and how often the voices told apart were as many
+  as spoke and could be named.
 - fields, fields_clinical, validation, unsupported_content, dates, drugs: scoring.py's. order_allergy: scoring.py's
   too, except that a retracted value or a drug no gold value carries counts as flagged only under a warning that points
   at a passage to check (FLAGS), since every Subjective value of a visit carries patients_own_words.
@@ -83,8 +84,8 @@ class VisitItem:
     sorting: str  # done, unavailable (reason says why), or unnamed (the voices couldn't be named)
     reason: str | None = None
     # MedASR's passages as heard (as Segment has them), each one's voice, whether it was unsure and what that weighed
-    # (diarize.Diarization.doubts()), and the names given to the voices, so the transcript can be rebuilt exactly and
-    # checked again offline.
+    # (diarize.Diarization.doubts(), with each window over it: listening.doubted()), and the names given to the voices,
+    # so the transcript can be rebuilt exactly and checked again offline.
     segments: list[dict] = field(default_factory=list)
     voices: list[int | None] = field(default_factory=list)
     unsure: list[bool] = field(default_factory=list)
@@ -158,7 +159,8 @@ def faults(item: VisitItem) -> list[str]:
     heard = rebuild(item)
     if heard.text != item.hypothesis:
         found.append("its transcript isn't the one its passages make")
-    if any(doubt != diarize.unsure(doubts) for doubt, doubts in zip(item.unsure, item.doubts, strict=True)):
+    if any(doubt != diarize.unsure(doubts, conversation.words(Segment(**segment)))
+           for doubt, doubts, segment in zip(item.unsure, item.doubts, item.segments, strict=True)):
         found.append("a passage is marked sure or unsure against what its stored doubts say")
     if not item.names:
         return found + (["it was drafted with no voices named"] if item.windows else [])
@@ -347,7 +349,8 @@ def _label(item: VisitItem, index: int, thresholds: dict | None) -> str:
     """Who the passage says spoke it: its voice's name, or unsure, at the thresholds given or as the run had it."""
     voice = item.voices[index]
     name = item.names.get(str(voice), "unsure") if voice is not None else "unsure"
-    doubt = item.unsure[index] if thresholds is None else diarize.unsure(item.doubts[index], **thresholds)
+    words = conversation.words(Segment(**item.segments[index]))
+    doubt = item.unsure[index] if thresholds is None else diarize.unsure(item.doubts[index], words, **thresholds)
     return "unsure" if doubt else name
 
 

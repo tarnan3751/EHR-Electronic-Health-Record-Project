@@ -11,14 +11,18 @@ voice each, and how sure that is, from speaker embeddings made by an Embedder (e
    three), and a turn shorter than MIN_TURN joins the turn beside it whose voice its windows are nearer.
 4. Each window's similarity is its cosine similarity to the centre of the voice it was first put with, and its margin
    the difference between its similarity to the nearest voice's centre and to the next nearest's. A passage is Unsure
-   (unsure()) when no window over it was embedded; when any window over it was relabelled, by the smoothing, by a short
-   turn joining the turn beside it, or as part of a small group joined to a voice; when any of them is less similar to
-   its voice's centre than SIMILARITY_FLOOR, or than that voice's typical window (the median) by more than
-   SIMILARITY_DROP, as a window holding someone else's short answer is; when any of them sits near two voices (a margin
-   under UNSURE_MARGIN); or when most of them were first put with another voice. So a short turn ("no" between two of the
-   clinician's questions) is never another voice's with confidence, whether the smoothing gave it there or it was too
-   short to have a window of its own. The thresholds are starting values, which the eval's visits measure
-   (eval/README.md).
+   (unsure()) when it has fewer than MIN_WORDS words, too few to tell a voice by whatever its windows say; when no window
+   over it was embedded; when any window over it was relabelled, by the smoothing, by a short turn joining the turn
+   beside it, or as part of a small group joined to a voice; when any of them is less similar to its voice's centre than
+   SIMILARITY_FLOOR; when any of them sits near two voices (a margin under UNSURE_MARGIN); or when most of them were
+   first put with another voice. So a short turn ("no" between two of the clinician's questions) is never another
+   voice's with confidence when the smoothing gave it there or it is a passage of its own; one too short for a window of
+   its own, said with no pause either side, goes with the passage it is in. How much less similar a window is than its
+   voice's typical window (the median), its drop, is measured but judges nothing (SIMILARITY_DROP is None): on the
+   second visits run, any window over a passage more than 0.1 under it made most of every clean visit Unsure on
+   ordinary spread, and without that rule every word the clean recordings then labelled wrong with confidence was in a
+   passage under four words. These are the values the eval's visits measured (eval/README.md), which go on measuring
+   them.
 
 Speech in a window too quiet to embed goes with the turn nearest it. Overlapping speech goes to the voice the window
 is nearer, usually the louder. Voices are numbered 1, 2, 3 in the order they first speak. Nothing here is kept: the
@@ -42,7 +46,8 @@ MIN_GROUP = 4  # windows: a group smaller than this (3 s of speech) is a noise, 
 MIN_TURN = 100  # frames: 1 s
 UNSURE_MARGIN = 0.1
 SIMILARITY_FLOOR = 0.5
-SIMILARITY_DROP = 0.1
+SIMILARITY_DROP: float | None = None  # judges nothing (see the header); the eval's sweeps give it values
+MIN_WORDS = 4  # a passage with fewer is Unsure whatever its windows
 EDGE = 20  # frames: a turn reaches this far into the quiet either side of its speech, for the quiet starts of words
 
 
@@ -85,7 +90,7 @@ class Diarization:
         """What unsure() weighs for the passage from start to end, given to `voice`: the windows' smallest margin and
         similarity, their largest drop, whether any was relabelled, and whether most were first put with another voice;
         None if none was embedded. The eval keeps these to measure the thresholds."""
-        over = self._over(start, end)
+        over = self.over(start, end)
         if not over:
             return None
         return {
@@ -96,24 +101,30 @@ class Diarization:
             "elsewhere": sum(w.group != voice for w in over) * 2 > len(over),
         }
 
-    def unsure(self, start: int, end: int, voice: int) -> bool:
-        """Whether the passage from start to end, given to `voice`, couldn't be told with confidence (see the header)."""
-        return unsure(self.doubts(start, end, voice))
+    def unsure(self, start: int, end: int, voice: int, words: int) -> bool:
+        """Whether the passage from start to end, `words` long and given to `voice`, couldn't be told with confidence
+        (see the header)."""
+        return unsure(self.doubts(start, end, voice), words)
 
-    def _over(self, start: int, end: int) -> list[Window]:
+    def over(self, start: int, end: int) -> list[Window]:
+        """The windows over the passage from start to end: those whose core (the frames each labels) it touches."""
         first, last = start // segmenter.HOP, max(start // segmenter.HOP + 1, -(-end // segmenter.HOP))
         return [w for w in self.windows if w.start < last and first < w.end]
 
 
-def unsure(doubts: dict | None, margin: float | None = None, floor: float | None = None, drop: float | None = None) -> bool:
-    """Whether a passage with these doubts (Diarization.doubts()) is Unsure, at the thresholds given or this module's."""
+def unsure(doubts: dict | None, words: int, margin: float | None = None, floor: float | None = None,
+           drop: float | None = None) -> bool:
+    """Whether a passage `words` long with these doubts (Diarization.doubts()) is Unsure, at the thresholds given or this
+    module's."""
+    drop = SIMILARITY_DROP if drop is None else drop
     return (
-        doubts is None
+        words < MIN_WORDS
+        or doubts is None
         or doubts["relabelled"]
         or doubts["elsewhere"]
         or doubts["margin"] < (UNSURE_MARGIN if margin is None else margin)
         or doubts["similarity"] < (SIMILARITY_FLOOR if floor is None else floor)
-        or doubts["drop"] > (SIMILARITY_DROP if drop is None else drop)
+        or (drop is not None and doubts["drop"] > drop)
     )
 
 

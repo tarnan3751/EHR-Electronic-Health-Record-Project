@@ -11,6 +11,7 @@ from ehr_dictation import diarize
 from ehr_dictation.audio import SAMPLE_RATE
 
 PITCHES = (220.0, 440.0, 660.0, 1500.0)  # three voices and a noise
+WORDS = 10  # a passage long enough to be judged by its windows (diarize.MIN_WORDS)
 
 
 class PitchEmbedder:
@@ -96,10 +97,10 @@ def test_a_passage_where_both_speak_at_once_sits_between_the_voices_and_under_th
 
     between = found.doubts(*at(11.1, 12.4), 1)["margin"]
     assert between < 0.5 * found.doubts(*at(1, 4), 1)["margin"] and between < 0.5 * found.doubts(*at(6.5, 9.5), 2)["margin"]
-    assert not found.unsure(*at(1, 4), 1) and not found.unsure(*at(6.5, 9.5), 2)
+    assert not found.unsure(*at(1, 4), 1, WORDS) and not found.unsure(*at(6.5, 9.5), 2, WORDS)
     monkeypatch.setattr(diarize, "UNSURE_MARGIN", between + 0.01)
-    assert found.unsure(*at(11.1, 12.4), overlap.voice) and not found.unsure(*at(1, 4), 1)
-    assert found.unsure(*at(1, 4), 2), "a passage given to the voice its windows aren't is unsure"
+    assert found.unsure(*at(11.1, 12.4), overlap.voice, WORDS) and not found.unsure(*at(1, 4), 1, WORDS)
+    assert found.unsure(*at(1, 4), 2, WORDS), "a passage given to the voice its windows aren't is unsure"
 
 
 def test_silence_has_no_turns_and_the_embedder_is_never_asked():
@@ -129,7 +130,7 @@ def test_a_short_answer_between_questions_is_unsure_not_the_questioners():
     turn = next(t for t in found.turns if t.start <= (answer[0] + answer[1]) // 2 < t.end)
 
     # The patient's (voice 2), or unsure: never the clinician's with confidence.
-    assert turn.voice == 2 or found.unsure(*answer, turn.voice)
+    assert turn.voice == 2 or found.unsure(*answer, turn.voice, WORDS)
 
 
 def test_a_voice_too_short_to_be_a_group_is_unsure_wherever_it_went():
@@ -138,7 +139,7 @@ def test_a_voice_too_short_to_be_a_group_is_unsure_wherever_it_went():
     third = int(13.5 * SAMPLE_RATE), int(15.5 * SAMPLE_RATE)
     turn = next(t for t in found.turns if t.start <= (third[0] + third[1]) // 2 < t.end)
 
-    assert found.voices <= 3 and found.unsure(*third, turn.voice)
+    assert found.voices <= 3 and found.unsure(*third, turn.voice, WORDS)
     assert found.doubts(*third, turn.voice)["similarity"] < found.doubts(SAMPLE_RATE, 5 * SAMPLE_RATE, 1)["similarity"]
 
 
@@ -147,17 +148,28 @@ def test_a_passage_far_from_its_voices_centre_is_unsure(monkeypatch):
     found = diarize.diarize(samples, PitchEmbedder(), 2)
     clear = int(1 * SAMPLE_RATE), int(4 * SAMPLE_RATE)
 
-    assert not found.unsure(*clear, 1)
+    assert not found.unsure(*clear, 1, WORDS)
     monkeypatch.setattr(diarize, "SIMILARITY_FLOOR", found.doubts(*clear, 1)["similarity"] + 0.01)
-    assert found.unsure(*clear, 1)
+    assert found.unsure(*clear, 1, WORDS)
 
 
-def test_a_short_turn_too_short_for_a_window_of_its_own_is_unsure():
-    # The clinician's question, 0.8 s, inside the patient's talk with no pause: no window is mostly the clinician's.
+def test_a_short_turn_too_short_for_a_window_of_its_own_is_unsure_as_a_passage_of_its_own():
+    # The clinician's question, 0.8 s, inside the patient's talk with no pause: no window is mostly the clinician's. Its
+    # windows' drop shows it, which the eval measures, but judges nothing (SIMILARITY_DROP is None): its few words do.
     samples = visit((None, 1), (1, 6), (0, 0.8), (1, 6), (None, 0.5), (0, 6))
     found = diarize.diarize(samples, PitchEmbedder(), 2)
     question = int(7.0 * SAMPLE_RATE), int(7.8 * SAMPLE_RATE)
     turn = next(t for t in found.turns if t.start <= question[0] < t.end)
+    doubts = found.doubts(*question, turn.voice)
 
-    assert found.unsure(*question, turn.voice)
-    assert found.doubts(*question, turn.voice)["drop"] > found.doubts(int(2 * SAMPLE_RATE), int(5 * SAMPLE_RATE), 1)["drop"]
+    assert doubts["drop"] > found.doubts(int(2 * SAMPLE_RATE), int(5 * SAMPLE_RATE), 1)["drop"]
+    assert diarize.unsure(doubts, WORDS, drop=0.1) and not found.unsure(*question, turn.voice, WORDS)
+    assert found.unsure(*question, turn.voice, diarize.MIN_WORDS - 1)
+
+
+def test_a_passage_under_min_words_is_unsure_whatever_its_windows():
+    samples = visit((0, 5), (None, 0.5), (1, 5), (None, 0.5), (0, 5))
+    found = diarize.diarize(samples, PitchEmbedder(), 2)
+    clear = int(1 * SAMPLE_RATE), int(4 * SAMPLE_RATE)
+
+    assert not found.unsure(*clear, 1, diarize.MIN_WORDS) and found.unsure(*clear, 1, diarize.MIN_WORDS - 1)

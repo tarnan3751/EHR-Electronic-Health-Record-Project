@@ -125,10 +125,15 @@ class Window:
     text: str
 
 
+def words(segment: Segment) -> int:
+    """How many words a passage has, as diarize.unsure() and windows() count them."""
+    return len(tokens(segment.text))
+
+
 def windows(conversation: Conversation, size: int = WINDOW_TOKENS, sizes: Sequence[int] | None = None) -> list[Window]:
     """The named visit in parts of about `size` tokens, cut where who is speaking changes (see the header). `sizes` is
     each passage's, by llama-server's tokenizer; without it, its words."""
-    sizes = sizes if sizes is not None else [len(tokens(placed.segment.text)) for placed in conversation.placed]
+    sizes = sizes if sizes is not None else [words(placed.segment) for placed in conversation.placed]
     # A turn longer than a window is cut at its passages.
     pieces: list[list[int]] = []
     for line in _lines(conversation, range(len(conversation.placed))):
