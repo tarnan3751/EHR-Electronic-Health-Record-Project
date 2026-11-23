@@ -78,7 +78,7 @@ def test_an_english_instruction_is_cut_from_the_translation_as_from_an_english_v
     assert field.pending and field.value == "Continue metformin."
 
 
-# A point or a comma before exactly three digits (F8; sentences outside the test set): a thousand times apart.
+# A point or a comma before exactly three digits (sentences outside the test set): a thousand times apart.
 @pytest.mark.parametrize(("text", "english"), [
     ("Heparina 5.000 unidades.", "Heparin 5 units."),
     ("Heparina 5.000 unidades.", "Heparin 5000 units."),
@@ -514,7 +514,7 @@ def test_a_word_of_doubt_inside_a_clause_doesnt_close_it():
     assert reasons("Podría iniciar amoxicilina.", ["Podría iniciar amoxicilina."], "Could start amoxicillin.") == []
 
 
-# ---- Halves, quarters and thirds (F2; sentences outside the test set) -----------------------------------------------
+# ---- Halves, quarters and thirds (sentences outside the test set) ---------------------------------------------------
 
 
 @pytest.mark.parametrize(("text", "english"), [
@@ -550,3 +550,68 @@ def test_a_half_or_a_quarter_misread_is_refused(text, english):
 ])
 def test_a_fraction_with_no_exact_decimal_is_refused(text, english):
     assert "number_unreadable" in reasons(text, [text], english)
+
+
+# ---- In order, and paired (sentences outside the test set) ----------------------------------------------------------
+
+SWAPS = [
+    ("Losartán 50 mg en la mañana y amlodipino 10 mg en la noche.",
+     "Losartan 10 mg in the morning and amlodipine 50 mg at night.",
+     "Losartan 50 mg in the morning and amlodipine 10 mg at night."),
+    ("Suspender metformina e iniciar insulina.", "Start metformin and stop insulin.",
+     "Stop metformin and start insulin."),
+    ("TA 142 sobre 88.", "BP 88/142.", "BP 142/88."),
+    ("Glucosa 140, TA 120 sobre 80.", "Glucose 120, BP 140/80.", "Glucose 140, BP 120/80."),
+    ("Potasio 5,8, sodio 135.", "Potassium 135, sodium 5.8.", "Potassium 5.8, sodium 135."),
+    ("Dolor en rodilla derecha y edema en tobillo izquierdo.", "Left knee pain and right ankle edema.",
+     "Right knee pain and left ankle edema."),
+    ("Amoxicilina oral y ceftriaxona intramuscular.", "Amoxicillin intramuscular and ceftriaxone oral.",
+     "Oral amoxicillin and intramuscular ceftriaxone."),
+    ("Dolor leve en la rodilla e intenso en la cadera.", "Severe knee pain and mild hip pain.",
+     "Mild knee pain and severe hip pain."),
+    ("Madre con diabetes y padre con hipertensión.", "Mother with hypertension and father with diabetes.",
+     "Mother with diabetes and father with hypertension."),
+    ("Posible neumonía, asma conocida.", "Pneumonia, possible asthma.", "Possible pneumonia, known asthma."),
+    ("Fiebre de 39 desde hace 2 días.", "Fever of 2 for 39 days.", "Fever of 39 for 2 days."),
+]
+
+
+@pytest.mark.parametrize(("text", "swapped", "kept"), SWAPS)
+def test_a_class_swapped_is_refused_and_kept_in_order_is_offered(text, swapped, kept):
+    assert reasons(text, [text], swapped) == ["order_changed"]
+    assert reasons(text, [text], kept) == []
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Glucosa de 140.", "Blood pressure 140."),
+    ("Glucosa de 140.", "Reading of 140."),  # a word no list knows beside a number the Spanish labels
+    ("FC 78, FR 18.", "RR 78, HR 18."),
+    ("Losartán 50 mg y amlodipino 10 mg.", "Losartan 10 mg and amlodipine."),  # the dose moved to the other drug
+])
+def test_a_number_given_another_label_is_refused(text, english):
+    assert reasons(text, [text], english) == ["label_changed"]
+
+
+@pytest.mark.parametrize(("text", "english"), [
+    ("Glucosa de 140.", "Glucose 140."),
+    ("Glucosa de 140.", "140."),
+    ("Glucosa en ayunas de 110.", "Fasting glucose 110."),
+    ("La A1c de la última vez fue 6,1.", "The last A1c was 6.1."),
+    ("Toma 50 mg de losartán al día.", "Takes losartan 50 mg daily."),
+    ("Aumentar lisinopril de 10 a 20 mg.", "Increase lisinopril from 10 to 20 mg."),
+    ("Evitar cargar peso durante 2 semanas.", "Avoid lifting loads for 2 weeks."),  # a period measures nothing
+    ("Tos y fiebre, sin disnea.", "Cough and fever, no dyspnea."),
+    ("Mujer sana con antecedente familiar de cáncer de colon.", "Healthy woman, family history of colon cancer."),
+])
+def test_a_number_with_its_label_and_a_qualifier_on_its_clause_are_offered(text, english):
+    assert reasons(text, [text], english) == []
+
+
+def test_another_order_is_refused_and_what_isnt_spelled_alike_still_passes():
+    # Fail closed: a reordering can't be told from a swap.
+    text = "Amlodipino y losartán."
+    assert reasons(text, [text], "Losartan and amlodipine.") == ["order_changed"]
+    # Known gaps: a finding the two languages spell differently, moved to another severity or qualifier.
+    for text, english in [("Dolor leve en la rodilla e intenso en la cadera.", "Mild hip pain and severe knee pain."),
+                          ("Posible gripe, tos conocida.", "Flu, possible cough.")]:
+        assert reasons(text, [text], english) == []

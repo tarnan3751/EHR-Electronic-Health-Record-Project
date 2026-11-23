@@ -57,12 +57,25 @@ statement:
      negation and a doubt, as validation.py reads "I don't think she has" and "I doubt"; and "le preocupa", "me
      pregunto si", "posibilidad de" and "presuntamente" are doubt, as "worried", "wonder", "a chance" and
      "presumably" are;
+   - in order, and paired: numbers, drugs, sides, routes, severity, how often, relatives and medication changes each
+     come in the English in the Spanish's order, some left out but none moved (order_changed): "TA 142 sobre 88" is
+     not "BP 88/142", nor "Suspender metformina e iniciar insulina" "Start metformin and stop insulin"; a number
+     measures what the Spanish says it measures, the vital sign, result (LABELS) or drug named before it in its
+     clause (label_changed): "Glucosa de 140" is not "Blood pressure 140", nor "Reading of 140"; and a qualifier stays
+     on the clause it qualifies in the Spanish, with the findings both languages spell alike ("neumonía" and
+     "pneumonia", _skeleton()) (order_changed): "Posible neumonía, asma conocida" is not "Pneumonia, possible asthma",
+     nor "Madre con diabetes y padre con hipertensión" "Mother with hypertension and father with diabetes". English
+     that says the Spanish in another order is refused as well ("Amlodipino y losartán" as "Losartan and
+     amlodipine"): the checks can't tell a reordering from a swap;
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
      model added ("continue metformin and check kidney function" from "continuar metformina").
 5. If any statement fails, the whole field is discarded, as an English value is.
 
 What these don't check: the meaning of every other word. "dolor abdominal leve" translated "mild chest pain" passes
-(the severity and the length agree), and so does a finding moved inside a statement; nor a drug name no list knows,
+(the severity and the length agree), and so does a finding moved inside a statement, from one severity, side or
+qualifier to another, when the two languages spell it differently ("Dolor leve en la rodilla e intenso en la cadera"
+as "Mild hip pain and severe knee pain", "Posible gripe, tos conocida" as "Flu, possible cough"); nor a drug name no
+list knows,
 written with no dose just after it, for one no list knows either ("continuar plixor" written "continue vortanex"); nor
 a word left in the English that isn't English, if the transcript says it or it is written in English's letters: a
 Spanish word left untranslated ("pain in the rodilla", "pain in the región lumbar"), or a word of no language. A quote is matched whole word by whole word, so one the schema's length cut
@@ -131,6 +144,8 @@ REASONS = (
     "severity_not_in_sources",
     "abbreviation_not_in_sources",
     "action_changed",
+    "order_changed",
+    "label_changed",
     "negation_dropped",
     "negation_added",
     "certainty_dropped",
@@ -230,6 +245,7 @@ class _Context:
     cues: set[int]
     taken_back: set[int]
     qualified: dict[str, set[int]]
+    qualifier_cues: dict[str, set[int]]
 
 
 GLUE = frozenset({"sobre", "de", "el", "la", "los", "las", "un", "una"}) | spanish.UNIT_WORDS
@@ -303,6 +319,7 @@ def _context(transcript: Transcript) -> _Context:
         cues=cues,
         taken_back=taken_back,
         qualified=spanish.qualified(text, toks),
+        qualifier_cues=spanish.qualifier_cue_kinds(text, toks),
     )
 
 
@@ -324,7 +341,44 @@ def english_numbers(text: str) -> list[str]:
     """The numbers in English text, as digits, a comma before three digits read as a thousands separator, and a half or
     a quarter as its decimal (english_fractions()). The digit in an abbreviation ("A1c", "SpO2", "T2DM") is part of its
     name, which the abbreviation check compares."""
-    return numbers(ALPHANUMERIC.sub(" ", english_fractions(re.sub(r"(?<=\d),(?=\d{3}\b)", "", text))))
+    return numbers(_as_numbers(text)[0])
+
+
+NUMBER_WORD = re.compile(r"[A-Za-z]+|\d+(?:\.\d+)?(?:st|nd|rd|th)?")  # textnorm.numbers()'s words
+
+
+def english_number_items(text: str) -> list[tuple[str, int]]:
+    """Each number of english_numbers(), in order, with where in the text it starts."""
+    rewritten, origin = _as_numbers(text)
+    starts: list[int] = []
+    for word in NUMBER_WORD.finditer(rewritten):
+        count = len(numbers(rewritten[: word.end()]))
+        starts += [origin[word.start()]] * (count - len(starts))
+    return list(zip(numbers(rewritten), starts))
+
+
+def _as_numbers(text: str) -> tuple[str, list[int]]:
+    """The text as english_numbers() reads it, and for each of its characters where in the text it came from."""
+    origin = list(range(len(text)))
+    text, origin = _rewrite(re.compile(r"(?<=\d),(?=\d{3}\b)"), lambda m: "", text, origin)
+    for pattern, decimal in _EN_FRACTIONS:
+        text, origin = _rewrite(pattern, lambda m, d=decimal: f" {normalize_decimal(d(m))} ", text, origin)
+    return _rewrite(ALPHANUMERIC, lambda m: " " * len(m.group()), text, origin)
+
+
+def _rewrite(pattern: re.Pattern, replace, text: str, origin: list[int]) -> tuple[str, list[int]]:
+    out: list[str] = []
+    where: list[int] = []
+    last = 0
+    for match in pattern.finditer(text):
+        new = replace(match)
+        out += [text[last : match.start()], new]
+        source = origin[match.start()] if match.start() < len(origin) else len(text)
+        where += origin[last : match.start()] + [source] * len(new)
+        last = match.end()
+    out.append(text[last:])
+    where += origin[last:]
+    return "".join(out), where
 
 
 _EN_WHOLE = r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)"
@@ -420,16 +474,20 @@ ENGLISH_FREQUENCIES = [
 
 
 def english_frequencies(text: str) -> set[str]:
+    return {value for _, read in english_frequency_items(text) for value in read}
+
+
+def english_frequency_items(text: str) -> list[tuple[int, frozenset[str]]]:
     lowered = text.lower()
     taken: list[tuple[int, int]] = []
-    found: set[str] = set()
+    found: list[tuple[int, frozenset[str]]] = []
     for pattern, read in ENGLISH_FREQUENCIES:
         for match in pattern.finditer(lowered):
             if any(match.start() < end and start < match.end() for start, end in taken):
                 continue
             taken.append(match.span())
-            found |= read(match)
-    return found
+            found.append((match.start(), frozenset(read(match))))
+    return sorted(found, key=lambda item: item[0])
 
 
 ENGLISH_ROUTES = [
@@ -449,8 +507,12 @@ ENGLISH_ROUTES = [
 
 
 def english_routes(text: str) -> set[str]:
+    return {name for _, name in english_route_items(text)}
+
+
+def english_route_items(text: str) -> list[tuple[int, str]]:
     lowered = text.lower()
-    return {name for name, pattern in ENGLISH_ROUTES if pattern.search(lowered)}
+    return sorted((match.start(), name) for name, pattern in ENGLISH_ROUTES for match in pattern.finditer(lowered))
 
 
 ENGLISH_SIDES = {"left": "left", "right": "right", "bilateral": "bilateral", "bilaterally": "bilateral", "both": "bilateral"}
@@ -526,11 +588,15 @@ OBJECT_REACH = 4  # words after an action within which its drug, dose or number 
 
 
 def english_actions(text: str) -> set[str]:
+    return set(english_action_items(text))
+
+
+def english_action_items(text: str) -> list[str]:
     words = [t.text for t in tokens(text)]
-    found = set()
+    found = []
     for i, word in enumerate(words):
         if word in ACTIONS and any(w in OBJECT_WORDS or w[0].isdigit() or is_drug(w) for w in words[i + 1 : i + 1 + OBJECT_REACH]):
-            found.add(ACTIONS[word])
+            found.append(ACTIONS[word])
     return found
 
 
@@ -569,8 +635,12 @@ PAST = re.compile(r"[áéíóú]$")
 
 
 def spanish_actions(said: list[spanish.Token]) -> set[str]:
+    return set(spanish_action_items(said))
+
+
+def spanish_action_items(said: list[spanish.Token]) -> list[str]:
     keys = [t.key for t in said]
-    found = set()
+    found = []
     i = 0
     while i < len(keys):
         if PAST.search(said[i].text):
@@ -580,7 +650,7 @@ def spanish_actions(said: list[spanish.Token]) -> set[str]:
         words, kind = phrase if phrase else ((keys[i],), SPANISH_ACTION.get(keys[i]))
         after = keys[i + len(words) : i + len(words) + OBJECT_REACH]
         if kind and any(w in OBJECT_WORDS or w[0].isdigit() or any(is_drug(c) for c in spanish.drug_candidates(w)) for w in after):
-            found.add(kind)
+            found.append(kind)
         i += len(words)
     return found
 
@@ -640,6 +710,333 @@ def _english_qualified(text: str) -> dict[str, bool]:
         found[kind] = found[kind] or bool(pattern.search(text))
     found["negation"] = found["negation"] or any(t.text in NEGATED_WORDS for t in tokens(text))
     return found
+
+
+# ---- In order, and paired ------------------------------------------------------------------------------------------
+
+# What a number measures, named before it: the vital signs and common results, each by an id of its own, as Spanish
+# (keys) and English (lower case) name it. A number's label is the first of these or a drug before it in its clause,
+# past function words, units, dose forms, the words in LABEL_GLUE and up to LABEL_REACH other words ("la A1c de la
+# última vez fue 6,1"); else the first other word, if any; a number joined to the one before it ("142 sobre 88", "10 to
+# 20 mg") has that one's label; with none before it, a drug after it in its clause ("50 mg de losartán"); and a number
+# of days, weeks, times or tablets (COUNTS) has none.
+LABELS = {
+    "bp": ("ta; tension arterial; presion arterial; tension; presion; pa", "bp; blood pressure; pressure"),
+    "hr": ("fc; frecuencia cardiaca; pulso; frecuencia del pulso", "hr; heart rate; pulse"),
+    "rr": ("fr; frecuencia respiratoria", "rr; respiratory rate; respirations"),
+    "temp": ("temperatura; temp; fiebre; febricula", "temperature; temp; fever"),
+    "spo2": ("sato2; sat o2; sat; saturacion; saturando; spo2; oximetria",
+             "spo2; sat; sats; saturation; saturating; o2 sat; oxygen saturation; pulse ox; oximetry"),
+    "glucose": ("glucosa; glucemia; glicemia; azucar; glucometria", "glucose; sugar; sugars; glycemia"),
+    "a1c": ("hba1c; a1c; hemoglobina glucosilada; hemoglobina glicosilada; hemoglobina glicada",
+            "a1c; hba1c; hemoglobin a1c; glycated hemoglobin"),
+    "hb": ("hemoglobina; hb; hgb", "hemoglobin; hb; hgb"),
+    "k": ("potasio; k", "potassium; k"),
+    "na": ("sodio; na", "sodium; na"),
+    "cr": ("creatinina; cr", "creatinine; cr"),
+    "weight": ("peso; pesa", "weight; weighs; weighed"),
+    "height": ("talla; estatura; mide", "height"),
+    "bmi": ("imc", "bmi"),
+    "cholesterol": ("colesterol", "cholesterol"),
+    "ldl": ("ldl", "ldl"),
+    "hdl": ("hdl", "hdl"),
+    "tg": ("trigliceridos", "triglycerides"),
+    "tsh": ("tsh", "tsh"),
+    "inr": ("inr", "inr"),
+    "platelets": ("plaquetas", "platelets; platelet; plt"),
+    "wbc": ("leucocitos; leucos; globulos blancos", "wbc; leukocytes; white count; white cells; white blood cells"),
+    "gfr": ("tfg; filtrado glomerular; filtrado", "gfr; egfr"),
+    "ef": ("fevi; fraccion de eyeccion", "ef; lvef; ejection fraction"),
+}
+SPANISH_LABELS = sorted(((tuple(name.split()), label) for label, (names, _) in LABELS.items()
+                         for name in names.split("; ")), key=lambda item: -len(item[0]))
+ENGLISH_LABELS = sorted(((tuple(name.split()), label) for label, (_, names) in LABELS.items()
+                         for name in names.split("; ")), key=lambda item: -len(item[0]))
+LABEL_GLUE = frozenset(
+    """sobre aproximadamente alrededor cerca actualmente hoy sistolica diastolica media basal capilar ayunas aire
+    ambiente mmhg lpm rpm over approximately around nearly roughly currently today systolic diastolic mean baseline
+    capillary fasting random room air measured tablet tablets capsule capsules puff puffs drop drops""".split()
+) | spanish.UNIT_WORDS | spanish.COUNTED | frozenset(UNIT_NAMES)
+# "sobre" counts sachets, but joins the two numbers of a blood pressure first ("142 sobre 88").
+COUNTS = spanish.COUNTED - {"sobre"} | frozenset(
+    """time times dose doses hour hours day days week weeks month months year years minute minutes tablet tablets
+    capsule capsules pill pills drop drops puff puffs patch patches""".split()
+)
+LABEL_REACH = 3  # words before a number, other than function words and LABEL_GLUE, its label may be past
+SPANISH_JOINS = frozenset("sobre a y".split())  # between two numbers of one reading or range: "142 sobre 88", "10 a 20"
+ENGLISH_JOINS = frozenset("over to and".split())
+CLAUSE_END = re.compile(r"[.,;!?\n]")
+
+
+def _labels(words: list[str], gaps: list[str], numbered: list[int], names: list, stop: frozenset[str],
+            drug, joins: frozenset[str]) -> list[tuple[str, object] | None]:
+    """The label of each number (numbered: the index of its first word), as ("id", label), ("drug", names it may be),
+    ("word", word), or None: see LABELS. gaps[i] is the text between words i - 1 and i."""
+    first = set(numbered)
+    is_number = [word[:1].isdigit() or word in validation.NUMBER_WORDS or word in spanish.NUMBER_WORDS
+                 for word in words]
+    found: list[tuple[str, object] | None] = []
+
+    def named(i: int):
+        for phrase, label in names:
+            if tuple(words[i - len(phrase) + 1 : i + 1]) == phrase:
+                return ("id", label)
+        names_of = drug(words[i])
+        return ("drug", names_of) if names_of else None
+
+    for k, at in enumerate(numbered):
+        label = None
+        # A number of days, weeks, times or tablets counts them: it measures nothing.
+        if at + 1 < len(words) and words[at + 1] in COUNTS:
+            found.append(None)
+            continue
+        i, passed = at - 1, 0
+        while i >= 0 and not CLAUSE_END.search(gaps[i + 1]) and passed < LABEL_REACH:
+            if is_number[i]:
+                joined = all(words[j] in joins or words[j] in stop or words[j] in LABEL_GLUE
+                             for j in range(i + 1, at) if not is_number[j])
+                previous = [n for n, start in enumerate(numbered[:k]) if start <= i]
+                label = (found[previous[-1]] if joined and previous else None) or label
+                break
+            if words[i] not in stop and words[i] not in LABEL_GLUE:
+                if named(i):
+                    label = named(i)
+                    break
+                label = label or ("word", words[i])
+                passed += 1
+            i -= 1
+        if label is None or label[0] == "word":
+            j = at + 1
+            while j < len(words) and j - at <= 5 and not CLAUSE_END.search(gaps[j]):
+                if j not in first and not is_number[j] and words[j] not in stop and words[j] not in LABEL_GLUE:
+                    after = named(j)
+                    if after and after[0] == "drug":
+                        label = after
+                    break
+                j += 1
+        found.append(label)
+    return found
+
+
+def _paired(english, spanish_label) -> bool:
+    """Whether a number's English label may stand for its Spanish one: the same vital sign or result; a drug the
+    Spanish one may be; and no other word, nor none, for a vital sign or result the Spanish names."""
+    kind = english[0] if english else None
+    said = spanish_label[0] if spanish_label else None
+    if kind == "id":
+        return said == "id" and english[1] == spanish_label[1]
+    if kind == "drug":
+        return said != "id" and not (said == "drug" and not english[1] & spanish_label[1])
+    if kind == "word":
+        return said != "id"
+    return True
+
+
+def _follows(english: list, said: list, same, shared: bool = False) -> bool:
+    """Whether the English items are the Spanish ones in order, some left out: each matched to the first Spanish item
+    after the last one matched (or from it, if items may share one) that it may be, which finds a match whenever there
+    is one."""
+    j = 0
+    for item in english:
+        while j < len(said) and not same(item, said[j]):
+            j += 1
+        if j == len(said):
+            return False
+        j += 0 if shared else 1
+    return True
+
+
+# Where a statement's clauses part: punctuation, and "and" or "but" ("y", "e", "pero").
+SPANISH_PARTS = frozenset("y e pero".split())
+ENGLISH_PARTS = frozenset("and but".split())
+KINDS = ("negation", "certainty", "history", "experiencer")
+
+
+def _skeleton(word: str) -> str | None:
+    """The first five letters of a word as both languages may spell it, so "hipertensión" and "hypertension", and
+    "neumonía" and "pneumonia", meet: None for a shorter word."""
+    word = spanish.fold(word)
+    for spelled, said in (("ph", "f"), ("th", "t"), ("y", "i"), ("k", "c"), ("qu", "c"), ("ch", "c"), ("z", "s")):
+        word = word.replace(spelled, said)
+    word = re.sub(r"(.)\1", r"\1", word[1:] if word.startswith(("pn", "ps")) else word)
+    return word[:5] if len(word) >= 5 and word.isalpha() else None
+
+
+@dataclass(frozen=True)
+class _Part:
+    """A clause of a statement: the kinds of qualifier said in it or reaching a finding of it, the relatives it names,
+    and the skeletons of its findings (_skeleton())."""
+
+    kinds: frozenset[str]
+    relatives: frozenset[str]
+    skeletons: frozenset[str]
+
+
+def _parts(words: list[str], gaps: list[str], content: list[bool], flagged: dict[str, set[int]],
+           cues: dict[str, set[int]], relatives: list[frozenset[str]], joins: frozenset[str]) -> list[_Part]:
+    """The statement's clauses, in order (see _Part). content: the words that are findings (not function words, nor a
+    qualifier's cue); flagged and cues: for each kind, the words its cues reach and the cues' own words."""
+    parts: list[list[int]] = [[]]
+    for i, word in enumerate(words):
+        if CLAUSE_END.search(gaps[i]) or word in joins:
+            parts.append([])
+        if word not in joins:
+            parts[-1].append(i)
+    found = []
+    for part in parts:
+        findings = [i for i in part if content[i]]
+        if not findings:
+            continue
+        kinds = {kind for kind in KINDS
+                 if any(i in flagged[kind] for i in findings) or any(i in cues[kind] for i in part)}
+        found.append(_Part(frozenset(kinds), frozenset().union(*(relatives[i] for i in part)),
+                           frozenset(s for i in findings if (s := _skeleton(words[i])))))
+    return found
+
+
+def _english_flagged(text: str, words: list[textnorm.Token]) -> tuple[dict[str, set[int]], dict[str, set[int]]]:
+    """For each kind, the English words a qualifier reaches (as _english_qualified() reads them), and its cues' words,
+    with the words of MORE_ENGLISH and NEGATED_WORDS among the cues. Cues of a kind that reach nothing in the statement
+    ("either" closing it) say nothing of their clause, and aren't counted."""
+    names = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", "certainty_dropped": "certainty",
+             "history_dropped": "history"}
+    flagged: dict[str, set[int]] = {}
+    cues: dict[str, set[int]] = {}
+    for qualifier in validation.QUALIFIERS:
+        read = _without_told_relatives(text) if qualifier.reason == "experiencer_dropped" else text
+        reached, cue_words = validation._reach(read, tokens(read), qualifier)
+        flagged[names[qualifier.reason]] = set(reached)
+        cues[names[qualifier.reason]] = set(cue_words) if reached else set()
+    for kind, pattern in MORE_ENGLISH.items():
+        for match in pattern.finditer(text):
+            cues[kind] |= {i for i, w in enumerate(words) if w.end > match.start() and w.start < match.end()}
+    cues["negation"] |= {i for i, w in enumerate(words) if w.text in NEGATED_WORDS}
+    return flagged, cues
+
+
+# For each class compared in order, the reasons that already refuse a change in it: what fails those isn't compared
+# again.
+ALREADY = {
+    "numbers": {"number_not_in_sources", "number_unreadable", "ambiguous_number", "source_superseded"},
+    "labels": {"drug_not_in_sources", "drug_dropped", "abbreviation_not_in_sources"},
+    "drugs": {"drug_not_in_sources", "drug_dropped", "source_superseded"},
+    "sides": {"side_not_in_sources"},
+    "routes": {"route_not_in_sources"},
+    "severity": {"severity_not_in_sources"},
+    "frequencies": {"frequency_not_in_sources"},
+    "relatives": {"experiencer_changed"},
+    "actions": {"action_changed"},
+    "clauses": {f"{kind}_{change}" for kind in ("negation", "certainty", "history", "experiencer")
+                for change in ("dropped", "added", "changed")},
+}
+
+
+def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Context, refused: set[str]) -> set[str]:
+    """Each class the checks read, in the English as in the Spanish, some left out but none moved (order_changed);
+    each number measuring what the Spanish says it measures (label_changed); and each qualifier on the clause, and the
+    findings, it qualifies in the Spanish (order_changed). A class already refused (refused, ALREADY) isn't compared
+    again."""
+    found: set[str] = set()
+    said = [ctx.toks[i] for i in said_index]
+    said_text = " ".join(t.text for t in said)
+    position = {index: k for k, index in enumerate(said_index)}
+    # Between two words of the Spanish, what the transcript has, unless only a correction and what it took back lie
+    # between them; two passages, or the two sides of a cut instruction, are two clauses.
+    gaps = []
+    for k, index in enumerate(said_index):
+        between = range(said_index[k - 1] + 1, index) if k else range(0)
+        if k and all(i in ctx.cues or i in ctx.taken_back for i in between):
+            gaps.append(" " if between else ctx.text[said[k - 1].end : said[k].start])
+        else:
+            gaps.append(". " if k else "")
+
+    numbered = [t for t in terms if t.kind == "number"]
+    spoken = {value for t in numbered for value in t.values}
+    english_items = [(value, start) for value, start in english_number_items(english) if value in spoken]
+    spanish_labels = _labels([t.key for t in said], gaps, [position[t.first] for t in numbered],
+                             SPANISH_LABELS, spanish.STOPWORDS, _spanish_drug, SPANISH_JOINS)
+    labelled = spanish.tokens(english)
+    label_gaps = [english[labelled[i - 1].end : labelled[i].start] if i else "" for i in range(len(labelled))]
+    at = [next((k for k, w in enumerate(labelled) if w.start >= start), len(labelled) - 1)
+          for _, start in english_items]
+    english_labels = _labels([w.key for w in labelled], label_gaps, at, ENGLISH_LABELS, STOPWORDS, _english_drug,
+                             ENGLISH_JOINS)
+    numbers_said = list(zip(numbered, spanish_labels))
+    numbers_written = list(zip(english_items, english_labels))
+    if refused & ALREADY["numbers"]:
+        pass
+    elif not _follows(numbers_written, numbers_said, lambda e, s: e[0][0] in s[0].values):
+        found.add("order_changed")
+    elif not refused & ALREADY["labels"] and not _follows(
+            numbers_written, numbers_said, lambda e, s: e[0][0] in s[0].values and _paired(e[1], s[1])):
+        found.add("label_changed")
+
+    words = tokens(english)
+    english_words = [w.text for w in words]
+    drugs = [t for t in terms if t.kind == "drug"]
+    named = {name for t in drugs for name in t.values}
+    sides = [t for t in terms if t.kind == "side"]
+    severity = [spanish.SEVERITY[t.key] for t in said if t.key in spanish.SEVERITY]
+    classes = [
+        ("drugs", [w for w in english_words if w in named], drugs, lambda e, s: e in s.values),
+        ("sides", [ENGLISH_SIDES[w] for w in english_words if w in ENGLISH_SIDES], sides, lambda e, s: e in s.values),
+        ("routes", [name for _, name in english_route_items(english)],
+         [name for _, name in spanish.route_items(said_text)], lambda e, s: e == s),
+        ("severity", [w for w in english_words if w in ENGLISH_SEVERITY], severity, lambda e, s: e in s),
+        ("frequencies", [read for _, read in english_frequency_items(english)],
+         [read for _, read in spanish.frequency_items(said_text)], lambda e, s: e <= s),
+        ("relatives", [ENGLISH_RELATIVES[w] for w in english_words if w in ENGLISH_RELATIVES], spanish.relatives(said),
+         lambda e, s: e in s),
+        ("actions", english_action_items(english), spanish_action_items(said), lambda e, s: e == s),
+    ]
+    if not all(_follows(english_items, said_items, same) for name, english_items, said_items, same in classes
+               if not refused & ALREADY[name]):
+        found.add("order_changed")
+
+    if refused & ALREADY["clauses"]:
+        return found
+    said_flagged = {kind: {position[i] for i in ctx.qualified[kind] if i in position} for kind in KINDS}
+    english_flagged, english_cues = _english_flagged(english, words)
+    if not any(said_flagged.values()) and not any(english_flagged.values()) and not any(english_cues.values()):
+        return found
+    said_cues = ctx.qualifier_cues
+    said_parts = _parts([t.key for t in said], gaps,
+                        [spanish._is_content(t) and not any(said_index[k] in c for c in said_cues.values())
+                         for k, t in enumerate(said)],
+                        said_flagged, {kind: {position[i] for i in said_cues[kind] if i in position} for kind in KINDS},
+                        [frozenset(spanish.RELATIVES.get(t.text, ())) for t in said], SPANISH_PARTS)
+    english_gaps = [english[words[i - 1].end : words[i].start] if i else "" for i in range(len(words))]
+    every_cue = set().union(*english_cues.values())
+    english_parts = _parts(english_words, english_gaps,
+                           [w.isalpha() and len(w) >= 2 and w not in STOPWORDS and i not in every_cue
+                            for i, w in enumerate(english_words)],
+                           english_flagged, english_cues,
+                           [frozenset({ENGLISH_RELATIVES[w]}) if w in ENGLISH_RELATIVES else frozenset()
+                            for w in english_words], ENGLISH_PARTS)
+    skeletons = {s for t in said if (s := _skeleton(t.key))}
+    reached = {s for k, t in enumerate(said) if any(k in f for f in said_flagged.values()) if (s := _skeleton(t.key))}
+
+    # An English clause sits in a Spanish one that says the same qualifiers, with the findings both name; or, saying
+    # none, in any Spanish clause, unless it names a finding a Spanish qualifier reaches.
+    def same(e: _Part, s: _Part) -> bool:
+        shared = e.skeletons & skeletons
+        return (e.relatives <= s.relatives and shared <= s.skeletons
+                and (e.kinds == s.kinds or (not e.kinds and not shared & reached)))
+
+    if not _follows(english_parts, said_parts, same, shared=True):
+        found.add("order_changed")
+    return found
+
+
+def _spanish_drug(key: str) -> frozenset[str]:
+    if not key.isalpha() or len(key) < 4 or key in spanish.NOT_DRUGS:
+        return frozenset()
+    names = spanish.drug_candidates(key)
+    return frozenset(names) if any(is_drug(name) for name in names) else frozenset()
+
+
+def _english_drug(word: str) -> frozenset[str]:
+    return frozenset({word}) if word.isalpha() and is_drug(word) else frozenset()
 
 
 # ---- One statement --------------------------------------------------------------------------------------------------
@@ -836,6 +1233,8 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         not whos & english_relatives for whos in spanish_relatives
     ):
         reasons.add("experiencer_changed")
+
+    reasons |= _in_order(english, said_index, terms, ctx, set(reasons))
 
     if english_content(english) > spanish_content(said) + EXTRA_WORDS:
         reasons.add("translation_adds_words")

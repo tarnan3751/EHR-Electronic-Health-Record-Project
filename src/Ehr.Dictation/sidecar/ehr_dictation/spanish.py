@@ -347,16 +347,21 @@ AMBIGUOUS_FREQUENCY = re.compile(r"\bcada tercer dia\b")
 def frequencies(text: str) -> set[str]:
     """How often the text says something is taken or done, as times per period ("2/d", "1/w", "3/d" for every eight
     hours), and when ("prn", "hs", "ac")."""
+    return {value for _, read in frequency_items(text) for value in read}
+
+
+def frequency_items(text: str) -> list[tuple[int, frozenset[str]]]:
+    """Each time the text says how often, in order: where, and what it may be read as."""
     folded = fold(text)
     taken: list[tuple[int, int]] = []
-    found: set[str] = set()
+    found: list[tuple[int, frozenset[str]]] = []
     for pattern, read in FREQUENCIES:
         for match in pattern.finditer(folded):
             if any(match.start() < end and start < match.end() for start, end in taken):
                 continue
             taken.append(match.span())
-            found |= read(match)
-    return found
+            found.append((match.start(), frozenset(read(match))))
+    return sorted(found, key=lambda item: item[0])
 
 
 SIDES = {"izquierdo": "left", "izquierda": "left", "izquierdos": "left", "izquierdas": "left", "izq": "left",
@@ -380,8 +385,13 @@ ROUTES = [
 
 
 def routes(text: str) -> set[str]:
+    return {name for _, name in route_items(text)}
+
+
+def route_items(text: str) -> list[tuple[int, str]]:
+    """Each route the text names, in order: where, and which."""
     folded = fold(text)
-    return {name for name, pattern in ROUTES if pattern.search(folded)}
+    return sorted((match.start(), name) for name, pattern in ROUTES for match in pattern.finditer(folded))
 
 
 # What each severity word allows in English: "intenso" is intense or severe.
@@ -675,6 +685,15 @@ def _is_content(token: Token) -> bool:
 
 def qualified(text: str, toks: list[Token]) -> dict[str, set[int]]:
     """For each kind of qualifier (negation, certainty, history, experiencer), the content words its cues reach."""
+    return _qualified(text, toks)[0]
+
+
+def qualifier_cue_kinds(text: str, toks: list[Token]) -> dict[str, set[int]]:
+    """For each kind, the words of its cues ("niega", "posible", "antecedentes de", "madre")."""
+    return _qualified(text, toks)[1]
+
+
+def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[str, set[int]]]:
     keys = [t.key for t in toks]
     certainty_before = _matches(keys, CERTAINTY_BEFORE)
     both = set(NEGATION_BEFORE)
@@ -704,15 +723,17 @@ def qualified(text: str, toks: list[Token]) -> dict[str, set[int]]:
         relatives.append((i, i))
     closing = {"certainty": _closing(text, toks, CERTAINTY_CLOSING)}
     out: dict[str, set[int]] = {}
+    cue_words: dict[str, set[int]] = {}
     for kind, before, after, ends in (
         ("negation", free(_matches(keys, NEGATION_BEFORE)), free(_matches(keys, NEGATION_AFTER)), TERMINATORS),
         ("certainty", certainty_before, _matches(keys, CERTAINTY_AFTER), TERMINATORS),
         ("history", history, _matches(keys, HISTORY_AFTER), TERMINATORS),
         ("experiencer", sorted(_matches(keys, EXPERIENCER_BEFORE) + relatives), relatives_after, TERMINATORS | REPORTING),
     ):
-        reached, _ = _reach(text, toks, before, after, ends, closing.get(kind, []))
+        reached, cues = _reach(text, toks, before, after, ends, closing.get(kind, []))
         out[kind] = {i for i in reached if _is_content(toks[i])}
-    return out
+        cue_words[kind] = cues
+    return out, cue_words
 
 
 def relatives(toks: list[Token]) -> list[set[str]]:
