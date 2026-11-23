@@ -35,5 +35,6 @@ def test_each_source_gives_names():
     orderables, allergens, counts = generate_catalog.names()
 
     assert all(counts.values())
-    assert {"lisinopril mg oral tablet", "complete blood count cbc", "screening mammogram"} <= set(orderables)
-    assert "penicillin g" in allergens or any(name.startswith("penicillin") for name in allergens)
+    assert {"+^lisinopril$ mg oral tablet", "+^amoxicillin$", "^complete blood count$ ^cbc$", "^screening mammogram$",
+            "^chest x ray$ views"} <= set(orderables)
+    assert {"^penicillin g$", "^amoxicillin$", "^natural latex rubber$"} <= set(allergens)

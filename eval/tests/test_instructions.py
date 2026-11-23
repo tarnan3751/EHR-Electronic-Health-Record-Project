@@ -37,8 +37,8 @@ def said(text: str) -> list[str]:
 # kept, in order, and none inside them.
 @pytest.mark.parametrize("text", texts(), ids=lambda text: text[:40])
 def test_what_is_cut_from_a_text_is_exactly_what_is_listed(text):
-    kept, _ = _without_instructions(text)
     spans = directives(text)
+    kept, _ = _without_instructions(text, text, [(start, end) for start, end, _ in spans])
     outside = "".join(
         text[start:end] + " " for start, end in zip([0, *(e for _, e, _ in spans)], [*(s for s, _, _ in spans), len(text)])
     )

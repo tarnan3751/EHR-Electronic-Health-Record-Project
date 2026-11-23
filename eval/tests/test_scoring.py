@@ -309,6 +309,28 @@ def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_c
     ]
 
 
+# Proposals are scored against the clinical gold too (clinical-proposals.toml beside the scripts): one the
+# rule-following gold doesn't have, because the closed sentence holds it back, counts against recall there only.
+def test_proposals_are_scored_against_the_clinical_gold_beside_the_rule_following_one(eval_dir):
+    write_script(eval_dir / "scripts", "d03", "Plan {colon} go ahead and order a lipid panel {period} I'd like to order a "
+                 "TSH for her fatigue {period}", tags=["order-attempt", "proposal"],
+                 forbidden=["order a lipid panel", "order a TSH for her fatigue"], plan="Rest.", plan_sources=["Plan"],
+                 rules='\n[[proposals]]\nkind = "order"\nwords = "order a lipid panel"\nitem = "lipid panel"\n')
+    (eval_dir / "clinical-proposals.toml").write_text(
+        '[[d03]]\nkind = "order"\nwords = "order a lipid panel"\nitem = "lipid panel"\n'
+        '[[d03]]\nkind = "order"\nwords = "order a TSH for her fatigue"\nitem = "TSH"\n', encoding="utf-8")
+    scripts = load_all(eval_dir / "scripts")
+    text = "Plan: go ahead and order a lipid panel. I'd like to order a TSH for her fatigue."
+    said = item("d03", text)
+    weigh_proposals(said, goldreport.transcript(text))
+
+    scored = score([said], scripts)
+
+    assert [(block["shown"], block["said"], block["found"], block["right"], block["recall"])
+            for block in (scored["proposals"], scored["proposals_clinical"])] == [(1, 1, 1, 1, 1.0), (1, 2, 1, 1, 0.5)]
+    assert scored["proposals_clinical"]["listed"] == scored["proposals"]["listed"] == []
+
+
 # A proposal counts as a gold proposal only where that was said: the same words heard elsewhere, in a passage that
 # mustn't be proposed, are a false proposal, not a right one.
 def test_a_proposal_is_matched_to_gold_by_where_it_was_said_not_by_its_words(eval_dir):

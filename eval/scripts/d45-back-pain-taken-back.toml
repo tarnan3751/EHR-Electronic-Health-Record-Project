@@ -3,7 +3,7 @@ id = "d45-back-pain-taken-back"
 voice = "am_michael"
 tags = [
     "vitals", "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "spoken-punctuation",
-    "proposal-trap",
+    "proposal", "proposal-trap",
 ]
 dates = []
 drugs = ["ibuprofen", "codeine"]

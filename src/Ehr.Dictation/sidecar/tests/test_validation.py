@@ -4,6 +4,7 @@ The review's and the owner's cases are here verbatim."""
 
 from __future__ import annotations
 
+import random
 import re
 
 import pytest
@@ -491,6 +492,75 @@ def test_a_family_member_who_is_the_subject_still_has_it():
     assert own("She has a history of MI in 2019.", "MI in 2019.").reasons == ["history_dropped"]
 
 
+# A negation carries through a list after a comma, to a full stop, "but", "except", a new subject or a clause that says
+# something is there or someone told it.
+@pytest.mark.parametrize(("said", "value", "source"), [
+    ("Denies fever, chills, night sweats.", "Chills, night sweats.", "chills, night sweats"),
+    ("She denies fever, chills, nausea, vomiting.", "Chills, nausea.", "chills, nausea"),
+    ("No fever, chills, or night sweats.", "Night sweats.", "or night sweats"),
+    ("No fever, cough, or shortness of breath.", "Cough.", "cough, or shortness"),
+    ("Negative for chest pain, palpitations, syncope.", "Palpitations, syncope.", "palpitations, syncope"),
+    ("Review of systems negative for headache, vision changes, weakness.", "Vision changes, weakness.",
+     "vision changes, weakness"),
+    ("She has no rash, joint pain, or mouth ulcers.", "Joint pain.", "joint pain, or mouth"),
+    ("Denies chest pain, shortness of breath, or leg swelling.", "Leg swelling.", "or leg swelling"),
+    ("Without fever, rigors, or dysuria.", "Rigors.", "rigors, or dysuria"),
+    ("She does not have diabetes, hypertension, or asthma.", "Hypertension.", "hypertension, or asthma"),
+])
+def test_a_negation_carries_through_a_list_after_a_comma(said, value, source):
+    assert own(said, value, source).reasons == ["negation_dropped"]
+
+
+# A list the negation carries through ends at the first word that ends it, "but", a semicolon, or something said to be
+# there after "and" or "or"; what follows is the patient's.
+@pytest.mark.parametrize(("said", "negated", "after"), [
+    ("Denies fever, chills or night sweats but reports weight loss.", "chills or night sweats", "weight loss"),
+    ("Denies chest pain, shortness of breath or palpitations but endorses fatigue.",
+     "shortness of breath or palpitations", "endorses fatigue"),
+    ("No nausea, vomiting or diarrhea but has abdominal pain.", "vomiting or diarrhea", "has abdominal pain"),
+    ("Denies fever, chills and night sweats; reports weight loss.", "chills and night sweats", "weight loss"),
+    ("Denies fever, chills, or night sweats but reports weight loss.", "or night sweats", "reports weight loss"),
+    ("Negative for headache, vision changes and weakness but positive for neck pain.", "vision changes and weakness",
+     "neck pain"),
+    ("Denies fever, chills or night sweats and reports weight loss.", "chills or night sweats", "weight loss"),
+])
+def test_a_negation_carries_through_a_list_up_to_the_word_that_ends_it(said, negated, after):
+    assert own(said, f"{negated.removeprefix('or ').capitalize()}.", negated).reasons == ["negation_dropped"]
+    assert own(said, f"{after.capitalize()}.", after).pending
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("No fever, but cough for three days.", "Cough for three days."),
+    ("Denies fever, reports cough for three days.", "Reports cough for three days."),
+    ("No fever, she has a cough for three days.", "She has a cough for three days."),
+    ("No fever, chills, but a productive cough.", "A productive cough."),
+    ("No fever, the cough is better.", "The cough is better."),
+    ("Denies fever, reports a cough.", "Reports a cough."),
+    ("Negative for nausea, positive for headache.", "Positive for headache."),
+    ("No fever, she is eating well.", "She is eating well."),
+    ("No rash, but has joint pain.", "Has joint pain."),
+    ("No fever, chills, or night sweats, has a cough.", "Has a cough."),
+    ("Denies fever, chills, night sweats. Cough for two weeks.", "Cough for two weeks."),
+])
+def test_a_negations_list_ends_where_something_else_is_said(said, value):
+    assert own(said, value, value.rstrip(".")).pending
+
+
+# In dictation a line break is a spoken new paragraph: a cue reaches no further than one, as no further than a full stop,
+# before what it qualifies (over a subject and its verb, or a relative clause, included) or back over it.
+@pytest.mark.parametrize(("said", "value"), [
+    ("I don't think {new paragraph} She has pneumonia.", "She has pneumonia."),
+    ("Not sure {new paragraph} She has gout.", "She has gout."),
+    ("Seen with her mother {new paragraph} who has diabetes.", "Who has diabetes."),
+    ("She has pneumonia {new paragraph} Probably.", "She has pneumonia."),
+    ("She has pneumonia {new paragraph} or maybe bronchitis.", "She has pneumonia."),
+    ("No fever {new paragraph} cough for two days.", "Cough for two days."),
+])
+def test_a_cue_stops_at_a_new_paragraph(said, value):
+    assert field(value, value.rstrip("."), text=transcript(said)).pending
+    assert not field(value, value.rstrip("."), text=transcript(said.replace(" {new paragraph}", ""))).pending
+
+
 def test_a_qualifier_stops_at_a_new_subject():
     assert own("No fever she is eating well.", "She is eating well.").pending
     assert own("Mother had a stroke patient has hypertension.", "Patient has hypertension.").pending
@@ -688,6 +758,29 @@ def test_a_doubt_after_the_finding_or_a_question_is_refused_as_doubt_itself(said
     assert "certainty_dropped" in field(value, said, name="plan", text=transcript(said)).reasons
 
 
+# A source said both hedged and plainly is read where it was said plainly only when that is the whole of its clause after
+# a heading; never someone else's sentence that says the same words.
+@pytest.mark.parametrize(("said", "value", "source"), [
+    ("Possible pulmonary embolism. Pulmonary embolism protocol reviewed.", "Pulmonary embolism.", "Pulmonary embolism"),
+    ("I doubt she has shingles. The patient in the next bed has shingles.", "Shingles.", "has shingles"),
+    ("I think she has strep throat. Her classmate has strep throat.", "Strep throat.", "strep throat"),
+    ("Maybe a urinary tract infection. Her roommate had a urinary tract infection.", "A urinary tract infection.",
+     "a urinary tract infection"),
+    ("No chest pain today. The paramedics were told chest pain today.", "Chest pain today.", "chest pain today"),
+    ("Probable gout of the left toe. Gout of the left toe runs in her family.", "Gout of the left toe.",
+     "Gout of the left toe"),
+])
+def test_a_hedged_finding_is_never_grounded_on_someone_elses_sentence(said, value, source):
+    assert not field(value, source, name="plan", text=transcript(said)).pending
+
+
+def test_a_hedged_finding_restated_plainly_under_a_heading_is_read_there():
+    said = "I think she has a viral upper respiratory infection. Assessment: viral upper respiratory infection."
+
+    assert field("Viral upper respiratory infection.", "viral upper respiratory infection", name="plan",
+                 text=transcript(said)).pending
+
+
 def test_without_punctuation_a_qualifier_stops_at_the_next_step_or_heading():
     said = "no further pancreatitis continue monthly olezarsen no other injury on exam swelling below the malleolus"
 
@@ -880,17 +973,18 @@ def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_document
     assert own(said, said).value == "She is not allergic to sulfa after all."
 
 
-@pytest.mark.parametrize(("said", "instruction"), [
-    ("There's no reason not to order an MRI of the knee.", "order an MRI of the knee"),
-    ("I can't not order an MRI.", "order an MRI"),
-    ("There's no good reason not to order an MRI.", "order an MRI"),
-    ("There's no reason we should not order an MRI.", "order an MRI"),
-    ("There is no good reason that we can not order a CT today.", "order a CT today"),
-    ("No real reason why the team would not order labs.", "order labs"),
-    ("There's no reason she could not order a lipid panel.", "order a lipid panel"),
+# Listed whole: what comes before the instruction says nothing once it is cut.
+@pytest.mark.parametrize("said", [
+    "There's no reason not to order an MRI of the knee.",
+    "I can't not order an MRI.",
+    "There's no good reason not to order an MRI.",
+    "There's no reason we should not order an MRI.",
+    "There is no good reason that we can not order a CT today.",
+    "No real reason why the team would not order labs.",
+    "There's no reason she could not order a lipid panel.",
 ])
-def test_two_negations_make_an_instruction_again(said, instruction):
-    assert said_instructions(said) == [instruction]
+def test_two_negations_make_an_instruction_again(said):
+    assert said_instructions(said) == [said.rstrip(".")]
     assert "MRI" not in own(said, said).value
 
 
@@ -943,15 +1037,38 @@ def test_an_instruction_inside_a_source_splits_it_in_two():
     assert own(said, "MRI, recheck in 3 months.").reasons == ["unsupported_content"]
 
 
-# What is cut is what is listed, never more: a sentence whose rest needs the instruction keeps its rest, ending on the
-# word that shows it is unfinished, and the instruction is listed.
-@pytest.mark.parametrize(("said", "rest"), [("Do not start metformin until we order an A1c.", "Do not start metformin until."),
-                                            ("There's no reason not to order an MRI of the knee.", "There's no reason not to.")])
-def test_a_sentence_whose_rest_needs_the_instruction_keeps_its_rest_unfinished(said, rest):
+# What is cut is what is listed, never more, and nothing is left that says nothing without it: a piece of the sentence
+# that ends in a subordinator, whose negation is bare, or that is under three words, is listed with the instruction; a
+# condition before it goes with it when nothing else follows, and stays with what does.
+@pytest.mark.parametrize(("said", "listed", "rest"), [
+    ("Stop warfarin only after we order an INR and it is above 3.",
+     "Stop warfarin only after we order an INR and it is above 3", ""),
+    ("Do not start metformin until we order an A1c.", "Do not start metformin until we order an A1c", ""),
+    ("There's no reason not to order an MRI of the knee.", "There's no reason not to order an MRI of the knee", ""),
+    ("No, order a CBC.", "No, order a CBC", ""),
+    ("I don't think we need to order a skin biopsy either.", "I don't think we need to order a skin biopsy either", ""),
+    ("If her hemoglobin drops below 7, order a transfusion.", "If her hemoglobin drops below 7, order a transfusion", ""),
+    ("We discussed ordering a sleep study, and she would rather wait.", "We discussed ordering a sleep study",
+     "She would rather wait."),
+    ("If her ferritin is low, order an iron panel and continue omeprazole.", "order an iron panel",
+     "If her ferritin is low, continue omeprazole."),
+    ("Avoid NSAIDs, order a CBC, and recheck.", "order a CBC", "Avoid NSAIDs. Recheck."),
+])
+def test_a_piece_that_says_nothing_without_its_instruction_is_listed_with_it(said, listed, rest):
     checked = own(said, said)
 
+    assert [said[s:e] for s, e in directive_spans(said)] == [listed]
     assert checked.value == rest
-    assert [said[s:e] for s, e in directive_spans(said)] == [said[len(rest) - 1 :].strip().rstrip(".")]
+    assert checked.pending == bool(rest)
+
+
+# Only what the transcript lists is cut from a value: a sentence it reads in context as no instruction stays.
+def test_a_value_keeps_what_the_transcript_does_not_list():
+    text = transcript("Any problems with refills? No. Refill history is regular.")
+
+    assert not not_carried_over(text)
+    assert field("Refill history is regular.", "Refill history is regular", text=text).pending
+    assert "order_or_allergy_change" in field("Refill her lisinopril.", "Refill history is regular", text=text).reasons
 
 
 def test_an_instruction_after_and_is_cut_where_it_starts():
@@ -1192,7 +1309,7 @@ def test_the_instructions_next_to_them_are_still_listed_whole(said):
     text = transcript(said)
 
     (listed,) = not_carried_over(text)
-    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".").removeprefix("No, ")
+    assert text.text[listed["start"] : listed["end"]] == said.rstrip(".")
 
 
 # What an instruction says is listed and cut with it: its condition, subject and all, where it is removed from, and
@@ -1212,11 +1329,78 @@ def test_an_instruction_is_listed_with_its_condition_and_what_it_takes(said, ins
 
 # What is left on each side of an instruction cut from the middle of a sentence is a sentence of its own, as its
 # sources are, so it still reads where it was said.
+# Once something is cut, what starts the value or follows a full stop starts with a capital; after a semicolon, as said.
+@pytest.mark.parametrize(("said", "rest"), [
+    ("Order a CBC; if it is low, start iron.", "If it is low, start iron."),
+    ("Continue apixaban; do not stop it, and order a CBC.", "Continue apixaban; do not stop it."),
+    ("Order a CBC. recheck in 3 months.", "Recheck in 3 months."),
+])
+def test_what_is_kept_beside_a_cut_starts_with_the_right_case(said, rest):
+    assert own(said, said).value == rest
+
+
 def test_each_side_of_a_cut_is_a_sentence_of_its_own():
-    said = "We discussed ordering a sleep study, and she would rather wait."
+    said = "Hold the lisinopril, order a BMP, and recheck in a week."
     checked = own(said, said)
 
-    assert checked.pending and checked.value == "We discussed. she would rather wait."
+    assert checked.pending and checked.value == "Hold the lisinopril. Recheck in a week."
+
+
+# A long order list cut by the reach goes on over what it lists, so no tail of it is left in the note: the review's
+# sentence, said without punctuation and with it past MARKED_REACH words.
+@pytest.mark.parametrize(("said", "value", "sources"), [
+    ("Plan order a cbc a bmp a lipid panel a tsh an a1c a urinalysis a chest x ray and an ecg and recheck in two weeks",
+     "Urinalysis, chest x ray and an ECG.", ["urinalysis a chest x ray and an ecg"]),
+    ("Plan: Order a CBC, a BMP, a lipid panel, a TSH, an A1c, a urinalysis, a chest x-ray, an ECG, a urine culture, a PSA, "
+     "a vitamin D level, a B12 level, a ferritin, an iron panel, a magnesium, a phosphate, a uric acid.",
+     "Urinalysis, chest x-ray, ECG, urine culture, PSA.", ["urinalysis, a chest x-ray, an ECG, a urine culture, a PSA"]),
+])
+def test_the_tail_of_a_long_order_list_is_listed_and_kept_out_of_the_note(said, value, sources):
+    text = transcript(said)
+
+    (listed,) = not_carried_over(text)
+
+    assert sources[0].lower() in text.text[listed["start"] : listed["end"]].lower()
+    assert "order_or_allergy_change" in field(value, *sources, name="plan", text=text).reasons
+    assert "recheck in two weeks" not in text.text[listed["start"] : listed["end"]]
+
+
+LIST_ITEMS = ["CBC", "BMP", "CMP", "lipid panel", "TSH", "urinalysis", "chest x-ray", "hemoglobin A1c", "vitamin D",
+              "ferritin", "magnesium", "uric acid", "lisinopril", "metformin", "amlodipine", "atorvastatin"]
+
+
+# As a property: a list of 2 to 25 items the reference data names, after "order", said with or without punctuation, with
+# "and" or without, leaves no word of any item outside what is listed.
+def test_no_item_of_an_order_list_is_left_outside_what_is_listed():
+    rng = random.Random(15)
+    said = 0
+    for count in range(2, 26):
+        for joined in ("{} ", "{}, ", "{} and "):
+            for end in ("", ".", " and recheck in two weeks", ", recheck in two weeks."):
+                items = [rng.choice(LIST_ITEMS) for _ in range(count)]
+                text = "order " + "".join(joined.format("a " + item) for item in items[:-1]) + "a " + items[-1] + end
+                spans = directive_spans(text)
+                at = len("order ")
+                for item in items:
+                    at = text.index(item, at)
+                    assert any(s <= at and at + len(item) <= e for s, e in spans), (text, item)
+                    at += len(item)
+                said += 1
+    assert said == 24 * 3 * 4
+
+
+# A negation before an aside between commas still makes what follows it an instruction not to.
+@pytest.mark.parametrize("said", [
+    "Do not, under any circumstances, order a CT; start antibiotics.",
+    "Under no circumstances, order a CT with contrast. Start antibiotics.",
+])
+def test_an_instruction_not_to_is_read_over_an_aside(said):
+    text = transcript(said)
+
+    assert not directive_spans(said)
+    assert not not_carried_over(text)
+    assert not proposals(text)
+    assert directive_spans("No, wait, order a CBC.")
 
 
 # What is cut from a value is what is listed, never the rest of its sentence.
@@ -1224,7 +1408,7 @@ def test_a_value_keeps_the_rest_of_a_sentence_an_instruction_is_cut_from():
     said = "Order a CBC and recheck in 3 months, she prefers mornings."
     checked = own(said, said)
 
-    assert checked.pending and checked.value == "recheck in 3 months, she prefers mornings."
+    assert checked.pending and checked.value == "Recheck in 3 months, she prefers mornings."
 
 
 # Spoken to the patient (step 16's conversations) the allergy list and the prescription are "your": the same instructions.
@@ -1469,13 +1653,13 @@ def held_back(text) -> list[tuple[str | None, str]]:
 # listed instruction's place, as a kind, a place and warnings, never words; the note's fields carry neither.
 def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said():
     text = transcript(
-        "Start metformin. Go ahead and order a hemoglobin A1c. Add penicillin to her allergy list. Recheck in 3 months."
+        "Start metformin. Go ahead and order a hemoglobin A1c. Add amoxicillin to her allergy list. Recheck in 3 months."
     )
 
     sent = proposals(text)
 
     assert proposed(text) == [("order", "Go ahead and order a hemoglobin A1c"),
-                              ("allergy_addition", "Add penicillin to her allergy list")]
+                              ("allergy_addition", "Add amoxicillin to her allergy list")]
     assert [(p["start"], p["end"]) for p in sent] == [(r["start"], r["end"]) for r in not_carried_over(text)]
     assert all(set(p) == {"kind", "start", "end", "warnings"} and p["warnings"] == [] for p in sent)
     assert own(text.text, "Start metformin. Recheck in 3 months.", "Start metformin.", "Recheck in 3 months.").pending
@@ -1488,7 +1672,7 @@ def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said()
         "Okay so plan: order a lipid panel and a chest X-ray.",
         "Cephalexin should be added to her allergies.",
         "We'll send amoxicillin 500 mg three times a day to her pharmacy.",
-        "Put latex on her allergy list.",
+        "Put codeine on her allergy list.",
     ],
 )
 def test_an_instruction_said_as_one_is_proposed(said):
@@ -1522,6 +1706,8 @@ def test_an_instruction_said_as_one_is_proposed(said):
         ("We already put an order in last week.", "in_the_past"),
         ("Can you order an MRI?", "question"),
         ("She asked, can you order an MRI.", "quoted"),
+        ("Call that in to her pharmacy.", "names_no_item"),
+        ("Add penicillin to her allergy list.", "names_no_item"),
         ("Her mother asked whether we could order an MRI.", "hedged"),
     ],
 )
@@ -1540,6 +1726,18 @@ def test_an_instruction_over_an_unclear_passage_or_in_a_transcript_not_yet_final
     assert held_back(unclear) == [("unclear", "Go ahead and order an A1c")]
     assert held_back(live) == [("not_final", "Go ahead and order an A1c")]
     assert proposals(unclear) == proposals(live) == []
+
+
+# A heading line an instruction stands under holds it back, but Plan, Orders or Labs.
+@pytest.mark.parametrize(("heading", "proposed_under_it"), [
+    ("Next visit", False), ("Options discussed", False), ("Declined", False), ("If symptoms persist", False),
+    ("Plan", True), ("Orders", True), ("Labs", True),
+])
+def test_only_a_plan_orders_or_labs_heading_lets_an_instruction_under_it_be_proposed(heading, proposed_under_it):
+    text = assemble([Segment(0, 16000, f"{heading} {{colon}} {{new paragraph}} Order a lipid panel {{period}}", 0.9, None,
+                             True)], final=True)
+
+    assert bool(proposals(text)) == proposed_under_it
 
 
 def test_at_most_twenty_are_proposed_and_every_rule_is_named():

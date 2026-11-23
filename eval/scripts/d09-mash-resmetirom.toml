@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): hepatology clinic starting resmetirom for MASH, with an order to leave out. Format: eval/README.md.
 id = "d09-mash-resmetirom"
 voice = "af_heart"
-tags = ["long", "vitals", "numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal-trap"]
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
 dates = []
 drugs = ["metformin", "semaglutide", "lisinopril", "rosuvastatin", "resmetirom"]
 forbidden = ["order a hepatitis B surface antibody"]
@@ -99,4 +99,4 @@ sources = [
 
 [[not_proposed]]
 words = "order a hepatitis B surface antibody"
-why = "not_plain"
+why = "names_no_item"

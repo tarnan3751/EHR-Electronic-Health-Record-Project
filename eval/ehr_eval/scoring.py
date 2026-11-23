@@ -20,7 +20,9 @@
   the order-and-allergy rule threw away that the gold says was legitimate (false discards), so the owner can judge where
   that rule draws its line.
 - proposals (the expansion plan's step 15): what the dictation proposed, each an order or an allergy to add at the
-  place of a listed instruction, against each script's gold proposals: found where its gold words are, as said or as
+  place of a listed instruction, against each script's gold proposals, the rule-following gold (proposals), and again
+  against the clinical gold (proposals_clinical, clinical-proposals.toml: every one a clinician would expect proposed,
+  those the closed sentence holds back included): found where its gold words are, as said or as
   heard (_as_heard()), and of the same kind; right when the item it names was heard word for word, misheard when not;
   false when it matches no gold proposal. Each false or misheard one is listed (listed: the recording, the kind and the
   words shown, normalized), for the gate to require the owner's acceptance of. A proposal is matched by where it was
@@ -52,7 +54,7 @@ from ehr_dictation.transcript import Transcript
 
 from .dates import said_right
 from .normalize import normalize, words
-from .scripts import Gold, Script
+from .scripts import Gold, Proposal, Script, clinical_proposals
 
 TWO_MINUTES = 110.0  # seconds: the scripts written to run about two minutes
 AT_THE_LIMIT = 165.0  # seconds: the max-length scripts, near the 3-minute limit
@@ -119,7 +121,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "validation": _validation(items),
         "unsupported_content": _unsupported(items),
         "order_allergy": _order_allergy(items, scripts),
-        "proposals": _proposals(items, scripts),
+        **proposal_scores(items, scripts),
         "warnings": _warnings(items, scripts),
         "sorting": _sorting(items),
         "timing": _timing(items),
@@ -357,13 +359,23 @@ def _order_allergy(items: list[Item], scripts: dict[str, Script]) -> dict:
     }
 
 
-def _proposals(items: list[Item], scripts: dict[str, Script]) -> dict:
+def proposal_scores(items: list[Item], scripts: dict[str, Script]) -> dict:
+    """The proposals' measures against the rule-following gold (each script's [[proposals]]) and against the clinical
+    gold (clinical-proposals.toml, beside the scripts)."""
+    clinical = clinical_proposals(next(iter(scripts.values())).path.parents[1]) if scripts else {}
+    return {
+        "proposals": _proposals(items, scripts, lambda script: script.proposals),
+        "proposals_clinical": _proposals(items, scripts, lambda script: clinical.get(script.id, ())),
+    }
+
+
+def _proposals(items: list[Item], scripts: dict[str, Script], gold: Callable[[Script], tuple[Proposal, ...]]) -> dict:
     shown = said = found = right = with_warnings = 0
     listed: list[dict] = []
     held_back: Counter[str] = Counter()
     for item in items:
         script = scripts[item.script]
-        golds = list(script.proposals)
+        golds = list(gold(script))
         places = _heard_at(item, script, [normalize(gold.words) for gold in golds])
         said += len(golds)
         matched: set[int] = set()

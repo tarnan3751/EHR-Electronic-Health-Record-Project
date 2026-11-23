@@ -296,6 +296,71 @@ HELD_BACK = [
     # A next sentence that goes on with the instruction's (a full stop heard where none was said).
     "Add nitrofurantoin to her allergy list. with a reaction rash.",
     "Order a lipid panel. To be drawn fasting.",
+    # A negation, a number word, a closed-class word, or a word that only ends or goes on with a name, is no item.
+    "Order a CBC, no.",
+    "Refill lisinopril, no.",
+    "Document no allergy.",
+    "Add no to her allergies.",
+    "Order another one.",
+    "Call in one.",
+    "Order a chest.",
+    "Order a test, option.",
+    "Order the plan.",
+    "Refill pain.",
+    "Order normal.",
+    "Order a CBC, normal.",
+    "Order morning.",
+    # A sentence after it that is only a condition, a time for later, or says it was done; one before it that is only a
+    # condition; and a retraction two sentences on.
+    "Order a CBC. If her fever returns.",
+    "Order a CBC. Only if her fever returns.",
+    "Order a CBC. When she is fasting.",
+    "Order a CBC. Once she finishes her antibiotics.",
+    "Order a CBC. In case her fever returns.",
+    "Order a CBC. Depending on her symptoms.",
+    "Order a CBC. In two weeks.",
+    "Order a CBC. Next week.",
+    "Order a CBC. At her next visit.",
+    "Order a CBC. At follow-up.",
+    "Order a CBC. Later.",
+    "Order a CBC. Already done.",
+    "Order a CBC. Already ordered by cardiology.",
+    "Refill her lisinopril. Already sent.",
+    "If her potassium is low. Then order a BMP.",
+    "Unless she improves. Order a chest x-ray.",
+    "Order a CBC. She is anxious about needles. Actually, let's not.",
+    "Order a CBC. Recheck her potassium as well. Actually, forget the CBC.",
+    "Add amoxicillin to her allergies. She reacted with hives. Wait, that was her sister.",
+    "Order a CBC. And a BMP. No, just the BMP.",
+    # "Call in" is an order only with the pharmacy it goes to.
+    "I'll call in the morning.",
+    "Will call in the evening.",
+    "Call in the morning.",
+    # Penicillin and latex: the reference data names only "Penicillin G", "Penicillin V" and "Natural latex rubber".
+    "Add penicillin to her allergy list.",
+    "Add latex to her allergy list.",
+    # A verb takes only what it can: refill, prescribe, renew, a prescription, call in and send a medication, and every
+    # item of a joined list.
+    "Refill a CBC.",
+    "Prescribe a CBC.",
+    "Renew her lipid panel.",
+    "Write a prescription for a TSH.",
+    "Call in a chest x-ray to her pharmacy.",
+    "Send a CBC to her pharmacy.",
+    "Send a prescription for a lipid panel to her pharmacy.",
+    "Refill lisinopril and a CBC.",
+    "Prescribe amoxicillin and a urinalysis.",
+    # A number only in a quantity or between two words of the item's name, and never a zero.
+    "Order a CBC 2019.",
+    "Order a CBC 12.",
+    "Order a CBC 50 50.",
+    "Order a 2019 CBC.",
+    "Refill lisinopril 10.",
+    "Order a CBC 0 times a day.",
+    "Order a CBC zero times a day.",
+    "Refill lisinopril 10 mg for zero days.",
+    "Refill lisinopril 10 mg with 0 refills.",
+    "Refill lisinopril 0 mg.",
     # Having it refilled, or sorting it out, is listed but isn't the plain form.
     "Have her lisinopril refilled.",
     "Please get her metformin 500 mg refilled for 90 days.",
@@ -309,11 +374,14 @@ CONTROLS = [
     ("Order a CBC. Thanks.", ["Order a CBC"]),
     ("Order a CBC. Recheck in one week.", ["Order a CBC"]),
     ("There is no fever, chest pain, or shortness of breath. Order a CBC.", ["Order a CBC"]),
-    ("Add penicillin as an allergy.", ["Add penicillin as an allergy"]),
+    ("Add amoxicillin as an allergy.", ["Add amoxicillin as an allergy"]),
     ("Add an allergy to codeine.", ["Add an allergy to codeine"]),
-    ("Record a new allergy to latex.", ["Record a new allergy to latex"]),
+    ("Record a new allergy to codeine.", ["Record a new allergy to codeine"]),
     ("List codeine as an allergy.", ["List codeine as an allergy"]),
-    ("Penicillin should be added to her allergies.", ["Penicillin should be added to her allergies"]),
+    ("Amoxicillin should be added to her allergies.", ["Amoxicillin should be added to her allergies"]),
+    ("Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray.",
+     ["Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray"]),
+    ("Go ahead and order a fasting lipid panel.", ["Go ahead and order a fasting lipid panel"]),
     ("Plan: order a CBC.", ["order a CBC"]),
     ("Plan, order a CBC.", ["order a CBC"]),
     ("Okay so order a CBC.", ["order a CBC"]),
@@ -334,6 +402,18 @@ CONTROLS = [
     ("Write her a script for amoxicillin.", ["Write her a script for amoxicillin"]),
     ("Order a CBC. She is allergic to penicillin, add that to her allergies.", ["Order a CBC"]),
     ("I'm not going to order a CBC. Order a BMP.", ["Order a BMP"]),
+    # An order takes any orderable, medications too; a refill or a prescription a medication, with its numbers in its
+    # quantities or its name; "no refills" is a phrase of its own.
+    ("Order lisinopril 10 mg daily.", ["Order lisinopril 10 mg daily"]),
+    ("Order a CBC and lisinopril.", ["Order a CBC and lisinopril"]),
+    ("Refill lisinopril and metformin.", ["Refill lisinopril and metformin"]),
+    ("Refill her lisinopril 10 mg oral tablet.", ["Refill her lisinopril 10 mg oral tablet"]),
+    ("Refill lisinopril 10.5 mg.", ["Refill lisinopril 10.5 mg"]),
+    ("Prescribe amoxicillin 500 mg three times a day for 7 days.",
+     ["Prescribe amoxicillin 500 mg three times a day for 7 days"]),
+    ("Refill her lisinopril with no refills.", ["Refill her lisinopril with no refills"]),
+    ("Refill lisinopril with 3 refills.", ["Refill lisinopril with 3 refills"]),
+    ("Order vitamin D 1000 units daily.", ["Order vitamin D 1000 units daily"]),
 ]
 
 # Said plainly under the earlier form, not the closed sentence: held back, still listed, each with why.
@@ -353,7 +433,6 @@ NOT_PLAIN_NOW = [
     ('Order her usual labs.', "'usual labs' names no item"),
     ('Order a CBC two times.', "'two times' is no quantity"),
     ('Add penicillin to her allergies and order a CBC.', 'a second verb'),
-    ('Order a stat CBC and a BMP and a lipid panel and a TSH and a urinalysis and a chest x-ray.', "'stat' before the item"),
     ('Just order a CBC.', "'just' is no lead-in"),
     ('Refill her metformin for her diabetes.', 'a reason'),
     ('Order a CBC because she is tired.', 'a reason'),
@@ -402,15 +481,15 @@ PLAIN = [
     "Refill her lisinopril for 90 days.",
     "Refill her lisinopril for three months.",
     "Send amoxicillin 500 mg three times a day to her pharmacy.",
-    "Add penicillin to her allergy list.",
+    "Add amoxicillin to her allergy list.",
     "Renew her albuterol as well.",
     "Refill her lisinopril too.",
     "Send metformin 500 mg twice daily before meals to her pharmacy.",
-    "Penicillin needs to be added to his allergy list.",
-    "Put penicillin on his allergy list.",
+    "Codeine needs to be added to his allergy list.",
+    "Put codeine on his allergy list.",
     "List codeine as an allergy.",
     "Add an allergy to codeine.",
-    "Record a new allergy to latex.",
+    "Record a new allergy to codeine.",
     "Call in amoxicillin to her pharmacy.",
     "Place an order for a chest X-ray.",
     "E-prescribe amoxicillin.",
@@ -473,21 +552,16 @@ FIXTURES = [
     ("I'm ordering a lipid panel and a TSH.", "order"),
     ("Send amoxicillin 500 mg three times a day to her pharmacy.", "order"),
     ("Prescribe insulin glargine with no refills.", "order"),
-    ("Add penicillin to her allergy list.", ALLERGY_ADDITION),
-    ("Penicillin should be added to her allergies.", ALLERGY_ADDITION),
+    ("Add amoxicillin to her allergy list.", ALLERGY_ADDITION),
+    ("Amoxicillin should be added to her allergies.", ALLERGY_ADDITION),
     ("Add an allergy to codeine.", ALLERGY_ADDITION),
 ]
 
 
 @functools.cache
 def closed_words() -> frozenset[str]:
-    """Every word of the closed classes but the items: lead-ins, verbs, determiners, quantities, trailers, joins."""
-    return frozenset(word for pattern in (
-        " ".join(" ".join(lead) for lead in validation.PLAIN_LEADS), " ".join(" ".join(v + i) for v, i, _ in validation.ORDER_FORMS),
-        " ".join(" ".join(step for step in form if step != validation.ITEMS) for form in validation.ALLERGY_FORMS),
-        validation.QUANTITY.pattern, validation._PHARMACY, validation._LIST, " ".join(validation.DETERMINERS), "new and",
-        " ".join(" ".join(trailer) for trailer in validation.TRAILERS), " ".join(validation._NUMBER_WORDS),
-    ) for word in re.findall(r"[a-z']+", pattern.lower()))
+    """Every word of the closed classes but the items, and the number words."""
+    return validation._CLOSED_WORDS | validation._NUMBER_WORDS
 
 
 @functools.cache
@@ -496,7 +570,7 @@ def general_words() -> tuple[str, ...]:
     data's words: words none of which may be in a plain instruction."""
     texts = [item["hypothesis"] for item in json.loads((REPOSITORY / "eval/results/latest.json").read_text())["items"]]
     texts += [tomllib.loads(path.read_text(encoding="utf-8"))["text"] for path in (REPOSITORY / "eval/scripts").glob("*.toml")]
-    vocabulary = set(validation._names("order")[1]) | set(validation._names("allergen")[1])
+    vocabulary = validation._names("order")[2] | validation._names("allergen")[2]
     found = {token.text for text in texts for token in validation.tokens(text)}
     return tuple(sorted(word for word in found - closed_words() - vocabulary if not word[0].isdigit()))
 
@@ -523,10 +597,14 @@ def test_any_other_word_anywhere_in_a_plain_instruction_makes_it_not_plain(said,
     ("Add peanut to her allergy list.", "peanut", "allergen"),
 ])
 def test_a_word_from_an_unrelated_name_never_joins_an_item(said, item, kind):
-    names, holding, distinctive = validation._names(kind)
+    names, runs, *_ = validation._names(kind)
+    holding: dict[str, set[int]] = {}
+    for i, name in enumerate(names):
+        for word in set(name):
+            holding.setdefault(word, set()).add(i)
     words = [token.text for token in validation.tokens(item)]
-    rest = {i for word in words for i in holding[word]}
-    strangers = sorted(word for word in distinctive - closed_words() if not holding[word] & rest)[::25]
+    rest = set.union(*(holding[word] for word in words))
+    strangers = sorted(word for word in runs if word not in closed_words() and not holding[word] & rest)[::25]
     sentence_kind = "order" if kind == "order" else ALLERGY_ADDITION
 
     let_through = [
