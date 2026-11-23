@@ -363,7 +363,8 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
     // TC-UC23-04 in the browser: once the voices are handed over, the draft is the service's to write and can be retrieved
     // from the draft. When it can't be fetched, the page says so, offers Try again and Open the draft, not discarding;
-    // and leaving the page then keeps the visit: nothing discarded at the service or in the database.
+    // and leaving the page then keeps the visit: nothing discarded at the service or in the database. From the draft, its
+    // review says it hasn't been drafted yet, with Retrieve first and Discard after it, and Retrieve then drafts it.
     [Fact]
     public async Task TC_UC23_04_after_the_voices_are_handed_over_leaving_keeps_the_visit()
     {
@@ -393,15 +394,33 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.True(await page.IsVisibleAsync("[data-ambient-retry]"));
         Assert.True(await page.IsVisibleAsync("[data-ambient-open-draft]"));
         Assert.True(await page.IsHiddenAsync("[data-ambient-discard-stuck]"));
-        Assert.Equal(await page.GetAttributeAsync("[data-ambient-open-draft]", "href"),
-            "/patients/" + patient + "/notes/drafts/" + (await AmbientFlows.RowsAsync(apps,
-                "SELECT draft_id::text FROM ehr.ai_note_reviews WHERE patient_id = @id AND mode = 'ambient'", patient)).Single());
+        var draft = (await AmbientFlows.RowsAsync(apps,
+            "SELECT draft_id::text FROM ehr.ai_note_reviews WHERE patient_id = @id AND mode = 'ambient'", patient)).Single();
+        Assert.Equal(await page.GetAttributeAsync("[data-ambient-open-draft]", "href"), $"/patients/{patient}/notes/drafts/{draft}");
 
         await page.EvaluateAsync("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }))");
         await page.WaitForTimeoutAsync(500);
         Assert.DoesNotContain(await EventsAsync(page), e => e.StartsWith("sent DELETE ", StringComparison.Ordinal) || e.Contains("/discard", StringComparison.Ordinal));
-        Assert.Equal(["recording"], await AmbientFlows.RowsAsync(apps,
-            "SELECT r.state FROM ehr.ai_note_reviews r WHERE r.patient_id = @id AND r.mode = 'ambient'", patient));
+        const string State = "SELECT r.state FROM ehr.ai_note_reviews r WHERE r.patient_id = @id AND r.mode = 'ambient'";
+        Assert.Equal(["recording"], await AmbientFlows.RowsAsync(apps, State, patient));
+
+        var review = (await AmbientFlows.RowsAsync(apps,
+            "SELECT id::text FROM ehr.ai_note_reviews WHERE patient_id = @id AND mode = 'ambient'", patient)).Single();
+        await page.UnrouteAsync("**/ambient/*/result");
+        await page.GotoAsync($"{server.Url}/patients/{patient}/notes/drafts/{draft}/review/{review}");
+        Assert.Contains("hasn't been drafted yet. If its voices were named a moment ago, wait a minute and choose Retrieve.",
+            await page.TextContentAsync("[data-ambient-not-drafted]"));
+        await AiReviewBrowserTests.TabToAsync(page, "[data-review-retrieve]");
+        await page.Keyboard.PressAsync("Tab");
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('form[action*=\"handler=Discard\"] button')"));
+        await page.Keyboard.PressAsync("Shift+Tab");
+        await page.Keyboard.PressAsync("Enter");
+        for (var i = 0; i < 60 && (await AmbientFlows.RowsAsync(apps, State, patient)).Single() != "pending"; i++)
+        {
+            await page.WaitForTimeoutAsync(250);
+        }
+
+        Assert.Equal(["pending"], await AmbientFlows.RowsAsync(apps, State, patient));
     }
 
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the

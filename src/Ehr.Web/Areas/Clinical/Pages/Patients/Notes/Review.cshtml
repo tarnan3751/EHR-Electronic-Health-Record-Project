@@ -62,11 +62,12 @@
     @Html.AntiForgeryToken()
     @if (Model.Review.State == AiReviewStates.Recording && !Model.Signed)
     {
-        @* Step 16: a visit left here when its page couldn't fetch it, or was closed, says what it is; it is retrieved if
-           its voices were named in time, or discarded. *@
+        @* Step 16: a visit left here when its page couldn't fetch it, or was closed, says what it is. One whose voices were
+           named may still be drafting at the service, so Retrieve comes first and the sentence says to wait for it;
+           otherwise it is discarded. *@
         @if (Model.Ambient)
         {
-            <p class="sc-notice sc-notice--warning" data-ambient-never-drafted>A visit recorded at @Clinic.Format(Model.Review.CreatedAt) was never drafted. Discard it to dictate or listen again.</p>
+            <p class="sc-notice sc-notice--warning" data-ambient-not-drafted>A visit recorded at @Clinic.Format(Model.Review.CreatedAt) hasn't been drafted yet. If its voices were named a moment ago, wait a minute and choose Retrieve. Otherwise discard it to dictate or listen again.</p>
         }
         else
         {
