@@ -1543,6 +1543,22 @@
         background: var(--danger);
     }
 
+    /* Time left: how much of a dictation's limit is left, after its controls while recording. The minutes and seconds
+       in mono-id, so the digits hold still as they count down, then "left" in body-sm. Not a live region. */
+    .sc-timeleft {
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
+        white-space: nowrap;
+    }
+
+    .sc-timeleft__value {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink);
+    }
+
     /* Transcript: the panel a dictation's words appear in. */
     .sc-transcript {
         border: 1px solid var(--line);

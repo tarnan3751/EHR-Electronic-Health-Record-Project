@@ -53,13 +53,18 @@ else
             <p class="sc-field__hint" id="dictation-language-hint" data-dictation-language-hint hidden>Spanish: speak Spanish. The transcript stays in Spanish and the proposed note is in English for you to check. You don't need to say punctuation. Up to 2 minutes in Spanish.</p>
         </div>
 
-        @* "Dictate" is the page's one primary button; its shortcut is printed on it (js/dictation.js binds it). *@
+        @* "Dictate" is the page's one primary button; its shortcut is printed on it (js/dictation.js binds it). While
+           recording, the time left of the dictation's limit follows the buttons. Not a live region: it changes every
+           second, and the status line under it says the few points worth hearing. *@
         <div class="sc-actions">
             <button type="button" class="sc-btn sc-btn--primary" data-dictation-start aria-keyshortcuts="Alt+Shift+D">Dictate <kbd class="sc-kbd" aria-hidden="true">Alt+Shift+D</kbd></button>
             <button type="button" class="sc-btn" data-dictation-stop disabled>Stop</button>
             <button type="button" class="sc-btn sc-btn--quiet" data-dictation-cancel disabled>Cancel</button>
+            <span class="sc-timeleft" data-dictation-time-left hidden><span class="sc-timeleft__value" data-dictation-time-left-value></span> left</span>
         </div>
         <p class="sc-status" role="status" aria-live="polite" data-dictation-status>Select Dictate and speak your note.</p>
+        @* At the limit, the script's words for it, until the dictation goes on to its review. *@
+        <p class="sc-notice sc-notice--warning" data-dictation-limit hidden></p>
         <div class="sc-actions">
             <button type="button" class="sc-btn" data-dictation-review hidden>Retry saving proposals for review</button>
             <a data-dictation-manual hidden>Continue manual note</a>
