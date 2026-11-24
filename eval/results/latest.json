@@ -37,7 +37,7 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "f2d8a8931fc709deea77669bc5d67c356c6742bc05424daf9450f421896150b7",
-  "scoring": "77ad5d2860ebea2f3451c34f1c24fb30bd8bff45f7da74aa47b590011458ab05"
+  "scoring": "0e9eb4027ab605e49e18d2db685d0306cde8486524d89ad2685d80fea9391569"
  },
  "dataset": {
   "recordings_sha256": "58ec8499a961cc787e421919552e1c4060e074cb5a7192c84a29ba17d6b142cf",
@@ -22383,7 +22383,7 @@
   }
  ],
  "rescored_from": {
-  "scoring": "2bfbaf93a1e00fb60c6bed491c452ed7c4dc0a70295beebf7f3ea8579734fcf4",
+  "scoring": "77ad5d2860ebea2f3451c34f1c24fb30bd8bff45f7da74aa47b590011458ab05",
   "gold_sha256": "b8a36a520a4986aaea34a8252a4263a7d9a04d5778daea8a1391163527d94264",
   "structuring_outputs_reused": true
  }

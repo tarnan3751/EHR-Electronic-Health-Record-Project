@@ -3,7 +3,7 @@
 order (ORDERABLES) or allergy to add (ALLERGENS) may name to be proposed (validation.py, "plain"), one a line, as
 their words in lower case without numbers, each standalone run marked "^" before its first word and "$" after
 its last, and a medication's "+" before it. Read only when a proposal is weighed.
-From: order catalog 13490; common catalog items 29; RxNorm medications 20061; allergens 5907; common names 3 rows.
+From: order catalog 13490; common catalog items 29; RxNorm medications 20061; allergens 5907; common names 4 rows.
 
 A derived copy of names from three sources, which ask for these notices (docs/expansion/reference-data.md):
 - RxNorm: This product uses publicly available data courtesy of the U.S. National Library of Medicine (NLM),
@@ -18,6 +18,7 @@ A derived copy of names from three sources, which ask for these notices (docs/ex
   The version used is 2.83."""
 
 ORDERABLES = """
+^a c$
 +^abacavir$
 +^abacavir$ mg ^dolutegravir$ mg ^lamivudine$ mg oral tablet
 +^abacavir$ mg ^dolutegravir$ mg ^lamivudine$ mg oral tablet ^triumeq$

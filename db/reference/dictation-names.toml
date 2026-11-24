@@ -1,5 +1,6 @@
 # Common names a clinician dictates for an item the reference data holds under another name (the expansion plan's step
-# 15.1): "penicillin" for penicillin G or V, "latex" for natural latex rubber, "CRP" for C reactive protein.
+# 15.1): "penicillin" for penicillin G or V, "latex" for natural latex rubber, "CRP" for C reactive protein, "A1c" for
+# hemoglobin A1c (read as one word: validation.py's ONE_WORD).
 # Hand-written, unlike the rest of db/reference, and read by src/Ehr.Dictation/sidecar/generate_catalog.py alone, which
 # writes each name into the dictation's catalog (ehr_dictation/catalog.py) as a name of its own, of its kind only, so an
 # instruction said plainly with it can be proposed (validation.py, "plain"). Nothing else reads it: the migration job and
@@ -35,3 +36,10 @@ codes = ["1988-5"]  # C reactive protein [Mass/volume] in Serum or Plasma
 source = """LOINC 2.83, 1988-5: short name "CRP SerPl-mCnc", display name "CRP [Mass/Vol]", related name "CRP"; the \
 most ordered of LOINC's C reactive protein tests (common order rank 117; high-sensitivity 30522-7, a different test, \
 is 273)."""
+
+[[name]]
+name = "A1c"
+kind = "orderable"
+codes = ["SYN-LAB-005"]  # Hemoglobin A1c, the clinic's common item
+source = """The clinic's common item, "Hemoglobin A1c"; LOINC 2.83's related names for 4548-4 and 17856-6, "HbA1c" and \
+"Hgb A1c"."""

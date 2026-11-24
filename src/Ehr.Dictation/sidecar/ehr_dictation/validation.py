@@ -34,7 +34,8 @@ her allergies"); determiners and possessives (a, an, the, her, his, their, some,
 order's item fasting, stat, urgent, routine or repeat; an item, an orderable for an order (a medication for refill,
 prescribe, renew, e-prescribe, a prescription or script, call in and send: "Refill a CBC" isn't plain) and an allergen
 for an allergy to add, as the reference data names it, or a common name mapped to it there
-(db/reference/dictation-names.toml: "penicillin", "latex", "CRP") (is_item(): a run of one name of catalog.py that
+(db/reference/dictation-names.toml: "penicillin", "latex", "CRP", "A1c"; a word written as letters and digits, "A1c" or
+"B12", is one word here, ONE_WORD, and nowhere else) (is_item(): a run of one name of catalog.py that
 begins with one of its standalone runs whole, a generic head, an abbreviation in parentheses, a brand in brackets, a
 common catalog item's name or a common name, and never holds a negation or a number word, nor a number but between two of its words, so "lisinopril"
 and "chest x-ray" are items and "no", "one", "morning", "chest" alone or "CBC 2019" aren't); the item's quantities
@@ -1799,7 +1800,7 @@ def _held_back(text: str, words: list[Token], unclear: list[tuple[int, int]], st
     if any(token.text not in OPENERS for token in lead[joins[-1] + 1 if joins else 0 :] if token.start < start):
         return "not_imperative"
     kind = "order" if kinds == {"order"} else ALLERGY_ADDITION
-    said = [token.text for token in words if start <= token.start and token.end <= end]
+    said = _whole([token for token in words if start <= token.start and token.end <= end], text)
     of = "order" if kind == "order" else "allergen"
     if not any(is_item(said[i : i + size], of) for i in range(len(said)) for size in range(1, MAX_ITEM_WORDS + 1)):
         return "names_no_item"
@@ -1851,8 +1852,9 @@ def is_item(words: list[str], kind: str) -> bool:
     "lisinopril" and "lisinopril 10 mg oral tablet" are, "chest" or "morning" alone isn't; none starts with a stopword,
     a single letter or a word of the closed classes, or holds a negation or a number word (NEVER_IN_AN_ITEM), and a
     number is part of one only between two of its words, and never a zero ("lisinopril 10 mg", not "CBC 2019" or
-    "lisinopril 0 mg"). Of kind "order" any
-    orderable, MEDICATION only a medication, and otherwise an allergen."""
+    "lisinopril 0 mg"). A word a plain instruction reads whole (ONE_WORD: "A1c", "B12") is compared by its letters, as
+    the catalog writes names without their numbers: "a1c" is "^a c$", the common name of Hemoglobin A1c. Of kind "order"
+    any orderable, MEDICATION only a medication, and otherwise an allergen."""
     if not words or words[0][0].isdigit() or words[-1][0].isdigit() or any(_is_zero(word) for word in words):
         return False
     words = [word for word in words if not word[0].isdigit()]
@@ -1860,6 +1862,7 @@ def is_item(words: list[str], kind: str) -> bool:
         word in NEVER_IN_AN_ITEM for word in words
     ):
         return False
+    words = [part for word in words for part in (re.findall(r"[a-z]+", word) if ONE_WORD.fullmatch(word) else [word])]
     names, runs, _, medications = _names("order" if kind in ("order", MEDICATION) else "allergen")
     return any(
         end - start <= len(words) and names[i][start : start + len(words)] == tuple(words)
@@ -1985,20 +1988,46 @@ def closed(sentence: str, kind: str) -> bool:
 
 
 def _closed_words(sentence: str) -> list[str] | None:
-    """The sentence's words in lower case, a comma and the colon after "plan" each a word of its own; None when any
-    other mark comes between two words (a semicolon, a dash, a bracket, a quote...)."""
+    """The sentence's words in lower case, a comma and the colon after "plan" each a word of its own, and a word
+    written as letters and digits read whole (ONE_WORD); None when any other mark comes between two words (a semicolon,
+    a dash, a bracket, a quote...)."""
+    whole = [match.span() for match in ONE_WORD.finditer(sentence)]
     words: list[str] = []
     last = 0
     for match in WORD.finditer(sentence):
         raw = sentence[last : match.start()]
         between = raw.strip()
+        word = match.group().lower().replace("’", "'")
+        if not raw and words and any(start < match.start() < end for start, end in whole):
+            words[-1] += word
+            last = match.end()
+            continue
         if between in (",", ":") and words and (between == "," or words[-1] == "plan"):
             words.append(between)
         elif between and raw != "-":
             return None
-        words.append(match.group().lower().replace("’", "'"))
+        words.append(word)
         last = match.end()
     return words if sentence[last:].strip() in ("", ".", "!") else None
+
+
+# A word written as letters, digits and letters, or as one letter and digits, with nothing between them, which a plain
+# instruction and its item reads whole ("A1c", "HbA1c", "B12", "D3", "T4"): never a count ("x2"), a number and its unit
+# ("10mg"), or a name and a number ("CBC2"), which are read as before. Only the closed sentence and the item check read
+# words this way; FR-14's rule (directives()) and every field check read them as tokens() does.
+ONE_WORD = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]+\d+[A-Za-z]+|[A-WYZa-wyz]\d+)(?![A-Za-z0-9])")
+
+
+def _whole(found: list[Token], text: str) -> list[str]:
+    """Tokens' words as a plain instruction reads them, each run of them ONE_WORD spans read whole."""
+    whole = [match.span() for match in ONE_WORD.finditer(text, found[0].start, found[-1].end)] if found else []
+    words: list[str] = []
+    for i, token in enumerate(found):
+        if i and found[i - 1].end == token.start and any(start < token.start < end for start, end in whole):
+            words[-1] += token.text
+        else:
+            words.append(token.text)
+    return words
 
 
 def _past_the_lead_ins(words: list[str]) -> list[int]:
