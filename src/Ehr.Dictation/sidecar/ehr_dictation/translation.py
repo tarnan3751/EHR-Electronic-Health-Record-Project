@@ -70,7 +70,8 @@ statement:
      are generated from their infinitives (spanish.conjugate()), with the pronouns a command takes ("suspéndala");
      "baja" and "continua", unaccented, are adjectives ("dosis baja");
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
-     validation.py reads them in English, with an English word that negates itself ("uncontrolled") a negation and a
+     validation.py reads them in English, with a word that negates itself a negation in either language ("afebril",
+     "indoloro", "inconsciente": spanish.SELF_NEGATING; "afebrile", "uncontrolled", "absent": NEGATED_WORDS) and a
      relative told something ("the mother is explained") not someone having it: the same (negation_dropped or
      negation_added, and so on), and the relatives named the same (experiencer_changed). A qualifier carries over a
      list past its commas, in both languages, as validation.py carries an English negation (spanish.carry_over_list()):
@@ -1049,11 +1050,14 @@ def _more_english(text: str) -> list[tuple[str, set[int], set[int]]]:
 
 
 # English words that are a negation of their own, as Spanish says "no" and the word: "no controlada" is
-# "uncontrolled", "tos no productiva" a "nonproductive cough". Read so here only; validation.py reads English dictation
-# as it did.
+# "uncontrolled", "tos no productiva" a "nonproductive cough"; or as a Spanish word negates itself
+# (spanish.SELF_NEGATING): "afebril" is "afebrile", "indoloro" "painless" or "nontender", "inconsciente"
+# "unconscious"; and "absent" before what it negates ("absent distal pulses"), which validation.py reads only after it.
+# Read so here only; validation.py reads English dictation as it did.
 NEGATED_WORDS = frozenset(
     """uncontrolled uncomplicated untreated unvaccinated unimmunized nonproductive nontender nonradiating nonpitting
-    nonpalpable nondistended nonreactive nonsmoker""".split()
+    nonpalpable nondistended nonreactive nonsmoker afebrile apyrexial apyretic asymptomatic eupneic eupnoeic anicteric
+    acyanotic painless unconscious absent""".split()
 )
 # A relative told something isn't someone having it, as a relative reporting it isn't (validation.REPORTING): "Mother
 # is explained about feeding", "the father was advised to", "explained to the mother". Spanish reads "se explica a la

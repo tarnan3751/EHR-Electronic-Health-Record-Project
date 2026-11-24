@@ -270,6 +270,30 @@ def test_an_english_word_that_negates_itself_is_a_negation(text, english, expect
     assert reasons(text, [text], english) == expected
 
 
+# A Spanish word that negates itself ("afebril", "indoloro") is a negation, written as one English word that does
+# ("afebrile", "painless") or with a negation ("without fever"); written as the finding itself, it is dropped.
+@pytest.mark.parametrize(("text", "english", "expected"), [
+    ("Paciente afebril.", "Febrile patient.", ["negation_dropped"]),
+    ("Paciente afebril.", "Afebrile patient.", []),
+    ("Paciente afebril.", "Patient without fever.", []),
+    ("Abdomen indoloro.", "Tender abdomen.", ["negation_dropped"]),
+    ("Abdomen indoloro.", "Nontender abdomen.", []),
+    ("Asintomático desde ayer.", "Symptomatic since yesterday.", ["negation_dropped"]),
+    ("Asintomático desde ayer.", "Asymptomatic since yesterday.", []),
+    ("Eupneico en reposo.", "Dyspneic at rest.", ["negation_dropped"]),
+    ("Eupneico en reposo.", "Eupneic at rest.", []),
+    ("Paciente inconsciente.", "Patient conscious.", ["negation_dropped"]),
+    ("Paciente inconsciente.", "Patient unconscious.", []),
+    ("Paciente consciente.", "Patient unconscious.", ["negation_added"]),
+    ("Paciente consciente y orientado.", "Patient alert and oriented.", []),
+    ("Pulsos distales presentes.", "Absent distal pulses.", ["negation_added"]),
+    ("Pulsos distales presentes.", "Distal pulses present.", []),
+    ("Pulsos distales ausentes.", "Absent distal pulses.", []),
+])
+def test_a_spanish_word_that_negates_itself_is_a_negation(text, english, expected):
+    assert reasons(text, [text], english) == expected
+
+
 @pytest.mark.parametrize(("english", "expected"), [
     ("Suspend lisinopril.", []),
     ("Suspended lisinopril.", []),

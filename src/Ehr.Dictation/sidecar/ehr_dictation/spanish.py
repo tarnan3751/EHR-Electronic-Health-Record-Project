@@ -585,6 +585,13 @@ NEGATION_BEFORE = _phrases(
     seguro; no estoy segura; no estamos seguros; no es seguro"""
 )
 NEGATION_AFTER = _phrases("negativo; negativa; negativos; negativas; ausente; ausentes; descartado; descartada; descartados; descartadas")
+# Words that negate themselves, a finding and its absence in one ("afebril" is without fever, "indoloro" without pain):
+# each is a negation of its own, as translation.py reads "afebrile" or "nontender" in English.
+SELF_NEGATING = frozenset(
+    """afebril afebriles apiretico apiretica apireticos apireticas asintomatico asintomatica asintomaticos
+    asintomaticas eupneico eupneica eupneicos eupneicas anicterico anicterica anictericos anictericas acianotico
+    acianotica acianoticos acianoticas indoloro indolora indoloros indoloras inconsciente inconscientes""".split()
+)
 CERTAINTY_BEFORE = _phrases(
     """posible; posibles; posiblemente; probable; probables; probablemente; sospecha de; se sospecha; sospechoso de;
     sospechosa de; sospecho; a descartar; descartar; dudoso; dudosa; en estudio; impresiona de; presunto; presunta;
@@ -897,6 +904,10 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
                                   (ends - CONTRASTS) | REPORTING | LIST_STOPS, LIST_JOINS)
         out[kind] = {i for i in reached if _is_content(toks[i])}
         cue_words[kind] = cues
+    # A word that negates itself is a negation and what it negates: a cue, as "afebrile" is in English.
+    negating = {i for i, token in enumerate(toks) if token.key in SELF_NEGATING}
+    out["negation"] |= negating
+    cue_words["negation"] |= negating
     return out, cue_words
 
 
