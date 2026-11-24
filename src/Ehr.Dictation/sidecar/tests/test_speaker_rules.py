@@ -632,6 +632,40 @@ def test_nothing_of_an_act_is_left_in_a_value_and_sort_that_out_needs_the_refill
     assert validation.conversation_not_carried_over(parking, parking.passages()) == []
 
 
+# ---- The record model session's fix round -------------------------------------------------------------------------
+
+# A prescription sent on, found by its frame whatever the place was heard as (c09's room recording heard "I'll send it
+# over to the chemist for you" as "…to the chemistvi"); a person sent, a place that is a person, or a sending refused,
+# isn't one.
+SENT_ON = ["i will send it over to the chemistvi", "i'll send it over to the farmacy for you",
+           "i'll send them off to the labb this afternoon", "we'll fax that through to the hospitle"]
+NOT_SENT_ON = ["i won't send it over to the farmacy", "i'll send you to the hospital", "i'll send it to you by post",
+               "i'll send her home to rest"]
+
+
+@pytest.mark.parametrize("said", SENT_ON)
+def test_a_prescription_sent_on_is_cut_and_listed_whatever_the_place_was_heard_as(said):
+    text = heard(("clinician", "give it with food and finish the whole bottle {period}"), ("clinician", said))
+
+    listed = validation.conversation_not_carried_over(text, text.passages())
+    sent = checked(text, plan=("Give it with food and finish the whole bottle. " + said,
+                               ["give it with food and finish the whole bottle", said]))["plan"]
+    kept = checked(text, plan=("Give it with food and finish the whole bottle.",
+                               ["give it with food and finish the whole bottle"]))["plan"]
+
+    assert [text.text[i["start"] : i["end"]] for i in listed] == [said], listed
+    assert not sent.pending or sent.value == "Give it with food and finish the whole bottle.", "cut from the value"
+    assert kept.pending, "the care said beside it is still offered"
+
+
+@pytest.mark.parametrize("said", NOT_SENT_ON)
+def test_a_person_sent_or_a_sending_refused_is_not_listed(said):
+    text = heard(("clinician", said))
+
+    assert validation.conversation_not_carried_over(text, text.passages()) == [], said
+    assert checked(text, plan=(said, [said]))["plan"].pending
+
+
 # The conversation's own names live beside the common ones in one module: none may stand in for a common one, which
 # would change what a dictation's checks do.
 def test_no_name_in_the_checks_is_defined_twice():

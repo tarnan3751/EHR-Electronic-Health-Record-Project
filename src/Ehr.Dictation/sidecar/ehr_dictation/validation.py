@@ -2308,10 +2308,11 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #   an ordering act or of the prescription itself is cut from every value and listed, as dictation's instructions are;
 #   care described without one stays in the Plan. Found as acts, a closed-class noun and its verb in one clause in either
 #   order (_ACTS: the prescription, a supply, a test or a referral, the allergy list), "I'll sort that out" when the refill
-#   was the last thing spoken of, and "take that off your list" when the allergy was. Kept: "we'll get some bloods
-#   today", "let's get an x-ray of that knee", "I want you to have a chest x-ray", "I'll refer you to the physio", "I'll
-#   get you an appointment with the physio", "the nurse will give you the flu jab", "I'm going to put you on
-#   amoxicillin", and a test spoken of only as a possibility, with if, unless or when ("if it doesn't settle we can
+#   was the last thing spoken of, "take that off your list" when the allergy was, and a prescription sent on by its
+#   frame, whatever the place was heard as ("I'll send it over to the chemist", heard "…the chemistvi"). Kept: "we'll get
+#   some bloods today", "let's get an x-ray of that knee", "I want you to have a chest x-ray", "I'll refer you to the
+#   physio", "I'll get you an appointment with the physio", "the nurse will give you the flu jab", "I'm going to put you
+#   on amoxicillin", and a test spoken of only as a possibility, with if, unless or when ("if it doesn't settle we can
 #   arrange an ultrasound"). Where that line falls needs a clinician's reading.
 # - No one_field_holds_dictation: a conversation isn't dictated into one section.
 # - Warnings on a value that passes, each pointing at a source: speaker_unsure, from a passage whose speaker couldn't be
@@ -2724,7 +2725,10 @@ def conversation_not_carried_over(transcript: Transcript, passages: tuple[tuple[
 # in the Plan; "can" alone is no possibility. One negated in its clause ("I won't send it to the pharmacy") is no
 # instruction. Its span starts at its subject and lead-in ("I've put in a referral", so nothing of it is left behind)
 # and ends as _spoken_end() says. "I'll sort that out" and "we'll take that off your list" are acts when the refill or
-# the allergy is what was spoken of last: among the TOPIC_WORDS words before, in that turn or the one before it.
+# the allergy is what was spoken of last: among the TOPIC_WORDS words before, in that turn or the one before it. A
+# prescription sent on is found by its frame too, whatever the place was heard as (_SENT_ON): sending or faxing what was
+# just spoken of ("it", "that", "them") on to a place, "I'll send it over to the chemist for you", which MedASR heard as
+# "…to the chemistvi", running the place and the next words together. A place is never a person ("send it to you").
 ACT_REACH = 8
 TOPIC_WORDS = 8
 _PHARMACIES = (
@@ -2757,6 +2761,12 @@ _ACTS = (
 )
 # "get you more of the metformin": more of a drug is the medicine got anew too.
 _MORE_OF = re.compile(r"\bget\s+you\s+(?:some\s+)?more\s+of\s+(?:the\s+|your\s+)?(\w+)", re.IGNORECASE)
+_SENT_ON = re.compile(
+    rf"\b(?:send|sent|sending|fax|faxed|faxing){_SP}+(?:it|that|this|them|those|these){_SP}+"
+    rf"(?:(?:over|off|across|through|on|straight){_SP}+)?(?:to|into){_SP}+(?:(?:the|your|her|his|their|a){_SP}+)?"
+    r"(?!(?:me|you|him|her|them|us|it)\b)[\w'’]+",
+    re.IGNORECASE,
+)
 _SORTED = re.compile(r"\b(?:sort|sorting)\s+(?:that|it|this|those|them)\s+out\b|\bget\s+(?:that|it|this)\s+sorted\b",
                      re.IGNORECASE)
 _OFF_THE_LIST = re.compile(r"\b(?:take|get|remove|cross)\s+(?:that|it|this|those|them)\s+off\s+(?:your|the)\s+list\b",
@@ -2868,6 +2878,7 @@ def conversation_directives(text: str) -> list[tuple[int, int, str]]:
     matches += [(m.start(), m.end(), "order") for m in _SORTED.finditer(text) if _topic(text, words, m.start(), _REFILL_SPOKEN)]
     matches += [(m.start(), m.end(), "allergy_change") for m in _OFF_THE_LIST.finditer(text)
                 if _topic(text, words, m.start(), _ALLERGY_SPOKEN)]
+    matches += [(m.start(), m.end(), "order") for m in _SENT_ON.finditer(text)]
     found = list(directives(text))
     for match_start, match_end, kind in matches:
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, match_start)), default=0)
