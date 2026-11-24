@@ -352,7 +352,8 @@ def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript, *
         words=words,
         unclear=transcript.unclear_ranges(),
         directives=(directive_spans(transcript.text) if scope is None
-                    else conversation_directive_spans(transcript.text, scope.voiced("clinician"))),
+                    else conversation_directive_spans(transcript.text, tuple(
+                        (start, end) for start, end, who, _ in scope.passages if who in LISTED_FROM))),
         letters=frozenset(clean(transcript.text).casefold()),
         terms=terms,
         cues=cues,
@@ -2317,8 +2318,8 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #   care described without one stays in the Plan. Found as acts, a closed-class noun and its verb in one clause in either
 #   order (_ACTS: the prescription, a supply, a test or a referral, the allergy list), "I'll sort that out" when the refill
 #   was the last thing spoken of, "take that off your list" when the allergy was, and the clinician's own sending of a
-#   prescription on, by its frame, in the clinician's voice, whatever the place was heard as ("I'll send it over to the
-#   chemist", heard "…the chemistvi"). Kept: "we'll get
+#   prescription on, by its frame, in a passage of the clinician's or one whose speaker couldn't be told, whatever the
+#   place was heard as ("I'll send it over to the chemist", heard "…the chemistvi"). Kept: "we'll get
 #   some bloods today", "let's get an x-ray of that knee", "I want you to have a chest x-ray", "I'll refer you to the
 #   physio", "I'll get you an appointment with the physio", "the nurse will give you the flu jab", "I'm going to put you
 #   on amoxicillin", and a test spoken of only as a possibility, with if, unless or when ("if it doesn't settle we can
@@ -2335,10 +2336,12 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #
 # conversation_not_carried_over() lists the instructions said in the clinician's passages (decision D18): a patient
 # asking for a refill is no instruction of the clinician's. One in a passage whose speaker couldn't be told is listed
-# too, marked as such (speaker "unsure"), so the screen can say it may still need placing; every item says who said it.
-# An instruction is cut from every value, whoever said it, by the rules above.
+# too, marked as such (speaker "unsure"), so the screen can say it may still need placing; every item says who said it
+# (LISTED_FROM). An instruction is cut from every value, whoever said it, by the rules above; a prescription sent on is
+# found by its frame only where it could be the clinician's, in those same passages.
 
 SPEAKER_UNSURE = "speaker_unsure"
+LISTED_FROM = ("clinician", "unsure")  # whose passages a conversation's instructions are listed from
 OTHER_SPEAKER = "other_speaker"
 PATIENTS_OWN_WORDS = "patients_own_words"
 PART_NOT_OFFERED = "part_not_offered"
@@ -2725,11 +2728,6 @@ class Scope:
             return None
         return dict(self.names).get(voices.pop())
 
-    def voiced(self, name: str) -> tuple[tuple[int, int], ...]:
-        """The places of the passages in the voice the clinician gave this name, sure or not."""
-        names = dict(self.names)
-        return tuple((start, end) for start, end, _, voice in self.passages if names.get(voice) == name)
-
 
 def _warn_of_speakers(checked: dict[str, Checked]) -> None:
     for field in checked.values():
@@ -2780,12 +2778,11 @@ def merge(parts: list[tuple[Scope, Checks]]) -> Checks:
 def conversation_not_carried_over(transcript: Transcript, passages: tuple[tuple[int, int, str, int | None], ...]) -> list[dict]:
     """not_carried_over() for a conversation: the instructions said in the clinician's passages, and in those whose speaker
     couldn't be told, each with who said it (see above)."""
-    said = [(start, end, who) for start, end, who, _ in passages if who in ("clinician", "unsure")]
-    clinicians = Scope((0, 0), passages, transcript.roles).voiced("clinician")
+    said = [(start, end, who) for start, end, who, _ in passages if who in LISTED_FROM]
     return [
         {"reason": kind, "start": utf16_offset(transcript.text, start), "end": utf16_offset(transcript.text, end),
          "speaker": who}
-        for start, end, kind in conversation_directives(transcript.text, clinicians)
+        for start, end, kind in conversation_directives(transcript.text, tuple((low, high) for low, high, _ in said))
         for low, high, who in said
         if low <= start < high
     ]
@@ -2805,9 +2802,10 @@ def conversation_not_carried_over(transcript: Transcript, passages: tuple[tuple[
 # the allergy is what was spoken of last: among the TOPIC_WORDS words before, in that turn or the one before it. A
 # prescription sent on is found by its frame too, whatever the place was heard as (_SENT_ON), as the clinician's own
 # act: "I" or "we", present or future ("I'll", "I will", "we're going to", "I'm sending", "let me"), sending or faxing
-# what was just spoken of ("it", "that", "them") on to a place, in a passage of the voice the clinician named as
-# theirs: "I'll send it over to the chemist for you", which MedASR heard as "…to the chemistvi", running the place and
-# the next words together. A place is never a pronoun ("send it to you"). What still passes: the clinician's own
+# what was just spoken of ("it", "that", "them") on to a place, in a passage of the clinician's or one whose speaker
+# couldn't be told (LISTED_FROM), never a sure patient's or someone else's ("I'll send it to my sister"): "I'll send
+# it over to the chemist for you", which MedASR heard as "…to the chemistvi", running the place and the next words
+# together. A place is never a pronoun ("send it to you"). What still passes: the clinician's own
 # sending to a person named as a place is listed as an order ("I'll send it to your mum"); and a prescription sent on
 # in other words ("I'll get that sent over to the chemistvi", "I'll pop it over…", "I'll send it in to the farmacy",
 # "it'll be waiting for you at the chemistvi") is found only by its noun, so not when that was misheard.
@@ -2947,16 +2945,17 @@ def _topic(text: str, words: list[Token], start: int, spoken: re.Pattern) -> boo
 
 
 def conversation_directive_spans(text: str,
-                                 clinicians: tuple[tuple[int, int], ...] | None = None) -> list[tuple[int, int]]:
-    return [(start, end) for start, end, _ in conversation_directives(text, clinicians)]
+                                 listed_from: tuple[tuple[int, int], ...] | None = None) -> list[tuple[int, int]]:
+    return [(start, end) for start, end, _ in conversation_directives(text, listed_from)]
 
 
 def conversation_directives(text: str,
-                            clinicians: tuple[tuple[int, int], ...] | None = None) -> list[tuple[int, int, str]]:
+                            listed_from: tuple[tuple[int, int], ...] | None = None) -> list[tuple[int, int, str]]:
     """directives(), and the instructions said to the patient (see above), merged as directives() merges them. Given the
-    places of the passages in the clinician's voice (`clinicians`), a prescription sent on (_SENT_ON) counts only in
-    them; read in a value's own words, where no voice is known, it counts wherever it is, and _without_instructions()
-    keeps one the transcript says word for word outside what it lists."""
+    places of the passages instructions are listed from (`listed_from`: the clinician's, and those whose speaker
+    couldn't be told), a prescription sent on (_SENT_ON) counts only in them; read in a value's own words, where no
+    voice is known, it counts wherever it is, and _without_instructions() keeps one the transcript says word for word
+    outside what it lists."""
     words = tokens(text)
     matches = []
     for start, end, kind, test in _acts(text, words):
@@ -2969,7 +2968,7 @@ def conversation_directives(text: str,
     matches += [(m.start(), m.end(), "allergy_change") for m in _OFF_THE_LIST.finditer(text)
                 if _topic(text, words, m.start(), _ALLERGY_SPOKEN)]
     matches += [(m.start(), m.end(), "order") for m in _SENT_ON.finditer(text)
-                if clinicians is None or any(start <= m.start() < end for start, end in clinicians)]
+                if listed_from is None or any(start <= m.start() < end for start, end in listed_from)]
     found = list(directives(text))
     for match_start, match_end, kind in matches:
         clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, match_start)), default=0)

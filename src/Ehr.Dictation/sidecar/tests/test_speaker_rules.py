@@ -687,6 +687,36 @@ def test_a_sending_that_isnt_the_clinicians_own_is_kept_whole():
     assert [text.text[i["start"] : i["end"]] for i in listed] == ["I'll send it over to the chemistvi"]
 
 
+# The frame counts wherever the instruction is listed from, the clinician's passages and those whose speaker couldn't be
+# told, whichever voice they were heard in (the review of round 6: limited to the voice named clinician, it let "i will
+# send it over to the chemistvi" through, unlisted, from an Unsure passage of the patient's voice or a voice named
+# unsure); never in a sure passage of the patient's or someone else's.
+UNSURE_SENDINGS = [
+    ("the clinician's voice, Unsure", {1: "clinician", 2: "patient"}, 1, True),
+    ("the patient's voice, Unsure", {1: "clinician", 2: "patient"}, 2, True),
+    ("a voice named unsure", {1: "clinician", 2: "patient", 3: "unsure"}, 3, False),
+]
+
+
+@pytest.mark.parametrize(("where", "names", "voice", "unsure"), UNSURE_SENDINGS)
+def test_a_prescription_sent_on_where_the_speaker_couldnt_be_told_is_cut_and_listed(where, names, voice, unsure):
+    said = "i will send it over to the chemistvi"
+    before = "give it with food and finish the whole bottle"
+    text = conversation.assemble([
+        (Segment(0, 16000, before, 0.9, None, True), 1, False),
+        (Segment(16000, 32000, said, 0.9, None, True), voice, unsure),
+        (Segment(32000, 48000, "okay thanks", 0.9, None, True), 2, False),
+    ]).named(names)
+    sister = heard(("clinician", before), ("patient", "i will send it over to my sister"))
+
+    plan = checked(text, plan=(f"{before}. {said}.", [before, said]))["plan"]
+    listed = validation.conversation_not_carried_over(text, text.passages())
+
+    assert [(text.text[i["start"] : i["end"]], i["speaker"]) for i in listed] == [(said, "unsure")], where
+    assert not plan.pending or "chemistvi" not in plan.value, where
+    assert validation.conversation_not_carried_over(sister, sister.passages()) == []
+
+
 # The lean: an Unsure passage in the clinician's voice is no Subjective source (c09's room recording quoted the
 # clinician's "like a seashell? that's a good way to put it. any trouble with her hearing at school?", heard Unsure, as
 # the patient's history), while Objective, Assessment and Plan may still quote it, warned; one in the patient's voice,
