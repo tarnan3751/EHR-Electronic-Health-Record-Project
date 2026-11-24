@@ -11,7 +11,7 @@ from collections import Counter
 import pytest
 
 from dictation_scripts import load_scripts as load_english
-from dictation_scripts_es import FIELDS, HOLDOUT_DIR, load_scripts, runs
+from dictation_scripts_es import FIELDS, HOLDOUT_DIR, SEEN, load_scripts, runs
 from ehr_dictation import prompt, spanish, translation, validation
 from ehr_dictation.textnorm import tokens
 from ehr_eval import scoring_es
@@ -163,13 +163,15 @@ def test_the_spanish_sets_voices_and_recordings_are_the_ones_voices_toml_lists()
     assert english.forbidden and english.words <= MAX_LENGTH_WORDS[1] and spanish.forbidden
 
 
-def test_five_scripts_are_held_out_and_run_only_when_asked():
-    assert [s.id[:3] for s in HOLDOUT] == ["h01", "h02", "h03", "h04", "h05"]
+def test_the_first_five_scripts_run_only_when_asked_are_seen_and_any_after_them_held_out():
+    assert [s.id[:3] for s in HOLDOUT][:5] == list(SEEN) == ["h01", "h02", "h03", "h04", "h05"]
+    # Room for h06 on: held out, never seen, numbered after the seen five.
+    assert all(s.id[:3] not in SEEN and s.id[:3] > "h05" for s in HOLDOUT[5:])
     assert not {s.id for s in SCRIPTS} & {s.id for s in HOLDOUT}
-    long, corrected, family, switching, follow_up = HOLDOUT
+    long, corrected, family, switching, follow_up = HOLDOUT[:5]
     # Sealed before Spanish was limited to 2 minutes (decision 20), they keep the lengths they were written to; they
     # are read as text only (run_a.py), never recorded.
-    assert all(75 <= s.words <= 330 for s in HOLDOUT)
+    assert all(75 <= s.words <= 330 for s in HOLDOUT[:5])
     assert "long" in long.tags and 290 <= long.words <= 330
     assert len(corrected.retracted) == 2 and "self-correction" in corrected.tags
     assert family.family and "allergy-change" in family.tags and family.forbidden

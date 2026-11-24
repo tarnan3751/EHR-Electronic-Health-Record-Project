@@ -11,13 +11,14 @@ import sys
 
 import pytest
 
-from dictation_scripts_es import HOLDOUT_DIR, load_scripts
+from dictation_scripts_es import HOLDOUT_DIR, SEEN, load_scripts
 from ehr_eval import facts_es, run_es, scoring_es
 from ehr_eval.scripts import EVAL_DIR
 
 HOLDOUT = load_scripts(HOLDOUT_DIR)
 SCRIPTS = {script.id[:3]: script for script in load_scripts() + HOLDOUT}  # the held-out ones too
-# The held-out scripts' five files, as sealed after run A2 (the decision log's step 17): their fact lists are kept apart.
+# The five seen scripts' files (h01 to h05), as sealed after run A2 (the decision log's step 17): their fact lists are
+# kept apart.
 SEALED = "7180abd6707bf9f62b19c3b94ee21a3879fc33698f15c866752e7aef032005a9"
 
 
@@ -36,12 +37,13 @@ def test_the_scoring_of_changes_reads_neither_the_spanish_checks_nor_the_english
     assert not names & {"translation", "validation"}
 
 
-def test_every_script_has_a_fact_list_the_held_out_ones_kept_apart_so_their_files_stay_as_sealed():
+def test_every_script_has_a_fact_list_the_seen_ones_kept_apart_so_their_files_stay_as_sealed():
     assert all(scoring_es.facts_of(script) for script in SCRIPTS.values())
-    assert not any(script.facts for script in HOLDOUT)
-    kept_apart = scoring_es.facts_dir(HOLDOUT_DIR)
-    assert sorted(path.name for path in kept_apart.glob("*.toml")) == sorted(s.path.name for s in HOLDOUT)
-    sealed = b"".join(path.read_bytes() for path in sorted(HOLDOUT_DIR.glob("*.toml")))
+    seen = [script for script in HOLDOUT if script.id[:3] in SEEN]
+    assert not any(script.facts for script in seen)
+    kept_apart = {path.name for path in scoring_es.facts_dir(HOLDOUT_DIR).glob("*.toml")}
+    assert {s.path.name for s in seen} <= kept_apart
+    sealed = b"".join(script.path.read_bytes() for script in sorted(seen, key=lambda s: s.path.name))
     assert hashlib.sha256(sealed).hexdigest() == SEALED
 
 

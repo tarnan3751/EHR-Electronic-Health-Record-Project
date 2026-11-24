@@ -355,6 +355,21 @@ def test_a_script_that_timed_out_is_a_failure_in_every_measure_and_a_partial_run
     assert run_a.summary(metrics, None, gap).startswith("INCOMPLETE, not run A")
 
 
+def test_the_seen_scripts_are_named_and_held_out_ones_measured_apart():
+    # h01 to h05 are seen (the owner's ruling, 2026-11-24): their measures are named as seen; a held-out script beside
+    # them (h06 on) has its own measures under held_out. A copy of h05 stands in for one here.
+    seen = [run(key, gold_answer(key)) for key in ("h01-lumbalgia", "h05-diabetes-hipertension")]
+    alone = scoring_es.score(seen, SCRIPTS)
+    assert alone["seen"] == ["h01-lumbalgia", "h05-diabetes-hipertension"] and "held_out" not in alone
+    unseen = dataclasses.replace(SCRIPTS["h05-diabetes-hipertension"], id="h06-a-new-one")
+    scripts = SCRIPTS | {unseen.id: unseen}
+    item = dataclasses.replace(seen[1], variant="h06-a-new-one--text", script="h06-a-new-one")
+    both = scoring_es.score([*seen, item], scripts)
+    assert both["seen"] == ["h01-lumbalgia", "h05-diabetes-hipertension"]
+    assert both["held_out"]["fields"] == scoring_es.score([item], scripts)["fields"]
+    assert "seen" not in scoring_es.score([run("e01-hta-control", gold_answer("e01-hta-control"))], SCRIPTS)
+
+
 def test_a_run_of_the_held_out_scripts_is_scored_again_against_them():
     assert run_a.stored_scripts_dir({"dataset": {"holdout": True}}) == HOLDOUT_DIR
     assert run_a.stored_scripts_dir({"dataset": {"scripts": 16}}) != HOLDOUT_DIR

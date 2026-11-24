@@ -14,8 +14,9 @@ runs to come.
   Changed: a number, unit, drug, frequency, date, duration, route, side, severity, abbreviation or polarity the facts of
   what it cites don't say of what it says it of (a value moved to another vital sign, result or drug is changed too),
   and a medication change, negation, doubt, the past or a relative other than theirs, or left out of something it
-  names (facts_es.py's header). The held-out scripts' fact lists are kept apart from their files, which stay as they
-  were sealed (facts_of()). A changed item said elsewhere in the script is marked as moved from another passage, and
+  names (facts_es.py's header). The first five held-out scripts' fact lists are kept apart from their files, which
+  stay as they were sealed (facts_of()); those five are seen now (dictation_scripts_es.SEEN), named under seen in the
+  measures, with the held-out ones' own measures under held_out when a run holds both. A changed item said elsewhere in the script is marked as moved from another passage, and
   is still changed. Any changed without a warning stops the step (run_a.py says so) until the owner decides.
   Misfiled, in the owner's words of 2026-11-24: "a value its field's gold lacks and another field's gold has" (a Plan
   passage put in Subjective); a value of any kind (facts_es.VALUES) the facts back, so not changed, each listed with
@@ -85,7 +86,7 @@ from dataclasses import dataclass, field
 import jiwer
 
 from dictation_scripts import load_scripts as load_english
-from dictation_scripts_es import HOLDOUT_DIR, Script, load_scripts
+from dictation_scripts_es import HOLDOUT_DIR, SEEN, Script, load_scripts
 from ehr_dictation import spanish, whisper_asr
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.prompt import FIELDS
@@ -153,7 +154,7 @@ class SpanishItem:
 
 
 def score(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
-    return {
+    measured = {
         "fields": _fields(items, scripts, lambda script: script.gold),
         "discarded": _discarded(items, scripts),
         "validation": _validation(items),
@@ -163,6 +164,12 @@ def score(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
         "sorting": _sorting(items),
         "timing": _timing(items),
     }
+    # The scripts of eval/scripts-es-holdout already seen (dictation_scripts_es.SEEN): named, so their measures are read
+    # as seen, not held out; and, when a run holds both, the measures of the held-out ones alone.
+    seen = sorted({item.script for item in items if item.script[:3] in SEEN})
+    held_out = [item for item in items if scripts[item.script].path.parent == HOLDOUT_DIR and item.script[:3] not in SEEN]
+    return measured | ({"seen": seen} if seen else {}) | (
+        {"held_out": score(held_out, scripts)} if seen and held_out else {})
 
 
 def _discarded(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:

@@ -23,10 +23,12 @@ scoring to compare each statement shown with what the Spanish it cites says with
 (ehr_eval/facts_es.py says the format; this reader keeps them as written). All of it is synthetic and needs a
 Spanish-speaking clinician's reading before any real use.
 
-Five more scripts, eval/scripts-es-holdout/h01 to h05, in the same format, are held out: written once the checks of run
-A's first round were settled, read once, unseen, in run A2, and regression items since, with changes made after seeing
-them (eval/README.md lists them); they are run only when asked (run_a.py --holdout). Their files stay as sealed, so
-their fact lists are kept apart, in eval/scripts-es-holdout-facts.
+More scripts, in eval/scripts-es-holdout, in the same format, are run only when asked (run_a.py --holdout). The first
+five, h01 to h05, are seen (SEEN), not held out: written once the checks of run A's first round were settled, read once,
+unseen, in run A2, regression items since, with changes made after seeing them (eval/README.md lists them), and the
+owner's definition of a value filed in the wrong field (2026-11-24) came after their results; their measures are
+reported as seen (scoring_es.score()). Their files stay as sealed, so their fact lists are kept apart, in
+eval/scripts-es-holdout-facts. Held out are those after them, h06 on, written by someone who has seen no results.
 
     uv run eval/dictation_scripts_es.py            # every script: id, voice, spoken words, tags
     uv run eval/dictation_scripts_es.py e07        # e07's spoken text, to read aloud
@@ -45,6 +47,8 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts-es"
 HOLDOUT_DIR = Path(__file__).resolve().parent / "scripts-es-holdout"
+# The first five scripts in HOLDOUT_DIR, seen: read in run A2 and since, and reported as seen, not held out.
+SEEN = ("h01", "h02", "h03", "h04", "h05")
 FIELDS = ("subjective", "objective", "assessment", "plan")
 
 PUNCTUATION = {"punto y aparte": ("\n\n", "."), "nuevo párrafo": ("\n\n", "."), "punto y seguido": (".", ",")}
