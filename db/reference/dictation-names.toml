@@ -4,10 +4,11 @@
 # reads whole (validation.py's ONE_WORD); every other ("B12", "T4") keeps its digits apart.
 # Hand-written, unlike the rest of db/reference, and read by src/Ehr.Dictation/sidecar/generate_catalog.py alone, which
 # writes each name into the dictation's catalog (ehr_dictation/catalog.py) as a name of its own, of its kind only, so an
-# instruction said plainly with it can be proposed (validation.py, "plain"). Nothing else reads it: the migration job and
-# the tests' database apply only *.sql, the order and allergy forms search the reference data as before, and a proposal
-# fills in nothing, so a name decides only whether a proposal appears; the clinician still picks the item on the empty
-# form.
+# instruction said plainly with it can be proposed (validation.py, "plain"), and, as for any orderable, a long list of
+# orders that FR-14's rule cuts at its reach goes on over it ("... and an iron panel and CRP"), so no item of the list is
+# left in the note. Nothing else reads it: the migration job and the tests' database apply only *.sql, the order and
+# allergy forms search the reference data as before, and a proposal fills in nothing; the clinician still picks the item
+# on the empty form.
 #
 # Each entry: the name as said (name); what it names (kind): an orderable, for an order, or an allergen, for an
 # allergy to add; the items it stands for (codes), each of which must be in the reference data as that kind, or the

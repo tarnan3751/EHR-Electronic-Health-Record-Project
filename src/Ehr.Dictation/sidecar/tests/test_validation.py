@@ -1389,6 +1389,18 @@ def test_no_item_of_an_order_list_is_left_outside_what_is_listed():
     assert said == 24 * 3 * 4
 
 
+# A common name the reference data maps (db/reference/dictation-names.toml) is an orderable to FR-14's rule too: a long
+# list cut by its reach goes on over it, as over any item (step 15.1's review), so none of the list stays in the note.
+@pytest.mark.parametrize(("said", "listed"), [
+    ("order a CBC and a BMP and a lipid panel and a TSH and a ferritin and an iron panel and CRP and she can go home",
+     "order a CBC and a BMP and a lipid panel and a TSH and a ferritin and an iron panel and CRP"),
+    ("order a CBC a BMP a lipid panel a TSH a ferritin an iron panel and an ESR and CRP her knee is still swollen",
+     "order a CBC a BMP a lipid panel a TSH a ferritin an iron panel and an ESR and CRP"),
+])
+def test_a_long_order_list_is_listed_over_a_common_name(said, listed):
+    assert [said[start:end] for start, end in directive_spans(said)] == [listed]
+
+
 # A negation before an aside between commas still makes what follows it an instruction not to.
 @pytest.mark.parametrize("said", [
     "Do not, under any circumstances, order a CT; start antibiotics.",
