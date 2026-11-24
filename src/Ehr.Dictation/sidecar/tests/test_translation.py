@@ -355,6 +355,21 @@ def test_a_relative_told_something_has_nothing(text, english, expected):
     assert reasons(text, [text], english) == expected
 
 
+@pytest.mark.parametrize(("text", "english", "expected"), [
+    # Someone the patient comes with, and a relative clause saying what they have: theirs, from its verb on.
+    ("Acude con su madre, que tiene diabetes.", "Comes with her mother; has diabetes.", ["experiencer_dropped"]),
+    ("Acude con su madre, que tiene diabetes.", "Comes with her mother, who has diabetes.", []),
+    ("Acude con su madre.", "Comes with her mother.", []),
+    # A relative named with whose relative they are: someone telling it isn't someone having it.
+    ("La madre del niño refiere que tose por las noches.", "Mother coughs at night.", ["experiencer_added"]),
+    ("La madre del niño refiere que tose por las noches.", "The mother reports that he coughs at night.", []),
+    ("La madre del niño tiene asma.", "The child's mother has asthma.", []),
+    ("La madre del niño tiene asma.", "The child has asthma.", ["experiencer_dropped", "experiencer_changed"]),
+])
+def test_who_has_it_is_read_past_a_relative_clause_and_whose_relative_they_are(text, english, expected):
+    assert reasons(text, [text], english) == expected
+
+
 # ---- Drugs, failing closed both ways --------------------------------------------------------------------------------
 
 

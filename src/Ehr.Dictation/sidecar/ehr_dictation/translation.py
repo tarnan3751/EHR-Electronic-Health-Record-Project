@@ -72,7 +72,9 @@ statement:
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
      validation.py reads them in English, with a word that negates itself a negation in either language ("afebril",
      "indoloro", "inconsciente": spanish.SELF_NEGATING; "afebrile", "uncontrolled", "absent": NEGATED_WORDS) and a
-     relative told something ("the mother is explained") not someone having it: the same (negation_dropped or
+     relative told something ("the mother is explained") not someone having it, a relative clause read from its verb
+     on ("acude con su madre, que tiene diabetes" is the mother's diabetes) and a relative named with whose relative
+     they are read past that ("la madre del niño refiere que tose" is the child's cough): the same (negation_dropped or
      negation_added, and so on), and the relatives named the same (experiencer_changed). A qualifier carries over a
      list past its commas, in both languages, as validation.py carries an English negation (spanish.carry_over_list()):
      up to the word that ends it (a contrast, a word starting a clause, a step of the plan, the end of its sentence),

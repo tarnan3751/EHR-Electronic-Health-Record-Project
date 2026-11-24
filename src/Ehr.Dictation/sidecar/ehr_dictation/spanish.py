@@ -655,8 +655,10 @@ HAVING = frozenset(
     "presenta presente".split()
 )
 # A relative after one of these (and maybe "su", "el", "la") is someone the patient is with or speaks to: "acompañado
-# de su madre", "se informa al padre" ("al" is "a el"). Unless a relative clause says what they have: "su madre, que
-# tiene diabetes".
+# de su madre", "se informa al padre" ("al" is "a el"). Unless a relative clause says what they have: "acude con su
+# madre, que tiene diabetes", which the relative reaches from the clause's verb on, past its comma. A relative named
+# with whose relative they are ("la madre del niño") reaches past that: "la madre del niño tiene asma" is the mother's,
+# "la madre del niño refiere que tose" the child's, since someone telling it (REPORTING) ends the reach.
 NOT_EXPERIENCER_AFTER = frozenset("con por a al de para junto".split())
 POSSESSIVES = frozenset("su sus el la los las mi".split())
 WHO_HAS = re.compile(r"\s*,?\s+(?:que|quien)\s+(?=(?:tiene|tuvo|tenia|padece|padecio|es|era|fue)\b)")
@@ -870,10 +872,12 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
     history = [(f, l) for f, l in _matches(keys, HISTORY_BEFORE)
                if tuple(keys[f : f + len(HISTORY_HEADING)]) != HISTORY_HEADING]
     relatives, relatives_after = [], []
+    folded = fold(text)
     for i, token in enumerate(toks):
         if token.text not in RELATIVES:
             continue
-        relative = WHO_HAS.match(fold(text), token.end)
+        last = _whose(text, toks, i)
+        relative = WHO_HAS.match(folded, toks[last].end)
         relative = None if relative and "\n" in relative.group() else relative
         j = i - 1
         if j >= 0 and toks[j].key in POSSESSIVES:
@@ -884,7 +888,10 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
             continue
         if not relative and j >= 0 and toks[j].key in NOT_EXPERIENCER_AFTER:
             continue
-        relatives.append((i, i))
+        # A relative clause says what they have, reached from its verb on: "su madre, que tiene diabetes".
+        if relative:
+            last = next(k for k, t in enumerate(toks) if t.start >= relative.end())
+        relatives.append((i, last))
     closing = {"certainty": _closing(text, toks, CERTAINTY_CLOSING)}
     relatives_after += _matches(keys, EXPERIENCER_AFTER)
     out: dict[str, set[int]] = {}
@@ -909,6 +916,15 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
     out["negation"] |= negating
     cue_words["negation"] |= negating
     return out, cue_words
+
+
+def _whose(text: str, toks: list[Token], i: int) -> int:
+    """The last word of a relative named with whose relative they are, which is no finding of theirs: "la madre del
+    niño", "el padre de la paciente" (i is the relative)."""
+    k = i
+    if k + 2 < len(toks) and toks[k + 1].key in ("de", "del") and not text[toks[k].end : toks[k + 1].start].strip():
+        k += 2 if toks[k + 2].key not in ("la", "el", "los", "las", "su", "sus") or k + 3 >= len(toks) else 3
+    return k
 
 
 def relatives(toks: list[Token]) -> list[set[str]]:
