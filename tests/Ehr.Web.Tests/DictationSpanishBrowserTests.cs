@@ -213,7 +213,7 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(
             [
                 "Recording. Speak your note, then select Stop.",
-                "1 minute of dictation left.",
+                $"Dictation stops in a minute, at its {minutes}-minute limit.",
                 "30 seconds of dictation left. Stop soon, then dictate the rest separately.",
                 "10 seconds of dictation left. Stop soon, then dictate the rest separately.",
                 $"{stopped} Finishing the transcript and proposing the fields. This can take up to a minute.",

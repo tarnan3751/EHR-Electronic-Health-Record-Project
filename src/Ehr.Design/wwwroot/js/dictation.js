@@ -14,7 +14,7 @@
 // - the model unavailable or too slow: the transcript stays as plain text, with the API's message;
 // - an order or allergy change dictated: listed as not carried over, never filled into a field (FR-14);
 // - the dictation's limit, 3 minutes or 2 in Spanish as the service gives it: the time left shown beside Stop, the
-//   status line saying when 1 minute, 30 and 10 seconds are left, and at the limit the recording stopped, the page's
+//   status line saying a minute ahead that it stops then, at its limit, and when 30 and 10 seconds are left, and at the limit the recording stopped, the page's
 //   own words for it shown, said once with the transcript's finishing, and what was recorded taken on to the review;
 // - Cancel: the session is deleted, so its audio and transcript are discarded, and the screen is cleared.
 // The language is chosen for each dictation, English first (the expansion plan's step 17): sent with the start as
@@ -60,12 +60,13 @@
     // How long to wait before sending again after a failure: doubling, up to the most.
     const firstRetryMs = 1000;
     const mostRetryMs = 10000;
-    // What the status line says as the time left reaches each point, in seconds: a minute ahead, then twice near the
-    // end, whatever the limit. The time left itself is shown beside Stop.
+    // What the status line says as the time left reaches each point, in seconds, given the limit in minutes: a minute
+    // ahead, in the Listen page's words for a visit ("Listening stops in a minute, at its 20-minute limit."), then twice
+    // near the end, whatever the limit. The time left itself is shown beside Stop.
     const leftToSay = [
-        [60, "1 minute of dictation left."],
-        [30, "30 seconds of dictation left. Stop soon, then dictate the rest separately."],
-        [10, "10 seconds of dictation left. Stop soon, then dictate the rest separately."],
+        [60, (limit) => `Dictation stops in a minute, at its ${limit}-minute limit.`],
+        [30, () => "30 seconds of dictation left. Stop soon, then dictate the rest separately."],
+        [10, () => "10 seconds of dictation left. Stop soon, then dictate the rest separately."],
     ];
 
     let state = fresh();
@@ -386,7 +387,7 @@
         if (reached) {
             state.leftSaid = reached[0];
             if (state.recorder?.state === "recording") {
-                say(reached[1]);
+                say(reached[1](state.session.maxSeconds / 60));
             }
         }
     }
