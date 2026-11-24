@@ -16,8 +16,10 @@ runs to come.
   names (facts_es.py's header). The held-out scripts' fact lists are kept apart from their files, which stay as they
   were sealed (facts_of()). A changed item said elsewhere in the script is marked as moved from another passage, and
   is still changed. Any changed without a warning stops the step (run_a.py says so) until the owner decides.
-  Misfiled, reported on its own and never a stop: a number, drug, side or medication change the facts back, so not
-  changed, in a field whose gold doesn't say it (a Plan passage put in Subjective).
+  Misfiled: a value of any kind (facts_es.VALUES) the facts back, so not changed, in a field whose gold doesn't say it
+  (a Plan passage put in Subjective), each listed with whether its field carries a warning, and the share of offered
+  statements that say one; reported, never a stop. Content F1 counts it too, per field: the passage's words lower
+  precision where it was filed and recall where it belonged.
 - ambiguous_offered: every statement shown from a passage whose number reads two ways ("5.000", a fact entry that
   says refuse), with the passage as the transcript has it and whether it is written so there; the checks leave its
   field for the clinician while it is, and e16's gold for it is empty. It is compared with what was said all the same
@@ -83,7 +85,7 @@ AMBIGUOUS_NUMBER = re.compile(r"\d[.,]\d{3}(?!\d)")  # a passage whose number re
 STRUCTURING_SECONDS = 90.0  # the sidecar's limit (settings.py): an answer slower than this isn't offered
 CHANGED = ("number", "unit", "drug", "frequency", "date", "duration", "route", "side", "severity", "abbreviation",
            "polarity", "action", "negation", "certainty", "history", "experiencer", "relative")
-MISFILED = ("number", "drug", "side", "action")
+MISFILED = facts_es.VALUES
 
 
 @dataclass
@@ -242,9 +244,10 @@ def facts_of(script: Script) -> tuple[dict, ...]:
 
 
 def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
-    shown, unflagged, misfiled = Counter(), Counter(), Counter()
+    shown, unflagged, misfiled, misfiled_unflagged = Counter(), Counter(), Counter(), Counter()
     listed: list[dict] = []
     misfiled_listed: list[dict] = []
+    statements = misfiled_statements = 0
     for item in items:
         script = scripts[item.script]
         offered = {name: outcome for name, outcome in item.fields.items() if outcome.shown.strip()}
@@ -258,10 +261,13 @@ def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> di
                     listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": what,
                                    "moved_from_another_passage": moved, "flagged": bool(outcome.warnings),
                                    "statement": statement["english"]})
+                statements += 1
+                misfiled_statements += bool(filed)
                 for kind, what in filed:
                     misfiled[kind] += 1
+                    misfiled_unflagged[kind] += not outcome.warnings
                     misfiled_listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": what,
-                                            "statement": statement["english"]})
+                                            "flagged": bool(outcome.warnings), "statement": statement["english"]})
     return {
         "shown": {kind: shown[kind] for kind in CHANGED},
         "unflagged": {kind: unflagged[kind] for kind in CHANGED},
@@ -269,7 +275,10 @@ def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> di
         "moved_from_another_passage": sum(1 for entry in listed if entry["moved_from_another_passage"]),
         "listed": listed,
         "misfiled": {"shown": {kind: misfiled[kind] for kind in MISFILED}, "total": sum(misfiled.values()),
-                     "listed": misfiled_listed},
+                     "unflagged": {kind: misfiled_unflagged[kind] for kind in MISFILED},
+                     "unflagged_total": sum(misfiled_unflagged.values()),
+                     "statements": statements, "misfiled_statements": misfiled_statements,
+                     "share": _ratio(misfiled_statements, statements), "listed": misfiled_listed},
     }
 
 

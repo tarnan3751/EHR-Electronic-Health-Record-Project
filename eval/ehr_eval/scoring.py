@@ -11,6 +11,10 @@
   clinical gold, what a careful clinician would accept, which shows what the strict rules cost.
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
+- misfiled: each value an offered value's sentence says (facts_es.py's reading: a number, drug, frequency, date, how
+  long, route, side, severity, polarity or medication change) that its field's rule-following gold doesn't, with
+  whether the field carries a warning, and the share of offered sentences that say one; as the Spanish set counts its
+  statements' values (scoring_es.py), and beside content F1, which counts it too. Reported, never a stop.
 - order_allergy (on what the sidecar sends for an offered field: the value with any instruction cut out of it): offered
   values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), found as the
   script says it or as the transcript heard it (_as_heard()), retracted (a value the clinician corrected away), or a
@@ -40,6 +44,7 @@
 
 from __future__ import annotations
 
+import re
 import statistics
 from collections import Counter
 from collections.abc import Callable
@@ -52,6 +57,7 @@ from ehr_dictation.prompt import FIELDS
 from ehr_dictation.textnorm import STOPWORDS, numbers
 from ehr_dictation.transcript import Transcript
 
+from . import facts_es
 from .dates import said_right
 from .normalize import normalize, words
 from .scripts import Gold, Proposal, Script, clinical_proposals
@@ -120,6 +126,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "fields_clinical": _fields(items, scripts, lambda script: script.gold),
         "validation": _validation(items),
         "unsupported_content": _unsupported(items),
+        "misfiled": misfiled(items, scripts),
         "order_allergy": _order_allergy(items, scripts),
         **proposal_scores(items, scripts),
         "warnings": _warnings(items, scripts),
@@ -244,6 +251,36 @@ def _unsupported(items: list[Item]) -> dict:
         return _ratio(missing, total)
 
     return {"proposed": rate(lambda f: f.proposed), "shown": rate(lambda f: f.shown)}
+
+
+SENTENCE = re.compile(r"(?<=[.!?])\s+")
+
+
+def misfiled(items: list[Item], scripts: dict[str, Script]) -> dict:
+    """Each value a sentence of an offered value says that its field's rule-following gold doesn't (the module's
+    header), as scoring_es.py counts a Spanish statement's: kind by kind, and without a warning."""
+    lexicon = facts_es.Lexicon(drugs=frozenset(drug.lower() for script in scripts.values() for drug in script.drugs))
+
+    def values(text: str) -> set[tuple[str, str | None, str]]:
+        return {(c.kind, c.label, c.value) for c in facts_es.claims(text, lexicon) if c.kind in facts_es.VALUES}
+
+    shown, unflagged, statements, sentences, listed = Counter(), Counter(), 0, 0, []
+    for item in items:
+        gold = {name: values(g.value) for name, g in scripts[item.script].gold_rules.items()}
+        for name, outcome in item.fields.items():
+            for sentence in (s for s in SENTENCE.split(outcome.shown.strip()) if s):
+                sentences += 1
+                filed = sorted(values(sentence) - gold.get(name, set()), key=str)
+                statements += bool(filed)
+                for kind, _, value in filed:
+                    shown[kind] += 1
+                    unflagged[kind] += not outcome.warnings
+                    listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": value,
+                                   "flagged": bool(outcome.warnings), "statement": sentence})
+    return {"shown": {kind: shown[kind] for kind in facts_es.VALUES}, "total": sum(shown.values()),
+            "unflagged": {kind: unflagged[kind] for kind in facts_es.VALUES}, "unflagged_total": sum(unflagged.values()),
+            "statements": sentences, "misfiled_statements": statements, "share": _ratio(statements, sentences),
+            "listed": listed}
 
 
 def _contains(text: str, phrase: str) -> bool:

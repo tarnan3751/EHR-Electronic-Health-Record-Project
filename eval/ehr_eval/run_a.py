@@ -220,7 +220,10 @@ def summary(metrics: dict, diagnosed: list[str] | None = None) -> str:
         f"{metrics['mistranslations']['unflagged']}; moved from another passage: "
         f"{metrics['mistranslations']['moved_from_another_passage']}).",
         f"Misfiled (said in the Spanish cited, not in that field's gold; never a stop): "
-        f"{metrics['mistranslations']['misfiled']['shown']}.",
+        f"{metrics['mistranslations']['misfiled']['shown']} (without a warning: "
+        f"{metrics['mistranslations']['misfiled']['unflagged_total']}), in "
+        f"{metrics['mistranslations']['misfiled']['misfiled_statements']} of "
+        f"{metrics['mistranslations']['misfiled']['statements']} statements.",
         f"Instructions: {metrics['instructions']['said']} said, {metrics['instructions']['reported_not_carried_over']} "
         f"reported as not carried over, {metrics['instructions']['shown']} shown.",
         f"Structuring: {metrics['timing'].get('structure')} s; tokens written "

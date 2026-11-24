@@ -139,6 +139,29 @@ def test_a_passage_filed_in_another_field_is_misfiled_not_changed():
     assert not scoring_es.thresholds(metrics)[0][1]
 
 
+def test_a_passage_filed_in_the_wrong_field_counts_against_content_f1_and_apart():
+    # The same answer scored twice: e14's weight and height in Objective, where its gold has them, and in Subjective.
+    # Content F1 is per field, so the misplaced passage lowers precision in Subjective and recall in Objective; and it
+    # is counted apart as misfiled: each value, without a warning here, and its statement.
+    script = SCRIPTS["e14-nino-sano"]
+    as_said = {name: [{"spanish": list(s.spanish), "english": s.english} for s in said]
+               for name, said in script.statements.items()}
+    weight, *rest = as_said["objective"]
+    right = scoring_es.score([run("e14-nino-sano", gold_answer("e14-nino-sano"))], SCRIPTS)
+    wrong = scoring_es.score([run("e14-nino-sano", gold_answer(
+        "e14-nino-sano", subjective=[*as_said["subjective"], weight], objective=rest))], SCRIPTS)
+
+    by_field = wrong["fields"]["by_field"]
+    assert right["fields"]["content"]["f1"] == 1.0 > wrong["fields"]["content"]["f1"]
+    assert by_field["subjective"]["content"]["precision"] < 1.0 and by_field["objective"]["content"]["recall"] < 1.0
+    misfiled = wrong["mistranslations"]["misfiled"]
+    assert (right["mistranslations"]["misfiled"]["misfiled_statements"], misfiled["misfiled_statements"]) == (0, 1)
+    assert {(e["kind"], e["shown"], e["flagged"]) for e in misfiled["listed"]} == {
+        ("number", "11 kg", False), ("number", "81 cm", False)}
+    assert misfiled["unflagged_total"] == misfiled["unflagged"]["number"] == 2
+    assert wrong["mistranslations"]["unflagged_total"] == 0
+
+
 def test_a_drug_named_as_said_is_neither_changed_nor_misfiled_when_the_gold_names_it_otherwise():
     # "Salbutamol" said and written, the gold's "albuterol": the same drug.
     plan = [{"spanish": ["continuar salbutamol inhalado 2 disparos cada 4 horas si es necesario."],

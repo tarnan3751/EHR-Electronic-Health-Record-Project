@@ -184,6 +184,7 @@ TOKEN = re.compile(r"\d+(?:[.,]\d+)*(?:/\d+(?:[.,]\d+)?)?|°[cf]?|%|[a-zμ][a-z0
 # ---- The facts ------------------------------------------------------------------------------------------------------
 
 KINDS = ("number", "frequency", "duration", "date", "route", "side", "severity", "polarity", "action")
+VALUES = ("drug", *KINDS)  # every kind of value a statement says of something
 FLAGS = ("negated", "doubt", "history", "who")
 ITEM_KEYS = {"of", "aka", *KINDS, *FLAGS}
 
@@ -584,7 +585,7 @@ def negated(english: str, phrase: str) -> list[bool]:
 def compare(english: str, cited: list[Entry], script: list[Entry],
             lexicon: Lexicon) -> tuple[list[tuple[str, str, bool]], list[Claim]]:
     """What the English changes from the items of the entries it cites, each (kind, what, said elsewhere in the
-    script); and what it says that they back, of the kinds a misfiling is told by (drug, number, side, action)."""
+    script); and every value it says that they back (VALUES), which a misfiling is told by."""
     items = [item for entry in cited for item in entry.items]
     everywhere = [item for entry in script for item in entry.items]
     said = claims(english, lexicon)
@@ -679,7 +680,7 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
             changed.append(("relative", claim.value, False))
         if claim.kind == "history" and claim.label is None and not any(item.history for item in items):
             changed.append(("history", "shown as in the past", False))
-    return changed, [claim for claim in backed_claims if claim.kind in ("drug", "number", "side", "action")]
+    return changed, [claim for claim in backed_claims if claim.kind in VALUES]
 
 
 def _added_measurement(value: str, backed: set[str]) -> bool:
