@@ -6,6 +6,9 @@
     const status = document.getElementById("note-save-status");
     const errors = document.getElementById("note-errors");
     let snapshot = JSON.parse(root.querySelector("[data-review-snapshot]").textContent);
+    // A recorded visit's transcript (step 16), beside the snapshot when the page read it; a decision's answer has none.
+    const conversation = root.querySelector("[data-review-transcript]");
+    const transcript = conversation ? JSON.parse(conversation.textContent) : null;
     let busy = false;
     const dirty = new Set();
     const buttons = () => root.querySelectorAll("button");
@@ -20,7 +23,7 @@
     }
 
     function render() {
-        if (snapshot.result) view.renderResult(snapshot.result);
+        if (snapshot.result) view.renderResult(transcript ? { ...snapshot.result, transcript } : snapshot.result);
         for (const proposal of snapshot.proposals) {
             const card = root.querySelector(`[data-proposal-id="${proposal.id}"]`);
             if (!card) continue;

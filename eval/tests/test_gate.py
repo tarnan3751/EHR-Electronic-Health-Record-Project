@@ -9,7 +9,7 @@ import pytest
 
 from ehr_dictation import prompt
 from ehr_dictation.transcript import Segment, assemble
-from ehr_eval import gate, scoring
+from ehr_eval import conversations, gate, scoring
 from ehr_eval.scripts import (
     EVAL_DIR,
     PIPELINE_FILES,
@@ -136,12 +136,15 @@ def test_the_code_feeding_the_models_needs_a_new_run_and_the_rest_only_scoring_a
 
 def test_every_eval_module_is_hashed_with_the_answers_or_the_scoring():
     modules = {f"ehr_eval/{path.name}" for path in (EVAL_DIR / "ehr_eval").glob("*.py")}
+    hashed = {*PIPELINE_FILES, *SCORING_FILES, *conversations.PIPELINE_FILES, *conversations.SCORING_FILES}
 
-    # Neither the package, the gate, the clinical gold report nor the trick sentences' scorer (which the gate runs
-    # itself every time) makes or scores an answer.
-    assert modules - set(PIPELINE_FILES) - set(SCORING_FILES) == {
-        "ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/goldreport.py", "ehr_eval/tricks.py"}
+    # Neither the package, the gates, the clinical gold report nor the trick sentences' scorer (which the gate runs
+    # itself every time) makes or scores an answer: a dictation's (the first two lists) or a visit's (the visits' own,
+    # conversations.py).
+    assert modules - hashed == {"ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/ambient_gate.py",
+                                "ehr_eval/goldreport.py", "ehr_eval/tricks.py"}
     assert not set(PIPELINE_FILES) & set(SCORING_FILES)
+    assert not set(conversations.PIPELINE_FILES) & set(conversations.SCORING_FILES)
 
 
 def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):

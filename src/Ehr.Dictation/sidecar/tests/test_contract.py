@@ -12,6 +12,10 @@ After a deliberate change to what the sidecar answers, rewrite the files and com
 
 Values that vary from run to run, or with the prompt, are replaced with fixed ones: the session ID and the prompt,
 schema and structuring hashes.
+
+A recorded visit's answers (the expansion plan's step 16) are here too, each route named as the on-prem app names the
+call (start-ambient, audio-ambient and so on: AmbientApi.cs), made with stand-ins for the speaker model as well: tones,
+a pitch a voice.
 """
 
 from __future__ import annotations
@@ -19,13 +23,17 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
-from conftest import MODELS, FakeLlama, FakeRecognizer, answer, encode, noise, tone
+from conftest import (
+    LISTENING_MODELS, MODELS, FakeLlama, FakeRecognizer, PitchEmbedder, PitchRecognizer, answer, encode, noise, tone, visit,
+)
 from fastapi.testclient import TestClient
 
+from ehr_dictation import conversation
 from ehr_dictation.api import create_app
 from ehr_dictation.asr import Recognition
 from ehr_dictation.audio import SAMPLE_RATE
@@ -210,7 +218,135 @@ def answers(settings: Settings) -> dict[str, dict]:
     with client(settings, FakeLlama(GROUNDED), max_sessions=0) as http:
         keep("start-429-busy", "start", http.post("/v1/sessions", headers=HEADERS))
 
+    _visits(settings, keep)
     return {name: {"$comment": COMMENT, **_fixed(value)} for name, value in produced.items()}
+
+
+LISTENING = HEADERS | {"X-Dictation-Mode": "ambient"}
+NAMED = {"speakers": {"1": "clinician", "2": "patient"}}
+EVERYONE = {"speakers": {"1": "clinician", "2": "patient", "3": "other"}}
+DRAFTED = answer(
+    ("I have had a cough for three days. She coughs at night.", ["I have had a cough for three days", "She coughs at night"]),
+    objective=("Your chest is clear.", ["Your chest is clear"]),
+)
+
+
+class InstructedVisit(PitchRecognizer):
+    """Hears the clinician send a prescription, the patient ask for a refill and the third voice arrange a scan."""
+
+    SAID = {"Your chest is clear {period}": "I'll send that to your pharmacy {period}",
+            "I have had a cough for three days {period}": "Can you refill my inhaler {question mark}",
+            "She coughs at night {period}": "I'll arrange a scan {period}"}
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        heard = super().recognize(samples)
+        return Recognition(self.SAID[heard.text], heard.confidence)
+
+
+def listening_client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, model_timeout: float = 0.5,
+                     models=LISTENING_MODELS, **limits) -> TestClient:
+    settings = dataclasses.replace(settings, **limits)
+    return TestClient(create_app(settings, recognizer=recognizer or PitchRecognizer(), structurer=llama.structurer(model_timeout),
+                                 models=models, embedder=PitchEmbedder() if models.speaker else None))
+
+
+def heard(http: TestClient, *turns: str, speakers: int = 2) -> str:
+    """A visit started, its recording sent and stopped, and waited on until its voices are told apart."""
+    session = http.post("/v1/sessions", params={"mode": "ambient", "speakers": speakers}, headers=LISTENING).json()["sessionId"]
+    http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=wav(visit(*turns)), headers=LISTENING)
+    http.post(f"/v1/sessions/{session}/stop", headers=LISTENING)
+    http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING)
+    return session
+
+
+def _visits(settings: Settings, keep: Callable) -> None:
+    def drafted(http: TestClient, session: str, names: dict) -> None:
+        http.post(f"/v1/sessions/{session}/speakers", json=names, headers=LISTENING)
+
+    with listening_client(settings, FakeLlama(DRAFTED)) as http:
+        started = http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2}, headers=LISTENING)
+        keep("start-ambient-201", "start-ambient", started)
+        http.delete(f"/v1/sessions/{started.json()['sessionId']}", headers=LISTENING)
+        session = http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2}, headers=LISTENING).json()["sessionId"]
+        keep("audio-ambient-200", "audio-ambient",
+             http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=wav(visit("clinician", "patient")),
+                       headers=LISTENING))
+        keep("speakers-ambient-409-not_stopped", "speakers-ambient",
+             http.post(f"/v1/sessions/{session}/speakers", json=NAMED, headers=LISTENING))
+        keep("cancel-ambient-204", "cancel-ambient", http.delete(f"/v1/sessions/{session}", headers=LISTENING))
+        dictation = start(http)
+        keep("audio-ambient-404-not_found", "audio-ambient",
+             http.post(f"/v1/sessions/{dictation}/audio", params={"seq": 0}, content=wav(visit("clinician")), headers=LISTENING))
+        http.delete(f"/v1/sessions/{dictation}", headers=HEADERS)
+
+        # Three voices: the patient's words and someone else's in Subjective, the clinician's in Objective.
+        session = heard(http, "clinician", "patient", "other", "clinician", speakers=3)
+        keep("result-ambient-200-awaiting_speakers", "result-ambient",
+             http.post(f"/v1/sessions/{session}/result", headers=LISTENING))
+        keep("speakers-ambient-422-speakers_incomplete", "speakers-ambient",
+             http.post(f"/v1/sessions/{session}/speakers", json=NAMED, headers=LISTENING))
+        drafted(http, session, EVERYONE)
+        keep("result-ambient-200-done", "result-ambient",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
+        keep("speakers-ambient-409-speakers_given", "speakers-ambient",
+             http.post(f"/v1/sessions/{session}/speakers", json={"speakers": {"1": "patient", "2": "clinician", "3": "other"}},
+                       headers=LISTENING))
+
+    # Still being transcribed when stop gives up waiting: MedASR held until it has answered.
+    recognizer = PitchRecognizer()
+    with listening_client(settings, FakeLlama(DRAFTED), recognizer, stop_wait_seconds=0.5) as http:
+        session = http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2}, headers=LISTENING).json()["sessionId"]
+        http.post(f"/v1/sessions/{session}/audio", params={"seq": 0}, content=wav(visit("clinician", "patient")),
+                  headers=LISTENING)
+        recognizer.hold = threading.Event()
+        keep("stop-ambient-200-pending", "stop-ambient", http.post(f"/v1/sessions/{session}/stop", headers=LISTENING))
+        recognizer.hold.set()
+
+    # Named, and K2 Horizon still drafting: then too slow, so the visit is left undrafted.
+    with listening_client(settings, FakeLlama(DRAFTED, delay=3)) as http:
+        session = heard(http, "clinician", "patient")
+        keep("speakers-ambient-200-pending", "speakers-ambient",
+             http.post(f"/v1/sessions/{session}/speakers", json=NAMED, headers=LISTENING))
+        keep("result-ambient-200-unavailable-model_timeout", "result-ambient",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
+
+    # Named, and never a turn with K2 Horizon, a dictation always waiting: the visit is left undrafted as busy.
+    with listening_client(settings, FakeLlama(DRAFTED), ambient_wait_seconds=0.2) as http:
+        session = heard(http, "clinician", "patient")
+        turns = http.app.state.sessions._turns
+        turns._dictations, _ = 1, turns._none.clear()
+        drafted(http, session, NAMED)
+        keep("result-ambient-200-unavailable-model_busy", "result-ambient",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
+
+    # Drafted in two windows, the second without the patient: Subjective comes from the first, and says the second had
+    # something for it that didn't pass.
+    original = conversation.WINDOW_TOKENS
+    conversation.WINDOW_TOKENS = 12
+    try:
+        with listening_client(settings, FakeLlama(answer(("I have had a cough for three days.", ["I have had a cough for three days"]),
+                                                         objective=("Your chest is clear.", ["Your chest is clear"])))) as http:
+            session = heard(http, "clinician", "patient", "clinician", "clinician")
+            drafted(http, session, NAMED)
+            keep("result-ambient-200-done-part_not_offered", "result-ambient",
+                 http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
+    finally:
+        conversation.WINDOW_TOKENS = original
+
+    # The third voice named unsure: its passage is Unsure, and the instruction said in it is listed beside the
+    # clinician's, each with who said it; the patient's request for a refill isn't.
+    with listening_client(settings, FakeLlama(answer()), InstructedVisit()) as http:
+        session = heard(http, "clinician", "patient", "other", speakers=3)
+        drafted(http, session, {"speakers": {"1": "clinician", "2": "patient", "3": "unsure"}})
+        keep("result-ambient-200-done-not_carried_over", "result-ambient",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=LISTENING))
+
+    with listening_client(settings, FakeLlama(DRAFTED), models=MODELS) as http:
+        keep("start-ambient-503-listening_unavailable", "start-ambient",
+             http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2}, headers=LISTENING))
+    with listening_client(settings, FakeLlama(DRAFTED), ambient_max_sessions=0) as http:
+        keep("start-ambient-429-busy", "start-ambient",
+             http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2}, headers=LISTENING))
 
 
 def _fixed(value: object) -> object:
@@ -249,8 +385,11 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     produced = answers(settings)
     bodies = {name: value["body"] for name, value in produced.items()}
 
-    assert {value["status"] for value in produced.values()} == {200, 201, 204, 401, 404, 409, 413, 422, 429}
-    assert {value["route"] for value in produced.values()} == {"start", "audio", "stop", "result", "cancel"}
+    assert {value["status"] for value in produced.values()} == {200, 201, 204, 401, 404, 409, 413, 422, 429, 503}
+    assert {value["route"] for value in produced.values()} == {
+        "start", "audio", "stop", "result", "cancel",
+        "start-ambient", "audio-ambient", "stop-ambient", "speakers-ambient", "result-ambient", "cancel-ambient",
+    }
     reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long", "transcription_failed")
     assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in reasons} == set(reasons)
     planned = bodies["result-200-done-not_carried_over"]
@@ -272,3 +411,46 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     assert [w["code"] for w in near["warnings"]] == ["near_unclear_passage"]
     failed = bodies["result-200-unavailable-transcription_failed"]
     assert failed["transcript"]["text"] and not failed["transcript"]["final"]
+
+
+# The same for a recorded visit's (the expansion plan's step 16): what the on-prem app must read of it, and nothing of a
+# visit in a dictation's answers.
+def test_the_contract_covers_every_answer_of_a_visit(settings):
+    bodies = {name: value["body"] for name, value in answers(settings).items()}
+
+    assert bodies["start-ambient-201"]["mode"] == "ambient" and bodies["start-ambient-201"]["maxSeconds"] == 1200
+    assert "mode" not in bodies["start-201"]
+    heard = bodies["audio-ambient-200"]
+    assert heard["transcript"] == {"text": "", "final": False, "segments": []} and "quietSeconds" in heard
+    assert bodies["stop-ambient-200-pending"]["sorting"] == "pending"
+    waiting = bodies["result-ambient-200-awaiting_speakers"]
+    assert waiting["sorting"] == "awaiting_speakers" and [v["group"] for v in waiting["speakers"]] == [1, 2, 3]
+    assert {(s["speakerGroup"], s["speaker"]) for s in waiting["transcript"]["segments"]} == {(1, None), (2, None), (3, None)}
+    assert bodies["speakers-ambient-200-pending"]["sorting"] == "pending"
+    done = bodies["result-ambient-200-done"]
+    assert done["sorting"] == "done" and done["proposals"] == [] and "speakers" not in done
+    assert all(s["speaker"] in ("clinician", "patient", "other") for s in done["transcript"]["segments"])
+    subjective = done["fields"]["subjective"]
+    assert [s["speaker"] for s in subjective["sources"]] == ["patient", "other"]
+    assert [w["code"] for w in subjective["warnings"]] == ["patients_own_words", "other_speaker"]
+    assert done["provenance"]["speaker"]["repository"] == "speechbrain/spkrec-ecapa-voxceleb"
+    parted = bodies["result-ambient-200-done-part_not_offered"]["fields"]["subjective"]
+    assert [w["code"] for w in parted["warnings"]] == ["patients_own_words", "part_not_offered"]
+    assert bodies["result-ambient-200-unavailable-model_timeout"]["reason"] == "model_timeout"
+    assert bodies["result-ambient-200-unavailable-model_busy"]["reason"] == "model_busy"
+    instructed = bodies["result-ambient-200-done-not_carried_over"]
+    assert [s["speaker"] for s in instructed["transcript"]["segments"]] == ["clinician", "patient", "unsure"]
+    assert [(i["reason"], i["speaker"]) for i in instructed["notCarriedOver"]] == [("order", "clinician"), ("order", "unsure")]
+    assert {bodies[name]["error"] for name in ("speakers-ambient-409-not_stopped", "speakers-ambient-409-speakers_given",
+                                               "speakers-ambient-422-speakers_incomplete", "start-ambient-503-listening_unavailable",
+                                               "audio-ambient-404-not_found", "start-ambient-429-busy")} == {
+        "not_stopped", "speakers_given", "speakers_incomplete", "listening_unavailable", "not_found", "busy"}
+    # Every pending Subjective value of a visit says it is the patient's own words, and every named segment its speaker.
+    for name, body in bodies.items():
+        if "ambient" in name and body and body.get("fields"):
+            subjective = body["fields"]["subjective"]
+            assert subjective["status"] != "pending" or "patients_own_words" in [w["code"] for w in subjective["warnings"]], name
+        if "ambient" in name and body and body.get("sorting") in ("done", "unavailable"):
+            assert all(segment["speaker"] for segment in body["transcript"]["segments"]), name
+    dictated = [body for name, body in bodies.items() if "ambient" not in name and body]
+    assert not any("speaker" in json.dumps(body) or "quietSeconds" in body for body in dictated)

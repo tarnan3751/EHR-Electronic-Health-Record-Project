@@ -46,15 +46,17 @@ public class SoapNotesMigrationTests(MigratedDatabase database) : IClassFixture<
     Task PlantAsync(string sql, params (string Name, object Value)[] parameters) =>
         Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "SET LOCAL session_replication_role = replica;\n" + sql, parameters);
 
-    // Every row of the tables a note is kept in, as JSON, without the columns this step added.
+    // Every row of the tables a note is kept in, as JSON, without the columns this step added, nor those a later step
+    // added to a dictation's review and its proposals (step 16: a review's mode, consent and sensitivity, a proposal's
+    // sensitivity), which a migration after this one gives every row.
     async Task<List<string>> RowsAsync() => await AsSuperuserAsync(
         """
         SELECT t || ' ' || (r - 'subjective' - 'objective' - 'note_template_code')::text
         FROM (SELECT 'clinical_notes' AS t, to_jsonb(n) AS r, n.id FROM ehr.clinical_notes n
               UNION ALL SELECT 'clinical_drafts', to_jsonb(d), d.id FROM ehr.clinical_drafts d
               UNION ALL SELECT 'note_addenda', to_jsonb(a), a.id FROM ehr.note_addenda a
-              UNION ALL SELECT 'ai_note_reviews', to_jsonb(v), v.id FROM ehr.ai_note_reviews v
-              UNION ALL SELECT 'ai_field_proposals', to_jsonb(p), p.id FROM ehr.ai_field_proposals p) AS rows
+              UNION ALL SELECT 'ai_note_reviews', to_jsonb(v) - 'mode' - 'consent_id' - 'sensitive', v.id FROM ehr.ai_note_reviews v
+              UNION ALL SELECT 'ai_field_proposals', to_jsonb(p) - 'sensitive', p.id FROM ehr.ai_field_proposals p) AS rows
         ORDER BY t, id
         """);
 

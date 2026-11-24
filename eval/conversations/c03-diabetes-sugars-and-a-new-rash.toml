@@ -1,0 +1,218 @@
+id = "c03-diabetes-sugars-and-a-new-rash"
+speakers = 2
+voices = { clinician = "bf_emma", patient = "ef_dora" }
+tags = ["small-talk", "thinking-aloud", "home-readings", "allergy-change", "self-correction", "question-no", "negation", "numbers", "dates", "same-gender"]
+hedged = ["hypos"]
+noise = ["room"]
+dates = ["--03-14"]
+drugs = ["metformin", "atorvastatin"]
+forbidden = ["I'll add sulfa to the allergy list"]
+retracted = ["500 mg"]
+denied = ["numbness", "tingling", "blurry vision", "trouble breathing"]
+
+[[turns]]
+role = "clinician"
+text = "Hello again, come on in. How was the trip to the seaside? You were off just after your last visit, weren't you?"
+
+[[turns]]
+role = "patient"
+text = "We were, yes. It rained for most of the week, but the grandchildren didn't mind. They were in the sea every day."
+
+[[turns]]
+role = "clinician"
+text = "Children never seem to feel the cold. So, how has the diabetes been?"
+
+[[turns]]
+role = "patient"
+text = "Up and down, to be honest. My sugars have been creeping up over the last couple of months. I don't reckon I've had any hypos, though."
+
+[[turns]]
+role = "clinician"
+text = "Have you been checking at home?"
+
+[[turns]]
+role = "patient"
+text = "Every morning before breakfast. I brought my meter with me. Most mornings I'm between [[150|one fifty]] and [[170|one seventy]]. This morning it was [[164|one sixty-four]]. The highest was [[188|one eighty-eight]], after a birthday party."
+gap = 0.8
+
+[[turns]]
+role = "clinician"
+text = "And after meals?"
+
+[[turns]]
+role = "patient"
+text = "I only check after dinner now and then. It's usually around [[200|two hundred]]."
+
+[[turns]]
+role = "clinician"
+text = "And you're taking metformin [[500 mg|five hundred milligrams]] twice a day at the moment?"
+
+[[turns]]
+role = "patient"
+text = "That's right. I take it with breakfast and with dinner, and I haven't missed any doses."
+
+[[turns]]
+role = "clinician"
+text = "Good. Any stomach upset with it?"
+
+[[turns]]
+role = "patient"
+text = "A bit of loose stool at the start, but that settled down after a few weeks."
+
+[[turns]]
+role = "clinician"
+text = "Any numbness or tingling in your feet?"
+
+[[turns]]
+role = "patient"
+text = "No. I check my feet every night, and they look fine to me."
+
+[[turns]]
+role = "clinician"
+text = "Any blurry vision?"
+
+[[turns]]
+role = "patient"
+text = "No, none at all. I've got my eye exam booked for [[March 14|March fourteenth]], so they'll check then."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Good. Any other changes since I last saw you? New medicines, anything like that?"
+
+[[turns]]
+role = "patient"
+text = "Oh, yes, I nearly forgot. I had a water infection last month, and the walk-in clinic gave me an antibiotic. After [[3 days|three days]] I came out in a rash, red itchy blotches all over my arms and my chest. The pharmacist said it was a sulfa antibiotic and told me to stop it."
+
+[[turns]]
+role = "clinician"
+text = "Did the rash go away once you stopped it?"
+
+[[turns]]
+role = "patient"
+text = "Yes, it cleared up about a week after I stopped."
+
+[[turns]]
+role = "clinician"
+text = "Any trouble breathing, or swelling of your lips or face?"
+
+[[turns]]
+role = "patient"
+text = "No, nothing like that. Just the rash."
+gap = 0.3
+
+[[turns]]
+role = "clinician"
+text = "Okay. That sounds like an allergy to sulfa. I'll add sulfa to the allergy list, so nobody gives it to you again."
+
+[[turns]]
+role = "patient"
+text = "Thank you, that would make me feel better."
+
+[[turns]]
+role = "clinician"
+text = "Let me take your blood pressure and have a look at your feet."
+
+[[turns]]
+role = "patient"
+text = "Okay."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "Your blood pressure is [[128/78|one twenty-eight over seventy-eight]], and your weight is the same as last time. Your feet look healthy, with good pulses, and you can feel the monofilament everywhere. Your skin is clear, with no sign of the rash."
+gap = 3.0
+
+[[turns]]
+role = "patient"
+text = "And what about the blood test? The nurse took it last week."
+
+[[turns]]
+role = "clinician"
+text = "Yes, I have it here. Your [[A1c|A one C]] is [[8.1|eight point one]], up from [[7.2|seven point two]] in the spring. Your kidney function is normal."
+
+[[turns]]
+role = "clinician"
+text = "So let me think this through. Your sugars are higher than they were, but you're taking the metformin every day, and your diet sounds about the same. Your kidneys are working well, so there's room to go up on the dose. That's the simplest next step, before we think about adding another medicine. So your diabetes control has slipped since the spring."
+gap = 1.2
+
+[[turns]]
+role = "patient"
+text = "So more tablets?"
+
+[[turns]]
+role = "clinician"
+text = "The same tablets, just more of them. Let's go up on the metformin to [[500 mg|five hundred milligrams]] twice a day, sorry, [[1000 mg|one thousand milligrams]] twice a day. So from tomorrow, take metformin [[1000 mg|one thousand milligrams]] twice a day, with breakfast and with dinner."
+
+[[turns]]
+role = "patient"
+text = "Will that upset my stomach again?"
+
+[[turns]]
+role = "clinician"
+text = "It might for a week or so. Take it with food, and it usually settles. If your stomach is still upset after [[2 weeks|two weeks]], call me."
+
+[[turns]]
+role = "patient"
+text = "And the cholesterol tablet? Do I keep taking that?"
+
+[[turns]]
+role = "clinician"
+text = "Yes, continue the atorvastatin [[20 mg|twenty milligrams]] at night. Keep checking your fasting sugar every morning, and bring your meter next time. Come back in [[3 months|three months]], and we'll repeat your [[A1c|A one C]] then."
+
+[[turns]]
+role = "patient"
+text = "That's fine. Thank you for sorting out the allergy as well."
+
+[[turns]]
+role = "clinician"
+text = "You're welcome. Enjoy the rest of your week, and say hello to the grandchildren."
+
+[gold.subjective]
+value = "My sugars have been creeping up over the last couple of months. Every morning before breakfast. Most mornings I'm between 150 and 170. This morning it was 164. The highest was 188, after a birthday party. I only check after dinner now and then. It's usually around 200. I take it with breakfast and with dinner, and I haven't missed any doses. A bit of loose stool at the start, but that settled down after a few weeks. I check my feet every night, and they look fine to me. I've got my eye exam booked for March 14. I had a water infection last month, and the walk-in clinic gave me an antibiotic. After 3 days I came out in a rash, red itchy blotches all over my arms and my chest. The pharmacist said it was a sulfa antibiotic and told me to stop it. It cleared up about a week after I stopped. I don't reckon I've had any hypos."
+sources = [
+    "My sugars have been creeping up over the last couple of months",
+    "Every morning before breakfast",
+    "Most mornings I'm between 150 and 170",
+    "This morning it was 164",
+    "The highest was 188, after a birthday party",
+    "I only check after dinner now and then",
+    "It's usually around 200",
+    "I take it with breakfast and with dinner, and I haven't missed any doses",
+    "A bit of loose stool at the start, but that settled down after a few weeks",
+    "I check my feet every night, and they look fine to me",
+    "I've got my eye exam booked for March 14",
+    "I had a water infection last month, and the walk-in clinic gave me an antibiotic",
+    "After 3 days I came out in a rash, red itchy blotches all over my arms and my chest",
+    "The pharmacist said it was a sulfa antibiotic and told me to stop it",
+    "it cleared up about a week after I stopped",
+    "I don't reckon I've had any hypos",
+]
+
+[gold.objective]
+value = "Your blood pressure is 128/78, and your weight is the same as last time. Your feet look healthy, with good pulses, and you can feel the monofilament everywhere. Your skin is clear, with no sign of the rash. Your A1c is 8.1, up from 7.2 in the spring. Your kidney function is normal."
+sources = [
+    "Your blood pressure is 128/78, and your weight is the same as last time",
+    "Your feet look healthy, with good pulses, and you can feel the monofilament everywhere",
+    "Your skin is clear, with no sign of the rash",
+    "Your A1c is 8.1, up from 7.2 in the spring",
+    "Your kidney function is normal",
+]
+
+[gold.assessment]
+value = "Your diabetes control has slipped since the spring. That sounds like an allergy to sulfa."
+sources = [
+    "your diabetes control has slipped since the spring",
+    "That sounds like an allergy to sulfa",
+]
+
+[gold.plan]
+value = "Take metformin 1000 mg twice a day, with breakfast and with dinner. Take it with food. If your stomach is still upset after 2 weeks, call me. Continue the atorvastatin 20 mg at night. Keep checking your fasting sugar every morning, and bring your meter next time. Come back in 3 months, and we'll repeat your A1c then."
+sources = [
+    "take metformin 1000 mg twice a day, with breakfast and with dinner",
+    "Take it with food",
+    "If your stomach is still upset after 2 weeks, call me",
+    "continue the atorvastatin 20 mg at night",
+    "Keep checking your fasting sugar every morning, and bring your meter next time",
+    "Come back in 3 months, and we'll repeat your A1c then",
+]

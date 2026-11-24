@@ -105,6 +105,10 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     public DbSet<AiFieldProposal> AiFieldProposals => Set<AiFieldProposal>();
     public DbSet<AiChartProposal> AiChartProposals => Set<AiChartProposal>();
 
+    public DbSet<AmbientConsent> AmbientConsents => Set<AmbientConsent>();
+
+    public DbSet<AmbientTranscript> AmbientTranscripts => Set<AmbientTranscript>();
+
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
 
     public DbSet<NoteAddendum> NoteAddenda => Set<NoteAddendum>();

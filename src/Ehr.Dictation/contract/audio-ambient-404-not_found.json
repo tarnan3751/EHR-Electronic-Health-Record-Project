@@ -1,0 +1,9 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "audio-ambient",
+  "status": 404,
+  "body": {
+    "error": "not_found",
+    "detail": "No such dictation: it was cancelled or expired, or it isn't yours."
+  }
+}

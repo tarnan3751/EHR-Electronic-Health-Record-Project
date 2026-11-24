@@ -1,0 +1,709 @@
+id = "c11-annual-visit-four-problems"
+speakers = 2
+voices = { clinician = "af_bella", patient = "bf_emma" }
+tags = ["long", "same-gender", "home-readings", "small-talk", "thinking-aloud", "hedging", "backchannel", "question-no", "order-spoken", "negation", "numbers"]
+hedged = ["sleep apnoea"]
+noise = ["room"]
+dates = []
+drugs = ["lisinopril", "metformin", "atorvastatin", "empagliflozin", "ibuprofen", "paracetamol"]
+forbidden = ["I'm ordering an A1c and a lipid panel"]
+denied = ["headaches", "dizziness", "chest pain", "cough", "numbness", "blurred vision", "thoughts of harming yourself", "weakness"]
+
+[[turns]]
+role = "clinician"
+text = "Hello, come on through and have a seat. Did you get caught in that rain?"
+
+[[turns]]
+role = "patient"
+text = "Only the tail end of it. I had my umbrella with me, for once."
+
+[[turns]]
+role = "clinician"
+text = "It's lovely to see you again. How have you been?"
+
+[[turns]]
+role = "patient"
+text = "Oh, not too bad, thank you. I finally retired at the end of the spring, so I've had the whole summer to myself."
+
+[[turns]]
+role = "clinician"
+text = "Congratulations! That's a big milestone. How are you finding it?"
+
+[[turns]]
+role = "patient"
+text = "Strange, to be honest. I thought I'd love every minute, and some days I do. I've been painting the garden fence, and I do the crossword with my coffee every morning."
+
+[[turns]]
+role = "clinician"
+text = "That sounds lovely. What color did you paint the fence?"
+
+[[turns]]
+role = "patient"
+text = "A sort of sage green. My neighbour says it looks like a hospital corridor, but I'm very pleased with it."
+
+[[turns]]
+role = "clinician"
+text = "Well, it's your fence, not hers."
+overlap = 0.3
+
+[[turns]]
+role = "patient"
+text = "That's exactly what I told her! She's coming round to it, slowly."
+
+[[turns]]
+role = "clinician"
+text = "Did they throw you a party at the library when you left?"
+
+[[turns]]
+role = "patient"
+text = "They did. Cake, speeches, and a card signed by half the town. Somebody even made a bookmark with my face on it."
+
+[[turns]]
+role = "clinician"
+text = "That's wonderful. You must have been there a long time."
+
+[[turns]]
+role = "patient"
+text = "[[22 years|Twenty-two years]]. I started out in the children's section and finished up running the whole place."
+
+[[turns]]
+role = "clinician"
+text = "Good for you. So, this is your annual visit. I'd like to go over your blood pressure and your diabetes, and anything else that's on your mind. Was there something in particular you wanted to talk about today?"
+
+[[turns]]
+role = "patient"
+text = "Two things, really. My right shoulder has been aching, and I've been feeling a bit low lately. I wasn't sure whether the second one was worth mentioning."
+gap = 0.8
+
+[[turns]]
+role = "clinician"
+text = "It's absolutely worth mentioning, and I'm glad you did. We'll get to both. Let's start with your blood pressure. Did you bring your readings?"
+
+[[turns]]
+role = "patient"
+text = "I did. I wrote them all in a little notebook, like you asked me to. Shall I read you the last week?"
+
+[[turns]]
+role = "clinician"
+text = "Yes, please."
+
+[[turns]]
+role = "patient"
+text = "This morning it was [[142/88|one forty-two over eighty-eight]]. Yesterday it was [[138/84|one thirty-eight over eighty-four]], and the day before, [[146/90|one forty-six over ninety]]."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm."
+overlap = 0.2
+
+[[turns]]
+role = "patient"
+text = "Then [[135/82|one thirty-five over eighty-two]], [[140/86|one forty over eighty-six]], and on Sunday it was [[151/92|one fifty-one over ninety-two]], but I'd had a big lunch out with friends that day."
+
+[[turns]]
+role = "clinician"
+text = "That's really useful. When do you usually take them?"
+
+[[turns]]
+role = "patient"
+text = "First thing in the morning, before my tablets. I sit quietly for [[5 minutes|five minutes]] first, the way the leaflet says."
+
+[[turns]]
+role = "clinician"
+text = "Perfect. And is that the same machine we checked against ours last year?"
+
+[[turns]]
+role = "patient"
+text = "The very same. I put new batteries in it over the summer."
+
+[[turns]]
+role = "clinician"
+text = "Let me think this through out loud for a moment."
+
+[[turns]]
+role = "patient"
+text = "Go ahead."
+
+[[turns]]
+role = "clinician"
+text = "Most of those are above [[135/85|one thirty-five over eighty-five]], which is the target I'd like you under at home. You're on lisinopril [[10 mg|ten milligrams]], and there's plenty of room to go up on that. The other choice would be adding a second medicine on top. With your diabetes, I lean toward going up on the lisinopril first, because it also protects your kidneys."
+gap = 1.0
+
+[[turns]]
+role = "patient"
+text = "Whatever you think is best. I'd prefer to keep the number of tablets down, if I can."
+
+[[turns]]
+role = "clinician"
+text = "That's a fair point. Before I decide, any headaches?"
+
+[[turns]]
+role = "patient"
+text = "No."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Any dizziness when you stand up?"
+
+[[turns]]
+role = "patient"
+text = "No, none at all."
+
+[[turns]]
+role = "clinician"
+text = "Any chest pain or breathlessness when you're out walking?"
+
+[[turns]]
+role = "patient"
+text = "No, I'm fine on the hills."
+
+[[turns]]
+role = "clinician"
+text = "And has the lisinopril ever given you a dry cough?"
+
+[[turns]]
+role = "patient"
+text = "No, not that I've noticed."
+
+[[turns]]
+role = "clinician"
+text = "How much salt do you use?"
+
+[[turns]]
+role = "patient"
+text = "Hardly any at the table, but I do love a packet of crisps in the afternoon."
+
+[[turns]]
+role = "clinician"
+text = "That's good to hear, apart from the crisps. So the readings are steady, just a little high, and the tablet isn't bothering you. That makes me comfortable going up on the dose. Now, your diabetes. You're taking metformin [[1000 mg|one thousand milligrams]] twice a day, and atorvastatin [[20 mg|twenty milligrams]] at night. Is that still correct?"
+
+[[turns]]
+role = "patient"
+text = "Yes, both of those. The metformin upset my stomach when I first started, but that settled down after a few weeks."
+
+[[turns]]
+role = "clinician"
+text = "Do you check your sugars at home?"
+
+[[turns]]
+role = "patient"
+text = "A couple of mornings a week. They're usually between [[130|a hundred and thirty]] and [[150|a hundred and fifty]]. Once or twice it's been near [[170|a hundred and seventy]]."
+
+[[turns]]
+role = "clinician"
+text = "Your last [[A1c|A one C]] was [[7.4|seven point four]] in the spring, and I'd like it under [[7|seven]]. How has your eating been?"
+
+[[turns]]
+role = "patient"
+text = "Not great, if I'm honest. I've been snacking more since I stopped working. Biscuits with every cup of tea, mostly, and I'm drinking a lot more tea."
+
+[[turns]]
+role = "clinician"
+text = "What do your main meals look like?"
+
+[[turns]]
+role = "patient"
+text = "Porridge for breakfast, a sandwich at lunchtime, and a proper dinner in the evening, usually fish or chicken with vegetables."
+
+[[turns]]
+role = "clinician"
+text = "That's a good base. It's the bits in between that add up, and it happens to a lot of people after they retire. Are you getting any exercise?"
+
+[[turns]]
+role = "patient"
+text = "Less than I was. I used to walk to work and back, which was [[2 miles|two miles]] a day. Now it's mostly the garden."
+
+[[turns]]
+role = "clinician"
+text = "Do you think you could build some walking back in? Even [[20 minutes|twenty minutes]] most days would help your sugar and your blood pressure."
+
+[[turns]]
+role = "patient"
+text = "I could. I've just got out of the habit. Without the walk to work, some days there's no reason to leave the house."
+
+[[turns]]
+role = "clinician"
+text = "That's a big part of all this, I suspect. Any numbness or tingling in your feet?"
+
+[[turns]]
+role = "patient"
+text = "No, nothing like that."
+
+[[turns]]
+role = "clinician"
+text = "Any blurred vision?"
+
+[[turns]]
+role = "patient"
+text = "No, but I'm overdue at the optician. I keep putting it off."
+
+[[turns]]
+role = "clinician"
+text = "We'll come back to that. Do you smoke at all?"
+
+[[turns]]
+role = "patient"
+text = "No, never have. I have a glass of wine at the weekend, and that's about it."
+
+[[turns]]
+role = "clinician"
+text = "Uh-huh."
+overlap = 0.3
+
+[[turns]]
+role = "patient"
+text = "Can I ask, am I going to end up on insulin? My neighbour's on it, and she hates the needles."
+
+[[turns]]
+role = "clinician"
+text = "Probably not any time soon. Your numbers are close to where I want them, and small changes can make a real difference. Swapping the biscuits for fruit or a handful of nuts would be a good start."
+
+[[turns]]
+role = "patient"
+text = "I can manage that. I like an apple."
+
+[[turns]]
+role = "clinician"
+text = "Now, you said you've been feeling low. Tell me a bit more about that."
+
+[[turns]]
+role = "patient"
+text = "It's hard to describe. Since I retired, the days feel a bit empty. I used to see people all day at the library, and now some days I don't speak to anyone until the evening."
+gap = 1.2
+
+[[turns]]
+role = "clinician"
+text = "I see."
+overlap = 0.2
+
+[[turns]]
+role = "patient"
+text = "I know it sounds silly. I couldn't wait to stop working, and now I miss it."
+
+[[turns]]
+role = "clinician"
+text = "It doesn't sound silly at all. How long has it felt like this?"
+
+[[turns]]
+role = "patient"
+text = "About [[3 months|three months]] now, since the end of the summer."
+
+[[turns]]
+role = "clinician"
+text = "And how are you sleeping?"
+
+[[turns]]
+role = "patient"
+text = "Badly. I fall asleep easily enough, but I wake up around [[4|four]] and lie there thinking. I was told I might have sleep apnoea a few years ago."
+
+[[turns]]
+role = "clinician"
+text = "Thinking about anything in particular?"
+
+[[turns]]
+role = "patient"
+text = "Nothing much. Whether I've done the right thing, and what I'll do with myself all winter."
+
+[[turns]]
+role = "clinician"
+text = "Do you nap during the day?"
+
+[[turns]]
+role = "patient"
+text = "Sometimes after lunch, for half an hour or so. Then I can't settle at night, and round it goes."
+
+[[turns]]
+role = "clinician"
+text = "Do you still enjoy the things you used to?"
+
+[[turns]]
+role = "patient"
+text = "Some of them. I've stopped going to my walking group on Tuesdays, which I used to love. I just can't be bothered anymore."
+
+[[turns]]
+role = "clinician"
+text = "And your energy, your concentration?"
+
+[[turns]]
+role = "patient"
+text = "My energy's low. I can still do the crossword, but it takes me twice as long."
+
+[[turns]]
+role = "clinician"
+text = "Who do you see in a normal week?"
+
+[[turns]]
+role = "patient"
+text = "A friend from the library comes round for coffee on Fridays, and I chat to the neighbours over the fence. That's most of it."
+
+[[turns]]
+role = "clinician"
+text = "I have to ask everyone this. Have you had any thoughts of harming yourself, or of not wanting to be here?"
+
+[[turns]]
+role = "patient"
+text = "Never. I promise, it's nothing like that. I just feel flat."
+gap = 0.5
+
+[[turns]]
+role = "clinician"
+text = "Thank you for telling me. I think this is a low patch after a big change, and it might be early depression. We should take it seriously either way, and there's a lot we can do."
+
+[[turns]]
+role = "patient"
+text = "That's a relief. I was worried you'd think I was making a fuss over nothing."
+
+[[turns]]
+role = "clinician"
+text = "Not at all. I'm already weighing a few options. Talking therapy tends to help most with this kind of low mood, and getting a routine back matters as much as any tablet."
+
+[[turns]]
+role = "patient"
+text = "I've always liked a routine. Without one, I drift."
+
+[[turns]]
+role = "clinician"
+text = "Then we'll build one back up. Now, let's talk about the shoulder. When did it start?"
+
+[[turns]]
+role = "patient"
+text = "About [[2 months|two months]] ago. I think it started with all the painting, reaching up over my head."
+
+[[turns]]
+role = "clinician"
+text = "Where exactly does it hurt?"
+
+[[turns]]
+role = "patient"
+text = "Here, on the outside of my upper arm. It's worst when I reach up to the top cupboard, and when I lie on that side at night. It wakes me up."
+
+[[turns]]
+role = "clinician"
+text = "Did you fall, or hurt it suddenly at any point?"
+
+[[turns]]
+role = "patient"
+text = "No, it just crept up on me."
+
+[[turns]]
+role = "clinician"
+text = "Can you still get dressed and do your hair?"
+
+[[turns]]
+role = "patient"
+text = "Doing my hair is the worst part. That, and reaching back for the seat belt in the car."
+
+[[turns]]
+role = "clinician"
+text = "Any pins and needles down your arm, or weakness in your hand?"
+
+[[turns]]
+role = "patient"
+text = "No, my hand's fine. I can still hold a paintbrush."
+
+[[turns]]
+role = "clinician"
+text = "Have you taken anything for it?"
+
+[[turns]]
+role = "patient"
+text = "A couple of paracetamol now and then. They take the edge off."
+
+[[turns]]
+role = "clinician"
+text = "Okay. Let me examine you. I'll start with your blood pressure, and then we'll look at the shoulder and your feet."
+
+[[turns]]
+role = "patient"
+text = "Fine by me."
+gap = 0.5
+
+[[turns]]
+role = "clinician"
+text = "Your blood pressure here is [[144/86|one forty-four over eighty-six]], so it matches your notebook. Your pulse is [[72|seventy-two]] and regular. Your weight is [[176 pounds|a hundred and seventy-six pounds]], up [[4 pounds|four pounds]] since last year."
+gap = 3.0
+
+[[turns]]
+role = "patient"
+text = "That'll be the biscuits."
+
+[[turns]]
+role = "clinician"
+text = "Maybe a little. Now I'll have a listen to your heart and lungs. Deep breaths in and out through your mouth."
+
+[[turns]]
+role = "patient"
+text = "Like this?"
+gap = 2.0
+
+[[turns]]
+role = "clinician"
+text = "Just like that. Your heart sounds normal, and your lungs are clear."
+gap = 2.5
+
+[[turns]]
+role = "patient"
+text = "Glad to hear it."
+
+[[turns]]
+role = "clinician"
+text = "Now lift your arm out to the side for me, nice and slowly."
+
+[[turns]]
+role = "patient"
+text = "Ooh. That's the spot, about halfway up."
+gap = 1.0
+
+[[turns]]
+role = "clinician"
+text = "Keep going, all the way up over your head."
+
+[[turns]]
+role = "patient"
+text = "That's easier, once it's past the middle."
+
+[[turns]]
+role = "clinician"
+text = "Push up against my hand. That's it. Now push out, and now in."
+
+[[turns]]
+role = "patient"
+text = "That all feels strong."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "Now I'm going to press on a few spots. Tell me if anything's sore."
+
+[[turns]]
+role = "patient"
+text = "Not there. A bit there. Nothing there either."
+gap = 2.0
+
+[[turns]]
+role = "clinician"
+text = "You have a painful arc between about [[70|seventy]] and [[120 degrees|a hundred and twenty degrees]], and your strength is good in every direction. The joint at the top of your shoulder isn't tender."
+gap = 1.0
+
+[[turns]]
+role = "patient"
+text = "Is that good news?"
+
+[[turns]]
+role = "clinician"
+text = "Mostly, yes. I'll explain in a minute. Let me check your feet first, so shoes and socks off for me."
+
+[[turns]]
+role = "patient"
+text = "There we go."
+gap = 2.5
+
+[[turns]]
+role = "clinician"
+text = "Can you feel this? And this one?"
+
+[[turns]]
+role = "patient"
+text = "Yes. Yes, that one too."
+
+[[turns]]
+role = "clinician"
+text = "The feeling in your feet is normal, and the pulses are strong. The skin looks healthy, and there are no sores."
+gap = 1.5
+
+[[turns]]
+role = "patient"
+text = "Go on, then. What's the verdict?"
+
+[[turns]]
+role = "clinician"
+text = "Let me pull it all together. Your blood pressure is running above target, both here and at home. Your diabetes was close to target in the spring, but the snacking may have pushed it up since then. Your mood has dipped since you stopped working. The shoulder is most likely a rotator cuff tendinopathy from all that painting. I don't think it's a frozen shoulder, because you can still lift your arm over your head."
+gap = 0.8
+
+[[turns]]
+role = "patient"
+text = "What's a tendinopathy, when it's at home?"
+
+[[turns]]
+role = "clinician"
+text = "It means the tendon that lifts your arm has been overworked and irritated. Painting overhead for weeks on end is a classic way to do it, and it usually settles with the right exercises."
+
+[[turns]]
+role = "patient"
+text = "So nothing serious, then?"
+
+[[turns]]
+role = "clinician"
+text = "Nothing that worries me today, but all four deserve some attention. Here's what I'd suggest. For your blood pressure, increase the lisinopril to [[20 mg|twenty milligrams]] once a day, and keep up the readings at home. Continue the metformin and the atorvastatin as before. I'm ordering an [[A1c|A one C]] and a lipid panel, so we'll know where your sugar and cholesterol are."
+
+[[turns]]
+role = "patient"
+text = "And if the sugar has gone up?"
+
+[[turns]]
+role = "clinician"
+text = "Then we might think about adding something like empagliflozin, which helps the heart and kidneys too. If it's over [[8|eight]], I'd want to move a bit faster. But let's see the number first, before we change anything."
+
+[[turns]]
+role = "patient"
+text = "Should I stop the metformin before the blood test?"
+
+[[turns]]
+role = "clinician"
+text = "Keep taking it as usual. You'll need to fast from midnight, though, so book an early slot."
+
+[[turns]]
+role = "patient"
+text = "Makes sense. And the shoulder?"
+
+[[turns]]
+role = "clinician"
+text = "I'll show you [[3 exercises|three exercises]] to do twice a day. You can use ibuprofen gel on it at bedtime and keep taking the paracetamol when you need it. Please don't take ibuprofen tablets, because they can push your blood pressure up and they're hard on the kidneys. If it's no better in [[6 weeks|six weeks]], we can arrange an ultrasound."
+
+[[turns]]
+role = "patient"
+text = "Will it need an injection?"
+
+[[turns]]
+role = "clinician"
+text = "Possibly, if the exercises haven't helped after a couple of months. A steroid injection can settle it down, but I'd like to try the simple things first."
+
+[[turns]]
+role = "patient"
+text = "And the low mood? I don't really want to go on tablets for it, if I can help it."
+gap = 0.6
+
+[[turns]]
+role = "clinician"
+text = "That's fair, and we don't have to start there. I want you to see our counselor here, and the front desk can book that for you on your way out. Try to get back to your walking group this week, even if you don't feel like it."
+
+[[turns]]
+role = "patient"
+text = "I'll ring them tonight. They did ask after me last week."
+
+[[turns]]
+role = "clinician"
+text = "Please do. Book in with the optician for your diabetes eye check, too. Come back in [[4 weeks|four weeks]], and we'll go through your blood pressure, your results and how your mood is."
+
+[[turns]]
+role = "patient"
+text = "I will. Thank you, this has been really helpful. I feel lighter already."
+
+[[turns]]
+role = "clinician"
+text = "One more thing before you go. Have you had your flu jab this year?"
+
+[[turns]]
+role = "patient"
+text = "Not yet. Could I have it today?"
+
+[[turns]]
+role = "clinician"
+text = "Of course. The nurse can give you the flu jab on your way out."
+
+[[turns]]
+role = "patient"
+text = "Wonderful. You know, I might even take up painting properly. Pictures this time, not fences."
+
+[[turns]]
+role = "clinician"
+text = "There's a watercolor class at the community center on Thursday mornings. It might be just the thing, and you'd meet some new people while you're at it."
+
+[[turns]]
+role = "patient"
+text = "Oh, I like the sound of that. I've always fancied doing the hills behind the town in watercolor."
+
+[[turns]]
+role = "clinician"
+text = "I'd hang that in my waiting room. The front desk has the leaflet for the class, too."
+
+[[turns]]
+role = "patient"
+text = "I'll look into it. And I'll bring a photo of the fence next time, so you can judge the green for yourself."
+
+[[turns]]
+role = "clinician"
+text = "I'll look forward to it. Take care, and I'll see you in [[4 weeks|four weeks]]."
+
+[[turns]]
+role = "patient"
+text = "Thank you again. I came in feeling like a bit of a fraud, and I'm going home with a plan."
+
+[gold.subjective]
+value = "My right shoulder has been aching, and I've been feeling a bit low lately. This morning it was 142/88. Yesterday it was 138/84, and the day before, 146/90. Then 135/82, 140/86, and on Sunday it was 151/92, but I'd had a big lunch out with friends that day. I sit quietly for 5 minutes first, the way the leaflet says. The metformin upset my stomach when I first started, but that settled down after a few weeks. They're usually between 130 and 150. Once or twice it's been near 170. I've been snacking more since I stopped working. Biscuits with every cup of tea, mostly, and I'm drinking a lot more tea. I used to walk to work and back, which was 2 miles a day. Now it's mostly the garden. I'm overdue at the optician. I have a glass of wine at the weekend, and that's about it. Since I retired, the days feel a bit empty. I used to see people all day at the library, and now some days I don't speak to anyone until the evening. About 3 months now, since the end of the summer. I fall asleep easily enough, but I wake up around 4 and lie there thinking. I've stopped going to my walking group on Tuesdays, which I used to love. My energy's low. I can still do the crossword, but it takes me twice as long. I just feel flat. About 2 months ago. I think it started with all the painting, reaching up over my head. It's worst when I reach up to the top cupboard, and when I lie on that side at night. It wakes me up. A couple of paracetamol now and then. They take the edge off. I don't really want to go on tablets for it, if I can help it. I was told I might have sleep apnoea a few years ago."
+sources = [
+    "My right shoulder has been aching, and I've been feeling a bit low lately",
+    "This morning it was 142/88",
+    "Yesterday it was 138/84, and the day before, 146/90",
+    "Then 135/82, 140/86, and on Sunday it was 151/92, but I'd had a big lunch out with friends that day",
+    "I sit quietly for 5 minutes first, the way the leaflet says",
+    "The metformin upset my stomach when I first started, but that settled down after a few weeks",
+    "They're usually between 130 and 150",
+    "Once or twice it's been near 170",
+    "I've been snacking more since I stopped working",
+    "Biscuits with every cup of tea, mostly, and I'm drinking a lot more tea",
+    "I used to walk to work and back, which was 2 miles a day",
+    "Now it's mostly the garden",
+    "I'm overdue at the optician",
+    "I have a glass of wine at the weekend, and that's about it",
+    "Since I retired, the days feel a bit empty",
+    "I used to see people all day at the library, and now some days I don't speak to anyone until the evening",
+    "About 3 months now, since the end of the summer",
+    "I fall asleep easily enough, but I wake up around 4 and lie there thinking",
+    "I've stopped going to my walking group on Tuesdays, which I used to love",
+    "My energy's low",
+    "I can still do the crossword, but it takes me twice as long",
+    "I just feel flat",
+    "About 2 months ago",
+    "I think it started with all the painting, reaching up over my head",
+    "It's worst when I reach up to the top cupboard, and when I lie on that side at night",
+    "It wakes me up",
+    "A couple of paracetamol now and then",
+    "They take the edge off",
+    "I don't really want to go on tablets for it, if I can help it",
+    "I was told I might have sleep apnoea a few years ago",
+]
+
+[gold.objective]
+value = "Your blood pressure here is 144/86, so it matches your notebook. Your pulse is 72 and regular. Your weight is 176 pounds, up 4 pounds since last year. Your heart sounds normal, and your lungs are clear. You have a painful arc between about 70 and 120 degrees, and your strength is good in every direction. The joint at the top of your shoulder isn't tender. The feeling in your feet is normal, and the pulses are strong. The skin looks healthy, and there are no sores."
+sources = [
+    "Your blood pressure here is 144/86, so it matches your notebook",
+    "Your pulse is 72 and regular",
+    "Your weight is 176 pounds, up 4 pounds since last year",
+    "Your heart sounds normal, and your lungs are clear",
+    "You have a painful arc between about 70 and 120 degrees, and your strength is good in every direction",
+    "The joint at the top of your shoulder isn't tender",
+    "The feeling in your feet is normal, and the pulses are strong",
+    "The skin looks healthy, and there are no sores",
+]
+
+[gold.assessment]
+value = "I think this is a low patch after a big change, and it might be early depression. Your blood pressure is running above target, both here and at home. Your diabetes was close to target in the spring, but the snacking may have pushed it up since then. Your mood has dipped since you stopped working. The shoulder is most likely a rotator cuff tendinopathy from all that painting. I don't think it's a frozen shoulder, because you can still lift your arm over your head."
+sources = [
+    "I think this is a low patch after a big change, and it might be early depression",
+    "Your blood pressure is running above target, both here and at home",
+    "Your diabetes was close to target in the spring, but the snacking may have pushed it up since then",
+    "Your mood has dipped since you stopped working",
+    "The shoulder is most likely a rotator cuff tendinopathy from all that painting",
+    "I don't think it's a frozen shoulder, because you can still lift your arm over your head",
+]
+
+[gold.plan]
+value = "Swapping the biscuits for fruit or a handful of nuts would be a good start. For your blood pressure, increase the lisinopril to 20 mg once a day, and keep up the readings at home. Continue the metformin and the atorvastatin as before. You'll need to fast from midnight, though, so book an early slot. I'll show you 3 exercises to do twice a day. You can use ibuprofen gel on it at bedtime and keep taking the paracetamol when you need it. Please don't take ibuprofen tablets, because they can push your blood pressure up and they're hard on the kidneys. If it's no better in 6 weeks, we can arrange an ultrasound. I want you to see our counselor here, and the front desk can book that for you on your way out. Try to get back to your walking group this week, even if you don't feel like it. Book in with the optician for your diabetes eye check, too. Come back in 4 weeks, and we'll go through your blood pressure, your results and how your mood is. The nurse can give you the flu jab on your way out."
+sources = [
+    "Swapping the biscuits for fruit or a handful of nuts would be a good start",
+    "For your blood pressure, increase the lisinopril to 20 mg once a day, and keep up the readings at home",
+    "Continue the metformin and the atorvastatin as before",
+    "You'll need to fast from midnight, though, so book an early slot",
+    "I'll show you 3 exercises to do twice a day",
+    "You can use ibuprofen gel on it at bedtime and keep taking the paracetamol when you need it",
+    "Please don't take ibuprofen tablets, because they can push your blood pressure up and they're hard on the kidneys",
+    "If it's no better in 6 weeks, we can arrange an ultrasound",
+    "I want you to see our counselor here, and the front desk can book that for you on your way out",
+    "Try to get back to your walking group this week, even if you don't feel like it",
+    "Book in with the optician for your diabetes eye check, too",
+    "Come back in 4 weeks, and we'll go through your blood pressure, your results and how your mood is",
+    "The nurse can give you the flu jab on your way out",
+]

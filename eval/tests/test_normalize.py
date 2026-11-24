@@ -20,6 +20,24 @@ def test_written_and_spoken_forms_normalize_alike(written, spoken):
     assert normalize(written) == normalize(spoken)
 
 
+@pytest.mark.parametrize(("short", "written_out"), [
+    ("I've had it since Tuesday.", "I have had it since Tuesday."),
+    ("I'm fine, it's not bad.", "I am fine, it is not bad."),
+    ("It's been a week.", "It has been a week."),
+    ("That isn't it.", "That's not it."),
+    ("I haven't, and I don't.", "I have not, and I do not."),
+    ("I'd stop it; we'll see; you're right; let's go.", "I would stop it; we will see; you are right; let us go."),
+    ("I can't and won't.", "I cannot and will not."),
+])
+def test_a_contraction_and_its_words_written_out_normalize_alike(short, written_out):
+    assert normalize(short) == normalize(written_out)
+
+
+def test_a_possessive_is_no_contraction():
+    assert normalize("the doctor's note") == "the doctor's note"
+    assert normalize("it's") != normalize("its")
+
+
 def test_and_between_ordinary_words_is_kept():
     assert normalize("rest and fluids") == "rest and fluids"
     assert normalize("two and three") == "2 and 3"

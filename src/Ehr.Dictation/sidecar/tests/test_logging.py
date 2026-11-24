@@ -1,11 +1,12 @@
-"""Nothing a clinician says reaches a log: a whole dictation, sorted and checked, logs no transcript text and no field
-value at any level, from the sidecar or the libraries it uses."""
+"""Nothing a clinician says reaches a log: a whole dictation, sorted and checked, or a whole recorded visit, its voices
+named and its note drafted, logs no transcript text and no field value at any level, from the sidecar or the libraries
+it uses."""
 
 from __future__ import annotations
 
 import logging
 
-from conftest import MODELS, FakeLlama, FakeRecognizer, answer
+from conftest import LISTENING_MODELS, MODELS, FakeLlama, FakeRecognizer, PitchEmbedder, answer, encode, visit
 from fastapi.testclient import TestClient
 from test_api import HEADERS, recording_chunks
 
@@ -37,4 +38,35 @@ def test_a_dictation_logs_none_of_its_words(settings, caplog, capfd):
     assert SPOKEN in result["transcript"]["text"]
     logged = "\n".join(r.getMessage() for r in records + caplog.records) + "".join(capfd.readouterr())
     assert records, "the sidecar logged nothing at all"
+    assert SPOKEN not in logged.lower() and "quokka" not in logged.lower()
+
+
+# TC-UC23-05's service half (NFR-07): a whole visit logs none of its words either, neither what anyone said nor what was
+# drafted. test_ambient.py: test_a_whole_visit_writes_nothing_to_disk.
+def test_a_visit_logs_none_of_its_words(settings, caplog, capfd):
+    caplog.set_level(logging.DEBUG)
+    records: list[logging.LogRecord] = []
+    collector = logging.Handler(logging.DEBUG)
+    collector.emit = records.append
+    logging.getLogger("ehr_dictation").addHandler(collector)
+    llama = FakeLlama(answer((PROPOSED, [f"{SPOKEN} {SPOKEN}"]), plan=("Order zebrafinch panel.", [SPOKEN])))
+    app = create_app(settings, recognizer=FakeRecognizer(SPOKEN), structurer=llama.structurer(), models=LISTENING_MODELS,
+                     embedder=PitchEmbedder())
+    listening = HEADERS | {"X-Dictation-Mode": "ambient"}
+    data = encode(visit("clinician", "patient", "clinician"), "webm")
+    try:
+        with TestClient(app) as http:
+            session_id = http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2}, headers=listening).json()["sessionId"]
+            http.post(f"/v1/sessions/{session_id}/audio", params={"seq": 0}, content=data, headers=listening)
+            http.post(f"/v1/sessions/{session_id}/stop", headers=listening)
+            http.post(f"/v1/sessions/{session_id}/result", params={"wait": 5}, headers=listening)
+            http.post(f"/v1/sessions/{session_id}/speakers", json={"speakers": {"1": "clinician", "2": "patient"}},
+                      headers=listening)
+            result = http.post(f"/v1/sessions/{session_id}/result", params={"wait": 5}, headers=listening).json()
+    finally:
+        logging.getLogger("ehr_dictation").removeHandler(collector)
+
+    assert result["sorting"] == "done" and SPOKEN in result["transcript"]["text"]
+    logged = "\n".join(r.getMessage() for r in records + caplog.records) + "".join(capfd.readouterr())
+    assert "drafted" in logged and "voices named" in logged
     assert SPOKEN not in logged.lower() and "quokka" not in logged.lower()

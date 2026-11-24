@@ -2,6 +2,8 @@
 @using Ehr.Data.Patients
 @model ChartModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@inject Ehr.Domain.Notes.NoteWriteAuthority NoteWrites
+@inject Ehr.Web.Ambient.AmbientListening Listening
 @{
     // This chart uses native forms. Avoid htmx's automatic patient-URL sessionStorage history.
     ViewData["UseHtmx"] = false;
@@ -90,6 +92,12 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             <div class="sc-actions">
                 <a asp-page="Dictate" asp-all-route-data="dictateRoute" class="sc-btn" data-dictate-link>Dictate a note</a>
+                @* Step 16: listening to a visit, when the clinic has it switched on, at the clinic only, and not in what the
+                   cloud app forwards here. *@
+                @if (Listening.Enabled && Ehr.Web.Forwarding.ClinicNetwork.AtTheClinic(HttpContext.Request, NoteWrites))
+                {
+                    <a asp-page="Listen" asp-all-route-data="dictateRoute" class="sc-btn" data-listen-link>Listen to the visit</a>
+                }
                 <form method="post" asp-page-handler="NewNote"><button class="sc-btn">New note</button></form>
             </div>
         }

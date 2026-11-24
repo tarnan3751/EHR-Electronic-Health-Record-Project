@@ -1,0 +1,231 @@
+id = "c08-low-back-strain"
+speakers = 2
+voices = { clinician = "am_puck", patient = "am_michael" }
+tags = ["thinking-aloud", "hedging", "small-talk", "allergy-change", "same-gender", "question-no", "negation", "numbers"]
+hedged = ["slipped a disc"]
+noise = []
+dates = []
+drugs = ["ibuprofen", "codeine"]
+forbidden = ["take codeine off the allergy list"]
+denied = ["numbness", "weakness", "fever"]
+
+[[turns]]
+role = "clinician"
+text = "Hey, good to see you again. How did the move go? Last time you were here, you were about to pack up the whole house."
+
+[[turns]]
+role = "patient"
+text = "We're finally in. The new place is great, but we're still living out of boxes. The kitchen is the only room that's done."
+
+[[turns]]
+role = "clinician"
+text = "Well, that's the most important room. So what brings you in today?"
+overlap = 0.3
+
+[[turns]]
+role = "patient"
+text = "My back. I was carrying boxes up the stairs on Saturday, and I felt something pull in my lower back. It's been sore ever since."
+
+[[turns]]
+role = "clinician"
+text = "Where exactly does it hurt?"
+
+[[turns]]
+role = "patient"
+text = "Here, on the right side, just above my belt."
+
+[[turns]]
+role = "clinician"
+text = "Does the pain go down into your leg at all?"
+
+[[turns]]
+role = "patient"
+text = "No, I only feel it in my back. It's worst when I bend forward or get out of a chair."
+
+[[turns]]
+role = "clinician"
+text = "How bad is it, on a scale of [[1 to 10|one to ten]]?"
+
+[[turns]]
+role = "patient"
+text = "About a [[7|seven]] when I move the wrong way. Lying still, it's more like a [[3|three]]."
+gap = 0.8
+
+[[turns]]
+role = "clinician"
+text = "Have you taken anything for it?"
+
+[[turns]]
+role = "patient"
+text = "Ibuprofen, [[400 mg|four hundred milligrams]], [[3 times|three times]] a day. It takes the edge off, but it doesn't last."
+
+[[turns]]
+role = "clinician"
+text = "Is it keeping you up at night?"
+
+[[turns]]
+role = "patient"
+text = "It wakes me up when I roll over. Otherwise I sleep okay."
+
+[[turns]]
+role = "clinician"
+text = "And how about work? Are you managing?"
+
+[[turns]]
+role = "patient"
+text = "I work from home, so I've been working from the couch with my laptop. Sitting at my desk for more than an hour is hard."
+
+[[turns]]
+role = "clinician"
+text = "Have you hurt your back before?"
+
+[[turns]]
+role = "patient"
+text = "Once, about [[10 years|ten years]] ago, playing basketball. It got better in a couple of weeks."
+
+[[turns]]
+role = "clinician"
+text = "Any numbness or tingling in your legs or feet?"
+
+[[turns]]
+role = "patient"
+text = "No, none."
+
+[[turns]]
+role = "clinician"
+text = "Any weakness, like your leg giving way?"
+
+[[turns]]
+role = "patient"
+text = "No, I can walk fine. It just hurts."
+
+[[turns]]
+role = "clinician"
+text = "Any trouble controlling your bladder or bowels?"
+
+[[turns]]
+role = "patient"
+text = "No, nothing like that."
+
+[[turns]]
+role = "clinician"
+text = "And any fever since this started?"
+
+[[turns]]
+role = "patient"
+text = "No."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Good. Any allergies to medicines?"
+
+[[turns]]
+role = "patient"
+text = "Codeine's on my chart, but that's not really an allergy. It never gave me a rash or anything. Codeine only made me sleepy."
+
+[[turns]]
+role = "clinician"
+text = "That sounds like a side effect, not an allergy. I'll take codeine off the allergy list."
+
+[[turns]]
+role = "patient"
+text = "Good, that's been bugging me for years."
+
+[[turns]]
+role = "clinician"
+text = "Okay, let me examine your back. Can you stand up and bend forward for me?"
+
+[[turns]]
+role = "patient"
+text = "Ow. That's about as far as I can go."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "You're tender over the muscles on the right side of your lower back, and they feel tight. Your reflexes are normal, and your strength is normal in both legs. When I raise each leg straight, there's no pain down the leg."
+gap = 2.5
+
+[[turns]]
+role = "patient"
+text = "So what do you think it is?"
+
+[[turns]]
+role = "clinician"
+text = "Let me think it through out loud. You lifted something heavy, and the pain stays on the right side. It doesn't go down your leg, and your nerves are working normally. So I don't think a disc is pressing on a nerve. It's most likely a strain of the muscles in your lower back. And there's no sign you've slipped a disc."
+gap = 1.0
+
+[[turns]]
+role = "patient"
+text = "That's a relief. I was worried it was something serious."
+
+[[turns]]
+role = "clinician"
+text = "Here's what I'd suggest. Keep taking the ibuprofen with food, up to [[3 times|three times]] a day, for the next week. Use heat on your back for [[20 minutes|twenty minutes]] at a time. Keep walking as much as you can, and avoid heavy lifting for [[2 weeks|two weeks]]. If it isn't better in [[3 weeks|three weeks]], come back and we'll talk about physical therapy."
+
+[[turns]]
+role = "patient"
+text = "Can I still go to the gym? I usually go [[3 times|three times]] a week."
+
+[[turns]]
+role = "clinician"
+text = "Gentle walking and stretching, yes. Skip the weights until the pain settles down."
+
+[[turns]]
+role = "patient"
+text = "Sounds good. Hopefully the rest of the boxes can wait that long."
+
+[[turns]]
+role = "clinician"
+text = "Maybe let someone else carry the heavy ones this time."
+
+[[turns]]
+role = "patient"
+text = "Deal. My neighbors already offered to help."
+
+[gold.subjective]
+value = "I was carrying boxes up the stairs on Saturday, and I felt something pull in my lower back. It's been sore ever since. On the right side, just above my belt. I only feel it in my back. It's worst when I bend forward or get out of a chair. About a 7 when I move the wrong way. Lying still, it's more like a 3. Ibuprofen, 400 mg, 3 times a day. It takes the edge off, but it doesn't last. It wakes me up when I roll over. Sitting at my desk for more than an hour is hard. Once, about 10 years ago, playing basketball. It got better in a couple of weeks. I can walk fine. It never gave me a rash or anything. Codeine only made me sleepy."
+sources = [
+    "I was carrying boxes up the stairs on Saturday, and I felt something pull in my lower back",
+    "It's been sore ever since",
+    "on the right side, just above my belt",
+    "I only feel it in my back",
+    "It's worst when I bend forward or get out of a chair",
+    "About a 7 when I move the wrong way",
+    "Lying still, it's more like a 3",
+    "Ibuprofen, 400 mg, 3 times a day",
+    "It takes the edge off, but it doesn't last",
+    "It wakes me up when I roll over",
+    "Sitting at my desk for more than an hour is hard",
+    "Once, about 10 years ago, playing basketball",
+    "It got better in a couple of weeks",
+    "I can walk fine",
+    "It never gave me a rash or anything",
+    "Codeine only made me sleepy",
+]
+
+[gold.objective]
+value = "You're tender over the muscles on the right side of your lower back, and they feel tight. Your reflexes are normal, and your strength is normal in both legs. When I raise each leg straight, there's no pain down the leg."
+sources = [
+    "You're tender over the muscles on the right side of your lower back, and they feel tight",
+    "Your reflexes are normal, and your strength is normal in both legs",
+    "When I raise each leg straight, there's no pain down the leg",
+]
+
+[gold.assessment]
+value = "I don't think a disc is pressing on a nerve. It's most likely a strain of the muscles in your lower back. There's no sign you've slipped a disc."
+sources = [
+    "I don't think a disc is pressing on a nerve",
+    "It's most likely a strain of the muscles in your lower back",
+    "there's no sign you've slipped a disc",
+]
+
+[gold.plan]
+value = "Keep taking the ibuprofen with food, up to 3 times a day, for the next week. Use heat on your back for 20 minutes at a time. Keep walking as much as you can, and avoid heavy lifting for 2 weeks. If it isn't better in 3 weeks, come back and we'll talk about physical therapy. Skip the weights until the pain settles down."
+sources = [
+    "Keep taking the ibuprofen with food, up to 3 times a day, for the next week",
+    "Use heat on your back for 20 minutes at a time",
+    "Keep walking as much as you can, and avoid heavy lifting for 2 weeks",
+    "If it isn't better in 3 weeks, come back and we'll talk about physical therapy",
+    "Skip the weights until the pain settles down",
+]
