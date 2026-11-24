@@ -1054,14 +1054,16 @@ def correction_cues(text: str, toks: list[Token]) -> list[tuple[int, int]]:
 #   "sácale una placa de tórax", "agendar resonancia", "que le tomen una radiografía", "mándale hacer una prueba", "le
 #   doy una orden", "hazle una orden de laboratorios";
 # - a verb of adding, removing or changing, with an allergy in its clause: "ponle alergia a las sulfas", "quítale la
-#   alergia a la penicilina", "anota que es alérgica a la penicilina", "alergia a la sulfa, agrégala".
+#   alergia a la penicilina", "anota que es alérgica a la penicilina", "apunta que es alérgico", "mete la penicilina
+#   en alergias", "alergia a la sulfa, agrégala"; or asking that it be on record: "que quede registrado que es
+#   alérgica al látex".
 # A past form is documentation, told by its accent ("ya se solicitó", "se le recetó", "el cardiólogo le recetó"), and so
 # is someone else's request (OTHER_SUBJECTS, WANTS). When it can't be told whether something is a plan or an
 # instruction, it is taken for an instruction: cut from the note and listed, the clinician sees it and can type it.
 ORDERING = "pedir solicitar ordenar recetar prescribir indicar renovar resurtir surtir rellenar"
 DOING = "hacer sacar tomar mandar enviar agendar programar realizar tramitar dar poner generar dejar"
-ALLERGY_ACTS = """agregar anadir poner anotar registrar documentar incluir marcar quitar eliminar borrar retirar sacar
-actualizar cambiar corregir modificar inactivar desactivar"""
+ALLERGY_ACTS = """agregar anadir poner meter anotar apuntar registrar documentar incluir marcar quitar eliminar borrar retirar
+sacar actualizar cambiar corregir modificar inactivar desactivar"""
 # Forms conjugate() can't make: a changed stem, or an irregular imperative ("pon", "haz", "pídele").
 IRREGULAR.update({
     "pedir": ("pido pides pide piden pida pidas pidan pidiendo pidele pidale pidanle pideme pidame", "pidio pidieron"),
@@ -1073,17 +1075,35 @@ IRREGULAR.update({
     "dar": ("doy das da dan de des den dale dele denle dame deme dare daremos dara", "dio di dimos dieron dado dada"),
     "corregir": ("corrijo corrige corrigen corrija corrijan corrigele", "corrigio"),
 })
-# What a verb of doing orders: a prescription, an order, a refill, laboratory tests, imaging, a study, a referral.
-ORDERABLE = frozenset(
-    """orden ordenes receta recetas prescripcion resurtido resurtidos refill refills laboratorio laboratorios labs lab
-    analisis analitica placa placas radiografia radiografias rx tomografia tac resonancia rm ultrasonido ecografia
-    eco ecocardiograma electrocardiograma ecg biometria hemograma perfil quimica prueba pruebas examen examenes estudio
-    estudios cultivo urocultivo biopsia interconsulta referencia derivacion mamografia densitometria espirometria
-    colonoscopia endoscopia""".split()
-)
+# What can be ordered, by name, with the Spanish words that say it: one list, for what a verb of doing orders here
+# (ORDERABLE) and for what the English may name of it in a translation (translation.ORDERABLES gives each its English).
+# Not "consulta", a visit as often as a referral ("acude a consulta", "hace un mes que vino a consulta").
+ORDERABLE_WORDS = {
+    "xray": "radiografia radiografias placa placas rx rayos",
+    "ct": "tomografia tac tc",
+    "mri": "resonancia rm rmn",
+    "ultrasound": "ultrasonido ultrasonidos ecografia ecografias eco",
+    "echo": "ecocardiograma ecocardiogramas ecocardiografia eco",
+    "ecg": "electrocardiograma electrocardiogramas ecg ekg electro",
+    "labs": "laboratorio laboratorios labs lab analisis analitica estudio estudios prueba pruebas examen examenes quimica",
+    "blood count": "biometria hemograma bh",
+    "panel": "perfil perfiles panel",
+    "culture": "cultivo cultivos urocultivo hemocultivo",
+    "biopsy": "biopsia biopsias",
+    "referral": "interconsulta referencia derivacion derivar referir",
+    "prescription": "receta recetas prescripcion",
+    "refill": "resurtido resurtidos refill refills resurtir",
+    "mammogram": "mamografia mamografias",
+    "spirometry": "espirometria",
+    "colonoscopy": "colonoscopia",
+    "endoscopy": "endoscopia",
+    "densitometry": "densitometria",
+}
+# What a verb of doing orders: any of them, or an order ("hazle una orden de laboratorios").
+ORDERABLE = frozenset(word for words in ORDERABLE_WORDS.values() for word in words.split()) | {"orden", "ordenes"}
 ALLERGY_NOUNS = frozenset("alergia alergias alergico alergica alergicos alergicas".split())
 # "Anoto que es alérgica" is the clinician noting it, documentation; "Anota que es alérgica" asks for it.
-NOTING = frozenset("anoto registro documento incluyo marco".split())
+NOTING = frozenset("anoto apunto registro documento incluyo marco".split())
 
 
 def _verb_forms(infinitives: str) -> dict[str, frozenset[str]]:
@@ -1118,6 +1138,9 @@ ORDERS = [
 ]
 ALLERGY_CHANGES = [
     re.compile(r"\b(?:dar de baja|da de baja|dale de baja|de de baja)\b{0}{{0,40}}?\balergi".format(_SENTENCE)),
+    # Asking that it be on record: "que quede registrado que es alérgica al látex", "deja constancia de su alergia".
+    re.compile(r"\b(?:que\s+quede|que\s+conste|deja|deje|dejar)\s+(?:registrad|anotad|apuntad|documentad|constancia)\w*"
+               r"\b{0}{{0,60}}?\balergi".format(_SENTENCE)),
     re.compile(rf"\b(?:debe|deben|hay que)\s+(?:agregarse|anadirse|anotarse|registrarse|quitarse|eliminarse)\b"
                rf"{_SENTENCE}{{0,50}}?\balergi"),
 ]

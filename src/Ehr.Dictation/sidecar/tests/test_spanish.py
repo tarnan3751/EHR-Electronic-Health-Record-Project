@@ -254,6 +254,13 @@ def test_documentation_plans_and_instructions_not_to_are_not_instructions(text):
     ("Márcala como alérgica a la penicilina.", "allergy_change"),
     ("Agregar alergia a penicilina.", "allergy_change"),
     ("Dale de baja la alergia al ibuprofeno.", "allergy_change"),
+    # As English notes, puts or records one (validation.py): "apunta", "mete", "que quede registrado".
+    ("Apunta que es alérgico a la penicilina.", "allergy_change"),
+    ("Mete la penicilina en alergias.", "allergy_change"),
+    ("Que quede registrado que es alérgica al látex.", "allergy_change"),
+    # What can be ordered, as the translation checks name it: "rayos", "electro".
+    ("Sácale unos rayos X de tórax.", "order"),
+    ("Hazle un electro.", "order"),
 ])
 def test_an_instruction_said_in_an_everyday_form_is_found(text, kind):
     assert instructions(text) == [(text.rstrip("."), kind)]
@@ -274,9 +281,20 @@ def test_an_instruction_said_in_an_everyday_form_is_found(text, kind):
     "Toma la metformina con la comida.",
     "Trae los resultados de laboratorio.",
     "Control en dos semanas con laboratorios.",
+    # The clinician noting it is documentation; a visit is no order.
+    "Apunto que es alérgico a la penicilina.",
+    "Hace un mes que vino a consulta.",
 ])
 def test_the_past_someone_elses_request_and_a_plan_are_not_instructions(text):
     assert instructions(text) == []
+
+
+def test_what_can_be_ordered_is_one_list_for_the_detector_and_the_translation_checks():
+    from ehr_dictation import translation
+
+    assert {name: words for name, (_, words) in translation.ORDERABLES.items()} == spanish.ORDERABLE_WORDS
+    assert spanish.ORDERABLE == {w for words in spanish.ORDERABLE_WORDS.values() for w in words.split()} | {
+        "orden", "ordenes"}
 
 
 # An instruction not to, read over an aside, or after a clause that says never, as validation.py reads English.

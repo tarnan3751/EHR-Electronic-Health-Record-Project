@@ -1423,31 +1423,30 @@ def _parts(words: list[str], gaps: list[str], content: list[bool], flagged: dict
     return found
 
 
-# What can be ordered, in English, by what in Spanish says it: an English one the Spanish a statement cites doesn't say
-# is refused, so an instruction cut from the note can't come back in a neighbouring statement ("Continue losartan 50 mg
+# What can be ordered, in English, by what in Spanish says it (spanish.ORDERABLE_WORDS, the list the instruction
+# detector reads too): an English one the Spanish a statement cites doesn't say is refused, so an instruction cut from the note can't come back in a neighbouring statement ("Continue losartan 50 mg
 # daily; chest X-ray."). Abbreviations ("CBC", "CT", "MRI", "ECG") are the abbreviation check's.
-ORDERABLES = {
-    "xray": (r"x-?rays?|radiographs?|radiography|films?", "radiografia radiografias placa placas rx rayos"),
-    "ct": (r"ct scans?|cat scans?|computed tomography|tomography", "tomografia tac tc"),
-    "mri": (r"magnetic resonance|resonance", "resonancia rm rmn"),
-    "ultrasound": (r"ultrasounds?|sonograms?|sonography|ultrasonography",
-                   "ultrasonido ultrasonidos ecografia ecografias eco"),
-    "echo": (r"echocardiograms?|echocardiography|echo", "ecocardiograma ecocardiogramas ecocardiografia eco"),
-    "ecg": (r"electrocardiograms?|electrocardiography", "electrocardiograma electrocardiogramas ecg ekg"),
-    "labs": (r"labs?|laboratory|blood (?:work|tests?)|bloodwork|lab tests?|tests",
-             "laboratorio laboratorios labs lab analisis analitica estudios pruebas examenes"),
-    "blood count": (r"blood counts?|complete blood count|hemogram", "biometria hemograma bh"),
-    "panel": (r"panels?|profiles?", "perfil perfiles panel"),
-    "culture": (r"cultures?", "cultivo cultivos urocultivo hemocultivo"),
-    "biopsy": (r"biops(?:y|ies)", "biopsia biopsias"),
-    "referral": (r"referrals?|consults?", "interconsulta referencia derivacion derivar referir consulta"),
-    "prescription": (r"prescriptions?|scripts?|rx", "receta recetas prescripcion"),
-    "refill": (r"refills?|re-?fill", "resurtido resurtidos refill refills resurtir"),
-    "mammogram": (r"mammograms?|mammography", "mamografia mamografias"),
-    "spirometry": (r"spirometry", "espirometria"),
-    "colonoscopy": (r"colonoscopy|colonoscopies", "colonoscopia"),
-    "endoscopy": (r"endoscopy|endoscopies", "endoscopia"),
-}
+ORDERABLES = {name: (english, spanish.ORDERABLE_WORDS[name]) for name, english in {
+    "xray": r"x-?rays?|radiographs?|radiography|films?",
+    "ct": r"ct scans?|cat scans?|computed tomography|tomography",
+    "mri": r"magnetic resonance|resonance",
+    "ultrasound": r"ultrasounds?|sonograms?|sonography|ultrasonography",
+    "echo": r"echocardiograms?|echocardiography|echo",
+    "ecg": r"electrocardiograms?|electrocardiography",
+    "labs": r"labs?|laboratory|blood (?:work|tests?)|bloodwork|lab tests?|tests",
+    "blood count": r"blood counts?|complete blood count|hemogram",
+    "panel": r"panels?|profiles?",
+    "culture": r"cultures?",
+    "biopsy": r"biops(?:y|ies)",
+    "referral": r"referrals?|consults?",
+    "prescription": r"prescriptions?|scripts?|rx",
+    "refill": r"refills?|re-?fill",
+    "mammogram": r"mammograms?|mammography",
+    "spirometry": r"spirometry",
+    "colonoscopy": r"colonoscopy|colonoscopies",
+    "endoscopy": r"endoscopy|endoscopies",
+    "densitometry": r"densitometry|bone density|dexa",
+}.items()}
 ENGLISH_ORDERABLES = [(name, re.compile(rf"\b(?:{pattern})\b", re.IGNORECASE))
                       for name, (pattern, _) in ORDERABLES.items()]
 SPANISH_ORDERABLES = {word: {name for name, (_, words) in ORDERABLES.items() if word in words.split()}
