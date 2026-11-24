@@ -47,7 +47,7 @@ def test_each_source_gives_names():
     assert {"^penicillin g$", "^amoxicillin$", "^natural latex rubber$"} <= set(allergens)
 
 
-# TC-UC10-14 (the expansion plan's step 15.1): the common names in db/reference/dictation-names.toml.
+# TC-UC10-21 (the expansion plan's step 15.1): the common names in db/reference/dictation-names.toml.
 def test_each_common_name_stands_for_items_the_reference_data_holds_and_is_an_item_of_its_kind_only():
     entries = tomllib.loads((REPOSITORY / generate_catalog.NAMES).read_text(encoding="utf-8"))["name"]
     orderables, allergens, _ = generate_catalog.names()  # refuses a code the reference data doesn't hold as its kind

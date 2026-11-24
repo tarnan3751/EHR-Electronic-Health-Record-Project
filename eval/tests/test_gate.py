@@ -390,7 +390,7 @@ def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
     assert "a misheard proposal" in problem
 
 
-# TC-UC10-13 (NFR-05; FR-14 as reworded, the expansion plan's step 15.1): the trick sentences, weighed again by the
+# TC-UC10-20 (NFR-05; FR-14 as reworded, the expansion plan's step 15.1): the trick sentences, weighed again by the
 # checks on every change, and pinned: none expected held back may be proposed unless the owner has accepted it by name,
 # the wrong proposals may number no more than the set records, and every control must be proposed; and the recordings
 # must keep the owner's floor of right proposals. Each of the four, failing and passing.
