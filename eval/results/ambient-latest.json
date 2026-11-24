@@ -42,7 +42,7 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "22df8dc632128e1b75af059db2dcdb745a787e585a3d59a4e04e819d27d29737",
   "pipeline": "029c8d618a975c3cdbede060830600c2e7f7a9aa698158c779ec42bd18b0d90b",
-  "scoring": "9fa2536cf1b3b86d6db18a8514bdb1e5c0156ded89cc82b547a1160b75a0880b"
+  "scoring": "817153eb368f500dd656c47b72bad307e56a9eb2bd2cf61669226fa6ec03efc9"
  },
  "dataset": {
   "recordings_sha256": "5b4a690da0f930a3f93348be455532838ad45e96926542aad950b6c835f0cf09",
@@ -354,9 +354,9 @@
    "items": 22
   },
   "misheard_offered": {
-   "sources": 179,
-   "misheard": 98,
-   "share": 0.5475,
+   "sources": 133,
+   "misheard": 69,
+   "share": 0.5188,
    "passages": [
     {
      "variant": "c01-cough-after-a-cold--clean",
@@ -492,54 +492,6 @@
     },
     {
      "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "she came home from school and said her ear felt funny and by bedtime she was crying end",
-     "said": "she came home from school and said her ear felt funny and by bedtime she was crying hm"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "i gave her ibuprofen at bedtime and it came down to about 100 she finally fell asleep around 2 0 but she kept waking up",
-     "said": "i gave her ibuprofen at bedtime and it came down to about 100 she finally fell asleep around 2 but she kept waking up"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "know she is not thrown up",
-     "said": "no she is not thrown up"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "a all night she says it sounds funny like she is under water",
-     "said": "ear all night she says it sounds funny like she is under water"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "like a seizure that is a good way to put it any trouble with her hearing at school",
-     "said": "like a seashell that is a good way to put it any trouble with her hearing at school"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "her teacher said she was not answering when cooled on yesterday and she keeps asking me to repeat things",
-     "said": "her teacher said she was not answering when called on yesterday and she keeps asking me to repeat things"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "yes she wanted to stay on the couch morning and she is usually running around",
-     "said": "yes she wanted to stay on the couch all morning and she is usually running around"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "heard": "know she is not allergic to anything",
-     "said": "no she is not allergic to anything"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
      "field": "objective",
      "heard": "a temperature here is 101.8 a left ear looks normal the right eardrum is red and bulging and there is fluid behind it now open wide and say otomy her throat is a little red and her lungs are clear you did great",
      "said": "her temperature here is 101.8 her left ear looks normal the right eardrum is red and bulging and there is fluid behind it hm now open wide and say for me ahh her throat is a little red and her lungs are clear you did great"
@@ -555,12 +507,6 @@
      "field": "assessment",
      "heard": "colds often lead to ear infections the cold leaves fluid behind the irtrum and bacteria congruent",
      "said": "colds often lead to ear infections the cold leaves fluid behind the eardrum and bacteria can"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "plan",
-     "heard": "give it with food and finish the whole bottle even if she feels better in a couple of days i will send it over to the chemistvi",
-     "said": "give it with food and finish the whole bottle even if she feels better in a couple of days i will send it over to the chemist"
     },
     {
      "variant": "c09-earache-and-fever--room",
@@ -625,66 +571,6 @@
     {
      "variant": "c11-annual-visit-four-problems--clean",
      "field": "subjective",
-     "heard": "badly i fall asleep easily enough but i wake up around fo and lie there thing",
-     "said": "badly i fall asleep easily enough but i wake up around 4 and lie there thinking"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "i was told i might have sleep apnea a few years ago",
-     "said": "i was told i might have sleep apnoea a few years ago"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "nothing much whether i have done the right thing and what i will do with myself or winter ate nap during the day",
-     "said": "nothing much whether i have done the right thing and what i will do with myself all winter do you nap during the day"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "some of them i stopped going to my walking group on tuesdays which i used to love i just can not be bothered anymore",
-     "said": "some of them i have stopped going to my walking group on tuesdays which i used to love i just can not be bothered anymore"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "my energy is low i can still do the crossword but it takes me twice as long",
-     "said": "my energy's low i can still do the crossword but it takes me twice as long"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "a friend from the libry comes around for coffee on fridays and i chat to the neighbors over the fence that is most of it",
-     "said": "a friend from the library comes round for coffee on fridays and i chat to the neighbours over the fence that is most of it"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "that is a relief i was worried you think i was making a fst over nothing",
-     "said": "that is a relief i was worried you would think i was making a fuss over nothing"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "i have always like to routine without 1 eye drift",
-     "said": "i have always liked a routine without 1 i drift"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "here on the outside of my upper arm it is worse when i reach up to the top cuboard and when i lie on that side at night it wakes me up",
-     "said": "here on the outside of my upper arm it is worst when i reach up to the top cupboard and when i lie on that side at night it wakes me up"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "heard": "no it just creppted up on me",
-     "said": "no it just crept up on me"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
      "heard": "know my hands fine i can still hold a paint brush",
      "said": "no my hand's fine i can still hold a paintbrush"
     },
@@ -711,18 +597,6 @@
      "field": "objective",
      "heard": "your blood pressure is running above target both here and at home your diabetes was close to target in the spring but the snacking may have pushed it up since then name your mood has dipped since you stopped working",
      "said": "your blood pressure is running above target both here and at home your diabetes was close to target in the spring but the snacking may have pushed it up since then your mood has dipped since you stopped working"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "heard": "to things really my right shoulder has been aching and i have been feeling a bit low lately i was not sure whether the 2 1 was worth mentioning",
-     "said": "2 things really my right shoulder has been aching and i have been feeling a bit low lately i was not sure whether the 2 1 was worth mentioning"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "heard": "i did i wrote the more in a little note like you me to so i redow the last week",
-     "said": "i did i wrote them all in a little notebook like you asked me to shall i read you the last week"
     },
     {
      "variant": "c11-annual-visit-four-problems--room",
@@ -780,24 +654,6 @@
     },
     {
      "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "heard": "make sense on the shoulder",
-     "said": "makes sense and the shoulder"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "heard": "will need an injection",
-     "said": "will it need an injection"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "heard": "and the low mood i don really want to go on tablets for it if i can help it",
-     "said": "and the low mood i do not really want to go on tablets for it if i can help it"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
      "field": "plan",
      "heard": "so we will know way your sugar and cholesterol are",
      "said": "so we will know where your sugar and cholesterol are"
@@ -843,36 +699,6 @@
      "field": "subjective",
      "heard": "the tterotropium 2 puffs every morning and the blue 1 the albuterol when i am short of breath",
      "said": "the tiotropium 2 puffs every morning and the blue 1 the albuterol when i am short of breath"
-    },
-    {
-     "variant": "c12-heart-failure-and-copd-review--clean",
-     "field": "subjective",
-     "heard": "show me how you take the tiotropium perten for me just as you do at home",
-     "said": "show me how you take the tiotropium pretend for me just as you do at home"
-    },
-    {
-     "variant": "c12-heart-failure-and-copd-review--clean",
-     "field": "subjective",
-     "heard": "i breathe out into it to empty my lungs put my lips round and press and breathe in like that",
-     "said": "i breathe out into it to empty my lungs put my lips round it press and breathe in like that"
-    },
-    {
-     "variant": "c12-heart-failure-and-copd-review--clean",
-     "field": "subjective",
-     "heard": "just the 1 last winter and antibiotic for a chest infection gave me hives all over my arms and chest it was doxycycline",
-     "said": "just the 1 last winter an antibiotic for a chest infection gave me hives all over my arms and chest it was doxycycline"
-    },
-    {
-     "variant": "c12-heart-failure-and-copd-review--clean",
-     "field": "subjective",
-     "heard": "within a couple of days once i stopp taking it",
-     "said": "within a couple of days once i stopped taking it"
-    },
-    {
-     "variant": "c12-heart-failure-and-copd-review--clean",
-     "field": "subjective",
-     "heard": "my appetite is not what it was i have cut out the cryps in the bakon and i do nott add salt to the table anymore i still have a take away on a friday i will admit",
-     "said": "my appetite's not what it was i have cut out the crisps and the bacon and i do not add salt at the table any more i still have a takeaway on a friday i will admit"
     },
     {
      "variant": "c12-heart-failure-and-copd-review--clean",
@@ -1405,32 +1231,32 @@
   },
   "fields": {
    "detection": {
-    "tp": 41,
+    "tp": 40,
     "fp": 0,
-    "fn": 47,
+    "fn": 48,
     "precision": 1.0,
-    "recall": 0.4659,
-    "f1": 0.6357
+    "recall": 0.4545,
+    "f1": 0.625
    },
    "content": {
-    "precision": 0.6134,
-    "recall": 0.2506,
-    "f1": 0.3558
+    "precision": 0.6294,
+    "recall": 0.2105,
+    "f1": 0.3155
    },
    "by_field": {
     "subjective": {
      "detection": {
-      "tp": 5,
+      "tp": 4,
       "fp": 0,
-      "fn": 17,
+      "fn": 18,
       "precision": 1.0,
-      "recall": 0.2273,
-      "f1": 0.3704
+      "recall": 0.1818,
+      "f1": 0.3077
      },
      "content": {
-      "precision": 0.5626,
-      "recall": 0.1837,
-      "f1": 0.277
+      "precision": 0.5777,
+      "recall": 0.1024,
+      "f1": 0.174
      }
     },
     "objective": {
@@ -1473,9 +1299,9 @@
       "f1": 0.5807
      },
      "content": {
-      "precision": 0.7122,
+      "precision": 0.7164,
       "recall": 0.195,
-      "f1": 0.3062
+      "f1": 0.3066
      }
     }
    },
@@ -1490,39 +1316,39 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.6314,
-      "recall": 0.2748,
-      "f1": 0.3829
+      "precision": 0.666,
+      "recall": 0.2525,
+      "f1": 0.3662
      }
     },
     "backchannel": {
      "detection": {
-      "tp": 20,
+      "tp": 19,
       "fp": 0,
-      "fn": 24,
+      "fn": 25,
       "precision": 1.0,
-      "recall": 0.4545,
-      "f1": 0.625
+      "recall": 0.4318,
+      "f1": 0.6032
      },
      "content": {
-      "precision": 0.6222,
-      "recall": 0.2821,
-      "f1": 0.3882
+      "precision": 0.6352,
+      "recall": 0.2114,
+      "f1": 0.3172
      }
     },
     "container:mp4": {
      "detection": {
-      "tp": 20,
+      "tp": 19,
       "fp": 0,
-      "fn": 24,
+      "fn": 25,
       "precision": 1.0,
-      "recall": 0.4545,
-      "f1": 0.625
+      "recall": 0.4318,
+      "f1": 0.6032
      },
      "content": {
-      "precision": 0.6354,
-      "recall": 0.228,
-      "f1": 0.3356
+      "precision": 0.6153,
+      "recall": 0.1794,
+      "f1": 0.2778
      }
     },
     "container:webm": {
@@ -1535,9 +1361,9 @@
       "f1": 0.6462
      },
      "content": {
-      "precision": 0.5962,
-      "recall": 0.2732,
-      "f1": 0.3747
+      "precision": 0.6403,
+      "recall": 0.2415,
+      "f1": 0.3507
      }
     },
     "dates": {
@@ -1550,9 +1376,9 @@
       "f1": 0.72
      },
      "content": {
-      "precision": 0.6268,
-      "recall": 0.275,
-      "f1": 0.3823
+      "precision": 0.6646,
+      "recall": 0.2504,
+      "f1": 0.3638
      }
     },
     "hedging": {
@@ -1565,9 +1391,9 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.6102,
-      "recall": 0.289,
-      "f1": 0.3922
+      "precision": 0.6586,
+      "recall": 0.2492,
+      "f1": 0.3616
      }
     },
     "home-readings": {
@@ -1580,9 +1406,9 @@
       "f1": 0.7302
      },
      "content": {
-      "precision": 0.5937,
-      "recall": 0.2866,
-      "f1": 0.3866
+      "precision": 0.6356,
+      "recall": 0.2496,
+      "f1": 0.3584
      }
     },
     "long": {
@@ -1595,24 +1421,24 @@
       "f1": 0.8148
      },
      "content": {
-      "precision": 0.5872,
-      "recall": 0.3387,
-      "f1": 0.4296
+      "precision": 0.6425,
+      "recall": 0.2822,
+      "f1": 0.3922
      }
     },
     "negation": {
      "detection": {
-      "tp": 41,
+      "tp": 40,
       "fp": 0,
-      "fn": 47,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.4659,
-      "f1": 0.6357
+      "recall": 0.4545,
+      "f1": 0.625
      },
      "content": {
-      "precision": 0.6134,
-      "recall": 0.2506,
-      "f1": 0.3558
+      "precision": 0.6294,
+      "recall": 0.2105,
+      "f1": 0.3155
      }
     },
     "noise:babble": {
@@ -1640,69 +1466,69 @@
       "f1": 0.6087
      },
      "content": {
-      "precision": 0.6069,
-      "recall": 0.2834,
-      "f1": 0.3864
+      "precision": 0.6492,
+      "recall": 0.2535,
+      "f1": 0.3646
      }
     },
     "noise:room": {
      "detection": {
-      "tp": 17,
+      "tp": 16,
       "fp": 0,
-      "fn": 7,
+      "fn": 8,
       "precision": 1.0,
-      "recall": 0.7083,
-      "f1": 0.8292
+      "recall": 0.6667,
+      "f1": 0.8
      },
      "content": {
-      "precision": 0.6336,
-      "recall": 0.3756,
-      "f1": 0.4716
+      "precision": 0.6075,
+      "recall": 0.2787,
+      "f1": 0.3821
      }
     },
     "numbers": {
      "detection": {
-      "tp": 41,
+      "tp": 40,
       "fp": 0,
-      "fn": 47,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.4659,
-      "f1": 0.6357
+      "recall": 0.4545,
+      "f1": 0.625
      },
      "content": {
-      "precision": 0.6134,
-      "recall": 0.2506,
-      "f1": 0.3558
+      "precision": 0.6294,
+      "recall": 0.2105,
+      "f1": 0.3155
      }
     },
     "order-spoken": {
      "detection": {
-      "tp": 28,
+      "tp": 27,
       "fp": 0,
-      "fn": 32,
+      "fn": 33,
       "precision": 1.0,
-      "recall": 0.4667,
-      "f1": 0.6364
+      "recall": 0.45,
+      "f1": 0.6207
      },
      "content": {
-      "precision": 0.5923,
-      "recall": 0.2398,
-      "f1": 0.3414
+      "precision": 0.594,
+      "recall": 0.1871,
+      "f1": 0.2846
      }
     },
     "question-no": {
      "detection": {
-      "tp": 41,
+      "tp": 40,
       "fp": 0,
-      "fn": 47,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.4659,
-      "f1": 0.6357
+      "recall": 0.4545,
+      "f1": 0.625
      },
      "content": {
-      "precision": 0.6134,
-      "recall": 0.2506,
-      "f1": 0.3558
+      "precision": 0.6294,
+      "recall": 0.2105,
+      "f1": 0.3155
      }
     },
     "refill-request": {
@@ -1715,24 +1541,24 @@
       "f1": 0.6087
      },
      "content": {
-      "precision": 0.6529,
-      "recall": 0.2316,
-      "f1": 0.3419
+      "precision": 0.6875,
+      "recall": 0.2148,
+      "f1": 0.3273
      }
     },
     "relative-health": {
      "detection": {
-      "tp": 10,
+      "tp": 9,
       "fp": 0,
-      "fn": 14,
+      "fn": 15,
       "precision": 1.0,
-      "recall": 0.4167,
-      "f1": 0.5883
+      "recall": 0.375,
+      "f1": 0.5455
      },
      "content": {
-      "precision": 0.6236,
-      "recall": 0.2155,
-      "f1": 0.3203
+      "precision": 0.5415,
+      "recall": 0.133,
+      "f1": 0.2135
      }
     },
     "same-gender": {
@@ -1745,9 +1571,9 @@
       "f1": 0.6835
      },
      "content": {
-      "precision": 0.5789,
-      "recall": 0.262,
-      "f1": 0.3607
+      "precision": 0.6119,
+      "recall": 0.2314,
+      "f1": 0.3358
      }
     },
     "self-correction": {
@@ -1760,24 +1586,24 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.5978,
-      "recall": 0.2166,
-      "f1": 0.318
+      "precision": 0.6221,
+      "recall": 0.201,
+      "f1": 0.3038
      }
     },
     "small-talk": {
      "detection": {
-      "tp": 30,
+      "tp": 29,
       "fp": 0,
-      "fn": 34,
+      "fn": 35,
       "precision": 1.0,
-      "recall": 0.4688,
-      "f1": 0.6383
+      "recall": 0.4531,
+      "f1": 0.6236
      },
      "content": {
-      "precision": 0.6201,
-      "recall": 0.2921,
-      "f1": 0.3971
+      "precision": 0.6407,
+      "recall": 0.2391,
+      "f1": 0.3482
      }
     },
     "thinking-aloud": {
@@ -1790,24 +1616,24 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.5734,
-      "recall": 0.3135,
-      "f1": 0.4054
+      "precision": 0.6119,
+      "recall": 0.2682,
+      "f1": 0.3729
      }
     },
     "three-speakers": {
      "detection": {
-      "tp": 7,
+      "tp": 6,
       "fp": 0,
-      "fn": 9,
+      "fn": 10,
       "precision": 1.0,
-      "recall": 0.4375,
-      "f1": 0.6087
+      "recall": 0.375,
+      "f1": 0.5455
      },
      "content": {
-      "precision": 0.5806,
-      "recall": 0.2088,
-      "f1": 0.3071
+      "precision": 0.4375,
+      "recall": 0.0992,
+      "f1": 0.1617
      }
     },
     "voices:2": {
@@ -1820,56 +1646,56 @@
       "f1": 0.6415
      },
      "content": {
-      "precision": 0.6194,
-      "recall": 0.2596,
-      "f1": 0.3659
+      "precision": 0.6554,
+      "recall": 0.2343,
+      "f1": 0.3452
      }
     },
     "voices:3": {
      "detection": {
-      "tp": 7,
+      "tp": 6,
       "fp": 0,
-      "fn": 9,
+      "fn": 10,
       "precision": 1.0,
-      "recall": 0.4375,
-      "f1": 0.6087
+      "recall": 0.375,
+      "f1": 0.5455
      },
      "content": {
-      "precision": 0.5806,
-      "recall": 0.2088,
-      "f1": 0.3071
+      "precision": 0.4375,
+      "recall": 0.0992,
+      "f1": 0.1617
      }
     }
    }
   },
   "fields_clinical": {
    "detection": {
-    "tp": 41,
+    "tp": 40,
     "fp": 0,
-    "fn": 47,
+    "fn": 48,
     "precision": 1.0,
-    "recall": 0.4659,
-    "f1": 0.6357
+    "recall": 0.4545,
+    "f1": 0.625
    },
    "content": {
-    "precision": 0.6134,
-    "recall": 0.2506,
-    "f1": 0.3558
+    "precision": 0.6294,
+    "recall": 0.2105,
+    "f1": 0.3155
    },
    "by_field": {
     "subjective": {
      "detection": {
-      "tp": 5,
+      "tp": 4,
       "fp": 0,
-      "fn": 17,
+      "fn": 18,
       "precision": 1.0,
-      "recall": 0.2273,
-      "f1": 0.3704
+      "recall": 0.1818,
+      "f1": 0.3077
      },
      "content": {
-      "precision": 0.5626,
-      "recall": 0.1837,
-      "f1": 0.277
+      "precision": 0.5777,
+      "recall": 0.1024,
+      "f1": 0.174
      }
     },
     "objective": {
@@ -1912,9 +1738,9 @@
       "f1": 0.5807
      },
      "content": {
-      "precision": 0.7122,
+      "precision": 0.7164,
       "recall": 0.195,
-      "f1": 0.3062
+      "f1": 0.3066
      }
     }
    },
@@ -1929,39 +1755,39 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.6314,
-      "recall": 0.2748,
-      "f1": 0.3829
+      "precision": 0.666,
+      "recall": 0.2525,
+      "f1": 0.3662
      }
     },
     "backchannel": {
      "detection": {
-      "tp": 20,
+      "tp": 19,
       "fp": 0,
-      "fn": 24,
+      "fn": 25,
       "precision": 1.0,
-      "recall": 0.4545,
-      "f1": 0.625
+      "recall": 0.4318,
+      "f1": 0.6032
      },
      "content": {
-      "precision": 0.6222,
-      "recall": 0.2821,
-      "f1": 0.3882
+      "precision": 0.6352,
+      "recall": 0.2114,
+      "f1": 0.3172
      }
     },
     "container:mp4": {
      "detection": {
-      "tp": 20,
+      "tp": 19,
       "fp": 0,
-      "fn": 24,
+      "fn": 25,
       "precision": 1.0,
-      "recall": 0.4545,
-      "f1": 0.625
+      "recall": 0.4318,
+      "f1": 0.6032
      },
      "content": {
-      "precision": 0.6354,
-      "recall": 0.228,
-      "f1": 0.3356
+      "precision": 0.6153,
+      "recall": 0.1794,
+      "f1": 0.2778
      }
     },
     "container:webm": {
@@ -1974,9 +1800,9 @@
       "f1": 0.6462
      },
      "content": {
-      "precision": 0.5962,
-      "recall": 0.2732,
-      "f1": 0.3747
+      "precision": 0.6403,
+      "recall": 0.2415,
+      "f1": 0.3507
      }
     },
     "dates": {
@@ -1989,9 +1815,9 @@
       "f1": 0.72
      },
      "content": {
-      "precision": 0.6268,
-      "recall": 0.275,
-      "f1": 0.3823
+      "precision": 0.6646,
+      "recall": 0.2504,
+      "f1": 0.3638
      }
     },
     "hedging": {
@@ -2004,9 +1830,9 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.6102,
-      "recall": 0.289,
-      "f1": 0.3922
+      "precision": 0.6586,
+      "recall": 0.2492,
+      "f1": 0.3616
      }
     },
     "home-readings": {
@@ -2019,9 +1845,9 @@
       "f1": 0.7302
      },
      "content": {
-      "precision": 0.5937,
-      "recall": 0.2866,
-      "f1": 0.3866
+      "precision": 0.6356,
+      "recall": 0.2496,
+      "f1": 0.3584
      }
     },
     "long": {
@@ -2034,24 +1860,24 @@
       "f1": 0.8148
      },
      "content": {
-      "precision": 0.5872,
-      "recall": 0.3387,
-      "f1": 0.4296
+      "precision": 0.6425,
+      "recall": 0.2822,
+      "f1": 0.3922
      }
     },
     "negation": {
      "detection": {
-      "tp": 41,
+      "tp": 40,
       "fp": 0,
-      "fn": 47,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.4659,
-      "f1": 0.6357
+      "recall": 0.4545,
+      "f1": 0.625
      },
      "content": {
-      "precision": 0.6134,
-      "recall": 0.2506,
-      "f1": 0.3558
+      "precision": 0.6294,
+      "recall": 0.2105,
+      "f1": 0.3155
      }
     },
     "noise:babble": {
@@ -2079,69 +1905,69 @@
       "f1": 0.6087
      },
      "content": {
-      "precision": 0.6069,
-      "recall": 0.2834,
-      "f1": 0.3864
+      "precision": 0.6492,
+      "recall": 0.2535,
+      "f1": 0.3646
      }
     },
     "noise:room": {
      "detection": {
-      "tp": 17,
+      "tp": 16,
       "fp": 0,
-      "fn": 7,
+      "fn": 8,
       "precision": 1.0,
-      "recall": 0.7083,
-      "f1": 0.8292
+      "recall": 0.6667,
+      "f1": 0.8
      },
      "content": {
-      "precision": 0.6336,
-      "recall": 0.3756,
-      "f1": 0.4716
+      "precision": 0.6075,
+      "recall": 0.2787,
+      "f1": 0.3821
      }
     },
     "numbers": {
      "detection": {
-      "tp": 41,
+      "tp": 40,
       "fp": 0,
-      "fn": 47,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.4659,
-      "f1": 0.6357
+      "recall": 0.4545,
+      "f1": 0.625
      },
      "content": {
-      "precision": 0.6134,
-      "recall": 0.2506,
-      "f1": 0.3558
+      "precision": 0.6294,
+      "recall": 0.2105,
+      "f1": 0.3155
      }
     },
     "order-spoken": {
      "detection": {
-      "tp": 28,
+      "tp": 27,
       "fp": 0,
-      "fn": 32,
+      "fn": 33,
       "precision": 1.0,
-      "recall": 0.4667,
-      "f1": 0.6364
+      "recall": 0.45,
+      "f1": 0.6207
      },
      "content": {
-      "precision": 0.5923,
-      "recall": 0.2398,
-      "f1": 0.3414
+      "precision": 0.594,
+      "recall": 0.1871,
+      "f1": 0.2846
      }
     },
     "question-no": {
      "detection": {
-      "tp": 41,
+      "tp": 40,
       "fp": 0,
-      "fn": 47,
+      "fn": 48,
       "precision": 1.0,
-      "recall": 0.4659,
-      "f1": 0.6357
+      "recall": 0.4545,
+      "f1": 0.625
      },
      "content": {
-      "precision": 0.6134,
-      "recall": 0.2506,
-      "f1": 0.3558
+      "precision": 0.6294,
+      "recall": 0.2105,
+      "f1": 0.3155
      }
     },
     "refill-request": {
@@ -2154,24 +1980,24 @@
       "f1": 0.6087
      },
      "content": {
-      "precision": 0.6529,
-      "recall": 0.2316,
-      "f1": 0.3419
+      "precision": 0.6875,
+      "recall": 0.2148,
+      "f1": 0.3273
      }
     },
     "relative-health": {
      "detection": {
-      "tp": 10,
+      "tp": 9,
       "fp": 0,
-      "fn": 14,
+      "fn": 15,
       "precision": 1.0,
-      "recall": 0.4167,
-      "f1": 0.5883
+      "recall": 0.375,
+      "f1": 0.5455
      },
      "content": {
-      "precision": 0.6236,
-      "recall": 0.2155,
-      "f1": 0.3203
+      "precision": 0.5415,
+      "recall": 0.133,
+      "f1": 0.2135
      }
     },
     "same-gender": {
@@ -2184,9 +2010,9 @@
       "f1": 0.6835
      },
      "content": {
-      "precision": 0.5789,
-      "recall": 0.262,
-      "f1": 0.3607
+      "precision": 0.6119,
+      "recall": 0.2314,
+      "f1": 0.3358
      }
     },
     "self-correction": {
@@ -2199,24 +2025,24 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.5978,
-      "recall": 0.2166,
-      "f1": 0.318
+      "precision": 0.6221,
+      "recall": 0.201,
+      "f1": 0.3038
      }
     },
     "small-talk": {
      "detection": {
-      "tp": 30,
+      "tp": 29,
       "fp": 0,
-      "fn": 34,
+      "fn": 35,
       "precision": 1.0,
-      "recall": 0.4688,
-      "f1": 0.6383
+      "recall": 0.4531,
+      "f1": 0.6236
      },
      "content": {
-      "precision": 0.6201,
-      "recall": 0.2921,
-      "f1": 0.3971
+      "precision": 0.6407,
+      "recall": 0.2391,
+      "f1": 0.3482
      }
     },
     "thinking-aloud": {
@@ -2229,24 +2055,24 @@
       "f1": 0.6667
      },
      "content": {
-      "precision": 0.5734,
-      "recall": 0.3135,
-      "f1": 0.4054
+      "precision": 0.6119,
+      "recall": 0.2682,
+      "f1": 0.3729
      }
     },
     "three-speakers": {
      "detection": {
-      "tp": 7,
+      "tp": 6,
       "fp": 0,
-      "fn": 9,
+      "fn": 10,
       "precision": 1.0,
-      "recall": 0.4375,
-      "f1": 0.6087
+      "recall": 0.375,
+      "f1": 0.5455
      },
      "content": {
-      "precision": 0.5806,
-      "recall": 0.2088,
-      "f1": 0.3071
+      "precision": 0.4375,
+      "recall": 0.0992,
+      "f1": 0.1617
      }
     },
     "voices:2": {
@@ -2259,46 +2085,46 @@
       "f1": 0.6415
      },
      "content": {
-      "precision": 0.6194,
-      "recall": 0.2596,
-      "f1": 0.3659
+      "precision": 0.6554,
+      "recall": 0.2343,
+      "f1": 0.3452
      }
     },
     "voices:3": {
      "detection": {
-      "tp": 7,
+      "tp": 6,
       "fp": 0,
-      "fn": 9,
+      "fn": 10,
       "precision": 1.0,
-      "recall": 0.4375,
-      "f1": 0.6087
+      "recall": 0.375,
+      "f1": 0.5455
      },
      "content": {
-      "precision": 0.5806,
-      "recall": 0.2088,
-      "f1": 0.3071
+      "precision": 0.4375,
+      "recall": 0.0992,
+      "f1": 0.1617
      }
     }
    }
   },
   "validation": {
    "proposed": 81,
-   "passed": 41,
-   "pass_rate": 0.5062,
+   "passed": 40,
+   "pass_rate": 0.4938,
    "reasons": {
     "bad_format": 5,
-    "bare_answer": 7,
+    "bare_answer": 6,
     "date_not_in_sources": 10,
-    "drug_not_in_sources": 10,
+    "drug_not_in_sources": 11,
     "number_not_in_sources": 15,
     "source_in_unclear_passage": 8,
-    "source_is_a_question": 14,
+    "source_is_a_question": 11,
     "source_not_in_transcript": 15,
     "source_superseded": 3,
-    "source_too_short": 1,
-    "unsupported_content": 37,
+    "source_too_short": 2,
+    "unsupported_content": 38,
     "words_out_of_order": 3,
-    "wrong_speaker": 6
+    "wrong_speaker": 11
    },
    "unknown_fields": 0
   },
@@ -2307,15 +2133,15 @@
    "shown": 0.0
   },
   "order_allergy": {
-   "shown": 1,
+   "shown": 0,
    "retracted_shown": 0,
    "retracted_shown_unflagged": 0,
    "drug_not_in_gold_shown": 0,
    "drug_not_in_gold_shown_unflagged": 0,
    "unflagged": [],
    "forbidden_said": 24,
-   "reported_not_carried_over": 19,
-   "reported_recall": 0.7917,
+   "reported_not_carried_over": 20,
+   "reported_recall": 0.8333,
    "discarded_by_rule": 0,
    "legitimate_fields_lost": 0,
    "lost_where_nothing_was_attempted": 0,
@@ -2324,50 +2150,8 @@
   "safety": {
    "denied_as_present": [],
    "hedged_as_certain": [],
-   "asked_as_finding": [
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "shown": "a all night she says it sounds funny like she is under water"
-    },
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "shown": "like a seizure that is a good way to put it any trouble with her hearing at school"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--clean",
-     "field": "subjective",
-     "shown": "nothing much whether i have done the right thing and what i will do with myself or winter ate nap during the day"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "shown": "i did i wrote the more in a little note like you me to so i redow the last week"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "shown": "make sense on the shoulder"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "shown": "will need an injection"
-    },
-    {
-     "variant": "c11-annual-visit-four-problems--room",
-     "field": "subjective",
-     "shown": "and the low mood i don really want to go on tablets for it if i can help it"
-    }
-   ],
-   "wrong_speaker_unwarned": [
-    {
-     "variant": "c09-earache-and-fever--room",
-     "field": "subjective",
-     "shown": "a all night she says it sounds funny like she is under water"
-    }
-   ],
+   "asked_as_finding": [],
+   "wrong_speaker_unwarned": [],
    "chart_proposals": 0,
    "requests_as_instructions": [],
    "requests_listed_unsure": [
@@ -2394,10 +2178,10 @@
    ]
   },
   "warnings": {
-   "shown": 41,
-   "patients_own_words": 5,
-   "speaker_unsure": 17,
-   "other_speaker": 1,
+   "shown": 40,
+   "patients_own_words": 4,
+   "speaker_unsure": 16,
+   "other_speaker": 0,
    "part_not_offered": 10,
    "possible_correction": 0,
    "near_unclear_passage": 3
@@ -18898,6 +18682,7 @@
       "source_in_unclear_passage",
       "number_not_in_sources",
       "date_not_in_sources",
+      "drug_not_in_sources",
       "unsupported_content"
      ],
      "value": "",
@@ -27151,7 +26936,6 @@
      "status": "empty",
      "reasons": [
       "wrong_speaker",
-      "source_is_a_question",
       "unsupported_content"
      ],
      "value": "",
@@ -30835,7 +30619,7 @@
      "status": "empty",
      "reasons": [
       "source_not_in_transcript",
-      "source_is_a_question",
+      "wrong_speaker",
       "unsupported_content"
      ],
      "value": "",
@@ -44283,7 +44067,7 @@
      "status": "empty",
      "reasons": [
       "source_not_in_transcript",
-      "bare_answer",
+      "source_is_a_question",
       "unsupported_content"
      ],
      "value": "",
@@ -49428,7 +49212,7 @@
      ],
      "status": "empty",
      "reasons": [
-      "source_is_a_question",
+      "wrong_speaker",
       "bare_answer",
       "unsupported_content"
      ],
@@ -61227,7 +61011,6 @@
      "status": "empty",
      "reasons": [
       "wrong_speaker",
-      "source_is_a_question",
       "unsupported_content"
      ],
      "value": "",
@@ -67289,6 +67072,7 @@
      "status": "empty",
      "reasons": [
       "source_not_in_transcript",
+      "wrong_speaker",
       "source_is_a_question",
       "bare_answer",
       "date_not_in_sources",
@@ -73521,101 +73305,13 @@
       "know she is not allergic to anything.",
       "yes all of them."
      ],
-     "status": "pending",
-     "reasons": [],
-     "value": "This ear, my ear hurts. It started yesterday afternoon. She came home from school and said her ear felt funny and by bedtime she was crying. She has had a fever since then. Last night, it was 102.4. I gave her ibuprofen at bedtime and it came down to about 100. She finally fell asleep around 2:00, but she kept waking up. She has not thrown up. No nothing like that. She had a runny nose last week, but it is mostly gone now. A all night. She says it sounds funny like she is under water. like a seizure that is a good way to put it any trouble with her hearing at school. her teacher said she was not answering when cooled on yesterday and she keeps asking me to repeat things. She is drinking fine. She did not want breakfast this morning, but she had some juice. It hurts when I chew. mostly the ear. The headache went away once the fever came down. Yes, she wanted to stay on the couch morning and she is usually running around. once when she was a toddler. it cleared up with an antibiotic. know she is not allergic to anything. yes all of them.",
-     "warnings": [
-      [
-       "patients_own_words",
-       163,
-       1923
-      ],
-      [
-       "other_speaker",
-       247,
-       277
-      ],
-      [
-       "speaker_unsure",
-       279,
-       367
-      ],
-      [
-       "other_speaker",
-       368,
-       428
-      ],
-      [
-       "other_speaker",
-       464,
-       586
-      ],
-      [
-       "other_speaker",
-       617,
-       643
-      ],
-      [
-       "other_speaker",
-       694,
-       714
-      ],
-      [
-       "other_speaker",
-       747,
-       804
-      ],
-      [
-       "other_speaker",
-       839,
-       900
-      ],
-      [
-       "speaker_unsure",
-       928,
-       1010
-      ],
-      [
-       "other_speaker",
-       1012,
-       1116
-      ],
-      [
-       "speaker_unsure",
-       1151,
-       1236
-      ],
-      [
-       "speaker_unsure",
-       1238,
-       1258
-      ],
-      [
-       "other_speaker",
-       1520,
-       1583
-      ],
-      [
-       "other_speaker",
-       1625,
-       1703
-      ],
-      [
-       "other_speaker",
-       1743,
-       1804
-      ],
-      [
-       "other_speaker",
-       1834,
-       1870
-      ],
-      [
-       "other_speaker",
-       1908,
-       1923
-      ]
-     ]
+     "status": "empty",
+     "reasons": [
+      "wrong_speaker",
+      "unsupported_content"
+     ],
+     "value": "",
+     "warnings": []
     },
     "objective": {
      "proposed": "A temperature here is 101.8. A left ear looks normal. The right eardrum is red and bulging and there is fluid behind it. now open wide and say otomy. Her throat is a little red and her lungs are clear you did great. at her age with a fever this high and a bulging eardrum, I treated. The best treatment is amoxicillin twice a day for 10 days.",
@@ -73652,12 +73348,12 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "give it with food and finish the whole bottle even if she feels better in a couple of days. I will send it over to the chemistvi. It tastes like bubble gut. most kids like it. Yes you can give ibuprofen every six to eight hours for the pain and the fever. A warm cloth over the ear can help too. it should a fluid usually clears over the next few weeks. If her hearing still seems muffled in four weeks, we will check her ears again.",
+     "value": "Give it with food and finish the whole bottle even if she feels better in a couple of days. It tastes like bubble gut. Most kids like it. Yes you can give ibuprofen every six to eight hours for the pain and the fever. A warm cloth over the ear can help too. It should a fluid usually clears over the next few weeks. If her hearing still seems muffled in four weeks, we will check her ears again.",
      "warnings": [
       [
        "speaker_unsure",
        3189,
-       3317
+       3279
       ],
       [
        "part_not_offered",
@@ -73668,98 +73364,6 @@
     }
    },
    "sources": {
-    "subjective": [
-     [
-      163,
-      185,
-      "patient"
-     ],
-     [
-      247,
-      277,
-      "other"
-     ],
-     [
-      279,
-      367,
-      "unsure"
-     ],
-     [
-      368,
-      428,
-      "other"
-     ],
-     [
-      464,
-      586,
-      "other"
-     ],
-     [
-      617,
-      643,
-      "other"
-     ],
-     [
-      694,
-      714,
-      "other"
-     ],
-     [
-      747,
-      804,
-      "other"
-     ],
-     [
-      839,
-      900,
-      "other"
-     ],
-     [
-      928,
-      1010,
-      "unsure"
-     ],
-     [
-      1012,
-      1116,
-      "other"
-     ],
-     [
-      1151,
-      1236,
-      "unsure"
-     ],
-     [
-      1238,
-      1258,
-      "unsure"
-     ],
-     [
-      1520,
-      1583,
-      "other"
-     ],
-     [
-      1625,
-      1703,
-      "other"
-     ],
-     [
-      1743,
-      1804,
-      "other"
-     ],
-     [
-      1834,
-      1870,
-      "other"
-     ],
-     [
-      1908,
-      1923,
-      "other"
-     ]
-    ],
     "objective": [
      [
       2389,
@@ -73787,7 +73391,7 @@
     "plan": [
      [
       3189,
-      3317,
+      3279,
       "unsure"
      ],
      [
@@ -73808,7 +73412,14 @@
     ]
    },
    "unknown": [],
-   "not_carried_over": [],
+   "not_carried_over": [
+    [
+     "order",
+     3281,
+     3317,
+     "unsure"
+    ]
+   ],
    "proposes": false,
    "proposals": 0,
    "timings": {
@@ -85883,8 +85494,10 @@
      ],
      "status": "empty",
      "reasons": [
+      "source_too_short",
       "source_not_in_transcript",
       "source_in_unclear_passage",
+      "wrong_speaker",
       "number_not_in_sources",
       "date_not_in_sources",
       "drug_not_in_sources",
@@ -100733,7 +100346,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "My right shoulder has been aching and I have been feeling a bit low lately. I wasn't sure whether the second one was worth mentioning. This morning, it was 142/88. Yesterday, it was 138/84 and the day before 146/90. then 135/82, 140/86 and on Sunday it was 151/92. but I had a big lunch out with friends that day. first thing in the morning before my tablets. I said quietly for five minutes first the way the leaflet says. the very same. I put new batteries in it over the summer. No nonatles. no I am fine on the hills. no not thetype nottest. hardly any at the table but I do love a packet of crysts in the afternoon. yes, both of those. The metformin upset my stomach when I first started but that settled down after a few weeks. couple of mornings a week. They are usually between 130 and 150. Once or twice, it has been near 170. Badly, I fall asleep easily enough, but I wake up around fo: and lie there Thing. I was told I might have sleep apnea a few years ago. Nothing much whether I have done the right thing and what I will do with myself or winter. ate nap during the day. sometimes after lunch for half an hour or so, Then I cann't settle at night and round it goes. Some of them, I stopped going to my walking group on Tuesdays, which I used to love. I just can't be bothered anymore. My energy is low. I can still do the crossword but it takes me twice as long. a friend from the libry comes around for coffee on Fridays and I chat to the neighbors over the fence. that's most of it. Never I promise it is nothing like that. I just feel flat. that's a relief. I was worried you think I was making a fst over nothing. I have always like to routine without one eye drift. about two months ago. I think it started with all the painting reaching up over my head. here on the outside of my upper arm. It is worse when I reach up to the top cuboard and when I lie on that side at night, it wakes me up. No it just creppted up on me. doing my hair is the worst part that and reaching back for the seat belt in the car. know my hands fine. I can still hold a paint brush. a couple of parasetal now and then they take the edge off.",
+     "value": "My right shoulder has been aching and I have been feeling a bit low lately. I wasn't sure whether the second one was worth mentioning. This morning, it was 142/88. Yesterday, it was 138/84 and the day before 146/90. then 135/82, 140/86 and on Sunday it was 151/92. but I had a big lunch out with friends that day. first thing in the morning before my tablets. I said quietly for five minutes first the way the leaflet says. the very same. I put new batteries in it over the summer. No nonatles. no I am fine on the hills. no not thetype nottest. hardly any at the table but I do love a packet of crysts in the afternoon. yes, both of those. The metformin upset my stomach when I first started but that settled down after a few weeks. couple of mornings a week. They are usually between 130 and 150. Once or twice, it has been near 170. doing my hair is the worst part that and reaching back for the seat belt in the car. know my hands fine. I can still hold a paint brush. a couple of parasetal now and then they take the edge off.",
      "warnings": [
       [
        "patients_own_words",
@@ -100751,19 +100364,14 @@
        2992
       ],
       [
-       "speaker_unsure",
-       5598,
-       5649
-      ],
-      [
-       "speaker_unsure",
-       5690,
-       5803
-      ],
-      [
        "part_not_offered",
        3628,
        5493
+      ],
+      [
+       "part_not_offered",
+       5494,
+       7421
       ],
       [
        "part_not_offered",
@@ -100902,71 +100510,6 @@
      [
       3436,
       3536,
-      "patient"
-     ],
-     [
-      5516,
-      5596,
-      "patient"
-     ],
-     [
-      5598,
-      5649,
-      "unsure"
-     ],
-     [
-      5690,
-      5803,
-      "unsure"
-     ],
-     [
-      5805,
-      5898,
-      "patient"
-     ],
-     [
-      5940,
-      6057,
-      "patient"
-     ],
-     [
-      6096,
-      6172,
-      "patient"
-     ],
-     [
-      6206,
-      6326,
-      "patient"
-     ],
-     [
-      6433,
-      6490,
-      "patient"
-     ],
-     [
-      6668,
-      6740,
-      "patient"
-     ],
-     [
-      6911,
-      6962,
-      "patient"
-     ],
-     [
-      7049,
-      7136,
-      "patient"
-     ],
-     [
-      7163,
-      7299,
-      "patient"
-     ],
-     [
-      7348,
-      7376,
       "patient"
      ],
      [
@@ -115944,12 +115487,17 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "to things really. My right shoulder has been aching and I have been feeling a bit low lately. I was not sure whether the second one was worth mentioning. I did I wrote the more in a little note like you me to, so I redow the last week. This morning, it was 142/88. Yesterday it was 138/84 and the day before 146/90. then 135/82, 140/86. and on Sunday it was 151/92, but I did a big lunch out with friends that day. first thing in the morning before my tablets. I said quietly for five minutes first the way the leaflet says. the very same. I put new b to reson it over the summer. whatever you think is best. I prefer to keep the number of tablets down if I can. no I am fine on the hills. no note that I have notic. hardly any at the table, but I do love a packet of cristps in the afternoon. yes, both of those. the metformin upset my stomach when I first started but that settled down after a few weeks. a couple of mornings a week. They usually between 130 and 150. Once or twice, it has been near 170. doing my hair is the worst part. that and reaching back for the seat belt in the car. know my hands fine. I can still hold a paint brush. a couple of parasitmal now and then they take the edge off. make sense on the shoulder. will need an injection. and the low mood, I' don' really want to go on tablets for it if I can help it.",
+     "value": "then 135/82, 140/86. and on Sunday it was 151/92, but I did a big lunch out with friends that day. first thing in the morning before my tablets. I said quietly for five minutes first the way the leaflet says. the very same. I put new b to reson it over the summer. whatever you think is best. I prefer to keep the number of tablets down if I can. no I am fine on the hills. no note that I have notic. hardly any at the table, but I do love a packet of cristps in the afternoon. yes, both of those. the metformin upset my stomach when I first started but that settled down after a few weeks. a couple of mornings a week. They usually between 130 and 150. Once or twice, it has been near 170. doing my hair is the worst part. that and reaching back for the seat belt in the car. know my hands fine. I can still hold a paint brush. a couple of parasitmal now and then they take the edge off.",
      "warnings": [
       [
        "patients_own_words",
-       1298,
-       11007
+       1773,
+       7670
+      ],
+      [
+       "part_not_offered",
+       0,
+       1772
       ],
       [
        "part_not_offered",
@@ -115960,6 +115508,11 @@
        "part_not_offered",
        5499,
        7380
+      ],
+      [
+       "part_not_offered",
+       10047,
+       11008
       ]
      ]
     },
@@ -116013,21 +115566,6 @@
    },
    "sources": {
     "subjective": [
-     [
-      1298,
-      1450,
-      "patient"
-     ],
-     [
-      1593,
-      1673,
-      "patient"
-     ],
-     [
-      1686,
-      1764,
-      "patient"
-     ],
      [
       1773,
       1870,
@@ -116086,21 +115624,6 @@
      [
       7612,
       7670,
-      "patient"
-     ],
-     [
-      10401,
-      10427,
-      "patient"
-     ],
-     [
-      10749,
-      10771,
-      "patient"
-     ],
-     [
-      10930,
-      11007,
       "patient"
      ]
     ],
@@ -129578,7 +129101,7 @@
      ],
      "status": "pending",
      "reasons": [],
-     "value": "I was in the hospital from sep1ird to sep1er seventh for about a week before that. My ankles had been swelling up and I was getting more and more breathless. The night before I went in, I had to sleep sitting up in my arm chair. because every time I lay down, I felt like I was drowning. The said my heart was not pumping properly and fluid had backed up into my lungs. The gave me water tablets through a drip and I lost about nine pounds of fluid in four days. it was I had trouble with my chest for years, the COPD, so I always put the breathlessness down to my lungs. My heart never crossed my mind. I have had high blood pressure for about 20 years and I had a hernia repaired about 15 years ago. Other than that, I have been lucky. Most mornings I cough up a bit of white phlegm about a teaspoon and then it settles. It has not changed color lately. No nothing like that. I take the bisoprolol every morning with my breakfast. I have not missed a single day since I came home. Morning and evening 12 hours apart. The pharmacist at the hospital was very firm about that. It does some days I take the water tablet at lunchtime if I am going out. So I am not hunting for a toilet or morning. I take both of those after breakfast with the bisoprolol. The pharmacist said the Empagliflozin looks after the kidneys as well. The tterotropium two puffs every morning and the blue one the albuterol when I am short of breath. The counter says I have only got five days left. I use the blue one once or twice most days usually after the stairs. Before the hospital, it was five or six times a day. I breathe out into it to empty my lungs, put my lips round and press and breathe in like that. just ibuprofen for my knees two tablets three times a day most days. My knees have grumbled ever since I retired. I had no idea I have been buying it by the big box. Most people don't know, it isn't printed on the box in large letters. just the one last winter and antibiotic for a chest infection gave me hives all over my arms and chest. It was doxycycline. within a couple of days once I stopp taking it. My appetite is not what it was. I have cut out the cryps in the bakon and I do nott add salt to the table anymore. I still have a take away on a Friday. I will admit. I am up twice a night to pass water now which is more than before the water tablet. The stream is a bit slow, but it always has been. I have my low days. I have lived on my own for six years now and the evenings can be long. I go to the bulls clalub on a Wednesday when my chest allows. a pint of bitter at the bows club and that' is my lot for the week. My neighbor does a big shop for me on a Saturday. I sought my own tablets into a pillbox on a Sunday night so I can see at a glance if I have missed one. about six hours a night and I wake up rested enough. Nobody has ever complained about my snoring, but then there is nobody there to hear it. last Octoba at the chemist. I have never had the pneumonia one.",
+     "value": "I was in the hospital from sep1ird to sep1er seventh for about a week before that. My ankles had been swelling up and I was getting more and more breathless. The night before I went in, I had to sleep sitting up in my arm chair. because every time I lay down, I felt like I was drowning. The said my heart was not pumping properly and fluid had backed up into my lungs. The gave me water tablets through a drip and I lost about nine pounds of fluid in four days. it was I had trouble with my chest for years, the COPD, so I always put the breathlessness down to my lungs. My heart never crossed my mind. I have had high blood pressure for about 20 years and I had a hernia repaired about 15 years ago. Other than that, I have been lucky. Most mornings I cough up a bit of white phlegm about a teaspoon and then it settles. It has not changed color lately. No nothing like that. I take the bisoprolol every morning with my breakfast. I have not missed a single day since I came home. Morning and evening 12 hours apart. The pharmacist at the hospital was very firm about that. It does some days I take the water tablet at lunchtime if I am going out. So I am not hunting for a toilet or morning. I take both of those after breakfast with the bisoprolol. The pharmacist said the Empagliflozin looks after the kidneys as well. The tterotropium two puffs every morning and the blue one the albuterol when I am short of breath. The counter says I have only got five days left. I am up twice a night to pass water now which is more than before the water tablet. The stream is a bit slow, but it always has been. I have my low days. I have lived on my own for six years now and the evenings can be long. I go to the bulls clalub on a Wednesday when my chest allows. a pint of bitter at the bows club and that' is my lot for the week. My neighbor does a big shop for me on a Saturday. I sought my own tablets into a pillbox on a Sunday night so I can see at a glance if I have missed one. about six hours a night and I wake up rested enough. Nobody has ever complained about my snoring, but then there is nobody there to hear it. last Octoba at the chemist. I have never had the pneumonia one.",
      "warnings": [
       [
        "patients_own_words",
@@ -129594,26 +129117,6 @@
        "speaker_unsure",
        4716,
        4833
-      ],
-      [
-       "speaker_unsure",
-       5562,
-       5682
-      ],
-      [
-       "speaker_unsure",
-       5684,
-       5757
-      ],
-      [
-       "speaker_unsure",
-       6551,
-       6601
-      ],
-      [
-       "speaker_unsure",
-       6603,
-       6671
       ],
       [
        "speaker_unsure",
@@ -129634,6 +129137,11 @@
        "part_not_offered",
        1765,
        3629
+      ],
+      [
+       "part_not_offered",
+       5404,
+       7374
       ]
      ]
     },
@@ -129768,51 +129276,6 @@
      [
       5355,
       5402,
-      "patient"
-     ],
-     [
-      5562,
-      5682,
-      "unsure"
-     ],
-     [
-      5684,
-      5757,
-      "unsure"
-     ],
-     [
-      5759,
-      5852,
-      "patient"
-     ],
-     [
-      6214,
-      6326,
-      "patient"
-     ],
-     [
-      6551,
-      6601,
-      "unsure"
-     ],
-     [
-      6603,
-      6671,
-      "unsure"
-     ],
-     [
-      6713,
-      6835,
-      "patient"
-     ],
-     [
-      6966,
-      7012,
-      "patient"
-     ],
-     [
-      7106,
-      7271,
       "patient"
      ],
      [
@@ -143649,5 +143112,10 @@
    "window_seconds_alongside": 80.7,
    "window_gave_way": 1
   }
+ },
+ "rescored_from": {
+  "scoring": "9fa2536cf1b3b86d6db18a8514bdb1e5c0156ded89cc82b547a1160b75a0880b",
+  "gold_sha256": "044123a6b09a256c8919ae488007b047bd2ffe00b97bdb0be6bcec4a5d6b08e7",
+  "structuring_outputs_reused": true
  }
 }
