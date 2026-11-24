@@ -10,7 +10,7 @@ import re
 import pytest
 
 from ehr_dictation.prompt import FIELDS
-from ehr_dictation.transcript import Segment, assemble
+from ehr_dictation.transcript import Segment, Transcript, assemble
 from ehr_dictation.validation import (
     FREE_WORDS,
     HELD_BACK,
@@ -1389,6 +1389,18 @@ def test_no_item_of_an_order_list_is_left_outside_what_is_listed():
     assert said == 24 * 3 * 4
 
 
+# A common name the reference data maps (db/reference/dictation-names.toml) is an orderable to FR-14's rule too: a long
+# list cut by its reach goes on over it, as over any item (step 15.1's review), so none of the list stays in the note.
+@pytest.mark.parametrize(("said", "listed"), [
+    ("order a CBC and a BMP and a lipid panel and a TSH and a ferritin and an iron panel and CRP and she can go home",
+     "order a CBC and a BMP and a lipid panel and a TSH and a ferritin and an iron panel and CRP"),
+    ("order a CBC a BMP a lipid panel a TSH a ferritin an iron panel and an ESR and CRP her knee is still swollen",
+     "order a CBC a BMP a lipid panel a TSH a ferritin an iron panel and an ESR and CRP"),
+])
+def test_a_long_order_list_is_listed_over_a_common_name(said, listed):
+    assert [said[start:end] for start, end in directive_spans(said)] == [listed]
+
+
 # A negation before an aside between commas still makes what follows it an instruction not to.
 @pytest.mark.parametrize("said", [
     "Do not, under any circumstances, order a CT; start antibiotics.",
@@ -1650,7 +1662,8 @@ def held_back(text) -> list[tuple[str | None, str]]:
 
 
 # TC-UC10-09: an order and an allergy to add, dictated plainly, are proposed where the clinician said them, each at its
-# listed instruction's place, as a kind, a place and warnings, never words; the note's fields carry neither.
+# listed instruction's place, as a kind, a place, warnings and the place of what was heard after it, never words; the
+# note's fields carry neither.
 def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said():
     text = transcript(
         "Start metformin. Go ahead and order a hemoglobin A1c. Add amoxicillin to her allergy list. Recheck in 3 months."
@@ -1661,7 +1674,9 @@ def test_a_plain_order_and_an_allergy_to_add_are_proposed_where_they_were_said()
     assert proposed(text) == [("order", "Go ahead and order a hemoglobin A1c"),
                               ("allergy_addition", "Add amoxicillin to her allergy list")]
     assert [(p["start"], p["end"]) for p in sent] == [(r["start"], r["end"]) for r in not_carried_over(text)]
-    assert all(set(p) == {"kind", "start", "end", "warnings"} and p["warnings"] == [] for p in sent)
+    assert all(set(p) == {"kind", "start", "end", "warnings", "heardAfter"} and p["warnings"] == [] for p in sent)
+    assert [text.text[p["heardAfter"]["start"] : p["heardAfter"]["end"]] for p in sent] == [
+        "Add amoxicillin to her allergy list. Recheck in 3 months.", "Recheck in 3 months."]
     assert own(text.text, "Start metformin. Recheck in 3 months.", "Start metformin.", "Recheck in 3 months.").pending
 
 
@@ -1707,7 +1722,7 @@ def test_an_instruction_said_as_one_is_proposed(said):
         ("Can you order an MRI?", "question"),
         ("She asked, can you order an MRI.", "quoted"),
         ("Call that in to her pharmacy.", "names_no_item"),
-        ("Add penicillin to her allergy list.", "names_no_item"),
+        ("Add shellfish to her allergy list.", "names_no_item"),
         ("Her mother asked whether we could order an MRI.", "hedged"),
     ],
 )
@@ -1748,13 +1763,65 @@ def test_at_most_twenty_are_proposed_and_every_rule_is_named():
 
 
 def test_a_proposal_carries_a_warning_for_a_correction_or_an_unclear_passage_beside_it():
-    corrected = transcript("Order a CBC today. Change the dressing daily.")
-    beside = transcript("Go ahead and order a CBC.", ("mumble mumble", "too_noisy"))
+    # Each longer than four words: a shorter sentence right after a plain instruction must be accounted for (step 15.1),
+    # and a short unclear passage there, which may be a retraction no one heard, holds it back instead.
+    corrected = transcript("Order a CBC today. Change the dressing on her leg daily.")
+    beside = transcript("Go ahead and order a CBC.", ("mumble mumble mumble mumble mumble", "too_noisy"))
+    short = transcript("Go ahead and order a CBC.", ("mumble mumble", "too_noisy"))
 
     (warned,) = weigh(corrected)
     (near,) = weigh(beside)
 
     assert warned.held_back is None and [(code, corrected.text[s:e]) for code, s, e in warned.warnings] == [
-        ("possible_correction", "Change the dressing daily")
+        ("possible_correction", "Change the dressing on her leg daily")
     ]
     assert near.held_back is None and [code for code, _, _ in near.warnings] == ["near_unclear_passage"]
+    assert held_back(short) == [("not_plain", "Go ahead and order a CBC")]
+
+
+FAR = (
+    "Order a CBC. Her fatigue started around the middle of summer with poor sleep and low appetite."
+    " It continued through the fall with trouble concentrating at work on most days. She turned down the blood test"
+)
+
+
+# What was heard after a proposal (step 15.1, at the owner's word of 2026-11-24), which its review shows beside it, so
+# a retraction the rules don't read is in view where the clinician opens it: the next sentence whole, even an
+# instruction ("The cardiologist will order it"), read past line breaks and heading lines; then the sentences after it
+# up to another instruction or another of the note's own sections, however far; nothing when nothing follows.
+@pytest.mark.parametrize(
+    ("said", "after"),
+    [
+        ("Order a CBC. She turned down the blood test.", "She turned down the blood test."),
+        ("Order a CBC. The cardiologist will order it with the echo.",
+         "The cardiologist will order it with the echo."),
+        ("Order a CBC. Recheck in one week. Refill her lisinopril.", "Recheck in one week."),
+        ("Order a CBC.\nPlan:\nRecheck in one week.", "Plan:\nRecheck in one week."),
+        ("Order a CBC.\n\nAssessment:\nNo acute distress.", None),
+        ("Order a CBC.", None),
+        # However far the next instruction or heading is: a refusal three sentences on, past the rules' reach, which
+        # don't hold the order back for it, is shown; and the reading still stops at an instruction or a heading.
+        (FAR + ".", FAR[13:] + "."),
+        (FAR + ". Order a BMP.", FAR[13:] + "."),
+        (FAR + ".\n\nAssessment:\nFatigue.", FAR[13:] + "."),
+    ],
+)
+def test_a_proposal_carries_where_what_was_heard_after_it_is(said, after):
+    first = proposals(Transcript(said, (), True))[0]
+
+    heard = first["heardAfter"]
+    assert (said[heard["start"] : heard["end"]] if heard else None) == after
+
+
+# However long the next sentence is, all of it, so a retraction at its end is in view too; in UTF-16 offsets, as every
+# place in a result is (a character outside the Basic Multilingual Plane counts two).
+def test_what_was_heard_after_a_proposal_is_the_next_sentence_whole_in_utf16_offsets():
+    rest = ("She talked about the weather \U0001F327 and her garden" + " and her roses" * 60
+            + " and she would prefer to wait.")
+    said = "Order a CBC. " + rest
+
+    (proposal,) = proposals(Transcript(said, (), True))
+
+    units = said.encode("utf-16-le")
+    heard = proposal["heardAfter"]
+    assert units[2 * heard["start"] : 2 * heard["end"]].decode("utf-16-le") == rest and len(rest) > 600

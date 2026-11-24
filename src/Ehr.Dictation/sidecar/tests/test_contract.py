@@ -105,6 +105,14 @@ class Instructing(FakeRecognizer):
         )
 
 
+class Retracting(FakeRecognizer):
+    """Hears a plain order and, after it, a refusal the proposal rules don't read: one of the trick sentences the owner
+    accepted by name (eval/trick-sentences.toml), in every passage."""
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        return Recognition("Order a CBC {period} She turned down the blood test {period}", 0.9)
+
+
 def client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, model_timeout: float = 0.5,
            **limits) -> TestClient:
     settings = dataclasses.replace(settings, **limits)
@@ -167,6 +175,14 @@ def answers(settings: Settings) -> dict[str, dict]:
     with client(settings, FakeLlama(planned), Instructing()) as http:
         session = stopped(http)
         keep("result-200-done-not_carried_over", "result",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+
+    # A plain order proposed with a refusal after it that the rules don't read: the proposal carries where what was
+    # heard after it is, which the review shows beside it (step 15.1, at the owner's word).
+    refused = answer(plan=("She turned down the blood test.", ["She turned down the blood test"]))
+    with client(settings, FakeLlama(refused), Retracting()) as http:
+        session = stopped(http)
+        keep("result-200-done-proposal_heard_after", "result",
              http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
 
     # A value whose transcript says another dose just after the one it uses: pending, with a possible_correction
@@ -395,6 +411,10 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
     planned = bodies["result-200-done-not_carried_over"]
     assert planned["fields"]["plan"]["value"] == "Start metformin."
     assert {item["reason"] for item in planned["notCarriedOver"]} == {"order", "allergy_change"}
+    refused = bodies["result-200-done-proposal_heard_after"]
+    first = refused["proposals"][0]
+    assert refused["transcript"]["text"][first["heardAfter"]["start"] : first["heardAfter"]["end"]] == (
+        "She turned down the blood test.")
     assert bodies["audio-200-partial"]["audioSeconds"] > 0
     segments = bodies["audio-200-partial"]["transcript"]["segments"]
     assert any(s["unclear"] for s in segments) and not segments[-1]["final"]

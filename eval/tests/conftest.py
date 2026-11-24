@@ -42,6 +42,23 @@ sources = {plan_sources}
 '''
 
 
+# Two trick sentences (trick-sentences.toml): one that must be held back, since a proposal would reverse its meaning,
+# and one that must be proposed.
+TRICKS = """most_wrong = 0
+
+[[group]]
+family = "f"
+expect = "held_back"
+reverses = true
+said = ["Order a CBC. Nah."]
+
+[[group]]
+family = "l"
+expect = "proposed"
+said = ["Go ahead and order a CBC."]
+"""
+
+
 def write_script(directory: Path, id: str, text: str, *, tags=("dates",), dates=(), drugs=(), forbidden=(),
                  subjective="", subjective_sources=(), plan="", plan_sources=(), rules: str = "") -> None:
     directory.mkdir(parents=True, exist_ok=True)
@@ -65,6 +82,7 @@ def eval_dir(tmp_path: Path) -> Path:
     (tmp_path / "voices.toml").write_text('[voices.af_heart]\naccent = "us"\n', encoding="utf-8")
     (tmp_path / "clinical-proposals.toml").write_text(
         '[[d02]]\nkind = "order"\nwords = "chest x-ray"\nitem = "chest x-ray"\n', encoding="utf-8")
+    (tmp_path / "trick-sentences.toml").write_text(TRICKS, encoding="utf-8")
     return tmp_path
 
 

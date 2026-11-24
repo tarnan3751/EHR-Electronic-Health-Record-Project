@@ -281,8 +281,10 @@ def test_a_drug_named_but_in_no_gold_value_must_not_be_offered(scripts):
 
 # The expansion plan's step 15: what the dictation proposed, against a script's gold proposals.
 def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_counted(eval_dir):
-    write_script(eval_dir / "scripts", "d03", "Plan {colon} go ahead and order a lipid panel {period} Rest {period}",
-                 tags=["order-attempt", "proposal"], forbidden=["order a lipid panel"], plan="Rest.", plan_sources=["Rest."],
+    # A sentence after each of more than four words, which needn't be accounted for (validation.py, step 15.1).
+    write_script(eval_dir / "scripts", "d03", "Plan {colon} go ahead and order a lipid panel {period} Rest at home for a few "
+                 "days {period}", tags=["order-attempt", "proposal"], forbidden=["order a lipid panel"],
+                 plan="Rest at home for a few days.", plan_sources=["Rest at home for a few days."],
                  rules='\n[[proposals]]\nkind = "order"\nwords = "order a lipid panel"\nitem = "lipid panel"\n')
     scripts = load_all(eval_dir / "scripts")
 
@@ -291,11 +293,11 @@ def test_proposals_are_found_right_misheard_or_false_and_what_was_held_back_is_c
         weigh_proposals(said, goldreport.transcript(text))
         return said
 
-    right = heard("Plan: go ahead and order a lipid panel. Rest.")
-    misheard = heard("Plan: go ahead and order a basic metabolic panel. Rest.")
-    false = heard("Plan: go ahead and order a chest X-ray. Rest.")
-    held = heard("Plan: consider ordering a lipid panel. Rest.")
-    warned = heard("Plan: go ahead and order a lipid panel. Change the dressing.")
+    right = heard("Plan: go ahead and order a lipid panel. Rest at home for a few days.")
+    misheard = heard("Plan: go ahead and order a basic metabolic panel. Rest at home for a few days.")
+    false = heard("Plan: go ahead and order a chest X-ray. Rest at home for a few days.")
+    held = heard("Plan: consider ordering a lipid panel. Rest at home for a few days.")
+    warned = heard("Plan: go ahead and order a lipid panel. Change the dressing on her leg today.")
 
     proposals = score([right, misheard, false, held, warned], scripts)["proposals"]
 

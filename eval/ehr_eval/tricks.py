@@ -1,0 +1,125 @@
+"""The trick sentences (eval/trick-sentences.toml; the expansion plan's step 15.1), weighed again by this commit's
+checks: what each is expected to give, and what it gives. No model is needed: each sentence is a whole final transcript,
+and the dictation's own rules (validation.weigh()) say what it proposes. The gate (gate.py) fails when the file isn't the
+one it records, when a sentence expected held back is proposed and the owner hasn't accepted it by name (the set's
+[accepted]), when a sentence accepted by name is no longer proposed, when most_wrong isn't the number of sentences
+accepted by name, when the wrong proposals number more than most_wrong, or when a control is not proposed at every
+instruction it lists; it reports how many of the wrong proposals reverse the meaning, and what the strict rule costs
+(expect = "cost"). Proposals are counted, not sentences: a sentence accepted by name that starts giving two proposals
+takes the count over the cap, and a control with two instructions that loses one is missed.
+
+    uv run --project eval python -m ehr_eval.tricks
+"""
+
+from __future__ import annotations
+
+import sys
+import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from ehr_dictation import validation
+from ehr_dictation.transcript import Transcript
+
+from .scripts import EVAL_DIR
+
+TRICKS = "trick-sentences.toml"
+
+
+@dataclass(frozen=True)
+class Trick:
+    said: str
+    family: str
+    expect: str  # proposed, held_back, or cost (a plain instruction the strict rule holds back)
+    reverses: bool = False  # held back, and a proposal would reverse the meaning
+    tolerated: str | None = None  # held back, and a proposal is a wrong one the owner tolerates, of this kind
+    still_proposed: bool = False  # held back, and recorded as one the rules still propose
+
+
+@dataclass
+class Scores:
+    sentences: int
+    most_wrong: int
+    wrong: list[str] = field(default_factory=list)  # proposed, though expected held back
+    wrong_proposals: int = 0  # the proposals those give, which the cap counts
+    reversing: list[str] = field(default_factory=list)  # of those, the ones marked as reversing the meaning
+    unaccepted: list[str] = field(default_factory=list)  # of those, the ones the owner hasn't accepted by name
+    accepted: int = 0  # sentences the owner accepts by name
+    stale: list[str] = field(default_factory=list)  # accepted by name, and not proposed (nor in the set at all)
+    controls: int = 0  # expected proposed
+    missed: list[str] = field(default_factory=list)  # expected proposed, and not at every instruction they list
+    cost: int = 0  # plain instructions the strict rule holds back (expect = "cost")
+    cost_held: int = 0  # of those, held back now
+
+
+def load(eval_dir: Path = EVAL_DIR) -> tuple[list[Trick], int, dict[str, str]]:
+    """The trick sentences, the most wrong proposals they may give, and each tolerated kind's reason."""
+    data = tomllib.loads((eval_dir / TRICKS).read_text(encoding="utf-8"))
+    tricks = [
+        Trick(said, group["family"], group["expect"], group.get("reverses", False), group.get("tolerated"),
+              group.get("still_proposed", False))
+        for group in data["group"]
+        for said in group["said"]
+    ]
+    return tricks, data["most_wrong"], data.get("tolerated", {})
+
+
+def accepted(eval_dir: Path = EVAL_DIR) -> frozenset[str]:
+    """The sentences the owner accepts by name as wrong proposals (the set's [accepted]), as the set has them."""
+    data = tomllib.loads((eval_dir / TRICKS).read_text(encoding="utf-8"))
+    return frozenset(data.get("accepted", {}).get("said", []))
+
+
+def proposed(said: str) -> list[str]:
+    """The words of each proposal the dictation makes from a sentence said as a whole, final transcript."""
+    return [said[weighed.start : weighed.end] for weighed in validation.weigh(Transcript(said, (), True))
+            if weighed.held_back is None]
+
+
+def score(eval_dir: Path = EVAL_DIR) -> Scores:
+    tricks, most_wrong, _ = load(eval_dir)
+    named = accepted(eval_dir)
+    scores = Scores(sentences=len(tricks), most_wrong=most_wrong, accepted=len(named))
+    for trick in tricks:
+        weighed = validation.weigh(Transcript(trick.said, (), True))
+        given = [one for one in weighed if one.held_back is None]
+        if trick.expect == "proposed":
+            scores.controls += 1
+            if not given or len(given) < len(weighed):
+                scores.missed.append(trick.said)
+        elif trick.expect == "cost":
+            scores.cost += 1
+            scores.cost_held += not given
+        elif given:
+            scores.wrong.append(trick.said)
+            scores.wrong_proposals += len(given)
+            if trick.reverses:
+                scores.reversing.append(trick.said)
+            if trick.said not in named:
+                scores.unaccepted.append(trick.said)
+    scores.stale = sorted(named - set(scores.wrong))
+    return scores
+
+
+def main() -> int:
+    scores = score()
+    for said in scores.wrong:
+        print(f"{'reverses the meaning' if said in scores.reversing else 'wrong'}"
+              f"{'' if said in scores.unaccepted else ', accepted by name'}: {said!r}")
+    for said in scores.missed:
+        print(f"expected proposed at every instruction it lists, and not: {said!r}")
+    for said in scores.stale:
+        print(f"accepted by name, and no longer proposed: {said!r}")
+    print(
+        f"{scores.sentences} trick sentences: {scores.wrong_proposals} wrong proposals (at most {scores.most_wrong}), "
+        f"from {len(scores.wrong)} sentences, {len(scores.wrong) - len(scores.unaccepted)} of them accepted by name "
+        "(there must be no other), "
+        f"{len(scores.reversing)} reversing the meaning; {scores.controls - len(scores.missed)} of "
+        f"{scores.controls} controls proposed; {scores.cost_held} of {scores.cost} plain instructions held back by the strict "
+        "rule, what it costs."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

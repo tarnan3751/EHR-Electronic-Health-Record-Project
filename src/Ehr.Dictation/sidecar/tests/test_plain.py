@@ -2,12 +2,14 @@
 plan's step 15): every word of the instruction's sentence is a lead-in, the verb, a determiner, an item the reference
 data names, its quantities or a trailer, in that order. Everything else is held back, and still listed as not carried
 over. The sentences that must be held back are both reviews', every one of them (the first's here, the second's in
-tests/review/held_back_*.txt), with the near misses of each lead-in and trailing phrase; those proposed are the plain
-controls and each lead-in and trailer said plainly, and the second review's plain sentences (tests/review/plain.txt)
-are each proposed or listed in tests/review/plain_not_proposed.txt with why. And as properties, so the next sentence
-no one wrote is covered too: a word from outside the closed classes and the reference data, put anywhere into a plain
-instruction, makes it not plain, and so does a word from a name its item shares nothing with. A sentence's
-"[unclear]" is a passage marked unclear, as the first review wrote them."""
+tests/review/held_back_*.txt), with the near misses of each lead-in and trailing phrase, and a case of each of step
+15.1's rules for the sentences next to it, both ways (the third review's sentences are the eval's trick sentences,
+eval/trick-sentences.toml); those proposed are the plain controls and each lead-in and trailer said plainly, and the
+second review's plain sentences (tests/review/plain.txt) are each proposed or listed in
+tests/review/plain_not_proposed.txt with why. And as properties, so the next sentence no one wrote is covered too: a
+word from outside the closed classes and the reference data, put anywhere into a plain instruction, makes it not plain,
+and so does a word from a name its item shares nothing with. A sentence's "[unclear]" is a passage marked unclear, as
+the first review wrote them."""
 
 from __future__ import annotations
 
@@ -336,9 +338,9 @@ HELD_BACK = [
     "I'll call in the morning.",
     "Will call in the evening.",
     "Call in the morning.",
-    # Penicillin and latex: the reference data names only "Penicillin G", "Penicillin V" and "Natural latex rubber".
-    "Add penicillin to her allergy list.",
-    "Add latex to her allergy list.",
+    # A name neither the reference data nor its common names (db/reference/dictation-names.toml) hold.
+    "Add shellfish to her allergy list.",
+    "Put sulfa on her allergy list.",
     # A verb takes only what it can: refill, prescribe, renew, a prescription, call in and send a medication, and every
     # item of a joined list.
     "Refill a CBC.",
@@ -365,6 +367,64 @@ HELD_BACK = [
     "Have her lisinopril refilled.",
     "Please get her metformin 500 mg refilled for 90 days.",
     "Sort out the refill.",
+    # Step 15.1. A short sentence after it, or a short clause it opens with, that isn't accounted for: words of
+    # retraction, refusal or doubt no list names.
+    "Order a CBC. Nah.",
+    "Order a CBC. Oops.",
+    "Order a CBC. Abort.",
+    "I'm going to order a CBC. Kidding.",
+    "Order a CBC. Questionable.",
+    "Refill her lisinopril. Hang on.",
+    "Refill her lisinopril. Hang on, let me check her pressure first.",
+    "Order a CBC. Pointless, she had one Monday.",
+    "Order a CBC. Excuse me, wrong patient entirely.",
+    "Order a CBC. Second thoughts, she has had plenty of blood drawn this month so we will pass on that.",
+    "Order a CBC. I. Mean. A BMP.",
+    "Order a CBC. Stop.",
+    "Order a CBC. Good.",
+    # A negation, a word of error or a condition anywhere in the sentence after it.
+    "Order a CBC. She is not willing to have blood drawn today.",
+    "Order a CBC. Insurance will not cover the blood count.",
+    "Order a CBC. The last line was a mistake.",
+    "Order a CBC. Patient prefers to wait until after the holidays.",
+    "Order a CBC. She will call us if she wants it.",
+    # Its item named again by another of its names, with a word of removing it.
+    "Order a CBC. Leave the blood count for now.",
+    # A list of what not to do earlier in its paragraph, whatever is said between.
+    "Not to do today. She is frail. Order a CBC.",
+    "Things to avoid today. Her pressure is fine. Refill her lisinopril.",
+    # Someone else before it: a bare sentence naming them, or their reaction before an allergy to add.
+    "Mom insists. Order a CBC.",
+    "Her mother asked. Refill her lisinopril.",
+    "Her sister reacted to amoxicillin. Add amoxicillin to her allergy list.",
+    # The sentences after it read past a line break or a new paragraph.
+    "Order a CBC {period} {new line} No {period}",
+    "Order a CBC. {new paragraph} Cancel that.",
+    "Order a CBC. {new paragraph} She declined it.",
+    "Order a CBC. {new paragraph} Nah.",
+    "Refill her lisinopril. {new paragraph} Actually, let's not.",
+    "Add amoxicillin to her allergy list. {new paragraph} Wait, that was her sister.",
+    # Step 15.1's review. A negation, a word of error or a condition in a sentence that opens a step of the plan.
+    "Order a CBC. Recommend she not have any blood drawn today.",
+    "Order a CBC. Return to clinic as needed, no blood work required.",
+    "Order a CBC. Encourage fluids, no labs needed.",
+    # Reading goes on past a heading line, the retraction cues included, up to another of the note's own sections.
+    "Order a CBC. {new line} Correction {colon} {new line} Cancel the CBC.",
+    "Order a CBC. {new line} Addendum {colon} {new line} Patient declined the blood draw.",
+    "Order a CBC. {new paragraph} Plan {colon} {new line} No labs today.",
+    # Every sentence within reach is read alike, not only the first.
+    "Order a CBC. Recheck in one week. Nah.",
+    "Order a CBC. Continue metformin. The CBC is not needed after all.",
+    "Order a CBC. She feels tired. Oops, wrong patient.",
+    "Order a CBC. {new paragraph} Recheck in one week. {new paragraph} Oops, wrong patient.",
+    # What follows a heading is read, not taken as accounted for with it.
+    "Order a CBC. Assessment: labs unnecessary.",
+    "Order a CBC. Impression: CBC pointless.",
+    # Before it: a retraction right before, and a word of refusing or removing in its paragraph.
+    "Hold off on these for now. Order a CBC.",
+    "Things she refused. Order a CBC.",
+    "I'm going to dictate what we're not doing. Order a CBC.",
+    "Skip these today. Order a CBC. Order a lipid panel.",
 ]
 
 # Plain, as the review's own controls: proposed, these words.
@@ -374,6 +434,21 @@ CONTROLS = [
     ("Order a CBC. Thanks.", ["Order a CBC"]),
     ("Order a CBC. Recheck in one week.", ["Order a CBC"]),
     ("There is no fever, chest pain, or shortness of breath. Order a CBC.", ["Order a CBC"]),
+    # Step 15.1: a short sentence after it accounted for (a step of the plan with its verb, a heading, lead-ins alone,
+    # thanks), a longer one with none of the cues, and a heading line, where reading past a new paragraph stops.
+    ("Order a CBC. Continue amlodipine.", ["Order a CBC"]),
+    ("Order a CBC. Follow up in clinic.", ["Order a CBC"]),
+    ("Order a CBC. Plan: recheck in one week.", ["Order a CBC"]),
+    ("Order a CBC. Okay.", ["Order a CBC"]),
+    ("Order a CBC. Also, continue her iron.", ["Order a CBC"]),
+    ("Order a CBC. Thank you.", ["Order a CBC"]),
+    ("Order a CBC. Emollients twice a day to the shins.", ["Order a CBC"]),
+    ("Order a CBC. {new paragraph} Recheck in one week.", ["Order a CBC"]),
+    ("Order a CBC. {new paragraph} Assessment {colon} {new paragraph} No acute distress.", ["Order a CBC"]),
+    ("She is frail. Order a CBC.", ["Order a CBC"]),
+    ("Avoid ibuprofen for now. {new paragraph} Order a CBC.", ["Order a CBC"]),
+    # A retraction said of an instruction before this one is not said of it.
+    ("Order a sed rate. Skip that. Order a CBC.", ["Order a CBC"]),
     ("Add amoxicillin as an allergy.", ["Add amoxicillin as an allergy"]),
     ("Add an allergy to codeine.", ["Add an allergy to codeine"]),
     ("Record a new allergy to codeine.", ["Record a new allergy to codeine"]),
@@ -493,6 +568,11 @@ PLAIN = [
     "Call in amoxicillin to her pharmacy.",
     "Place an order for a chest X-ray.",
     "E-prescribe amoxicillin.",
+    # The common names of step 15.1, each of its kind only (db/reference/dictation-names.toml).
+    "Add penicillin to her allergy list.",
+    "Penicillin should be added to her allergies.",
+    "Add latex to her allergy list.",
+    "Order a CRP today.",
 ]
 
 
@@ -613,3 +693,40 @@ def test_a_word_from_an_unrelated_name_never_joins_an_item(said, item, kind):
     ]
 
     assert strangers and let_through == []
+
+
+# Step 15.1: a word written as letters and digits with nothing between them is one word in a plain instruction only
+# when the whole word is a common name written so (validation.ONE_WORD; catalog.WHOLE_WORDS, from
+# db/reference/dictation-names.toml): "A1c" and "HbA1c", the common names of Hemoglobin A1c, compared with the
+# catalog's names by their letters. Any other keeps its digits apart, as before: "B12", "D3", "T4", "K2" and "B7" make no
+# item of "vitamin B" or "T", and neither does "A9c", whose digit no name holds; a count ("x2"), a number and its unit
+# ("10mg") and a name and a number ("CBC2") are read as before. FR-14's rule reads none of them whole: what it lists and
+# cuts is unchanged.
+@pytest.mark.parametrize(("said", "words", "listed"), [
+    ("Order an A1c.", ["order", "an", "a1c"], ["Order an A1c"]),
+    ("Go ahead and order an A1C today.", ["go", "ahead", "and", "order", "an", "a1c", "today"],
+     ["Go ahead and order an A1C today"]),
+    ("Order a hemoglobin A1c.", ["order", "a", "hemoglobin", "a1c"], ["Order a hemoglobin A1c"]),
+    ("Order an HbA1c.", ["order", "an", "hba1c"], ["Order an HbA1c"]),
+    ("Order an A9c.", ["order", "an", "a", "9", "c"], []),
+    ("Order a vitamin B12.", ["order", "a", "vitamin", "b", "12"], []),
+    ("Order vitamin D3 1000 units daily.", ["order", "vitamin", "d", "3", "1000", "units", "daily"], []),
+    ("Order a vitamin B7.", ["order", "a", "vitamin", "b", "7"], []),
+    ("Order a T4.", ["order", "a", "t", "4"], []),
+    ("Prescribe vitamin K2.", ["prescribe", "vitamin", "k", "2"], []),
+    ("Add vitamin B12 to her allergies.", ["add", "vitamin", "b", "12", "to", "her", "allergies"], []),
+    ("Refill her lisinopril x2 weeks.", ["refill", "her", "lisinopril", "x", "2", "weeks"],
+     ["Refill her lisinopril x2 weeks"]),
+    ("Refill lisinopril 10mg.", ["refill", "lisinopril", "10", "mg"], ["Refill lisinopril 10mg"]),
+    ("Order a CBC2.", ["order", "a", "cbc", "2"], []),
+])
+def test_a_word_of_letters_and_digits_is_read_whole_in_a_plain_instruction_alone(said, words, listed):
+    text = transcript(said)
+
+    assert validation._closed_words(said) == words
+    assert proposed(said) == listed
+    assert [token.text for token in validation.tokens(said)] == [
+        part for word in words for part in re.findall(r"[a-z]+|\d+", word)
+    ]
+    assert len(not_carried_over(text)) == 1
+    assert validation.is_item(["a", "1", "c"], "order") is False

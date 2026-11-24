@@ -8,8 +8,10 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Notes;
 // An order, or an allergy to add, that a dictation proposes (the expansion plan's step 15; FR-14 as reworded), as the
 // review and the form opened from it show it: the clinician's own words in the review's stored transcript, in the
 // sentence they said them in and the one before it, which may name what the words are about ("Add ivabradine 5 mg twice
-// daily. Call that in to his pharmacy."), with the words marked; the words each warning points at; when it was
-// dictated; and the proposal's row, with its decision. Nothing else is shown of it, and nothing from it fills a field.
+// daily. Call that in to his pharmacy."), with the words marked; what was heard after it, as the service found it
+// (step 15.1: the sentence after its own, and those after that up to another instruction), so a retraction its rules
+// don't read is in view; the words each warning points at; when it was dictated; and the proposal's row, with its
+// decision. Nothing else is shown of it, and nothing from it fills a field.
 public sealed record ProposedFromDictation(
     AiChartProposal Row, Guid DraftId, string Before, string Words, string After, IReadOnlyList<ProposedFromDictation.Warning> Warnings,
     DateTimeOffset DictatedAt)
@@ -25,6 +27,9 @@ public sealed record ProposedFromDictation(
     public int Start { get; init; }
 
     public int End { get; init; }
+
+    // What was heard after it (step 15.1), as said; empty when nothing follows, or in a result stored before then.
+    public string HeardAfter { get; init; } = "";
 
     public bool IsOrder => Row.Kind == AiChartProposalKinds.Order;
 
@@ -87,6 +92,7 @@ public sealed record ProposedFromDictation(
         {
             Start = proposal.Start,
             End = proposal.End,
+            HeardAfter = proposal.HeardAfter is { } after ? text[after.Start..after.End] : "",
         };
     }
 
