@@ -37,7 +37,7 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "f2d8a8931fc709deea77669bc5d67c356c6742bc05424daf9450f421896150b7",
-  "scoring": "0e9eb4027ab605e49e18d2db685d0306cde8486524d89ad2685d80fea9391569"
+  "scoring": "e3619bec01d8b243e3390a2194393b6e4598354509fcd08428e607259b57febb"
  },
  "dataset": {
   "recordings_sha256": "58ec8499a961cc787e421919552e1c4060e074cb5a7192c84a29ba17d6b142cf",
@@ -2149,13 +2149,13 @@
    "false_discard_rate": 0.0
   },
   "proposals": {
-   "shown": 19,
+   "shown": 18,
    "said": 24,
-   "found": 19,
-   "right": 19,
+   "found": 18,
+   "right": 18,
    "false": 0,
    "misheard": 0,
-   "recall": 0.7917,
+   "recall": 0.75,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
@@ -2165,7 +2165,7 @@
     "names_no_item": 18,
     "negated": 1,
     "not_an_addition": 7,
-    "not_plain": 20,
+    "not_plain": 21,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
@@ -2174,13 +2174,13 @@
    "listed": []
   },
   "proposals_clinical": {
-   "shown": 19,
+   "shown": 18,
    "said": 63,
-   "found": 19,
-   "right": 19,
+   "found": 18,
+   "right": 18,
    "false": 0,
    "misheard": 0,
-   "recall": 0.3016,
+   "recall": 0.2857,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
@@ -2190,7 +2190,7 @@
     "names_no_item": 18,
     "negated": 1,
     "not_an_addition": 7,
-    "not_plain": 20,
+    "not_plain": 21,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
@@ -21752,12 +21752,6 @@
    "chunk_seconds": [],
    "proposals": [
     [
-     "allergy_addition",
-     1175,
-     1211,
-     []
-    ],
-    [
      "order",
      1259,
      1294,
@@ -21770,6 +21764,12 @@
      1079,
      1112,
      "names_no_item"
+    ],
+    [
+     "allergy_addition",
+     1175,
+     1211,
+     "not_plain"
     ],
     [
      "order",
@@ -22383,7 +22383,7 @@
   }
  ],
  "rescored_from": {
-  "scoring": "77ad5d2860ebea2f3451c34f1c24fb30bd8bff45f7da74aa47b590011458ab05",
+  "scoring": "0e9eb4027ab605e49e18d2db685d0306cde8486524d89ad2685d80fea9391569",
   "gold_sha256": "b8a36a520a4986aaea34a8252a4263a7d9a04d5778daea8a1391163527d94264",
   "structuring_outputs_reused": true
  }

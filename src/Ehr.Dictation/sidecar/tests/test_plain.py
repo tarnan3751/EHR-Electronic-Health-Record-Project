@@ -404,6 +404,27 @@ HELD_BACK = [
     "Order a CBC. {new paragraph} Nah.",
     "Refill her lisinopril. {new paragraph} Actually, let's not.",
     "Add amoxicillin to her allergy list. {new paragraph} Wait, that was her sister.",
+    # Step 15.1's review. A negation, a word of error or a condition in a sentence that opens a step of the plan.
+    "Order a CBC. Recommend she not have any blood drawn today.",
+    "Order a CBC. Return to clinic as needed, no blood work required.",
+    "Order a CBC. Encourage fluids, no labs needed.",
+    # Reading goes on past a heading line, the retraction cues included, up to another of the note's own sections.
+    "Order a CBC. {new line} Correction {colon} {new line} Cancel the CBC.",
+    "Order a CBC. {new line} Addendum {colon} {new line} Patient declined the blood draw.",
+    "Order a CBC. {new paragraph} Plan {colon} {new line} No labs today.",
+    # Every sentence within reach is read alike, not only the first.
+    "Order a CBC. Recheck in one week. Nah.",
+    "Order a CBC. Continue metformin. The CBC is not needed after all.",
+    "Order a CBC. She feels tired. Oops, wrong patient.",
+    "Order a CBC. {new paragraph} Recheck in one week. {new paragraph} Oops, wrong patient.",
+    # What follows a heading is read, not taken as accounted for with it.
+    "Order a CBC. Assessment: labs unnecessary.",
+    "Order a CBC. Impression: CBC pointless.",
+    # Before it: a retraction right before, and a word of refusing or removing in its paragraph.
+    "Hold off on these for now. Order a CBC.",
+    "Things she refused. Order a CBC.",
+    "I'm going to dictate what we're not doing. Order a CBC.",
+    "Skip these today. Order a CBC. Order a lipid panel.",
 ]
 
 # Plain, as the review's own controls: proposed, these words.
@@ -417,7 +438,7 @@ CONTROLS = [
     # thanks), a longer one with none of the cues, and a heading line, where reading past a new paragraph stops.
     ("Order a CBC. Continue amlodipine.", ["Order a CBC"]),
     ("Order a CBC. Follow up in clinic.", ["Order a CBC"]),
-    ("Order a CBC. Assessment: stable.", ["Order a CBC"]),
+    ("Order a CBC. Plan: recheck in one week.", ["Order a CBC"]),
     ("Order a CBC. Okay.", ["Order a CBC"]),
     ("Order a CBC. Also, continue her iron.", ["Order a CBC"]),
     ("Order a CBC. Thank you.", ["Order a CBC"]),
@@ -426,6 +447,8 @@ CONTROLS = [
     ("Order a CBC. {new paragraph} Assessment {colon} {new paragraph} No acute distress.", ["Order a CBC"]),
     ("She is frail. Order a CBC.", ["Order a CBC"]),
     ("Avoid ibuprofen for now. {new paragraph} Order a CBC.", ["Order a CBC"]),
+    # A retraction said of an instruction before this one is not said of it.
+    ("Order a sed rate. Skip that. Order a CBC.", ["Order a CBC"]),
     ("Add amoxicillin as an allergy.", ["Add amoxicillin as an allergy"]),
     ("Add an allergy to codeine.", ["Add an allergy to codeine"]),
     ("Record a new allergy to codeine.", ["Record a new allergy to codeine"]),

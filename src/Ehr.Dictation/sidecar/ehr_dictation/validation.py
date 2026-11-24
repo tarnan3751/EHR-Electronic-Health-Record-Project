@@ -45,25 +45,29 @@ a bracket, a quote), makes it not plain, and no list of what must not be said de
 something the reference data doesn't know (a new drug, a misheard name, an unusual test, a test by a name the catalog
 doesn't hold) is never proposed, only listed: the clinician still sees it, and the dictation proposes only what it has
 read whole. The sentences next to it are read for what may take it back (see "The sentences next to a plain
-instruction" below), those after it read past line breaks, up to a heading line. The next one, when it has
-BARE_SENTENCE words or fewer, or opens with a clause that short before a comma, holds it back unless that is accounted
-for, as the closed sentence's words are: an instruction of its own, a step of the plan said with its verb and what
-follows it ("Recheck in one week."), a heading, lead-ins alone, or thanks. So a word of retraction or doubt no list
-holds ("Nah.", "Oops.", "Kidding.", "Questionable.", "Hang on, let me check her pressure first.") holds it back. Unless
-it is an instruction or a step of the plan, the next one also holds it back with a negation, a word of error or a
-condition anywhere in it ("She is not willing to have blood drawn today.", "Patient prefers to wait until after the
-holidays."). The rest is read for cues, where a list still decides: after it, a short sentence that doubts, retracts or
-points back at it, one that opens with "no", "not", "or", "instead", "actually", "hold" or "wait", one that points back
-in its first three words, one that points back or names its item again (by another of its names too: "blood count" for
-a CBC) with a negation, a doubt or a word of removing it, one that is only a condition, a time for later or says it
-was done already, ordered or sent, or, for an allergy, one that denies it; and any sentence after it, while none holds
-an instruction of its own, within TAKEN_BACK_REACH words, that retracts it or opens like a retraction ("Order a CBC.
-She is anxious about needles. Actually, let's not."); before it, a bare negation or doubt, a bare sentence naming
-someone else ("Mom insists."), for an allergy one about someone else's allergy, reaction or its item ("Her sister
-reacted to penicillin."), a condition said as a sentence of its own, a heading line but Plan, Orders or Labs, a report
-or list of what not to do (quoting, per, according to, says, a request, the following, avoid, not to do), and a list of
-what not to do anywhere before it in its paragraph, within TAKEN_BACK_REACH words ("Not to do today. She is frail.
-Order a CBC."). A proposal can still be wrong, and is the clinician's to dismiss.
+instruction" below). Those after it are read past line breaks and heading lines, up to the heading of another of the
+note's own sections than Plan ("Assessment:"), within TAKEN_BACK_REACH words, up to one holding an instruction of its own, and each of them
+is held to the same rules, the first and every later one. One of BARE_SENTENCE words or fewer, or opening with a clause
+that short before a comma, holds it back unless that is accounted for, as the closed sentence's words are: a step of
+the plan said with its verb and what follows it ("Recheck in one week."), a heading with what follows it accounted for
+too, lead-ins alone, or thanks. So a short word of retraction or doubt no list holds ("Nah.", "Oops.", "Kidding.",
+"Questionable.", "Hang on, let me check her pressure first.") holds it back; a longer sentence whose words of refusal,
+doubt or reassignment no list holds ("She turned down the blood test.") does not, which no list can close. A negation, a
+word of error or a condition anywhere in one of them holds it back too, whatever it opens with ("She is not willing to
+have blood drawn today.", "Recommend she not have any blood drawn today.", "Patient prefers to wait until after the
+holidays."). The rest is read for cues, where a list still decides: a short sentence after it that doubts, retracts or
+points back at it, or one that points back or names its item again (by another of its names too: "blood count" for a
+CBC) with a negation, a doubt or a word of removing it, or, for an allergy, one that denies it; the next one when it
+opens with "no", "not", "or", "instead", "actually", "hold" or "wait", points back in its first three words, or is only
+a condition, a time for later or says it was done already, ordered or sent; and a later one that retracts it or opens
+like a retraction ("Order a CBC. She is anxious about needles. Actually, let's not."). Before it: a bare negation or
+doubt, a bare sentence naming someone else ("Mom insists."), for an allergy one about someone else's allergy, reaction
+or its item ("Her sister reacted to penicillin."), a condition said as a sentence of its own, a heading line but Plan,
+Orders or Labs, a report or list of what not to do (quoting, per, according to, says, a request, the following, avoid,
+not to do), a retraction right before it ("Hold off on these for now."), and a word of refusing, removing or putting
+off anywhere before it in its paragraph, within TAKEN_BACK_REACH words, unless said of what came before it ("Not to do
+today. She is frail. Order a CBC.", "Things she refused.", "what we're not doing"; not "Skip that."). A proposal can
+still be wrong, and is the clinician's to dismiss.
 Every rule below holds it back too, a second layer, and weigh() names the first that applies (HELD_BACK): not_final (the transcript isn't final yet); to_the_software (its
 sentence tells the software to ignore, disregard or forget its rules, instructions or directions, calls on it
 ("Assistant, ...", "Dear model, ..."), or is a note to the assistant, the AI or the system); mixed_kinds (an order and an allergy change run together); not_an_addition (an orders section, or an allergy
@@ -75,8 +79,8 @@ next visit, week, month, year or season, at the follow-up, later, eventually, in
 many days, weeks, months or years); taken_back (a correction cue, or hold off, never mind, forget that, cancel that,
 on second thought, let's not or not yet; ignore, disregard, delete, strike, undo, skip, cancel, scratch, drop,
 retract or rescind; hold or forget that or it; take that back; wait, no; declined or refused; don't need it; no longer
-needed; changed my mind: from its start to the end of the next sentence, read past line breaks, within
-TAKEN_BACK_REACH words after it); in_the_past (a word of the past in its clause, as for the pharmacy: already, last week, ago); unclear (it
+needed; changed my mind: from its start to the end of the next sentence, read past line breaks and heading lines,
+within TAKEN_BACK_REACH words after it); in_the_past (a word of the past in its clause, as for the pharmacy: already, last week, ago); unclear (it
 overlaps a passage marked unclear); question (its sentence ends in a question mark); quoted (the clause before it ends
 in a word of telling: "she asked, can you order an MRI"); not_imperative (anything but an opener, from the start of
 its clause or the last "and" or word starting a clause, up to its lead-in or subject: "capillary refill under 2
@@ -2107,39 +2111,42 @@ def _trailers(words: list[str], at: int) -> bool:
 
 
 # The sentences next to a plain instruction are read for what may take it back. Those after it are read past line
-# breaks, up to a heading line (_next_sentence()). The next one, when it has BARE_SENTENCE words or fewer, or opens
-# with a clause that short before a comma, holds it back unless that is accounted for (_accounted()), as the closed
-# sentence's words are: an instruction of its own, a step of the plan said with its verb and what follows it
-# (_PLAN_STEPS: "Recheck in one week.", "Continue amlodipine."; not stop, hold, avoid or discontinue, which said alone
-# take it back), a heading ("Assessment: stable."), lead-ins alone ("Okay.", "Next,") or thanks. So "Nah.", "Oops.",
-# "Kidding.", "Questionable." or "Hang on, let me check her pressure first." hold it back, though no list names them.
-# Unless it holds an instruction or opens a step of the plan, the next one also holds it back with a negation
-# (NEGATION), a word of error (_ERROR) or a condition (CONDITION_WORDS) anywhere in it ("She is not willing to have
-# blood drawn today.", "The last line was a mistake.", "Patient prefers to wait until after the holidays.").
-# The rest is read for cues (lists; a sentence they don't catch is taken as unrelated). After it, it is held back when
-# the next sentence:
-# - has BARE_SENTENCE words or fewer and a negation, a doubt or a retraction word (_NEXT_DOUBT), or points back at it
-#   (_POINTS_BACK);
-# - opens with "no", "not", "or", "instead", "actually", "hold" or "wait", or goes on with what the instruction's
-#   sentence said ("with", "for", "because", "since", "which", "to": "Add nitrofurantoin to her allergy list. with a
-#   reaction rash", a full stop heard where none was said) (_NEXT_OPENING); or points back within its first three words
-#   ("Nix that, she had one Friday", a retraction misheard: "Cancer that order for now");
-# - points back, or names its item again (by another of its names too: "Leave the blood count for now." after "Order a
-#   CBC.", _named_again()), and holds a negation or a word of removing it (_REMOVES: "We don't really need that one",
-#   "Take that out of the plan", "She had one done two days ago");
-# - for an allergy to add, speaks of an allergy or a reaction with a negation, someone else or a word pointing back ("She
-#   is not truly allergic to penicillin", "It was her mother who reacted", "Turns out it was a viral rash").
-# - is only a condition, a time for later, or says it was done already, ordered or sent ("Order a CBC. In two weeks.",
-#   "Already done."), unless it opens a step of the plan of its own ("Recheck in one week.");
-# and any later sentence, while none holds an instruction of its own, within TAKEN_BACK_REACH words, that retracts it
-# or opens like a retraction (_later_sentences_hold_it()). Before it, when the previous sentence is a bare negation or
-# doubt of BARE_SENTENCE words or fewer, a bare sentence naming someone else ("Mom insists.", "Her mother asked."), for
-# an allergy to add one about an allergy, a reaction or its item with someone else ("Her sister reacted to
-# penicillin."), a condition said as a sentence of its own ("If her potassium is low."), a heading line but Plan, Orders
-# or Labs (PROPOSAL_HEADINGS), or introduces a report or a list of what not to do (_REPORT_BEFORE: quoting, reading
-# from, per, according to, says, a request, a question, the following, avoid, not to do); and when a list of what not to
-# do (_NOT_TO_DO) is said anywhere before it in its paragraph, within TAKEN_BACK_REACH words, whatever is said between
-# ("Not to do today. She is frail. Order a CBC.").
+# breaks and heading lines ("Addendum:", "Correction:", "Plan:"), stopping only at the heading of another of the note's
+# own sections (_SECTIONS: Subjective, Objective, Exam, Examination, Observations, Vitals, Assessment, Impression),
+# within TAKEN_BACK_REACH words, up to a sentence that holds an instruction of its own. Each of them, the first and every
+# later one (_sentences_after_hold_it()):
+# - when it has BARE_SENTENCE words or fewer, or opens with a clause that short before a comma, holds it back unless
+#   that is accounted for (_accounted()), as the closed sentence's words are: a step of the plan said with its verb and
+#   what follows it (_PLAN_STEPS: "Recheck in one week.", "Continue amlodipine."; not stop, hold, avoid or discontinue,
+#   which said alone take it back), a heading with what follows it accounted for too ("Assessment: stable." is not,
+#   "Plan: recheck in one week." is), lead-ins alone ("Okay.", "Next,") or thanks. So "Nah.", "Oops.", "Kidding.",
+#   "Questionable." or "Hang on, let me check her pressure first." hold it back, though no list names them; a longer
+#   sentence whose words of refusal, doubt or reassignment no list holds ("She turned down the blood test.") does not;
+# - holds it back with a negation (NEGATION), a word of error (_ERROR) or a condition (CONDITION_WORDS) anywhere in it,
+#   whatever it opens with ("She is not willing to have blood drawn today.", "Recommend she not have any blood drawn
+#   today.", "The last line was a mistake.", "Patient prefers to wait until after the holidays.");
+# - holds it back when it has BARE_SENTENCE words or fewer and a negation, a doubt or a retraction word (_NEXT_DOUBT),
+#   or points back at it (_POINTS_BACK); when it points back, or names its item again (by another of its names too:
+#   "Leave the blood count for now." after "Order a CBC.", _named_again()), and holds a negation or a word of removing
+#   it (_REMOVES: "We don't really need that one", "Take that out of the plan", "She had one done two days ago"); and,
+#   for an allergy to add, when it speaks of an allergy or a reaction with a negation, someone else or a word pointing
+#   back ("She is not truly allergic to penicillin", "It was her mother who reacted", "Turns out it was a viral rash").
+# The first of them also holds it back when it opens with "no", "not", "or", "instead", "actually", "hold" or "wait", or
+# goes on with what the instruction's sentence said ("with", "for", "because", "since", "which", "to": "Add
+# nitrofurantoin to her allergy list. with a reaction rash", a full stop heard where none was said) (_NEXT_OPENING);
+# points back within its first three words ("Nix that, she had one Friday", a retraction misheard: "Cancer that order
+# for now"); or is only a condition, a time for later, or says it was done already, ordered or sent ("Order a CBC. In
+# two weeks.", "Already done."), unless it opens a step of the plan of its own ("Recheck in one week."). A later one
+# also holds it back when it retracts it (TAKEN_BACK) or opens like a retraction (_LATER_OPENING).
+# Before it, when the previous sentence is a bare negation or doubt of BARE_SENTENCE words or fewer, a bare sentence
+# naming someone else ("Mom insists.", "Her mother asked."), for an allergy to add one about an allergy, a reaction or its
+# item with someone else ("Her sister reacted to penicillin."), a condition said as a sentence of its own ("If her
+# potassium is low."), a heading line but Plan, Orders or Labs (PROPOSAL_HEADINGS), or introduces a report or a list of
+# what not to do (_REPORT_BEFORE: quoting, reading from, per, according to, says, a request, a question, the following,
+# avoid, not to do); when it is a retraction (TAKEN_BACK: "Hold off on these for now."); and when a word of refusing,
+# removing or putting off (_NOT_TO_DO: "Things she refused.", "Skip these today.", "what we're not doing") is said
+# anywhere before it in its paragraph, within TAKEN_BACK_REACH words, whatever is said between ("Not to do today. She is
+# frail. Order a CBC."), unless it is said of what came before it ("Skip that.").
 BARE_SENTENCE = 4
 _NEXT_DOUBT = frozenset(
     "no nope not never none nothing sure maybe or wrong hold wait think instead rather actually probably perhaps possibly "
@@ -2161,16 +2168,21 @@ _REPORT_BEFORE = re.compile(
     r"letter|records)\b|^\s*per\b",
     re.IGNORECASE,
 )
-# What the sentence after an instruction may be and still be taken as unrelated to it (_accounted()): a step of the plan
-# opened by one of these with what follows it, lead-ins alone, or thanks.
+# What a short sentence after an instruction may be and still be taken as unrelated to it (_accounted()): a step of the
+# plan opened by one of these with what follows it, lead-ins alone, or thanks.
 _PLAN_STEPS = (STEP_VERBS - frozenset("stop hold avoid discontinue".split())) | {"follow"}
 _ALONE = frozenset("okay ok alright so and also then now next finally lastly plan".split())
 _THANKS = (("thanks",), ("thank", "you"))
 _ERROR = re.compile(r"\b(?:mistakes?|mistaken|errors?|wrong|incorrect)\b", re.IGNORECASE)
 _CONDITION = re.compile(rf"\b(?:{'|'.join(sorted(CONDITION_WORDS, key=len, reverse=True))})\b", re.IGNORECASE)
-# A list of what not to do, which holds back the instructions after it in its paragraph.
+# The headings of a note's own sections but Plan: reading after an instruction stops at one.
+_SECTIONS = HEADINGS - {"plan"}
+# A list of what not to do, or of what was refused, removed or put off, which holds back the instructions after it in
+# its paragraph.
 _NOT_TO_DO = re.compile(
-    r"\b(?:avoid|not to do|not do|not be doing|do not|decided against|would not|declined)\b|(?:\bnot|n't) want\b",
+    r"\b(?:avoid|not to do|not do|not be doing|not doing|do not|decided against|would not|declin(?:e|ed|es|ing)|"
+    r"refus(?:e|ed|es|ing)|skip(?:s|ped|ping)?|hold(?:ing)? off|holding|struck|cancell?(?:ed|ing)|delet(?:ed|ing)|"
+    r"remov(?:ed|ing)|reject(?:ed|ing)?|defer(?:red|ring)?|off the table)\b|(?:\bnot|n't) want\b",
     re.IGNORECASE,
 )
 
@@ -2187,8 +2199,6 @@ def _neighbours_hold_it(text: str, sentence: int, sentence_end: int, kind: str) 
     if said_before.endswith(":") and said_before[:-1].strip().lower() not in PROPOSAL_HEADINGS:
         return True
     if said_before and _CONDITION_OPENING.match(said_before) and not directives(said_before):
-        return True
-    if _later_sentences_hold_it(text, sentence_end):
         return True
     if previous and len(previous) <= BARE_SENTENCE and any(
         word in _BARE_BEFORE or word.endswith("n't") for word in previous
@@ -2215,52 +2225,79 @@ def _neighbours_hold_it(text: str, sentence: int, sentence_end: int, kind: str) 
         end = start
     if _not_to_do_before(text, sentence):
         return True
-    after = _next_sentence(text, sentence_end)
-    said = text[after[0] : after[1]] if after else ""
-    following = [token.text for token in tokens(said)]
-    if not following:
-        return False
-    bare = [
-        "1" if word == "one" and following[i + 1 : i + 2] and following[i + 1] in _A_NUMBER_OF else word.removesuffix("'s")
-        for i, word in enumerate(following)
-    ]
-    negated = any(word in _REMOVES or word.endswith("n't") for word in bare)
-    doubted = any(word in _NEXT_DOUBT for word in bare)
-    # Naming its item again counts as pointing back at it: "Forget about the CBC.", "Leave the blood count for now."
-    renamed = _named_again(bare, text[sentence:sentence_end], kind)
-    pointing = renamed or any(word in _POINTS_BACK or word in named for word in bare)
-    # For an allergy: "that" counts only first ("That was her sister actually"), not as a conjunction ("Add a note to
-    # her allergies that the reaction was hives").
-    pointing_at_allergy = renamed or bare[0] == "that" or any(word in _POINTS_BACK - {"that"} or word in named for word in bare)
-    if (
-        (len(following) <= BARE_SENTENCE and any(word in _NEXT_DOUBT | _POINTS_BACK or word.endswith("n't") for word in bare))
-        or bare[0] in _NEXT_OPENING
-        or any(word in _POINTS_BACK for word in bare[:3])
-        or (pointing and (negated or doubted))
-        or (kind == ALLERGY_ADDITION and any(word in _ALLERGY_WORDS for word in bare) and (
-            negated or pointing_at_allergy or _SOMEONE_ELSE.search(" ".join(bare)) is not None))
-    ):
-        return True
-    if directives(said):
-        return False
-    opening = said.split(",", 1)[0]
-    if (len(following) <= BARE_SENTENCE or len(tokens(opening)) <= BARE_SENTENCE) and not _accounted(opening):
-        return True
-    return not _opens_a_step(following) and (
-        NEGATION.search(said) or _ERROR.search(said) or _CONDITION.search(said)
-    ) is not None
+    return _sentences_after_hold_it(text, sentence, sentence_end, kind, named - _CLOSED_WORDS)
+
+
+def _sentences_after_hold_it(text: str, sentence: int, sentence_end: int, kind: str, named: set[str]) -> bool:
+    """Whether a sentence after a plain instruction, within TAKEN_BACK_REACH words, read past line breaks and heading
+    lines, up to one holding an instruction of its own, may take it back, doubt it, put it off or report it (see
+    above). `named` is the instruction's item words."""
+    at, left, first = sentence_end, TAKEN_BACK_REACH, True
+    while left > 0 and (after := _next_sentence(text, at)) is not None:
+        said = text[after[0] : after[1]]
+        following = [token.text for token in tokens(said)]
+        at = after[1]
+        if not following:
+            continue
+        bare = [
+            "1" if word == "one" and following[i + 1 : i + 2] and following[i + 1] in _A_NUMBER_OF
+            else word.removesuffix("'s")
+            for i, word in enumerate(following)
+        ]
+        negated = any(word in _REMOVES or word.endswith("n't") for word in bare)
+        doubted = any(word in _NEXT_DOUBT for word in bare)
+        # Naming its item again counts as pointing back at it: "Forget about the CBC.", "Leave the blood count for now."
+        renamed = _named_again(bare, text[sentence:sentence_end], kind)
+        pointing = renamed or any(word in _POINTS_BACK or word in named for word in bare)
+        # For an allergy: "that" counts only first ("That was her sister actually"), not as a conjunction ("Add a note to
+        # her allergies that the reaction was hives").
+        pointing_at_allergy = renamed or bare[0] == "that" or any(
+            word in _POINTS_BACK - {"that"} or word in named for word in bare
+        )
+        if (
+            (len(following) <= BARE_SENTENCE and any(word in _NEXT_DOUBT | _POINTS_BACK or word.endswith("n't") for word in bare))
+            or (pointing and (negated or doubted))
+            or (kind == ALLERGY_ADDITION and any(word in _ALLERGY_WORDS for word in bare) and (
+                negated or pointing_at_allergy or _SOMEONE_ELSE.search(" ".join(bare)) is not None))
+        ):
+            return True
+        if first and (bare[0] in _NEXT_OPENING or any(word in _POINTS_BACK for word in bare[:3])):
+            return True
+        if directives(said):
+            return False
+        if first and following[0] not in NEXT_CLAUSE and (
+            _CONDITION_OPENING.match(said) or FOR_LATER.search(said) or PAST.search(said) or _DONE.search(said)
+        ):
+            return True
+        if not first and (TAKEN_BACK.search(said) or following[0] in _LATER_OPENING):
+            return True
+        opening = said.split(",", 1)[0]
+        if (len(following) <= BARE_SENTENCE or len(tokens(opening)) <= BARE_SENTENCE) and not _accounted(opening):
+            return True
+        if NEGATION.search(said) or _ERROR.search(said) or _CONDITION.search(said):
+            return True
+        left -= len(following)
+        first = False
+    return False
 
 
 def _next_sentence(text: str, mark: int) -> tuple[int, int] | None:
-    """Where the sentence after the one a sentence mark at `mark` ends starts and ends, read past line breaks; None at
-    the end of the text, or at a heading line ("Assessment:"), where another part of the note starts."""
-    start = mark + 1
-    while start < len(text) and text[start].isspace():
-        start += 1
-    if start >= len(text):
-        return None
-    end = _sentence_end(text, start)
-    return None if text[start:end].rstrip().endswith(":") else (start, end)
+    """Where the sentence after the one a sentence mark at `mark` ends starts and ends, read past line breaks and heading
+    lines ("Addendum:", "Correction:", "Plan:"); None at the end of the text, or at the heading of another of the note's
+    own sections (_SECTIONS: "Assessment:", "Exam:"), where another part of the note starts."""
+    while True:
+        start = mark + 1
+        while start < len(text) and text[start].isspace():
+            start += 1
+        if start >= len(text):
+            return None
+        end = _sentence_end(text, start)
+        said = text[start:end].rstrip()
+        if not said.endswith(":"):
+            return start, end
+        if said[:-1].strip().lower() in _SECTIONS:
+            return None
+        mark = end
 
 
 def _opens_a_step(words: list[str]) -> bool:
@@ -2270,13 +2307,13 @@ def _opens_a_step(words: list[str]) -> bool:
 
 def _accounted(said: str) -> bool:
     """Whether a short sentence after a plain instruction, or the short clause it opens with, is accounted for as
-    unrelated to it: a step of the plan, a heading, lead-ins alone, or thanks (see above)."""
+    unrelated to it: a step of the plan; a heading, with what follows it accounted for too; lead-ins alone; or thanks
+    (see above)."""
     words = [token.text for token in tokens(said)]
+    if words and words[0] in HEADINGS | PROPOSAL_HEADINGS and (heading := re.match(r"\s*[\w ]+?\s*:", said)):
+        return not tokens(said[heading.end() :]) or _accounted(said[heading.end() :])
     return bool(words) and (
-        _opens_a_step(words)
-        or (words[0] in HEADINGS and re.match(r"\s*\w+\s*:", said) is not None)
-        or all(word in _ALONE for word in words)
-        or tuple(words) in _THANKS
+        _opens_a_step(words) or all(word in _ALONE for word in words) or tuple(words) in _THANKS
     )
 
 
@@ -2298,8 +2335,10 @@ def _named_again(words: list[str], sentence: str, kind: str) -> bool:
 
 
 def _not_to_do_before(text: str, sentence: int) -> bool:
-    """Whether a list of what not to do (_NOT_TO_DO) is said before an instruction's sentence in its paragraph, within
-    TAKEN_BACK_REACH words, whatever is said between. A blank line ends the paragraph, and a heading line opens it."""
+    """Whether a word of refusing, removing or putting off (_NOT_TO_DO) is said before an instruction's sentence in its
+    paragraph, within TAKEN_BACK_REACH words, whatever is said between, or a retraction (TAKEN_BACK) in the sentence
+    right before it; either unless said of what came before it ("Skip that."). A blank line ends the paragraph, and a
+    heading line opens it."""
     at, left = sentence, TAKEN_BACK_REACH
     while left > 0:
         end = len(text[:at].rstrip())
@@ -2307,7 +2346,10 @@ def _not_to_do_before(text: str, sentence: int) -> bool:
             return False
         start = max((mark.end() for mark in SENTENCE_MARK.finditer(text, 0, end - 1)), default=0)
         said = text[start:end]
-        if _NOT_TO_DO.search(said):
+        words = [token.text for token in tokens(said)]
+        of_what_came_before = any(word in ("that", "it") for word in words) and not any(
+            word in ("these", "following", "next", "below") for word in words)
+        if not of_what_came_before and (_NOT_TO_DO.search(said) or (at == sentence and TAKEN_BACK.search(said))):
             return True
         if said.strip().endswith(":"):
             return False
@@ -2328,31 +2370,6 @@ _CONDITION_OPENING = re.compile(
 _DONE = re.compile(r"\b(?:done|ordered|sent)\b", re.IGNORECASE)
 # How a later sentence opens that takes it back: "No, just the BMP.", "Actually, let's not.", "Wait, that was her sister."
 _LATER_OPENING = frozenset("no not nope never or instead rather actually hold wait".split())
-
-
-def _later_sentences_hold_it(text: str, sentence_end: int) -> bool:
-    """Whether the sentences after a plain instruction that hold no instruction of their own, within TAKEN_BACK_REACH
-    words, read past line breaks, take it back or put it off: the first by opening with a condition, or saying a time
-    for later, that it was done already, ordered or sent (unless it opens a step of the plan of its own, "Recheck in one
-    week."); any of them with a retraction (TAKEN_BACK) or opening like one (_LATER_OPENING)."""
-    at, left, first = sentence_end, TAKEN_BACK_REACH, True
-    while left > 0 and (after := _next_sentence(text, at)) is not None:
-        said = text[after[0] : after[1]]
-        words = [token.text for token in tokens(said)]
-        at = after[1]
-        if not words:
-            continue
-        if directives(said):
-            return False
-        if first and words[0] not in NEXT_CLAUSE and (
-            _CONDITION_OPENING.match(said) or FOR_LATER.search(said) or PAST.search(said) or _DONE.search(said)
-        ):
-            return True
-        if not first and (TAKEN_BACK.search(said) or words[0] in _LATER_OPENING):
-            return True
-        left -= len(words)
-        first = False
-    return False
 
 
 def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, int]], start: int, end: int,
