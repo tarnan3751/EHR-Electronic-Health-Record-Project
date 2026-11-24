@@ -391,48 +391,66 @@ def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
 
 
 # TC-UC10-13 (NFR-05; FR-14 as reworded, the expansion plan's step 15.1): the trick sentences, weighed again by the
-# checks on every change, and pinned: none that reverses the meaning may be proposed, the wrong proposals may number no
-# more than the set records, and every control must be proposed; and the recordings must keep the owner's floor of
-# right proposals.
+# checks on every change, and pinned: none expected held back may be proposed unless the owner has accepted it by name,
+# the wrong proposals may number no more than the set records, and every control must be proposed; and the recordings
+# must keep the owner's floor of right proposals. Each of the four, failing and passing.
 TRICK = """most_wrong = {most_wrong}
-
+{accepted}
 [[group]]
 family = "f"
 expect = "held_back"
 reverses = {reverses}
 said = ["Order a CBC."]
 """
+TRICK_ACCEPTED = """
+[accepted]
+by = "the owner"
+on = 2026-11-24
+reason = "A known limit."
+said = ["Order a CBC."]
+"""
 
 
-def test_a_trick_sentence_that_reverses_the_meaning_proposed_fails(eval_dir):
+@pytest.mark.parametrize("reverses", ["true", "false"])
+def test_a_wrong_trick_proposal_not_accepted_by_name_fails_and_one_accepted_passes(eval_dir, reverses):
     save(eval_dir, "latest.json", results(eval_dir))
-    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true"), encoding="utf-8")
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses=reverses, accepted=""),
+                                                   encoding="utf-8")
 
     (problem,) = check(eval_dir / "results", eval_dir)
-    assert "'Order a CBC.' is proposed" in problem and "reverses the meaning" in problem
+    assert "'Order a CBC.' is proposed" in problem and "hasn't accepted it by name" in problem
+    assert ("reverses the meaning" in problem) == (reverses == "true")
+
+    (eval_dir / "trick-sentences.toml").write_text(
+        TRICK.format(most_wrong=1, reverses=reverses, accepted=TRICK_ACCEPTED), encoding="utf-8")
+    assert check(eval_dir / "results", eval_dir) == []
 
 
 def test_more_wrong_trick_proposals_than_the_set_records_fail(eval_dir):
     save(eval_dir, "latest.json", results(eval_dir))
-    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=0, reverses="false"), encoding="utf-8")
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=0, reverses="true", accepted=TRICK_ACCEPTED),
+                                                   encoding="utf-8")
 
     (problem,) = check(eval_dir / "results", eval_dir)
     assert "1 wrong proposals, more than the 0" in problem
 
-    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="false"), encoding="utf-8")
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
+                                                   encoding="utf-8")
     assert check(eval_dir / "results", eval_dir) == []
 
 
 # The trick sentences are pinned (TRICK_SENTENCES_SHA256): each of the review's three edits fails the gate, though each
 # kept the file's own counts consistent: a sentence deleted; a tolerated sentence made a control, the cap lowered; and a
-# reversing sentence added to a tolerated group, the cap raised.
+# reversing sentence added to a tolerated group, the cap raised. So does a sentence accepted by name, the cap raised.
 @pytest.mark.parametrize("edit", [
     lambda text: text.replace('    "Order a CBC. Nah.",\n', "", 1),
-    lambda text: text.replace("most_wrong = 7", "most_wrong = 6", 1).replace(
+    lambda text: text.replace("most_wrong = 96", "most_wrong = 95", 1).replace(
         'expect = "held_back"\nreverses = false\ntolerated = "everyday_item"', 'expect = "proposed"', 1),
-    lambda text: text.replace("most_wrong = 7", "most_wrong = 8", 1).replace(
+    lambda text: text.replace("most_wrong = 96", "most_wrong = 97", 1).replace(
         '    "So, will, order a CBC.",\n', '    "So, will, order a CBC.",\n    "Order a CBC. Not that one, cancel it.",\n', 1),
-], ids=["deleted", "tolerated-made-control", "reversing-made-tolerated"])
+    lambda text: text.replace("most_wrong = 96", "most_wrong = 97", 1).replace(
+        "said = [\n", 'said = [\n    "Order a CBC. Nah.",\n', 1),
+], ids=["deleted", "tolerated-made-control", "reversing-made-tolerated", "accepted-by-name"])
 def test_a_trick_set_changed_without_the_gate_fails(eval_dir, edit):
     committed = (EVAL_DIR / "trick-sentences.toml").read_text(encoding="utf-8")
     changed = edit(committed)
@@ -443,13 +461,16 @@ def test_a_trick_set_changed_without_the_gate_fails(eval_dir, edit):
     assert any("isn't the set this gate records" in problem for problem in problems)
 
 
-def test_a_control_not_proposed_fails(eval_dir):
+def test_a_control_not_proposed_fails_and_one_proposed_passes(eval_dir):
     save(eval_dir, "latest.json", results(eval_dir))
-    (eval_dir / "trick-sentences.toml").write_text(
-        'most_wrong = 0\n\n[[group]]\nfamily = "c"\nexpect = "proposed"\nsaid = ["Order a CBC. Nah."]\n', encoding="utf-8")
+    control = 'most_wrong = 0\n\n[[group]]\nfamily = "c"\nexpect = "proposed"\nsaid = ["{said}"]\n'
+    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC. Nah."), encoding="utf-8")
 
     (problem,) = check(eval_dir / "results", eval_dir)
     assert "control 'Order a CBC. Nah.' is not proposed" in problem
+
+    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC."), encoding="utf-8")
+    assert check(eval_dir / "results", eval_dir) == []
 
 
 def test_no_trick_sentences_fail(eval_dir):
@@ -460,9 +481,10 @@ def test_no_trick_sentences_fail(eval_dir):
     assert "no trick sentences" in problem
 
 
-def test_fewer_right_proposals_on_the_recordings_than_the_floor_fail(eval_dir):
+def test_fewer_right_proposals_on_the_recordings_than_the_floor_fail_and_as_many_pass(eval_dir):
     save(eval_dir, "latest.json", results(eval_dir))
 
     (problem,) = check(eval_dir / "results", eval_dir, floor=2)
     assert "1 right proposals against the clinical gold, under the owner's floor of 2" in problem
+    assert check(eval_dir / "results", eval_dir, floor=1) == []
     assert gate.PROPOSALS_FLOOR == 14

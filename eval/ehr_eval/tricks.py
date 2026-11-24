@@ -1,8 +1,9 @@
 """The trick sentences (eval/trick-sentences.toml; the expansion plan's step 15.1), weighed again by this commit's
 checks: what each is expected to give, and what it gives. No model is needed: each sentence is a whole final transcript,
 and the dictation's own rules (validation.weigh()) say what it proposes. The gate (gate.py) fails when the file isn't the
-one it records, when a sentence marked as reversing the meaning is proposed, when the wrong proposals number more than
-the set's most_wrong, or when a control is not proposed; it reports what the strict rule costs (expect = "cost").
+one it records, when a sentence expected held back is proposed and the owner hasn't accepted it by name (the set's
+[accepted]), when the wrong proposals number more than the set's most_wrong, or when a control is not proposed; it
+reports how many of the wrong proposals reverse the meaning, and what the strict rule costs (expect = "cost").
 
     uv run --project eval python -m ehr_eval.tricks
 """
@@ -38,6 +39,7 @@ class Scores:
     most_wrong: int
     wrong: list[str] = field(default_factory=list)  # proposed, though expected held back
     reversing: list[str] = field(default_factory=list)  # of those, the ones marked as reversing the meaning
+    unaccepted: list[str] = field(default_factory=list)  # of those, the ones the owner hasn't accepted by name
     controls: int = 0  # expected proposed
     missed: list[str] = field(default_factory=list)  # expected proposed, and not
     cost: int = 0  # plain instructions the strict rule holds back (expect = "cost")
@@ -56,6 +58,12 @@ def load(eval_dir: Path = EVAL_DIR) -> tuple[list[Trick], int, dict[str, str]]:
     return tricks, data["most_wrong"], data.get("tolerated", {})
 
 
+def accepted(eval_dir: Path = EVAL_DIR) -> frozenset[str]:
+    """The sentences the owner accepts by name as wrong proposals (the set's [accepted]), as the set has them."""
+    data = tomllib.loads((eval_dir / TRICKS).read_text(encoding="utf-8"))
+    return frozenset(data.get("accepted", {}).get("said", []))
+
+
 def proposed(said: str) -> list[str]:
     """The words of each proposal the dictation makes from a sentence said as a whole, final transcript."""
     return [said[weighed.start : weighed.end] for weighed in validation.weigh(Transcript(said, (), True))
@@ -64,6 +72,7 @@ def proposed(said: str) -> list[str]:
 
 def score(eval_dir: Path = EVAL_DIR) -> Scores:
     tricks, most_wrong, _ = load(eval_dir)
+    named = accepted(eval_dir)
     scores = Scores(sentences=len(tricks), most_wrong=most_wrong)
     for trick in tricks:
         given = proposed(trick.said)
@@ -78,18 +87,22 @@ def score(eval_dir: Path = EVAL_DIR) -> Scores:
             scores.wrong.append(trick.said)
             if trick.reverses:
                 scores.reversing.append(trick.said)
+            if trick.said not in named:
+                scores.unaccepted.append(trick.said)
     return scores
 
 
 def main() -> int:
     scores = score()
     for said in scores.wrong:
-        print(f"{'reverses the meaning' if said in scores.reversing else 'wrong'}: {said!r}")
+        print(f"{'reverses the meaning' if said in scores.reversing else 'wrong'}"
+              f"{'' if said in scores.unaccepted else ', accepted by name'}: {said!r}")
     for said in scores.missed:
         print(f"expected proposed, and not: {said!r}")
     print(
         f"{scores.sentences} trick sentences: {len(scores.wrong)} wrong proposals (at most {scores.most_wrong}), "
-        f"{len(scores.reversing)} reversing the meaning (there must be none); {scores.controls - len(scores.missed)} of "
+        f"{len(scores.wrong) - len(scores.unaccepted)} of them accepted by name (there must be no other), "
+        f"{len(scores.reversing)} reversing the meaning; {scores.controls - len(scores.missed)} of "
         f"{scores.controls} controls proposed; {scores.cost_held} of {scores.cost} plain instructions held back by the strict "
         "rule, what it costs."
     )
