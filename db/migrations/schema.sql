@@ -1122,3 +1122,11 @@ VALUES ('20261123190030_Messages', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE INDEX ix_messages_unread_from_staff ON ehr.messages (patient_id) WHERE sender_kind = 'staff' AND read_at IS NULL;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261124052432_UnreadMessagesIndex', '10.0.13');
+
+COMMIT;
+

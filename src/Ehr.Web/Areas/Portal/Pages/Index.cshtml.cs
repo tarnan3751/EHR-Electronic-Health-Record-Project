@@ -15,6 +15,9 @@ public class IndexModel(PhiReader phi) : PageModel
     // The patient's next appointments (FR-17), read with the patient in the page's one recorded read.
     public IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming { get; private set; } = [];
 
+    // How many messages from the care team the patient hasn't opened (FR-18), part of the same page view.
+    public int UnreadMessages { get; private set; }
+
     public async Task OnGetAsync()
     {
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
@@ -23,5 +26,9 @@ public class IndexModel(PhiReader phi) : PageModel
         var appointments = await phi.AppointmentsAsync(patientId, past: 0, HttpContext.RequestAborted);
         Patient = appointments?.Patient;
         Upcoming = [.. (appointments?.Upcoming ?? []).Take(3)];
+        if (Patient is not null)
+        {
+            UnreadMessages = await phi.UnreadFromStaffAsync(patientId, HttpContext.RequestAborted);
+        }
     }
 }

@@ -39,4 +39,8 @@ else
             </li>
         }
     </ul>
+    @if (threads.Threads.Count == Ehr.Web.Areas.Portal.Pages.Messages.IndexModel.Limit)
+    {
+        <p class="sc-muted">These are your @Ehr.Web.Areas.Portal.Pages.Messages.IndexModel.Limit latest conversations. For an older one, contact the clinic.</p>
+    }
 }

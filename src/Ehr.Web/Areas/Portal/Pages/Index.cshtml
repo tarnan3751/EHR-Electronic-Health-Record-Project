@@ -13,7 +13,12 @@
             <dt>Date of birth</dt><dd>@patient.BirthDate.ToString("yyyy-MM-dd")</dd>
         </dl>
     </section>
-    <p><a asp-page="/Results" class="sc-btn sc-btn--primary">See your test results</a></p>
+    @* Results, appointments and messages as three panels of one shape (docs/brand: the portal, one column). *@
+    <section class="sc-panel" aria-labelledby="home-results">
+        <h2 class="sc-panel__title" id="home-results">Your test results</h2>
+        <p>Released results, with what each one means.</p>
+        <p><a asp-page="/Results" class="sc-btn sc-btn--primary">See your test results</a></p>
+    </section>
     <section class="sc-panel" aria-labelledby="home-appointments">
         <h2 class="sc-panel__title" id="home-appointments">Your next appointments</h2>
         @if (Model.Upcoming.Count > 0)
@@ -26,7 +31,18 @@
         }
         <p><a asp-page="/Appointments">All your appointments</a></p>
     </section>
-    <p><a asp-page="/Messages/Index" class="sc-btn">Messages with your care team</a></p>
+    <section class="sc-panel" aria-labelledby="home-messages">
+        <h2 class="sc-panel__title" id="home-messages">Messages with your care team</h2>
+        @if (Model.UnreadMessages > 0)
+        {
+            <p><span class="sc-tag sc-tag--info">New</span> You have @Model.UnreadMessages new @(Model.UnreadMessages == 1 ? "message" : "messages") from your care team.</p>
+        }
+        else
+        {
+            <p class="sc-muted">No new messages.</p>
+        }
+        <p><a asp-page="/Messages/Index" class="sc-btn">Open your messages</a></p>
+    </section>
 }
 else
 {
