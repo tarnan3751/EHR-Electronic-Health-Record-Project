@@ -345,6 +345,8 @@ def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript, *
     terms = _terms(words)
     cues, taken_back, superseded = _corrections(transcript.text, words, terms)
     kinds = QUALIFIERS if scope is None else CONVERSATION_QUALIFIERS
+    if scope is not None:  # the voices' names, for the lean (NOT_QUOTED_UNSURE)
+        scope = Scope(scope.window, scope.passages, transcript.roles)
     context = _Transcript(
         text=transcript.text,
         words=words,
@@ -2353,9 +2355,11 @@ SPEAKERS = {
 # nearly always by the role that voice was named (in the record run, 97.6% of the Unsure words in the clinician's voice
 # were the clinician's on the clean visits, 72.4% in noise), so Subjective doesn't quote an Unsure passage in the
 # clinician's voice: most of those the model quoted were the clinician's own words, often a question. Each field: the
-# roles whose voice's Unsure passages it may not quote. A voice with no sure passage (one named "unsure") has no lean.
+# roles whose voice's Unsure passages it may not quote. A voice leans to the name the clinician gave it (Scope.names),
+# whether or not any of its passages is sure (in the record run's c05 babble recording none of the clinician's 25 was);
+# a voice named "unsure", or a passage no voice was told for, has no lean.
 NOT_QUOTED_UNSURE = {"subjective": frozenset({"clinician"})}
-ROLE_MARK =re.compile(r"\A\s*(?:clinician|patient|other|unsure)\s*:\s*", re.IGNORECASE)
+ROLE_MARK = re.compile(r"\A\s*(?:clinician|patient|other|unsure)\s*:\s*", re.IGNORECASE)
 # A hedge, a denial or a report said in a conversation, read as one shape (see above): the common cues (NEGATION,
 # CERTAINTY, which pass over a subject and its verb, TO_THE_FINDING) and a few heads people say to each other rather
 # than dictate, each followed by what speech puts between it and what it is about (_SAID_TO_THE_FINDING): fillers ("um",
@@ -2682,11 +2686,13 @@ MERGED_LIMIT = 12_000
 
 @dataclass(frozen=True)
 class Scope:
-    """Where a conversation's window may quote: the window (code points in the transcript), and every passage's place and
-    who said it (clinician, patient, other or unsure), in order."""
+    """Where a conversation's window may quote: the window (code points in the transcript), every passage's place and
+    who said it (clinician, patient, other or unsure), in order, and each voice's name as the clinician gave it, which
+    check() fills in from the conversation it is given."""
 
     window: tuple[int, int]
     passages: tuple[tuple[int, int, str, int | None], ...]  # place, who and voice (conversation.Conversation.passages())
+    names: tuple[tuple[int, str], ...] = ()  # voice and name (conversation.Conversation.roles)
 
     def pieces(self, span: tuple[int, int], words: list[Token]) -> list[tuple[int, int]]:
         """The span's words cut where the voice changes, a piece each run of one voice's words."""
@@ -2710,12 +2716,12 @@ class Scope:
         return said.pop() if len(said) == 1 else "unsure"
 
     def leans(self, span: tuple[int, int]) -> str | None:
-        """The role of the voice the span is in, as that voice's sure passages name it; None if it runs across two
-        voices, no voice was told, or none of its voice's passages is sure (a voice named "unsure")."""
+        """The name the clinician gave the voice the span is in (clinician, patient, other or unsure); None if it runs
+        across two voices or no voice was told."""
         voices = {voice for start, end, _, voice in self.passages if start < span[1] and span[0] < end}
         if len(voices) != 1 or None in voices:
             return None
-        return next((who for _, _, who, voice in self.passages if voice in voices and who != "unsure"), None)
+        return dict(self.names).get(voices.pop())
 
 
 def _warn_of_speakers(checked: dict[str, Checked]) -> None:

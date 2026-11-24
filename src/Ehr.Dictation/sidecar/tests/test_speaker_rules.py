@@ -690,6 +690,21 @@ def test_subjective_never_quotes_the_clinicians_voice_even_where_its_passage_is_
     assert [code for code, _, _ in assessed["assessment"].warnings] == ["speaker_unsure"]
 
 
+# The lean is the name the clinician gave the voice, whether or not any of its passages is sure: c05's babble recording
+# had none of the clinician's 25 passages sure, and "the tablets made you feel sick at first" went to Subjective.
+def test_the_lean_is_the_voices_name_even_with_no_sure_passage():
+    text = heard(("clinician", "so tell me how the sleep has been", True), ("patient", "not good i lie awake for hours"),
+                 ("clinician", "the tablets made you feel sick at first", True),
+                 ("patient", "they did for a week or so"))
+
+    leaned = checked(text, subjective=("The tablets made you feel sick at first.",
+                                       ["the tablets made you feel sick at first"]))["subjective"]
+    answered = checked(text, subjective=("They did for a week or so.", ["they did for a week or so"]))["subjective"]
+
+    assert leaned.reasons[0] == "wrong_speaker"
+    assert answered.pending and answered.speakers == ["patient"]
+
+
 def test_a_voice_named_unsure_has_no_lean():
     text = conversation.assemble([
         (Segment(0, 16000, "Your chest is clear {period}", 0.9, None, True), 1, False),
