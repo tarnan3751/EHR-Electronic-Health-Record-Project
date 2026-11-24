@@ -3,8 +3,10 @@ checks: what each is expected to give, and what it gives. No model is needed: ea
 and the dictation's own rules (validation.weigh()) say what it proposes. The gate (gate.py) fails when the file isn't the
 one it records, when a sentence expected held back is proposed and the owner hasn't accepted it by name (the set's
 [accepted]), when a sentence accepted by name is no longer proposed, when most_wrong isn't the number of sentences
-accepted by name, when the wrong proposals number more than most_wrong, or when a control is not proposed; it reports
-how many of the wrong proposals reverse the meaning, and what the strict rule costs (expect = "cost").
+accepted by name, when the wrong proposals number more than most_wrong, or when a control is not proposed at every
+instruction it lists; it reports how many of the wrong proposals reverse the meaning, and what the strict rule costs
+(expect = "cost"). Proposals are counted, not sentences: a sentence accepted by name that starts giving two proposals
+takes the count over the cap, and a control with two instructions that loses one is missed.
 
     uv run --project eval python -m ehr_eval.tricks
 """
@@ -39,12 +41,13 @@ class Scores:
     sentences: int
     most_wrong: int
     wrong: list[str] = field(default_factory=list)  # proposed, though expected held back
+    wrong_proposals: int = 0  # the proposals those give, which the cap counts
     reversing: list[str] = field(default_factory=list)  # of those, the ones marked as reversing the meaning
     unaccepted: list[str] = field(default_factory=list)  # of those, the ones the owner hasn't accepted by name
     accepted: int = 0  # sentences the owner accepts by name
     stale: list[str] = field(default_factory=list)  # accepted by name, and not proposed (nor in the set at all)
     controls: int = 0  # expected proposed
-    missed: list[str] = field(default_factory=list)  # expected proposed, and not
+    missed: list[str] = field(default_factory=list)  # expected proposed, and not at every instruction they list
     cost: int = 0  # plain instructions the strict rule holds back (expect = "cost")
     cost_held: int = 0  # of those, held back now
 
@@ -78,16 +81,18 @@ def score(eval_dir: Path = EVAL_DIR) -> Scores:
     named = accepted(eval_dir)
     scores = Scores(sentences=len(tricks), most_wrong=most_wrong, accepted=len(named))
     for trick in tricks:
-        given = proposed(trick.said)
+        weighed = validation.weigh(Transcript(trick.said, (), True))
+        given = [one for one in weighed if one.held_back is None]
         if trick.expect == "proposed":
             scores.controls += 1
-            if not given:
+            if not given or len(given) < len(weighed):
                 scores.missed.append(trick.said)
         elif trick.expect == "cost":
             scores.cost += 1
             scores.cost_held += not given
         elif given:
             scores.wrong.append(trick.said)
+            scores.wrong_proposals += len(given)
             if trick.reverses:
                 scores.reversing.append(trick.said)
             if trick.said not in named:
@@ -102,12 +107,13 @@ def main() -> int:
         print(f"{'reverses the meaning' if said in scores.reversing else 'wrong'}"
               f"{'' if said in scores.unaccepted else ', accepted by name'}: {said!r}")
     for said in scores.missed:
-        print(f"expected proposed, and not: {said!r}")
+        print(f"expected proposed at every instruction it lists, and not: {said!r}")
     for said in scores.stale:
         print(f"accepted by name, and no longer proposed: {said!r}")
     print(
-        f"{scores.sentences} trick sentences: {len(scores.wrong)} wrong proposals (at most {scores.most_wrong}), "
-        f"{len(scores.wrong) - len(scores.unaccepted)} of them accepted by name (there must be no other), "
+        f"{scores.sentences} trick sentences: {scores.wrong_proposals} wrong proposals (at most {scores.most_wrong}), "
+        f"from {len(scores.wrong)} sentences, {len(scores.wrong) - len(scores.unaccepted)} of them accepted by name "
+        "(there must be no other), "
         f"{len(scores.reversing)} reversing the meaning; {scores.controls - len(scores.missed)} of "
         f"{scores.controls} controls proposed; {scores.cost_held} of {scores.cost} plain instructions held back by the strict "
         "rule, what it costs."

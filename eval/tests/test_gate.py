@@ -493,6 +493,36 @@ def test_a_trick_set_changed_without_the_gate_fails(eval_dir, edit):
     assert any("isn't the set this gate records" in problem for problem in problems)
 
 
+# Proposals are counted, not sentences: a control with two instructions that loses its second fails, as does a sentence
+# accepted by name that starts giving two proposals, one more than the cap; each passes as it should be.
+def test_a_control_that_loses_one_of_its_instructions_fails_and_one_proposed_at_each_passes(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    control = 'most_wrong = 0\n\n[[group]]\nfamily = "c"\nexpect = "proposed"\nsaid = ["{said}"]\n'
+    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC. Order a BMP. Nah."),
+                                                   encoding="utf-8")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "control 'Order a CBC. Order a BMP. Nah.' is not proposed at every instruction it lists" in problem
+
+    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC. Order a BMP."), encoding="utf-8")
+    assert check(eval_dir / "results", eval_dir) == []
+
+
+def test_a_sentence_accepted_by_name_that_gives_two_proposals_exceeds_the_cap_and_one_that_gives_one_doesnt(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    two = TRICK_ACCEPTED.replace('said = ["Order a CBC."]', 'said = ["Order a CBC. Order a BMP."]')
+    (eval_dir / "trick-sentences.toml").write_text(
+        TRICK.format(most_wrong=1, reverses="true", accepted=two).replace(
+            'said = ["Order a CBC."]', 'said = ["Order a CBC. Order a BMP."]'), encoding="utf-8")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "2 wrong proposals, more than the 1" in problem
+
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
+                                                   encoding="utf-8")
+    assert check(eval_dir / "results", eval_dir) == []
+
+
 def test_a_control_not_proposed_fails_and_one_proposed_passes(eval_dir):
     save(eval_dir, "latest.json", results(eval_dir))
     control = 'most_wrong = 0\n\n[[group]]\nfamily = "c"\nexpect = "proposed"\nsaid = ["{said}"]\n'

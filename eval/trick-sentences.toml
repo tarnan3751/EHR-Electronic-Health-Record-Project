@@ -5,12 +5,12 @@
 # with this commit's checks, no model needed (ehr_eval/tricks.py; gate.py), and fails when a sentence expected held back
 # is proposed and the owner hasn't accepted it by name ([accepted], below), when one accepted by name is no longer
 # proposed, when most_wrong isn't the number accepted, when the wrong proposals, a proposal for any sentence expected
-# held back, number more than most_wrong, or when a control is not proposed. It also fails when this
-# file isn't the one it was written for (gate.py's TRICK_SENTENCES_SHA256): a change here is a change to the gate,
-# recorded there with it. eval/tests/test_tricks.py has a case for each sentence that reverses the meaning and is held
-# back, and each control. The review's sentences the rules still propose are in groups marked still_proposed; they and
-# the tolerated sentences are exactly those accepted by name, which the gate and a test keep so: when the rules hold one
-# back, it moves to its family's group and leaves [accepted], and most_wrong comes down with it.
+# held back, number more than most_wrong, or when a control is not proposed at every instruction it lists. It also fails
+# when this file isn't the one it was written for (gate.py's TRICK_SENTENCES_SHA256): a change here is a change to the
+# gate, recorded there with it. eval/tests/test_tricks.py has a case for each sentence that reverses the meaning and is
+# held back, and each control. The review's sentences the rules still propose are in groups marked still_proposed; they
+# and the tolerated sentences are exactly those accepted by name, which the gate and a test keep so: when the rules hold
+# one back, it moves to its family's group and leaves [accepted], and most_wrong comes down with it.
 #
 # Each group: its family (the review's letter); what is expected (expect): proposed, held_back, or cost (a plain
 # instruction the strict rule holds back: what it costs, reported, and no wrong proposal if proposed); for those held
@@ -21,7 +21,8 @@
 # join, a report, someone else, a condition, a time for later, the past, or the design ("call in" needs its pharmacy).
 # When in doubt, a sentence is marked as reversing.
 #
-# most_wrong is the number of sentences accepted by name, which the gate keeps equal. The owner's rule was first
+# most_wrong is the number of sentences accepted by name, which the gate keeps equal; each gives one proposal, and the
+# gate counts proposals, so one that starts giving two takes the count over it. The owner's rule was first
 # (2026-11-24, morning) no wrong proposal that reverses the meaning; no rule reached it, and the same day he put a cap
 # at what step 15.1 left in its place, accepting each sentence still proposed by name (below).
 #

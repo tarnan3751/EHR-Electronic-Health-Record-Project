@@ -35,8 +35,9 @@ someone committed instead:
    sentence expected held back is proposed unless the owner has accepted it by name (the set's [accepted]: on
    2026-11-24 he put a cap at step 15.1's count in place of zero); every sentence accepted by name is still proposed,
    and most_wrong is their number, so the cap holds no slack (as eval/known-limitations.toml's entries must each still
-   occur); the wrong proposals, a proposal for any sentence expected held back, number no more than most_wrong; and
-   every control is proposed. How many of the wrong proposals reverse the meaning, and what the strict rule costs, are
+   occur); the wrong proposals, a proposal for any sentence expected held back, number no more than most_wrong, counted
+   as proposals, so a sentence accepted by name that starts giving two exceeds it; and every control is proposed at
+   every instruction it lists. How many of the wrong proposals reverse the meaning, and what the strict rule costs, are
    reported.
 7. The recordings, their proposals scored again as in 4, give at least PROPOSALS_FLOOR right proposals against the
    clinical gold: the owner's floor, which holds however the rule-following gold changes.
@@ -75,7 +76,7 @@ RUN_IT = (
 PROPOSALS_FLOOR = 14
 # The trick sentences this gate was written for (eval/trick-sentences.toml, line endings as LF): a sentence added,
 # removed, relabelled or accepted, or a cap moved, changes this with it, in review.
-TRICK_SENTENCES_SHA256 = "288c418b379fbddb7aefbfc9324038f3778b7360140ac88dda1df1f0fb393b5b"
+TRICK_SENTENCES_SHA256 = "1aedfc5a67ea921d0e5e690badddcfcbeb6da4917c039b990435beaffbed5282"
 # What the results must say about proposals, against each gold.
 PROPOSAL_METRICS = ("shown", "said", "found", "false", "misheard", "listed")
 PROPOSAL_BLOCKS = ("proposals", "proposals_clinical")
@@ -309,15 +310,15 @@ def _trick_sentences(eval_dir: Path, sha256: str) -> list[str]:
             f"eval/{tricks.TRICKS} records most_wrong = {scores.most_wrong}, and accepts {scores.accepted} "
             "sentences by name: the cap is their number, and only the owner accepts one."
         )
-    if len(scores.wrong) > scores.most_wrong:
+    if scores.wrong_proposals > scores.most_wrong:
         problems.append(
-            f"The trick sentences give {len(scores.wrong)} wrong proposals, more than the {scores.most_wrong} "
+            f"The trick sentences give {scores.wrong_proposals} wrong proposals, more than the {scores.most_wrong} "
             f"eval/{tricks.TRICKS} records ({', '.join(repr(said) for said in scores.wrong)}). Tighten the proposal "
             "rules (validation.py); only the owner accepts another wrong proposal there."
         )
     problems += [
-        f"The trick sentences' control {said!r} is not proposed; each control must be. Find which rule (validation.py) "
-        "holds it back."
+        f"The trick sentences' control {said!r} is not proposed at every instruction it lists; each must be. Find "
+        "which rule (validation.py) holds it back."
         for said in scores.missed
     ]
     return problems
@@ -352,7 +353,7 @@ def main() -> int:
         f"{proposals['shown']} proposals scored again from the recordings ({proposals['right']} right, recall "
         f"{proposals['recall']} against the rule-following gold and {clinical['recall']} against the clinical gold, "
         f"precision {proposals['precision']}, every false or misheard one accepted; at least {PROPOSALS_FLOOR} right "
-        f"against the clinical gold), {trick.sentences} trick sentences weighed again ({len(trick.wrong)} wrong "
+        f"against the clinical gold), {trick.sentences} trick sentences weighed again ({trick.wrong_proposals} wrong "
         f"proposals, at most {trick.most_wrong}, each accepted by name, {len(trick.reversing)} of them reversing the "
         f"meaning; every control proposed; {trick.cost_held} of "
         f"{trick.cost} plain instructions held back by the strict rule, what it costs). "
