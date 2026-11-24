@@ -2,12 +2,13 @@
 plan's step 15): every word of the instruction's sentence is a lead-in, the verb, a determiner, an item the reference
 data names, its quantities or a trailer, in that order. Everything else is held back, and still listed as not carried
 over. The sentences that must be held back are both reviews', every one of them (the first's here, the second's in
-tests/review/held_back_*.txt), with the near misses of each lead-in and trailing phrase; those proposed are the plain
-controls and each lead-in and trailer said plainly, and the second review's plain sentences (tests/review/plain.txt)
-are each proposed or listed in tests/review/plain_not_proposed.txt with why. And as properties, so the next sentence
-no one wrote is covered too: a word from outside the closed classes and the reference data, put anywhere into a plain
-instruction, makes it not plain, and so does a word from a name its item shares nothing with. A sentence's
-"[unclear]" is a passage marked unclear, as the first review wrote them."""
+tests/review/held_back_*.txt), with the near misses of each lead-in and trailing phrase, and a case of each of step
+15.1's rules for the sentences next to it, both ways; those proposed are the plain controls and each lead-in and
+trailer said plainly, and the second review's plain sentences (tests/review/plain.txt) are each proposed or listed in
+tests/review/plain_not_proposed.txt with why. And as properties, so the next sentence no one wrote is covered too: a
+word from outside the closed classes and the reference data, put anywhere into a plain instruction, makes it not plain,
+and so does a word from a name its item shares nothing with. A sentence's "[unclear]" is a passage marked unclear, as
+the first review wrote them."""
 
 from __future__ import annotations
 
@@ -365,6 +366,43 @@ HELD_BACK = [
     "Have her lisinopril refilled.",
     "Please get her metformin 500 mg refilled for 90 days.",
     "Sort out the refill.",
+    # Step 15.1. A short sentence after it, or a short clause it opens with, that isn't accounted for: words of
+    # retraction, refusal or doubt no list names.
+    "Order a CBC. Nah.",
+    "Order a CBC. Oops.",
+    "Order a CBC. Abort.",
+    "I'm going to order a CBC. Kidding.",
+    "Order a CBC. Questionable.",
+    "Refill her lisinopril. Hang on.",
+    "Refill her lisinopril. Hang on, let me check her pressure first.",
+    "Order a CBC. Pointless, she had one Monday.",
+    "Order a CBC. Excuse me, wrong patient entirely.",
+    "Order a CBC. Second thoughts, she has had plenty of blood drawn this month so we will pass on that.",
+    "Order a CBC. I. Mean. A BMP.",
+    "Order a CBC. Stop.",
+    "Order a CBC. Good.",
+    # A negation, a word of error or a condition anywhere in the sentence after it.
+    "Order a CBC. She is not willing to have blood drawn today.",
+    "Order a CBC. Insurance will not cover the blood count.",
+    "Order a CBC. The last line was a mistake.",
+    "Order a CBC. Patient prefers to wait until after the holidays.",
+    "Order a CBC. She will call us if she wants it.",
+    # Its item named again by another of its names, with a word of removing it.
+    "Order a CBC. Leave the blood count for now.",
+    # A list of what not to do earlier in its paragraph, whatever is said between.
+    "Not to do today. She is frail. Order a CBC.",
+    "Things to avoid today. Her pressure is fine. Refill her lisinopril.",
+    # Someone else before it: a bare sentence naming them, or their reaction before an allergy to add.
+    "Mom insists. Order a CBC.",
+    "Her mother asked. Refill her lisinopril.",
+    "Her sister reacted to amoxicillin. Add amoxicillin to her allergy list.",
+    # The sentences after it read past a line break or a new paragraph.
+    "Order a CBC {period} {new line} No {period}",
+    "Order a CBC. {new paragraph} Cancel that.",
+    "Order a CBC. {new paragraph} She declined it.",
+    "Order a CBC. {new paragraph} Nah.",
+    "Refill her lisinopril. {new paragraph} Actually, let's not.",
+    "Add amoxicillin to her allergy list. {new paragraph} Wait, that was her sister.",
 ]
 
 # Plain, as the review's own controls: proposed, these words.
@@ -374,6 +412,19 @@ CONTROLS = [
     ("Order a CBC. Thanks.", ["Order a CBC"]),
     ("Order a CBC. Recheck in one week.", ["Order a CBC"]),
     ("There is no fever, chest pain, or shortness of breath. Order a CBC.", ["Order a CBC"]),
+    # Step 15.1: a short sentence after it accounted for (a step of the plan with its verb, a heading, lead-ins alone,
+    # thanks), a longer one with none of the cues, and a heading line, where reading past a new paragraph stops.
+    ("Order a CBC. Continue amlodipine.", ["Order a CBC"]),
+    ("Order a CBC. Follow up in clinic.", ["Order a CBC"]),
+    ("Order a CBC. Assessment: stable.", ["Order a CBC"]),
+    ("Order a CBC. Okay.", ["Order a CBC"]),
+    ("Order a CBC. Also, continue her iron.", ["Order a CBC"]),
+    ("Order a CBC. Thank you.", ["Order a CBC"]),
+    ("Order a CBC. Emollients twice a day to the shins.", ["Order a CBC"]),
+    ("Order a CBC. {new paragraph} Recheck in one week.", ["Order a CBC"]),
+    ("Order a CBC. {new paragraph} Assessment {colon} {new paragraph} No acute distress.", ["Order a CBC"]),
+    ("She is frail. Order a CBC.", ["Order a CBC"]),
+    ("Avoid ibuprofen for now. {new paragraph} Order a CBC.", ["Order a CBC"]),
     ("Add amoxicillin as an allergy.", ["Add amoxicillin as an allergy"]),
     ("Add an allergy to codeine.", ["Add an allergy to codeine"]),
     ("Record a new allergy to codeine.", ["Record a new allergy to codeine"]),

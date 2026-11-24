@@ -1748,13 +1748,17 @@ def test_at_most_twenty_are_proposed_and_every_rule_is_named():
 
 
 def test_a_proposal_carries_a_warning_for_a_correction_or_an_unclear_passage_beside_it():
-    corrected = transcript("Order a CBC today. Change the dressing daily.")
-    beside = transcript("Go ahead and order a CBC.", ("mumble mumble", "too_noisy"))
+    # Each longer than four words: a shorter sentence right after a plain instruction must be accounted for (step 15.1),
+    # and a short unclear passage there, which may be a retraction no one heard, holds it back instead.
+    corrected = transcript("Order a CBC today. Change the dressing on her leg daily.")
+    beside = transcript("Go ahead and order a CBC.", ("mumble mumble mumble mumble mumble", "too_noisy"))
+    short = transcript("Go ahead and order a CBC.", ("mumble mumble", "too_noisy"))
 
     (warned,) = weigh(corrected)
     (near,) = weigh(beside)
 
     assert warned.held_back is None and [(code, corrected.text[s:e]) for code, s, e in warned.warnings] == [
-        ("possible_correction", "Change the dressing daily")
+        ("possible_correction", "Change the dressing on her leg daily")
     ]
     assert near.held_back is None and [code for code, _, _ in near.warnings] == ["near_unclear_passage"]
+    assert held_back(short) == [("not_plain", "Go ahead and order a CBC")]
