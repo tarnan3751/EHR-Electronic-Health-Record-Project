@@ -382,6 +382,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             var html = await ReadAsync(dismissed);
             Assert.Contains("autofocus", LinkTo(html, AllergyFormPath(dictated.Patient, dictated.Allergy)));
             Assert.Contains("Order Dismissed", RefillRequestTests.Said(html));
+            Assert.DoesNotContain("data-chart-proposal-made", html);
             Assert.Equal(1, CountOf(html, "Dismiss proposal"));
         }
 
@@ -445,6 +446,36 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
         Assert.Contains("Not saved: this proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
         Assert.StartsWith("ordered|", await StateAsync(apps, second.Order), StringComparison.Ordinal);
+    }
+
+    // A decided proposal shows no warning, there being nothing left to check it for, and leads its clinician to what it
+    // was decided into, on the chart: the order signed for it, the allergy added for it.
+    [Fact]
+    public async Task A_decided_proposal_drops_its_warnings_and_leads_to_its_order_or_allergy_on_the_chart()
+    {
+        var dictated = await DictateAsync(apps);
+        var allergyForm = AllergyFormPath(dictated.Patient, dictated.Allergy);
+        using (var recorded = await PostFormAsync(dictated.Session.Client, allergyForm, allergyForm, ("Name", "Penicillin G"), ("Status", "active")))
+        {
+            var html = await ReadAsync(recorded);
+            var said = RefillRequestTests.Said(html);
+            var allergy = (await StateAsync(apps, dictated.Allergy)).Split('|')[2];
+            Assert.Contains("Allergy to add Allergy added", said);
+            Assert.DoesNotContain("Check: you may have corrected", said);
+            Assert.Contains("data-chart-proposal-made", LinkTo(html, $"/patients/{dictated.Patient}#allergy-{allergy}"));
+            Assert.Contains("See the allergy on the chart", said);
+        }
+
+        using (var ordered = await UC1OrderAsync(dictated, "Lipid panel"))
+        {
+            var html = await ReadAsync(ordered);
+            var order = (await StateAsync(apps, dictated.Order)).Split('|')[1];
+            Assert.Contains("data-chart-proposal-made", LinkTo(html, $"/patients/{dictated.Patient}#order-{order}"));
+            Assert.Contains("See the order on the chart", RefillRequestTests.Said(html));
+            var chart = await dictated.Session.Client.GetStringAsync($"/patients/{dictated.Patient}", Cancel);
+            Assert.Contains($"id=\"order-{order}\"", chart);
+            Assert.Contains($"id=\"allergy-{(await StateAsync(apps, dictated.Allergy)).Split('|')[2]}\"", chart);
+        }
     }
 
     // "Sign order" for a lab test on the order form opened from the dictation's order proposal, as the form posts it

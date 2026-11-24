@@ -175,13 +175,26 @@
                             <li class="sc-proposal" data-chart-proposal="@row.Id" data-review-state="@row.State" data-chart-proposal-start="@proposed.Start" data-chart-proposal-end="@proposed.End">
                                 <p class="sc-proposal__head"><span class="sc-proposal__field">@proposed.KindWords</span> <span class="@(proposed.Waiting ? "sc-tag sc-tag--warning" : row.State == AiChartProposalStates.Dismissed ? "sc-tag" : "sc-tag sc-tag--success")" data-chart-proposal-state>@proposed.StateWords</span></p>
                                 <p class="sc-proposal__value" data-chart-proposal-words>@proposed.Before<mark class="sc-transcript__source">@proposed.Words</mark>@proposed.After</p>
-                                @foreach (var warning in proposed.Warnings)
+                                @* Its warnings only while it waits: once decided, there is nothing left to check them for. *@
+                                @if (proposed.Waiting)
                                 {
-                                    <p class="sc-proposal__warning">Check: @ProposedFromDictation.WarningWords(warning.Code) “@warning.Said”</p>
+                                    foreach (var warning in proposed.Warnings)
+                                    {
+                                        <p class="sc-proposal__warning">Check: @ProposedFromDictation.WarningWords(warning.Code) “@warning.Said”</p>
+                                    }
                                 }
                                 @if (row.DecidedAt is { } decidedAt)
                                 {
-                                    <p class="sc-proposal__message">@proposed.StateWords @Clinic.Format(decidedAt).</p>
+                                    @* What it was decided into, on the chart: the order signed for it, or the allergy added. Only the
+                                       proposal's own clinician reads its review (row-level security). *@
+                                    var made = row.OrderId is { } order ? $"order-{order}" : row.AllergyId is { } allergy ? $"allergy-{allergy}" : null;
+                                    <p class="sc-proposal__message">
+                                        @proposed.StateWords @Clinic.Format(decidedAt).
+                                        @if (made is not null)
+                                        {
+                                            <a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id" asp-fragment="@made" data-chart-proposal-made>@(row.OrderId is not null ? "See the order on the chart" : "See the allergy on the chart")</a>
+                                        }
+                                    </p>
                                 }
                                 else if (OnPrem.IsReachable)
                                 {

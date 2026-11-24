@@ -39,7 +39,7 @@ else
             <p><a asp-page="/Patients/Listen" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Listen to the visit into this draft</a></p>
         }
     }
-    var waiting = (Guid.Parse(RouteData.Values["draftId"]!.ToString()!), Model.WaitingProposals);
+    var waiting = (Guid.Parse(RouteData.Values["draftId"]!.ToString()!), Model.WaitingProposals, false);
     <partial name="_WaitingProposals" model="waiting" />
     @* Step 14: the text of an earlier draft, or of one last saved on the desktop, is in Subjective until its author sorts
        and saves it. Nothing has changed in the saved draft. *@
