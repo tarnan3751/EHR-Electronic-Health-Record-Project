@@ -20,7 +20,8 @@ namespace Ehr.Web.Api.Dictation;
 // a new draft unless draftId names one. 201 with the binding, as the dictation's start answers. Nothing about the
 // microphone happens before this answer: the page opens it only then. A retry with the same reviewId gets the saved
 // binding. Refused with 422: no agreement, speakers other than 2 or 3, an unknown givenBy, or a spoken language other
-// than English ("en"), which is all listening works in.
+// than English ("en"), which is all listening works in; and with 409 sign_in_ending, before anything else, when the
+// sign-in's 12-hour end comes before a 20-minute visit could finish (DictationApi.cs, step 18).
 //
 // Then, for the session that start named, each call checked against its binding first (RequireOpenCaptureAsync): the
 // clinician's own, of a visit, with its consent, and still recording, neither staged nor ended; otherwise 409
@@ -85,6 +86,7 @@ public static partial class DictationApi
     {
         IdentifyReviewUser(context);
         context.Response.Headers.CacheControl = "no-store";
+        if (await SignInEndsTooSoonAsync(context, ambient: true) is { } tooSoon) return tooSoon;
         var cancel = context.RequestAborted;
         if (!input.Agreed)
             return ReviewAnswer(context, ReviewResult.Invalid("Confirm that everyone who will speak has agreed, aloud, to the visit being recorded."));

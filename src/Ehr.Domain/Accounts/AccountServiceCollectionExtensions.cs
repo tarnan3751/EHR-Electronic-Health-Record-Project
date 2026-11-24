@@ -55,7 +55,8 @@ public static class AccountServiceCollectionExtensions
                 options => options.ForwardDefaultSelector = AccountSchemes.Select)
             .AddCookie(AccountSchemes.Staff, options =>
             {
-                Cookie(options, "__Host-Ehr.Staff", TimeSpan.FromMinutes(30));
+                Cookie(options, "__Host-Ehr.Staff", SessionTimes.Idle);
+                SessionEvents(options);
                 options.LoginPath = "/sign-in";
                 options.LogoutPath = "/sign-out";
                 options.AccessDeniedPath = "/denied";
@@ -67,7 +68,8 @@ public static class AccountServiceCollectionExtensions
             })
             .AddCookie(AccountSchemes.Patient, options =>
             {
-                Cookie(options, "__Host-Ehr.Patient", TimeSpan.FromMinutes(20));
+                Cookie(options, "__Host-Ehr.Patient", SessionTimes.Idle);
+                SessionEvents(options);
                 options.LoginPath = "/portal/sign-in";
                 options.LogoutPath = "/portal/sign-out";
                 options.AccessDeniedPath = "/portal/denied";
@@ -101,7 +103,8 @@ public static class AccountServiceCollectionExtensions
     }
 
     // Every cookie: host-bound (the __Host- prefix needs Secure, Path=/ and no Domain), never readable by scripts,
-    // never sent cross-site, and idle-limited, with the lifetime extended by use.
+    // never sent cross-site, and idle-limited, with the lifetime extended by use: for a signed-in staff member or patient,
+    // 15 minutes after the last request, and never past 12 hours (SessionEvents, SessionTimes).
     static void Cookie(CookieAuthenticationOptions options, string name, TimeSpan lifetime)
     {
         options.Cookie.Name = name;
@@ -111,6 +114,14 @@ public static class AccountServiceCollectionExtensions
         options.Cookie.Path = "/";
         options.ExpireTimeSpan = lifetime;
         options.SlidingExpiration = true;
+    }
+
+    // The sign-in's time kept in its ticket, and a renewal whenever a minute has passed, but for a check of how long is
+    // left (SessionTimes). The account check every few minutes, and the 12-hour end, are OnValidatePrincipal's.
+    static void SessionEvents(CookieAuthenticationOptions options)
+    {
+        options.Events.OnSigningIn = SessionTimes.SigningInAsync;
+        options.Events.OnCheckSlidingExpiration = SessionTimes.CheckSlidingExpirationAsync;
     }
 
     // Under /api and /fhir, the status instead of the redirect; anywhere else, the redirect as before.
