@@ -53,9 +53,11 @@ statement:
      endings and exceptions) (drug_not_in_sources); and every drug the Spanish names must be named in the English
      (drug_dropped), so a drug no list knows can't be swapped in for one the clinician said;
    - sides (a capital R or L and "rt", "lt" too), routes (intrathecal, epidural, "IV push" and the others too),
-     severity (every degree spanish.SEVERITY allows, from "slight" and "scant" to "excruciating" and "worst", is read in
-     the English: one the Spanish's severity words don't allow is refused, so "Dolor leve" is not "Excruciating pain";
-     its limit: per statement and in order, not per finding, so "Dolor leve y fiebre" as "Pain and mild fever" passes),
+     severity (the English words spanish.SEVERITY's table gives, from "slight" and "scant" to "excruciating" and
+     "worst", are read: one the Spanish's severity words don't allow is refused, so "Dolor leve" is not "Excruciating
+     pain"; its limits: a word outside the table isn't read in either language, so "leve" written "agonizing" or
+     "life-threatening" passes, and it is per statement and in order, not per finding, so "Dolor leve y fiebre" as "Pain
+     and mild fever" passes),
      dose forms (tablets, syrup, a patch: spanish.DOSE_FORMS) and abbreviations, however they are written
      ("hiv", "nsaids": CLINICAL_ABBREVIATIONS): no more (side_, route_, severity_, dose_form_ and
      abbreviation_not_in_sources);
@@ -76,17 +78,21 @@ statement:
      the Spanish doesn't name is refused as a drug is (drug_not_in_sources). And where what a change is said of can't
      be read ("suspender la sonda"), the English may say no change of anything that goes the other way from one the
      Spanish says (OPPOSITES: "Keep the catheter"), failing closed; any other change it may, since everyday verbs say
-     changes too ("subir las escaleras", "stop to rest"). Its limit: only a drug, a class, a dose or a habit within
-     ACTION_REACH words of its verb is read, and a change of anything else only where it goes the other way. The verbs
-     are generated from their infinitives (spanish.conjugate()), with the pronouns a command takes ("suspéndala");
-     "baja" and "continua", unaccented, are adjectives ("dosis baja");
+     changes too ("subir las escaleras", "stop to rest"). Its limits: only a drug, a class, a dose or a habit within
+     ACTION_REACH words of its verb is read, and a change of anything else only where it goes the other way; and only
+     the verbs and phrases listed here are read, so a change said with another ("restringir", "desescalar", "titular al
+     alza"; "restrict") isn't compared. The verbs are generated from their infinitives (spanish.conjugate()), with the
+     pronouns a command takes ("suspéndala"); "baja" and "continua", unaccented, are adjectives ("dosis baja");
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
      validation.py reads them in English, with a word that negates itself a negation in either language ("afebril",
-     "indoloro", "inconsciente": spanish.SELF_NEGATING; "afebrile", "uncontrolled", "absent": NEGATED_WORDS) and a
-     relative told something ("the mother is explained") not someone having it, a relative clause read from its verb
-     on ("acude con su madre, que tiene diabetes" is the mother's diabetes) and a relative named with whose relative
-     they are read past that ("la madre del niño refiere que tose" is the child's cough): the same (negation_dropped or
-     negation_added, and so on), and the relatives named the same (experiencer_changed). A qualifier carries over a
+     "indoloro", "inconsciente": spanish.SELF_NEGATING; "afebrile", "uncontrolled", "absent": NEGATED_WORDS; only the
+     words those lists hold, so "Pupilas arreactivas" as "Reactive pupils" passes) and a relative told something ("the
+     mother is explained") not someone having it, a relative clause read from its verb on only after "que" or "quien"
+     and a verb of having or being (spanish.WHO_HAS: "acude con su madre, que tiene diabetes" is the mother's diabetes;
+     "el cual padece", "a quien le diagnosticaron" and "que fuma" are the patient's) and a relative named with whose
+     relative they are read past that ("la madre del niño refiere que tose" is the child's cough): the same
+     (negation_dropped or negation_added, and so on), and the relatives named the same (experiencer_changed). A
+     qualifier carries over a
      list past its commas, in both languages, as validation.py carries an English negation (spanish.carry_over_list()):
      up to the word that ends it (a contrast, a word starting a clause, a step of the plan, the end of its sentence),
      not into a clause of its own (a new subject, a verb of having or telling: "sin fiebre, la tos está mejor"), and
@@ -108,12 +114,14 @@ statement:
      a negation, as "ruled out" is; "hace años", "el año pasado", "en el pasado", "previamente", "previo" and "antiguo"
      are the past, as "years ago", "last year", "in the past", "previously", "prior", "previous", "old" and "remote"
      are (MORE_ENGLISH, read as validation.py's own cues are); and "en la familia" is someone else, as "in the family"
-     is. Having had something ("tuvo", "tenía", "padeció") written as having it now ("is having", "currently", "now",
-     "active") is history_dropped, unless the Spanish says now too ("actualmente"). Their limits: each kind is
-     compared per statement, and kept on its clause only for findings both languages spell alike or the glossary names
-     (below), so a negation or a doubt moved between two other findings passes; and who has a finding is read from the
-     relative forward in its clause (a relative clause from its verb on), so an appositive ("su madre, diabética, la
-     acompaña") isn't tied to them;
+     is. Only the cues listed here, in spanish.py and in validation.py are read: a doubt said otherwise ("sugiere",
+     "cabe pensar en", "Hipótesis diagnóstica:") isn't, so the finding passes as certain. Having had something ("tuvo",
+     "tenía", "padeció") written as having it now ("is having", "currently", "now", "active") is history_dropped, unless
+     the Spanish says now too ("actualmente"). Their limits: each kind is compared per statement, and kept on its clause
+     only for findings both languages spell alike or the glossary names (below), so a negation or a doubt moved between
+     two other findings passes; and who has a finding is read from the relative forward in its clause (a relative clause
+     from its verb on, only as WHO_HAS reads one), so an appositive ("su madre, diabética, la acompaña") isn't tied to
+     them;
    - in order, and paired: numbers, how long, drugs, sides, routes, severity, how often, relatives and medication
      changes each come in the English in the Spanish's order, some left out but none moved (order_changed): "TA 142
      sobre 88" is not "BP 88/142", nor "Suspender metformina e iniciar insulina" "Start metformin and stop insulin"; a
@@ -669,7 +677,7 @@ def english_sides(text: str) -> list[str]:
     found = [(w.start, ENGLISH_SIDES[w.text]) for w in tokens(text) if w.text in ENGLISH_SIDES]
     found += [(m.start(), "right" if m.group(1) == "R" else "left") for m in SIDE_LETTER.finditer(text)]
     return [side for _, side in sorted(found)]
-# Every English degree a Spanish severity word allows (spanish.SEVERITY): one the Spanish doesn't say is refused.
+# The English degrees spanish.SEVERITY's table gives: one the Spanish doesn't allow is refused; any other isn't read.
 ENGLISH_SEVERITY = frozenset(word for words in spanish.SEVERITY.values() for word in words) | {"excruciating", "worst"}
 # Dose forms, by spanish.DOSE_FORMS' names: an English one must be one the Spanish says ("inhalado" is not "tablets").
 ENGLISH_DOSE_FORMS = {

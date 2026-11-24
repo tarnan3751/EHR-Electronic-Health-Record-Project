@@ -681,10 +681,10 @@ HAVING = frozenset(
     "presenta presente".split()
 )
 # A relative after one of these (and maybe "su", "el", "la") is someone the patient is with or speaks to: "acompañado
-# de su madre", "se informa al padre" ("al" is "a el"). Unless a relative clause says what they have: "acude con su
-# madre, que tiene diabetes", which the relative reaches from the clause's verb on, past its comma. A relative named
-# with whose relative they are ("la madre del niño") reaches past that: "la madre del niño tiene asma" is the mother's,
-# "la madre del niño refiere que tose" the child's, since someone telling it (REPORTING) ends the reach.
+# de su madre", "se informa al padre" ("al" is "a el"). Unless a relative clause WHO_HAS reads says what they have:
+# "acude con su madre, que tiene diabetes", which the relative reaches from the clause's verb on, past its comma. A
+# relative named with whose relative they are ("la madre del niño") reaches past that: "la madre del niño tiene asma" is
+# the mother's, "la madre del niño refiere que tose" the child's, since someone telling it (REPORTING) ends the reach.
 NOT_EXPERIENCER_AFTER = frozenset("con por a al de para junto".split())
 POSSESSIVES = frozenset("su sus el la los las mi".split())
 WHO_HAS = re.compile(r"\s*,?\s+(?:que|quien)\s+(?=(?:tiene|tuvo|tenia|padece|padecio|es|era|fue)\b)")
