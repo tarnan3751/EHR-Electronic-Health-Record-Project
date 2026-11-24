@@ -1,17 +1,23 @@
 # The trick sentences (the expansion plan's step 15.1): the third review's 341 sentences that try to make the closed
-# sentence propose what it mustn't (validation.py, "plain"), with the controls it wrote that must be proposed, and a
-# family added in step 15.1, a line break or a new paragraph after an instruction. Each is a whole transcript. The
-# eval's gate weighs every one again with this commit's checks, no model needed (ehr_eval/tricks.py; gate.py), and
-# fails when a sentence marked as reversing the meaning is proposed, or when the wrong proposals, a proposal for any
-# sentence expected held back, number more than most_wrong. eval/tests/test_tricks.py has a case for each sentence.
+# sentence propose what it mustn't (validation.py, "plain"), with the controls it wrote that must be proposed; a family
+# added in step 15.1, a line break or a new paragraph after an instruction; and the 183 sentences and 54 plain controls
+# step 15.1's own review wrote ("review" families). Each is a whole transcript. The eval's gate weighs every one again
+# with this commit's checks, no model needed (ehr_eval/tricks.py; gate.py), and fails when a sentence marked as
+# reversing the meaning is proposed, when the wrong proposals, a proposal for any sentence expected held back, number
+# more than most_wrong, or when a control is not proposed. It also fails when this file isn't the one it was written
+# for (gate.py's TRICK_SENTENCES_SHA256): a change here is a change to the gate, recorded there with it.
+# eval/tests/test_tricks.py has a case for each sentence that reverses the meaning and each control. The review's
+# sentences the rules still propose are in groups marked still_proposed: the gate fails on them, and on the one that
+# doesn't reverse the meaning through the total, until the rules hold them back; then each moves to its family's group.
 #
-# Each group: its family (the review's letter); what is expected (expect): proposed, or held_back; for those held back,
-# whether a proposal would reverse the meaning (reverses): read whole, the sentence says not to do it, takes it back,
-# corrects it to something else, says it isn't needed or was done already, puts it in doubt or on hold, has someone
-# decide against it or decline it, or lists it among what not to do; and, for a wrong proposal the owner tolerates,
-# its kind (tolerated), whose reason is under [tolerated]. Not reversing: a vague or non-item, a quantity, a join, a
-# report, someone else, a condition, a time for later, the past, or the design ("call in" needs its pharmacy). When in
-# doubt, a sentence is marked as reversing.
+# Each group: its family (the review's letter); what is expected (expect): proposed, held_back, or cost (a plain
+# instruction the strict rule holds back: what it costs, reported, and no wrong proposal if proposed); for those held
+# back, whether a proposal would reverse the meaning (reverses): read whole, the sentence says not to do it, takes it
+# back, corrects it to something else, says it isn't needed or was done already, puts it in doubt or on hold, has
+# someone decide against it or decline it, or lists it among what not to do; and, for a wrong proposal the owner
+# tolerates, its kind (tolerated), whose reason is under [tolerated]. Not reversing: a vague or non-item, a quantity, a
+# join, a report, someone else, a condition, a time for later, the past, or the design ("call in" needs its pharmacy).
+# When in doubt, a sentence is marked as reversing.
 #
 # most_wrong is the number of sentences in the tolerated groups, which a test keeps equal: when one is fixed, it moves
 # to the group of its family and most_wrong comes down. The owner's rule (2026-11-24): no wrong proposal that reverses
@@ -255,7 +261,6 @@ said = [
     "Her mother asked whether penicillin should be added to her allergies.",
     "Her mother asked. Penicillin should be added to her allergies.",
     "Her mother insists. Penicillin should be added to her allergies.",
-    "Penicillin should be added to her mother's allergies.",
     "Penicillin should be added to her allergies once confirmed.",
     "Penicillin should be added to her allergies later.",
     "Penicillin will be added to her allergies by the pharmacist.",
@@ -276,6 +281,7 @@ said = [
     "Penicillin should be added to her allergies, I think.",
     "Penicillin should be added to her allergies?",
     "Whether penicillin should be added to her allergies is unclear.",
+    "Penicillin should be added to her mother's allergies.",
     "Penicillin, no, should be added to her allergies.",
     "Codeine never should be added to her allergies.",
     "Nothing should be added to her allergies.",
@@ -475,6 +481,7 @@ said = [
     "I'd like to order a CBC, but not today.",
     "Would order a CBC.",
     "Could order a CBC.",
+    "Should order a CBC.",
     "Might order a CBC.",
     "May order a CBC.",
     "I'd order a CBC.",
@@ -496,25 +503,24 @@ said = [
 family = "l: lead-ins"
 expect = "held_back"
 reverses = false
+tolerated = "lead_in_filler"
 said = [
-    "Should order a CBC.",
-    "I'd like to order a CBC eventually.",
-    "We need to order a CBC at some point.",
-    "Then, if needed, order a CBC.",
-    "Next, if needed, order a CBC.",
-    "We are going to order a CBC next year.",
-    "I'm going to order a CBC in the future.",
+    "So, will, order a CBC.",
+    "Will, order a CBC.",
+    "Now, now, now, order a CBC.",
 ]
 
 [[group]]
 family = "l: lead-ins"
 expect = "held_back"
 reverses = false
-tolerated = "lead_in_filler"
 said = [
-    "So, will, order a CBC.",
-    "Will, order a CBC.",
-    "Now, now, now, order a CBC.",
+    "I'd like to order a CBC eventually.",
+    "We need to order a CBC at some point.",
+    "Then, if needed, order a CBC.",
+    "Next, if needed, order a CBC.",
+    "We are going to order a CBC next year.",
+    "I'm going to order a CBC in the future.",
 ]
 
 [[group]]
@@ -581,4 +587,411 @@ said = [
     "Order a CBC.\n\nRecheck in one week.",
     "Order a CBC.\n\nAssessment:\nNo acute distress.",
     "Refill her lisinopril.\n\nThanks.",
+]
+
+[[group]]
+family = "review A: the next sentence opens a step of the plan"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC. Continue current plan without labs.",
+    "Order a CBC. Monitor clinically rather than checking counts.",
+    "Order a CBC. Recommend she not have any blood drawn today.",
+    "Order a CBC. Advised against blood work at this time.",
+    "Order a CBC. Explained labs are not necessary today.",
+    "Order a CBC. Counsel patient blood work is not needed today.",
+    "Order a CBC. Return to clinic as needed, no blood work required.",
+    "Order a CBC. Review whether it is needed at all.",
+    "Order a CBC. Encourage fluids, no labs needed.",
+    "Order a CBC. Resume watchful waiting without bloods.",
+    "Order a CBC. Advise bloodwork can wait until spring.",
+    "Order a CBC. Decrease the blood draws, none this month.",
+    "Refill her lisinopril. Recommend she not continue lisinopril given the cough.",
+    "Order a CBC. Reviewed with her, she does not want needles today.",
+]
+
+[[group]]
+family = "review A: the next sentence opens a step of the plan, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. Continue monitoring clinically instead of drawing blood.",
+    "Order a CBC. Recheck counts at the next visit instead.",
+    "Order a CBC. Switch the CBC to a BMP.",
+    "Order a CBC. Discuss with her whether she really wants a blood draw.",
+    "Order a CBC. Keep the blood draw off the list for today.",
+    "Order a CBC. Refer to hematology, who will decide on labs.",
+    "Order a CBC. Recommended she forgo the blood draw today.",
+    "Order a CBC. Continue to defer labs for now.",
+    "Order a CBC. Apply the same plan as before, minus the labs.",
+    "Refill her lisinopril. Discuss stopping the lisinopril at her next visit.",
+]
+
+[[group]]
+family = "review A: the next sentence opens a step of the plan, still proposed"
+expect = "held_back"
+reverses = false
+still_proposed = true
+said = [
+    "Order a CBC. Schedule the blood draw only after she sees hematology.",
+]
+
+[[group]]
+family = "review B: a longer next sentence, its words of refusal, removal or doubt in no list, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. Patient has decided against any blood work.",
+    "Order a CBC. She opted out of the blood draw.",
+    "Order a CBC. She would prefer to pass on the needle stick today.",
+    "Order a CBC. Patient is reluctant to have blood drawn today.",
+    "Order a CBC. She is hesitant about needles and wants to wait.",
+    "Order a CBC. She will let us know about the blood work.",
+    "Order a CBC. She wants to talk it over with her husband first.",
+    "Order a CBC. Let's leave the blood work for now.",
+    "Order a CBC. Let's forget the labs for today.",
+    "Order a CBC. We can leave the labs for today.",
+    "Order a CBC. Swap the CBC for a BMP.",
+    "Order a CBC. Change the CBC to a BMP.",
+    "Order a CBC. Replace the CBC with a BMP.",
+    "Order a CBC. The CBC should be a BMP.",
+    "Order a CBC. Let's do a BMP in place of the CBC.",
+    "Order a CBC. Discontinue the order for the complete blood count.",
+    "Order a CBC. Stop the order for the blood count please.",
+    "Order a CBC. She would sooner wait and see how she feels.",
+    "Order a CBC. Patient politely refusing blood draws today.",
+    "Order a CBC. Patient is refusing the blood draw today.",
+    "Order a CBC. She is declining blood work at this visit.",
+    "Order a CBC. She turned down the blood test.",
+    "Order a CBC. She has elected to hold all labs.",
+    "Order a CBC. Holding all labs this visit per her request.",
+    "Order a CBC. We agreed to forgo blood tests this time.",
+    "Order a CBC. On reflection the blood count adds little here.",
+    "Order a CBC. Thinking more carefully the urgent care counts were fine.",
+    "Order a CBC. Overkill for a viral illness like this.",
+    "Order a CBC. Seems excessive for a simple viral illness.",
+    "Order a CBC. Low yield given her normal exam today.",
+    "Order a CBC. Of limited value since her counts were fine at urgent care.",
+    "Order a CBC. Her insurance balks at paying for routine blood counts.",
+    "Refill her lisinopril. She stopped taking lisinopril because of the cough.",
+    "Refill her lisinopril. Switched her to losartan for the cough today.",
+    "Refill her amlodipine. Her ankles swell so much we are changing to another agent.",
+]
+
+[[group]]
+family = "review B: a longer next sentence, its words of refusal, removal or doubt in no list"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC. Probably overkill for a cold this mild.",
+    "Order a CBC. Unclear whether a blood count would change management.",
+    "Refill her lisinopril. Losartan replaces it starting today.",
+]
+
+[[group]]
+family = "review C: taken back two or three sentences on"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC. She feels tired. Nah, forget the labs.",
+    "Order a CBC. She feels tired. Oops, wrong patient.",
+    "Order a CBC. She feels tired. Just kidding.",
+    "Order a CBC. She feels tired. That was a mistake.",
+    "Order a CBC. She feels tired. Mistake, wrong chart.",
+    "Order a CBC. Continue her iron. Doubtful we need the CBC though.",
+    "Order a CBC. Continue her iron. Hmm, let me reconsider the blood count.",
+    "Order a CBC. Recheck in one week. Hang on, she had one yesterday.",
+    "Order a CBC. Continue metformin. Erase the CBC.",
+    "Order a CBC. Continue metformin. Remove the CBC from the orders.",
+    "Order a CBC. Continue metformin. The CBC is not needed after all.",
+    "Order a CBC. Continue metformin. She doesn't want the CBC.",
+    "Order a CBC. Recheck in one week. Patient says she won't do the blood test.",
+    "Order a CBC. Recheck in one week. Abort the blood count.",
+    "Order a CBC. Continue metformin. Recheck in one week. Oh no, she already had one.",
+    "Order a CBC. Continue metformin. Unnecessary after all, she had one Monday.",
+    "Refill her lisinopril. Her pressure is low today. Pause the refill.",
+    "Refill her lisinopril. Her pressure is low today. Hmm, not so fast.",
+    "Refill her lisinopril. Her pressure is low today. Let me reconsider.",
+    "Refill her lisinopril. Her pressure is low today. Questionable.",
+    "Refill her lisinopril. Her pressure is low today. Better not.",
+    "Add penicillin to her allergies. She had hives as a child. It was her brother, not her.",
+    "Add penicillin to her allergies. She had hives as a child. Turns out it was the virus.",
+    "Add latex to her allergies. She developed a rash after a dental visit. Turns out it was the mouthwash.",
+    "Add penicillin to her allergies. Recheck in one week. It was her sister who reacted.",
+    "Order a CRP. Continue ibuprofen. Her CRP from yesterday is already back.",
+    "Order an A1c. Recheck in three months. Oops, she had one in the spring.",
+    "Order a CBC.\nRecheck in one week.\nNah.",
+    "Order a CBC.\n\nRecheck in one week.\n\nOops, wrong patient.",
+    "Order a CBC. She has been more tired lately. Mistake.",
+    "Order a CBC. Ferritin was low last time. Wrong patient, my apologies.",
+]
+
+[[group]]
+family = "review C: taken back two or three sentences on, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Add latex to her allergies. She reacted to gloves at the dentist. Patch testing was negative though.",
+]
+
+[[group]]
+family = "review D: a heading line after it"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC.\nAddendum:\nPatient declined the blood draw.",
+    "Order a CBC.\nCorrection:\nCancel the CBC.",
+    "Order a CBC.\n\nAddendum:\nCBC not needed, done at urgent care yesterday.",
+    "Refill her lisinopril.\nNote:\nHold the refill, her pressure is low.",
+    "Add penicillin to her allergies.\nClarification:\nIt was her sister who reacted, not her.",
+    "Order a CBC.\nUpdate:\nShe refused.",
+    "Order a CBC.\n\nPlan:\nNo labs today.",
+    "Order a CRP.\naddendum:\ndisregard the CRP.",
+    "Add latex to her allergies.\n\ncorrection:\nthe reaction was to the tape not latex.",
+    "Order an A1c.\nNB:\nShe had one last week.",
+    "Order a CBC.\n\naddendum:\npatient declined.",
+]
+
+[[group]]
+family = "review E: the next sentence is an instruction of another form, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. Order the BMP in its place.",
+    "Order a CBC. Order a ferritin in place of the blood count.",
+    "Order a CBC. The cardiologist will order it with the echo.",
+    "Order a CBC. Her oncologist is ordering a CBC tomorrow anyway.",
+    "Order a CBC. Better to order a ferritin.",
+    "Order a CBC. Order a BMP in lieu of the CBC.",
+    "Refill her lisinopril. Refill the losartan in its place.",
+    "Add penicillin to her allergies. Add amoxicillin to her allergies in its place.",
+]
+
+[[group]]
+family = "review F: speech-recognition slips, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. She declinned the blood draw today.",
+    "Order a CBC. She refussed the blood test.",
+    "Order a CBC. Continue iron and leave out the labs.",
+    "Order a CBC. She would like to cancell the blood draw.",
+    "Order a CBC. Please disreguard the blood count order today.",
+]
+
+[[group]]
+family = "review F: speech-recognition slips"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC. Recheck in one week oops wrong patient",
+    "Order a CBC. Recheck in one week she doesn't want the blood test",
+    "Order a CBC.\n\nrecheck in one week.\nnah.",
+    "Order a CBC. Continue her iron. Kiddding.",
+    "Order a CBC. Recheck in one weak. Never mined.",
+    "Order a CBC. Recheck in one week. Scratch dat.",
+    "Order a CBC. Recheck in one week. Cancer that.",
+    "Order a CBC. Recheck in one week. Disc regard.",
+    "Order a CBC.\ncontinue her iron\nnah.",
+]
+
+[[group]]
+family = "review G: before it"
+expect = "held_back"
+reverses = true
+said = [
+    "Hold off on these for now. Order a CBC.",
+    "Skip these today. Order a CBC. Order a lipid panel.",
+    "We are holding the next two. Order a CBC. Order a lipid panel.",
+    "I'm going to dictate what we're not doing. Order a CBC.",
+    "Here is what we are skipping. Order a CBC.",
+    "Struck from the plan today. Order a CBC.",
+    "Things she refused. Order a CBC.",
+    "She refused these labs. Order a CBC. Order a lipid panel.",
+    "Patient refused both of these. Order a CBC. Order a TSH.",
+    "Off the table for today. Order a CBC.",
+    "Removed from her plan today. Order a CBC.",
+    "Items deleted from the plan. Order a CBC.",
+    "Previously considered but rejected. Order an MRI.",
+    "Cancelled orders. Order a CBC.",
+]
+
+[[group]]
+family = "review H: with the common names, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Add penicillin to her allergies. The allergist challenge test in March was completely clean.",
+    "Add latex to her allergies. Allergy testing at the dermatologist came back clean.",
+    "Order a CRP. She had a sed rate and CRP drawn this morning.",
+    "Order a CRP. Rheumatology checks her inflammatory markers every month.",
+    "Order an A1c. Her endocrinologist checked the A1c on Monday.",
+    "Order an A1c. She brought a home A1c kit result of 6.1 from this week.",
+    "Order a hemoglobin A1c. Endocrinology handles her diabetes labs.",
+    "Refill her lisinopril. Her nephrologist manages that prescription now.",
+    "Order an A1c. Her A1c came back at 6.8 this morning.",
+]
+
+[[group]]
+family = "review H: with the common names"
+expect = "held_back"
+reverses = true
+said = [
+    "Add latex to her allergies. Her reaction turned out to be from the adhesive tape.",
+    "Add penicillin to her allergies. Turns out the hives were from strawberries.",
+    "Order a CRP. Continue ibuprofen. Rheumatology already ordered the CRP.",
+    "Add latex to her allergies.\n\nRecheck in one week.\n\nOops, it was the tape.",
+    "Order a CRP.\nAddendum:\nCRP already resulted this morning.",
+    "Add penicillin to her allergies. Amoxicillin last winter caused no problem at all.",
+]
+
+[[group]]
+family = "review I: a heading as the next sentence"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC. Assessment: labs unnecessary.",
+    "Order a CBC. Plan: bloodwork unnecessary.",
+    "Order a CBC. Impression: CBC pointless.",
+    "Refill her lisinopril. Assessment: lisinopril causing cough, switching to losartan.",
+]
+
+[[group]]
+family = "review I: a heading as the next sentence, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. Plan: forego blood work this visit.",
+    "Order a CBC. Plan: patient prefers to defer labs.",
+]
+
+[[group]]
+family = "review J: done already, with no word of the past, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. The hospital drew a full blood count this morning.",
+    "Order a CBC. She has a standing order for monthly counts at the infusion center.",
+    "Order a CBC. Her standing lab order covers it.",
+    "Order a CBC. The infusion center draws counts every week anyway.",
+    "Order a CBC. Her CBC from this morning is in the chart.",
+    "Order a CBC. Urgent care faxed over a normal blood count today.",
+    "Refill her lisinopril. Pharmacy confirms she picked up a ninety day supply Tuesday.",
+]
+
+[[group]]
+family = "review J: done already, with no word of the past"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC. Results from this morning's blood count just came back normal.",
+]
+
+[[group]]
+family = "review K: given to someone else"
+expect = "held_back"
+reverses = true
+said = [
+    "Order a CBC. Her hematologist will draw counts at her visit Thursday.",
+]
+
+[[group]]
+family = "review K: given to someone else, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. Her oncologist prefers to draw it at the cancer center.",
+    "Order a CBC. Her primary care doctor will handle the labs.",
+    "Order a CBC. The nephrology team is taking care of her bloodwork.",
+    "Refill her lisinopril. Cardiology is managing her blood pressure meds now.",
+    "Order a CBC. Deferring blood work to the hematology team.",
+]
+
+[[group]]
+family = "review L: the wrong patient, still proposed"
+expect = "held_back"
+reverses = true
+still_proposed = true
+said = [
+    "Order a CBC. Mixed up my patients here.",
+    "Order a CBC. I'm confusing her with the patient before.",
+    "Order a CBC. Got her confused with Mr Jones in room four.",
+    "Order a CBC. Dictated in the previous patient's chart by accident.",
+    "Order a CBC. Meant for the patient in room four, apologies.",
+    "Order a CBC. Was thinking of Mrs Lee in the next room.",
+]
+
+[[group]]
+family = "review controls: plain instructions"
+expect = "proposed"
+said = [
+    "Order a CBC. She has been more tired lately.",
+    "Order a CBC. Recheck in two weeks.",
+    "Order a CBC. Continue iron supplements.",
+    "Order a CBC. She will come in fasting tomorrow.",
+    "Order a CBC. Her last hemoglobin was 10.2.",
+    "Order a CBC. Patient agrees with the plan.",
+    "Order a CBC. Order a BMP.",
+    "Order a CBC. Refill her lisinopril.",
+    "Order a CBC. Discussed results with the patient.",
+    "Order a CBC. She will get it drawn downstairs today.",
+    "Order a CBC. Lab is on the first floor.",
+    "Order a CBC. Encourage iron rich foods.",
+    "Order a CBC. Start ferrous sulfate 325 mg daily.",
+    "Order a CBC. Increase lisinopril to 20 mg daily.",
+    "Order a CBC. Results to the patient portal.",
+    "Order a CBC. We will call with results.",
+    "Order a CBC. Thank you.",
+    "Order a CRP. Her joints are swollen and warm today.",
+    "Refill her lisinopril. Her blood pressure is well controlled.",
+    "Order a CBC.\n\nRecheck in one month.",
+    "Order a CBC. Okay, next.",
+    "Order a CBC. She was counseled on diet and exercise.",
+    "Order a CBC. Will review results by phone.",
+    "Order a CBC. Her husband drove her today.",
+    "Order a CBC. Diet and exercise were discussed.",
+]
+
+[[group]]
+family = "review controls: plain instructions the strict rule holds back, what it costs"
+expect = "cost"
+said = [
+    "Order a CBC. Her fatigue has not improved.",
+    "Order a CBC. She is not anemic on exam.",
+    "Order a CBC. No other changes.",
+    "Order a CBC. Labs today.",
+    "Order a CBC. See you soon.",
+    "Order a CBC. Follow up in two weeks.",
+    "Order a CBC. She denies fever or chills.",
+    "Order a CBC. Return if symptoms worsen.",
+    "Order a CBC. Call if she develops a fever.",
+    "Order a CBC. Good.",
+    "Order a CBC. She agrees.",
+    "Order a CBC. She understands the plan and has no questions.",
+    "Order a CBC. Ferritin was low at her last visit.",
+    "Order a CBC. Her hemoglobin was 9.8 three months ago.",
+    "Order a CBC. Stop metformin.",
+    "Order a CBC. Hold metformin for two days.",
+    "Order a CBC. Her symptoms started two weeks ago.",
+    "Order a CBC. She is otherwise well.",
+    "Order a CBC. That is all.",
+    "Order a CBC. End of dictation.",
+    "Order a CBC. Nothing else today.",
+    "Add penicillin to her allergies. Reaction was hives.",
+    "Add penicillin to her allergies. She broke out in hives as a child.",
+    "Add latex to her allergies. Use non latex gloves for procedures.",
+    "Order an A1c. Her last one was 7.2 in March.",
+    "Refill her lisinopril for 90 days. No side effects reported.",
+    "Order a CBC. Assessment: iron deficiency anemia.",
+    "Order a CBC. She works nights, so she will come in the afternoon.",
+    "Order a lipid panel. Fasting, please.",
 ]

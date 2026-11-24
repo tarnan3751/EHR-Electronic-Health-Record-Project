@@ -22,10 +22,11 @@ from ehr_eval.scripts import (
 )
 
 
-def check(results_dir, eval_dir, floor: int = 0) -> list[str]:
-    """The gate, with no floor of right proposals: the small test set has one at most (d02's chest X-ray), and the
-    owner's floor is tested on its own."""
-    return gate.check(results_dir, eval_dir, floor=floor)
+def check(results_dir, eval_dir, floor: int = 0, tricks_sha256: str | None = None) -> list[str]:
+    """The gate, with no floor of right proposals (the small test set has one at most, d02's chest X-ray, and the
+    owner's floor is tested on its own), recording the trick sentences the eval directory holds unless told which."""
+    recorded = (eval_dir / "trick-sentences.toml").is_file() and gate.trick_sentences_sha256(eval_dir)
+    return gate.check(results_dir, eval_dir, floor=floor, tricks_sha256=tricks_sha256 or recorded or "")
 
 
 # Plain, and heard right: d02's chest X-ray is proposed where the script says it.
@@ -387,8 +388,9 @@ def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
 
 
 # TC-UC10-13 (NFR-05; FR-14 as reworded, the expansion plan's step 15.1): the trick sentences, weighed again by the
-# checks on every change: none that reverses the meaning may be proposed, and the wrong proposals may number no more
-# than the set records; and the recordings must keep the owner's floor of right proposals.
+# checks on every change, and pinned: none that reverses the meaning may be proposed, the wrong proposals may number no
+# more than the set records, and every control must be proposed; and the recordings must keep the owner's floor of
+# right proposals.
 TRICK = """most_wrong = {most_wrong}
 
 [[group]]
@@ -416,6 +418,35 @@ def test_more_wrong_trick_proposals_than_the_set_records_fail(eval_dir):
 
     (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="false"), encoding="utf-8")
     assert check(eval_dir / "results", eval_dir) == []
+
+
+# The trick sentences are pinned (TRICK_SENTENCES_SHA256): each of the review's three edits fails the gate, though each
+# kept the file's own counts consistent: a sentence deleted; a tolerated sentence made a control, the cap lowered; and a
+# reversing sentence added to a tolerated group, the cap raised.
+@pytest.mark.parametrize("edit", [
+    lambda text: text.replace('    "Order a CBC. Nah.",\n', "", 1),
+    lambda text: text.replace("most_wrong = 7", "most_wrong = 6", 1).replace(
+        'expect = "held_back"\nreverses = false\ntolerated = "everyday_item"', 'expect = "proposed"', 1),
+    lambda text: text.replace("most_wrong = 7", "most_wrong = 8", 1).replace(
+        '    "So, will, order a CBC.",\n', '    "So, will, order a CBC.",\n    "Order a CBC. Not that one, cancel it.",\n', 1),
+], ids=["deleted", "tolerated-made-control", "reversing-made-tolerated"])
+def test_a_trick_set_changed_without_the_gate_fails(eval_dir, edit):
+    committed = (EVAL_DIR / "trick-sentences.toml").read_text(encoding="utf-8")
+    changed = edit(committed)
+    assert changed != committed
+    (eval_dir / "trick-sentences.toml").write_text(changed, encoding="utf-8")
+
+    problems = gate._trick_sentences(eval_dir, gate.TRICK_SENTENCES_SHA256)
+    assert any("isn't the set this gate records" in problem for problem in problems)
+
+
+def test_a_control_not_proposed_fails(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    (eval_dir / "trick-sentences.toml").write_text(
+        'most_wrong = 0\n\n[[group]]\nfamily = "c"\nexpect = "proposed"\nsaid = ["Order a CBC. Nah."]\n', encoding="utf-8")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "control 'Order a CBC. Nah.' is not proposed" in problem
 
 
 def test_no_trick_sentences_fail(eval_dir):

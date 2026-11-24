@@ -30,8 +30,10 @@ someone committed instead:
    fields_clinical, is reported beside it and not gated), date and drug-name accuracy, and the share of offered words
    the transcript doesn't support.
 6. The trick sentences (eval/trick-sentences.toml; the expansion plan's step 15.1), weighed again by this commit's
-   checks (tricks.py; no model, and nothing taken from the results): none marked as reversing the meaning is proposed,
-   and the wrong proposals, a proposal for any sentence expected held back, number no more than the set's most_wrong.
+   checks (tricks.py; no model, and nothing taken from the results): the file is the one TRICK_SENTENCES_SHA256 records,
+   so no sentence is removed, added or relabelled and no cap moved without this file changing with it; none marked as
+   reversing the meaning is proposed; the wrong proposals, a proposal for any sentence expected held back, number no
+   more than the set's most_wrong; and every control is proposed. What the strict rule costs is reported.
 7. The recordings, their proposals scored again as in 4, give at least PROPOSALS_FLOOR right proposals against the
    clinical gold: the owner's floor, which holds however the rule-following gold changes.
 
@@ -44,6 +46,7 @@ Every failure says what to do about it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tomllib
@@ -65,6 +68,9 @@ RUN_IT = (
 
 # The owner's floor (2026-11-24, step 15.1): right proposals on the recordings, against the clinical gold.
 PROPOSALS_FLOOR = 14
+# The trick sentences this gate was written for (eval/trick-sentences.toml, line endings as LF): a sentence added,
+# removed or relabelled, or a cap moved, changes this with it, in review.
+TRICK_SENTENCES_SHA256 = "9c4de49e2b5859f561db066c7acb0b654be95296e86b87127d0b71d430d4fd4b"
 # What the results must say about proposals, against each gold.
 PROPOSAL_METRICS = ("shown", "said", "found", "false", "misheard", "listed")
 PROPOSAL_BLOCKS = ("proposals", "proposals_clinical")
@@ -79,7 +85,8 @@ GATED = [
 ]
 
 
-def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR, floor: int = PROPOSALS_FLOOR) -> list[str]:
+def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR, floor: int = PROPOSALS_FLOOR,
+          tricks_sha256: str = TRICK_SENTENCES_SHA256) -> list[str]:
     latest_path = results_dir / "latest.json"
     if not latest_path.is_file():
         return [f"There are no eval results ({latest_path.relative_to(eval_dir.parent)}). {RUN_IT}"]
@@ -171,7 +178,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR, floor: int
                 f"{floor}. Find which instructions the proposal rules (validation.py) or the catalog no longer take, "
                 "and score again or: " + RUN_IT
             )
-    problems += _trick_sentences(eval_dir)
+    problems += _trick_sentences(eval_dir, tricks_sha256)
     warnings = latest.get("metrics", {}).get("warnings", {})
     if "shown" not in warnings or any("flagged" not in warnings.get(key, {}) for key in (*WARNING_CODES, "any")):
         problems.append(f"The results don't say which offered values carry a warning. {RUN_IT}")
@@ -261,13 +268,24 @@ def _unaccepted_proposals(listed: list[dict], known: Path) -> list[str]:
     return problems
 
 
-def _trick_sentences(eval_dir: Path) -> list[str]:
-    """Each trick sentence that reverses the meaning and is proposed, and wrong proposals beyond the set's most_wrong
-    (tricks.py)."""
+def trick_sentences_sha256(eval_dir: Path = EVAL_DIR) -> str:
+    return hashlib.sha256((eval_dir / tricks.TRICKS).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _trick_sentences(eval_dir: Path, sha256: str) -> list[str]:
+    """A trick-sentence file other than the one recorded, each trick sentence that reverses the meaning and is proposed,
+    wrong proposals beyond the set's most_wrong, and each control not proposed (tricks.py)."""
     if not (eval_dir / tricks.TRICKS).is_file():
         return [f"There are no trick sentences (eval/{tricks.TRICKS}) to weigh the proposal rules on."]
+    problems = []
+    if trick_sentences_sha256(eval_dir) != sha256:
+        problems.append(
+            f"eval/{tricks.TRICKS} isn't the set this gate records (TRICK_SENTENCES_SHA256 in ehr_eval/gate.py): a "
+            "sentence removed, added or relabelled, or a cap moved, changes the gate. Record the file's new hash there, "
+            "in the same change, for review."
+        )
     scores = tricks.score(eval_dir)
-    problems = [
+    problems += [
         f"The trick sentence {said!r} is proposed, and a proposal for it reverses the meaning; there must be none. "
         "Tighten the proposal rules (validation.py), then score the stored answers again (ehr_eval/rescore.py)."
         for said in scores.reversing
@@ -278,6 +296,11 @@ def _trick_sentences(eval_dir: Path) -> list[str]:
             f"eval/{tricks.TRICKS} records ({', '.join(repr(said) for said in scores.wrong)}). Tighten the proposal "
             "rules (validation.py); only the owner tolerates another wrong proposal there."
         )
+    problems += [
+        f"The trick sentences' control {said!r} is not proposed; each control must be. Find which rule (validation.py) "
+        "holds it back."
+        for said in scores.missed
+    ]
     return problems
 
 
@@ -311,7 +334,8 @@ def main() -> int:
         f"{proposals['recall']} against the rule-following gold and {clinical['recall']} against the clinical gold, "
         f"precision {proposals['precision']}, every false or misheard one accepted; at least {PROPOSALS_FLOOR} right "
         f"against the clinical gold), {trick.sentences} trick sentences weighed again ({len(trick.wrong)} wrong "
-        f"proposals, at most {trick.most_wrong}, none reversing the meaning). "
+        f"proposals, at most {trick.most_wrong}, none reversing the meaning, every control proposed; {trick.cost_held} of "
+        f"{trick.cost} plain instructions held back by the strict rule, what it costs). "
         f"Run on {latest['run']['machine']['label']}."
     )
     return 0
