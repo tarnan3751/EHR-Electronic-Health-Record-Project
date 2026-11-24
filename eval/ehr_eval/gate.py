@@ -57,6 +57,11 @@ this commit's English prompt, sidecar code and scoring, scoring its stored answe
 eval/results/baseline-es.json on the server machine, from that machine and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and
 date accuracy. The English checks above are unchanged.
 
+The review's wrong translations (eval/wrong-translations.toml; step 17), checked again by this commit's Spanish checks
+with no model (wrong_translations.py; check_wrong_translations()): the file is the one WRONG_TRANSLATIONS_SHA256
+records, every wrong pair marked as reversing the meaning that passes without a warning is one the owner has accepted
+by its id in known-limitations.toml ([[accepted_wrong_translation]]), and each accepted one still passes.
+
 The visits' results (eval/results/ambient-latest.json, listening to a visit) are checked here too, by ambient_gate.py,
 in the same way. Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
@@ -67,6 +72,7 @@ Every failure says what to do about it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tomllib
@@ -77,7 +83,7 @@ from ehr_dictation.provenance import CHECKS_CODE_SHA256, PIPELINE_CODE_SHA256
 from ehr_dictation.settings import Settings
 from ehr_dictation.transcript import Segment, assemble
 
-from . import ambient_gate, run_a_en, run_es, scoring, scoring_es
+from . import ambient_gate, run_a_en, run_es, scoring, scoring_es, wrong_translations
 from .run_a import SORTED, incomplete
 from .scoring import WARNING_CODES
 from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
@@ -85,6 +91,9 @@ from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_
 
 RESULTS_DIR = EVAL_DIR / "results"
 ENGLISH_TEXT = "latest-en-text.json"  # the English text run's results (run_a_en.py), the Spanish texts' misfiled cap
+# The review's wrong translations this gate was written for (eval/wrong-translations.toml, line endings as LF): a pair
+# added, removed or marked otherwise changes the gate, and is recorded here with it, for review.
+WRONG_TRANSLATIONS_SHA256 = "101b9c1c885d47bc65baba54b27a05f858b643973280ef24207315be0824c5d1"
 KNOWN_LIMITATIONS = "known-limitations.toml"
 RUN_IT = (
     "Run the eval on the server machine (eval/README.md: uv run --project eval python -m ehr_eval.run ...) and commit "
@@ -550,8 +559,39 @@ def _unaccepted_mistranslations(unflagged: list[dict], known: Path, table: str =
     return problems
 
 
+def check_wrong_translations(eval_dir: Path = EVAL_DIR, sha256: str = WRONG_TRANSLATIONS_SHA256) -> list[str]:
+    """The review's wrong translations (wrong_translations.py), checked again: a set other than the one recorded, each
+    wrong pair marked as reversing the meaning that passes without a warning and that the owner hasn't accepted by its
+    id (known-limitations.toml, [[accepted_wrong_translation]]), and each accepted one that no longer passes."""
+    path = eval_dir / wrong_translations.PAIRS
+    if not path.is_file():
+        return [f"There are no wrong translations (eval/{wrong_translations.PAIRS}) to check the Spanish checks with."]
+    problems = []
+    if hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest() != sha256:
+        problems.append(
+            f"eval/{wrong_translations.PAIRS} isn't the set this gate records (WRONG_TRANSLATIONS_SHA256 in "
+            "ehr_eval/gate.py): a pair added, removed or marked otherwise changes the gate. Record the file's new hash "
+            "there, in the same change, for review.")
+    known = eval_dir / KNOWN_LIMITATIONS
+    accepted = tomllib.loads(known.read_text(encoding="utf-8")).get("accepted_wrong_translation", []) if known.is_file() else []
+    listed = {(entry["id"], entry["english"]) for entry in accepted}
+    reversing = wrong_translations.score(eval_dir).reversing
+    problems += [
+        f"The wrong translation {pair.id}, {pair.english!r} for {pair.spanish!r}, passes the Spanish checks without a "
+        "warning, and it reverses the meaning; there must be none the owner hasn't accepted in eval/known-limitations.toml "
+        "([[accepted_wrong_translation]], by its id). Tighten the checks (translation.py, spanish.py) with a general rule."
+        for pair in reversing if (pair.id, pair.english) not in listed
+    ]
+    problems += [
+        f"eval/known-limitations.toml accepts the wrong translation {id_} ({english!r}), which no longer passes the "
+        "Spanish checks without a warning, or isn't in the set as written. Remove it from the list."
+        for id_, english in sorted(listed - {(pair.id, pair.english) for pair in reversing})
+    ]
+    return problems
+
+
 def main() -> int:
-    problems = check() + check_english_text() + check_spanish()
+    problems = check() + check_english_text() + check_spanish() + check_wrong_translations()
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:

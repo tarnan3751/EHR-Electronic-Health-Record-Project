@@ -16,3 +16,14 @@ correction cue, no correction-like word between the two drug names, and no passa
 neither warning fires. Two drugs joined by "and" are an ordinary list."""
 accepted = "2026-11-15"
 by = "the owner"
+
+# The review's wrong translations (eval/wrong-translations.toml; the expansion plan's step 17): a wrong pair marked as
+# reversing the meaning that passes the Spanish checks without a warning fails the gate unless the owner accepts it
+# here, by its id and its English as the set has them, with why and when and by whom; and an accepted one that no
+# longer passes fails it too, so the list stays true. Only the owner adds an entry:
+#
+#   [[accepted_wrong_translation]]
+#   id = "w01"
+#   english = "Febrile patient."
+#   reason = "..."
+#   accepted = "..."

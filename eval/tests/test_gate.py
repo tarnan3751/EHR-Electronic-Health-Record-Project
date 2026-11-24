@@ -135,9 +135,10 @@ def test_every_eval_module_is_hashed_with_the_answers_or_the_scoring():
 
     # Neither the package, the gates nor the clinical gold report makes or scores an answer: a dictation's (the first
     # two lists; the Spanish eval's, the expansion plan's step 17, with the English set's, since run A's code sorts each
-    # script's text in its run) or a visit's (the visits' own, conversations.py).
+    # script's text in its run) or a visit's (the visits' own, conversations.py); nor the review's wrong translations,
+    # which the gate checks the Spanish checks with, apart from any results.
     assert modules - hashed == {"ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/ambient_gate.py",
-                                "ehr_eval/goldreport.py"}
+                                "ehr_eval/goldreport.py", "ehr_eval/wrong_translations.py"}
     assert not set(PIPELINE_FILES) & set(SCORING_FILES)
     assert not set(conversations.PIPELINE_FILES) & set(conversations.SCORING_FILES)
 
