@@ -91,6 +91,14 @@
     // While recording, the status line carries a dot and the transcript's head says "Recording": a word beside each.
     function buttons(recording) {
         statusArea.dataset.state = recording ? "recording" : "idle";
+        // For session.js (the expansion plan's step 18): no session warning or end while a dictation is recorded, sent or
+        // transcribed, from Dictate until its result, a failure or Cancel.
+        if (recording) {
+            document.body.dataset.sessionRecording = "recording";
+        } else {
+            delete document.body.dataset.sessionRecording;
+        }
+
         recordingMark.hidden = !recording;
         startButton.disabled = recording;
         stopButton.disabled = !recording;

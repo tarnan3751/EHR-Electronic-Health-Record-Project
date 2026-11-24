@@ -32,6 +32,8 @@ Components added to the shared stylesheet since the kit, in its style:
 - `sc-thread` and `sc-message`: a conversation, oldest message first, each in its own bordered block with who and when above the text. The reader's own messages are set in from the left with an accent bar (`sc-message--mine`); every message also says who wrote it, so the bar is never the only sign. To a patient, staff are "Your care team" and they are "You".
 - `sc-appbar__count`: a count beside an app bar link, as on "Inbox": mono, navy on mint, shown only when it isn't zero, and read out as "Inbox, 2 to do".
 - `sc-list__actions`: a record line's own actions, as plain links after the line's text, such as an active order's "Change" and "Discontinue…". Links, not buttons, because each opens a page; a destructive one ends in "…" and its page's button is the danger button, which names the action ("Discontinue order").
+- `sc-dialog`: a native dialog opened modally, as the warning before a session ends (the plan's step 18): `surface-raised`, a `line` border, `radius-lg` and `shadow-dialog`, at most `width-form` wide, its title in `sc-dialog__title` and its buttons in `sc-dialog__actions`, the primary one first and focused. Its words say what will happen and when ("You'll be signed out soon", "… in 1:58 unless you stay signed in."), with a countdown that isn't read aloud every second; Escape is the safe choice. No motion.
+- `sc-signed-out`: what takes a page's place when its session ends: the "Signed out:" notice saying why, whether what was typed is kept, and "Sign in again", which opens the sign-in in a borderless frame below (`sc-signed-out__frame`). Nothing of the page that was there stays on screen.
 
 ---
 

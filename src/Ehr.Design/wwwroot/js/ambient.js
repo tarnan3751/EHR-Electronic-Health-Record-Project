@@ -65,6 +65,17 @@
             resumedAt: 0, voices: [] };
     }
 
+    // For session.js (the expansion plan's step 18): a visit being recorded, sent, transcribed or drafted is "recording",
+    // which no session warning interrupts or ends; one paused, or waiting for its voices to be named or for the clinician
+    // after a failure, is "waiting"; otherwise nothing.
+    function busy(kind) {
+        if (kind) {
+            document.body.dataset.sessionRecording = kind;
+        } else {
+            delete document.body.dataset.sessionRecording;
+        }
+    }
+
     // The status line, a live region: each message stays until the next replaces it, an error in danger text and a
     // warning (nobody has spoken for 4 minutes, a minute left) in warning text.
     function say(text, isError = false, isWarning = false) {
@@ -202,6 +213,7 @@
             }
         });
         recorder.start(chunkMs);
+        busy("recording");
         state.resumedAt = Date.now();
         state.clock = setInterval(showRecording, 1000);
         consent.hidden = true;
@@ -331,6 +343,7 @@
         }
 
         state.paused = true;
+        busy("waiting");
         state.recorder.pause();
         state.stream.getAudioTracks().forEach((track) => { track.enabled = false; });
         state.recordedMs += Date.now() - state.resumedAt;
@@ -349,6 +362,7 @@
         }
 
         state.paused = false;
+        busy("recording");
         state.stream.getAudioTracks().forEach((track) => { track.enabled = true; });
         state.recorder.resume();
         state.resumedAt = Date.now();
@@ -386,6 +400,7 @@
 
     // Ends it here for good: nothing more recorded, queued or sent.
     function stopHere() {
+        busy();
         state.ended = true;
         state.queue = [];
         clearInterval(state.clock);
@@ -420,6 +435,7 @@
 
         state.stopping = true;
         state.paused = false;
+        busy("recording");
         clearInterval(state.clock);
         document.title = title;
         capture.hidden = true;
@@ -467,6 +483,7 @@
     // try again (when it might work) or discard the recording, as leaving the page would. Once they have been handed
     // over: try again, or open the draft, where Retrieve stages it; leaving keeps it.
     function stuck(retry) {
+        busy("waiting");
         retryButton.hidden = !retry;
         discardStuck.hidden = state.handedOff;
         openDraft.hidden = !state.handedOff;
@@ -480,6 +497,7 @@
 
     async function tryAgain() {
         again.hidden = true;
+        busy("recording");
         state.retryMs = firstRetryMs;
         if (state.handedOff) {
             say("Fetching the draft again.");
@@ -562,6 +580,7 @@
         }));
         part("voices-two").hidden = !(state.voices.length > 2 && state.consented < 3);
         speakersArea.hidden = false;
+        busy("waiting");
         say("Say who each voice is, then select Draft the note.");
         checkVoices();
         voicesArea.querySelector("select")?.focus();
@@ -597,6 +616,7 @@
         }
 
         state.drafting = true;
+        busy("recording");
         draftButton.disabled = true;
         speakersArea.hidden = true;
         say("Drafting the note. Keep this page open until it's ready: a few minutes for a long visit.");
@@ -605,6 +625,7 @@
         if (!named) {
             if (!state.ended) {
                 state.drafting = false;
+                busy("waiting");
                 speakersArea.hidden = false;
                 checkVoices();
             }
@@ -648,6 +669,8 @@
         } catch {
             say("The server couldn't confirm saving the draft. Open the draft to retrieve it.", true);
         }
+
+        busy();
     }
 
     function element(tag, text, className) {

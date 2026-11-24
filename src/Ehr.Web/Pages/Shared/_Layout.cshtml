@@ -1,5 +1,7 @@
 @* The one page frame: the head every page needs, and an app bar that says who is signed in and where they can go.
-   Staff see the clinic's links for their roles; a patient sees the portal's. Nobody signed in sees no app bar. *@
+   Staff see the clinic's links for their roles; a patient sees the portal's. Nobody signed in sees no app bar. A
+   signed-in page also carries the session's warning and what replaces the page when the session ends (session.js; the
+   expansion plan's step 18), which asks the server how long the session has left (SessionTimes). *@
 @{
     var isPatient = User.IsPortalAccount();
     var displayName = User.FindFirst(EhrClaims.DisplayName)?.Value ?? User.Identity?.Name;
@@ -16,6 +18,10 @@
     var subject = Context.Items[Ehr.Web.PortalSubjectFilter.Item] as Ehr.Web.PortalSubject;
     var acting = subject?.Acting;
     Func<string, string?> current = start => here.StartsWith(start, StringComparison.Ordinal) ? "page" : null;
+    // The session's page (step 18), which session.js asks: the portal's sign-in on its pages, the staff's on the rest.
+    var sessionPage = isPatient ? "/portal/session" : "/session";
+    var keeps = isPatient ? "your health information" : "patient information";
+    var button = isPatient ? "sc-btn sc-btn--portal" : "sc-btn";
 }
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 <!doctype html>
@@ -55,6 +61,11 @@
     {
         @* "/" reaches the patient search from any clinical page, and the arrow keys move through its results. *@
         <script src="~/_content/Ehr.Design/js/patient-search.js" defer></script>
+    }
+    @if (signedIn)
+    {
+        @* The warning before the session ends, and what happens when it does (step 18). *@
+        <script src="~/_content/Ehr.Design/js/session.js" defer></script>
     }
     @* A page's own scripts, such as dictation's, so no other page loads them. *@
     @await RenderSectionAsync("Scripts", required: false)
@@ -158,5 +169,45 @@
         <p id="request-error" class="sc-notice sc-notice--danger" role="alert" hidden></p>
         @RenderBody()
     </main>
+    @if (signedIn)
+    {
+        @* Step 18: the warning, 2 minutes before the session ends, as a dialog that takes the focus; session.js opens it
+           when the server confirms. Its settings are the server's, the same for everyone, so the page carries nothing
+           of the session's (no account, record or time left): the script asks for those. The words are here. *@
+        <dialog class="sc-dialog" role="alertdialog" aria-labelledby="session-warning-title" aria-describedby="session-warning-text"
+                data-session-warning data-session-kind="@(isPatient ? "portal" : "staff")" data-session-url="@sessionPage"
+                data-session-idle="@((int)SessionTimes.Idle.TotalSeconds)" data-session-warn="@((int)SessionTimes.Warning.TotalSeconds)"
+                data-session-sign-in="@(isPatient ? "/portal/sign-in" : "/sign-in")?ReturnUrl=@Uri.EscapeDataString(sessionPage)"
+                data-session-home="@(isPatient ? "/portal" : "/")" data-session-choose="/portal/choose" data-session-acting-url="/portal/acting">
+            <h2 class="sc-dialog__title" id="session-warning-title">You'll be signed out soon</h2>
+            <div id="session-warning-text">
+                <p data-session-idle-text>Nothing has been done here for a while. To keep @keeps safe, you'll be signed out in <span data-session-countdown>2:00</span> unless you stay signed in.</p>
+                <p data-session-final-text hidden>A sign-in lasts at most 12 hours, and yours ends in <span data-session-countdown>2:00</span>. Save what you're doing, then sign in again.</p>
+                <p data-session-typed hidden>What you've typed on this page stays here if you're signed out, out of sight, until you sign in again.</p>
+                <p data-session-waiting hidden>The visit on this page is paused, or waiting for its voices to be named. The dictation service discards a visit left like that for 10 minutes, whether or not you stay signed in.</p>
+            </div>
+            <div class="sc-dialog__actions">
+                <button type="button" class="@button sc-btn--primary" data-session-stay>Stay signed in</button>
+                <button type="button" class="@button sc-btn--primary" data-session-carry-on hidden>Keep working</button>
+                <form method="post" asp-area="@(isPatient ? "Portal" : "Clinical")" asp-page="/Account/SignOut">
+                    <button class="@button">Sign out now</button>
+                </form>
+            </div>
+        </dialog>
+        @* What takes the page's place when the session has ended: nothing of the page is on screen, and the sign-in is in a
+           frame here, so what was typed can come back for the same account (session.js). *@
+        <template data-session-ended>
+            <main id="main" class="sc-page sc-page--form sc-signed-out">
+                <h1 data-session-ended-heading>Signed out</h1>
+                <p class="sc-notice sc-notice--info" data-session-why="idle"><span class="sc-notice__state">Signed out:</span> nothing was done here for 15 minutes, so you were signed out to keep @keeps safe.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="longest"><span class="sc-notice__state">Signed out:</span> a sign-in lasts at most 12 hours.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="ended"><span class="sc-notice__state">Signed out:</span> this sign-in has ended, in this window or another.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="signed-out"><span class="sc-notice__state">Signed out:</span> you signed out.</p>
+                <p data-session-kept>What you typed is kept in this tab, out of sight, and comes back when you sign in again. If anyone else signs in here, it's cleared.</p>
+                <p><button type="button" class="@button sc-btn--primary" data-session-sign-in>Sign in again</button></p>
+                <iframe class="sc-signed-out__frame" title="Sign in again" data-session-frame hidden></iframe>
+            </main>
+        </template>
+    }
 </body>
 </html>
