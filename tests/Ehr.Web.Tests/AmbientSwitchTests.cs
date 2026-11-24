@@ -38,7 +38,27 @@ public class AmbientSwitchTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Listen to the visit", editor);
         using (var page = await session.Client.GetAsync($"/patients/{patient}/listen", Cancel))
         {
+            // To a clinician whose patient this is, a plain page that says so, and the way back to the chart: never "no
+            // patient with this ID" (looking at the pages), and nothing about the patient read.
             Assert.Equal(HttpStatusCode.NotFound, page.StatusCode);
+            var html = await page.Content.ReadAsStringAsync(Cancel);
+            Assert.Contains("Listening to a visit is switched off at this clinic.", html);
+            Assert.Contains($"href=\"/patients/{patient}\"", html);
+            Assert.DoesNotContain("there is no patient with this ID", html);
+            Assert.DoesNotContain("Synthetic", html);
+        }
+
+        // To anyone else, the 404 a patient's address they can't see answers today, the same whether the patient exists
+        // or not: the switched-off page tells no one of a patient they couldn't already find.
+        var other = await SignInAsync(off, await apps.CreateStaffAsync("Dr. Elsewhere", Ehr.Data.Accounts.StaffRoles.Clinician));
+        using (var theirs = await other.Client.GetAsync($"/patients/{patient}/listen", Cancel))
+        using (var nobody = await other.Client.GetAsync($"/patients/{Guid.NewGuid()}/listen", Cancel))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, theirs.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, nobody.StatusCode);
+            var told = await theirs.Content.ReadAsStringAsync(Cancel);
+            Assert.Equal(await nobody.Content.ReadAsStringAsync(Cancel), told);
+            Assert.DoesNotContain("switched off", told, StringComparison.Ordinal);
         }
 
         var token = Token(chart);

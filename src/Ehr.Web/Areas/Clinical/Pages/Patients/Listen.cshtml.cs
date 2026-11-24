@@ -18,7 +18,10 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients;
 // As Dictate's: only for a patient on the clinician's panel, and anyone else is sent back to the chart before anything
 // about the patient is read; the patient's name for the banner is one recorded read. A draft with a review open goes to
 // that review. On the cloud site the page opens but offers nothing: a visit is recorded only at the clinic. With
-// listening switched off (Ehr:Ambient:Enabled), the page answers 404.
+// listening switched off (Ehr:Ambient:Enabled), the page answers 404: to a clinician who has the patient on their panel,
+// a plain page saying listening is switched off at this clinic, with the way back to the chart, and nothing about the
+// patient read; to anyone else, the 404 any patient's address they can't see answers (ErrorPages), the same for a
+// patient who exists as for one who doesn't, so no one learns of a patient this way who couldn't already.
 public class ListenModel(PhiReader phi, PatientAssignments assignments, NoteWriteAuthority authority, Ambient.AmbientListening listening)
     : PageModel
 {
@@ -31,6 +34,10 @@ public class ListenModel(PhiReader phi, PatientAssignments assignments, NoteWrit
 
     public Patient Patient { get; private set; } = null!;
 
+    public Guid PatientId { get; private set; }
+
+    public bool SwitchedOff { get; private set; }
+
     public IReadOnlyList<AllergyIntolerance> Allergies { get; private set; } = [];
 
     // Listening is offered on the on-site app only (Forwarding/CloudForwardingMiddleware never forwards it), and not in
@@ -40,10 +47,19 @@ public class ListenModel(PhiReader phi, PatientAssignments assignments, NoteWrit
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
-        // Listening switched off (Ambient/AmbientListening): not here at all.
+        PatientId = id;
+        // Listening switched off (Ambient/AmbientListening): not here at all, and said so only to a clinician whose
+        // patient this is (see above).
         if (!listening.Enabled)
         {
-            return NotFound();
+            if (!await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted))
+            {
+                return NotFound();
+            }
+
+            SwitchedOff = true;
+            Response.StatusCode = StatusCodes.Status404NotFound;
+            return Page();
         }
 
         if (!await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted))

@@ -4,25 +4,35 @@
     // This page's address carries the patient and the search the clinician came from. Without htmx, nothing keeps it in
     // the browser's sessionStorage history, as on the chart.
     ViewData["UseHtmx"] = false;
-    ViewData["Title"] = $"Listen to the visit: {Model.Patient.FamilyName}, {Model.Patient.GivenName}";
+    ViewData["Title"] = Model.SwitchedOff ? "Listen to the visit" : $"Listen to the visit: {Model.Patient.FamilyName}, {Model.Patient.GivenName}";
     var chartRoute = Model.Search.RouteData();
-    chartRoute["id"] = Model.Patient.Id.ToString();
+    chartRoute["id"] = Model.PatientId.ToString();
 }
 @* UC 23 (the expansion plan's step 16): the screen for listening to a visit. The markup is the page's skeleton, and the
    consent comes first, before any script has run; js/ambient.js does the rest, finding each part by its data-ambient-*
    attribute. Nothing here opens the microphone: the script does, once the server has recorded the consent. *@
 @section Scripts {
-    @if (Model.AtTheClinic)
+    @if (Model.AtTheClinic && !Model.SwitchedOff)
     {
         <script src="~/_content/Ehr.Design/js/ambient.js" defer></script>
     }
 }
 @section Banner {
-    <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
+    @if (!Model.SwitchedOff)
+    {
+        <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
+    }
 }
 <div class="sc-pagehead">
     <p><a asp-page="Chart" asp-all-route-data="chartRoute">Back to the chart</a></p>
 </div>
+@if (Model.SwitchedOff)
+{
+    @* Listening switched off (Ehr:Ambient:Enabled), to a clinician whose patient this is: nothing about the patient read. *@
+    <h1>Listen to the visit</h1>
+    <p data-ambient-switched-off>Listening to a visit is switched off at this clinic.</p>
+    return;
+}
 <h1>Listen to the visit: @Model.Patient.FamilyName, @Model.Patient.GivenName</h1>
 
 @if (!Model.AtTheClinic)
