@@ -47,7 +47,8 @@
         <p class="sc-notice sc-notice--warning" data-ambient-at-the-clinic><span class="sc-notice__state">Read-only here:</span> @ReviewModel.FinishAtTheClinic</p>
     }
 }
-<section data-note-review data-dictation data-stage-url="@($"/api/dictation/sessions/review/{Model.Review.Id}/stage")">
+@* Off-site, a visit's words are read only at the clinic: the script says so where it would quote them. *@
+<section data-note-review data-dictation data-stage-url="@($"/api/dictation/sessions/review/{Model.Review.Id}/stage")" data-dictation-words-at-the-clinic="@(Model.DecideAtTheClinic ? "true" : "false")">
     <script type="application/json" data-review-snapshot>@Json.Serialize(Model.Snapshot)</script>
     @* Step 16: a recorded visit's transcript, read at the clinic, as stored (ReviewModel.ConversationJson). *@
     @if (Model.ConversationJson is { } conversation)

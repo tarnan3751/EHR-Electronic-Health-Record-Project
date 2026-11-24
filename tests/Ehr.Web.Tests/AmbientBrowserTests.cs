@@ -467,6 +467,29 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.True(shown.Split('|').SequenceEqual(paragraphs), $"The {shape}'s transcript shows: {string.Join("|", paragraphs)}");
     }
 
+    // TC-UC23-04 in the browser (looking at the pages, step 16): off-site, a visit's review is read without its
+    // conversation, so an instruction not carried over says its words are read at the clinic, never empty quotes, and
+    // nothing asks to select a field to see its words. At the clinic the same item quotes them (TC_UC23_06 above).
+    [Fact]
+    public async Task TC_UC23_04_off_site_an_instruction_not_carried_over_says_its_words_are_read_at_the_clinic()
+    {
+        apps.Dictation.Reset();
+        apps.Dictation.ExtraVoice = true;
+        var d = await AmbientFlows.DraftAsync(apps, names: new() { ["1"] = "clinician", ["2"] = "patient", ["3"] = "unsure" });
+        var offSite = await SignInAsync(apps.Cloud, await apps.ClinicianAsync(), via: apps.OnPrem);
+        await using var cloud = await ClinicalBrowserHost.StartAsync(apps, apps.Cloud);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
+        await using var context = await ContextAsync(browser, offSite);
+        var page = await context.NewPageAsync();
+        await page.GotoAsync($"{cloud.Url}{d.ReviewUrl}");
+        await page.WaitForSelectorAsync("[data-dictation-not-carried-list] li");
+
+        Assert.Equal("Order: Its words can be read only at the clinic. Said in a passage whose speaker couldn't be told.",
+            await page.Locator("[data-dictation-not-carried-list] li").TextContentAsync());
+        Assert.Equal("Each proposed field is awaiting your review.", await page.TextContentAsync("[data-dictation-sort-message]"));
+    }
+
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
     [Fact]

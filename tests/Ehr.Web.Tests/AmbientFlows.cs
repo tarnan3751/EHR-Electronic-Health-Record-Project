@@ -47,8 +47,8 @@ static class AmbientFlows
     }
 
     // The whole visit to its review: a chunk of audio, Stop, every voice named (1 the clinician, 2 the patient, 3 someone
-    // else), the draft, and the review staged as the page stages it.
-    public static async Task<Drafted> DraftAsync(WebApps apps, int speakers = 2)
+    // else, unless other names are given), the draft, and the review staged as the page stages it.
+    public static async Task<Drafted> DraftAsync(WebApps apps, int speakers = 2, Dictionary<string, string>? names = null)
     {
         var l = await StartAsync(apps, speakers);
         using (var chunk = await Audio(l, 0))
@@ -61,8 +61,8 @@ static class AmbientFlows
             Assert.Equal("awaiting_speakers", (await Json(stop)).GetProperty("sorting").GetString());
         }
 
-        var roles = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient" };
-        if (speakers == 3)
+        var roles = names ?? new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient" };
+        if (speakers == 3 && names is null)
         {
             roles["3"] = "other";
         }

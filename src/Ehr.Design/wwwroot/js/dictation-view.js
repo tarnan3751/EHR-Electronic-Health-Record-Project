@@ -33,6 +33,8 @@ window.SwiftChartDictationView = class {
         // its not-carried-over list leaves them out; the dictation page marks them in its list, read-only.
         const proposalWords = { order: "Proposed order", allergy_addition: "Proposed allergy to add" };
         const listedApart = root.querySelector("[data-chart-proposals]") !== null;
+        // A recorded visit's review off-site: its words are read only at the clinic, so none is quoted or highlighted here.
+        const wordsAtTheClinic = root.dataset.dictationWordsAtTheClinic === "true";
 
         // A field's status as a tag (docs/brand: Tag): the words say it, the tone only supports them.
         function setStatus(status, text, tone) {
@@ -137,7 +139,8 @@ window.SwiftChartDictationView = class {
             } else if (result.sorting === "unavailable") {
                 sortMessage.textContent = result.message || "The fields couldn't be sorted, so the transcript is kept as plain text.";
             } else {
-                sortMessage.textContent = "Each proposed field is awaiting your review. Select one to see the words it came from.";
+                sortMessage.textContent = wordsAtTheClinic ? "Each proposed field is awaiting your review."
+                    : "Each proposed field is awaiting your review. Select one to see the words it came from.";
             }
 
             for (const name of fieldNames) {
@@ -152,7 +155,8 @@ window.SwiftChartDictationView = class {
                 const text = ((result.transcript ?? state.transcript)?.text ?? "").slice(item.start, item.end);
                 const kind = proposed.get(`${item.start}:${item.end}`);
                 const li = element("li");
-                li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), document.createTextNode(`“${text}”`));
+                li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `),
+                    document.createTextNode(wordsAtTheClinic ? "Its words can be read only at the clinic." : `“${text}”`));
                 // A recorded visit's (step 16): an instruction said where who spoke couldn't be told.
                 if (item.speaker === "unsure") {
                     li.append(document.createTextNode(" Said in a passage whose speaker couldn't be told."));
