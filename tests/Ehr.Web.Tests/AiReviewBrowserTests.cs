@@ -347,6 +347,12 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await TabToAsync(page, "[data-dictation-field=plan] .sc-translation__pair");
         Assert.Equal(plan.Spanish, await HighlightedAsync(page));
         Assert.Contains("can mean every other day or every third day", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning").TextContentAsync());
+        // As the script renders them, every translated sentence says it is a translation to check: the one whose field
+        // warns, and those whose fields don't.
+        Assert.Equal(0, await page.Locator("[data-dictation-field=subjective] .sc-proposal__warning").CountAsync());
+        Assert.Equal(await page.Locator(".sc-translation__pair").CountAsync(), await page.Locator(".sc-translation__pair > .sc-translation__check:first-child").CountAsync());
+        Assert.Equal(["Translated from Spanish: check it against the Spanish beside it"],
+            (await page.Locator(".sc-translation__check").AllTextContentsAsync()).Distinct());
         // The Spanish quoted in a warning is marked as Spanish; in the Spanish transcript, an unclear passage's English
         // explanation is on an English wrapper, and the passage itself stays Spanish.
         Assert.Equal("Cada tercer día", await page.Locator("[data-dictation-field=plan] .sc-proposal__warning span[lang=es]").TextContentAsync());
@@ -416,6 +422,10 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
                 await shown.GotoAsync(reopened);
                 var layout = await shown.EvaluateAsync<System.Text.Json.JsonElement>(Layout);
                 var where = $"the review at {width} pixels in the {scheme} theme";
+                // The line over each translated sentence in the theme's own info colour (tokens.json), and ink on the tint.
+                var check = shown.Locator("[data-dictation-field=subjective] .sc-translation__check").First;
+                Assert.Equal(scheme == ColorScheme.Light ? "rgb(36, 89, 168)" : "rgb(143, 182, 242)",
+                    await check.EvaluateAsync<string>("e => getComputedStyle(e).color"));
                 Assert.False(layout.GetProperty("scrolls").GetBoolean(), $"The page scrolls sideways: {where}.");
                 Assert.Equal(0, layout.GetProperty("wide").GetArrayLength());
                 Assert.True(layout.GetProperty("wraps").GetBoolean(), $"The long Spanish quote doesn't wrap inside its pair: {where}.");

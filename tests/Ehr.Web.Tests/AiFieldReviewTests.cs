@@ -571,8 +571,9 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         return JsonDocument.Parse((string)(await command.ExecuteScalarAsync(Cancel))!).RootElement.Clone();
     }
 
+    // Each translated sentence as the review shows it, the owner's words over it (2026-11-24).
     static string Translated(string english, string spanish) =>
-        $"<li class=\"sc-translation__pair\"><p class=\"sc-translation__english\">{english}</p><p class=\"sc-translation__spanish\">You said: <span lang=\"es\">“{spanish}”</span></p></li>";
+        $"<li class=\"sc-translation__pair\"><p class=\"sc-translation__check\">Translated from Spanish: check it against the Spanish beside it</p><p class=\"sc-translation__english\">{english}</p><p class=\"sc-translation__spanish\">You said: <span lang=\"es\">“{spanish}”</span></p></li>";
 
     // TC-UC13-15 (successful flow; the expansion plan's step 17, proposed FR-61): a dictation in Spanish is reviewed in the
     // English screens: its transcript in Spanish, a notice that the proposals are translations to check sentence by
@@ -603,6 +604,18 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         }
 
         var stored = await StoredResultAsync(f);
+
+        // No translated sentence reads as checked for having no warning: the one in Plan, whose field warns of "cada
+        // tercer día", and those in the fields with none each say they are translations to check.
+        Assert.Equal("ambiguous_frequency", stored.GetProperty("fields").GetProperty("plan").GetProperty("warnings")[0].GetProperty("code").GetString());
+        Assert.Equal(0, stored.GetProperty("fields").GetProperty("subjective").GetProperty("warnings").GetArrayLength());
+        foreach (var (field, statements) in DictationSidecarStub.SpanishFields)
+        {
+            var card = html.Split($"data-dictation-field=\"{field}\"")[1];
+            card = card[..card.IndexOf("</ol>", StringComparison.Ordinal)];
+            Assert.Equal(statements.Length, card.Split("<p class=\"sc-translation__check\">Translated from Spanish: check it against the Spanish beside it</p>").Length - 1);
+        }
+
         Assert.Equal("es", stored.GetProperty("spokenLanguage").GetString());
         var transcript = stored.GetProperty("transcript").GetProperty("text").GetString()!;
         Assert.Equal(string.Join(' ', DictationSidecarStub.SpanishSentences), transcript);

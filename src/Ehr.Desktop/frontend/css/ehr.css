@@ -1825,17 +1825,30 @@
         background: var(--highlight-source);
     }
 
-    /* On the tint the Spanish is ink, which keeps its contrast there (tokens.json: highlight-source). */
+    /* On the tint the Spanish and the line over the pair are ink, which keeps their contrast there (tokens.json:
+       highlight-source). */
     .sc-translation__pair:hover .sc-translation__spanish,
-    .sc-translation__pair:focus .sc-translation__spanish {
+    .sc-translation__pair:focus .sc-translation__spanish,
+    .sc-translation__pair:hover .sc-translation__check,
+    .sc-translation__pair:focus .sc-translation__check {
         color: var(--ink);
     }
 
     .sc-translation__english,
-    .sc-translation__spanish {
+    .sc-translation__spanish,
+    .sc-translation__check {
         margin: 0;
         min-width: 0;
         overflow-wrap: anywhere;
+    }
+
+    /* Over every pair, across both columns, warning or not: "Translated from Spanish: check it against the Spanish
+       beside it", so no sentence reads as checked for having no warning. */
+    .sc-translation__check {
+        grid-column: 1 / -1;
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--info);
     }
 
     .sc-translation__spanish {

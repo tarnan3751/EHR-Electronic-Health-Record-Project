@@ -54,6 +54,10 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     // shown a sentence at a time beside the Spanish it was translated from.
     public bool Translated => Result?.SpokenLanguage == SpokenLanguage.Spanish;
 
+    // What every translated sentence says, in the owner's words (2026-11-24): no translated sentence reads as checked
+    // because it has no warning. dictation-view.js says the same of the sentences it renders.
+    public const string TranslatedSentence = "Translated from Spanish: check it against the Spanish beside it";
+
     // A field's sentences, each with the Spanish words it was translated from, when the dictation was in Spanish.
     public IEnumerable<(string English, string Spanish)> Statements(string field)
     {

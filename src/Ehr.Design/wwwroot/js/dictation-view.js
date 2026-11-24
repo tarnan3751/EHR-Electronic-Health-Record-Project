@@ -259,13 +259,15 @@ window.SwiftChartDictationView = class {
         }
 
         // A value proposed from Spanish (step 17): each English sentence beside the Spanish words it was translated from,
-        // which hovering or focusing the sentence highlights in the transcript (docs/brand: Translated sentences). The
-        // page renders the same list before this script runs (Notes/Review).
+        // which hovering or focusing the sentence highlights in the transcript (docs/brand: Translated sentences), each
+        // saying it is a translation to check, warning or not, so none reads as checked for having no warning. The page
+        // renders the same list before this script runs (Notes/Review, ReviewModel.TranslatedSentence).
         function renderStatements(field) {
             const list = element("ol", undefined, "sc-translation");
             const transcriptText = state.transcript?.text ?? "";
             for (const statement of field.statements) {
                 const pair = element("li", undefined, "sc-translation__pair");
+                pair.append(element("p", "Translated from Spanish: check it against the Spanish beside it", "sc-translation__check"));
                 const said = element("span", `“${statement.sources.map((s) => transcriptText.slice(s.start, s.end)).join(" … ")}”`);
                 said.lang = "es";
                 const spanish = element("p", "You said: ", "sc-translation__spanish");

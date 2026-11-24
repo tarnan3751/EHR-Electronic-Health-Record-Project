@@ -127,11 +127,12 @@
                         <dd data-field-value>@if (Model.Statements(field).ToList() is { Count: > 0 } statements)
                         {
                             // From a dictation in Spanish (step 17), each English sentence beside the Spanish it was translated
-                            // from (docs/brand: Translated sentences); otherwise the value as proposed.
+                            // from (docs/brand: Translated sentences), each saying it is a translation to check, warning or not,
+                            // so none reads as checked for having no warning; otherwise the value as proposed.
                             <ol class="sc-translation">
                                 @foreach (var (english, spanish) in statements)
                                 {
-                                    <li class="sc-translation__pair"><p class="sc-translation__english">@english</p><p class="sc-translation__spanish">You said: <span lang="es">“@spanish”</span></p></li>
+                                    <li class="sc-translation__pair"><p class="sc-translation__check">@ReviewModel.TranslatedSentence</p><p class="sc-translation__english">@english</p><p class="sc-translation__spanish">You said: <span lang="es">“@spanish”</span></p></li>
                                 }
                             </ol>
                         }
