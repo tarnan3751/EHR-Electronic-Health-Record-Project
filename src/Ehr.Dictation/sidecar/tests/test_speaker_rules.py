@@ -666,6 +666,42 @@ def test_a_person_sent_or_a_sending_refused_is_not_listed(said):
     assert checked(text, plan=(said, [said]))["plan"].pending
 
 
+# The lean: an Unsure passage in the clinician's voice is no Subjective source (c09's room recording quoted the
+# clinician's "like a seashell? that's a good way to put it. any trouble with her hearing at school?", heard Unsure, as
+# the patient's history), while Objective, Assessment and Plan may still quote it, warned; one in the patient's voice,
+# or in a voice named "unsure", is still Subjective's, warned.
+def test_subjective_never_quotes_the_clinicians_voice_even_where_its_passage_is_unsure():
+    text = heard(("clinician", "Your chest is clear {period}"),
+                 ("patient", "I have had a cough for two weeks {period}"),
+                 ("clinician", "The cough is from the cold you had {period}", True),
+                 ("patient", "It is worse at night {period}", True))
+
+    leaned = checked(text, subjective=("The cough is from the cold you had.", ["The cough is from the cold you had"]))
+    together = checked(text, subjective=("I have had a cough for two weeks. The cough is from the cold you had.",
+                                         ["I have had a cough for two weeks", "The cough is from the cold you had"]))
+    patients = checked(text, subjective=("I have had a cough for two weeks. It is worse at night.",
+                                         ["I have had a cough for two weeks", "It is worse at night"]))
+    assessed = checked(text, assessment=("The cough is from the cold you had.", ["The cough is from the cold you had"]))
+
+    assert leaned["subjective"].reasons[0] == "wrong_speaker"
+    assert not together["subjective"].pending, "refused, never trimmed"
+    assert patients["subjective"].pending and patients["subjective"].speakers == ["patient", "unsure"]
+    assert assessed["assessment"].pending
+    assert [code for code, _, _ in assessed["assessment"].warnings] == ["speaker_unsure"]
+
+
+def test_a_voice_named_unsure_has_no_lean():
+    text = conversation.assemble([
+        (Segment(0, 16000, "Your chest is clear {period}", 0.9, None, True), 1, False),
+        (Segment(16000, 32000, "I have had a cough for two weeks {period}", 0.9, None, True), 2, False),
+        (Segment(32000, 48000, "She coughs at night {period}", 0.9, None, True), 3, False),
+    ]).named({1: "clinician", 2: "patient", 3: "unsure"})
+
+    fields = checked(text, subjective=("She coughs at night.", ["She coughs at night"]))
+
+    assert fields["subjective"].pending and fields["subjective"].speakers == ["unsure"]
+
+
 # The conversation's own names live beside the common ones in one module: none may stand in for a common one, which
 # would change what a dictation's checks do.
 def test_no_name_in_the_checks_is_defined_twice():

@@ -2272,7 +2272,8 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #
 # - wrong_speaker (decision D15): a source must be in a turn of someone the field may quote (SPEAKERS): Subjective
 #   what the patient or someone with them said, Objective, Assessment and Plan what the clinician said, and any of them
-#   a passage whose speaker couldn't be told; a source over one voice's sure and unsure passages is unsure. A source
+#   a passage whose speaker couldn't be told, but for Subjective never one in the clinician's voice (the lean,
+#   NOT_QUOTED_UNSURE); a source over one voice's sure and unsure passages is unsure. A source
 #   that runs across two voices is cut where the voice changes, and each piece is judged on its own by every rule here
 #   (_said_pieces()): one in a turn the field may not quote, a question, one too short or only an answer is dropped,
 #   and so is an answer cut from its question that doesn't say what it is about, with a subject of its own or a word
@@ -2344,7 +2345,13 @@ SPEAKERS = {
     "assessment": frozenset({"clinician", "unsure"}),
     "plan": frozenset({"clinician", "unsure"}),
 }
-ROLE_MARK = re.compile(r"\A\s*(?:clinician|patient|other|unsure)\s*:\s*", re.IGNORECASE)
+# The lean (the record model session's fix round): a passage diarize.py was unsure of is still said in a voice, and
+# nearly always by the role that voice was named (in the record run, 97.6% of the Unsure words in the clinician's voice
+# were the clinician's on the clean visits, 72.4% in noise), so Subjective doesn't quote an Unsure passage in the
+# clinician's voice: most of those the model quoted were the clinician's own words, often a question. Each field: the
+# roles whose voice's Unsure passages it may not quote. A voice with no sure passage (one named "unsure") has no lean.
+NOT_QUOTED_UNSURE = {"subjective": frozenset({"clinician"})}
+ROLE_MARK =re.compile(r"\A\s*(?:clinician|patient|other|unsure)\s*:\s*", re.IGNORECASE)
 # A hedge, a denial or a report said in a conversation, read as one shape (see above): the common cues (NEGATION,
 # CERTAINTY, which pass over a subject and its verb, TO_THE_FINDING) and a few heads people say to each other rather
 # than dictate, each followed by what speech puts between it and what it is about (_SAID_TO_THE_FINDING): fillers ("um",
@@ -2599,7 +2606,8 @@ def _said_pieces(span: tuple[int, int], transcript: _Transcript, scope: Scope, n
         stage = next(
             (k for k, fails in enumerate((
                 any(_overlaps(piece, passage) for passage in transcript.unclear),
-                scope.speaker(piece) not in SPEAKERS[name],
+                scope.speaker(piece) not in SPEAKERS[name]
+                or scope.speaker(piece) == "unsure" and scope.leans(piece) in NOT_QUOTED_UNSURE.get(name, ()),
                 asks,
                 len(said) < 2 and not any(word.text[0].isdigit() for word in said),
                 all(word.text in ANSWER_WORDS for word in said) or (asked and not _about(said, asked)),
@@ -2653,6 +2661,14 @@ class Scope:
             return None
         said = {who for who, _ in inside}
         return said.pop() if len(said) == 1 else "unsure"
+
+    def leans(self, span: tuple[int, int]) -> str | None:
+        """The role of the voice the span is in, as that voice's sure passages name it; None if it runs across two
+        voices, no voice was told, or none of its voice's passages is sure (a voice named "unsure")."""
+        voices = {voice for start, end, _, voice in self.passages if start < span[1] and span[0] < end}
+        if len(voices) != 1 or None in voices:
+            return None
+        return next((who for _, _, who, voice in self.passages if voice in voices and who != "unsure"), None)
 
 
 def _warn_of_speakers(checked: dict[str, Checked]) -> None:
