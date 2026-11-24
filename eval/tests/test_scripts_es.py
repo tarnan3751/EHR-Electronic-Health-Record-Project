@@ -96,8 +96,26 @@ def test_what_the_script_names_is_in_it(script):
     for finding, relative in script.family:
         assert finding in gold.lower() and relative in gold.lower()
     for iso in script.dates:
-        month = int(iso[5:7])
-        assert list(spanish.MONTHS)[month - 1] in spanish.fold(display)
+        assert said_month(iso, display), iso
+
+
+def said_month(iso: str, display: str) -> bool:
+    """Whether the display text names the date's month, by any of its Spanish names ("septiembre" or "setiembre")."""
+    english = list(dict.fromkeys(spanish.MONTHS.values()))[int(iso[5:7]) - 1]
+    folded = spanish.fold(display)
+    return any(re.search(rf"\b{name}\b", folded) for name, month in spanish.MONTHS.items() if month == english)
+
+
+# spanish.MONTHS holds September twice, so the month a date names isn't its place among the table's keys: November was
+# read as "octubre" (the held-out scripts' author's finding, 2026-11-24).
+@pytest.mark.parametrize(("iso", "display", "said"), [
+    ("2026-11-03", "Vista el 3 de noviembre.", True), ("2026-11-03", "Vista el 3 de octubre.", False),
+    ("2026-10-03", "Vista el 3 de octubre.", True), ("2026-10-03", "Vista el 3 de setiembre.", False),
+    ("2026-09-03", "Vista el 3 de setiembre.", True), ("2026-09-03", "Vista el 3 de septiembre.", True),
+    ("2026-12-03", "Vista el 3 de diciembre.", True), ("2026-01-03", "Vista el 3 de enero.", True),
+])
+def test_a_scripts_date_is_found_by_its_months_spanish_name(iso, display, said):
+    assert said_month(iso, display) is said
 
 
 @pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
