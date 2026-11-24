@@ -42,7 +42,7 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "22df8dc632128e1b75af059db2dcdb745a787e585a3d59a4e04e819d27d29737",
   "pipeline": "e5716b705875dc4410e8111368d06de115798491da174257e1a2b1f6a5557351",
-  "scoring": "231a889442a4b774789b2aac15839f506057ef65a18a95eaae120b9afe59a3b8"
+  "scoring": "775780aa90d9d206780cdbda567d75b3c5ba0c4007c9f18cf828c0be9bf5834b"
  },
  "dataset": {
   "recordings_sha256": "936e6510c61662f07f93b70b0bf653f41de6c1f0a1f599b989b5a6e2dd2856ed",
@@ -143127,5 +143127,10 @@
    "window_seconds_alongside": 59.1,
    "window_gave_way": 1
   }
+ },
+ "rescored_from": {
+  "scoring": "231a889442a4b774789b2aac15839f506057ef65a18a95eaae120b9afe59a3b8",
+  "gold_sha256": "044123a6b09a256c8919ae488007b047bd2ffe00b97bdb0be6bcec4a5d6b08e7",
+  "structuring_outputs_reused": true
  }
 }

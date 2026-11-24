@@ -37,7 +37,7 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "e51298e314fcc4e71e4def42a41c8c0f9759b341b2d278563029fa76cab13701",
-  "scoring": "77df03d8feeb287e1548a0b07757fb8389cdb3a9fde0f5378452976bcc8d5546"
+  "scoring": "f36573b982cb7a338126b611e38b818bf03e32c4aa6802d47d5a7ecb28f972aa"
  },
  "dataset": {
   "recordings_sha256": "085cd012cb694caf10410c548ad2a61ee2d624b4e3714b0dd79fd57a9ed54d06",
@@ -2129,34 +2129,534 @@
   },
   "misfiled": {
    "shown": {
-    "drug": 12,
-    "number": 145,
-    "frequency": 63,
-    "duration": 23,
-    "date": 21,
-    "route": 3,
+    "drug": 11,
+    "number": 24,
+    "frequency": 12,
+    "duration": 2,
+    "date": 4,
+    "route": 0,
     "side": 2,
-    "severity": 1,
-    "polarity": 16,
-    "action": 40
+    "severity": 0,
+    "polarity": 4,
+    "action": 1
    },
-   "total": 326,
+   "total": 60,
    "unflagged": {
-    "drug": 10,
-    "number": 123,
-    "frequency": 56,
-    "duration": 20,
-    "date": 21,
-    "route": 2,
+    "drug": 9,
+    "number": 22,
+    "frequency": 11,
+    "duration": 1,
+    "date": 4,
+    "route": 0,
     "side": 1,
-    "severity": 1,
-    "polarity": 14,
-    "action": 37
+    "severity": 0,
+    "polarity": 3,
+    "action": 0
    },
-   "unflagged_total": 285,
+   "unflagged_total": 51,
    "statements": 1009,
-   "misfiled_statements": 163,
-   "share": 0.1615,
+   "misfiled_statements": 23,
+   "share": 0.0228,
+   "unflagged_statements": 19,
+   "rate": 0.0188,
+   "listed": [
+    {
+     "variant": "d02-t2dm-bexagliflozin--clean",
+     "field": "subjective",
+     "kind": "date",
+     "shown": "today",
+     "flagged": false,
+     "statement": "His A1c today is 8.4, down from 9.1 in the spring."
+    },
+    {
+     "variant": "d02-t2dm-bexagliflozin--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "8.4",
+     "flagged": false,
+     "statement": "His A1c today is 8.4, down from 9.1 in the spring."
+    },
+    {
+     "variant": "d02-t2dm-bexagliflozin--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "9.1",
+     "flagged": false,
+     "statement": "His A1c today is 8.4, down from 9.1 in the spring."
+    },
+    {
+     "variant": "d02-t2dm-bexagliflozin--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "96 kg",
+     "flagged": false,
+     "statement": "Weight is 96 kg, down 2 kg."
+    },
+    {
+     "variant": "d02-t2dm-bexagliflozin--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "2 kg",
+     "flagged": false,
+     "statement": "Weight is 96 kg, down 2 kg."
+    },
+    {
+     "variant": "d03-copd-ensifentrine--clean",
+     "field": "subjective",
+     "kind": "date",
+     "shown": "today",
+     "flagged": false,
+     "statement": "His inhalers are tiotropium and olodaterol once daily, and his technique was good when I watched him today."
+    },
+    {
+     "variant": "d03-copd-ensifentrine--babble-20db",
+     "field": "subjective",
+     "kind": "date",
+     "shown": "today",
+     "flagged": false,
+     "statement": "His inhalers are tiotropium and lodaterol once daily, his technique was good when I watched him today."
+    },
+    {
+     "variant": "d10-pah-sotatercept--clean",
+     "field": "assessment",
+     "kind": "polarity",
+     "shown": "better",
+     "flagged": false,
+     "statement": "Impression: Pulmonary arterial hypertension, now WHO functional class two, improving on triple therapy with Cotaatocept."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "bisoprolol",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "eplerenone",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "furosemide",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "morning",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "number",
+     "shown": "10 mg",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "number",
+     "shown": "25 mg",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--clean",
+     "field": "objective",
+     "kind": "number",
+     "shown": "40 mg",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "bisoprolol",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "eplerenone",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "furosemide",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "morning",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "number",
+     "shown": "10 mg",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "number",
+     "shown": "25 mg",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-20db",
+     "field": "objective",
+     "kind": "number",
+     "shown": "40 mg",
+     "flagged": false,
+     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "bisoprolol",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "eplerenone",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "drug",
+     "shown": "furosemide",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "frequency",
+     "shown": "morning",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "number",
+     "shown": "10 mg",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "number",
+     "shown": "25 mg",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d12-hfref-ivabradine--hvac-10db",
+     "field": "objective",
+     "kind": "number",
+     "shown": "40 mg",
+     "flagged": false,
+     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
+    },
+    {
+     "variant": "d15-acne-isotretinoin--clean",
+     "field": "subjective",
+     "kind": "date",
+     "shown": "today",
+     "flagged": false,
+     "statement": "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative."
+    },
+    {
+     "variant": "d15-acne-isotretinoin--clean",
+     "field": "subjective",
+     "kind": "polarity",
+     "shown": "negative",
+     "flagged": false,
+     "statement": "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative."
+    },
+    {
+     "variant": "d15-acne-isotretinoin--clean",
+     "field": "plan",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Plan: conontinue isotretino 40 mg daily."
+    },
+    {
+     "variant": "d15-acne-isotretinoin--clean",
+     "field": "plan",
+     "kind": "number",
+     "shown": "40 mg",
+     "flagged": false,
+     "statement": "Plan: conontinue isotretino 40 mg daily."
+    },
+    {
+     "variant": "d20-menopause-fezolinetant--clean",
+     "field": "plan",
+     "kind": "frequency",
+     "shown": "daily",
+     "flagged": false,
+     "statement": "Start Fesilantin 45 mg once daily."
+    },
+    {
+     "variant": "d23-ankle-sprain--clean",
+     "field": "objective",
+     "kind": "side",
+     "shown": "right",
+     "flagged": false,
+     "statement": "Below the lateral malleolus, no bony tenderness at the malleoli or the base of the fifth metatarsal, so no x-ray needed by the Auto-A rules right ankle sprain grade one to two ice compression elevation."
+    },
+    {
+     "variant": "d27-osteoporosis-denosumab--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "2.4",
+     "flagged": false,
+     "statement": "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and minus 2.4 at the hip."
+    },
+    {
+     "variant": "d27-osteoporosis-denosumab--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "2.8",
+     "flagged": false,
+     "statement": "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and minus 2.4 at the hip."
+    },
+    {
+     "variant": "d27-osteoporosis-denosumab--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "38",
+     "flagged": false,
+     "statement": "Calcium 9.4, vitamin D 38."
+    },
+    {
+     "variant": "d27-osteoporosis-denosumab--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "9.4",
+     "flagged": false,
+     "statement": "Calcium 9.4, vitamin D 38."
+    },
+    {
+     "variant": "d31-cah-crinecerfont--clean",
+     "field": "plan",
+     "kind": "number",
+     "shown": "2",
+     "flagged": false,
+     "statement": "Reduce hydrocortisone to 15 mg a day, split 7.5 mg in the morning, five at midday and 2-1l2 in the evening."
+    },
+    {
+     "variant": "d34-lipids-phone--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "4.4",
+     "flagged": false,
+     "statement": "His cholesterol is 6.8 with LDL 4.4."
+    },
+    {
+     "variant": "d34-lipids-phone--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "6.8",
+     "flagged": false,
+     "statement": "His cholesterol is 6.8 with LDL 4.4."
+    },
+    {
+     "variant": "d34-lipids-phone--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "44",
+     "flagged": false,
+     "statement": "His HbA1c is 44."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "side",
+     "shown": "left",
+     "flagged": true,
+     "statement": "three-year-old in room for left acute otitis media his third."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "action",
+     "shown": "start",
+     "flagged": true,
+     "statement": "Since the summer start amoxicillin 90 mg/kg."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "drug",
+     "shown": "amoxicillin",
+     "flagged": true,
+     "statement": "Since the summer start amoxicillin 90 mg/kg."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "90",
+     "flagged": true,
+     "statement": "Since the summer start amoxicillin 90 mg/kg."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "drug",
+     "shown": "ibuprofen",
+     "flagged": true,
+     "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "frequency",
+     "shown": "with food",
+     "flagged": true,
+     "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "polarity",
+     "shown": "better",
+     "flagged": true,
+     "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "duration",
+     "shown": "72 hours",
+     "flagged": true,
+     "statement": "Ne in 48 to 72 hours."
+    },
+    {
+     "variant": "d39-otitis-media--clean",
+     "field": "subjective",
+     "kind": "number",
+     "shown": "48",
+     "flagged": true,
+     "statement": "Ne in 48 to 72 hours."
+    },
+    {
+     "variant": "d40-adhd-guanfacine--clean",
+     "field": "subjective",
+     "kind": "duration",
+     "shown": "4 weeks",
+     "flagged": false,
+     "statement": "She could not tolerate methylphenidate because of poor appetite and weight loss, ough four weeks ago, we started guanfacine extended release 1 mg at bedtime."
+    },
+    {
+     "variant": "d47-hypothyroid-said-by-others--clean",
+     "field": "subjective",
+     "kind": "polarity",
+     "shown": "hypothyroidism",
+     "flagged": false,
+     "statement": "This is a 58-year-old woman with hypothyroidism, on levothyroxine 75 mcg daily."
+    }
+   ]
+  },
+  "no_gold": {
+   "shown": {
+    "drug": 1,
+    "number": 121,
+    "frequency": 51,
+    "duration": 17,
+    "date": 13,
+    "route": 3,
+    "side": 0,
+    "severity": 0,
+    "polarity": 12,
+    "action": 39
+   },
+   "total": 257,
+   "unflagged_total": 225,
    "listed": [
     {
      "variant": "d01-htn-aprocitentan--clean",
@@ -2313,30 +2813,6 @@
     {
      "variant": "d02-t2dm-bexagliflozin--clean",
      "field": "subjective",
-     "kind": "date",
-     "shown": "today",
-     "flagged": false,
-     "statement": "His A1c today is 8.4, down from 9.1 in the spring."
-    },
-    {
-     "variant": "d02-t2dm-bexagliflozin--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "8.4",
-     "flagged": false,
-     "statement": "His A1c today is 8.4, down from 9.1 in the spring."
-    },
-    {
-     "variant": "d02-t2dm-bexagliflozin--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "9.1",
-     "flagged": false,
-     "statement": "His A1c today is 8.4, down from 9.1 in the spring."
-    },
-    {
-     "variant": "d02-t2dm-bexagliflozin--clean",
-     "field": "subjective",
      "kind": "frequency",
      "shown": "daily",
      "flagged": false,
@@ -2349,22 +2825,6 @@
      "shown": "20 mg",
      "flagged": false,
      "statement": "He is taking metformin 1000 mg twice a day and bxagliflozin 20 mg daily, which he started three months ago."
-    },
-    {
-     "variant": "d02-t2dm-bexagliflozin--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "96 kg",
-     "flagged": false,
-     "statement": "Weight is 96 kg, down 2 kg."
-    },
-    {
-     "variant": "d02-t2dm-bexagliflozin--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "2 kg",
-     "flagged": false,
-     "statement": "Weight is 96 kg, down 2 kg."
     },
     {
      "variant": "d02-t2dm-bexagliflozin--clean",
@@ -2415,28 +2875,12 @@
      "statement": "This 71-year-old retired joiner was admitted on the 28th of October with an infective exacerbation and discharged after four days on a five-day course of prednisolone 30 mg and doxycycline."
     },
     {
-     "variant": "d03-copd-ensifentrine--clean",
-     "field": "subjective",
-     "kind": "date",
-     "shown": "today",
-     "flagged": false,
-     "statement": "His inhalers are tiotropium and olodaterol once daily, and his technique was good when I watched him today."
-    },
-    {
      "variant": "d03-copd-ensifentrine--babble-20db",
      "field": "subjective",
      "kind": "number",
      "shown": "28",
      "flagged": false,
      "statement": "This 71-year-old retired joiner was admitted on the 28th of October with an infective exacerbation and discharged after four days on a five-day course of prednisolone 30 mg and doxycycline."
-    },
-    {
-     "variant": "d03-copd-ensifentrine--babble-20db",
-     "field": "subjective",
-     "kind": "date",
-     "shown": "today",
-     "flagged": false,
-     "statement": "His inhalers are tiotropium and lodaterol once daily, his technique was good when I watched him today."
     },
     {
      "variant": "d03-copd-ensifentrine--babble-20db",
@@ -2496,27 +2940,11 @@
     },
     {
      "variant": "d04-bronchiolitis-infant--clean",
-     "field": "subjective",
-     "kind": "duration",
-     "shown": "3 days",
-     "flagged": false,
-     "statement": "seven-month-old boy with three days of runny nose and cough, and wheeze since last night."
-    },
-    {
-     "variant": "d04-bronchiolitis-infant--clean",
      "field": "plan",
      "kind": "number",
      "shown": "92%",
      "flagged": false,
      "statement": "target saturation above 92%."
-    },
-    {
-     "variant": "d04-bronchiolitis-infant--monitor-20db",
-     "field": "subjective",
-     "kind": "duration",
-     "shown": "3 days",
-     "flagged": false,
-     "statement": "Pediatric assessment unit, seven-month-old boy with three days of runny nose and cough, and wheeze since last night."
     },
     {
      "variant": "d04-bronchiolitis-infant--monitor-20db",
@@ -2528,27 +2956,11 @@
     },
     {
      "variant": "d04-bronchiolitis-infant--monitor-10db",
-     "field": "subjective",
-     "kind": "duration",
-     "shown": "3 days",
-     "flagged": false,
-     "statement": "Pediatric assessment unit, seven-month-old boy with three days of runny nose and cough, and wheeze since last night."
-    },
-    {
-     "variant": "d04-bronchiolitis-infant--monitor-10db",
      "field": "plan",
      "kind": "number",
      "shown": "92%",
      "flagged": false,
      "statement": "target saturation above 92%."
-    },
-    {
-     "variant": "d04-bronchiolitis-infant--monitor-5db",
-     "field": "subjective",
-     "kind": "duration",
-     "shown": "3 days",
-     "flagged": false,
-     "statement": "seven-month-old boy with three days of runny nose and cough, and wheeze since last night."
     },
     {
      "variant": "d04-bronchiolitis-infant--monitor-5db",
@@ -2776,14 +3188,6 @@
     },
     {
      "variant": "d10-pah-sotatercept--clean",
-     "field": "assessment",
-     "kind": "polarity",
-     "shown": "better",
-     "flagged": false,
-     "statement": "Impression: Pulmonary arterial hypertension, now WHO functional class two, improving on triple therapy with Cotaatocept."
-    },
-    {
-     "variant": "d10-pah-sotatercept--clean",
      "field": "plan",
      "kind": "action",
      "shown": "continue",
@@ -2953,54 +3357,6 @@
     {
      "variant": "d12-hfref-ivabradine--clean",
      "field": "objective",
-     "kind": "drug",
-     "shown": "bisoprolol",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "drug",
-     "shown": "eplerenone",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "drug",
-     "shown": "furosemide",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "morning",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
      "kind": "frequency",
      "shown": "daily",
      "flagged": false,
@@ -3011,30 +3367,6 @@
      "field": "objective",
      "kind": "frequency",
      "shown": "twice daily",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "number",
-     "shown": "10 mg",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "number",
-     "shown": "25 mg",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--clean",
-     "field": "objective",
-     "kind": "number",
-     "shown": "40 mg",
      "flagged": false,
      "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, Dapagliflilozin 10 mg daily and furosemide 40 mg in the morning."
     },
@@ -3113,54 +3445,6 @@
     {
      "variant": "d12-hfref-ivabradine--hvac-20db",
      "field": "objective",
-     "kind": "drug",
-     "shown": "bisoprolol",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "drug",
-     "shown": "eplerenone",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "drug",
-     "shown": "furosemide",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "morning",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
      "kind": "frequency",
      "shown": "daily",
      "flagged": false,
@@ -3171,30 +3455,6 @@
      "field": "objective",
      "kind": "frequency",
      "shown": "twice daily",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "number",
-     "shown": "10 mg",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "number",
-     "shown": "25 mg",
-     "flagged": false,
-     "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-20db",
-     "field": "objective",
-     "kind": "number",
-     "shown": "40 mg",
      "flagged": false,
      "statement": "Current medications: Sacubitril/valsartan 4951 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapagliflozine 10 mg daily and furosemide 40 mg in the morning."
     },
@@ -3289,54 +3549,6 @@
     {
      "variant": "d12-hfref-ivabradine--hvac-10db",
      "field": "objective",
-     "kind": "drug",
-     "shown": "bisoprolol",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "drug",
-     "shown": "eplerenone",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "drug",
-     "shown": "furosemide",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "frequency",
-     "shown": "morning",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
      "kind": "frequency",
      "shown": "daily",
      "flagged": false,
@@ -3347,30 +3559,6 @@
      "field": "objective",
      "kind": "frequency",
      "shown": "twice daily",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "number",
-     "shown": "10 mg",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "number",
-     "shown": "25 mg",
-     "flagged": false,
-     "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
-    },
-    {
-     "variant": "d12-hfref-ivabradine--hvac-10db",
-     "field": "objective",
-     "kind": "number",
-     "shown": "40 mg",
      "flagged": false,
      "statement": "Current medications: Scubitril/valsartan 49/51 mg twice daily, bisoprolol 10 mg daily, eplerenone 25 mg daily, dapacliflozine 10 mg daily, and furosemide 40 mg in the morning."
     },
@@ -3457,14 +3645,6 @@
     {
      "variant": "d14-asthma-child--clean",
      "field": "subjective",
-     "kind": "severity",
-     "shown": "moderate",
-     "flagged": false,
-     "statement": "Nine-year-old boy with moderate persistent asthma, seen with his father."
-    },
-    {
-     "variant": "d14-asthma-child--clean",
-     "field": "subjective",
      "kind": "number",
      "shown": "4.5",
      "flagged": false,
@@ -3501,38 +3681,6 @@
      "shown": "18",
      "flagged": false,
      "statement": "She started on the 18th ofvolgast at 20 mg daily and went up to 40 mg daily in Sptemba period."
-    },
-    {
-     "variant": "d15-acne-isotretinoin--clean",
-     "field": "subjective",
-     "kind": "date",
-     "shown": "today",
-     "flagged": false,
-     "statement": "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative."
-    },
-    {
-     "variant": "d15-acne-isotretinoin--clean",
-     "field": "subjective",
-     "kind": "polarity",
-     "shown": "negative",
-     "flagged": false,
-     "statement": "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative."
-    },
-    {
-     "variant": "d15-acne-isotretinoin--clean",
-     "field": "plan",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Plan: conontinue isotretino 40 mg daily."
-    },
-    {
-     "variant": "d15-acne-isotretinoin--clean",
-     "field": "plan",
-     "kind": "number",
-     "shown": "40 mg",
-     "flagged": false,
-     "statement": "Plan: conontinue isotretino 40 mg daily."
     },
     {
      "variant": "d15-acne-isotretinoin--clean",
@@ -3729,14 +3877,6 @@
     {
      "variant": "d20-menopause-fezolinetant--clean",
      "field": "plan",
-     "kind": "frequency",
-     "shown": "daily",
-     "flagged": false,
-     "statement": "Start Fesilantin 45 mg once daily."
-    },
-    {
-     "variant": "d20-menopause-fezolinetant--clean",
-     "field": "plan",
      "kind": "number",
      "shown": "45 mg",
      "flagged": false,
@@ -3904,22 +4044,6 @@
     },
     {
      "variant": "d23-ankle-sprain--clean",
-     "field": "subjective",
-     "kind": "date",
-     "shown": "last night",
-     "flagged": false,
-     "statement": "22-year-old man rolled his right ankle playing basketball, last night swelling and pain over the outside of the ankle."
-    },
-    {
-     "variant": "d23-ankle-sprain--clean",
-     "field": "objective",
-     "kind": "side",
-     "shown": "right",
-     "flagged": false,
-     "statement": "Below the lateral malleolus, no bony tenderness at the malleoli or the base of the fifth metatarsal, so no x-ray needed by the Auto-A rules right ankle sprain grade one to two ice compression elevation."
-    },
-    {
-     "variant": "d23-ankle-sprain--clean",
      "field": "plan",
      "kind": "number",
      "shown": "3",
@@ -4018,41 +4142,9 @@
      "variant": "d27-osteoporosis-denosumab--clean",
      "field": "subjective",
      "kind": "number",
-     "shown": "2.4",
-     "flagged": false,
-     "statement": "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and minus 2.4 at the hip."
-    },
-    {
-     "variant": "d27-osteoporosis-denosumab--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "2.8",
-     "flagged": false,
-     "statement": "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and minus 2.4 at the hip."
-    },
-    {
-     "variant": "d27-osteoporosis-denosumab--clean",
-     "field": "subjective",
-     "kind": "number",
      "shown": "20/26",
      "flagged": false,
      "statement": "She has had denosumab 60 mg under the skin every six months, the last dose on Ma six 20/26, so she is due now."
-    },
-    {
-     "variant": "d27-osteoporosis-denosumab--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "38",
-     "flagged": false,
-     "statement": "Calcium 9.4, vitamin D 38."
-    },
-    {
-     "variant": "d27-osteoporosis-denosumab--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "9.4",
-     "flagged": false,
-     "statement": "Calcium 9.4, vitamin D 38."
     },
     {
      "variant": "d27-osteoporosis-denosumab--clean",
@@ -4233,14 +4325,6 @@
     {
      "variant": "d31-cah-crinecerfont--clean",
      "field": "plan",
-     "kind": "number",
-     "shown": "2",
-     "flagged": false,
-     "statement": "Reduce hydrocortisone to 15 mg a day, split 7.5 mg in the morning, five at midday and 2-1l2 in the evening."
-    },
-    {
-     "variant": "d31-cah-crinecerfont--clean",
-     "field": "plan",
      "kind": "action",
      "shown": "continue",
      "flagged": false,
@@ -4285,30 +4369,6 @@
      "shown": "9",
      "flagged": false,
      "statement": "Spoke to the patient, a 67-year-old man, about his blood results from the 9th of November."
-    },
-    {
-     "variant": "d34-lipids-phone--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "4.4",
-     "flagged": false,
-     "statement": "His cholesterol is 6.8 with LDL 4.4."
-    },
-    {
-     "variant": "d34-lipids-phone--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "6.8",
-     "flagged": false,
-     "statement": "His cholesterol is 6.8 with LDL 4.4."
-    },
-    {
-     "variant": "d34-lipids-phone--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "44",
-     "flagged": false,
-     "statement": "His HbA1c is 44."
     },
     {
      "variant": "d35-strep-throat--clean",
@@ -4529,56 +4589,8 @@
     {
      "variant": "d39-otitis-media--clean",
      "field": "subjective",
-     "kind": "side",
-     "shown": "left",
-     "flagged": true,
-     "statement": "three-year-old in room for left acute otitis media his third."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "action",
-     "shown": "start",
-     "flagged": true,
-     "statement": "Since the summer start amoxicillin 90 mg/kg."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "drug",
-     "shown": "amoxicillin",
-     "flagged": true,
-     "statement": "Since the summer start amoxicillin 90 mg/kg."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "90",
-     "flagged": true,
-     "statement": "Since the summer start amoxicillin 90 mg/kg."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "drug",
-     "shown": "ibuprofen",
-     "flagged": true,
-     "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
      "kind": "duration",
      "shown": "10 days",
-     "flagged": true,
-     "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "frequency",
-     "shown": "with food",
      "flagged": true,
      "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
     },
@@ -4597,38 +4609,6 @@
      "shown": "twice daily",
      "flagged": true,
      "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "polarity",
-     "shown": "better",
-     "flagged": true,
-     "statement": "a day split twice daily for 10 days, ibuprofen with food for pain and fever if he is not better."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "duration",
-     "shown": "72 hours",
-     "flagged": true,
-     "statement": "Ne in 48 to 72 hours."
-    },
-    {
-     "variant": "d39-otitis-media--clean",
-     "field": "subjective",
-     "kind": "number",
-     "shown": "48",
-     "flagged": true,
-     "statement": "Ne in 48 to 72 hours."
-    },
-    {
-     "variant": "d40-adhd-guanfacine--clean",
-     "field": "subjective",
-     "kind": "duration",
-     "shown": "4 weeks",
-     "flagged": false,
-     "statement": "She could not tolerate methylphenidate because of poor appetite and weight loss, ough four weeks ago, we started guanfacine extended release 1 mg at bedtime."
     },
     {
      "variant": "d41-multiproblem-followup--clean",
@@ -4689,26 +4669,10 @@
     {
      "variant": "d44-cystitis-nitrofurantoin-rash--clean",
      "field": "subjective",
-     "kind": "date",
-     "shown": "last week",
-     "flagged": false,
-     "statement": "Telephone followup for a 34-year-old woman treated for urinary tract infection last week."
-    },
-    {
-     "variant": "d44-cystitis-nitrofurantoin-rash--clean",
-     "field": "subjective",
      "kind": "number",
      "shown": "34",
      "flagged": false,
      "statement": "Telephone followup for a 34-year-old woman treated for urinary tract infection last week."
-    },
-    {
-     "variant": "d44-cystitis-nitrofurantoin-rash--hvac-20db",
-     "field": "subjective",
-     "kind": "date",
-     "shown": "last week",
-     "flagged": false,
-     "statement": "etelephone followup for a 34-year-old woman treated for urinary tract infection last week."
     },
     {
      "variant": "d44-cystitis-nitrofurantoin-rash--hvac-20db",
@@ -4721,26 +4685,10 @@
     {
      "variant": "d44-cystitis-nitrofurantoin-rash--hvac-10db",
      "field": "subjective",
-     "kind": "date",
-     "shown": "last week",
-     "flagged": false,
-     "statement": "Telephone followup for a 34-year-old woman treated for urinary tract infection last week."
-    },
-    {
-     "variant": "d44-cystitis-nitrofurantoin-rash--hvac-10db",
-     "field": "subjective",
      "kind": "number",
      "shown": "34",
      "flagged": false,
      "statement": "Telephone followup for a 34-year-old woman treated for urinary tract infection last week."
-    },
-    {
-     "variant": "d47-hypothyroid-said-by-others--clean",
-     "field": "subjective",
-     "kind": "polarity",
-     "shown": "hypothyroidism",
-     "flagged": false,
-     "statement": "This is a 58-year-old woman with hypothyroidism, on levothyroxine 75 mcg daily."
     },
     {
      "variant": "d48-eczema-sound-alikes--babble-10db",
@@ -25026,5 +24974,10 @@
     ]
    ]
   }
- ]
+ ],
+ "rescored_from": {
+  "scoring": "77df03d8feeb287e1548a0b07757fb8389cdb3a9fde0f5378452976bcc8d5546",
+  "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
+  "structuring_outputs_reused": true
+ }
 }
