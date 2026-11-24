@@ -30,7 +30,7 @@ The lab is on-prem only too: `lab` calls the on-prem app at https://ehr.example.
 
 ## One-time setup
 
-1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty. For the `ai` profile, give Docker at least 10 GB, or 13 GB with Whisper installed for Spanish dictation (the `dictation` service's cap is 5 GB). On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
+1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty. For the `ai` profile, give Docker at least 10 GB, or 13 GB with Whisper installed for Spanish dictation (the `dictation` service's cap is 5 GB, an estimate: it is to be set to the container's measured peak with Whisper and the speaker model loaded, plus 25%, from `uv run src/Ehr.Dictation/measure_memory.py`, which says what it needs). On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
 2. **Settings file.** Copy `.env.example` to `.env`. The defaults work; `.env` is gitignored. If you already have a `.env`, copy over any lines it's missing from `.env.example`; Compose names the missing setting if you don't. `EHR_LAB_KEY` is optional, so Compose doesn't ask for it: without it there is no lab, and the stack runs as before.
 3. **Certificates.** Install [mkcert](https://github.com/FiloSottile/mkcert) (macOS: `brew install mkcert`; Windows: `winget install FiloSottile.mkcert`), then:
    ```
