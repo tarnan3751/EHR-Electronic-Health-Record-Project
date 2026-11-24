@@ -562,7 +562,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.verify:
             return verify(models_dir)
         ensure_not_committable(models_dir)
-        if args.from_file and args.only in ("medasr", "speaker"):
+        if args.from_file and args.only in ("medasr", "speaker", "whisper"):
             raise SetupError(f"--from-file is for the K2 Horizon file; it can't be used with --only {args.only}.")
         if args.only in (None, "medasr") and not args.dry_run and not get_token():
             raise SetupError(gated_message(args.medasr_repo))

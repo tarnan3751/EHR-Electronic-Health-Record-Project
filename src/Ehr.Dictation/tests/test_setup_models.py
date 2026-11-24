@@ -220,6 +220,19 @@ def test_an_identical_copy_is_reused_instead_of_downloaded(hub, models, tmp_path
     assert not [f for _, f in hub.downloads if f.endswith(".gguf")]
 
 
+# --from-file is for the K2 Horizon file: with a model that isn't one, it is refused before anything is read or
+# downloaded, Whisper (step 17) as MedASR and the speaker model are.
+@pytest.mark.parametrize("only", ["medasr", "speaker", "whisper"])
+def test_from_file_with_a_model_it_isnt_for_is_refused(hub, models, tmp_path, capsys, only):
+    existing = tmp_path / f"IFM_K2-Horizon-7B-GGUF_{Q4}"
+    existing.write_bytes(Q4_BYTES)
+
+    assert run(models, "--only", only, "--from-file", str(existing)) == 1
+
+    assert f"it can't be used with --only {only}" in capsys.readouterr().err
+    assert not hub.downloads and not (models / "models-manifest.json").exists()
+
+
 def test_a_different_copy_is_refused(hub, models, tmp_path, capsys):
     other = tmp_path / "community-Q4_K_M.gguf"
     other.write_bytes(b"Z" * len(Q4_BYTES))
