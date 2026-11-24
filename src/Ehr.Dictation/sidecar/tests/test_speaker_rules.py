@@ -638,9 +638,10 @@ def test_nothing_of_an_act_is_left_in_a_value_and_sort_that_out_needs_the_refill
 # over to the chemist for you" as "…to the chemistvi"); a person sent, a place that is a person, or a sending refused,
 # isn't one.
 SENT_ON = ["i will send it over to the chemistvi", "i'll send it over to the farmacy for you",
-           "i'll send them off to the labb this afternoon", "we'll fax that through to the hospitle"]
+           "i'll send them off to the labb this afternoon", "we'll fax that through to the hospitle",
+           "we're sending it over to the farmacy for you", "let me send that across to the chemistvi"]
 NOT_SENT_ON = ["i won't send it over to the farmacy", "i'll send you to the hospital", "i'll send it to you by post",
-               "i'll send her home to rest"]
+               "i'll send her home to rest", "the nurse sent them to the lab last week"]
 
 
 @pytest.mark.parametrize("said", SENT_ON)
@@ -664,6 +665,26 @@ def test_a_person_sent_or_a_sending_refused_is_not_listed(said):
 
     assert validation.conversation_not_carried_over(text, text.passages()) == [], said
     assert checked(text, plan=(said, [said]))["plan"].pending
+
+
+# The clinician's own act only, in the clinician's voice: a patient's sending, or someone else's, is no order and stays
+# whole (the review's "the nurse sent them to the lab and they came back normal" was offered as "The nurse. They came
+# back normal.").
+def test_a_sending_that_isnt_the_clinicians_own_is_kept_whole():
+    text = heard(("clinician", "any other results"),
+                 ("patient", "the nurse sent them to the lab and they came back normal {period}"),
+                 ("patient", "I'll send it to my sister so she knows {period}"),
+                 ("clinician", "I'll send it over to the chemistvi {period}"))
+
+    told = checked(text, subjective=("The nurse sent them to the lab and they came back normal.",
+                                     ["the nurse sent them to the lab and they came back normal"]))["subjective"]
+    sister = checked(text, subjective=("I'll send it to my sister so she knows.",
+                                       ["I'll send it to my sister so she knows"]))["subjective"]
+    listed = validation.conversation_not_carried_over(text, text.passages())
+
+    assert told.pending and told.value == "The nurse sent them to the lab and they came back normal."
+    assert sister.pending and sister.value == "I'll send it to my sister so she knows."
+    assert [text.text[i["start"] : i["end"]] for i in listed] == ["I'll send it over to the chemistvi"]
 
 
 # The lean: an Unsure passage in the clinician's voice is no Subjective source (c09's room recording quoted the
