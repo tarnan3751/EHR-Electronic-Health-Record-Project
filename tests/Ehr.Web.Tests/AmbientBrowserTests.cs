@@ -537,6 +537,29 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("Each proposed field is awaiting your review.", await page.TextContentAsync("[data-dictation-sort-message]"));
     }
 
+    // TC-UC23-06 in the browser (looking at the pages): the Listen page's actions have a gap above what follows them, the
+    // sentence on someone else coming in and the voices' Draft the note, and that sentence keeps to the consent's column.
+    [Fact]
+    public async Task TC_UC23_06_the_listen_pages_actions_are_spaced_and_its_sentence_keeps_to_the_column()
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        const string Gap = "([above, below]) => document.querySelector(below).getBoundingClientRect().top - document.querySelector(above).getBoundingClientRect().bottom";
+        var column = await page.EvaluateAsync<double>("() => document.querySelector('[data-ambient-consent]').getBoundingClientRect().width");
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-clock]').textContent.startsWith('Recording the visit')");
+
+        Assert.True(await page.EvaluateAsync<double>(Gap, new[] { "[data-ambient-capture] .sc-actions", "[data-ambient-someone-else]" }) >= 8);
+        Assert.True(await page.EvaluateAsync<double>("() => document.querySelector('[data-ambient-someone-else]').getBoundingClientRect().width") <= column + 1);
+
+        await page.ClickAsync("[data-ambient-stop]");
+        await page.WaitForSelectorAsync("[data-ambient-voice='2']");
+        Assert.True(await page.EvaluateAsync<double>(Gap, new[] { "[data-ambient-voices]", "[data-ambient-draft-actions]" }) >= 8);
+    }
+
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
     [Fact]

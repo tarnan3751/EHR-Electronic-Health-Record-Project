@@ -88,25 +88,29 @@ else
         <section data-ambient-capture hidden aria-labelledby="ambient-capture">
             <h2 id="ambient-capture">Listening to the visit</h2>
             <p class="sc-status" data-ambient-clock></p>
-            <div class="sc-actions">
-                <button type="button" class="sc-btn" data-ambient-pause>Pause listening</button>
-                <button type="button" class="sc-btn sc-btn--primary" data-ambient-stop>Stop and draft the note</button>
-                <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard>Stop and discard</button>
+            <div class="sc-stack">
+                <div class="sc-actions">
+                    <button type="button" class="sc-btn" data-ambient-pause>Pause listening</button>
+                    <button type="button" class="sc-btn sc-btn--primary" data-ambient-stop>Stop and draft the note</button>
+                    <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard>Stop and discard</button>
+                </div>
+                <p class="sc-muted sc-prose" data-ambient-someone-else>If anyone else comes in, pause until they have agreed or left. If the patient changes their mind, select Stop and discard: nothing recorded is kept.</p>
             </div>
-            <p class="sc-muted">If anyone else comes in, pause until they have agreed or left. If the patient changes their mind, select Stop and discard: nothing recorded is kept.</p>
         </section>
 
         <section data-ambient-speakers hidden aria-labelledby="ambient-speakers">
             <h2 id="ambient-speakers">Who is speaking</h2>
             <p>These are the voices SwiftChart told apart. Say who each one is before the note is drafted: its Subjective comes only from what the patient or someone with them said, and its Objective, Assessment and Plan only from what you said.</p>
             <p data-ambient-voices-two hidden>You said only the patient and you would speak, so any other voice can only be “I can't tell”.</p>
-            <div class="sc-stack" data-ambient-voices></div>
-            <div class="sc-actions">
-                <button type="button" class="sc-btn sc-btn--primary" data-ambient-draft disabled aria-describedby="ambient-draft-hint">Draft the note</button>
-                <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard-recording>Discard the recording</button>
+            <div class="sc-stack">
+                <div class="sc-stack" data-ambient-voices></div>
+                <div class="sc-actions" data-ambient-draft-actions>
+                    <button type="button" class="sc-btn sc-btn--primary" data-ambient-draft disabled aria-describedby="ambient-draft-hint">Draft the note</button>
+                    <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard-recording>Discard the recording</button>
+                </div>
+                @* Why Draft the note can't be pressed yet, tied to it; the script hides it once every voice is named. *@
+                <p class="sc-field__hint" id="ambient-draft-hint" data-ambient-draft-hint>Name every voice to draft the note.</p>
             </div>
-            @* Why Draft the note can't be pressed yet, tied to it; the script hides it once every voice is named. *@
-            <p class="sc-field__hint" id="ambient-draft-hint" data-ambient-draft-hint>Name every voice to draft the note.</p>
         </section>
     </section>
 }
