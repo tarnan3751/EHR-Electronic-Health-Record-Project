@@ -58,15 +58,21 @@ statement:
    - what can be ordered (an X-ray, labs, a culture, a referral, a prescription, a refill: ORDERABLES): no more
      (orderable_not_in_sources), so an instruction cut from the note can't come back in a neighbouring statement
      ("Continuar losartán 50 mg al día" as "Continue losartan 50 mg daily; chest X-ray.");
-   - what is done with each drug, dose, dose's number and habit (smoking, alcohol): the verb nearest it within
-     ACTION_REACH words either side in its clause, a change (start, stop, hold, continue, increase, decrease, switch)
+   - what is done with each drug, drug class or therapy (DRUG_CLASSES: "antihipertensivos", "anticoagulación"), dose,
+     dose's number and habit (smoking, alcohol): the verb nearest it within ACTION_REACH words either side in its
+     clause, a change (start, stop, hold, continue, increase, decrease, switch; "doblar" and "double" an increase, "a la
+     mitad" and "halve" a decrease, "evitar", "avoid" and "prohibido" a stop, "espaciar" and "less often" fewer doses)
      or a taking ("toma", "takes", "fuma"), said before it or after it ("Metformina: suspender", "Metformina se
      suspende", "Metformin was stopped"), with its tense: a Spanish preterite, imperfect or participle is past
      ("suspendió", "tomaba", "suspendido"), an English one past after "was", "had", "previously", "used to" or with
      "ago" after it, and "either" otherwise ("stopped"). Each must be the same on both sides (action_changed): a change
      the same change, in a tense that may be the same; a taking a taking or nothing, but one in the past ("tomaba",
      "exfumador") a taking in the past. So "Dejó de fumar hace 10 años" is not "Smoking for 10 years", "Toma
-     metformina" not "Metformin was stopped", and "Suspendió la metformina hace un mes" not "Stop metformin". The verbs
+     metformina" not "Metformin was stopped", and "Suspendió la metformina hace un mes" not "Stop metformin". A class
+     the Spanish doesn't name is refused as a drug is (drug_not_in_sources). And where what a change is said of can't
+     be read ("suspender la sonda"), the English may say no change of anything that goes the other way from one the
+     Spanish says (OPPOSITES: "Keep the catheter"), failing closed; any other change it may, since everyday verbs say
+     changes too ("subir las escaleras", "stop to rest"). The verbs
      are generated from their infinitives (spanish.conjugate()), with the pronouns a command takes ("suspéndala");
      "baja" and "continua", unaccented, are adjectives ("dosis baja");
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
@@ -714,7 +720,16 @@ ACTIONS = {
     "taper": "decrease", "tapered": "decrease", "switch": "switch", "switched": "switch", "switching": "switch",
     # "Suspender" said, "suspend" written: a stop, as the prompt asks it written.
     "suspend": "stop", "suspended": "stop", "suspending": "stop",
+    # A dose doubled or halved; a drug or a habit to avoid, forbidden or allowed.
+    "double": "increase", "doubled": "increase", "doubling": "increase", "triple": "increase", "tripled": "increase",
+    "halve": "decrease", "halved": "decrease", "halving": "decrease", "avoid": "stop", "avoided": "stop",
+    "avoiding": "stop", "forbid": "stop", "forbidden": "stop", "prohibit": "stop", "prohibited": "stop",
+    "allow": "continue", "allowed": "continue", "permit": "continue", "permitted": "continue",
 }
+# How often, made more or less often: a change of its own ("use albuterol less often", "space out the albuterol").
+ACTION_PHRASES = {("more", "often"): "increase", ("more", "frequently"): "increase", ("less", "often"): "decrease",
+                  ("less", "frequently"): "decrease", ("space", "out"): "decrease", ("spread", "out"): "decrease",
+                  ("in", "half"): "decrease"}
 # Taking a drug, or a habit, without changing it: "takes", "toma", "smokes", "fuma".
 ENGLISH_TAKES = {"take": "present", "takes": "present", "taking": "present", "took": "past", "taken": "either",
                  "use": "present", "uses": "present", "using": "present", "smoke": "present", "smokes": "present",
@@ -730,17 +745,46 @@ ENGLISH_HABITS = {"smoke": "smoking", "smokes": "smoking", "smoking": "smoking",
 ENGLISH_OBJECTS = {"dose": "dose", "doses": "dose", "dosage": "dose", "medication": "medication",
                    "medications": "medication", "medicine": "medication", "medicines": "medication",
                    "treatment": "treatment", "therapy": "treatment"}
+# Drug classes and therapies, named as a drug is: what is done with one is compared as with a drug ("Suspender los
+# antihipertensivos" is not "Continue antihypertensives"), and an English class the Spanish doesn't name is refused as
+# a drug would be (drug_not_in_sources). Each: its English words, as words of the English; its Spanish keys.
+DRUG_CLASSES = {
+    "antihypertensive": ("antihypertensive antihypertensives",
+                         "antihipertensivo antihipertensivos antihipertensiva antihipertensivas"),
+    "antibiotic": ("antibiotic antibiotics", "antibiotico antibioticos antibioticoterapia"),
+    "anticoagulant": ("anticoagulant anticoagulants anticoagulation thinner thinners",
+                      "anticoagulante anticoagulantes anticoagulacion"),
+    "antiplatelet": ("antiplatelet antiplatelets", "antiagregante antiagregantes antiagregacion"),
+    "diuretic": ("diuretic diuretics", "diuretico diureticos"),
+    "nsaid": ("nsaid nsaids antiinflammatory antiinflammatories", "aine aines antiinflamatorio antiinflamatorios"),
+    "analgesic": ("analgesic analgesics painkiller painkillers", "analgesico analgesicos analgesia"),
+    "steroid": ("steroid steroids corticosteroid corticosteroids",
+                "corticoide corticoides esteroide esteroides corticosteroide corticosteroides"),
+    "statin": ("statin statins", "estatina estatinas"),
+    "antidepressant": ("antidepressant antidepressants", "antidepresivo antidepresivos"),
+    "beta blocker": ("betablocker betablockers blocker blockers",
+                     "betabloqueante betabloqueantes betabloqueador betabloqueadores"),
+    "chemotherapy": ("chemotherapy chemo", "quimioterapia quimio"),
+}
+ENGLISH_CLASSES = {word: name for name, (words, _) in DRUG_CLASSES.items() for word in words.split()}
+ANTI = {"inflammatory": "nsaid", "inflammatories": "nsaid"}  # after "anti-", as English splits it; not "inflammatory flare"
+SPANISH_CLASSES = {key: name for name, (_, keys) in DRUG_CLASSES.items() for key in keys.split()}
 
 # The Spanish, from each verb's forms (spanish.conjugate()): by kind, the infinitives; and the verbs said with a word
 # after them ("dejar de", "cambiar a", "suspender temporalmente").
 SPANISH_CHANGES = {
     "start": "iniciar empezar comenzar agregar anadir pautar reiniciar",
-    "stop": "suspender retirar descontinuar quitar interrumpir",
-    "continue": "continuar seguir mantener",
-    "increase": "aumentar subir incrementar",
-    "decrease": "disminuir bajar reducir",
+    "stop": "suspender retirar descontinuar quitar interrumpir evitar prohibir",
+    "continue": "continuar seguir mantener permitir",
+    "increase": "aumentar subir incrementar doblar duplicar triplicar",
+    "decrease": "disminuir bajar reducir espaciar",
     "hold": "pausar omitir",
 }
+# Participles that say a state, not a past change: "prohibido el alcohol" forbids it now.
+STATES = frozenset("prohibido prohibida prohibidos prohibidas permitido permitida permitidos permitidas".split())
+# A change said by how much, whichever verb goes with it ("bajar a la mitad", "reducir a la mitad", "pasar al doble"),
+# read where its last word is.
+SPANISH_ACTION_PHRASES = {("a", "la", "mitad"): "decrease", ("al", "doble"): "increase"}
 # Forms that are adjectives as often: "dosis baja", "tos continua". Accented, they are the verb ("bajó", "continúa").
 NOT_CHANGES = frozenset("baja bajo bajas bajos continua continuo continuas continuos".split())
 SPANISH_CHANGE_PHRASES = [("dejar", "de", "stop"), ("cambiar", "a", "switch"), ("cambiar", "por", "switch"),
@@ -825,7 +869,10 @@ def english_mentions(text: str) -> list[_Mention]:
              in DOSE_UNITS}
     what = [frozenset({w}) if w.isalpha() and is_drug(w) else frozenset({ENGLISH_HABITS[w]}) if w in ENGLISH_HABITS
             else frozenset({ENGLISH_OBJECTS[w]}) if w in ENGLISH_OBJECTS
+            else frozenset({ENGLISH_CLASSES[w]}) if w in ENGLISH_CLASSES
+            else frozenset({ANTI[w]}) if w in ANTI and i and keys[i - 1] == "anti"
             else frozenset({w}) if words[i].start in doses else frozenset() for i, w in enumerate(keys)]
+    phrase_at = _phrase_actions(keys, gaps)
 
     def past(j: int, change: bool) -> bool:
         before = keys[max(0, j - 2) : j]
@@ -834,12 +881,20 @@ def english_mentions(text: str) -> list[_Mention]:
 
     def action_at(j: int) -> tuple[str | None, str]:
         word = keys[j]
+        if j in phrase_at:
+            return phrase_at[j], "present"
         if word in ACTIONS:
-            either = word.endswith("ed") or word in ("began", "held", "withdrawn", "withdrew", "kept", "quit")
+            either = word.endswith("ed") or word in ("began", "held", "withdrawn", "withdrew", "kept", "quit", "forbidden")
             return ACTIONS[word], "past" if past(j, True) else "either" if either else "present"
         if word in ENGLISH_TAKES:
             if j and keys[j - 1] in ACTIONS:  # "stopped taking", "quit smoking": the change
                 return action_at(j - 1)
+            # "Use albuterol less often": how often it is taken, changed.
+            later = next((phrase_at[k] for k in range(j + 1, min(len(keys), j + 4))
+                          if k in phrase_at and not any(re.search(r"[.,;!?\n]", gaps[m]) for m in range(j + 1, k + 1))),
+                         None)
+            if later:
+                return later, "present"
             return "take", "past" if past(j, False) else ENGLISH_TAKES[word]
         return None, "present"
 
@@ -852,6 +907,42 @@ def english_mentions(text: str) -> list[_Mention]:
         return None
 
     return _mentions(keys, gaps, what, action_at, ENGLISH_PARTS | {"or"}, habit_at)
+
+
+def _phrase_actions(keys: list[str], gaps: list[str]) -> dict[int, str]:
+    """Where an English phrase of ACTION_PHRASES starts, with its change."""
+    return {j: ACTION_PHRASES[(keys[j], keys[j + 1])] for j in range(len(keys) - 1)
+            if (keys[j], keys[j + 1]) in ACTION_PHRASES and not gaps[j + 1].strip()}
+
+
+def english_change_kinds(text: str) -> set[str]:
+    """Every change an English verb or phrase says, whatever it is said of."""
+    words = tokens(text)
+    keys = [w.text for w in words]
+    gaps = [text[words[i - 1].end : words[i].start] if i else "" for i in range(len(words))]
+    return {ACTIONS[k] for k in keys if k in ACTIONS} | set(_phrase_actions(keys, gaps).values())
+
+
+def spanish_change_kinds(said: list[spanish.Token]) -> set[str]:
+    """Every change a Spanish verb says, whatever it is said of."""
+    keys = [t.key for t in said]
+    found = {SPANISH_CHANGE[t.key][0] for t in said if t.key in SPANISH_CHANGE and t.text not in NOT_CHANGES}
+    for verb, word, kind in SPANISH_CHANGE_PHRASES:
+        present, past = PHRASE_FORMS[verb]
+        found |= {kind for i in range(len(keys) - 1) if keys[i] in present | past and keys[i + 1] == word}
+    return found | {kind for phrase, kind in SPANISH_ACTION_PHRASES.items()
+                    if any(tuple(keys[i : i + len(phrase)]) == phrase for i in range(len(keys)))}
+
+
+def english_classes(text: str) -> set[str]:
+    words = [t.text for t in tokens(text)]
+    return {ENGLISH_CLASSES[w] for w in words if w in ENGLISH_CLASSES} | {
+        ANTI[w] for i, w in enumerate(words) if w in ANTI and i and words[i - 1] == "anti"}
+
+
+# A change and those that go the other way: what the English may not say where the Spanish says the other.
+OPPOSITES = {"stop": {"start", "continue"}, "hold": {"start", "continue"}, "start": {"stop", "hold"},
+             "continue": {"stop", "hold"}, "increase": {"decrease"}, "decrease": {"increase"}, "switch": set()}
 
 
 def spanish_mentions(said: list[spanish.Token], gaps: list[str] | None = None,
@@ -868,6 +959,8 @@ def spanish_mentions(said: list[spanish.Token], gaps: list[str] | None = None,
             return frozenset({SPANISH_TAKE[key][0]})
         if key in SPANISH_OBJECTS:
             return frozenset({SPANISH_OBJECTS[key]})
+        if key in SPANISH_CLASSES:
+            return frozenset({SPANISH_CLASSES[key]})
         if i in doses:
             return doses[i]
         return _spanish_drug(key)
@@ -882,9 +975,12 @@ def spanish_mentions(said: list[spanish.Token], gaps: list[str] | None = None,
                 return kind, spanish.tense(said[j], past)
             if key == word and before in present | past:
                 return kind, spanish.tense(said[j - 1], past)
+        for phrase, kind in SPANISH_ACTION_PHRASES.items():
+            if tuple(keys[j - len(phrase) + 1 : j + 1]) == phrase:
+                return kind, "present"
         if key in SPANISH_CHANGE and said[j].text not in NOT_CHANGES:
             kind, past = SPANISH_CHANGE[key]
-            return kind, spanish.tense(said[j], past)
+            return kind, "either" if key in STATES else spanish.tense(said[j], past)
         if key in SPANISH_TAKE:
             if j >= 2 and keys[j - 1] in ("de", "a") and action_at(j - 2)[0] not in (None, "take"):
                 return action_at(j - 2)  # "dejó de tomar", "empezó a fumar": the change
@@ -1809,7 +1905,15 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         reasons.add("severity_not_in_sources")
     if not english_abbreviations(english) <= spanish.abbreviations(said_text):
         reasons.add("abbreviation_not_in_sources")
+    if not english_classes(english) <= {SPANISH_CLASSES[t.key] for t in said if t.key in SPANISH_CLASSES}:
+        reasons.add("drug_not_in_sources")
     if _actions_changed(english_mentions(english), _spanish_mentions(said_index, ctx)):
+        reasons.add("action_changed")
+    # Failing closed where what a change is said of can't be read: a change the English says, of anything, that goes
+    # the other way from one the Spanish says ("Suspender la sonda" is not "Keep the catheter"). Not any change the
+    # Spanish doesn't say: everyday verbs say changes too ("subir las escaleras", "stop to rest").
+    said_kinds = spanish_change_kinds(said)
+    if any(OPPOSITES[kind] & said_kinds for kind in english_change_kinds(english) - said_kinds):
         reasons.add("action_changed")
 
     in_english = _english_qualified(english)

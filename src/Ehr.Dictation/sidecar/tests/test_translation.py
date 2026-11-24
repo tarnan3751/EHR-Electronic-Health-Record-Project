@@ -733,6 +733,33 @@ def test_a_drug_taken_or_changed_as_the_spanish_says_is_offered(text, english):
     assert reasons(text, [text], english) == []
 
 
+# A drug class or therapy is compared as a drug; a dose doubled or halved, a drug avoided, forbidden or taken less
+# often are changes; and where what a change is said of can't be read, the English may not go the other way.
+@pytest.mark.parametrize(("text", "changed", "kept"), [
+    ("Suspender los antihipertensivos.", "Continue antihypertensives.", "Stop antihypertensives."),
+    ("Suspender los antibióticos.", "Continue antibiotics.", "Stop antibiotics."),
+    ("Suspender la anticoagulación.", "Continue anticoagulation.", "Stop anticoagulation."),
+    ("Doblar la dosis de furosemida.", "Halve the furosemide dose.", "Double the furosemide dose."),
+    ("Bajar a la mitad la dosis de prednisona.", "Double the prednisone dose.", "Halve the prednisone dose."),
+    ("Espaciar el salbutamol.", "Use albuterol more often.", "Space out albuterol."),
+    ("Evitar el ibuprofeno.", "Use ibuprofen.", "Avoid ibuprofen."),
+    ("Prohibido el alcohol.", "Alcohol allowed.", "Alcohol is forbidden."),
+    ("Suspender la sonda.", "Keep the catheter.", "Stop the catheter."),
+    ("Aumentar la ingesta de agua.", "Reduce water intake.", "Increase water intake."),
+])
+def test_a_class_a_dose_by_how_much_or_a_change_of_what_cant_be_read_is_compared(text, changed, kept):
+    assert reasons(text, [text], changed) == ["action_changed"]
+    assert reasons(text, [text], kept) == []
+
+
+def test_a_class_is_a_drug_named_and_anti_inflammatory_only_after_anti():
+    assert reasons("Suspender los antibióticos.", ["Suspender los antibióticos."], "Stop anticoagulation.") == [
+        "drug_not_in_sources"]
+    assert reasons("Evitar los antiinflamatorios.", ["Evitar los antiinflamatorios."], "Avoid anti-inflammatories.") == []
+    text = "Artrosis de rodilla izquierda con brote inflamatorio."
+    assert reasons(text, [text], "Left knee osteoarthritis with inflammatory flare.") == []
+
+
 # ---- A qualifier over a list, and a passage quoting its tail (sentences outside the test set) ------------------------
 
 LIST = "Niega fiebre, tos, disnea, dolor torácico y síncope."
