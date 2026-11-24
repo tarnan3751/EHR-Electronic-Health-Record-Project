@@ -261,6 +261,20 @@ def test_an_item_marked_skipped_fails(spanish_dir):
     assert any("didn't sort every Spanish recording and text" in p for p in found)
 
 
+# The review's case: a timed-out item relabelled sorted, nothing proposed, its time past the limit, would have counted
+# its gold fields as never discarded.
+def test_an_item_said_to_be_sorted_past_the_limit_fails(spanish_dir):
+    def relabelled(item: scoring_es.SpanishItem) -> scoring_es.SpanishItem:
+        if item.variant != "e16-anadido-corto--clean":
+            return item
+        return dataclasses.replace(item, sorting="done", fields={}, timings={"structure": 95.0})
+
+    save(spanish_dir, "latest-es.json", results(spanish_dir, change=relabelled))
+
+    assert any("e16-anadido-corto--clean sorted after more than the sidecar's 90 seconds" in p
+               for p in problems(spanish_dir))
+
+
 def test_stored_answers_that_cant_be_scored_again_fail(spanish_dir):
     def misheard(item: scoring_es.SpanishItem) -> scoring_es.SpanishItem:
         return dataclasses.replace(item, hypothesis="Not what was heard.") if item.variant == "e01-hta-control--clean" else item

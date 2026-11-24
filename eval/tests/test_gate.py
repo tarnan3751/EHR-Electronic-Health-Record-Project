@@ -151,6 +151,15 @@ def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):
     assert any("didn't sort every recording" in p for p in problems)
 
 
+def test_a_recording_said_to_be_sorted_past_the_limit_fails(eval_dir):
+    late = results(eval_dir)
+    late["items"][1]["timings"] = {"structure": 95.0}
+    save(eval_dir, "latest.json", late)
+
+    assert any("d02--clean sorted after more than the sidecar's 90 seconds" in p
+               for p in check(eval_dir / "results", eval_dir))
+
+
 # The review's case: recordings dropped and the counts made to agree still fail, as do a recording held twice or one no
 # script defines.
 @pytest.mark.parametrize("change", ["drop", "twice", "undefined"])
