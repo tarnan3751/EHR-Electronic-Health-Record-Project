@@ -110,7 +110,9 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
 
         using var acknowledged = await AcknowledgeAsync(colleague.Client, patient, order);
         Assert.Contains($"Acknowledged by Dr. Second Results", await ReadAsync(acknowledged));
-        Assert.Empty(await MessageTests.RowsAsync(apps, patient, "recipient_id::text", "inbox_items", "created_at", "done_at IS NULL"));
+        // Every result item is done. (The covering clinician's emergency access waits in the administrators' inboxes for
+        // its review, step 18.)
+        Assert.Empty(await MessageTests.RowsAsync(apps, patient, "recipient_id::text", "inbox_items", "created_at", "done_at IS NULL AND kind = 'result'"));
         foreach (var target in new[] { path, path + "?handler=Acknowledge" })
         {
             using var tooLate = await session.Client.PostAsync(target, Form(("__RequestVerificationToken", stale), ($"Values[{Hematocrit}]", "41"), ("CollectedAt", "2026-11-01T08:00")), Cancel);

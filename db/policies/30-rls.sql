@@ -229,8 +229,9 @@ DROP POLICY IF EXISTS patient_assignments_patient_select ON ehr.patient_assignme
 CREATE POLICY patient_assignments_patient_select ON ehr.patient_assignments FOR SELECT
     USING (patient_id = (SELECT ehr.current_patient_id()));
 
--- Emergency access (PHI). A clinician records and reads their own; admins review it in the audit log, where the
--- break_glass event carries the same reason. Nothing updates or deletes (10-grants.sql).
+-- Emergency access (PHI). A clinician records and reads their own; admins review it (step 18) from the audit log, where
+-- the break_glass event carries the same reason, and through ehr.emergency_access_for_review
+-- (72-emergency-access-review.sql), never this table. Nothing updates or deletes (10-grants.sql).
 ALTER TABLE ehr.break_glass_accesses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.break_glass_accesses FORCE ROW LEVEL SECURITY;
 
@@ -242,9 +243,27 @@ DROP POLICY IF EXISTS break_glass_accesses_own_insert ON ehr.break_glass_accesse
 CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR INSERT
     WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
 -- For the tables' owner alone, which ehr.record_views runs as (42-record-views.sql): it marks a view made inside a
--- window, and returns no reason. No runtime role is or can become it.
+-- window, and returns no reason; and which the review's guard, its delivery and ehr.emergency_access_for_review run as
+-- (72-emergency-access-review.sql). No runtime role is or can become it.
 DROP POLICY IF EXISTS break_glass_accesses_owner_select ON ehr.break_glass_accesses;
 CREATE POLICY break_glass_accesses_owner_select ON ehr.break_glass_accesses FOR SELECT TO ehr_owner USING (true);
+
+-- Reviews of emergency accesses (step 18): restricted, like the audit log they belong with. An administrator reads
+-- every review and adds one as themselves; the guard (72-emergency-access-review.sql) holds the rest. Nobody else reads
+-- one: not the clinician whose access it was, not a patient, not someone signed out. Nothing changes or deletes one.
+ALTER TABLE ehr.emergency_access_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.emergency_access_reviews FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS emergency_access_reviews_admin_select ON ehr.emergency_access_reviews;
+CREATE POLICY emergency_access_reviews_admin_select ON ehr.emergency_access_reviews FOR SELECT
+    USING ((SELECT ehr.is_admin()));
+
+DROP POLICY IF EXISTS emergency_access_reviews_admin_insert ON ehr.emergency_access_reviews;
+CREATE POLICY emergency_access_reviews_admin_insert ON ehr.emergency_access_reviews FOR INSERT
+    WITH CHECK ((SELECT ehr.is_admin()) AND reviewer_id = (SELECT ehr.current_user_id()));
+-- For the tables' owner alone, which the sweep of waiting accesses runs as (72-emergency-access-review.sql).
+DROP POLICY IF EXISTS emergency_access_reviews_owner_select ON ehr.emergency_access_reviews;
+CREATE POLICY emergency_access_reviews_owner_select ON ehr.emergency_access_reviews FOR SELECT TO ehr_owner USING (true);
 
 -- The rest of the chart (PHI): allergies, medications, diagnoses and visits, each row one patient's. Clinicians read
 -- every patient's; a patient reads their own. A visit is inserted when a patient is checked in for an appointment

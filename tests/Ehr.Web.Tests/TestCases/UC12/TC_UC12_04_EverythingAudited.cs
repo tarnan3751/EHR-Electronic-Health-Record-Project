@@ -26,7 +26,8 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 //   4. Read the patient's audit events, and the admin's audit page for the patient.
 // Expected result: Apart from the test's own insert of the patient, every one of the patient's events is the
 //   clinician's: one break_glass, with the reason, for the break_glass_accesses row; one insert of that
-//   break_glass_accesses row; four reads; one insert of a patient_assignments row. Nothing else. The admin's page lists
+//   break_glass_accesses row; four reads; one insert of a patient_assignments row; and, since the expansion plan's step
+//   18, an insert of an inbox item for each of the two administrators, the access to review. Nothing else. The admin's page lists
 //   break_glass, insert and read events for the patient, with the reason.
 // Creator: Luke Garcia
 public class TC_UC12_04_EverythingAudited(WebApps apps) : IClassFixture<WebApps>
@@ -67,6 +68,9 @@ public class TC_UC12_04_EverythingAudited(WebApps apps) : IClassFixture<WebApps>
         [
             (AuditActions.BreakGlass, "break_glass_accesses", 1),
             (AuditActions.Insert, "break_glass_accesses", 1),
+            // Step 18: the access goes to each administrator's inbox to review, the bootstrap admin's and Log Reader's,
+            // which the database writes in the same transaction, under the clinician who granted it.
+            (AuditActions.Insert, "inbox_items", 2),
             (AuditActions.Insert, "patient_assignments", 1),
             (AuditActions.Read, "patients", 4),
         ];
