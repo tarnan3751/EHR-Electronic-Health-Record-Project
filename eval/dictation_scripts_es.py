@@ -17,8 +17,9 @@ punctuation as marks, and marked up only where speech and writing differ:
 - `<<en|...>>`: words said in English, in a Spanish dictation; the audio generator reads them with an English voice.
 
 The gold is a list of statements per field: the passages of the display text a statement comes from, word for word,
-and the English a careful clinician would accept, which must pass the sidecar's Spanish checks (translation.py;
-eval/tests/test_gold_es.py). Beside it, `facts` lists what each passage of the text says, written by hand, for the
+and the English a careful clinician would accept, which in the test set must pass the sidecar's Spanish checks
+(translation.py; eval/tests/test_gold_es.py); the scripts run only when asked are held to their structure only, and a
+gold statement of theirs the checks refuse is a false refusal (ehr_eval/refusals.py). Beside it, `facts` lists what each passage of the text says, written by hand, for the
 scoring to compare each statement shown with what the Spanish it cites says without the checks' own readers
 (ehr_eval/facts_es.py says the format; this reader keeps them as written). All of it is synthetic and needs a
 Spanish-speaking clinician's reading before any real use.

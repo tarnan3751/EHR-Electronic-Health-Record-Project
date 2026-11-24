@@ -19,8 +19,9 @@ far for --rescore to finish without the models. At the end it prints, for someon
 every passage of the scripts that mix English into Spanish, and of the English script dictated as Spanish, as Whisper
 wrote it, with the probability that it was Spanish (code_switching), for Spanish nobody said; every passage the
 no-speech rule alone left out, with its time span, both probabilities and words, and their total (no_speech_only); every
-statement offered from a passage whose number reads two ways, with the passage (ambiguous_offered); and how long
-Spanish passes held the transcription lock English dictations share, each clean recording's longest hold
+statement offered from a passage whose number reads two ways, with the passage (ambiguous_offered); the fields with
+gold the checks discarded with the false refusals beside them, each by sentence (refusals.py: false_refusals, the
+recordings' and the texts'); and how long Spanish passes held the transcription lock English dictations share, each clean recording's longest hold
 while its chunks came in and its final pass's after stop, and what that means for an English dictation on that machine
 (live.lock). Every clean recording dictated in Spanish is fed in one-second chunks and stopped for that (--no-live skips
 it): the CPU timing step is run with --device cpu --only e09 e14 e15.
@@ -43,9 +44,9 @@ from pathlib import Path
 from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import load_scripts
 from ehr_dictation import validation
-from ehr_dictation.transcript import Segment, assemble
+from ehr_dictation.transcript import Segment, Transcript, assemble
 
-from . import scoring_es
+from . import refusals, scoring_es
 from .answers_es import answer, live_chunks, open_pipeline
 from .run import machine
 from .run_a import check, run_script, spanish_first, text_transcript, unchecked
@@ -145,10 +146,10 @@ async def main_async(args: argparse.Namespace, api_key: str) -> int:
               flush=True)
     await pipeline.llama.aclose()
 
-    save(items, scoring_es.score_audio(items, scripts, english))
+    save(items, measured(items, scripts, english))
     metrics = json.loads(args.out.read_text(encoding="utf-8"))["metrics"]
     print("\n".join([code_switching(metrics), no_speech_only(metrics), ambiguous_offered(metrics),
-                     english_waits(metrics, args.device)]))
+                     *false_refusals(metrics), english_waits(metrics, args.device)]))
     print(f"Wrote {args.out}")
     return 0
 
@@ -225,6 +226,32 @@ def code_switching(metrics: dict) -> str:
     return "\n".join(lines)
 
 
+def transcript_of(item: scoring_es.SpanishItem, script) -> Transcript:  # noqa: ANN001
+    """The transcript an item was checked against: a display text's as run A reads it, a recording's rebuilt from its
+    passages as heard."""
+    if item.variant.endswith("--text"):
+        return text_transcript(script)[0]
+    return assemble([Segment(**segment) for segment in item.segments], final=True)
+
+
+def measured(items: list[scoring_es.SpanishItem], scripts: dict, english: dict) -> dict:
+    """The run's measures (scoring_es.score_audio()), with the false refusals of the recordings dictated in Spanish and
+    of the display texts beside their fields discarded (refusals.py)."""
+    metrics = scoring_es.score_audio(items, scripts, english)
+    text = [item for item in items if item.variant.endswith("--text")]
+    spoken = [item for item in items if item not in text and not item.run_as]
+    for group, into in ((spoken, metrics), (text, metrics["text"])):
+        transcripts = {item.variant: transcript_of(item, scripts[item.script]) for item in group}
+        into["false_refusals"] = refusals.measure(group, transcripts, scripts)
+    return metrics
+
+
+def false_refusals(metrics: dict) -> list[str]:
+    return [*refusals.lines(metrics["discarded"], metrics["false_refusals"]),
+            *(f"Texts: {line}" if not line.startswith(" ") else line
+              for line in refusals.lines(metrics["text"]["discarded"], metrics["text"]["false_refusals"]))]
+
+
 def stored_item(entry: dict) -> scoring_es.SpanishItem:
     fields = {name: scoring_es.SpanishOutcome(**outcome) for name, outcome in entry["fields"].items()}
     return scoring_es.SpanishItem(**{**entry, "fields": fields,
@@ -241,10 +268,7 @@ def rescore(stored: dict, eval_dir: Path = EVAL_DIR) -> dict:
     for entry in stored["items"]:
         old = stored_item(entry)
         script = scripts.get(old.script) or english[old.script]
-        if old.variant.endswith("--text"):
-            transcript, _ = text_transcript(script)
-        else:
-            transcript = assemble([Segment(**segment) for segment in old.segments], final=True)
+        transcript = transcript_of(old, script)
         if transcript.text != old.hypothesis:
             raise SystemExit(f"{old.variant}'s transcript can't be rebuilt as it was: run the Spanish eval again.")
         item = dataclasses.replace(old, fields={}, unknown=[], tags=[t for t in old.tags if ":" in t] + list(script.tags))
@@ -256,7 +280,7 @@ def rescore(stored: dict, eval_dir: Path = EVAL_DIR) -> dict:
         items.append(item)
     out = {**stored, "provenance": stored["provenance"] | {"scoring": scoring_sha256(eval_dir)},
            "dataset": stored["dataset"] | {"gold_sha256": gold_es_sha256(eval_dir)},
-           "metrics": scoring_es.score_audio(items, scripts, english),
+           "metrics": measured(items, scripts, english),
            "items": [dataclasses.asdict(item) for item in items]}
     out["rescored"] = {"at": datetime.now(UTC).isoformat(timespec="seconds"),
                        "scoring": stored["provenance"].get("scoring")}

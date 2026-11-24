@@ -51,7 +51,7 @@ PIPELINE_FILES = ("ehr_eval/answers.py", "ehr_eval/answers_es.py", "ehr_eval/run
 # (rescore.py), which the gate also asks for when the list of accepted limitations changes.
 SCORING_FILES = ("ehr_eval/scripts.py", "ehr_eval/normalize.py", "ehr_eval/dates.py", "ehr_eval/scoring.py",
                  "ehr_eval/run.py", "ehr_eval/rescore.py", "ehr_eval/scoring_es.py", "ehr_eval/facts_es.py",
-                 "ehr_eval/run_es.py",
+                 "ehr_eval/run_es.py", "ehr_eval/refusals.py",
                  "known-limitations.toml")
 # What makes the Spanish set's recordings, beside its scripts: their renderers, the voices and the audio generator.
 DATASET_FILES_ES = ("dictation_scripts_es.py", "dictation_scripts.py", "voices.toml", "generate_audio.py")

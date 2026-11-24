@@ -1,6 +1,11 @@
-"""The Spanish test set's scripts (eval/scripts-es, the expansion plan's step 17) and the five held out
+"""The Spanish test set's scripts (eval/scripts-es, the expansion plan's step 17) and the ones run only when asked
 (eval/scripts-es-holdout) against the rules in dictation_scripts_es.py: each parses, says every number in words and
-writes it in digits, quotes its gold word for word, lists what it names, and the set covers what the plan asks of it."""
+writes it in digits, quotes its gold word for word, lists what it names, and the set covers what the plan asks of it.
+
+The ones run only when asked are checked for their structure only (the owner's ruling of 2026-11-24): their fields,
+sources and lists of what each passage says, never whether their words are on the checks' lists (spanish.py,
+translation.py, validation.py), so a held-out script tests the checks rather than being written to pass them. A gold
+statement of theirs the checks refuse is a false refusal, reported (ehr_eval/refusals.py), not a failure here."""
 
 from __future__ import annotations
 
@@ -20,6 +25,11 @@ from ehr_eval.scripts import EVAL_DIR
 SCRIPTS = load_scripts()
 HOLDOUT = load_scripts(HOLDOUT_DIR)
 ALL = SCRIPTS + HOLDOUT
+
+
+def held_out(script) -> bool:  # noqa: ANN001
+    """Whether the script is one run only when asked: the loader's folder for them (HOLDOUT_DIR)."""
+    return script.path.parent.name == HOLDOUT_DIR.name
 TAGS = frozenset(
     """numbers vitals dates decimal-comma units frequency routes sides severity actions drug-name-differs negation
     certainty history experiencer self-correction recombination order-attempt allergy-change mixed-plan injection
@@ -75,7 +85,8 @@ def test_the_gold_quotes_the_display_text_and_writes_no_markup(script):
             for quote in statement.spanish:
                 assert quote in script.display, f"{name}: {quote!r} isn't in the display text"
             assert not re.search(r"[\[\]{}<>|]", statement.english)
-            assert validation._without_instructions(statement.english, "", [])[1] == 0, "an English instruction"
+            if not held_out(script):  # the English checks' reading of an instruction: words, not structure
+                assert validation._without_instructions(statement.english, "", [])[1] == 0, "an English instruction"
 
 
 @pytest.mark.parametrize("script", ALL, ids=lambda s: s.id)
@@ -83,11 +94,13 @@ def test_what_the_script_names_is_in_it(script):
     display = script.display
     for drug, english in zip(script.drugs, script.drugs_en, strict=True):
         assert drug.lower() in display.lower()
-        assert english.lower() in spanish.drug_candidates(drug.split()[-1]) | {drug.lower()}, (drug, english)
+        if not held_out(script):  # the checks' reading of a Spanish drug name: words, not structure
+            assert english.lower() in spanish.drug_candidates(drug.split()[-1]) | {drug.lower()}, (drug, english)
     for retracted in script.retracted:
         at = display.find(retracted)
         assert at >= 0, retracted
-        assert spanish.correction_cues(display[at:], spanish.tokens(display[at:])), "a correction follows it"
+        if not held_out(script):  # the checks' list of the words that take something back
+            assert spanish.correction_cues(display[at:], spanish.tokens(display[at:])), "a correction follows it"
     gold = " ".join(g.value for g in script.gold.values())
     for retracted in script.retracted:
         assert retracted.replace(",", ".") not in gold
@@ -123,9 +136,13 @@ def test_each_negated_or_present_finding_is_said_in_the_gold_and_one_way_only(sc
     # The scoring counts a finding listed as negated that a statement shows without its negation, and one listed as
     # present that it shows negated, wherever the statement says it (scoring_es.negated()). A phrase the gold says both
     # ways would count a right answer as changed ("effusion" in "mild effusion ... without effusion"), and one it never
-    # says would check nothing.
+    # says would check nothing. A script run only when asked is checked for its structure only: each finding it lists
+    # is in its gold, as the scorer's reading of its negations is reported, not refused (ehr_eval/refusals.py).
     gold = " ".join(g.value for g in script.gold.values())
     assert not set(script.negated) & set(script.affirmed), "listed both negated and present"
+    if held_out(script):
+        assert all(_contains(gold, finding) for finding in script.negated + script.affirmed)
+        return
     for finding in script.negated:
         places = scoring_es.negated(gold, finding)
         assert places and all(places), f"{finding!r} isn't negated everywhere the gold says it: {places}"
@@ -136,12 +153,73 @@ def test_each_negated_or_present_finding_is_said_in_the_gold_and_one_way_only(sc
 
 @pytest.mark.parametrize("script", [s for s in ALL if s.forbidden], ids=lambda s: s.id)
 def test_every_forbidden_passage_is_inside_an_instruction_the_spanish_checks_recognize(script):
+    # For a script run only when asked, only that it is in the text: whether the checks recognize it is what the run
+    # finds out.
     text = script.display
     spans = spanish.directives(text)
     for forbidden in script.forbidden:
         at = text.find(forbidden)
         assert at >= 0, f"{forbidden!r} isn't in the display text"
-        assert any(start <= at and at + len(forbidden) <= end for start, end, _ in spans), forbidden
+        assert held_out(script) or any(start <= at and at + len(forbidden) <= end for start, end, _ in spans), forbidden
+
+
+def _contains(text: str, phrase: str) -> bool:
+    return bool(re.search(rf"(?<!\w){re.escape(phrase.lower())}(?!\w)", text.lower()))
+
+
+# The format tests each script is held to, the ones run only when asked for their structure only.
+FORMAT_TESTS = (
+    test_the_script_follows_the_format, test_the_gold_quotes_the_display_text_and_writes_no_markup,
+    test_what_the_script_names_is_in_it, test_each_negated_or_present_finding_is_said_in_the_gold_and_one_way_only,
+    test_every_forbidden_passage_is_inside_an_instruction_the_spanish_checks_recognize,
+)
+
+
+def format_failures(script) -> list[str]:  # noqa: ANN001
+    failures = []
+    for test in FORMAT_TESTS:
+        try:
+            test(script)
+        except AssertionError as error:
+            failures.append(f"{test.__name__}: {error}")
+    return failures
+
+
+def written(tmp_path, folder: str, replacements: list[tuple[str, str]]):  # noqa: ANN001, ANN201
+    """h02, the seen script, written into a folder of that name with the replacements made, and loaded from it."""
+    source = next(s for s in HOLDOUT if s.id.startswith("h02")).path
+    text = source.read_text(encoding="utf-8")
+    for old, new in replacements:
+        assert old in text, old
+        text = text.replace(old, new)
+    (tmp_path / folder).mkdir()
+    (tmp_path / folder / source.name).write_text(text, encoding="utf-8")
+    return load_scripts(tmp_path / folder)[0]
+
+
+# A drug the checks don't read from its Spanish (azitromicina, as azitromycin), well formed: what a held-out script may
+# say, and the test set's may not.
+OFF_LIST = [("nitrofurantoína", "azitromicina"), ("nitrofurantoin", "azithromycin"), ("Nitrofurantoin", "Azithromycin")]
+
+
+def test_a_held_out_script_with_a_word_off_the_checks_lists_passes_the_format_tests(tmp_path):
+    script = written(tmp_path, HOLDOUT_DIR.name, OFF_LIST)
+    assert held_out(script) and "azithromycin" not in spanish.drug_candidates("azitromicina")
+    assert format_failures(script) == []
+    # The same file in the test set's folder is held to the checks' reading too.
+    other = written(tmp_path, "scripts-es", OFF_LIST)
+    assert [f.split(":")[0] for f in format_failures(other)] == ["test_what_the_script_names_is_in_it"]
+
+
+@pytest.mark.parametrize("broken", [
+    [("spanish = [\"No está embarazada.\"]", "spanish = [\"No está embarazada ahora.\"]")],  # a source not in the text
+    [("drugs = [\"azitromicina\"]", "drugs = [\"fosfomicina\"]")],  # a drug listed that the text doesn't say
+    [("negated = [\"fever\", \"low back pain\"]", "negated = [\"fever\", \"chest pain\"]")],  # a finding not in the gold
+    [("retracted = [\"50 mg\", \"3 días\"]", "retracted = [\"50 mg\", \"4 días\"]")],  # a retraction not in the text
+    [("voice = \"ef_dora\"", "voice = \"af_bella\"")],  # a voice the set doesn't have
+])
+def test_a_held_out_script_broken_in_its_structure_still_fails_them(tmp_path, broken):
+    assert format_failures(written(tmp_path, HOLDOUT_DIR.name, OFF_LIST + broken))
 
 
 def test_tags_agree_with_the_content():
@@ -163,7 +241,9 @@ def test_the_set_covers_what_the_plan_asks():
 
 
 def test_drugs_the_english_gold_names_are_ones_the_script_lists():
-    for script in ALL:
+    # The test set's only: which words are drugs is the checks' list (translation.is_drug()), so a script run only when
+    # asked isn't held to it ("folic" is a drug word there, "folic acid" the script's drug).
+    for script in SCRIPTS:
         named = {name.lower() for name in script.drugs_en}
         for gold in script.gold.values():
             assert {t.text for t in tokens(gold.value) if translation.is_drug(t.text)} <= named, script.id

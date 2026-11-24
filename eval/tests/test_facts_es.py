@@ -64,9 +64,12 @@ def test_each_fact_is_said_once_in_the_text_and_follows_the_format(script):
         assert script.display.count(entry.said) == 1, entry.said
 
 
-@pytest.mark.parametrize("script", SCRIPTS.values(), ids=lambda s: s.id)
+@pytest.mark.parametrize("script", [s for s in SCRIPTS.values() if s not in HOLDOUT], ids=lambda s: s.id)
 def test_every_gold_statement_changes_nothing_and_misfiles_nothing(script):
-    # Read straight against the facts, whether or not the checks would offer it (test_run_a.py goes through them).
+    # Read straight against the facts, whether or not the checks would offer it (test_run_a.py goes through them). The
+    # scripts run only when asked are held to their structure only (test_scripts_es.py): where the scorer reads their
+    # gold as changed is reported (refusals.scorer_on_gold()), so a changed item an answer shows there may be the
+    # scorer's.
     for name, statements in script.statements.items():
         for statement in statements:
             spans = [(script.display.index(q), script.display.index(q) + len(q)) for q in statement.spanish]

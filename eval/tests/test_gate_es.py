@@ -101,7 +101,7 @@ def results(eval_dir: Path, keep=lambda variant: True, change=lambda item: item)
                        "scoring": scoring_sha256(eval_dir)},
         "dataset": {"recordings_sha256": recordings_es_sha256(eval_dir), "gold_sha256": gold_es_sha256(eval_dir),
                     "complete": True, "recordings": sum(1 for i in items if not i.variant.endswith("--text"))},
-        "metrics": json.loads(json.dumps(scoring_es.score_audio(items, scripts, english))),
+        "metrics": json.loads(json.dumps(run_es.measured(items, scripts, english))),
         "items": [dataclasses.asdict(item) for item in items],
     }
 
