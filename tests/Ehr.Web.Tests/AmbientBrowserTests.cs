@@ -423,6 +423,50 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["pending"], await AmbientFlows.RowsAsync(apps, State, patient));
     }
 
+    // TC-UC23-01 in the browser (looking at the pages, step 16): a visit's transcript is a paragraph a turn, and one
+    // voice's passages keep the space between them. The shapes the transcript comes in: the dictation service's
+    // (transcript.py's _join puts a space between one voice's passages, conversation.py a line break where the voice
+    // changes, and a passage the voice was unsure of is a turn of its own), the stub's (a line break between every
+    // passage), and a dictation's (no speakers: one paragraph, as it always was).
+    [Theory]
+    [InlineData("service", "Your chest is clear. Likely a viral cough.\nI have had a cough. It is worse at night. Get a chest X-ray.",
+        "0:20:clinician 21:42:clinician 43:62:patient 63:84:patient 85:103:unsure",
+        "Clinician Your chest is clear. Likely a viral cough.|Patient I have had a cough. It is worse at night.|Unsure Get a chest X-ray.")]
+    [InlineData("stub", "Your chest is clear.\nLikely a viral cough.\nI have had a cough.",
+        "0:20:clinician 21:42:clinician 43:62:patient",
+        "Clinician Your chest is clear. Likely a viral cough.|Patient I have had a cough.")]
+    [InlineData("dictation", "Cough for three days. Worse at night.", "0:21: 22:37:", "Cough for three days. Worse at night.")]
+    public async Task TC_UC23_01_one_voices_passages_keep_the_space_between_them(string shape, string text, string segments, string shown)
+    {
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
+        var page = await browser.NewPageAsync();
+        await page.SetContentAsync("""
+            <section data-view><div data-dictation-transcript></div><p data-dictation-unclear hidden></p></section>
+            """);
+        await page.AddScriptTagAsync(new() { Content = await File.ReadAllTextAsync(Ehr.Testing.RepositoryRoot.Combine("src/Ehr.Design/wwwroot/js/dictation-view.js"), TestContext.Current.CancellationToken) });
+        var transcript = new
+        {
+            text,
+            segments = segments.Split(' ').Select(s => s.Split(':')).Select(s => new
+            {
+                start = int.Parse(s[0], System.Globalization.CultureInfo.InvariantCulture),
+                end = int.Parse(s[1], System.Globalization.CultureInfo.InvariantCulture),
+                final = true,
+                speaker = s[2] == "" ? null : s[2],
+            }),
+        };
+
+        var paragraphs = await page.EvaluateAsync<string[]>("""
+            transcript => {
+                new window.SwiftChartDictationView(document.querySelector('[data-view]')).renderTranscript(transcript);
+                return [...document.querySelectorAll('[data-dictation-transcript] p')].map((p) => p.textContent);
+            }
+            """, transcript);
+
+        Assert.True(shown.Split('|').SequenceEqual(paragraphs), $"The {shape}'s transcript shows: {string.Join("|", paragraphs)}");
+    }
+
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
     [Fact]

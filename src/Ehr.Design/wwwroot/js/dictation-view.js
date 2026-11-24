@@ -83,7 +83,14 @@ window.SwiftChartDictationView = class {
             for (let i = 0; i + 1 < sorted.length; i++) {
                 const [from, to] = [sorted[i], sorted[i + 1]];
                 const segment = segments.find((s) => s.start <= from && to <= s.end);
+                // Between two passages: where the speaker changes, the line break that ends a turn, dropped as the next
+                // turn starts a paragraph of its own; inside a turn, the space the service joins one voice's passages
+                // with, kept as a space, or the turn's words would run together ("clear.Likely").
                 if (turns && !segment && !text.slice(from, to).trim()) {
+                    if (speaker !== null && segments.find((s) => s.start >= to)?.speaker === speaker) {
+                        paragraph.append(document.createTextNode(" "));
+                    }
+
                     continue;
                 }
 
