@@ -1540,6 +1540,12 @@
         font-weight: 600;
     }
 
+    /* A warning the status line carries, such as listening about to stop: said once, as every message is. */
+    .sc-status--warning {
+        color: var(--warning);
+        font-weight: 600;
+    }
+
     .sc-status[data-state="recording"] {
         color: var(--ink);
     }

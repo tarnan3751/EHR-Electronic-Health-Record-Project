@@ -230,6 +230,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("document.querySelector('[data-ambient-clock]').textContent.startsWith('Recording the visit')");
         Assert.Equal("Listening: the visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.DoesNotContain("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
         await page.EvaluateAsync("""
             window.__said = [];
             const status = document.querySelector('[data-ambient-status]');
@@ -244,6 +245,46 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForFunctionAsync("document.querySelector('[data-ambient-status]').textContent.startsWith('Nobody has spoken for 4 minutes')");
         await page.WaitForTimeoutAsync(2000);
         Assert.StartsWith("Nobody has spoken for 4 minutes", await page.TextContentAsync("[data-ambient-status]"));
+        // In the guide's warning style (looking at the pages: it read as any other status), and said once.
+        Assert.Contains("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
+        Assert.Single(await page.EvaluateAsync<string[]>("window.__said"), said => said.StartsWith("Nobody has spoken", StringComparison.Ordinal));
+    }
+
+    // TC-UC23-06 in the browser (looking at the pages; decided without Tahseen, to review): a minute before the 20-minute
+    // limit the status line says so once, in warning style, and at the limit it says the limit once with what happens
+    // next, the voices named and the note drafted. On Playwright's clock, run forward.
+    [Fact]
+    public async Task TC_UC23_06_a_minute_before_the_limit_and_at_it_the_status_line_says_so_once()
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
+        await using var context = await ContextAsync(browser, session);
+        await context.Clock.InstallAsync();
+        var page = await context.NewPageAsync();
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-clock]').textContent.startsWith('Recording the visit')");
+        await page.EvaluateAsync("""
+            window.__said = [];
+            const status = document.querySelector('[data-ambient-status]');
+            new MutationObserver(() => window.__said.push(status.textContent)).observe(status, { childList: true, characterData: true, subtree: true });
+            """);
+
+        await page.Clock.FastForwardAsync("19:05");
+        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-status]').textContent.startsWith('Listening stops')");
+        await page.WaitForTimeoutAsync(1500);
+        Assert.Equal("Listening stops in a minute, at its 20-minute limit.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Contains("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
+
+        await page.Clock.FastForwardAsync("01:00");
+        await page.WaitForSelectorAsync("[data-ambient-voice='2']");
+        var said = await page.EvaluateAsync<string[]>("window.__said");
+        Assert.Single(said, s => s.StartsWith("Listening stops in a minute", StringComparison.Ordinal));
+        Assert.Single(said, s => s == "Listening stopped at its 20-minute limit. Transcribing the visit and telling its voices apart: "
+            + "then say who each voice is to draft the note.");
+        Assert.DoesNotContain("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
     }
 
     // TC-UC23-06 in the browser: three voices told apart under a consent for the patient and the clinician. The third can

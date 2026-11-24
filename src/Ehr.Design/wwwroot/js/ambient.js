@@ -8,8 +8,9 @@
 //    the clock that ticks is apart from the status line, a live region, which says each change and warning and keeps it
 //    until the next. Pause, or the page going out of sight, even while listening starts, pauses the recorder and
 //    switches the microphone's tracks off, and nothing is sent until the clinician resumes. It stops on its own at the
-//    session's limit or after five minutes with nobody speaking, and at once, keeping nothing, if the clinician is
-//    signed out or the listening is refused.
+//    session's limit, saying so a minute before and saying at the limit what happens next, or after five minutes with
+//    nobody speaking, warned at four, and at once, keeping nothing, if the clinician is signed out or the listening is
+//    refused. A warning on the status line is in the guide's warning style, and like every message said once.
 // 3. Stop and draft: the server transcribes the visit and tells its voices apart; the clinician says who each voice is,
 //    with no role chosen for them, or that they can't tell, and the note is drafted and saved for review (UC 13), where
 //    the page goes. Fetching the draft is tried again a few times while the service doesn't answer, then given up.
@@ -59,14 +60,22 @@
     function fresh() {
         return { requestId: null, session: null, consented: 0, stream: null, recorder: null, queue: [], nextSeq: 0, sending: false,
             paused: false, hidden: false, stopping: false, stopped: false, drafting: false, handedOff: false, ended: false, left: false,
-            persisted: false, warned: false, retrying: false, retryMs: firstRetryMs, retryTimer: 0, clock: 0, recordedMs: 0,
+            persisted: false, warned: false, nearLimit: false, retrying: false, retryMs: firstRetryMs, retryTimer: 0, clock: 0, recordedMs: 0,
             resumedAt: 0, voices: [] };
     }
 
-    // The status line, a live region: each message stays until the next replaces it.
-    function say(text, isError = false) {
+    // The status line, a live region: each message stays until the next replaces it, an error in danger text and a
+    // warning (nobody has spoken for 4 minutes, a minute left) in warning text.
+    function say(text, isError = false, isWarning = false) {
         statusArea.textContent = text;
         statusArea.classList.toggle("sc-status--error", isError);
+        statusArea.classList.toggle("sc-status--warning", isWarning);
+    }
+
+    // At the session's limit: the limit, and what happens next, said once.
+    function atTheLimit() {
+        return `Listening stopped at its ${Math.round((state.session?.maxSeconds ?? 0) / 60)}-minute limit. Transcribing the `
+            + "visit and telling its voices apart: then say who each voice is to draft the note.";
     }
 
     function call(method, path, body, type) {
@@ -113,7 +122,11 @@
         clock.dataset.state = "recording";
         document.title = `● Recording: ${title}`;
         if (max > 0 && elapsed >= max) {
-            stopAndDraft(`Stopped at the ${Math.round(max / 60)}-minute limit. Say who each voice is to draft the note.`);
+            stopAndDraft(atTheLimit());
+        } else if (max > 0 && max - elapsed <= 60 && !state.nearLimit) {
+            // Once, a minute before the limit, not a countdown each second.
+            state.nearLimit = true;
+            say(`Listening stops in a minute, at its ${Math.round(max / 60)}-minute limit.`, false, true);
         }
     }
 
@@ -268,7 +281,7 @@
 
                 if (response.status === 413) {
                     state.queue = [];
-                    stopAndDraft("Stopped at the time limit. Say who each voice is to draft the note.");
+                    stopAndDraft(atTheLimit());
                     return;
                 }
 
@@ -304,7 +317,7 @@
             stopAndDraft("Stopped: nobody has spoken for 5 minutes. Say who each voice is to draft the note.");
         } else if (quiet >= warnQuietSeconds && !state.stopping && !state.warned) {
             state.warned = true;
-            say("Nobody has spoken for 4 minutes: listening stops in a minute unless someone speaks.");
+            say("Nobody has spoken for 4 minutes: listening stops in a minute unless someone speaks.", false, true);
         } else if (quiet < warnQuietSeconds && state.warned) {
             state.warned = false;
             say("Listening: someone spoke, so listening carries on.");
