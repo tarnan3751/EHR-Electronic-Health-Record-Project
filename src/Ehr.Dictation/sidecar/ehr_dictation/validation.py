@@ -33,9 +33,10 @@ we're or we are; for an allergy, add or put ... to or on her allergies or allerg
 her allergies"); determiners and possessives (a, an, the, her, his, their, some, another, "a new"), and before an
 order's item fasting, stat, urgent, routine or repeat; an item, an orderable for an order (a medication for refill,
 prescribe, renew, e-prescribe, a prescription or script, call in and send: "Refill a CBC" isn't plain) and an allergen
-for an allergy to add, as the reference data names it (is_item(): a run of one name of catalog.py that begins with one
-of its standalone runs whole, a generic head, an abbreviation in parentheses, a brand in brackets or a common catalog
-item's name, and never holds a negation or a number word, nor a number but between two of its words, so "lisinopril"
+for an allergy to add, as the reference data names it, or a common name mapped to it there
+(db/reference/dictation-names.toml: "penicillin", "latex", "CRP") (is_item(): a run of one name of catalog.py that
+begins with one of its standalone runs whole, a generic head, an abbreviation in parentheses, a brand in brackets, a
+common catalog item's name or a common name, and never holds a negation or a number word, nor a number but between two of its words, so "lisinopril"
 and "chest x-ray" are items and "no", "one", "morning", "chest" alone or "CBC 2019" aren't); the item's quantities
 (numbers in doses, frequencies, durations, supply or refills, never a zero; forms, routes: QUANTITY); and trailers
 (today, now, stat, please, too, as well, also), with "and" or a comma joining another item the verb takes. Any other word anywhere in the sentence, or any other mark (a semicolon, a dash,
@@ -79,7 +80,7 @@ overlaps a passage marked unclear); question (its sentence ends in a question ma
 in a word of telling: "she asked, can you order an MRI"); not_imperative (anything but an opener, from the start of
 its clause or the last "and" or word starting a clause, up to its lead-in or subject: "capillary refill under 2
 seconds"); names_no_item (no run of its words is an item the reference data names: "call that in", "send the
-prescription", "send it", or "add penicillin", which the reference data names only as penicillin G or V); not_plain
+prescription", "send it", or "add shellfish", which neither the reference data nor a common name names); not_plain
 (not said in the closed sentence, or a sentence next to it holds it back, as above); too_many (past
 MAX_PROPOSALS). A proposal is its kind (order or allergy_addition), the place of its listed
 instruction, and its warnings, never words: possible_correction, pointing from a correction-like word said after the

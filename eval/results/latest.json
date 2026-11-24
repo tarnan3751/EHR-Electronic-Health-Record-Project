@@ -37,11 +37,11 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "f2d8a8931fc709deea77669bc5d67c356c6742bc05424daf9450f421896150b7",
-  "scoring": "6dad42eecd215f6cd818ab83caa3956912d26998f59f67f64fb88321b631b7f8"
+  "scoring": "77ad5d2860ebea2f3451c34f1c24fb30bd8bff45f7da74aa47b590011458ab05"
  },
  "dataset": {
   "recordings_sha256": "58ec8499a961cc787e421919552e1c4060e074cb5a7192c84a29ba17d6b142cf",
-  "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
+  "gold_sha256": "b8a36a520a4986aaea34a8252a4263a7d9a04d5778daea8a1391163527d94264",
   "scripts": 51,
   "recordings": 100,
   "complete": true,
@@ -2149,23 +2149,23 @@
    "false_discard_rate": 0.0
   },
   "proposals": {
-   "shown": 14,
-   "said": 18,
-   "found": 14,
-   "right": 14,
+   "shown": 19,
+   "said": 24,
+   "found": 19,
+   "right": 19,
    "false": 0,
    "misheard": 0,
-   "recall": 0.7778,
+   "recall": 0.7917,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
     "hedged": 5,
     "in_the_past": 1,
-    "names_no_item": 24,
+    "names_no_item": 18,
     "negated": 1,
     "not_an_addition": 7,
-    "not_plain": 19,
+    "not_plain": 20,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
@@ -2174,23 +2174,23 @@
    "listed": []
   },
   "proposals_clinical": {
-   "shown": 14,
+   "shown": 19,
    "said": 63,
-   "found": 14,
-   "right": 14,
+   "found": 19,
+   "right": 19,
    "false": 0,
    "misheard": 0,
-   "recall": 0.2222,
+   "recall": 0.3016,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
     "hedged": 5,
     "in_the_past": 1,
-    "names_no_item": 24,
+    "names_no_item": 18,
     "negated": 1,
     "not_an_addition": 7,
-    "not_plain": 19,
+    "not_plain": 20,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
@@ -19098,19 +19098,20 @@
     0.16679087502416223,
     0.17172458302229643
    ],
-   "proposals": [],
+   "proposals": [
+    [
+     "allergy_addition",
+     2028,
+     2062,
+     []
+    ]
+   ],
    "held_back": [
     [
      "order",
      1989,
      2026,
      "not_plain"
-    ],
-    [
-     "allergy_addition",
-     2028,
-     2062,
-     "names_no_item"
     ]
    ]
   },
@@ -21272,6 +21273,12 @@
    "chunk_seconds": [],
    "proposals": [
     [
+     "allergy_addition",
+     1179,
+     1215,
+     []
+    ],
+    [
      "order",
      1262,
      1297,
@@ -21283,12 +21290,6 @@
      "order",
      1083,
      1116,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
-     1179,
-     1215,
      "names_no_item"
     ],
     [
@@ -21566,6 +21567,12 @@
    "chunk_seconds": [],
    "proposals": [
     [
+     "allergy_addition",
+     1176,
+     1212,
+     []
+    ],
+    [
      "order",
      1259,
      1294,
@@ -21577,12 +21584,6 @@
      "order",
      1081,
      1114,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
-     1176,
-     1212,
      "names_no_item"
     ],
     [
@@ -21751,6 +21752,12 @@
    "chunk_seconds": [],
    "proposals": [
     [
+     "allergy_addition",
+     1175,
+     1211,
+     []
+    ],
+    [
      "order",
      1259,
      1294,
@@ -21762,12 +21769,6 @@
      "order",
      1079,
      1112,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
-     1175,
-     1211,
      "names_no_item"
     ],
     [
@@ -22345,6 +22346,12 @@
      367,
      409,
      []
+    ],
+    [
+     "allergy_addition",
+     569,
+     612,
+     []
     ]
    ],
    "held_back": [
@@ -22368,22 +22375,16 @@
     ],
     [
      "allergy_addition",
-     569,
-     612,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
      614,
      650,
-     "names_no_item"
+     "not_plain"
     ]
    ]
   }
  ],
  "rescored_from": {
-  "scoring": "208cd8c61edacdf13c993be93e1797f80b70c6ebc28ccb1388e9b3772c648a71",
-  "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
+  "scoring": "2bfbaf93a1e00fb60c6bed491c452ed7c4dc0a70295beebf7f3ea8579734fcf4",
+  "gold_sha256": "b8a36a520a4986aaea34a8252a4263a7d9a04d5778daea8a1391163527d94264",
   "structuring_outputs_reused": true
  }
 }

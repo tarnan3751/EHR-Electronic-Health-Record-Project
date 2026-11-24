@@ -337,9 +337,9 @@ HELD_BACK = [
     "I'll call in the morning.",
     "Will call in the evening.",
     "Call in the morning.",
-    # Penicillin and latex: the reference data names only "Penicillin G", "Penicillin V" and "Natural latex rubber".
-    "Add penicillin to her allergy list.",
-    "Add latex to her allergy list.",
+    # A name neither the reference data nor its common names (db/reference/dictation-names.toml) hold.
+    "Add shellfish to her allergy list.",
+    "Put sulfa on her allergy list.",
     # A verb takes only what it can: refill, prescribe, renew, a prescription, call in and send a medication, and every
     # item of a joined list.
     "Refill a CBC.",
@@ -544,6 +544,11 @@ PLAIN = [
     "Call in amoxicillin to her pharmacy.",
     "Place an order for a chest X-ray.",
     "E-prescribe amoxicillin.",
+    # The common names of step 15.1, each of its kind only (db/reference/dictation-names.toml).
+    "Add penicillin to her allergy list.",
+    "Penicillin should be added to her allergies.",
+    "Add latex to her allergy list.",
+    "Order a CRP today.",
 ]
 
 

@@ -1707,7 +1707,7 @@ def test_an_instruction_said_as_one_is_proposed(said):
         ("Can you order an MRI?", "question"),
         ("She asked, can you order an MRI.", "quoted"),
         ("Call that in to her pharmacy.", "names_no_item"),
-        ("Add penicillin to her allergy list.", "names_no_item"),
+        ("Add shellfish to her allergy list.", "names_no_item"),
         ("Her mother asked whether we could order an MRI.", "hedged"),
     ],
 )
