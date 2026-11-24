@@ -44,7 +44,8 @@ EVAL_DIR = Path(__file__).resolve().parents[1]
 DATASET_FILES = ("dictation_scripts.py", "voices.toml", "generate_audio.py")
 # What makes a run's answers, the transcript and K2 Horizon's proposals, beside the sidecar's own code: the eval's code
 # that feeds the recordings through it, and both lockfiles. A change to any means running the eval again.
-PIPELINE_FILES = ("ehr_eval/answers.py", "ehr_eval/answers_es.py", "ehr_eval/run_a.py", "uv.lock",
+PIPELINE_FILES = ("ehr_eval/answers.py", "ehr_eval/answers_es.py", "ehr_eval/run_a.py", "ehr_eval/run_a_en.py",
+                  "uv.lock",
                   "../src/Ehr.Dictation/sidecar/uv.lock")
 # What checks and scores those answers, beside the sidecar's checks: a change means scoring the stored answers again
 # (rescore.py), which the gate also asks for when the list of accepted limitations changes.

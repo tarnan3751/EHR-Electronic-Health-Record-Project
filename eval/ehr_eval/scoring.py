@@ -10,6 +10,8 @@
   sidecar's own rules allow, so this measures the pipeline against its design. fields_clinical: the same against the
   clinical gold, what a careful clinician would accept, which shows what the strict rules cost.
 - validation: of the values K2 Horizon proposed, how many passed, and each reason the others failed.
+- discarded: the share of the fields the rule-following gold has a value for that K2 Horizon proposed and the checks
+  discarded, or that a recording not sorted left with nothing, as the Spanish set measures it (scoring_es.py).
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - misfiled: each value an offered value's sentence says (facts_es.py's reading: a number, drug, frequency, date, how
   long, route, side, severity, polarity or medication change) that its field's rule-following gold doesn't, with
@@ -125,6 +127,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "fields": _fields(items, scripts, lambda script: script.gold_rules),
         "fields_clinical": _fields(items, scripts, lambda script: script.gold),
         "validation": _validation(items),
+        "discarded": _discarded(items, scripts),
         "unsupported_content": _unsupported(items),
         "misfiled": misfiled(items, scripts),
         "order_allergy": _order_allergy(items, scripts),
@@ -237,6 +240,19 @@ def _validation(items: list[Item]) -> dict:
         "reasons": dict(sorted(reasons.items())),
         "unknown_fields": sum(len(i.unknown) for i in items),
     }
+
+
+def _discarded(items: list[Item], scripts: dict[str, Script]) -> dict:
+    with_gold = discarded = 0
+    for item in items:
+        for name in FIELDS:
+            if not scripts[item.script].gold_rules[name].value:
+                continue
+            with_gold += 1
+            outcome = item.fields.get(name)
+            discarded += item.sorting != "done" or bool(
+                outcome and outcome.proposed.strip() and outcome.status != "pending")
+    return {"fields_with_gold": with_gold, "discarded": discarded, "share": _ratio(discarded, with_gold)}
 
 
 def _unsupported(items: list[Item]) -> dict:
