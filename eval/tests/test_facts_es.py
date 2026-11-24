@@ -100,7 +100,7 @@ def changes(key: str, said: str, english: str, hypothesis: str | None = None) ->
     ("e01", "Antecedente de tabaquismo, lo dejó hace 5 años.", "History of smoking, still smokes 5 packs.",
      {("unit", "5 packs (smoking)"), ("action", "stop, past (smoking) left out")}),
     ("e01", "Hombre de 62 años con hipertensión arterial desde hace 10 años.",
-     "62-year-old man with hypotension for 10 years.", {("polarity", "hypotension (age)"), ("duration", "10 years (age)")}),
+     "62-year-old man with hypotension for 10 years.", {("polarity", "hypotension")}),
 ])
 def test_what_the_checks_own_reading_let_through_is_changed(key, said, english, changed):
     assert changes(key, said, english) == changed
@@ -151,6 +151,63 @@ def test_what_the_checks_own_reading_let_through_is_changed(key, said, english, 
 def test_each_kind_of_change_is_counted_and_the_right_translation_isnt(key, said, right, wrong, kind):
     assert changes(key, said, right) == set()
     assert kind in {changed for changed, _ in changes(key, said, wrong)}
+
+
+# The scorer's own misreadings (step 17, For Tahseen first 8), each gone, and what each resembles still counted: an age
+# said in words read as a duration and other values tied to the age; a weight lifted read as the vital sign; a doubt of
+# a cause cut off at its comma (e04's facts give the doubt to the finding, e08's and h01's to the cause).
+@pytest.mark.parametrize(("key", "said", "right", "wrong", "kind"), [
+    ("h02", "Mujer de 34 años con ardor al orinar y ganas de orinar con frecuencia desde hace 2 días.",
+     "34 years old woman with burning on urination and urinary frequency for 2 days.",
+     "35 years old woman with burning on urination and urinary frequency for 2 days.", "number"),
+    ("h02", "Mujer de 34 años con ardor al orinar y ganas de orinar con frecuencia desde hace 2 días.",
+     "34 years old woman with burning on urination and urinary frequency for 2 days.",
+     "34 years old woman with burning on urination and urinary frequency for 5 days.", "duration"),
+    ("e04", "Mujer de 33 años que empezó con ronchas en los brazos hace 2 días, después de tomar amoxicilina.",
+     "33-year-old woman who started with spots on her arms 2 days ago, after taking amoxicillin.",
+     "33-year-old woman who started with spots on her arms 5 days ago, after taking amoxicillin.", "duration"),
+    ("h01", "Evitar cargar peso durante 2 semanas.", "Avoid lifting weight for 2 weeks.",
+     "Avoid lifting weight for 2 months.", "duration"),
+    ("e04", "urticaria probablemente por amoxicilina.", "Urticaria, probably due to amoxicillin.",
+     "Urticaria, due to amoxicillin.", "certainty"),
+    ("h01", "lumbociática derecha aguda, probablemente por una hernia discal.",
+     "Acute right sciatica probably due to a herniated disc.", "Acute right sciatica due to a herniated disc.",
+     "certainty"),
+    ("e01", "TA 152/94, FC 78, peso 88 kg.", "BP 152/94, HR 78, weight 88 kg.", "BP 152/94, HR 78, weight 89 kg.",
+     "number"),
+])
+def test_the_scorers_misreadings_are_gone_and_what_they_resemble_is_still_counted(key, said, right, wrong, kind):
+    assert changes(key, said, right) == set()
+    assert kind in {changed for changed, _ in changes(key, said, wrong)}
+
+
+# A doubt of a cause the Spanish doesn't say is still added; a doubt of a finding after a comma is still that finding's.
+def test_a_doubt_of_a_cause_added_is_counted_and_a_doubt_after_a_comma_is_still_its_findings():
+    entries = facts_es.entries([{"said": "Exantema por amoxicilina.", "items": [{"of": "rash"}, {"of": "amoxicillin"}]}])
+    lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items), frozenset({"amoxicillin"}))
+    for english in ("Rash probably due to amoxicillin.", "Rash, probably due to amoxicillin."):
+        changed, _ = facts_es.compare(english, entries, entries, lexicon)
+        assert ("certainty", "shown with doubt", False) in changed, english
+    assert facts_es.compare("Rash due to amoxicillin.", entries, entries, lexicon)[0] == []
+    items = (facts_es.Item("pneumonia", ("pneumonia",), {}, None, False, False, None),
+             facts_es.Item("asthma", ("asthma",), {}, None, False, False, None))
+    said = facts_es.claims("Pneumonia, possible asthma.", facts_es.Lexicon(items))
+    assert [(c.kind, c.label) for c in said if c.kind == "doubt"] == [("doubt", "asthma")]
+
+
+# An increase or decrease of something named, said as a trend ("the swelling has decreased"), is no medication change;
+# one said of a drug or a dose still is.
+@pytest.mark.parametrize(("english", "action"), [
+    ("The swelling has decreased.", None),
+    ("Pain has increased since Monday.", None),
+    ("Ibuprofen was decreased.", "decrease, past"),
+    ("The dose was decreased.", "decrease, past"),
+    ("Decrease ibuprofen.", "decrease"),
+    ("Metformin has been increased to 1000 mg.", "increase, past"),
+])
+def test_a_trend_is_no_medication_change_and_a_drugs_change_still_is(english, action):
+    lexicon = facts_es.Lexicon(drugs=frozenset({"ibuprofen", "metformin"}))
+    assert next((c.value for c in facts_es.claims(english, lexicon) if c.kind == "action"), None) == action
 
 
 def test_a_number_the_spanish_says_without_a_unit_may_be_given_a_unit_of_measurement_only():

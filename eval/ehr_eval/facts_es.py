@@ -30,7 +30,13 @@ The reading of a statement's English (claims()): it is cut into clauses at comma
 its unit, frequency, route, side, severity, polarity, action, doubt, history and relative is tied to the nearest name
 in its clause (or to none); a negation ("no", "not", "denies", "without", "negative for") reaches every name after it
 up to the end of the sentence, a semicolon, "but" or "with", and "ruled out" or "excluded" the names before it in its
-clause. Then (compare()), against the items of the entries whose passages the statement cites, it is changed when it
+clause. Four readings it doesn't make (each was a misreading of the scorer's, step 17): an age said in words ("34
+years old") is the age's number, as "34-year-old" is, not how long something lasted, and nothing but its number is said
+of an age; a weight lifted, carried or borne ("avoid lifting weight") is a load, not the vital sign; an increase or
+decrease after "has", "was" and the like, in a clause naming no drug, dose or number ("the swelling has decreased"), is
+a trend, not a medication change; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
+said of neither thing it links, with or without a comma before it, so it answers to either one's doubt in the facts and
+is added only if neither has one. Then (compare()), against the items of the entries whose passages the statement cites, it is changed when it
 says a number, unit, frequency, duration, date, route, side, severity, polarity, drug or abbreviation those items
 don't say of what it says it of (a value of another item is changed too: "glucose 140" as "BP 140"), and when it says
 an action, negation, doubt, past or relative other than theirs, or leaves out one they say of something it names.
@@ -177,6 +183,16 @@ ABBREVIATIONS = {"bp", "hr", "rr", "spo2", "sao2", "copd", "hiv", "aids", "nsaid
                  "covid-19", "a1c", "hba1c", "dm", "htn", "chf", "uti", "uri", "dvt", "pe", "cva", "tia", "gerd",
                  "bph", "ckd", "aki", "afib", "cad", "ards", "ssri", "ace", "arb", "ppi", "ivc"}
 CLAUSE_WORDS = {"and", "or", "but", "then"}
+# A doubt before one of these is the doubt of a cause ("Urticaria, probably due to amoxicillin"): of the link between what
+# was named and what caused it, which a fact list may give either of them, comma or none.
+CAUSES = [["due", "to"], ["secondary", "to"], ["caused", "by"], ["related", "to"], ["because", "of"],
+          ["attributed", "to"], ["from"]]
+# A weight lifted, carried or borne is a load, not the vital sign ("avoid lifting weight").
+LOADS = {"lift", "lifts", "lifting", "lifted", "carry", "carries", "carrying", "carried", "bear", "bears", "bearing",
+         "heavy"}
+# Before an increase or decrease said of something already named ("the swelling has decreased"), a finding's trend.
+PERFECT_OR_PASSIVE = {"has", "have", "had", "been", "is", "are", "was", "were"}
+DOSE_WORDS = {"dose", "doses", "dosage", "dosing"}
 
 TOKEN = re.compile(r"\d+(?:[.,]\d+)*(?:/\d+(?:[.,]\d+)?)?|°[cf]?|%|[a-zμ][a-z0-9μ]*(?:[-'/.][a-z0-9]+)*|[,;:.()]")
 
@@ -403,6 +419,8 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
     labels: list[tuple[int, int, str, bool]] = []
     for name, label, drug in lexicon.names():
         for i in range(len(toks) - len(name) + 1):
+            if label == "weight" and i and toks[i - 1] in LOADS:
+                continue
             if tuple(folded[i : i + len(name)]) == name and not any(taken[i : i + len(name)]):
                 labels.append((i, i + len(name), label, drug))
                 for j in range(i, i + len(name)):
@@ -458,7 +476,10 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
         if unit in ("year-old", "month-old"):
             take(i, end + 1, "number", f"{value}{' months' if unit == 'month-old' else ''}")
             labels.append((end, end + 1, "age", False))
-        elif (period := unit.split("-")[0]) in PERIODS:  # "6 weeks", "18-month vaccines"
+        elif (period := unit.split("-")[0]) in PERIODS and PERIODS[period] in ("years", "months") and toks[
+                end + 1 : end + 2] == ["old"]:  # "34 years old", an age as "34-year-old" is, not how long something lasted
+            take(i, end + 2, "number", f"{value}{' months' if PERIODS[period] == 'months' else ''}")
+        elif period in PERIODS:  # "6 weeks", "18-month vaccines"
             take(i, end + 1, "duration", _period(value, period))
         elif unit in UNITS:
             if toks[end + 1 : end + 4] == ["and", "a", "half"]:  # "a tablet and a half"
@@ -487,9 +508,16 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
     for i, tok in enumerate(toks):
         if free(i, i + 1) and i not in names_at and _polar_word(tok) is not None:
             take(i, i + 1, "polarity", tok)
+    clause_of = _clauses(toks)
+    drugs_at = {clause_of[start] for start, _, _, drug in labels if drug}
+    numbers_at = {clause_of[start] for start, _, kind, _ in kinds if kind == "number"}
     for i, tok in enumerate(toks):
         if not free(i, i + 1):
             continue
+        if (tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] + ACTIONS["decrease"][0] + ACTIONS["decrease"][1]
+                and i and toks[i - 1] in PERFECT_OR_PASSIVE and clause_of[i] not in drugs_at | numbers_at
+                and not any(t in DOSE_WORDS for t, c in zip(toks, clause_of, strict=True) if c == clause_of[i])):
+            continue  # "the swelling has decreased": a trend, where no drug or dose is named, not a medication change
         if tok in ("use", "uses") and i - 1 in names_at:
             continue  # "alcohol use" names a habit; "uses albuterol" is taking it
         if tok in ACTIONS["take"][0] and i and any(toks[i - 1] in forms for pair in ACTIONS.values() for forms in pair):
@@ -517,12 +545,7 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
         if free(i, i + 1) and tok in ABBREVIATIONS:
             take(i, i + 1, "abbreviation", tok)
 
-    # Clauses, and each claim tied to the nearest name in its own.
-    clause_of, clause = [], 0
-    for tok in toks:
-        if tok in (",", ";", ".", "(", ")") or tok in CLAUSE_WORDS:
-            clause += 1
-        clause_of.append(clause)
+    # Each claim tied to the nearest name in its clause.
     found: list[Claim] = []
     for start, end, label, drug in labels:
         if drug:
@@ -536,12 +559,26 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
         # (a medication change, a side, severity, polarity, doubt, the past, a relative), the one before otherwise.
         after_first = kind in ("action", "side", "severity", "polarity", "doubt", "history", "present", "who")
         before_only = kind == "who of what was named before"
+        # An age has nothing said of it but its number ("33-year-old woman who started with spots 2 days ago").
         near = [(start - (le - 1) if le <= start else s - (end - 1), (s < end) == after_first, label)
-                for s, le, label, _ in labels if clause_of[s] == clause_of[start] and (s < start or not before_only)]
+                for s, le, label, _ in labels if clause_of[s] == clause_of[start] and (s < start or not before_only)
+                and (label != "age" or kind == "number")]
         label = min(near)[2] if near else None
+        if kind == "doubt" and any(_match(toks, end, cause) for cause in CAUSES):
+            label = None  # the doubt of a cause (CAUSES): satisfied by either thing it links, added if neither has one
         found.append(Claim("who" if before_only else kind, label, value))
     found += _negations(toks, labels, clause_of)
     return found
+
+
+def _clauses(toks: list[str]) -> list[int]:
+    """Each token's clause: cut at commas, semicolons, full stops, brackets and CLAUSE_WORDS."""
+    clause_of, clause = [], 0
+    for tok in toks:
+        if tok in (",", ";", ".", "(", ")") or tok in CLAUSE_WORDS:
+            clause += 1
+        clause_of.append(clause)
+    return clause_of
 
 
 def _negations(toks: list[str], labels: list[tuple[int, int, str, bool]], clause_of: list[int]) -> list[Claim]:
