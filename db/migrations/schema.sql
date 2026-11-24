@@ -2348,3 +2348,62 @@ VALUES ('20261122164730_AiChartProposals', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.ai_note_reviews ADD consent_id uuid;
+
+ALTER TABLE ehr.ai_note_reviews ADD mode character varying(16) NOT NULL DEFAULT 'dictation';
+
+ALTER TABLE ehr.ai_note_reviews ADD sensitive boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE ehr.ai_field_proposals ADD sensitive boolean NOT NULL DEFAULT FALSE;
+
+CREATE TABLE ehr.ambient_consents (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    clinician_id uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    speakers smallint NOT NULL,
+    given_by character varying(16) NOT NULL,
+    confirmed_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_ambient_consents PRIMARY KEY (id),
+    CONSTRAINT ak_ambient_consents_id_patient_id UNIQUE (id, patient_id),
+    CONSTRAINT ck_ambient_consents_given_by CHECK (given_by IN ('patient', 'representative')),
+    CONSTRAINT ck_ambient_consents_speakers CHECK (speakers IN (2, 3)),
+    CONSTRAINT fk_ambient_consents_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ambient_consents_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.ambient_transcripts (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    transcript jsonb NOT NULL,
+    sensitive boolean NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_ambient_transcripts PRIMARY KEY (id),
+    CONSTRAINT ck_ambient_transcripts_sensitive CHECK (sensitive),
+    CONSTRAINT ck_ambient_transcripts_transcript CHECK (jsonb_typeof(transcript) = 'object' AND octet_length(transcript::text) <= 1048576),
+    CONSTRAINT fk_ambient_transcripts_ai_note_reviews_id_patient_id FOREIGN KEY (id, patient_id) REFERENCES ehr.ai_note_reviews (id, patient_id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_ai_note_reviews_consent_id ON ehr.ai_note_reviews (consent_id);
+
+CREATE INDEX ix_ai_note_reviews_consent_id_patient_id ON ehr.ai_note_reviews (consent_id, patient_id);
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT ck_ai_note_reviews_consent CHECK ((mode = 'ambient') = (consent_id IS NOT NULL));
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT ck_ai_note_reviews_mode CHECK (mode IN ('dictation', 'ambient'));
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT ck_ai_note_reviews_sensitive CHECK (sensitive = (mode = 'ambient'));
+
+CREATE INDEX ix_ambient_consents_clinician_id ON ehr.ambient_consents (clinician_id);
+
+CREATE INDEX ix_ambient_consents_patient_id ON ehr.ambient_consents (patient_id);
+
+CREATE INDEX ix_ambient_transcripts_id_patient_id ON ehr.ambient_transcripts (id, patient_id);
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT fk_ai_note_reviews_ambient_consents_consent_id_patient_id FOREIGN KEY (consent_id, patient_id) REFERENCES ehr.ambient_consents (id, patient_id) ON DELETE RESTRICT;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261122182450_AmbientListening', '10.0.13');
+
+COMMIT;
+

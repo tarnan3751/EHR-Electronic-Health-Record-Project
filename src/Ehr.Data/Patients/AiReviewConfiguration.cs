@@ -21,6 +21,17 @@ public sealed class AiReviewConfiguration : IEntityTypeConfiguration<AiNoteRevie
         review.Property(r => r.ResultJson).HasColumnType("jsonb");
         review.Property(r => r.CreatedAt).HasDefaultValueSql("now()");
         review.Property(r => r.CompletedAt).ValueGeneratedOnAddOrUpdate();
+        // Ambient listening (step 16): a conversation's review names its consent, which allows no other review.
+        review.ToTable(table =>
+        {
+            table.HasCheckConstraint("ck_ai_note_reviews_mode", "mode IN ('dictation', 'ambient')");
+            table.HasCheckConstraint("ck_ai_note_reviews_consent", "(mode = 'ambient') = (consent_id IS NOT NULL)");
+            table.HasCheckConstraint("ck_ai_note_reviews_sensitive", "sensitive = (mode = 'ambient')");
+        });
+        review.Property(r => r.Mode).HasMaxLength(16).HasDefaultValue(AiReviewModes.Dictation);
+        review.HasOne<AmbientConsent>().WithMany().HasForeignKey(r => new { r.ConsentId, r.PatientId })
+            .HasPrincipalKey(c => new { c.Id, c.PatientId }).OnDelete(DeleteBehavior.Restrict);
+        review.HasIndex(r => r.ConsentId).IsUnique();
     }
 
     public void Configure(EntityTypeBuilder<AiFieldProposal> proposal)

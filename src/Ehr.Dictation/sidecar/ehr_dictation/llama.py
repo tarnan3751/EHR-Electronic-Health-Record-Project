@@ -44,6 +44,10 @@ class ModelOutputInvalid(StructuringFailed):
     reason = "model_output_invalid"
 
 
+class AnswerCutOff(ModelOutputInvalid):
+    """The answer reached the token limit before it ended: invalid, and for a visit's window, too long to draft whole."""
+
+
 class TranscriptTooLong(StructuringFailed):
     reason = "transcript_too_long"
 
@@ -105,6 +109,14 @@ class Structurer:
     def structuring(self) -> Structuring:
         return self._structuring
 
+    def using(self, structuring: Structuring) -> Structurer:
+        """The same llama-server, model file and time limit with another prompt: a conversation's (step 16)."""
+        return Structurer(self._llama, structuring, self._model_file, timeout=self._timeout)
+
+    async def tokens(self, text: str) -> int:
+        """How many tokens the text is to K2 Horizon, by llama-server's own tokenizer."""
+        return await self._llama.tokens(text)
+
     async def propose(self, transcript: str) -> Proposal:
         try:
             async with asyncio.timeout(self._timeout):
@@ -125,7 +137,7 @@ class Structurer:
         except (KeyError, IndexError, TypeError):
             raise ModelOutputInvalid("The answer has no message.") from None
         if choice.get("finish_reason") == "length":
-            raise ModelOutputInvalid("The answer was cut off at the token limit.")
+            raise AnswerCutOff("The answer was cut off at the token limit.")
         fields, unknown = parse_answer(content)
         return Proposal(fields, unknown, answer.get("timings"))
 

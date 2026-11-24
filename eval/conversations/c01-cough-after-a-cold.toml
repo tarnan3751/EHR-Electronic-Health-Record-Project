@@ -1,0 +1,244 @@
+id = "c01-cough-after-a-cold"
+speakers = 2
+voices = { clinician = "af_heart", patient = "am_michael" }
+tags = ["small-talk", "question-no", "negation", "numbers", "thinking-aloud", "hedging", "backchannel", "relative-health"]
+noise = ["room"]
+dates = []
+drugs = ["penicillin", "omeprazole"]
+denied = ["fever", "chest pain", "shortness of breath", "blood"]
+hedged = ["pneumonia"]
+
+[[turns]]
+role = "clinician"
+text = "Good morning. Come on in and have a seat. How was the drive over?"
+
+[[turns]]
+role = "patient"
+text = "Not bad at all, the roads were quiet this morning. Finding a parking space was the hard part."
+
+[[turns]]
+role = "clinician"
+text = "It always is on a Tuesday. So, what brings you in today?"
+
+[[turns]]
+role = "patient"
+text = "I've had a cough for about [[2 weeks|two weeks]] now. It started with a cold, and the cold went away, but the cough just stayed."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. Is it a dry cough, or are you bringing anything up?"
+
+[[turns]]
+role = "patient"
+text = "Mostly dry. Some mornings there's a little bit of clear phlegm."
+gap = 0.5
+
+[[turns]]
+role = "clinician"
+text = "Any fever?"
+
+[[turns]]
+role = "patient"
+text = "No, no fever."
+
+[[turns]]
+role = "clinician"
+text = "Any chest pain?"
+
+[[turns]]
+role = "patient"
+text = "No."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Any shortness of breath when you walk or climb stairs?"
+
+[[turns]]
+role = "patient"
+text = "No, I can do the stairs at home without a problem."
+
+[[turns]]
+role = "clinician"
+text = "Okay. Any blood when you cough?"
+
+[[turns]]
+role = "patient"
+text = "No, never."
+
+[[turns]]
+role = "clinician"
+text = "Good. Is the cough worse at any particular time of day?"
+
+[[turns]]
+role = "patient"
+text = "It's worse at night. It wakes me up [[2 or 3 times|two or three times]] a night, and I feel tired at work the next day."
+
+[[turns]]
+role = "clinician"
+text = "What kind of work do you do?"
+
+[[turns]]
+role = "patient"
+text = "I teach fourth grade, so there's always something going around. My daughter had the same cold last month."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Of course. Any trouble swallowing, or a hoarse voice?"
+
+[[turns]]
+role = "patient"
+text = "My voice gets a bit hoarse by the end of the school day. Swallowing is fine."
+
+[[turns]]
+role = "clinician"
+text = "And how is your appetite? Are you drinking plenty of water?"
+
+[[turns]]
+role = "patient"
+text = "My appetite is fine. I try to drink water, maybe [[6 glasses|six glasses]] a day."
+
+[[turns]]
+role = "clinician"
+text = "Good. Do you smoke, or have you ever smoked?"
+
+[[turns]]
+role = "patient"
+text = "I quit [[10 years|ten years]] ago. Before that I smoked about half a pack a day for [[15 years|fifteen years]]."
+
+[[turns]]
+role = "clinician"
+text = "That's great that you quit. Have you taken anything for the cough?"
+
+[[turns]]
+role = "patient"
+text = "Just honey and lemon, and some cough syrup from the drugstore. The syrup helps a little at night."
+
+[[turns]]
+role = "clinician"
+text = "Any heartburn, or a sour taste in your mouth, especially when you lie down?"
+
+[[turns]]
+role = "patient"
+text = "Actually, yes. I've had some heartburn after dinner the last few weeks."
+
+[[turns]]
+role = "clinician"
+text = "That's helpful. Any allergies to medicines?"
+
+[[turns]]
+role = "patient"
+text = "Penicillin gives me a rash."
+
+[[turns]]
+role = "clinician"
+text = "Okay. Let me take a listen. Deep breaths in and out through your mouth."
+
+[[turns]]
+role = "patient"
+text = "Okay."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "Now open wide and say ah for me."
+gap = 2.0
+
+[[turns]]
+role = "patient"
+text = "Ah."
+
+[[turns]]
+role = "clinician"
+text = "Your temperature is [[98.4|ninety-eight point four]] and your oxygen level is [[98 percent|ninety-eight percent]]. Your lungs are clear on both sides. No wheezing, but your throat looks a little red at the back. Your ears look normal."
+gap = 3.0
+
+[[turns]]
+role = "clinician"
+text = "So I'm thinking about what this could be. A cough that hangs on after a cold is common. It could be a post viral cough, but the heartburn makes me wonder about reflux as well. Reflux can cause a cough at night, because acid comes up when you lie flat."
+gap = 1.0
+
+[[turns]]
+role = "patient"
+text = "Is it anything serious?"
+
+[[turns]]
+role = "clinician"
+text = "I don't think you have pneumonia. Your lungs sound clear and your oxygen is good."
+
+[[turns]]
+role = "clinician"
+text = "Here's what I'd suggest. Try omeprazole [[20 mg|twenty milligrams]] once a day before breakfast for [[4 weeks|four weeks]]. Avoid eating within [[3 hours|three hours]] of bed. Keep using honey at night. If the cough isn't better in [[4 weeks|four weeks]], come back and we'll get a chest X-ray."
+gap = 0.6
+
+[[turns]]
+role = "patient"
+text = "Okay. Should I keep taking the cough syrup?"
+
+[[turns]]
+role = "clinician"
+text = "Yes, you can keep taking it at night if it helps you sleep."
+
+[[turns]]
+role = "patient"
+text = "Great. Thank you, that's a relief. My class has a field trip at the end of the month, so I hope this clears up by then."
+
+[[turns]]
+role = "clinician"
+text = "I hope so too. Where are you taking them?"
+
+[[turns]]
+role = "patient"
+text = "To the science museum downtown. Thirty kids on a bus, wish me luck."
+
+[[turns]]
+role = "clinician"
+text = "Good luck! Feel better, and call us if anything changes before then."
+
+[gold.subjective]
+value = "I've had a cough for about 2 weeks now. It started with a cold, and the cold went away, but the cough just stayed. Mostly dry. Some mornings there's a little bit of clear phlegm. No fever. I can do the stairs at home without a problem. It's worse at night. It wakes me up 2 or 3 times a night. My daughter had the same cold last month. My voice gets a bit hoarse by the end of the school day. Swallowing is fine. I quit 10 years ago. Before that I smoked about half a pack a day for 15 years. Just honey and lemon, and some cough syrup from the drugstore. The syrup helps a little at night. I've had some heartburn after dinner the last few weeks. Penicillin gives me a rash."
+sources = [
+    "I've had a cough for about 2 weeks now",
+    "It started with a cold, and the cold went away, but the cough just stayed",
+    "Mostly dry",
+    "Some mornings there's a little bit of clear phlegm",
+    "no fever",
+    "I can do the stairs at home without a problem",
+    "It's worse at night",
+    "It wakes me up 2 or 3 times a night",
+    "My daughter had the same cold last month",
+    "My voice gets a bit hoarse by the end of the school day",
+    "Swallowing is fine",
+    "I quit 10 years ago",
+    "Before that I smoked about half a pack a day for 15 years",
+    "Just honey and lemon, and some cough syrup from the drugstore",
+    "The syrup helps a little at night",
+    "I've had some heartburn after dinner the last few weeks",
+    "Penicillin gives me a rash",
+]
+
+[gold.objective]
+value = "Your temperature is 98.4 and your oxygen level is 98 percent. Your lungs are clear on both sides. No wheezing, but your throat looks a little red at the back. Your ears look normal."
+sources = [
+    "Your temperature is 98.4 and your oxygen level is 98 percent",
+    "Your lungs are clear on both sides",
+    "No wheezing, but your throat looks a little red at the back",
+    "Your ears look normal",
+]
+
+[gold.assessment]
+value = "It could be a post viral cough, but the heartburn makes me wonder about reflux as well. I don't think you have pneumonia."
+sources = [
+    "It could be a post viral cough, but the heartburn makes me wonder about reflux as well",
+    "I don't think you have pneumonia",
+]
+
+[gold.plan]
+value = "Try omeprazole 20 mg once a day before breakfast for 4 weeks. Avoid eating within 3 hours of bed. Keep using honey at night. If the cough isn't better in 4 weeks, come back and we'll get a chest X-ray."
+sources = [
+    "Try omeprazole 20 mg once a day before breakfast for 4 weeks",
+    "Avoid eating within 3 hours of bed",
+    "Keep using honey at night",
+    "If the cough isn't better in 4 weeks, come back and we'll get a chest X-ray",
+]

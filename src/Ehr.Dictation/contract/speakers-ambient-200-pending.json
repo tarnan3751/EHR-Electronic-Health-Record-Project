@@ -1,0 +1,61 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "speakers-ambient",
+  "status": 200,
+  "body": {
+    "transcript": {
+      "text": "Your chest is clear.\nI have had a cough for three days.",
+      "final": true,
+      "segments": [
+        {
+          "start": 0,
+          "end": 20,
+          "startMs": 0,
+          "endMs": 3215,
+          "final": true,
+          "unclear": null,
+          "speakerGroup": 1,
+          "speaker": "clinician"
+        },
+        {
+          "start": 21,
+          "end": 55,
+          "startMs": 3530,
+          "endMs": 6965,
+          "final": true,
+          "unclear": null,
+          "speakerGroup": 2,
+          "speaker": "patient"
+        }
+      ]
+    },
+    "sorting": "pending",
+    "reason": null,
+    "fields": null,
+    "notCarriedOver": [],
+    "proposals": [],
+    "provenance": {
+      "speech": {
+        "repository": "google/medasr",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "language": {
+        "repository": "IFM/K2-Horizon-7B-GGUF",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "K2-Horizon-7B-Q4_K_M.gguf",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "llamaServer": null,
+      "prompt": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "schema": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "structuring": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "code": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "speaker": {
+        "repository": "speechbrain/spkrec-ecapa-voxceleb",
+        "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    }
+  }
+}

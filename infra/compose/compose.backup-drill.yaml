@@ -1,0 +1,10 @@
+# For CI's check that old backups are deleted (.github/workflows/ci.yml, server stack), on a stack already up:
+#   docker compose -f compose.yaml -f compose.backup-drill.yaml up --detach --no-deps barman
+# Barman then takes a base backup at every pass of its loop and keeps two, so deleting old backups and the WAL before
+# them can be seen in minutes, not days. Never for a stack whose backups are kept.
+services:
+  barman:
+    environment:
+      BARMAN_BACKUP_EVERY: "1"
+    volumes:
+      - ./backup-drill/retention.conf:/etc/barman.d/retention.conf:ro

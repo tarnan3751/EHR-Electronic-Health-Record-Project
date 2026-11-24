@@ -5,6 +5,9 @@ transcribes and commits each finished passage, and, while the clinician is still
 tentative tail the next call replaces. At the end (final), everything is committed. Each passage is judged by quality.py
 as it is transcribed; silence makes no passage. The eval calls advance() on a whole recording at once, final, which is
 what stopping a session does with whatever audio was never committed.
+
+A recorded visit (the expansion plan's step 16) is transcribed once it has stopped, a turn at a time (passages()), each
+turn cut at its own pauses and judged against the whole recording's background, as advance() judges a dictation's.
 """
 
 from __future__ import annotations
@@ -49,6 +52,17 @@ def advance(samples: np.ndarray, progress: Progress, recognizer: Recognizer, *, 
     elif samples.size - committed >= segmenter.SAMPLE_RATE // 2:
         tail = _passage(samples, frame_levels, floor, committed, samples.size, recognizer, final=False)
     return Progress(segments, committed, tail)
+
+
+def passages(samples: np.ndarray, frame_levels: np.ndarray, floor: float, start: int, end: int,
+             recognizer: Recognizer) -> list[Segment]:
+    """The final passages of samples[start:end], one speaker's turn: cut at its pauses, transcribed and judged, with
+    frame_levels and floor measured over the whole recording (segmenter.levels() and noise_floor())."""
+    cuts = segmenter.cut_points(frame_levels, start // segmenter.HOP, min(-(-end // segmenter.HOP), frame_levels.size),
+                                final=True)
+    edges = [start, *(cut * segmenter.HOP for cut in cuts), end]
+    found = [_passage(samples, frame_levels, floor, low, high, recognizer, final=True) for low, high in zip(edges, edges[1:])]
+    return [segment for segment in found if segment is not None]
 
 
 def _passage(

@@ -3,8 +3,9 @@
 @using Ehr.Data.Patients
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ReviewModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@inject AmbientTranscriptKeep Keep
 @{
-    ViewData["Title"] = "Review AI-proposed fields";
+    ViewData["Title"] = Model.Ambient ? "Review the note drafted from the visit" : "Review AI-proposed fields";
 }
 @* The patient, in the banner under the app bar. The note pages read no allergies, so the banner shows none. *@
 @section Banner {
@@ -33,12 +34,27 @@
     };
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to the chart</a></p>
 </div>
-<h1>Review AI-proposed fields</h1>
-<p class="sc-prose">Compare every suggestion with your original words. Accepted and edited values enter the note only when you complete review. Orders and allergy changes are never executed by this workflow.</p>
-<section data-note-review data-dictation data-stage-url="@($"/api/dictation/sessions/review/{Model.Review.Id}/stage")">
+<h1>@(Model.Ambient ? "Review the note drafted from the visit" : "Review AI-proposed fields")</h1>
+<p class="sc-prose">Compare every suggestion with @(Model.Ambient ? "what was said" : "your original words"). Accepted and edited values enter the note only when you complete review. Orders and allergy changes are never executed by this workflow.</p>
+@* The expansion plan's step 16: a recorded visit's review. *@
+@if (Model.Ambient)
+{
+    <p class="sc-notice sc-notice--info" data-ambient-own-words><span class="sc-notice__state">Check:</span> each Subjective value is in the patient's own words. Reword it as your note before you accept it.</p>
+    @if (Model.DecideAtTheClinic)
+    {
+        <p class="sc-notice sc-notice--warning" data-ambient-at-the-clinic><span class="sc-notice__state">Read-only here:</span> @ReviewModel.FinishAtTheClinic</p>
+    }
+}
+@* Off-site, a visit's words are read only at the clinic: the script says so where it would quote them. *@
+<section data-note-review data-dictation data-stage-url="@($"/api/dictation/sessions/review/{Model.Review.Id}/stage")" data-dictation-words-at-the-clinic="@(Model.DecideAtTheClinic ? "true" : "false")">
     <script type="application/json" data-review-snapshot>@Json.Serialize(Model.Snapshot)</script>
+    @* Step 16: a recorded visit's transcript, read at the clinic, as stored (ReviewModel.ConversationJson). *@
+    @if (Model.ConversationJson is { } conversation)
+    {
+        <script type="application/json" data-review-transcript>@Html.Raw(conversation)</script>
+    }
     <p id="note-save-status" class="sc-status" role="status" aria-live="polite">Saved review</p>
     <div id="note-errors" class="sc-notice sc-notice--danger" role="alert" tabindex="-1" hidden="@(Model.Errors.Count == 0)">
         @foreach (var error in Model.Errors) { <p>@error</p> }
@@ -47,11 +63,21 @@
     @Html.AntiForgeryToken()
     @if (Model.Review.State == AiReviewStates.Recording && !Model.Signed)
     {
-        <p class="sc-notice sc-notice--warning">This dictation has not been staged for review. Retrieve its finished result, or discard the temporary dictation and continue manually. No AI text has entered the note.</p>
+        @* Step 16: a visit left here when its page couldn't fetch it, or was closed, says what it is. One whose voices were
+           named may still be drafting at the service, so Retrieve comes first and the sentence says to wait for it;
+           otherwise it is discarded. *@
+        @if (Model.Ambient)
+        {
+            <p class="sc-notice sc-notice--warning" data-ambient-not-drafted>A visit recorded at @Clinic.Format(Model.Review.CreatedAt) hasn't been drafted yet. If its voices were named a moment ago, wait a minute and choose Retrieve. Otherwise discard it to dictate or listen again.</p>
+        }
+        else
+        {
+            <p class="sc-notice sc-notice--warning">This dictation has not been staged for review. Retrieve its finished result, or discard the temporary dictation and continue manually. No AI text has entered the note.</p>
+        }
         <div class="sc-actions">
-            <button type="button" class="sc-btn" data-review-retrieve>Retrieve finished dictation</button>
+            <button type="button" class="sc-btn" data-review-retrieve>@(Model.Ambient ? "Retrieve the visit's draft" : "Retrieve finished dictation")</button>
             <form method="post" asp-page-handler="Discard" data-review-submit>
-                <button class="sc-btn sc-btn--danger">Discard unfinished dictation and continue manually</button>
+                <button class="sc-btn sc-btn--danger">@(Model.Ambient ? "Discard the visit" : "Discard unfinished dictation and continue manually")</button>
             </form>
         </div>
     }
@@ -64,13 +90,24 @@
         <section>
             <section class="sc-transcript" aria-labelledby="review-transcript">
                 <div class="sc-transcript__head"><h2 class="sc-transcript__title" id="review-transcript">Original transcript</h2></div>
-                <div class="sc-transcript__body" data-dictation-transcript><p>@Model.Result?.Transcript.Text</p></div>
+                @if (Model.Ambient && !Model.TranscriptKept)
+                {
+                    <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder" data-ambient-transcript-gone>@(Model.Review.State == AiReviewStates.Pending ? NoteReviews.TranscriptGone(Keep) : "This visit's transcript was deleted when its review was finished. Each proposal shows who said the words it came from.")</p></div>
+                }
+                else if (Model.Ambient && Model.DecideAtTheClinic)
+                {
+                    <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder">The conversation can be read only at the clinic.</p></div>
+                }
+                else
+                {
+                    <div class="sc-transcript__body" data-dictation-transcript><p>@(Model.Ambient ? Model.ConversationText : Model.Result?.Transcript.Text)</p></div>
+                }
                 <p class="sc-transcript__note" data-dictation-unclear hidden>Marked passages were unclear. Check them before approving.</p>
             </section>
             <p class="sc-status" data-dictation-sort-message></p>
             <section class="sc-notice sc-notice--warning" data-dictation-not-carried hidden>
                 <h3>Not carried over</h3>
-                <p>Dictation doesn't propose these. Place any that still apply through their normal clinical workflow.</p>
+                <p>@(Model.Ambient ? "This draft" : "Dictation") doesn't propose these. Place any that still apply through their normal clinical workflow.</p>
                 <ul data-dictation-not-carried-list></ul>
             </section>
         </section>
@@ -83,7 +120,7 @@
                     <div class="sc-proposal" data-dictation-field="@field" data-proposal-id="@proposal?.Id" data-review-state="@proposal?.State">
                         <dt class="sc-proposal__head"><span class="sc-proposal__field">@FieldLabel(field)</span> <span class="@StateTone(proposal?.State)" data-field-status>@StateWords(proposal?.State)</span></dt>
                         <dd data-field-value>@proposal?.OriginalValue</dd>
-                        @if (proposal is { State: AiProposalStates.Pending } && !Model.Signed)
+                        @if (proposal is { State: AiProposalStates.Pending } && !Model.Signed && !Model.DecideAtTheClinic)
                         {
                             <dd class="sc-proposal__controls" data-review-controls>
                                 <form method="post" asp-page-handler="Decide" data-review-submit>
@@ -91,7 +128,10 @@
                                     <input type="hidden" name="ProposalId" value="@proposal.Id" />
                                     <input type="hidden" name="DecisionKey" value="@(Model.ProposalId == proposal.Id && Model.DecisionKey != Guid.Empty ? Model.DecisionKey : Guid.NewGuid())" />
                                     <div class="sc-actions">
-                                        <button class="sc-btn" name="Decision" value="accepted">Accept @field</button>
+                                        @if (!Model.TranscriptGone)
+                                        {
+                                            <button class="sc-btn" name="Decision" value="accepted">Accept @field</button>
+                                        }
                                         <button class="sc-btn" name="Decision" value="rejected">Reject @field</button>
                                     </div>
                                     <details>
@@ -99,7 +139,13 @@
                                         <div class="sc-stack">
                                             <div class="sc-field sc-field--wide">
                                                 <label for="edited-@field">Corrected @field</label>
-                                                <textarea id="edited-@field" class="sc-field__input" name="EditedValue" rows="5">@(Model.ProposalId == proposal.Id ? Model.EditedValue : proposal.OriginalValue)</textarea>
+                                                @* Step 16: with a visit's transcript gone, the words offered can't go in as they are, so they aren't
+                                                   offered here ready to approve. *@
+                                                @if (Model.TranscriptGone)
+                                                {
+                                                    <p class="sc-field__hint" id="edited-@field-hint" data-ambient-own-note>Write it as your own note: with the visit's transcript deleted, the words offered can't go in as they are.</p>
+                                                }
+                                                <textarea id="edited-@field" class="sc-field__input" name="EditedValue" rows="5" aria-describedby="@(Model.TranscriptGone ? $"edited-{field}-hint" : null)">@(Model.ProposalId == proposal.Id ? Model.EditedValue : Model.TranscriptGone ? "" : proposal.OriginalValue)</textarea>
                                             </div>
                                             <div class="sc-actions"><button class="sc-btn" name="Decision" value="edited">Approve edited @field</button></div>
                                         </div>
@@ -179,7 +225,15 @@
         <summary>Current saved note — compare before adding approved values</summary>
         <partial name="_NoteContent" model="NoteSections.AsSaved(Model.Draft)" />
     </details>
-    @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed)
+    @if (Model.Ambient && Model.Review.State == AiReviewStates.Pending && !Model.Signed && !Model.DecideAtTheClinic && Model.Proposals.Any(p => p.State == AiProposalStates.Pending))
+    {
+        @* For a patient who withdraws their consent after the visit: nothing goes into the note, and the transcript goes. *@
+        <form method="post" asp-page-handler="RejectAll" class="sc-form sc-form--wide" data-ambient-reject-all>
+            <input type="hidden" name="Version" value="@Model.Draft.Version" />
+            <button class="sc-btn sc-btn--danger sc-btn--wraps">Reject every proposal and delete the conversation</button>
+        </form>
+    }
+    @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed && !Model.DecideAtTheClinic)
     {
         <form method="post" asp-page-handler="Complete" class="sc-form sc-form--wide" data-review-submit data-review-complete>
             <input type="hidden" name="Version" value="@Model.Draft.Version" />
