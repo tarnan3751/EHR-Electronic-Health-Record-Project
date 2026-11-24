@@ -183,6 +183,8 @@ builder.Services.AddRazorPages(options =>
         // The same, for whose record a portal page is about (FR-19).
         options.Filters.Add(new TypeFilterAttribute(typeof(PortalSubjectFilter)));
         options.Filters.Add(new Ehr.Web.Areas.Clinical.Pages.Patients.Notes.NoteWriteExceptionFilter());
+        // Nothing signed in is cached (step 18).
+        options.Filters.Add(new NoStoreFilter());
     })
     // Validation runs on the server only, so pages don't need the jQuery validation attributes.
     .AddViewOptions(options => options.HtmlHelperOptions.ClientValidationEnabled = false);
