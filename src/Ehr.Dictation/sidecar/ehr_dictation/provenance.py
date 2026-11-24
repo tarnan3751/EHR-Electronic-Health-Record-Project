@@ -2,7 +2,9 @@
 from the models-manifest.json setup_models.py wrote, for the provenance each dictated note will store (NFR-15).
 
 At startup MedASR's weights are hashed and compared with the manifest, and the sidecar refuses to start if they differ,
-so a result never claims a model it didn't use. The K2 Horizon file is llama-server's to load: llama.py checks that it
+so a result never claims a model it didn't use. The speaker model that tells a visit's voices apart (the expansion
+plan's step 16) is optional: with no entry in the manifest, speaker is None and listening to a visit is refused; with
+one, its weights are checked the same way (and again as ecapa.py loads them). The K2 Horizon file is llama-server's to load: llama.py checks that it
 serves the file the manifest names. The manifest's hashes are the ones Hugging Face publishes.
 
 Whisper, which transcribes dictation in Spanish (the expansion plan's step 17), is optional: setup_models.py fetches it
@@ -27,6 +29,8 @@ MEDASR_DIR = "medasr"
 MEDASR_WEIGHTS = "model.safetensors"
 WHISPER_DIR = "whisper"
 WHISPER_WEIGHTS = "model.safetensors"
+SPEAKER_DIR = "speaker"
+SPEAKER_WEIGHTS = "embedding_model.ckpt"
 
 
 class ProvenanceError(Exception):
@@ -38,6 +42,7 @@ class Models:
     speech: dict
     language: dict | None
     spanish_speech: dict | None = None  # Whisper, when it is installed
+    speaker: dict | None = None
 
     @property
     def language_file(self) -> str | None:
@@ -89,7 +94,20 @@ def load(models_dir: Path, *, verify: bool = True) -> Models:
         if llm
         else None
     )
-    return Models(speech, language, spanish_speech)
+    return Models(speech, language, spanish_speech, _speaker(manifest.get("speaker"), models_dir, verify))
+
+
+def _speaker(entry: dict | None, models_dir: Path, verify: bool) -> dict | None:
+    if not entry:
+        return None
+    weights = next((f for f in entry.get("files", []) if f.get("path") == SPEAKER_WEIGHTS), None)
+    if not weights:
+        raise ProvenanceError(f"{MANIFEST} records no speaker-model weights: run src/Ehr.Dictation/setup_models.py.")
+    if verify and _sha256(models_dir / SPEAKER_DIR / SPEAKER_WEIGHTS) != weights["sha256"]:
+        raise ProvenanceError(
+            f"The speaker model's {SPEAKER_WEIGHTS} doesn't match {MANIFEST}: run src/Ehr.Dictation/setup_models.py --verify."
+        )
+    return {"repository": entry["repository"], "commit": entry["commit"], "sha256": weights["sha256"]}
 
 
 def _sha256(path: Path) -> str | None:

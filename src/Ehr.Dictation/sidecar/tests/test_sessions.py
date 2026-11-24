@@ -642,7 +642,7 @@ def make_spanish(settings, whisper: FakeWhisper | None = None, llama: FakeLlama 
 
 
 async def dictate_in(sessions: Sessions, language: str) -> str:
-    session = sessions.start(ALICE, language)
+    session = sessions.start(ALICE, language=language)
     for seq, chunk in enumerate(chunks()):
         await sessions.add_audio(session.id, ALICE, seq, chunk)
     return session.id
@@ -652,7 +652,7 @@ def test_spanish_without_whisper_installed_is_refused(settings):
     sessions, _ = make(settings)
 
     with pytest.raises(SessionError) as refused:
-        sessions.start(ALICE, "es")
+        sessions.start(ALICE, language="es")
 
     assert (refused.value.status, refused.value.code) == (503, "language_unavailable")
     assert sessions.count == 0
@@ -738,7 +738,7 @@ def test_a_dictation_in_spanish_is_refused_past_two_minutes_and_one_in_english_i
 
     async def run(language: str):
         sessions = make_spanish(settings)
-        session = sessions.start(ALICE, language)
+        session = sessions.start(ALICE, language=language)
         for seq in range(4):
             await sessions.add_audio(session.id, ALICE, seq, half_minute)
         try:
@@ -758,7 +758,7 @@ def test_a_dictation_in_spanish_is_refused_past_two_minutes_and_one_in_english_i
 def test_a_live_spanish_transcript_has_finished_passages_only(settings):
     async def run():
         sessions = make_spanish(settings)
-        session = sessions.start(ALICE, "es")
+        session = sessions.start(ALICE, language="es")
         return [await sessions.add_audio(session.id, ALICE, seq, chunk) for seq, chunk in enumerate(chunks())]
 
     answers = asyncio.run(run())
@@ -772,7 +772,7 @@ def test_a_live_spanish_transcript_has_finished_passages_only(settings):
 def test_a_spanish_chunk_is_answered_in_time_while_whisper_is_busy_and_the_next_one_catches_up(settings):
     async def run():
         sessions = make_spanish(settings, call_seconds=0.3)
-        session = sessions.start(ALICE, "es")
+        session = sessions.start(ALICE, language="es")
         parts = chunks()
         await sessions._transcribing.acquire()
         started = time.perf_counter()

@@ -47,6 +47,41 @@ the two above), 401 (no key), 404 (no such session for this owner), 409 (out_of_
 not_stopped), 413 (too_large, too_long), 422 (not_audio), 429 (busy) or 503 (language_unavailable: Spanish without
 Whisper installed).
 Nothing a request carries is logged.
+
+Listening to a visit (the expansion plan's step 16; listening.py) uses the same routes and one more, every call with
+`X-Dictation-Mode: ambient`, which the on-prem app sends for a visit's session (AmbientApi.cs). A session is a
+dictation's or a visit's from its start: a call without the header never finds a visit's, and one with it never a
+dictation's (404, as for no session).
+
+    POST   /v1/sessions?mode=ambient&speakers=N   201 {sessionId, mode: "ambient", maxSeconds, maxChunkBytes}: N people
+                                             will speak, 2 or 3; an optional JSON body {spokenLanguage}, which must be
+                                             English ("en"); 503 listening_unavailable without the speaker model
+                                             or when it couldn't be loaded
+    POST   /v1/sessions/{id}/audio?seq=N     200 {receivedSeq, audioSeconds, quietSeconds, transcript}, quietSeconds how
+                                             long nobody has spoken; the transcript stays empty while it records
+    POST   /v1/sessions/{id}/stop            the result, as far as it gets within 8 s
+    POST   /v1/sessions/{id}/result?wait=S   the same, waiting up to S seconds for its next step
+    POST   /v1/sessions/{id}/speakers        body {"speakers": {"1": "clinician", "2": "patient", "3": "other"}}:
+                                             who each voice is, or "unsure" for a voice the clinician can't place;
+                                             then the note is drafted, and the result follows
+    DELETE /v1/sessions/{id}                 204; everything about it is gone
+
+A visit's result is a dictation's, and sorting is first pending, while it is transcribed and its voices told apart;
+then awaiting_speakers, with speakers: [{group, seconds}], each voice that said something and how long, and each
+segment's speakerGroup (1 to 3, or null where no voice was told); once the voices are named, pending while the note is
+drafted, and done or unavailable. Each segment then has speaker (clinician, patient, other or unsure), whatever the
+sorting comes to (a visit that couldn't be transcribed has no segments), and each source of
+a field its speaker; a field's warnings may also be speaker_unsure, other_speaker, patients_own_words (on every
+Subjective value: it is the patient's own words) or part_not_offered (a part of the visit had a value for the field
+that didn't pass, which it points at), and a failed field's reasons wrong_speaker (a source said by someone the field
+may not quote). notCarriedOver lists what the clinician said and what was said in a passage whose speaker couldn't be
+told, each item's speaker saying which (clinician or unsure), proposals is always empty, and provenance also has
+speaker {repository, commit, sha256} and the conversation prompt's hashes. More errors: 400 bad_request (no 2 or 3
+speakers, the kinds in the query and the header differing), 409 not_stopped (names before the voices are told apart)
+and speakers_given (other names once given), 422 speakers_incomplete (a voice left out or named twice, not exactly one
+clinician and one patient, someone else on a visit the clinician said two would speak at, a voice's number not in ASCII
+digits, or a body that isn't one JSON object with "speakers" once) and unsupported_language,
+429 busy (two visits at once already).
 """
 
 from __future__ import annotations
@@ -64,10 +99,12 @@ from fastapi import FastAPI, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import prompt, provenance
+from . import ecapa, prompt, provenance
 from .asr import MedAsr, Recognizer
+from .diarize import Embedder
+from .listening import Listening, Members
 from .llama import LlamaServer, Structurer
-from .sessions import SessionError, Sessions, Spanish
+from .sessions import AMBIENT, DICTATION, SessionError, Sessions, Spanish
 from .settings import Settings
 from .whisper_asr import Whisper
 
@@ -84,10 +121,12 @@ def create_app(
     structurer: Structurer | None = None,
     models: provenance.Models | None = None,
     spanish: Spanish | None = None,
+    embedder: Embedder | None = None,
 ) -> FastAPI:
     """The app, from the environment unless told otherwise (the tests pass stand-ins for the models). Refuses to start
-    without its keys, or with a MedASR or a Whisper that isn't the one models-manifest.json records; starts without
-    Spanish when Whisper isn't installed."""
+    without its keys, or with a MedASR, a Whisper or a speaker model that isn't the one models-manifest.json records;
+    starts without Spanish when Whisper isn't installed, and the recorded speaker model failing to load turns listening
+    to a visit off, logged, and nothing else."""
     settings = settings or Settings.from_environment()
     _configure_logging()
     expected = hashlib.sha256(f"Bearer {settings.api_key}".encode()).digest()
@@ -108,10 +147,20 @@ def create_app(
                                timeout=settings.structuring_seconds),
                 )
         asr = recognizer or MedAsr(settings.models_dir / provenance.MEDASR_DIR, settings.device)
-        app.state.sessions = Sessions(settings, asr, sorter, loaded_models, spanish=in_spanish)
+        speaker = embedder
+        if speaker is None and loaded_models.speaker:
+            # Weights that aren't the manifest's stop the service; recorded weights this port can't load only turn
+            # listening to a visit off, since the fault is the port's, not the file's.
+            try:
+                speaker = ecapa.Ecapa(settings.models_dir / provenance.SPEAKER_DIR / provenance.SPEAKER_WEIGHTS,
+                                      loaded_models.speaker["sha256"], settings.device)
+            except ecapa.WeightsDontFit as error:
+                log.error("listening to a visit is off: %s", error)
+        app.state.sessions = Listening(settings, asr, sorter, loaded_models, spanish=in_spanish, embedder=speaker)
         sweeper = asyncio.create_task(_sweep(app.state.sessions))
-        log.info("ready: MedASR on %s, %s, llama-server at %s", settings.device,
-                 f"Whisper on {settings.device}" if in_spanish else "no Whisper (Spanish refused)", settings.llama_url)
+        log.info("ready: MedASR on %s, %s, llama-server at %s, %s", settings.device,
+                 f"Whisper on {settings.device}" if in_spanish else "no Whisper (Spanish refused)", settings.llama_url,
+                 "listening to a visit" if speaker else "no speaker model, so no listening to a visit")
         try:
             yield
         finally:
@@ -146,8 +195,11 @@ def create_app(
             raise SessionError(400, "no_owner", "Send X-Dictation-Owner.")
         return value
 
-    def sessions(request: Request) -> Sessions:
+    def sessions(request: Request) -> Listening:
         return request.app.state.sessions
+
+    def mode(request: Request) -> str:
+        return AMBIENT if request.headers.get("x-dictation-mode", "") == AMBIENT else DICTATION
 
     @app.get("/health")
     async def health() -> dict:
@@ -155,31 +207,70 @@ def create_app(
 
     @app.post("/v1/sessions", status_code=201)
     async def start(request: Request) -> dict:
-        who = owner(request)
-        session = sessions(request).start(who, await _spoken_language(request))
-        return {"sessionId": session.id, "maxSeconds": sessions(request).max_seconds(session),
+        who, kind = owner(request), mode(request)
+        if request.query_params.get("mode", kind) != kind:
+            raise SessionError(400, "bad_request", "Name the same kind of session in the query and in X-Dictation-Mode.")
+        if kind == DICTATION:
+            session = sessions(request).start(who, language=await _spoken_language(request))
+            return {"sessionId": session.id, "maxSeconds": sessions(request).max_seconds(session),
+                    "maxChunkBytes": settings.max_chunk_bytes}
+        if (await _language(request)).lower() != "en":
+            raise SessionError(422, "unsupported_language", "Listening to a visit works in English only.")
+        speakers = request.query_params.get("speakers", "")
+        session = sessions(request).start(who, AMBIENT, int(speakers) if speakers in ("2", "3") else 0)
+        return {"sessionId": session.id, "mode": AMBIENT, "maxSeconds": settings.ambient_max_session_seconds,
                 "maxChunkBytes": settings.max_chunk_bytes}
 
     @app.post("/v1/sessions/{session_id}/audio")
     async def add_audio(request: Request, session_id: str, seq: int = Query(ge=0)) -> dict:
         who = owner(request)
         data = await _read(request, settings.max_chunk_bytes)
+        if mode(request) == AMBIENT:
+            return await sessions(request).hear(session_id, who, seq, data)
         return await sessions(request).add_audio(session_id, who, seq, data)
 
     @app.post("/v1/sessions/{session_id}/stop")
     async def stop(request: Request, session_id: str) -> dict:
+        if mode(request) == AMBIENT:
+            return await sessions(request).stop_listening(session_id, owner(request))
         return await sessions(request).stop(session_id, owner(request))
 
     @app.post("/v1/sessions/{session_id}/result")
     async def result(request: Request, session_id: str, wait: float = Query(0.0, ge=0)) -> dict:
+        if mode(request) == AMBIENT:
+            return await sessions(request).visit_result(session_id, owner(request), wait)
         return await sessions(request).result(session_id, owner(request), wait)
+
+    @app.post("/v1/sessions/{session_id}/speakers")
+    async def speakers(request: Request, session_id: str) -> dict:
+        who = owner(request)
+        if mode(request) != AMBIENT:
+            raise SessionError(404, "not_found", "No such visit: it was cancelled or expired, or it isn't yours.")
+        # A JSON object, every member kept, so a voice named twice, or "speakers" given twice, is refused rather than
+        # quietly the last one; an array is no object.
+        try:
+            body = json.loads(await _read(request, 4096) or b"{}", object_pairs_hook=Members)
+        except ValueError:
+            body = None
+        given = [value for key, value in body if key == "speakers"] if isinstance(body, Members) else []
+        return await sessions(request).name_speakers(session_id, who, given[0] if len(given) == 1 else None)
 
     @app.delete("/v1/sessions/{session_id}", status_code=204)
     async def cancel(request: Request, session_id: str) -> Response:
-        sessions(request).cancel(session_id, owner(request))
+        sessions(request).cancel(session_id, owner(request), mode(request))
         return Response(status_code=204)
 
     return app
+
+
+async def _language(request: Request) -> str:
+    """The spoken language a visit's start names in its body, {"spokenLanguage": "en"}; English if it names none."""
+    body = await _read(request, 4096)
+    try:
+        language = json.loads(body).get("spokenLanguage") if body else None
+    except (ValueError, AttributeError):
+        raise SessionError(400, "bad_request", "Send the start's body as JSON.") from None
+    return str(language or "en")
 
 
 async def _read(request: Request, limit: int) -> bytes:

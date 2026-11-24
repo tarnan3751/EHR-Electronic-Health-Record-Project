@@ -1,0 +1,244 @@
+id = "c06-bladder-infection"
+speakers = 2
+voices = { clinician = "af_nicole", patient = "ff_siwis" }
+tags = ["question-no", "order-spoken", "self-correction", "same-gender", "negation", "numbers"]
+noise = ["room"]
+dates = []
+drugs = ["nitrofurantoin", "ibuprofen"]
+forbidden = ["I'm sending nitrofurantoin to your pharmacy"]
+retracted = ["Tuesday"]
+denied = ["fever", "back pain", "nausea", "discharge"]
+
+[[turns]]
+role = "clinician"
+text = "Hi, come on in and have a seat. What brings you in today?"
+
+[[turns]]
+role = "patient"
+text = "I'm pretty sure I have a bladder infection. It burns every time I pee, and I feel like I have to go all the time."
+
+[[turns]]
+role = "clinician"
+text = "That sounds miserable. When did it start?"
+
+[[turns]]
+role = "patient"
+text = "It's been burning since Tuesday, no wait, since Monday. I remember because I had a long day at the office and kept running to the bathroom."
+gap = 0.6
+
+[[turns]]
+role = "clinician"
+text = "Okay. And how often are you going?"
+
+[[turns]]
+role = "patient"
+text = "About every hour during the day, and [[2 or 3 times|two or three times]] at night. And only a little comes out each time."
+
+[[turns]]
+role = "clinician"
+text = "Does it hurt more at the end, when you finish?"
+
+[[turns]]
+role = "patient"
+text = "Yes, that's the worst part. It's a sharp sting at the very end, and then it eases off."
+
+[[turns]]
+role = "clinician"
+text = "Have you seen any blood in your urine, or noticed a strong smell?"
+
+[[turns]]
+role = "patient"
+text = "It smells stronger than usual, and it looks a bit cloudy. I haven't seen any blood."
+
+[[turns]]
+role = "clinician"
+text = "Have you had any fever or chills?"
+
+[[turns]]
+role = "patient"
+text = "No, no fever. I've felt a bit run down, but I think that's from not sleeping."
+
+[[turns]]
+role = "clinician"
+text = "Any back pain, or pain along your sides?"
+
+[[turns]]
+role = "patient"
+text = "No, my back is fine. I do have a dull ache low in my belly."
+
+[[turns]]
+role = "clinician"
+text = "Any nausea or vomiting?"
+
+[[turns]]
+role = "patient"
+text = "No."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Any itching or discharge?"
+
+[[turns]]
+role = "patient"
+text = "No, none of that."
+
+[[turns]]
+role = "clinician"
+text = "Have you tried anything for it so far?"
+
+[[turns]]
+role = "patient"
+text = "I've been drinking cranberry juice, but it hasn't helped at all."
+
+[[turns]]
+role = "clinician"
+text = "Cranberry juice won't clear an infection once it's started. Have you had a bladder infection before?"
+
+[[turns]]
+role = "patient"
+text = "Yes, I had the same thing about [[3 years|three years]] ago. I took an antibiotic for a few days and it cleared up."
+
+[[turns]]
+role = "clinician"
+text = "Is there any chance you could be pregnant?"
+
+[[turns]]
+role = "patient"
+text = "No, I had my period last week."
+
+[[turns]]
+role = "clinician"
+text = "Do you take any medicines every day? And are you allergic to anything?"
+
+[[turns]]
+role = "patient"
+text = "Just a multivitamin. And no allergies that I know of."
+
+[[turns]]
+role = "clinician"
+text = "How much are you drinking during the day?"
+
+[[turns]]
+role = "patient"
+text = "Not as much as I should. I have about [[3 glasses|three glasses]] of water a day, and a lot of coffee at work."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Coffee can irritate the bladder, and when you don't drink much water, the bacteria have more time to settle in."
+
+[[turns]]
+role = "patient"
+text = "I had no idea. I drink at least [[4 cups|four cups]] a day, more when work is busy."
+
+[[turns]]
+role = "clinician"
+text = "Okay, let me take a look. Can you lie back on the table for me?"
+
+[[turns]]
+role = "patient"
+text = "Sure."
+
+[[turns]]
+role = "clinician"
+text = "Your temperature is [[98.6|ninety-eight point six]] and your blood pressure is [[118/74|one eighteen over seventy-four]]. No tenderness over your kidneys, but your belly is a little tender just above the pubic bone."
+gap = 2.5
+
+[[turns]]
+role = "patient"
+text = "Yes, that's where it aches."
+
+[[turns]]
+role = "clinician"
+text = "And your urine test shows white blood cells and nitrites. So this looks like a simple bladder infection. With no fever and no back pain, I'm not worried that it has reached your kidneys."
+gap = 1.0
+
+[[turns]]
+role = "patient"
+text = "That's what I figured. Did I do something to cause it?"
+
+[[turns]]
+role = "clinician"
+text = "Not at all. Bladder infections are very common, and they often happen for no clear reason."
+
+[[turns]]
+role = "patient"
+text = "That's good to know. So what do we do about it?"
+
+[[turns]]
+role = "clinician"
+text = "I'm sending nitrofurantoin to your pharmacy. Take it twice a day with food for [[5 days|five days]], and finish all of it even if you feel better sooner. Drink plenty of water, and cut back on coffee until this clears up."
+
+[[turns]]
+role = "patient"
+text = "How soon should I start to feel better?"
+
+[[turns]]
+role = "clinician"
+text = "Most people feel a lot better within a day or so of starting it."
+
+[[turns]]
+role = "patient"
+text = "Okay. Is there anything I can take for the burning in the meantime?"
+
+[[turns]]
+role = "clinician"
+text = "You can take ibuprofen with food, up to [[3 times|three times]] a day. A heating pad on your lower belly helps too. If the burning isn't better in [[2 days|two days]], or you start to feel sick, call us."
+
+[[turns]]
+role = "patient"
+text = "I will. Thank you so much."
+
+[[turns]]
+role = "clinician"
+text = "You're welcome. I hope you feel better soon."
+
+[gold.subjective]
+value = "It burns every time I pee, and I feel like I have to go all the time. It's been burning since Monday. About every hour during the day, and 2 or 3 times at night. Only a little comes out each time. It's a sharp sting at the very end, and then it eases off. It smells stronger than usual, and it looks a bit cloudy. I haven't seen any blood. No fever. I've felt a bit run down. I do have a dull ache low in my belly. I've been drinking cranberry juice, but it hasn't helped at all. I had the same thing about 3 years ago. I took an antibiotic for a few days and it cleared up. I had my period last week. Just a multivitamin. No allergies that I know of. I have about 3 glasses of water a day, and a lot of coffee at work. I drink at least 4 cups a day, more when work is busy."
+sources = [
+    "It burns every time I pee, and I feel like I have to go all the time",
+    "It's been burning since Tuesday, no wait, since Monday",
+    "About every hour during the day, and 2 or 3 times at night",
+    "only a little comes out each time",
+    "It's a sharp sting at the very end, and then it eases off",
+    "It smells stronger than usual, and it looks a bit cloudy",
+    "I haven't seen any blood",
+    "no fever",
+    "I've felt a bit run down",
+    "I do have a dull ache low in my belly",
+    "I've been drinking cranberry juice, but it hasn't helped at all",
+    "I had the same thing about 3 years ago",
+    "I took an antibiotic for a few days and it cleared up",
+    "I had my period last week",
+    "Just a multivitamin",
+    "no allergies that I know of",
+    "I have about 3 glasses of water a day, and a lot of coffee at work",
+    "I drink at least 4 cups a day, more when work is busy",
+]
+
+[gold.objective]
+value = "Your temperature is 98.6 and your blood pressure is 118/74. No tenderness over your kidneys, but your belly is a little tender just above the pubic bone. Your urine test shows white blood cells and nitrites."
+sources = [
+    "Your temperature is 98.6 and your blood pressure is 118/74",
+    "No tenderness over your kidneys, but your belly is a little tender just above the pubic bone",
+    "your urine test shows white blood cells and nitrites",
+]
+
+[gold.assessment]
+value = "This looks like a simple bladder infection. I'm not worried that it has reached your kidneys."
+sources = [
+    "this looks like a simple bladder infection",
+    "I'm not worried that it has reached your kidneys",
+]
+
+[gold.plan]
+value = "Take it twice a day with food for 5 days, and finish all of it even if you feel better sooner. Drink plenty of water, and cut back on coffee until this clears up. Most people feel a lot better within a day or so of starting it. You can take ibuprofen with food, up to 3 times a day. A heating pad on your lower belly helps too. If the burning isn't better in 2 days, or you start to feel sick, call us."
+sources = [
+    "Take it twice a day with food for 5 days, and finish all of it even if you feel better sooner",
+    "Drink plenty of water, and cut back on coffee until this clears up",
+    "Most people feel a lot better within a day or so of starting it",
+    "You can take ibuprofen with food, up to 3 times a day",
+    "A heating pad on your lower belly helps too",
+    "If the burning isn't better in 2 days, or you start to feel sick, call us",
+]

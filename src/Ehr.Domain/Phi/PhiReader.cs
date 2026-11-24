@@ -28,6 +28,9 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
 {
     public const string PatientsTable = "patients";
 
+    // The reads one page makes through several of these calls, recorded together in one statement (AuditRecorder).
+    public Task<T> TogetherAsync<T>(Func<Task<T>> reads, CancellationToken cancellationToken) => audit.TogetherAsync(reads, cancellationToken);
+
     public async Task<Patient?> PatientAsync(Guid id, string part, CancellationToken cancellationToken)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
@@ -1203,6 +1206,62 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         }
 
         return review;
+    }
+
+    // Ambient listening (step 16). Whether the signed-in clinician is listening to a visit under this session, with its
+    // consent recorded and the review neither staged nor ended: the check every chunk of audio passes before it goes to
+    // the dictation service. How many people its consent said would speak, or null when it isn't. Like IsAssignedAsync,
+    // it shows nothing of the record, so it records no read: the count only holds the voices named to it.
+    public Task<short?> AmbientCaptureAsync(string sessionId, CancellationToken cancel) =>
+        (from r in db.AiNoteReviews
+         join c in db.AmbientConsents on r.ConsentId equals (Guid?)c.Id
+         where r.SessionId == sessionId && r.ClinicianId == user.UserId && r.Mode == AiReviewModes.Ambient
+             && r.State == AiReviewStates.Recording
+         select (short?)c.Speakers).FirstOrDefaultAsync(cancel);
+
+    // Whether a review's conversation is still kept (only while the review is open, and for at most 7 days): what decides
+    // where its proposals may be decided and how. Shows nothing of the transcript, which the cloud app can't read, so it
+    // records no read.
+    public Task<bool> AmbientTranscriptKeptAsync(Guid review, CancellationToken cancel) =>
+        db.AmbientTranscripts.Where(t => t.Id == review).Select(t => t.Id).AnyAsync(cancel);
+
+    // A review and, when it is a visit's whose transcript is still kept, that transcript, in one query: the review page at
+    // the clinic (step 16), one round trip fewer than reading them apart. Each a recorded read of the note being written,
+    // as AiReviewAsync and AmbientTranscriptAsync record them.
+    public async Task<(AiNoteReview? Review, AmbientTranscript? Transcript)> AiReviewWithTranscriptAsync(Guid id, CancellationToken cancel)
+    {
+        var row = await (
+            from review in db.AiNoteReviews.AsNoTracking()
+            where review.Id == id && review.ClinicianId == user.UserId
+            join kept in db.AmbientTranscripts.AsNoTracking() on review.Id equals kept.Id into transcripts
+            from transcript in transcripts.DefaultIfEmpty()
+            select new { review, transcript }).SingleOrDefaultAsync(cancel);
+        if (row is null)
+        {
+            return (null, null);
+        }
+
+        audit.Record(AuditActions.Read, row.review.PatientId, "ai_note_reviews", row.review.Id, part: AuditParts.NoteDraft);
+        if (row.transcript is { } read)
+        {
+            audit.Record(AuditActions.Read, read.PatientId, "ambient_transcripts", read.Id, part: AuditParts.NoteDraft);
+        }
+
+        await db.SaveChangesAsync(cancel);
+        return (row.review, row.transcript);
+    }
+
+    // The conversation's transcript, for the review screen: a recorded read of the note being written.
+    public async Task<AmbientTranscript?> AmbientTranscriptAsync(Guid review, CancellationToken cancel)
+    {
+        var transcript = await db.AmbientTranscripts.AsNoTracking().SingleOrDefaultAsync(t => t.Id == review, cancel);
+        if (transcript is not null)
+        {
+            audit.Record(AuditActions.Read, transcript.PatientId, "ambient_transcripts", transcript.Id, part: AuditParts.NoteDraft);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return transcript;
     }
 
     public async Task<IReadOnlyList<AiNoteReview>> AiReviewsAsync(Guid draft, string part, CancellationToken cancel)

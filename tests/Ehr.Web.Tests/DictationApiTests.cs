@@ -501,6 +501,8 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, stopped.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
         Assert.Equal("stopped", await ErrorAsync(late));
+        // A dictation's words; a visit's recording says it was stopped (TC-UC23-04).
+        Assert.Equal("This dictation has stopped, so it takes no more audio.", (string?)(await JsonAsync(late))["message"]);
     }
 
     // Also TC-UC9-03 (FR-10): audio that can't be decoded is refused, 422. The primary test is the sidecar's test_sessions.py.
@@ -551,7 +553,7 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
 
     // Every answer the real service gives, pinned in src/Ehr.Dictation/contract by the service's own tests from its own
     // code, is read and passed on: none is refused as a bad answer, each keeps its status and code (a refused key is
-    // this API's 503), and a result keeps its sorting.
+    // this API's 503), and a result keeps its sorting. A visit's (the expansion plan's step 16) through its own routes.
     [Theory]
     [MemberData(nameof(ContractAnswers))]
     public async Task Every_answer_the_real_service_gives_is_read_and_passed_on(string name)
@@ -559,18 +561,12 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         var contract = JsonNode.Parse(await File.ReadAllTextAsync(ContractFile(name), Cancel))!;
         var status = (int)contract["status"]!;
         var body = contract["body"];
-        service.Answer = ((HttpStatusCode)status, body?.ToJsonString() ?? "");
-        var page = await OpenAsync(apps, apps.OnPrem);
+        var answer = ((HttpStatusCode)status, body?.ToJsonString() ?? "");
+        var route = (string?)contract["route"] ?? "";
 
-        using var response = (string?)contract["route"] switch
-        {
-            "start" => await SendAsync(page, HttpMethod.Post, Sessions),
-            "audio" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/audio?seq=0", Audio([1, 2, 3])),
-            "stop" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/stop"),
-            "result" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result"),
-            "cancel" => await SendAsync(page, HttpMethod.Delete, $"{Sessions}/{SomeSessionId}"),
-            var route => throw new InvalidOperationException($"{name}.json has a route this test doesn't know: {route}."),
-        };
+        using var response = route.EndsWith("-ambient", StringComparison.Ordinal)
+            ? await AskForAVisitAsync(route, answer)
+            : await AskAsync(name, route, answer);
 
         Assert.NotEqual(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(status == 401 ? 503 : status, (int)response.StatusCode);
@@ -589,7 +585,90 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal((string?)sorting, (string?)answered["sorting"]);
             Assert.Equal((string?)body["transcript"]!["text"], (string?)answered["transcript"]!["text"]);
+            if ((string?)body["reason"] == "model_busy")
+            {
+                Assert.Equal(DictationResult.BusyMessage, (string?)answered["message"]);
+            }
         }
+    }
+
+    async Task<HttpResponseMessage> AskAsync(string name, string route, (HttpStatusCode, string) answer)
+    {
+        service.Answer = answer;
+        var page = await OpenAsync(apps, apps.OnPrem);
+        return route switch
+        {
+            "start" => await SendAsync(page, HttpMethod.Post, Sessions),
+            "audio" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/audio?seq=0", Audio([1, 2, 3])),
+            "stop" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/stop"),
+            "result" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result"),
+            "cancel" => await SendAsync(page, HttpMethod.Delete, $"{Sessions}/{SomeSessionId}"),
+            _ => throw new InvalidOperationException($"{name}.json has a route this test doesn't know: {route}."),
+        };
+    }
+
+    // A visit's routes (AmbientApi.cs) take a visit the clinician is listening to, with its consent and binding, so the
+    // visit starts first and the pinned answer is set after; a start's is the answer to the start.
+    async Task<HttpResponseMessage> AskForAVisitAsync(string route, (HttpStatusCode, string) answer)
+    {
+        const string Listen = DictationApi.AmbientPath;
+        if (route == "start-ambient")
+        {
+            var (session, patient, token) = await AmbientFlows.OpenAsync(apps);
+            service.Answer = answer;
+            return await AmbientFlows.Post(session.Client, token, $"{Listen}/start", AmbientFlows.Consent(Guid.NewGuid(), patient));
+        }
+
+        if (route == "cancel-ambient")
+        {
+            var page = await OpenAsync(apps, apps.OnPrem);
+            service.Answer = answer;
+            return await SendAsync(page, HttpMethod.Delete, $"{Listen}/{SomeSessionId}");
+        }
+
+        var visit = await AmbientFlows.StartAsync(apps);
+        service.Answer = answer;
+        var path = $"{Listen}/{visit.SessionId}";
+        return route switch
+        {
+            "audio-ambient" => await AmbientFlows.Audio(visit, 0),
+            "stop-ambient" => await AmbientFlows.Post(visit.Session.Client, visit.Token, $"{path}/stop"),
+            "speakers-ambient" => await AmbientFlows.Post(visit.Session.Client, visit.Token, $"{path}/speakers",
+                new { speakers = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient" } }),
+            "result-ambient" => await AmbientFlows.Post(visit.Session.Client, visit.Token, $"{path}/result"),
+            _ => throw new InvalidOperationException($"A contract file has a route this test doesn't know: {route}."),
+        };
+    }
+
+    // An empty field's reason codes are one list in three places, so none drifts: the service's (validation.py's REASONS),
+    // the contract's (EmptyField.Codes, which a visit's are held to as it is staged), and the database's guard on a
+    // visit's stored result (db/policies/56-ambient-listening.sql).
+    [Fact]
+    public async Task An_empty_fields_reasons_are_the_services_own_codes_in_the_contract_and_the_database()
+    {
+        static List<string> Quoted(string text) => [.. System.Text.RegularExpressions.Regex.Matches(text, "\"([a-z_]+)\"").Select(m => m.Groups[1].Value)];
+        var service = await File.ReadAllTextAsync(RepositoryRoot.Combine("src/Ehr.Dictation/sidecar/ehr_dictation/validation.py"), Cancel);
+        var reasons = System.Text.RegularExpressions.Regex.Match(service, @"(?m)^REASONS = \((.*?)^\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(reasons.Success, "validation.py has no REASONS.");
+        Assert.Equal(Quoted(reasons.Groups[1].Value), EmptyField.Codes);
+
+        var policies = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/56-ambient-listening.sql"), Cancel);
+        var guarded = System.Text.RegularExpressions.Regex.Match(policies, @"WHERE r NOT IN \((.*?)\)\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(guarded.Success, "56-ambient-listening.sql holds no list of reasons.");
+        Assert.Equal(EmptyField.Codes, Quoted(guarded.Groups[1].Value));
+    }
+
+    // Why fields couldn't be sorted, in the contract (SortingFailure) and in the database's guard on a visit's stored
+    // result: the same list, so a reason the service adds can't be staged by one and refused by the other.
+    [Fact]
+    public async Task The_reasons_fields_couldnt_be_sorted_are_the_contracts_in_the_database_too()
+    {
+        var policies = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/56-ambient-listening.sql"), Cancel);
+        var guarded = System.Text.RegularExpressions.Regex.Match(policies, @"result -> 'reason' IN \((.*?)\)\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(guarded.Success, "56-ambient-listening.sql holds no list of sorting failures.");
+        Assert.Equal(
+            Enum.GetValues<SortingFailure>().Select(reason => JsonSerializer.Serialize(reason).Trim('"')),
+            System.Text.RegularExpressions.Regex.Matches(guarded.Groups[1].Value, "\"([a-z_]+)\"").Select(m => m.Groups[1].Value));
     }
 
     // From a dictation in Spanish, a number that reads two ways ("5.000 unidades") is refused by the service, not warned

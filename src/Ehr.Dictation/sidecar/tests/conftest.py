@@ -172,6 +172,53 @@ MODELS = Models(
 WHISPER = {"repository": "openai/whisper-large-v3-turbo", "commit": "41f01f3fe87f28c78e2fbf8b568835947dd65ed9",
            "sha256": "e" * 64}
 MODELS_WITH_WHISPER = Models(MODELS.speech, MODELS.language, WHISPER)
+# With the speaker model a visit's voices are told apart with (the expansion plan's step 16).
+LISTENING_MODELS = Models(
+    speech=MODELS.speech, language=MODELS.language,
+    speaker={"repository": "speechbrain/spkrec-ecapa-voxceleb", "commit": "e" * 40, "sha256": "f" * 64},
+)
+
+# ---- A recorded visit (the expansion plan's step 16) ---------------------------------------------------------------
+# Tones stand in for voices, never a voice: a pitch each, which the stand-in speaker model hears as a direction and the
+# stand-in MedASR as one thing that voice says.
+
+PITCHES = {"clinician": 220.0, "patient": 440.0, "other": 660.0}
+SAYS = {
+    "clinician": "Your chest is clear {period}",
+    "patient": "I have had a cough for three days {period}",
+    "other": "She coughs at night {period}",
+}
+
+
+class PitchEmbedder:
+    """Stands in for the speaker model: how loud each voice's pitch is in a window."""
+
+    def embed(self, windows: np.ndarray) -> np.ndarray:
+        spectrum = np.abs(np.fft.rfft(windows, axis=1))
+        bins = np.fft.rfftfreq(windows.shape[1], 1 / SAMPLE_RATE)
+        return np.stack([spectrum[:, (bins > p - 20) & (bins < p + 20)].sum(axis=1) for p in PITCHES.values()], axis=1) + 1e-3
+
+
+class PitchRecognizer(FakeRecognizer):
+    """Stands in for MedASR in a visit: hears what the passage's loudest voice says (SAYS)."""
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        if self.hold is not None:
+            self.hold.wait(10)
+        self.calls.append(samples.size)
+        spectrum = np.abs(np.fft.rfft(samples))
+        bins = np.fft.rfftfreq(samples.size, 1 / SAMPLE_RATE)
+        loudest = max(PITCHES, key=lambda who: spectrum[(bins > PITCHES[who] - 20) & (bins < PITCHES[who] + 20)].sum())
+        return Recognition(SAYS[loudest], self.confidence)
+
+
+def visit(*turns: str, seconds: float = 3.0, pause: float = 0.75) -> np.ndarray:
+    """Each turn, a voice's pitch for `seconds`, with a pause after it, over a quiet room."""
+    pieces = []
+    for who in turns:
+        pieces += [tone(seconds, frequency=PITCHES[who]), np.zeros(int(pause * SAMPLE_RATE), np.float32)]
+    samples = np.concatenate(pieces)
+    return samples + noise(samples.size / SAMPLE_RATE, -70)
 
 
 @pytest.fixture

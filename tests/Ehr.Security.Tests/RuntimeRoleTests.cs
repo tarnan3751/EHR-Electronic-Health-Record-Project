@@ -109,6 +109,12 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // (ExpectedColumnPrivileges).
         [("ehr_app", "ai_chart_proposals")] = ["SELECT", "INSERT"],
         [("ehr_read", "ai_chart_proposals")] = ["SELECT"],
+        // Step 16: a consent is a record; a transcript is written as its review is staged and deleted as it is finished. The
+        // cloud app's role sees only that a transcript exists (ExpectedColumnPrivileges).
+        [("ehr_app", "ambient_consents")] = ["SELECT", "INSERT"],
+        [("ehr_read", "ambient_consents")] = ["SELECT"],
+        [("ehr_app", "ambient_transcripts")] = ["SELECT", "INSERT", "DELETE"],
+        [("ehr_read", "ambient_transcripts")] = [],
         [("ehr_app", "clinical_notes")] = ["SELECT", "INSERT"],
         [("ehr_read", "clinical_notes")] = ["SELECT"],
         [("ehr_app", "note_addenda")] = ["SELECT", "INSERT"],
@@ -327,6 +333,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.
         [("ehr_app", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
         [("ehr_read", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
+        // Step 16: that a conversation's transcript exists, never the transcript.
+        [("ehr_read", "ambient_transcripts", "SELECT")] = ["created_at", "id", "patient_id", "sensitive"],
     };
 
     async Task AssertExactPrivilegesAsync()

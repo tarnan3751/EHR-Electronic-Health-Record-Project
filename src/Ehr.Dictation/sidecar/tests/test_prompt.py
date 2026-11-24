@@ -126,3 +126,44 @@ def test_the_spanish_prompts_example_of_a_correction_is_an_answer_the_checks_off
 
 def one_passage(text: str) -> Transcript:
     return Transcript(text, (Placed(Segment(0, 0, text, 1.0, None, True), 0, len(text)),), True)
+
+
+# ---- A recorded visit's conversation (the expansion plan's step 16) -------------------------------------------------
+
+CONVERSATION = prompt.load_conversation()
+# What the two prompts say alike, in the dictation prompt's words.
+SHARED = (
+    "The transcript is in the user message, between <transcript> and </transcript>.",
+    "You may leave words out, but never the words just before a number, and add only \"a\", \"an\" or \"the\".",
+    "copy every number, unit, date, drug name, dose and abbreviation exactly as transcribed, don't spell out abbreviations",
+    "The clinician does those in the chart; they are not part of the note.",
+    "Every fact in the value must be in one of its sources. Never quote [unclear].",
+    "Answer with one JSON object and nothing else:\n",
+)
+
+
+def test_the_conversation_prompt_shares_the_dictation_prompts_words_and_schema():
+    dictation = prompt.load()
+
+    for sentence in SHARED:
+        assert sentence in dictation.system and sentence in CONVERSATION.system, sentence
+    assert dictation.system.splitlines()[-1] == CONVERSATION.system.splitlines()[-1], "the same answer"
+    for name, field in CONVERSATION.schema["properties"].items():
+        assert f"- {name}: {field['description']}\n" in CONVERSATION.system, name
+    assert CONVERSATION.schema == dictation.schema
+    # The same parameters but the answer's length: a window's answer ends well within its 90 seconds.
+    assert CONVERSATION.parameters == dictation.parameters | {"max_tokens": 1100}
+    assert dictation.parameters["max_tokens"] == 2048, "dictation's own is unchanged"
+
+
+def test_the_conversation_prompt_names_the_roles_its_lines_are_led_by_and_isnt_sent_its_comment():
+    from ehr_dictation import conversation
+
+    assert all(f'"{label}:"' in CONVERSATION.system for label in conversation.LABELS.values())
+    assert CONVERSATION.system.startswith("You sort part of the transcript of a conversation between a clinician and a patient")
+    assert "<!--" not in CONVERSATION.system and "human review" not in CONVERSATION.system
+
+
+def test_the_conversation_has_a_structuring_hash_of_its_own():
+    assert CONVERSATION.structuring_sha256 != prompt.load().structuring_sha256
+    assert CONVERSATION.schema_sha256 == prompt.load().schema_sha256

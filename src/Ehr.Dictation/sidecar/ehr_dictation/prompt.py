@@ -2,7 +2,11 @@
 format llama-server enforces (FR-11). Human-reviewed, with the files it reads (AGENTS.md).
 
 The prompt and the schema live in src/Ehr.Dictation/schema, beside this package in the repository and in the image.
-The prompt file's opening <!-- comment --> and the schema's $schema and $comment are for people and are not sent.
+The prompt file's opening <!-- comment --> and the schema's $schema and $comment are for people and are not sent. A
+recorded visit's conversation (the expansion plan's step 16) is drafted with its own prompt, conversation-prompt.md,
+the same schema, and the same parameters but a shorter answer (CONVERSATION_PARAMETERS: a window's answer, at about 20
+tokens a second, ends within about 55 seconds), loaded with load_conversation(), so it has a structuring hash of its
+own and dictation's doesn't change.
 
 The transcript is untrusted input: it goes between <transcript> markers, any marker inside it is neutralized, and the
 prompt says to treat all of it as dictation. Passages marked unclear arrive as [unclear] (transcript.py).
@@ -33,6 +37,7 @@ FIELDS = ("subjective", "objective", "assessment", "plan")
 
 SCHEMA_DIRECTORY = Path(__file__).resolve().parents[2] / "schema"
 PROMPT_FILE = "structuring-prompt.md"
+CONVERSATION_PROMPT_FILE = "conversation-prompt.md"
 SCHEMA_FILE = "note-fields.schema.json"
 # Each dictation language's prompt and schema: English as above, Spanish translated into the same fields.
 LANGUAGES = {"en": (PROMPT_FILE, SCHEMA_FILE), "es": ("structuring-prompt-es.md", "note-fields-es.schema.json")}
@@ -43,6 +48,7 @@ PARAMETERS = {
     "max_tokens": 2048,
     "reasoning_effort": "none",
 }
+CONVERSATION_PARAMETERS = PARAMETERS | {"max_tokens": 1100}
 USER_TEMPLATE = "<transcript>\n{transcript}\n</transcript>"
 
 HEADER = re.compile(r"\A\s*<!--.*?-->\s*", re.DOTALL)
@@ -75,10 +81,12 @@ class Structuring:
         }
 
 
-def load(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None, language: str = "en") -> Structuring:
+def load(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None, language: str = "en",
+         prompt_file: str | None = None) -> Structuring:
     """The prompt and schema as sent for a dictation in `language` ("en" or "es"), with PARAMETERS unless the eval asks
-    for others to compare."""
-    prompt_file, schema_file = LANGUAGES[language]
+    for others to compare; a visit's prompt in place of the language's when it names one (load_conversation())."""
+    language_prompt, schema_file = LANGUAGES[language]
+    prompt_file = prompt_file or language_prompt
     parameters = dict(PARAMETERS if parameters is None else parameters)
     system = HEADER.sub("", (directory / prompt_file).read_text(encoding="utf-8")).strip()
     schema = json.loads((directory / schema_file).read_text(encoding="utf-8"))
@@ -95,6 +103,12 @@ def load(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None, lan
         ),
         language=language,
     )
+
+
+def load_conversation(directory: Path = SCHEMA_DIRECTORY, parameters: dict | None = None) -> Structuring:
+    """A recorded visit's: conversation-prompt.md, with CONVERSATION_PARAMETERS unless the eval asks for others."""
+    return load(directory, CONVERSATION_PARAMETERS if parameters is None else parameters,
+                prompt_file=CONVERSATION_PROMPT_FILE)
 
 
 def _canonical(value: object) -> str:

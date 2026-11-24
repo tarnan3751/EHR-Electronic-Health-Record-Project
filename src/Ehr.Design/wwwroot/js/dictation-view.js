@@ -23,12 +23,21 @@ window.SwiftChartDictationView = class {
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
             // Its Spanish words are marked as Spanish where it is shown (warningNote).
             ambiguous_frequency: "“Cada tercer día” can mean every other day or every third day: check which you meant.",
+            // A recorded visit's (the expansion plan's step 16).
+            speaker_unsure: "Who said this couldn't be told with confidence: check the highlighted words.",
+            other_speaker: "Someone else in the room said this: check that it is about the patient.",
+            patients_own_words: "In the patient's own words. Reword it as your note before you accept it.",
+            part_not_offered: "Part of the visit had something for this section that didn't pass the checks: read the highlighted part.",
         };
+        // Who said each passage of a recorded visit, in words beside it, never by colour alone.
+        const speakerWords = { clinician: "Clinician", patient: "Patient", other: "Other person", unsure: "Unsure" };
         const instructionWords = { order: "Order", allergy_change: "Allergy change" };
         // Those the dictation proposes (the expansion plan's step 15). The review lists them apart, with their actions, and
         // its not-carried-over list leaves them out; the dictation page marks them in its list, read-only.
         const proposalWords = { order: "Proposed order", allergy_addition: "Proposed allergy to add" };
         const listedApart = root.querySelector("[data-chart-proposals]") !== null;
+        // A recorded visit's review off-site: its words are read only at the clinic, so none is quoted or highlighted here.
+        const wordsAtTheClinic = root.dataset.dictationWordsAtTheClinic === "true";
 
         // A field's status as a tag (docs/brand: Tag): the words say it, the tone only supports them.
         function setStatus(status, text, tone) {
@@ -71,10 +80,35 @@ window.SwiftChartDictationView = class {
             }
 
             const sorted = [...points].sort((a, b) => a - b);
-            const paragraph = element("p");
+            // A recorded visit's transcript is a paragraph a turn, each led by who said it; a dictation's, one paragraph.
+            const turns = segments.some((s) => s.speaker);
+            const paragraphs = [];
+            let paragraph = element("p");
+            let speaker = null;
             for (let i = 0; i + 1 < sorted.length; i++) {
                 const [from, to] = [sorted[i], sorted[i + 1]];
                 const segment = segments.find((s) => s.start <= from && to <= s.end);
+                // Between two passages: where the speaker changes, the line break that ends a turn, dropped as the next
+                // turn starts a paragraph of its own; inside a turn, the space the service joins one voice's passages
+                // with, kept as a space, or the turn's words would run together ("clear.Likely").
+                if (turns && !segment && !text.slice(from, to).trim()) {
+                    if (speaker !== null && segments.find((s) => s.start >= to)?.speaker === speaker) {
+                        paragraph.append(document.createTextNode(" "));
+                    }
+
+                    continue;
+                }
+
+                if (turns && segment && segment.speaker !== speaker) {
+                    if (paragraph.childNodes.length > 0) {
+                        paragraphs.push(paragraph);
+                    }
+
+                    speaker = segment.speaker;
+                    paragraph = element("p", undefined, "sc-transcript__turn");
+                    paragraph.append(element("span", speakerWords[speaker] ?? "Unsure", "sc-transcript__speaker"), document.createTextNode(" "));
+                }
+
                 const highlighted = highlights.some((h) => h.start <= from && to <= h.end);
                 let node = document.createTextNode(text.slice(from, to));
                 if (segment?.unclear) {
@@ -109,7 +143,7 @@ window.SwiftChartDictationView = class {
                 paragraph.append(node);
             }
 
-            transcriptArea.replaceChildren(paragraph);
+            transcriptArea.replaceChildren(...paragraphs, paragraph);
             unclearNotice.hidden = !segments.some((s) => s.unclear);
         }
 
@@ -128,7 +162,8 @@ window.SwiftChartDictationView = class {
             } else if (result.sorting === "unavailable") {
                 sortMessage.textContent = result.message || "The fields couldn't be sorted, so the transcript is kept as plain text.";
             } else {
-                sortMessage.textContent = "Each proposed field is awaiting your review. Select one to see the words it came from.";
+                sortMessage.textContent = wordsAtTheClinic ? "Each proposed field is awaiting your review."
+                    : "Each proposed field is awaiting your review. Select one to see the words it came from.";
             }
 
             for (const name of fieldNames) {
@@ -139,16 +174,22 @@ window.SwiftChartDictationView = class {
             const items = (result.notCarriedOver ?? []).filter((item) => !(listedApart && proposed.has(`${item.start}:${item.end}`)));
             notCarried.hidden = items.length === 0;
             notCarriedList.replaceChildren(...items.map((item) => {
-                const text = (result.transcript?.text ?? "").slice(item.start, item.end);
+                // A recorded visit's review answers a decision without its transcript: the one shown stays.
+                const text = ((result.transcript ?? state.transcript)?.text ?? "").slice(item.start, item.end);
                 const kind = proposed.get(`${item.start}:${item.end}`);
                 const li = element("li");
                 // In a dictation in Spanish, the words quoted are Spanish (step 17).
-                const quote = spanish ? element("span", `“${text}”`) : document.createTextNode(`“${text}”`);
-                if (spanish) {
+                const quote = wordsAtTheClinic ? document.createTextNode("Its words can be read only at the clinic.")
+                    : spanish ? element("span", `“${text}”`) : document.createTextNode(`“${text}”`);
+                if (spanish && !wordsAtTheClinic) {
                     quote.lang = "es";
                 }
 
                 li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), quote);
+                // A recorded visit's (step 16): an instruction said where who spoke couldn't be told.
+                if (item.speaker === "unsure") {
+                    li.append(document.createTextNode(" Said in a passage whose speaker couldn't be told."));
+                }
                 highlightOnFocus(li, [item]);
                 return li;
             }));
@@ -176,6 +217,12 @@ window.SwiftChartDictationView = class {
                     control.onfocus = () => renderTranscript(state.transcript, field.sources ?? []);
                     control.onblur = () => renderTranscript(state.transcript);
                 }
+                // A recorded visit's: who said the words it came from, which stays when the transcript has gone.
+                const saidBy = [...new Set((field.sources ?? []).map((source) => source.speaker).filter(Boolean))];
+                if (saidBy.length > 0) {
+                    value.append(element("p", `Said by: ${saidBy.map((speaker) => speakerWords[speaker] ?? "Unsure").join(", ")}.`, "sc-proposal__message"));
+                }
+
                 for (const warning of field.warnings ?? []) {
                     const note = warningNote(warning.code);
                     highlightOnFocus(note, [warning]);

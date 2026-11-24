@@ -184,7 +184,7 @@ async def live_chunks(data: bytes, seconds: float, pipeline: Pipeline) -> Live:
     sessions = Sessions(settings, pipeline.medasr, pipeline.english, pipeline.models,
                         spanish=Spanish(pipeline.whisper, pipeline.spanish))
     lock = sessions._transcribing = TimedLock()  # noqa: SLF001 (the eval's instrument in the sidecar's own lock's place)
-    session = sessions.start("eval", "es")
+    session = sessions.start("eval", language="es")
     size = max(1, int(len(data) / max(seconds, 1.0)))
     live = Live()
     for seq, offset in enumerate(range(0, len(data), size)):

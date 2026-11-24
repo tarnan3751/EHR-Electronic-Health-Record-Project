@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Ehr.Data;
@@ -195,6 +196,10 @@ internal static partial class RenderBenchmark
                 // allergy form opened from them; and its editor, which says they wait. A generator of its own.
                 var proposed = await DictateProposalsAsync(app, clinicianId, noted);
                 results.AddRange(await MeasureProposalsAsync(client, times, "", proposed));
+                // A recorded visit (step 16): for each of those patients, a 20-minute conversation's review, with its transcript
+                // kept apart, staged through the app's own service.
+                var visits = await ListenToVisitsAsync(app, clinicianId, noted);
+                results.AddRange(await MeasureVisitReviewsAsync(client, times, "", visits));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -290,7 +295,7 @@ internal static partial class RenderBenchmark
                     {
                         await SettleAsync(database);
                         var (offSite, reviewed) = await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills, forms, drafted, proposed, () => StageReviewsAsync(app, clinicianId, noted));
+                            refills, forms, drafted, proposed, visits, () => StageReviewsAsync(app, clinicianId, noted));
                         results.AddRange(offSite);
                         results.AddRange(await MeasureReviewsAsync(client, times, "", reviewed));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
@@ -416,6 +421,8 @@ internal static partial class RenderBenchmark
             await MeasureAsync(client, times, prefix + $"Inbox, {InboxSize} items", typing: false, () => "/inbox"),
             // Vital signs (step 9): the flowsheet and its trend charts, drawn by the server.
             await MeasureAsync(client, times, prefix + "Vital signs, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}/vitals"),
+            // Step 16: listening to a visit, its consent first; off-site, the page that says it works only at the clinic.
+            await MeasureAsync(client, times, prefix + "Listen to the visit, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}/listen"),
             // Step 9b: the page that marks a set's readings entered in error, for a seeded visit's set.
             await MeasureAsync(client, times, prefix + "Mark vital signs in error form, a patient on the panel", typing: false, () =>
             {
@@ -485,7 +492,7 @@ internal static partial class RenderBenchmark
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
         CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms,
-        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, Func<Task<List<Reviewed>>> stageReviews)
+        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, List<Listened> visits, Func<Task<List<Reviewed>>> stageReviews)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -542,6 +549,8 @@ internal static partial class RenderBenchmark
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
             // A dictation's proposals (step 15), read from the cloud copy: opening or dismissing one says why it can't.
             results.AddRange(await MeasureProposalsAsync(client, times, "Off-site, ", proposed));
+            // A recorded visit's review (step 16), read from the cloud copy: without its transcript, which is read at the clinic.
+            results.AddRange(await MeasureVisitReviewsAsync(client, times, "Off-site, ", visits));
             // Pre-visit forms (step 13e): the clinician's pages, read from the cloud copy; asking says why it can't.
             results.AddRange(await MeasureFormsAsync(client, times, "Off-site, ", forms));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
@@ -1376,6 +1385,84 @@ internal static partial class RenderBenchmark
         return proposed;
     }
 
+    // A recorded visit's review (step 16).
+    sealed record Listened(Guid Patient, Guid Draft, Guid Review);
+
+    // Step 16: for each patient, a new draft from a 20-minute recorded visit, begun with its consent and staged through the
+    // app's own service and the database's rules, as the Listen page does: 3,000 words or so (150 a minute), kept apart,
+    // and a value proposed for each of the four fields from who said it. The dictation service cuts its transcript into a
+    // segment at the first pause of at least 0.4 seconds after at least a second (segmenter.py), and a conversation pauses
+    // that long every couple of seconds, between phrases and at each turn: 20 minutes is about 600 segments of 2 seconds,
+    // here in 200 turns of three, five words each.
+    static async Task<List<Listened>> ListenToVisitsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        var text = new StringBuilder();
+        var segments = new List<Ehr.Web.Api.Dictation.TranscriptSegment>();
+        for (var passage = 0; passage < 600; passage++)
+        {
+            var turn = passage / 3;
+            var (speaker, words) = turn % 2 == 0
+                ? (Ehr.Web.Api.Dictation.Speaker.Clinician, $"Synthetic question {turn}, part {passage % 3}.")
+                : (Ehr.Web.Api.Dictation.Speaker.Patient, $"Synthetic answer {turn}, part {passage % 3}.");
+            text.Append(passage == 0 ? "" : passage % 3 == 0 ? "\n" : " ");
+            segments.Add(new(text.Length, text.Length + words.Length, passage * 2000L, passage * 2000L + 1800, true, null, 1 + turn % 2, speaker));
+            text.Append(words);
+        }
+
+        // From the patient's first passage, and the clinician's.
+        Ehr.Web.Api.Dictation.PendingField Field(int passage) => new(
+            text.ToString(segments[passage].Start, segments[passage].End - segments[passage].Start),
+            [new(segments[passage].Start, segments[passage].End, segments[passage].Speaker)], []);
+        var fields = new Ehr.Web.Api.Dictation.NoteFields(Field(3), Field(0), Field(6), Field(12));
+        var transcript = new Ehr.Web.Api.Dictation.Transcript(text.ToString(), true, segments);
+        var result = new Ehr.Web.Api.Dictation.DictationResult(transcript with { Text = "", Segments = [] }, Ehr.Web.Api.Dictation.Sorting.Done, fields, [],
+            new Ehr.Web.Api.Dictation.Provenance(new("synthetic", "0", "0"), null, null, "synthetic", "synthetic", "synthetic", "synthetic"));
+        var trusted = new Ehr.Domain.Notes.TrustedReviewResult(JsonSerializer.Serialize(result, JsonSerializerOptions.Web),
+            new Dictionary<string, string>
+            {
+                ["subjective"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Subjective).Value,
+                ["objective"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Objective).Value,
+                ["assessment"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Assessment).Value,
+                ["plan"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Plan).Value,
+            },
+            [], JsonSerializer.Serialize(transcript, JsonSerializerOptions.Web));
+
+        var listened = new List<Listened>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var reviews = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.NoteReviews>();
+        await using var dbTransaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, _) in noted)
+        {
+            var begun = await reviews.BeginAsync(Guid.NewGuid(), patient, null, null, Guid.NewGuid().ToString("N"), 1200, 1024 * 1024,
+                CancellationToken.None, new Ehr.Domain.Notes.AmbientStart(2, AmbientConsentGivers.Patient));
+            if (begun.Status != 201 || begun.Review is not { } review
+                || (await reviews.StageAsync(review.Id, begun.Version!.Value, trusted, CancellationToken.None)).Status != 200)
+            {
+                throw new InvalidOperationException("The benchmark's recorded visit was refused.");
+            }
+
+            listened.Add(new(patient, review.DraftId, review.Id));
+        }
+
+        await dbTransaction.CommitAsync();
+        return listened;
+    }
+
+    static async Task<List<Result>> MeasureVisitReviewsAsync(HttpClient client, DatabaseTimes times, string site, List<Listened> visits)
+    {
+        var random = new Random(20261128);
+        return
+        [
+            await MeasureAsync(client, times, $"{site}Note review of a 20-minute recorded visit, a patient on the panel", typing: false, () =>
+            {
+                var one = visits[random.Next(visits.Count)];
+                return $"/patients/{one.Patient}/notes/drafts/{one.Draft}/review/{one.Review}";
+            }),
+        ];
+    }
+
     static async Task<List<Result>> MeasureProposalsAsync(HttpClient client, DatabaseTimes times, string site, List<Proposed> proposed)
     {
         var random = new Random(20261127);
@@ -2050,6 +2137,8 @@ internal static partial class RenderBenchmark
             builder
                 .UseContentRoot(RepositoryRoot.Combine("src/Ehr.Web"))
                 .UseSetting("Ehr:Site", "OnPrem")
+                // Listening to a visit is off unless switched on; on here, as the visit's review is measured.
+                .UseSetting("Ehr:Ambient:Enabled", "true")
                 .UseSetting("Logging:LogLevel:Default", "Warning")
                 .UseSetting("Logging:LogLevel:Microsoft.AspNetCore.DataProtection", "Critical")
                 .ConfigureTestServices(services =>
@@ -2089,6 +2178,7 @@ internal static partial class RenderBenchmark
                 .UseContentRoot(RepositoryRoot.Combine("src/Ehr.Web"))
                 .UseEnvironment(Environments.Production)
                 .UseSetting("Ehr:Site", "Cloud")
+                .UseSetting("Ehr:Ambient:Enabled", "true")
                 .UseSetting("ConnectionStrings:Ehr", connectionString)
                 .UseSetting("Ehr:OnPrem:Url", OnPremUrl)
                 .UseSetting("Ehr:CloudAudit:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))

@@ -16,7 +16,7 @@ namespace Ehr.Web.Tests;
 // transcript of one made-up sentence per chunk, and note fields sorted from it. It answers as the service does, error bodies with their detail included, and records every request
 // it gets. The switches make it fail the ways the service can, or propose more of the note's fields. The tests that
 // drive it run one at a time, and each starts it afresh.
-public sealed class DictationSidecarStub : HttpMessageHandler
+public sealed partial class DictationSidecarStub : HttpMessageHandler
 {
     public const string Url = "https://dictation.test";
 
@@ -122,6 +122,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         Slow = false;
         Undecodable = false;
         Answer = null;
+        QuietSeconds = 0;
+        ExtraVoice = false;
         return this;
     }
 
@@ -154,6 +156,13 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
         var owner = headers[DictationSidecar.OwnerHeader];
         var path = request.RequestUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // Listening to a visit (step 16), with its sessions' own answers: DictationSidecarStub.Ambient.cs.
+        var ambient = headers.TryGetValue(DictationSidecar.ModeHeader, out var mode) && mode == "ambient";
+        if (path is ["v1", "sessions"] && request.Method == HttpMethod.Post && ambient)
+        {
+            return StartAmbient(owner, request.RequestUri.Query);
+        }
+
         if (path is ["v1", "sessions"] && request.Method == HttpMethod.Post)
         {
             // As the service reads it: no body is English, otherwise {"spokenLanguage": "en" or "es"} and nothing else.
@@ -184,13 +193,19 @@ public sealed class DictationSidecarStub : HttpMessageHandler
             return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
         }
 
-        if (path is not ["v1", "sessions", var sessionId, ..] || !sessions.TryGetValue(sessionId, out var session) || session.Owner != owner)
+        if (path is not ["v1", "sessions", var sessionId, ..] || !sessions.TryGetValue(sessionId, out var session) || session.Owner != owner
+            || session.Ambient != ambient)
         {
             return Error(HttpStatusCode.NotFound, "not_found");
         }
 
         lock (session)
         {
+            if (session.Ambient)
+            {
+                return AmbientAnswer(sessionId, session, path, request.Method.Method, request.RequestUri.Query, body);
+            }
+
             switch (path, request.Method.Method)
             {
                 case ([_, _, _, "audio"], "POST"):
@@ -212,7 +227,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
                     }
 
                     session.Chunks++;
-                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, audioSeconds = session.Chunks * 2.0, transcript = Transcript(session, Spoken(session)) });
+                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, audioSeconds = session.Chunks * 2.0, transcript = Transcript(session, SentencesFor(session)) });
 
                 case ([_, _, _, "stop"], "POST"):
                     if (Undecodable)
@@ -239,7 +254,7 @@ public sealed class DictationSidecarStub : HttpMessageHandler
 
     bool InSpanish(StubSession session) => Spanish || session.Spanish;
 
-    string[] Spoken(StubSession session) => InSpanish(session) ? SpanishSentences : Sentences;
+    string[] SentencesFor(StubSession session) => InSpanish(session) ? SpanishSentences : Sentences;
 
     static string Text(StubSession session, string[] sentences) =>
         string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => sentences[chunk % sentences.Length]));
@@ -524,7 +539,8 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         return Json(status, body);
     }
 
-    sealed class StubSession(string owner, bool spanish, int maxSeconds)
+    // A dictation's, in its language, or a visit's (English, its limit its own).
+    sealed class StubSession(string owner, bool spanish = false, int maxSeconds = 180)
     {
         public string Owner { get; } = owner;
 
@@ -535,6 +551,16 @@ public sealed class DictationSidecarStub : HttpMessageHandler
         public int Chunks { get; set; }
 
         public bool Stopped { get; set; }
+
+        // Listening to a visit (step 16): how many voices it was told to expect, and who the clinician said each is.
+        public bool Ambient { get; init; }
+
+        public int Speakers { get; init; }
+
+        // How many voices it tells apart: Speakers, or one more (ExtraVoice).
+        public int Voices { get; init; }
+
+        public IReadOnlyDictionary<int, string>? Roles { get; set; }
     }
 }
 
@@ -548,6 +574,9 @@ public enum StubSorting
     Timeout,
 
     Unavailable,
+
+    // A recorded visit the service was too busy to draft: unavailable, with model_busy (step 16).
+    Busy,
 
     Discarded,
 }

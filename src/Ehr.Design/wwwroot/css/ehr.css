@@ -578,6 +578,16 @@
         padding: 0 var(--space-3);
     }
 
+    /* A button whose words can be longer than a phone is wide wraps them, instead of running past the window's edge: a
+       recorded visit's "Reject every proposal and delete the conversation" (step 16). */
+    .sc-btn--wraps {
+        height: auto;
+        min-height: var(--control-height);
+        padding-block: var(--space-1);
+        white-space: normal;
+        text-align: center;
+    }
+
     .sc-btn--portal,
     .sc-app--portal .sc-btn {
         height: var(--control-height-portal);
@@ -1530,6 +1540,12 @@
         font-weight: 600;
     }
 
+    /* A warning the status line carries, such as listening about to stop: said once, as every message is. */
+    .sc-status--warning {
+        color: var(--warning);
+        font-weight: 600;
+    }
+
     .sc-status[data-state="recording"] {
         color: var(--ink);
     }
@@ -1620,6 +1636,17 @@
 
     .sc-transcript__body > p {
         margin: 0;
+    }
+
+    /* A recorded visit's transcript (step 16): a paragraph a turn, led by who said it, in words. */
+    .sc-transcript__body > .sc-transcript__turn + .sc-transcript__turn {
+        margin-top: var(--space-2);
+    }
+
+    .sc-transcript__speaker {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink-muted);
     }
 
     .sc-transcript__tentative {
@@ -1723,6 +1750,22 @@
         line-height: 20px;
         color: var(--warning);
         font-weight: 600;
+    }
+
+    /* In the notice on a form opened from a proposal, its words and warnings keep the notice's paragraph gap. */
+    .sc-notice > .sc-proposal__value,
+    .sc-notice > .sc-proposal__warning {
+        margin: 0 0 var(--space-4);
+    }
+
+    /* An order or allergy proposed: its quiet button sits on its text, so when it wraps under the other it lines up with
+       that one's edge. */
+    .sc-proposal > .sc-actions {
+        column-gap: var(--space-4);
+    }
+
+    .sc-proposal > .sc-actions .sc-btn--quiet {
+        padding-inline: 0;
     }
 
     /* The decision's buttons, and under them the way to correct the text first. */

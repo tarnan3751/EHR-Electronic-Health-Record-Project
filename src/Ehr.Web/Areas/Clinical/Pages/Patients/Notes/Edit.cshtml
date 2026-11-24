@@ -2,6 +2,8 @@
 @using Ehr.Domain.Notes
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.EditModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@inject Ehr.Domain.Notes.NoteWriteAuthority NoteWrites
+@inject Ehr.Web.Ambient.AmbientListening Listening
 @{
     ViewData["Title"] = "Write clinical note";
 }
@@ -30,8 +32,14 @@ else
     else
     {
         <p><a asp-page="/Patients/Dictate" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Dictate into this draft</a></p>
+        @* Step 16: listening to a visit into this draft, when the clinic has it switched on, at the clinic only, and not in
+           what the cloud app forwards here. *@
+        @if (Listening.Enabled && Ehr.Web.Forwarding.ClinicNetwork.AtTheClinic(HttpContext.Request, NoteWrites))
+        {
+            <p><a asp-page="/Patients/Listen" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Listen to the visit into this draft</a></p>
+        }
     }
-    var waiting = (Guid.Parse(RouteData.Values["draftId"]!.ToString()!), Model.WaitingProposals);
+    var waiting = (Guid.Parse(RouteData.Values["draftId"]!.ToString()!), Model.WaitingProposals, false);
     <partial name="_WaitingProposals" model="waiting" />
     @* Step 14: the text of an earlier draft, or of one last saved on the desktop, is in Subjective until its author sorts
        and saves it. Nothing has changed in the saved draft. *@

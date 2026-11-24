@@ -1,0 +1,107 @@
+# Voices and rooms for the eval's synthetic visits (eval/conversations), read by eval/generate_conversations.py, which
+# uses Kokoro-82M at the revision eval/voices.toml pins, with the same pace, level and containers as the dictation set.
+#
+# Every voice here is one the dictation set already uses (eval/voices.toml: the eight dictation voices and the six
+# babble talkers), so nothing new is downloaded: all fourteen are in the Hugging Face cache once the dictation audio has
+# been made. Each is a synthetic voice under Kokoro's Apache-2.0 licence, as voices.toml records; ff_siwis was trained
+# in part on SIWIS (CC BY 4.0). No real person's voice is recorded or imitated. Kokoro has no child's voice: a visit
+# with a child uses a light adult voice for the child, which says nothing about how a real child is heard.
+#
+# Each voice: its accent (as voices.toml labels it), the English pronunciation rules it reads with ("us" or "gb"), and
+# whether it is a female or male voice, so a visit can pair two voices of one kind, the harder case to tell apart.
+
+[voices.af_heart]
+accent = "us"
+english = "us"
+kind = "female"
+
+[voices.af_bella]
+accent = "us"
+english = "us"
+kind = "female"
+
+[voices.af_nicole]
+accent = "us"
+english = "us"
+kind = "female"
+
+[voices.am_michael]
+accent = "us"
+english = "us"
+kind = "male"
+
+[voices.am_fenrir]
+accent = "us"
+english = "us"
+kind = "male"
+
+[voices.am_puck]
+accent = "us"
+english = "us"
+kind = "male"
+
+[voices.bf_emma]
+accent = "gb"
+english = "gb"
+kind = "female"
+
+[voices.bf_isabella]
+accent = "gb"
+english = "gb"
+kind = "female"
+
+[voices.bm_george]
+accent = "gb"
+english = "gb"
+kind = "male"
+
+[voices.bm_lewis]
+accent = "gb"
+english = "gb"
+kind = "male"
+
+[voices.hf_alpha]
+accent = "hi-voice"
+english = "gb"
+kind = "female"
+
+[voices.hm_omega]
+accent = "hi-voice"
+english = "gb"
+kind = "male"
+
+[voices.ef_dora]
+accent = "es-voice"
+english = "us"
+kind = "female"
+
+[voices.ff_siwis]
+accent = "fr-voice"
+english = "us"
+kind = "female"
+
+# ---- Rooms --------------------------------------------------------------------------------------------------------
+# Every visit gets a clean recording: each turn at the speech level of the dictation set, laid on one timeline with the
+# gap or overlap its script gives. A visit that lists a variant in `noise` also gets it:
+#
+# - room: an examination room, as a laptop on the desk hears it. The patient sits further from the microphone
+#   (patient_db below the clinician; someone else in the room as far), every voice gets a synthetic reverberant tail
+#   (exponentially decaying noise, seeded per visit, mixed in at wet_db), and ventilation noise (voices.toml's hvac
+#   recipe) is mixed in at snr_db against the speech.
+# - babble: a busy waiting room through the door: four Kokoro voices that aren't in the visit read voices.toml's babble
+#   texts at once, at snr_db.
+
+[room]
+patient_db = -6.0
+other_db = -6.0
+rt60_seconds = 0.45
+wet_db = -12.0
+snr_db = 15
+
+[babble]
+talkers = 4
+snr_db = 10
+
+# The longest a visit may be: the sidecar's limit (ambient_max_session_seconds).
+[limits]
+max_seconds = 1200

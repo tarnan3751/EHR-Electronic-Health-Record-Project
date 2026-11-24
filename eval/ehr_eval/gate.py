@@ -53,7 +53,8 @@ the owner has recorded eval/results/baseline-es.json on the server
 machine, from that machine and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and
 date accuracy. The English checks above are unchanged.
 
-Other results files (such as compare-low256.json, a comparison run) aren't checked.
+The visits' results (eval/results/ambient-latest.json, listening to a visit) are checked here too, by ambient_gate.py,
+in the same way. Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
     uv run --project eval python -m ehr_eval.gate
 
@@ -71,7 +72,7 @@ from ehr_dictation import prompt
 from ehr_dictation.settings import Settings
 from ehr_dictation.transcript import Segment, assemble
 
-from . import run_es, scoring
+from . import ambient_gate, run_es, scoring
 from .run_a import SORTED
 from .scoring import WARNING_CODES
 from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
@@ -212,7 +213,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                     f"The {name} is {now}, worse than the accepted baseline's {before}. Find what made it worse and fix "
                     f"it, then: {RUN_IT} (Only the owner accepts a new baseline, on the server machine.)"
                 )
-    return problems
+    return problems + ambient_gate.check(results_dir, eval_dir)
 
 
 def _unaccepted(unflagged: list[dict], known: Path) -> list[str]:
@@ -481,6 +482,15 @@ def main() -> int:
         f"instruction shown, every mistranslation and misfiled value without a warning accepted. "
         f"Run on {spanish['run']['machine']['label']}."
     )
+    visits_path = RESULTS_DIR / "ambient-latest.json"
+    if visits_path.is_file():
+        visits = json.loads(visits_path.read_text(encoding="utf-8"))["metrics"]
+        print(
+            f"The visits' results match too: WER {visits['wer']['overall']} (the patient's on clean recordings "
+            f"{visits['wer']['by_role_clean']['patient']}), field F1 {visits['fields']['content']['f1']}, "
+            f"{visits['attribution']['accuracy']} of the words labelled with the right speaker, every visit drafted, "
+            f"nothing unsafe offered that the owner hasn't accepted."
+        )
     return 0
 
 

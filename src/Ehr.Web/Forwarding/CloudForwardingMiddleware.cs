@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using Ehr.Data;
 using Ehr.Web.Api.Audit;
+using Ehr.Web.Api.Dictation;
 using Ehr.Web.Api.Lab;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Yarp.ReverseProxy.Forwarder;
@@ -10,7 +11,8 @@ namespace Ehr.Web.Forwarding;
 // The cloud app's write path. The replica can't take writes, so every request that could change data goes to the
 // on-prem app, which saves and renders the response; it comes back in one WAN round trip. Signing out, which saves
 // nothing, is handled here instead (HandledOffSiteAttribute), and the lab's door (Api/Lab) is never forwarded: it is the
-// clinic's network's alone. The on-prem app reports the save's WAL position, which
+// clinic's network's alone. Nor is listening to a visit (Api/Dictation, the expansion plan's step 16): a visit's
+// conversation is recorded only at the clinic, and never crosses the WAN. The on-prem app reports the save's WAL position, which
 // LastSaveCookie keeps. Until the replica has replayed that far, the same browser's page requests go to the on-prem
 // app too, so people see their own saves, unless the on-prem app can't save just then (OnPremStatus) and the
 // replica's copy is all there is. Other reads, PHI included, come from the replica; the PHI reader records them in the
@@ -34,7 +36,9 @@ public sealed class CloudForwardingMiddleware(
             // The lab's door is the clinic's network's alone (step 12): nothing under it is forwarded, so nobody on the
             // internet can reach it, or use up its rate limit, through here. With no door on this app, such a request is
             // answered here as any address with nothing there is.
-            if (endpoint?.Metadata.GetMetadata<HandledOffSiteAttribute>() is not null || context.Request.Path.StartsWithSegments(LabApi.Path))
+            // Nor is listening to a visit (step 16), which this app doesn't map either.
+            if (endpoint?.Metadata.GetMetadata<HandledOffSiteAttribute>() is not null || context.Request.Path.StartsWithSegments(LabApi.Path)
+                || context.Request.Path.StartsWithSegments(DictationApi.AmbientPath))
             {
                 await next(context);
                 return;

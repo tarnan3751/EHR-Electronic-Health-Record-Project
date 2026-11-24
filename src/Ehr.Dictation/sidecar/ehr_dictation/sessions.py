@@ -36,6 +36,12 @@ for MedASR and for the fields are cut to what is left of it. A session counts ag
 until its result is ready, sorting included, and the time K2 Horizon has starts when the session starts waiting for it.
 
 Logs name the session (a random ID, not patient information), sizes, times and reason codes, never audio or text.
+
+A session listening to a visit (the expansion plan's step 16) is one too, of its own kind (mode), which every call
+names: listening.py adds what such a session does. A call of one kind never finds a session of the other. A session's
+kind and its language are fixed when it starts, and a visit's is English (api.py refuses any other). While a dictation,
+in either language, waits for K2 Horizon or is being sorted, no visit's window starts, and a window being drafted gives
+way the moment one asks (Turns).
 """
 
 from __future__ import annotations
@@ -43,10 +49,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import math
 import secrets
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
+
+from typing import Any
 
 import numpy as np
 
@@ -63,6 +72,9 @@ log = logging.getLogger("ehr_dictation")
 
 # An opening chunk can be too short to decode; this much audio that still decodes to nothing isn't audio.
 UNDECODABLE_BYTES = 256 * 1024
+
+DICTATION = "dictation"
+AMBIENT = "ambient"  # listening to a visit (listening.py)
 
 
 class SessionError(Exception):
@@ -119,6 +131,14 @@ class Session:
     task: asyncio.Task | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     done: asyncio.Event = field(default_factory=asyncio.Event)
+    mode: str = DICTATION
+    visit: Any = None  # a visit's own state (listening.Visit)
+
+    @property
+    def waiting(self) -> bool:
+        """Whether it is waiting on the clinician, so it goes after idle_seconds: for audio, or, a visit, for its voices
+        to be named."""
+        return not self.stopped or self.sorting == "awaiting_speakers"
 
 
 class Sessions:
@@ -143,6 +163,7 @@ class Sessions:
         self._sessions: dict[str, Session] = {}
         self._transcribing = asyncio.Semaphore(1)
         self._sorting = asyncio.Semaphore(settings.sorting_at_once)
+        self._turns = Turns()
 
     @property
     def count(self) -> int:
@@ -150,7 +171,7 @@ class Sessions:
 
     # ---- Lifecycle -----------------------------------------------------------------------------------------------
 
-    def start(self, owner: str, language: str = "en") -> Session:
+    def start(self, owner: str, mode: str = DICTATION, *, language: str = "en") -> Session:
         if language == "es" and self._spanish is None:
             raise SessionError(503, "language_unavailable", "Spanish dictation isn't installed on this server.")
         self.sweep()
@@ -161,9 +182,10 @@ class Sessions:
         if sum(1 for s in working if s.owner == owner) >= self._settings.max_sessions_per_owner:
             raise SessionError(429, "busy", "Finish or cancel your other dictation first.")
         session = Session(id=secrets.token_urlsafe(24), owner=owner, touched=self._clock(), language=language,
-                          proposes=language == "en")
+                          proposes=language == "en", mode=mode)
         self._sessions[session.id] = session
-        log.info("session %s started%s", session.id, " in Spanish" if language == "es" else "")
+        log.info("session %s started%s%s", session.id, " in Spanish" if language == "es" else "",
+                 "" if mode == DICTATION else f" ({mode})")
         return session
 
     def max_seconds(self, session: Session) -> int:
@@ -176,8 +198,8 @@ class Sessions:
     def _structurer_for(self, session: Session) -> Structurer:
         return self._spanish.structurer if session.language == "es" else self._structurer
 
-    def cancel(self, session_id: str, owner: str) -> None:
-        session = self._get(session_id, owner)
+    def cancel(self, session_id: str, owner: str, mode: str = DICTATION) -> None:
+        session = self._get(session_id, owner, mode)
         self._discard(session)
         log.info("session %s cancelled", session.id)
 
@@ -187,7 +209,7 @@ class Sessions:
             if session.finished_at is not None:
                 expired = now - session.finished_at > self._settings.result_seconds
             else:
-                expired = not session.stopped and now - session.touched > self._settings.idle_seconds
+                expired = session.waiting and now - session.touched > self._settings.idle_seconds
             if expired:
                 self._discard(session)
                 log.info("session %s expired", session.id)
@@ -202,10 +224,10 @@ class Sessions:
         session.transcript = assemble([], final=False)
         session.checks = None
 
-    def _get(self, session_id: str, owner: str) -> Session:
+    def _get(self, session_id: str, owner: str, mode: str = DICTATION) -> Session:
         self.sweep()
         session = self._sessions.get(session_id)
-        if session is None or not secrets.compare_digest(session.owner, owner):
+        if session is None or not secrets.compare_digest(session.owner, owner) or session.mode != mode:
             raise _not_found()
         return session
 
@@ -383,7 +405,7 @@ class Sessions:
                 )
             else:
                 # K2 Horizon's time starts now, waiting for a turn included.
-                async with asyncio.timeout(self._settings.structuring_seconds), self._sorting:
+                async with asyncio.timeout(self._settings.structuring_seconds), self._turns.dictation(), self._sorting:
                     proposal = await self._structurer_for(session).propose(transcript.for_structuring())
                 checks = (translation.check if spanish else validation.check)(proposal.fields, proposal.unknown, transcript)
             session.checks, session.sorting = checks, "done"
@@ -427,6 +449,78 @@ class Sessions:
             "structuring": f"sha256:{structuring.structuring_sha256}",
             "code": f"sha256:{CODE_SHA256}",
         }
+
+
+class GaveWay(Exception):
+    """A visit's window stopped so that a dictation could have K2 Horizon: it is asked again when its turn comes."""
+
+
+class TooBusy(Exception):
+    """A visit's windows waited for their turns as long as they may in all (ambient_wait_seconds)."""
+
+
+class Turns:
+    """Whose turn it is with K2 Horizon (decision D16): a dictation's whenever it asks, within its own time; a visit's
+    window one at a time across all visits, and only while no dictation is waiting for K2 Horizon or being sorted. A
+    window already being drafted gives way the moment a dictation asks (GaveWay) and waits for its turn again, so no
+    dictation shares K2 Horizon with a window. A window waits at most the time it is given (TooBusy), and says how long
+    it waited (waited)."""
+
+    def __init__(self) -> None:
+        self._dictations = 0
+        self.waited = 0.0
+        self._none = asyncio.Event()
+        self._none.set()
+        self._window = asyncio.Lock()
+        self._drafting: asyncio.Future | None = None
+        self._gave_way = False
+
+    @contextlib.asynccontextmanager
+    async def dictation(self) -> AsyncIterator[None]:
+        self._dictations += 1
+        self._none.clear()
+        if self._drafting is not None:
+            self._gave_way = True
+            self._drafting.cancel()
+        try:
+            yield
+        finally:
+            self._dictations -= 1
+            if not self._dictations:
+                self._none.set()
+
+    @contextlib.asynccontextmanager
+    async def window(self, wait: float = math.inf) -> AsyncIterator[Turns]:
+        began = time.monotonic()
+        try:
+            async with asyncio.timeout(None if math.isinf(wait) else max(wait, 0.0)):
+                await self._window.acquire()
+                try:
+                    while self._dictations:
+                        await self._none.wait()
+                except BaseException:
+                    self._window.release()
+                    raise
+        except TimeoutError:
+            raise TooBusy from None
+        self.waited = time.monotonic() - began
+        try:
+            yield self
+        finally:
+            self._window.release()
+
+    async def draft(self, request: Awaitable) -> object:
+        """A window's request to K2 Horizon, in its turn: GaveWay if a dictation needed its slot first."""
+        self._gave_way = False
+        self._drafting = asyncio.ensure_future(request)
+        try:
+            return await self._drafting
+        except asyncio.CancelledError:
+            if self._gave_way:
+                raise GaveWay from None
+            raise
+        finally:
+            self._drafting = None
 
 
 @contextlib.asynccontextmanager

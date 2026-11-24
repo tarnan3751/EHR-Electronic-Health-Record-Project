@@ -13,6 +13,9 @@ public sealed class AiFieldProposal
     public Guid? DecisionKey { get; set; }
     public Guid? ReviewerId { get; set; }
     public DateTimeOffset? ReviewedAt { get; set; }
+
+    // A proposal from a recorded visit's conversation is a sensitive item, as its review is: the database sets it.
+    public bool Sensitive { get; set; }
 }
 
 public static class AiProposalStates

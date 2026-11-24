@@ -1,0 +1,366 @@
+id = "c09-earache-and-fever"
+speakers = 3
+voices = { clinician = "bm_lewis", patient = "af_nicole", other = "bf_isabella" }
+tags = ["three-speakers", "relative-health", "question-no", "backchannel", "small-talk", "negation", "numbers", "order-spoken"]
+asked = ["Has she been pulling at that ear"]
+noise = ["room"]
+dates = []
+drugs = ["ibuprofen", "amoxicillin"]
+denied = ["vomiting", "rash", "drainage"]
+forbidden = ["I'll send it over to the chemist for you"]
+
+[[turns]]
+role = "clinician"
+text = "Hello, come on in. And who do we have here?"
+
+[[turns]]
+role = "other"
+text = "Hi. She's [[6|six]], and she's been up most of the night with her ear."
+
+[[turns]]
+role = "clinician"
+text = "Oh, that's no fun. Hi there. Can you show me which ear is sore?"
+
+[[turns]]
+role = "patient"
+text = "This ear. My ear hurts."
+
+[[turns]]
+role = "clinician"
+text = "Your right ear? Thank you for showing me. That helps a lot."
+
+[[turns]]
+role = "other"
+text = "It started yesterday afternoon. She came home from school and said her ear felt funny, and by bedtime she was crying."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm."
+overlap = 0.3
+
+[[turns]]
+role = "other"
+text = "And she's had a fever since then. Last night it was [[102.4|one hundred two point four]]."
+
+[[turns]]
+role = "clinician"
+text = "Did you give her anything for it?"
+
+[[turns]]
+role = "other"
+text = "I gave her ibuprofen at bedtime, and it came down to about [[100|one hundred]]. She finally fell asleep around [[2|two]], but she kept waking up."
+
+[[turns]]
+role = "clinician"
+text = "Right. Has she been vomiting?"
+
+[[turns]]
+role = "other"
+text = "No, she hasn't thrown up."
+
+[[turns]]
+role = "clinician"
+text = "Any rash?"
+
+[[turns]]
+role = "other"
+text = "No, no rash."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Any drainage from the ear?"
+
+[[turns]]
+role = "other"
+text = "No, nothing like that."
+
+[[turns]]
+role = "clinician"
+text = "How about a cough or a runny nose?"
+
+[[turns]]
+role = "other"
+text = "She had a runny nose last week, but it's mostly gone now."
+
+[[turns]]
+role = "clinician"
+text = "Has she been pulling at that ear?"
+
+[[turns]]
+role = "other"
+text = "All night. She says it sounds funny, like she's under water."
+
+[[turns]]
+role = "patient"
+text = "It sounds like a seashell."
+
+[[turns]]
+role = "clinician"
+text = "Like a seashell? That's a good way to put it. Any trouble with her hearing at school?"
+
+[[turns]]
+role = "other"
+text = "Her teacher said she wasn't answering when called on yesterday, and she keeps asking me to repeat things."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. Is she eating and drinking okay?"
+
+[[turns]]
+role = "other"
+text = "She's drinking fine. She didn't want breakfast this morning, but she had some juice."
+
+[[turns]]
+role = "patient"
+text = "It hurts when I chew."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "It hurts when you chew? That happens a lot with a sore ear. Has she said anything about a headache?"
+
+[[turns]]
+role = "other"
+text = "A little, yesterday. I get migraines myself, so I always worry when she says her head hurts."
+
+[[turns]]
+role = "clinician"
+text = "That makes sense. Does the headache seem bad, or is it mostly the ear?"
+
+[[turns]]
+role = "other"
+text = "Mostly the ear. The headache went away once the fever came down."
+
+[[turns]]
+role = "clinician"
+text = "Good. Has she been more tired than usual?"
+
+[[turns]]
+role = "other"
+text = "Yes, she wanted to stay on the couch all morning, and she's usually running around."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. Has she had ear infections before?"
+
+[[turns]]
+role = "other"
+text = "Once, when she was a toddler. It cleared up with an antibiotic."
+
+[[turns]]
+role = "clinician"
+text = "Any allergies to medicines?"
+
+[[turns]]
+role = "other"
+text = "No, she's not allergic to anything."
+
+[[turns]]
+role = "clinician"
+text = "And is she up to date on her shots?"
+
+[[turns]]
+role = "other"
+text = "Yes, all of them."
+
+[[turns]]
+role = "clinician"
+text = "Great. Has anyone else at home been sick?"
+
+[[turns]]
+role = "other"
+text = "A few kids in her class have had colds, but everyone at home is fine."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. Okay, let's take a look. Can you hop up on the table for me? You can bring your bear."
+
+[[turns]]
+role = "patient"
+text = "He's coming too. He gets scared at the doctor."
+
+[[turns]]
+role = "clinician"
+text = "He's very brave to come along. What grade are you in?"
+
+[[turns]]
+role = "patient"
+text = "[[1st grade|First grade]]. My teacher has a hamster in our classroom."
+
+[[turns]]
+role = "clinician"
+text = "A hamster! Lucky you. Now I'm going to look in your ears with my little light. It won't hurt, I promise. Hold still for me."
+
+[[turns]]
+role = "patient"
+text = "Okay."
+gap = 0.5
+
+[[turns]]
+role = "clinician"
+text = "Her temperature here is [[101.8|one hundred one point eight]]. Her left ear looks normal. The right eardrum is red and bulging, and there's fluid behind it."
+gap = 3.0
+
+[[turns]]
+role = "other"
+text = "Mm-hm."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Now open wide and say ah for me."
+
+[[turns]]
+role = "patient"
+text = "Ahh."
+
+[[turns]]
+role = "clinician"
+text = "Her throat is a little red, and her lungs are clear. You did great."
+gap = 1.5
+
+[[turns]]
+role = "other"
+text = "So it's an ear infection?"
+
+[[turns]]
+role = "clinician"
+text = "Yes. She has an ear infection in her right ear. That's why it hurts more when she lies down or chews, and why her hearing sounds muffled on that side."
+
+[[turns]]
+role = "other"
+text = "I thought so. Is it from the cold she had last week?"
+
+[[turns]]
+role = "clinician"
+text = "Yes, colds often lead to ear infections. The cold leaves fluid behind the eardrum, and bacteria can grow in it."
+
+[[turns]]
+role = "patient"
+text = "Can my bear have medicine too?"
+
+[[turns]]
+role = "clinician"
+text = "Your bear is lucky. His ears are just fine."
+
+[[turns]]
+role = "other"
+text = "Does she need an antibiotic, or can we wait it out?"
+
+[[turns]]
+role = "clinician"
+text = "At her age, with a fever this high and a bulging eardrum, I'd treat it. The best treatment is amoxicillin, twice a day for [[10 days|ten days]]. Give it with food, and finish the whole bottle even if she feels better in a couple of days. I'll send it over to the chemist for you."
+
+[[turns]]
+role = "patient"
+text = "Does the medicine taste yucky?"
+
+[[turns]]
+role = "clinician"
+text = "It tastes like bubble gum. Most kids like it."
+
+[[turns]]
+role = "other"
+text = "Okay. Can I keep giving her ibuprofen?"
+
+[[turns]]
+role = "clinician"
+text = "Yes, you can give ibuprofen every [[6 to 8 hours|six to eight hours]] for the pain and the fever. A warm cloth over the ear can help too."
+
+[[turns]]
+role = "other"
+text = "Will her hearing come back to normal?"
+
+[[turns]]
+role = "clinician"
+text = "It should. The fluid usually clears over the next few weeks. If her hearing still seems muffled in [[4 weeks|four weeks]], we'll check her ears again."
+
+[[turns]]
+role = "other"
+text = "Should she stay home from school tomorrow?"
+
+[[turns]]
+role = "clinician"
+text = "Keep her home until she's gone a full day without a fever. If she isn't better in [[2 or 3 days|two or three days]], or the pain gets worse, bring her back."
+
+[[turns]]
+role = "other"
+text = "She has a swimming lesson on Saturday. Can she still go?"
+
+[[turns]]
+role = "clinician"
+text = "Let's skip this week's lesson, and keep her ear dry until the pain is gone. And how are you holding up? You had a long night too."
+
+[[turns]]
+role = "other"
+text = "I'm okay, just tired. I had a migraine this morning, probably from the lack of sleep."
+
+[[turns]]
+role = "clinician"
+text = "Try to rest when she does this afternoon."
+
+[[turns]]
+role = "other"
+text = "We will. Thank you so much. Did you hear that? Medicine with your breakfast, and you'll feel better soon."
+
+[[turns]]
+role = "patient"
+text = "Do I get a sticker?"
+
+[[turns]]
+role = "clinician"
+text = "You sure do. You were the best patient I've had all day."
+
+[gold.subjective]
+value = "She's 6, and she's been up most of the night with her ear. My ear hurts. It started yesterday afternoon. She came home from school and said her ear felt funny, and by bedtime she was crying. She's had a fever since then. Last night it was 102.4. I gave her ibuprofen at bedtime, and it came down to about 100. She finally fell asleep around 2, but she kept waking up. She hasn't thrown up. No rash. She had a runny nose last week, but it's mostly gone now. She says it sounds funny, like she's under water. It sounds like a seashell. Her teacher said she wasn't answering when called on yesterday, and she keeps asking me to repeat things. She's drinking fine. She didn't want breakfast this morning, but she had some juice. It hurts when I chew. The headache went away once the fever came down. She wanted to stay on the couch all morning, and she's usually running around. Once, when she was a toddler. It cleared up with an antibiotic. She's not allergic to anything."
+sources = [
+    "She's 6, and she's been up most of the night with her ear",
+    "My ear hurts",
+    "It started yesterday afternoon",
+    "She came home from school and said her ear felt funny, and by bedtime she was crying",
+    "she's had a fever since then",
+    "Last night it was 102.4",
+    "I gave her ibuprofen at bedtime, and it came down to about 100",
+    "She finally fell asleep around 2, but she kept waking up",
+    "she hasn't thrown up",
+    "no rash",
+    "She had a runny nose last week, but it's mostly gone now",
+    "She says it sounds funny, like she's under water",
+    "It sounds like a seashell",
+    "Her teacher said she wasn't answering when called on yesterday, and she keeps asking me to repeat things",
+    "She's drinking fine",
+    "She didn't want breakfast this morning, but she had some juice",
+    "It hurts when I chew",
+    "The headache went away once the fever came down",
+    "she wanted to stay on the couch all morning, and she's usually running around",
+    "Once, when she was a toddler",
+    "It cleared up with an antibiotic",
+    "she's not allergic to anything",
+]
+
+[gold.objective]
+value = "Her temperature here is 101.8. Her left ear looks normal. The right eardrum is red and bulging, and there's fluid behind it. Her throat is a little red, and her lungs are clear."
+sources = [
+    "Her temperature here is 101.8",
+    "Her left ear looks normal",
+    "The right eardrum is red and bulging, and there's fluid behind it",
+    "Her throat is a little red, and her lungs are clear",
+]
+
+[gold.assessment]
+value = "She has an ear infection in her right ear."
+sources = ["She has an ear infection in her right ear"]
+
+[gold.plan]
+value = "The best treatment is amoxicillin, twice a day for 10 days. Give it with food, and finish the whole bottle even if she feels better in a couple of days. You can give ibuprofen every 6 to 8 hours for the pain and the fever. A warm cloth over the ear can help too. If her hearing still seems muffled in 4 weeks, we'll check her ears again. Keep her home until she's gone a full day without a fever. If she isn't better in 2 or 3 days, or the pain gets worse, bring her back. Let's skip this week's lesson, and keep her ear dry until the pain is gone."
+sources = [
+    "The best treatment is amoxicillin, twice a day for 10 days",
+    "Give it with food, and finish the whole bottle even if she feels better in a couple of days",
+    "you can give ibuprofen every 6 to 8 hours for the pain and the fever",
+    "A warm cloth over the ear can help too",
+    "If her hearing still seems muffled in 4 weeks, we'll check her ears again",
+    "Keep her home until she's gone a full day without a fever",
+    "If she isn't better in 2 or 3 days, or the pain gets worse, bring her back",
+    "Let's skip this week's lesson, and keep her ear dry until the pain is gone",
+]

@@ -1,0 +1,54 @@
+using Ehr.Data;
+using Ehr.Data.Patients;
+using Ehr.Domain.Notes;
+
+namespace Ehr.Web.Ambient;
+
+// The on-site app's timer for listening to a visit (the expansion plan's step 16): every hour, the transcripts of
+// recorded visits whose reviews nobody has finished are deleted once they are older than Ehr:Ambient:KeepTranscriptDays
+// (7 unless set shorter, in whole days, at least 1; the database holds it between 1 and 7 whatever is asked,
+// AmbientTranscriptPurge). With nobody signed in, so the write audit records each delete as the system's act, with no
+// one's rights borrowed. A review left open is not ended: its proposals can then only be rejected, or edited into the
+// clinician's own words. Logs how many, never which.
+public sealed class AmbientTranscriptPurgeService(IServiceScopeFactory scopes, AmbientTranscriptKeep keep, ILogger<AmbientTranscriptPurgeService> logger)
+    : BackgroundService
+{
+    public const string Setting = "Ehr:Ambient:KeepTranscriptDays";
+
+    static readonly TimeSpan Every = TimeSpan.FromHours(1);
+
+    // 7 days, or the shorter time the setting gives in whole days, at least 1; anything else refuses to start. Both apps
+    // read it: the cloud app's review pages say it too.
+    public static AmbientTranscriptKeep KeepFrom(IConfiguration configuration)
+    {
+        var days = configuration.GetValue<double?>(Setting) ?? 7;
+        return days is >= 1 and <= 7 && days == Math.Floor(days)
+            ? new((int)days)
+            : throw new InvalidOperationException($"Set {Setting} to a whole number of days from 1 to 7, or leave it out for 7.");
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(Every);
+        do
+        {
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+                await using var transaction = await db.Database.BeginTransactionAsync(stoppingToken);
+                var deleted = await AmbientTranscriptPurge.PurgeAsync(db, TimeSpan.FromDays(keep.Days), stoppingToken);
+                await transaction.CommitAsync(stoppingToken);
+                if (deleted > 0)
+                {
+                    logger.LogInformation("Deleted {Count} transcripts of recorded visits whose reviews weren't finished in time.", deleted);
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError("The transcripts of recorded visits couldn't be purged: {Error}.", exception.GetType().Name);
+            }
+        }
+        while (await timer.WaitForNextTickAsync(stoppingToken));
+    }
+}

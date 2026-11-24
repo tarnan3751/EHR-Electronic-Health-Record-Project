@@ -1,0 +1,134 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "result-ambient",
+  "status": 200,
+  "body": {
+    "transcript": {
+      "text": "Your chest is clear.\nI have had a cough for three days.\nYour chest is clear. Your chest is clear.",
+      "final": true,
+      "segments": [
+        {
+          "start": 0,
+          "end": 20,
+          "startMs": 0,
+          "endMs": 3215,
+          "final": true,
+          "unclear": null,
+          "speakerGroup": 1,
+          "speaker": "clinician"
+        },
+        {
+          "start": 21,
+          "end": 55,
+          "startMs": 3530,
+          "endMs": 6965,
+          "final": true,
+          "unclear": null,
+          "speakerGroup": 2,
+          "speaker": "patient"
+        },
+        {
+          "start": 56,
+          "end": 76,
+          "startMs": 7280,
+          "endMs": 10860,
+          "final": true,
+          "unclear": null,
+          "speakerGroup": 1,
+          "speaker": "clinician"
+        },
+        {
+          "start": 77,
+          "end": 97,
+          "startMs": 10860,
+          "endMs": 14465,
+          "final": true,
+          "unclear": null,
+          "speakerGroup": 1,
+          "speaker": "clinician"
+        }
+      ]
+    },
+    "sorting": "done",
+    "reason": null,
+    "fields": {
+      "subjective": {
+        "status": "pending",
+        "value": "I have had a cough for three days.",
+        "sources": [
+          {
+            "start": 21,
+            "end": 54,
+            "speaker": "patient"
+          }
+        ],
+        "warnings": [
+          {
+            "code": "patients_own_words",
+            "start": 21,
+            "end": 54
+          },
+          {
+            "code": "part_not_offered",
+            "start": 56,
+            "end": 97
+          }
+        ]
+      },
+      "objective": {
+        "status": "pending",
+        "value": "Your chest is clear. Your chest is clear.",
+        "sources": [
+          {
+            "start": 0,
+            "end": 19,
+            "speaker": "clinician"
+          },
+          {
+            "start": 56,
+            "end": 75,
+            "speaker": "clinician"
+          }
+        ],
+        "warnings": []
+      },
+      "assessment": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "plan": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      }
+    },
+    "notCarriedOver": [],
+    "proposals": [],
+    "provenance": {
+      "speech": {
+        "repository": "google/medasr",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "language": {
+        "repository": "IFM/K2-Horizon-7B-GGUF",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "K2-Horizon-7B-Q4_K_M.gguf",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "llamaServer": "b11669-620d2225",
+      "prompt": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "schema": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "structuring": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "code": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "speaker": {
+        "repository": "speechbrain/spkrec-ecapa-voxceleb",
+        "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    }
+  }
+}

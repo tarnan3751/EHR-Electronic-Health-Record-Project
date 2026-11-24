@@ -72,6 +72,22 @@ WHISPER = {
 }
 
 
+SPEAKER_WEIGHTS = b"ecapa" * 400
+SPEAKER = {
+    "sha": setup_models.SPEAKER_COMMIT,
+    "license": "apache-2.0",
+    "files": {
+        ".gitattributes": (b"*.ckpt filter=lfs", False),
+        "README.md": (b"ECAPA model card", False),
+        "hyperparams.yaml": (b"n_mels: 80", False),
+        "embedding_model.ckpt": (SPEAKER_WEIGHTS, True),
+        "classifier.ckpt": (b"classifier" * 50, True),
+        "label_encoder.txt": (b"id10001", False),
+        "example1.wav": (b"RIFF", False),
+    },
+}
+
+
 class FakeHub:
     def __init__(self, repos, token="hf_test", gated=()):
         self.repos = repos
@@ -114,7 +130,10 @@ class FakeHub:
 @pytest.fixture
 def hub(monkeypatch):
     fake = FakeHub({"IFM/K2-Horizon-7B-GGUF": gguf_repo(), "google/medasr": MEDASR,
-                    "openai/whisper-large-v3-turbo": WHISPER})
+                    "openai/whisper-large-v3-turbo": WHISPER, setup_models.SPEAKER_REPO: dict(SPEAKER)})
+    # The fake's speaker weights stand in for the pinned file: the pin is what the fake Hub publishes.
+    monkeypatch.setattr(setup_models, "SPEAKER_WEIGHTS_SIZE", len(SPEAKER_WEIGHTS))
+    monkeypatch.setattr(setup_models, "SPEAKER_WEIGHTS_SHA256", hashlib.sha256(SPEAKER_WEIGHTS).hexdigest())
     monkeypatch.setattr(setup_models, "HfApi", lambda: fake)
     monkeypatch.setattr(setup_models, "hf_hub_download", fake.download)
     monkeypatch.setattr(setup_models, "get_token", lambda: fake.token)
@@ -341,3 +360,66 @@ def test_whisper_is_set_up_only_while_its_card_says_mit(hub, models, capsys, lic
     else:
         assert f"says its licence is {license!r}, not mit" in capsys.readouterr().err
         assert not hub.downloads and not (models / "whisper").exists()
+
+
+# ---- The speaker model (the expansion plan's step 16) -----------------------------------------------------------------
+
+
+def test_sets_up_the_speaker_model_at_its_pinned_commit_and_records_it(hub, models, capsys):
+    assert run(models, "--only", "speaker") == 0
+
+    assert (models / "speaker" / "embedding_model.ckpt").read_bytes() == SPEAKER_WEIGHTS
+    assert (models / "notices" / "speechbrain__spkrec-ecapa-voxceleb" / "README.md").is_file()
+    assert sorted(f for r, f in hub.downloads if r == setup_models.SPEAKER_REPO) == [
+        "README.md", "embedding_model.ckpt", "hyperparams.yaml"], "the weights and hyperparameters, and the card"
+    recorded = manifest(models)["speaker"]
+    assert (recorded["repository"], recorded["commit"], recorded["license"], recorded["file"]) == (
+        "speechbrain/spkrec-ecapa-voxceleb", "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286", "apache-2.0",
+        "embedding_model.ckpt")
+    assert {f["path"]: f["sha256"] for f in recorded["files"]}["embedding_model.ckpt"] == (
+        hashlib.sha256(SPEAKER_WEIGHTS).hexdigest())
+    assert "listen to a visit" in capsys.readouterr().out
+
+
+def test_the_pin_is_the_file_chosen_for_the_plan():
+    assert setup_models.SPEAKER_COMMIT == "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286"
+    assert setup_models.SPEAKER_WEIGHTS_SIZE == 83_316_686
+    assert setup_models.SPEAKER_WEIGHTS_SHA256 == "0575cb64845e6b9a10db9bcb74d5ac32b326b8dc90352671d345e2ee3d0126a2"
+
+
+def test_the_speaker_model_needs_no_sign_in(hub, models):
+    hub.token = None
+    assert run(models, "--only", "speaker") == 0
+
+
+@pytest.mark.parametrize(("change", "message"), [
+    ({"gated": "auto"}, "asks for terms or an account"),
+    ({"gated": None}, "didn't say whether"),
+    ({"license": "cc-by-4.0"}, "not apache-2.0"),
+    ({"license": None}, "not apache-2.0"),
+    ({"files": SPEAKER["files"] | {"embedding_model.ckpt": (b"retrained" * 400, True)}}, "isn't the file pinned here"),
+    ({"sha": "f" * 40}, "with another commit, ffffffffffff"),  # read_repository()'s check, for every pinned model
+])
+def test_a_speaker_model_that_changed_since_it_was_chosen_is_refused_before_any_download(hub, models, capsys, change,
+                                                                                         message):
+    hub.repos[setup_models.SPEAKER_REPO] = SPEAKER | change
+
+    assert run(models, "--only", "speaker") == 1
+    assert message in capsys.readouterr().err
+    assert hub.downloads == [] and not (models / "models-manifest.json").exists()
+
+
+def test_a_speaker_model_gated_at_download_says_to_ask_the_owner(hub, models, capsys):
+    hub.gated.add(setup_models.SPEAKER_REPO)
+
+    assert run(models, "--only", "speaker") == 1
+    err = capsys.readouterr().err
+    assert "ask the project owner" in err and "Accept its terms" not in err
+
+
+def test_verify_checks_the_speaker_model_too(hub, models, capsys):
+    assert run(models) == 0
+    (models / "speaker" / "embedding_model.ckpt").write_bytes(b"X" + SPEAKER_WEIGHTS[1:])
+
+    assert run(models, "--verify") == 1
+    assert "embedding_model.ckpt: CHANGED" in capsys.readouterr().out

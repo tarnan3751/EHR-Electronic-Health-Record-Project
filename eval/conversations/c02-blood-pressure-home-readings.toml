@@ -1,0 +1,243 @@
+id = "c02-blood-pressure-home-readings"
+speakers = 2
+voices = { clinician = "bm_george", patient = "hm_omega" }
+tags = ["small-talk", "home-readings", "refill-request", "order-spoken", "question-no", "negation", "numbers", "same-gender"]
+asked = ["And any swelling in your ankles"]
+noise = ["babble"]
+dates = []
+drugs = ["lisinopril"]
+forbidden = ["I'm ordering a basic metabolic panel today", "I'll send the refill to your pharmacy"]
+denied = ["headaches", "chest pain", "dizziness", "cough"]
+requests = ["Can you refill my lisinopril"]
+
+[[turns]]
+role = "clinician"
+text = "Good afternoon. Come on through and take a seat. Did you manage to park? They've dug up half the road outside."
+
+[[turns]]
+role = "patient"
+text = "I did, in the end. I went round the block a few times before a space came up."
+
+[[turns]]
+role = "clinician"
+text = "It's been like that all month. Right, so this is your blood pressure check. How have you been getting on?"
+
+[[turns]]
+role = "patient"
+text = "Pretty well, on the whole. I take the tablet every morning with my breakfast, so I don't forget it."
+
+[[turns]]
+role = "clinician"
+text = "Good. Remind me which tablet you're on."
+
+[[turns]]
+role = "patient"
+text = "I'm on lisinopril, [[20 mg|twenty milligrams]] once a day."
+
+[[turns]]
+role = "clinician"
+text = "And have you been checking your blood pressure at home, like we talked about?"
+
+[[turns]]
+role = "patient"
+text = "I have. I wrote them all down in a notebook. Let me find the page. Here we are. Monday was [[138/86|one thirty-eight over eighty-six]], Wednesday was [[134/84|one thirty-four over eighty-four]], Friday was [[136/85|one thirty-six over eighty-five]], and this morning it was [[131/82|one thirty-one over eighty-two]]."
+gap = 1.0
+
+[[turns]]
+role = "clinician"
+text = "Is that with the arm cuff we talked about?"
+
+[[turns]]
+role = "patient"
+text = "Yes, it goes on my upper arm. I sit quietly for [[5 minutes|five minutes]] first, like the leaflet says."
+
+[[turns]]
+role = "clinician"
+text = "Perfect. That's a nice steady run. Were there any higher ones?"
+
+[[turns]]
+role = "patient"
+text = "Only once. It was [[148/92|one forty-eight over ninety-two]] the morning after a big family dinner. There was a lot of salty food that night."
+
+[[turns]]
+role = "clinician"
+text = "That'll do it. Any headaches?"
+
+[[turns]]
+role = "patient"
+text = "No, no headaches."
+
+[[turns]]
+role = "clinician"
+text = "Any chest pain or tightness?"
+
+[[turns]]
+role = "patient"
+text = "No."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Any dizziness, especially when you stand up quickly?"
+
+[[turns]]
+role = "patient"
+text = "No, I haven't had any dizziness."
+
+[[turns]]
+role = "clinician"
+text = "Good. Some people get a dry, tickly cough on lisinopril. Have you had a cough?"
+
+[[turns]]
+role = "patient"
+text = "No, no cough at all."
+overlap = 0.3
+
+[[turns]]
+role = "clinician"
+text = "And any swelling in your ankles?"
+
+[[turns]]
+role = "patient"
+text = "Not that I've noticed. My shoes still fit, anyway."
+
+[[turns]]
+role = "clinician"
+text = "How are you getting on with the salt and the exercise?"
+
+[[turns]]
+role = "patient"
+text = "Better than before. I've stopped putting salt on my food at the table, and I walk the dog for half an hour most evenings."
+
+[[turns]]
+role = "clinician"
+text = "That's great. What kind of dog?"
+
+[[turns]]
+role = "patient"
+text = "A spaniel. She's got more energy than I have, so she keeps me moving."
+
+[[turns]]
+role = "clinician"
+text = "Good for her. Do you smoke?"
+
+[[turns]]
+role = "patient"
+text = "No, never have."
+
+[[turns]]
+role = "clinician"
+text = "And alcohol?"
+
+[[turns]]
+role = "patient"
+text = "A couple of pints at the weekend, that's all."
+
+[[turns]]
+role = "clinician"
+text = "Fair enough. Let me check your blood pressure, and then I'll have a listen to your heart."
+
+[[turns]]
+role = "patient"
+text = "Okay."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "Your blood pressure here is [[136/84|one thirty-six over eighty-four]], and your heart rate is [[72|seventy-two]] and regular. Your heart sounds normal, and your lungs are clear. There's no swelling in your ankles."
+gap = 3.0
+
+[[turns]]
+role = "clinician"
+text = "So your blood pressure is well controlled on the lisinopril. Your home readings and today's reading are both close to target, and that high reading came after a salty meal."
+gap = 0.8
+
+[[turns]]
+role = "patient"
+text = "That's good to hear. Do I have to take it forever?"
+
+[[turns]]
+role = "clinician"
+text = "Most people stay on it, yes. But if the salt stays down and you keep walking, we can sometimes lower the dose later on."
+
+[[turns]]
+role = "patient"
+text = "Fair enough. Can you refill my lisinopril? I've only got about a week's worth left."
+
+[[turns]]
+role = "clinician"
+text = "Of course. I'll send the refill to your pharmacy this afternoon."
+
+[[turns]]
+role = "patient"
+text = "Thanks. Should I keep checking at home?"
+
+[[turns]]
+role = "clinician"
+text = "Yes, please. Keep taking the lisinopril [[20 mg|twenty milligrams]] once a day. Check your blood pressure [[2 or 3 times|two or three times]] a week, and bring the notebook next time. Keep the salt down and keep up the walking. Come back and see me in [[3 months|three months]]."
+
+[[turns]]
+role = "patient"
+text = "Will do."
+
+[[turns]]
+role = "clinician"
+text = "Oh, and because you're on lisinopril, I'm ordering a basic metabolic panel today, to check your kidneys and your potassium."
+gap = 0.6
+
+[[turns]]
+role = "patient"
+text = "Is that the blood test at the front desk?"
+
+[[turns]]
+role = "clinician"
+text = "That's right. They can take it on your way out."
+
+[[turns]]
+role = "patient"
+text = "Lovely. Now let's see if I've got a parking ticket."
+
+[[turns]]
+role = "clinician"
+text = "Fingers crossed. Take care, and see you in [[3 months|three months]]."
+
+[gold.subjective]
+value = "I take the tablet every morning with my breakfast. I'm on lisinopril, 20 mg once a day. Monday was 138/86, Wednesday was 134/84, Friday was 136/85, and this morning it was 131/82. It goes on my upper arm. I sit quietly for 5 minutes first, like the leaflet says. It was 148/92 the morning after a big family dinner. There was a lot of salty food that night. No headaches. I haven't had any dizziness. No cough at all. I've stopped putting salt on my food at the table, and I walk the dog for half an hour most evenings. A couple of pints at the weekend, that's all."
+sources = [
+    "I take the tablet every morning with my breakfast",
+    "I'm on lisinopril, 20 mg once a day",
+    "Monday was 138/86, Wednesday was 134/84, Friday was 136/85, and this morning it was 131/82",
+    "it goes on my upper arm",
+    "I sit quietly for 5 minutes first, like the leaflet says",
+    "It was 148/92 the morning after a big family dinner",
+    "There was a lot of salty food that night",
+    "no headaches",
+    "I haven't had any dizziness",
+    "no cough at all",
+    "I've stopped putting salt on my food at the table, and I walk the dog for half an hour most evenings",
+    "A couple of pints at the weekend, that's all",
+]
+
+[gold.objective]
+value = "Your blood pressure here is 136/84, and your heart rate is 72 and regular. Your heart sounds normal, and your lungs are clear. There's no swelling in your ankles."
+sources = [
+    "Your blood pressure here is 136/84, and your heart rate is 72 and regular",
+    "Your heart sounds normal, and your lungs are clear",
+    "There's no swelling in your ankles",
+]
+
+[gold.assessment]
+value = "Your blood pressure is well controlled on the lisinopril. Your home readings and today's reading are both close to target."
+sources = [
+    "your blood pressure is well controlled on the lisinopril",
+    "Your home readings and today's reading are both close to target",
+]
+
+[gold.plan]
+value = "Keep taking the lisinopril 20 mg once a day. Check your blood pressure 2 or 3 times a week, and bring the notebook next time. Keep the salt down and keep up the walking. Come back and see me in 3 months."
+sources = [
+    "Keep taking the lisinopril 20 mg once a day",
+    "Check your blood pressure 2 or 3 times a week, and bring the notebook next time",
+    "Keep the salt down and keep up the walking",
+    "Come back and see me in 3 months",
+]
