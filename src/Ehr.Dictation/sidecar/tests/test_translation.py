@@ -746,6 +746,10 @@ def test_a_drug_taken_or_changed_as_the_spanish_says_is_offered(text, english):
     ("Prohibido el alcohol.", "Alcohol allowed.", "Alcohol is forbidden."),
     ("Suspender la sonda.", "Keep the catheter.", "Stop the catheter."),
     ("Aumentar la ingesta de agua.", "Reduce water intake.", "Increase water intake."),
+    ("Retirar las benzodiacepinas.", "Increase benzodiazepines.", "Stop benzodiazepines."),  # the review's case
+    ("Mantener en suspenso el metotrexato.", "Continue methotrexate.", "Hold methotrexate."),  # the review's case
+    ("Mantener en suspenso la metformina.", "Continue metformin.", "Hold metformin."),  # a drug the checks read
+    ("Metformina: mantener en suspenso.", "Metformin: continue.", "Metformin: hold."),
 ])
 def test_a_class_a_dose_by_how_much_or_a_change_of_what_cant_be_read_is_compared(text, changed, kept):
     assert reasons(text, [text], changed) == ["action_changed"]

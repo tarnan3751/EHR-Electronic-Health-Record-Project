@@ -804,9 +804,11 @@ SPANISH_CHANGES = {
 }
 # Participles that say a state, not a past change: "prohibido el alcohol" forbids it now.
 STATES = frozenset("prohibido prohibida prohibidos prohibidas permitido permitida permitidos permitidas".split())
-# A change said by how much, whichever verb goes with it ("bajar a la mitad", "reducir a la mitad", "pasar al doble"),
-# read where its last word is.
-SPANISH_ACTION_PHRASES = {("a", "la", "mitad"): "decrease", ("al", "doble"): "increase"}
+# A change said by how much, or by the state it leaves, whichever verb goes with it ("bajar a la mitad", "reducir a la
+# mitad", "pasar al doble", "dejar en suspenso"), read where its last word is; and a verb of change just before one
+# says the phrase's change, not its own ("mantener en suspenso" keeps nothing going). Only just before it: "mantener el
+# metotrexato en suspenso" says both.
+SPANISH_ACTION_PHRASES = {("a", "la", "mitad"): "decrease", ("al", "doble"): "increase", ("en", "suspenso"): "hold"}
 # Forms that are adjectives as often: "dosis baja", "tos continua". Accented, they are the verb ("bajó", "continúa").
 NOT_CHANGES = frozenset("baja bajo bajas bajos continua continuo continuas continuos".split())
 SPANISH_CHANGE_PHRASES = [("dejar", "de", "stop"), ("cambiar", "a", "switch"), ("cambiar", "por", "switch"),
@@ -945,10 +947,17 @@ def english_change_kinds(text: str) -> set[str]:
     return {ACTIONS[k] for k in keys if k in ACTIONS} | set(_phrase_actions(keys, gaps).values())
 
 
+def _phrase_after(keys: list[str], j: int) -> str | None:
+    """The change a phrase of SPANISH_ACTION_PHRASES says that starts just after keys[j], if one does."""
+    return next((kind for phrase, kind in SPANISH_ACTION_PHRASES.items()
+                 if tuple(keys[j + 1 : j + 1 + len(phrase)]) == phrase), None)
+
+
 def spanish_change_kinds(said: list[spanish.Token]) -> set[str]:
     """Every change a Spanish verb says, whatever it is said of."""
     keys = [t.key for t in said]
-    found = {SPANISH_CHANGE[t.key][0] for t in said if t.key in SPANISH_CHANGE and t.text not in NOT_CHANGES}
+    found = {SPANISH_CHANGE[t.key][0] for i, t in enumerate(said)
+             if t.key in SPANISH_CHANGE and t.text not in NOT_CHANGES and not _phrase_after(keys, i)}
     for verb, word, kind in SPANISH_CHANGE_PHRASES:
         present, past = PHRASE_FORMS[verb]
         found |= {kind for i in range(len(keys) - 1) if keys[i] in present | past and keys[i + 1] == word}
@@ -962,9 +971,12 @@ def english_classes(text: str) -> set[str]:
         ANTI[w] for i, w in enumerate(words) if w in ANTI and i and words[i - 1] == "anti"}
 
 
-# A change and those that go the other way: what the English may not say where the Spanish says the other.
+# A change and those that go the other way: what the English may not say where the Spanish says the other. An increase
+# may not stand for a stop or a hold either ("Retirar las benzodiacepinas" is not "Increase benzodiazepines"); a stop
+# may stand beside an increase, since everyday verbs say both ("subir las escaleras", "stop to rest").
 OPPOSITES = {"stop": {"start", "continue"}, "hold": {"start", "continue"}, "start": {"stop", "hold"},
-             "continue": {"stop", "hold"}, "increase": {"decrease"}, "decrease": {"increase"}, "switch": set()}
+             "continue": {"stop", "hold"}, "increase": {"decrease", "stop", "hold"}, "decrease": {"increase"},
+             "switch": set()}
 
 
 def spanish_mentions(said: list[spanish.Token], gaps: list[str] | None = None,
@@ -1002,7 +1014,7 @@ def spanish_mentions(said: list[spanish.Token], gaps: list[str] | None = None,
                 return kind, "present"
         if key in SPANISH_CHANGE and said[j].text not in NOT_CHANGES:
             kind, past = SPANISH_CHANGE[key]
-            return kind, "either" if key in STATES else spanish.tense(said[j], past)
+            return _phrase_after(keys, j) or kind, "either" if key in STATES else spanish.tense(said[j], past)
         if key in SPANISH_TAKE:
             if j >= 2 and keys[j - 1] in ("de", "a") and action_at(j - 2)[0] not in (None, "take"):
                 return action_at(j - 2)  # "dejó de tomar", "empezó a fumar": the change
