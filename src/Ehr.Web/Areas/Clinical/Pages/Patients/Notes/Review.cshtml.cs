@@ -95,7 +95,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
             ? Task.FromResult(ReviewResult.Invalid(FinishAtTheClinic))
             : reviews.RejectAllAndFinishAsync(reviewId, Version, HttpContext.RequestAborted), complete: true);
 
-    public const string FinishAtTheClinic = "Finish this review at the clinic: the conversation is read only on the clinic's network.";
+    public const string FinishAtTheClinic = "Finish this review at the clinic: the conversation can be read only at the clinic.";
 
     // Finishing a visit's review deletes its transcript: at the clinic too, while it is kept.
     public Task<IActionResult> OnPostCompleteAsync(Guid patientId, Guid draftId, Guid reviewId) =>

@@ -87,6 +87,9 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var offSite = await SignInAsync(apps.Cloud, await apps.ClinicianAsync(), via: apps.OnPrem);
         var html = await offSite.Client.GetStringAsync(d.ReviewUrl, Cancel);
         Assert.Contains("Read-only here:", html);
+        Assert.Contains("Finish this review at the clinic: the conversation can be read only at the clinic.", html);
+        Assert.Contains(">The conversation can be read only at the clinic.</p>", html);
+        Assert.DoesNotContain("clinic&#x27;s network", html);
         Assert.Contains("Your chest is clear.", html);
         Assert.DoesNotContain("What brings you in today?", html);
         Assert.DoesNotContain("data-review-controls", html);
