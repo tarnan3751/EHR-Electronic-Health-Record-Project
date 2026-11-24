@@ -29,7 +29,8 @@ five, h01 to h05, are seen (SEEN), not held out: written once the checks of run 
 unseen, in run A2, regression items since, with changes made after seeing them (eval/README.md lists them), and the
 owner's definition of a value filed in the wrong field (2026-11-24) came after their results; their measures are
 reported as seen (scoring_es.score()). Their files stay as sealed, so their fact lists are kept apart, in
-eval/scripts-es-holdout-facts. Held out are those after them, h06 on, written by someone who has seen no results.
+eval/scripts-es-holdout-facts. Held out are the five after them, h06 to h10, written by an agent that had seen no
+results (2026-11-24), their fact lists kept apart too, and run for the first time in run B's window.
 
     uv run eval/dictation_scripts_es.py            # every script: id, voice, spoken words, tags
     uv run eval/dictation_scripts_es.py e07        # e07's spoken text, to read aloud

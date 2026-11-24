@@ -17,9 +17,11 @@ from ehr_eval.scripts import EVAL_DIR
 
 HOLDOUT = load_scripts(HOLDOUT_DIR)
 SCRIPTS = {script.id[:3]: script for script in load_scripts() + HOLDOUT}  # the held-out ones too
-# The five seen scripts' files (h01 to h05), as sealed after run A2 (the decision log's step 17): their fact lists are
-# kept apart.
+# The five seen scripts' files (h01 to h05), as sealed after run A2 (the decision log's step 17), and the five held out
+# (h06 to h10), as their author delivered them (2026-11-24), each sealed apart, so the seen five's seal stays the one
+# run A2 recorded: their fact lists are kept apart.
 SEALED = "7180abd6707bf9f62b19c3b94ee21a3879fc33698f15c866752e7aef032005a9"
+SEALED_HELD_OUT = "39bb769c8ba101dfc4a346ef23aeb86c3f229683faed58ec88cab791b72e4fcb"
 
 
 def test_the_reading_imports_nothing_but_the_standard_library():
@@ -37,14 +39,15 @@ def test_the_scoring_of_changes_reads_neither_the_spanish_checks_nor_the_english
     assert not names & {"translation", "validation"}
 
 
-def test_every_script_has_a_fact_list_the_seen_ones_kept_apart_so_their_files_stay_as_sealed():
+def test_every_script_has_a_fact_list_the_run_only_when_asked_ones_kept_apart_so_their_files_stay_as_sealed():
     assert all(scoring_es.facts_of(script) for script in SCRIPTS.values())
-    seen = [script for script in HOLDOUT if script.id[:3] in SEEN]
-    assert not any(script.facts for script in seen)
+    assert not any(script.facts for script in HOLDOUT)
     kept_apart = {path.name for path in scoring_es.facts_dir(HOLDOUT_DIR).glob("*.toml")}
-    assert {s.path.name for s in seen} <= kept_apart
-    sealed = b"".join(script.path.read_bytes() for script in sorted(seen, key=lambda s: s.path.name))
-    assert hashlib.sha256(sealed).hexdigest() == SEALED
+    assert kept_apart == {s.path.name for s in HOLDOUT}
+    for scripts, seal in (([s for s in HOLDOUT if s.id[:3] in SEEN], SEALED),
+                          ([s for s in HOLDOUT if s.id[:3] not in SEEN], SEALED_HELD_OUT)):
+        sealed = b"".join(script.path.read_bytes() for script in sorted(scripts, key=lambda s: s.path.name))
+        assert hashlib.sha256(sealed).hexdigest() == seal
 
 
 def test_a_script_with_no_fact_list_anywhere_is_refused(tmp_path):

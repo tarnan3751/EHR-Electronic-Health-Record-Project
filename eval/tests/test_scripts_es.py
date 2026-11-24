@@ -261,10 +261,11 @@ def test_the_spanish_sets_voices_and_recordings_are_the_ones_voices_toml_lists()
     assert english.forbidden and english.words <= MAX_LENGTH_WORDS[1] and spanish.forbidden
 
 
-def test_the_first_five_scripts_run_only_when_asked_are_seen_and_any_after_them_held_out():
-    assert [s.id[:3] for s in HOLDOUT][:5] == list(SEEN) == ["h01", "h02", "h03", "h04", "h05"]
-    # Room for h06 on: held out, never seen, numbered after the seen five.
-    assert all(s.id[:3] not in SEEN and s.id[:3] > "h05" for s in HOLDOUT[5:])
+def test_the_first_five_scripts_run_only_when_asked_are_seen_and_the_next_five_held_out():
+    # h01 to h05 are seen (the owner's ruling, 2026-11-24); h06 to h10, written by an agent that had seen no results,
+    # are held out, never run before run B's window.
+    assert [s.id[:3] for s in HOLDOUT] == [f"h{n:02d}" for n in range(1, 11)]
+    assert [s.id[:3] for s in HOLDOUT[:5]] == list(SEEN) and not {s.id[:3] for s in HOLDOUT[5:]} & set(SEEN)
     assert not {s.id for s in SCRIPTS} & {s.id for s in HOLDOUT}
     long, corrected, family, switching, follow_up = HOLDOUT[:5]
     # Sealed before Spanish was limited to 2 minutes (decision 20), they keep the lengths they were written to; they
