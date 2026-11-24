@@ -22382,7 +22382,7 @@
   }
  ],
  "rescored_from": {
-  "scoring": "3dfedaf5885e26127e2e59f710d59d4efd3ddcf705120b60cbfeb4344c347180",
+  "scoring": "9a0438d09bc393cbaebcb4e468a213b07854a1e9151ee8aa543694ef0da57b95",
   "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
   "structuring_outputs_reused": true
  }

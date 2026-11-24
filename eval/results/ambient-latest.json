@@ -143129,7 +143129,7 @@
   }
  },
  "rescored_from": {
-  "scoring": "1ca88e128b1ee87c93991e83c24414b9ab14801e5d7437b15f83a7af3aea2391",
+  "scoring": "9fa2536cf1b3b86d6db18a8514bdb1e5c0156ded89cc82b547a1160b75a0880b",
   "gold_sha256": "044123a6b09a256c8919ae488007b047bd2ffe00b97bdb0be6bcec4a5d6b08e7",
   "structuring_outputs_reused": true
  }
