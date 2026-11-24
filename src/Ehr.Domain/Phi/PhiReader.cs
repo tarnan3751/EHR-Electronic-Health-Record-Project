@@ -1,10 +1,14 @@
 using Ehr.Data;
 using Ehr.Data.Audit;
+using Ehr.Data.Messaging;
 using Ehr.Data.Orders;
 using Ehr.Data.Patients;
+using Ehr.Data.Scheduling;
 using Ehr.Domain.Audit;
+using Ehr.Domain.Messaging;
 using Ehr.Domain.Orders;
 using Ehr.Domain.Patients;
+using Ehr.Domain.Scheduling;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Domain.Phi;
@@ -101,8 +105,19 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id);
 
         await db.SaveChangesAsync(cancellationToken);
+        var soon = DateTimeOffset.UtcNow.AddHours(-1);
+        var upcoming = await AppointmentEntriesAsync(
+            db.Appointments.Where(a => a.PatientId == id && a.Status == AppointmentStatus.Booked && a.StartsAt >= soon).OrderBy(a => a.StartsAt).Take(5),
+            latestFirst: false, cancellationToken);
+        var threads = await db.MessageThreads.AsNoTracking().Where(t => t.PatientId == id)
+            .OrderByDescending(t => t.LastMessageAt).ThenBy(t => t.Id).Take(5)
+            .Select(t => new ThreadEntry(t.Id, t.Subject, t.LastMessageAt,
+                db.Messages.Count(m => m.ThreadId == t.Id && m.SenderKind == MessageSender.Patient && m.ReadAt == null)))
+            .ToListAsync(cancellationToken);
         return new PatientChart(patient, allergies, medications, conditions, encounters, orders)
         {
+            Threads = threads,
+            Upcoming = upcoming,
             DiscontinuedName = discontinuedName,
             ReplacedName = replacedName,
             SensitiveHidden = hidden,
@@ -394,6 +409,149 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         }
 
         return charts;
+    }
+
+    public const string ThreadsTable = "message_threads";
+
+    // A patient's message threads (FR-18), latest first, each with how many messages the reader hasn't opened: the
+    // patient's own in the portal (those from staff), or the chart's for a clinician (those from the patient). One
+    // view of one patient: one recorded read of the patient. Row-level security returns a patient only their own.
+    public async Task<PatientThreads?> ThreadsAsync(Guid patientId, bool asPatient, int limit, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var from = asPatient ? MessageSender.Staff : MessageSender.Patient;
+        var threads = await db.MessageThreads.AsNoTracking().Where(t => t.PatientId == patientId)
+            .OrderByDescending(t => t.LastMessageAt).ThenBy(t => t.Id).Take(limit)
+            .Select(t => new ThreadEntry(t.Id, t.Subject, t.LastMessageAt,
+                db.Messages.Count(m => m.ThreadId == t.Id && m.SenderKind == from && m.ReadAt == null)))
+            .ToListAsync(cancellationToken);
+        var allergies = asPatient ? [] : await CurrentAllergies(patientId).ToListAsync(cancellationToken);
+
+        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new PatientThreads(patient, threads, allergies);
+    }
+
+    // One thread of a patient's, with its messages in order: a recorded read of the thread, whoever reads it. To a
+    // patient, staff messages come from "Your care team" and their own from "You"; to staff, each staff message names
+    // who wrote it. Null when the thread isn't this patient's.
+    public async Task<ThreadDetail?> ThreadAsync(Guid threadId, Guid patientId, bool asPatient, CancellationToken cancellationToken)
+    {
+        var thread = await db.MessageThreads.AsNoTracking().SingleOrDefaultAsync(t => t.Id == threadId && t.PatientId == patientId, cancellationToken);
+        var patient = thread is null ? null : await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (thread is null || patient is null)
+        {
+            return null;
+        }
+
+        var rows = await (
+            from message in db.Messages.AsNoTracking()
+            join staff in db.StaffUsers on message.SenderId equals staff.Id into senders
+            from staff in senders.DefaultIfEmpty()
+            where message.ThreadId == threadId
+            orderby message.SentAt, message.Id
+            select new { message.Id, message.SenderKind, Staff = staff == null ? null : staff.DisplayName, message.Body, message.SentAt, message.ReadAt })
+            .ToListAsync(cancellationToken);
+        var messages = rows.Select(m => new MessageEntry(m.Id, m.SenderKind,
+            m.SenderKind == MessageSender.Patient
+                ? asPatient ? "You" : $"{patient.GivenName} {patient.FamilyName}"
+                : asPatient ? "Your care team" : m.Staff ?? "Staff",
+            m.Body, m.SentAt, m.ReadAt)).ToList();
+        var other = asPatient ? MessageSender.Staff : MessageSender.Patient;
+        var allergies = asPatient ? [] : await CurrentAllergies(patientId).ToListAsync(cancellationToken);
+
+        audit.Record(AuditActions.Read, patient.Id, ThreadsTable, thread.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new ThreadDetail(thread.Id, thread.Subject, patient, allergies, messages,
+            [.. messages.Where(m => m.SenderKind == other && m.ReadAt is null).Select(m => m.Id)]);
+    }
+
+    // How many messages from staff a patient hasn't opened yet, across their conversations: whether they have already
+    // been told there is something to read. A number, about no particular message: not a recorded read.
+    public Task<int> UnreadFromStaffAsync(Guid patientId, CancellationToken cancellationToken) =>
+        db.Messages.CountAsync(m => m.PatientId == patientId && m.SenderKind == MessageSender.Staff && m.ReadAt == null, cancellationToken);
+
+    // Appointments, already chosen and limited, with the names the lists show: the clinician's, a staff account anyone
+    // signed in may read, and the patient's, which the caller records a read of where it shows it. Sorted here, by
+    // start: the joins keep no order.
+    async Task<List<AppointmentEntry>> AppointmentEntriesAsync(IQueryable<Appointment> appointments, bool latestFirst, CancellationToken cancellationToken)
+    {
+        var entries = await (
+            from appointment in appointments.AsNoTracking()
+            join clinician in db.StaffUsers on appointment.ClinicianId equals clinician.Id
+            join patient in db.Patients on appointment.PatientId equals patient.Id
+            select new AppointmentEntry(appointment.Id, appointment.PatientId, patient.FamilyName + ", " + patient.GivenName, patient.Mrn,
+                appointment.ClinicianId, clinician.DisplayName, appointment.StartsAt, appointment.Minutes, appointment.Reason, appointment.Status,
+                appointment.CancelReason, appointment.Version)).ToListAsync(cancellationToken);
+        return [.. latestFirst ? entries.OrderByDescending(a => a.StartsAt).ThenBy(a => a.Id) : entries.OrderBy(a => a.StartsAt).ThenBy(a => a.Id)];
+    }
+
+    // A clinician's day (FR-17): their appointments that start on that day, UTC, earliest first, whatever their
+    // status. Each patient named is a recorded read of that patient, as in a list of patients.
+    public async Task<IReadOnlyList<AppointmentEntry>> ScheduleAsync(Guid clinician, DateOnly day, CancellationToken cancellationToken)
+    {
+        var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        var to = from.AddDays(1);
+        var appointments = await AppointmentEntriesAsync(
+            db.Appointments.Where(a => a.ClinicianId == clinician && a.StartsAt >= from && a.StartsAt < to), latestFirst: false, cancellationToken);
+        if (appointments.Count > 0)
+        {
+            audit.RecordReads(PatientsTable, appointments.Select(a => a.PatientId).Distinct().Select(patient => (patient, patient)));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return appointments;
+    }
+
+    // A patient's appointments, for the portal: one view of one patient, so one recorded read of the patient.
+    // Row-level security returns a patient only their own.
+    public async Task<PatientAppointments?> AppointmentsAsync(Guid patientId, int past, CancellationToken cancellationToken)
+    {
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == patientId, cancellationToken);
+        if (patient is null)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow.AddHours(-1);
+        var mine = db.Appointments.Where(a => a.PatientId == patientId);
+        var upcoming = await AppointmentEntriesAsync(
+            mine.Where(a => a.Status == AppointmentStatus.Booked && a.StartsAt >= now).OrderBy(a => a.StartsAt).Take(50), latestFirst: false, cancellationToken);
+        var earlier = past == 0
+            ? []
+            : await AppointmentEntriesAsync(
+                mine.Where(a => a.Status != AppointmentStatus.Booked || a.StartsAt < now).OrderByDescending(a => a.StartsAt).Take(past),
+                latestFirst: true, cancellationToken);
+
+        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new PatientAppointments(patient, upcoming, earlier);
+    }
+
+    // Whose appointment it is, for the page's gate, which comes before anything is read or shown: the ID of the
+    // patient and nothing else. Not a recorded read; the read that follows the gate is.
+    public Task<Guid?> AppointmentPatientAsync(Guid id, CancellationToken cancellationToken) =>
+        db.Appointments.AsNoTracking().Where(a => a.Id == id).Select(a => (Guid?)a.PatientId).SingleOrDefaultAsync(cancellationToken);
+
+    // One appointment, with its patient and their allergies for the banner: one recorded read of the patient.
+    public async Task<AppointmentDetail?> AppointmentAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var appointment = (await AppointmentEntriesAsync(db.Appointments.Where(a => a.Id == id), latestFirst: false, cancellationToken)).SingleOrDefault();
+        if (appointment is null)
+        {
+            return null;
+        }
+
+        var patient = await db.Patients.AsNoTracking().SingleAsync(p => p.Id == appointment.PatientId, cancellationToken);
+        var allergies = await CurrentAllergies(patient.Id).ToListAsync(cancellationToken);
+        audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new AppointmentDetail(appointment, patient, allergies);
     }
 
     // The signed-in staff member's inbox: the items that still need action, oldest first, or the ones done, newest

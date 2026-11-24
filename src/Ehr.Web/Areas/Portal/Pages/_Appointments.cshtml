@@ -1,0 +1,17 @@
+@* A patient's appointments, as cards down one column (docs/brand: the portal). Dates are written out; times are UTC. *@
+@using Ehr.Data.Scheduling
+@model IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry>
+<ul class="sc-results">
+    @foreach (var appointment in Model)
+    {
+        <li class="sc-result" data-appointment="@appointment.Status">
+            <h3>@appointment.StartsAt.UtcDateTime.ToString("dddd, MMM d, yyyy")</h3>
+            <p>@appointment.StartsAt.UtcDateTime.ToString("HH:mm") UTC, for @appointment.Minutes minutes, with @appointment.Clinician</p>
+            <p>@appointment.Reason</p>
+            @if (appointment.Status != AppointmentStatus.Booked)
+            {
+                <p><span class="sc-tag">@(appointment.Status == AppointmentStatus.Fulfilled ? "Attended" : appointment.Status == AppointmentStatus.NoShow ? "Missed" : "Cancelled")</span></p>
+            }
+        </li>
+    }
+</ul>

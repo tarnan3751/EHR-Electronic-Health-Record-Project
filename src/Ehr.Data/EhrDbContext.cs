@@ -56,6 +56,14 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<ChartHistoryEntry> ChartHistory => Set<ChartHistoryEntry>();
 
+    // Secure messages between a patient and their care team (FR-18; PHI).
+    public DbSet<Messaging.MessageThread> MessageThreads => Set<Messaging.MessageThread>();
+
+    public DbSet<Messaging.Message> Messages => Set<Messaging.Message>();
+
+    // Appointments (FR-17; PHI).
+    public DbSet<Scheduling.Appointment> Appointments => Set<Scheduling.Appointment>();
+
     // What needs a staff member's action (PHI: an item names a patient).
     public DbSet<Inbox.InboxItem> InboxItems => Set<Inbox.InboxItem>();
 

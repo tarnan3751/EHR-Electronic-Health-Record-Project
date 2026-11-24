@@ -1120,6 +1120,46 @@
         font-weight: 600;
     }
 
+    /* A conversation: messages oldest first, each in its own block. The reader's own are set in from the left, and
+       marked with the accent bar, so who wrote what is clear without color alone (each also says who). */
+    .sc-thread {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        gap: var(--space-3);
+        max-width: var(--width-reading);
+    }
+
+    .sc-message {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+    }
+
+    .sc-message--mine {
+        margin-inline-start: var(--space-6);
+        border-inline-start: 3px solid var(--accent);
+    }
+
+    .sc-message__head {
+        margin: 0 0 var(--space-1);
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
+    }
+
+    .sc-message__head strong {
+        color: var(--ink);
+    }
+
+    .sc-message__body {
+        margin: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
     /* Table container: a border round the table, a header that stays in view, and room to scroll when narrow. */
     .sc-table-wrap {
         border: 1px solid var(--line);

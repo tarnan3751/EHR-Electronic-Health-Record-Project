@@ -1040,3 +1040,93 @@ VALUES ('20261123180030_InboxItems', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.appointments (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    clinician_id uuid NOT NULL,
+    starts_at timestamp with time zone NOT NULL,
+    minutes integer NOT NULL,
+    reason character varying(200) NOT NULL,
+    status character varying(20) NOT NULL,
+    cancel_reason character varying(500),
+    encounter_id uuid,
+    booked_by_id uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    booked_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_appointments PRIMARY KEY (id),
+    CONSTRAINT ck_appointments_cancelled CHECK ((status = 'cancelled') = (cancel_reason IS NOT NULL)),
+    CONSTRAINT ck_appointments_minutes CHECK (minutes BETWEEN 5 AND 240),
+    CONSTRAINT ck_appointments_status CHECK (status IN ('booked', 'cancelled', 'fulfilled', 'noshow')),
+    CONSTRAINT ck_appointments_visit CHECK ((status = 'fulfilled') = (encounter_id IS NOT NULL)),
+    CONSTRAINT fk_appointments_encounters_encounter_id FOREIGN KEY (encounter_id) REFERENCES ehr.encounters (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appointments_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appointments_staff_users_booked_by_id FOREIGN KEY (booked_by_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appointments_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_appointments_booked_by_id ON ehr.appointments (booked_by_id);
+
+CREATE INDEX ix_appointments_clinician_id_starts_at ON ehr.appointments (clinician_id, starts_at);
+
+CREATE UNIQUE INDEX ix_appointments_encounter_id ON ehr.appointments (encounter_id);
+
+CREATE INDEX ix_appointments_patient_id_starts_at ON ehr.appointments (patient_id, starts_at);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261123190010_Appointments', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE ehr.appointments ADD version integer NOT NULL DEFAULT 1;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261123190020_AppointmentVersion', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE ehr.message_threads (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    subject character varying(150) NOT NULL,
+    started_at timestamp with time zone NOT NULL DEFAULT (now()),
+    last_message_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_message_threads PRIMARY KEY (id),
+    CONSTRAINT fk_message_threads_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.messages (
+    id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    sender_kind character varying(20) NOT NULL,
+    sender_id uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    body character varying(4000) NOT NULL,
+    sent_at timestamp with time zone NOT NULL DEFAULT (now()),
+    read_at timestamp with time zone,
+    CONSTRAINT pk_messages PRIMARY KEY (id),
+    CONSTRAINT ck_messages_sender_kind CHECK (sender_kind IN ('patient', 'staff')),
+    CONSTRAINT fk_messages_message_threads_thread_id FOREIGN KEY (thread_id) REFERENCES ehr.message_threads (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_messages_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_message_threads_patient_id_last_message_at ON ehr.message_threads (patient_id, last_message_at);
+
+CREATE INDEX ix_messages_patient_id ON ehr.messages (patient_id);
+
+CREATE INDEX ix_messages_thread_id_sent_at ON ehr.messages (thread_id, sent_at);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261123190030_Messages', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE INDEX ix_messages_unread_from_staff ON ehr.messages (patient_id) WHERE sender_kind = 'staff' AND read_at IS NULL;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261124052432_UnreadMessagesIndex', '10.0.13');
+
+COMMIT;
+

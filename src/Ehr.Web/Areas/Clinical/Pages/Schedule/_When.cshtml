@@ -1,0 +1,42 @@
+@using Ehr.Domain.Scheduling
+@model Ehr.Web.Areas.Clinical.Pages.Schedule.WhenFields
+@{
+    string? Error(string field) => Model.Errors.GetValueOrDefault(field);
+}
+<div class="sc-field">
+    <label for="appointment-day">Day <span>(required)</span></label>
+    <input type="date" id="appointment-day" class="sc-field__input" name="Day" value="@Model.Day" required
+           aria-invalid="@(Error("Day") is null ? null : "true")" aria-describedby="@(Error("Day") is null ? null : "appointment-day-error")">
+    @if (Error("Day") is { } dayError)
+    {
+        <p class="sc-field__error" id="appointment-day-error">@dayError</p>
+    }
+</div>
+<div class="sc-field">
+    <label for="appointment-time">Time, UTC <span>(required)</span></label>
+    <input type="time" id="appointment-time" class="sc-field__input" name="Time" value="@Model.Time" required
+           aria-invalid="@(Error("Time") is null ? null : "true")" aria-describedby="@(Error("Time") is null ? null : "appointment-time-error")">
+    @if (Error("Time") is { } timeError)
+    {
+        <p class="sc-field__error" id="appointment-time-error">@timeError</p>
+    }
+</div>
+<div class="sc-field">
+    <label for="appointment-minutes">Length</label>
+    <select id="appointment-minutes" class="sc-field__input" name="Minutes" aria-invalid="@(Error("Minutes") is null ? null : "true")">
+        @foreach (var minutes in Appointments.Lengths)
+        {
+            <option value="@minutes" selected="@(minutes == Model.Minutes)">@minutes minutes</option>
+        }
+    </select>
+</div>
+<div class="sc-field">
+    <label for="appointment-reason">Reason for the visit <span>(required)</span></label>
+    <input id="appointment-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="@Appointments.MaximumLength" autocomplete="off" required
+           aria-invalid="@(Error("Reason") is null ? null : "true")" aria-describedby="@(Error("Reason") is null ? "appointment-reason-hint" : "appointment-reason-error appointment-reason-hint")">
+    @if (Error("Reason") is { } reasonError)
+    {
+        <p class="sc-field__error" id="appointment-reason-error">@reasonError</p>
+    }
+    <p class="sc-field__hint" id="appointment-reason-hint">The patient sees this in the portal.</p>
+</div>
