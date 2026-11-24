@@ -260,12 +260,47 @@ def test_the_answer_as_written_is_kept_only_when_asked_even_one_the_sidecar_refu
     assert keeping("not json").answer == "not json"
 
 
+TEST_SET = sorted(script_id for script_id in SCRIPTS if script_id.startswith("e"))
+
+
 def test_scoring_again_needs_somewhere_to_write(tmp_path):
     stored = tmp_path / "run.json"
-    stored.write_text(json.dumps(stored_run("e01-hta-control")), encoding="utf-8")
+    stored.write_text(json.dumps(stored_run(*TEST_SET)), encoding="utf-8")
     assert run_a.main(["--rescore", str(stored)]) == 2
     assert run_a.main(["--rescore", str(stored), "--out", str(tmp_path / "again.json")]) == 0
     assert json.loads((tmp_path / "again.json").read_text(encoding="utf-8"))["rescored"]
+
+
+# The product owner's rule: a script that timed out is a failure in every measure, or the run is repeated; never left
+# out. A results file missing a script, holding one twice, or with one neither sorted nor failed isn't scored again.
+@pytest.mark.parametrize(("change", "says"), [
+    (lambda items: items[1:], "no item for e01-hta-control"),
+    (lambda items: [*items, items[0]], "held twice: e01-hta-control"),
+    (lambda items: [{**items[0], "sorting": "skipped", "fields": {}}, *items[1:]], "neither sorted nor failed: e01"),
+])
+def test_a_results_file_that_isnt_a_whole_run_is_refused(tmp_path, capsys, change, says):
+    stored = stored_run(*TEST_SET)
+    stored["items"] = change(stored["items"])
+    (tmp_path / "run.json").write_text(json.dumps(stored), encoding="utf-8")
+
+    assert run_a.main(["--rescore", str(tmp_path / "run.json"), "--out", str(tmp_path / "again.json")]) == 2
+    assert says in capsys.readouterr().err and not (tmp_path / "again.json").exists()
+
+
+def test_a_script_that_timed_out_is_a_failure_in_every_measure_and_a_partial_run_says_it_is_incomplete():
+    timed_out = scoring_es.SpanishItem(variant="e14-nino-sano--text", script="e14-nino-sano", tags=[], hypothesis="",
+                                       sorting="unavailable", reason="model_timeout")
+    metrics = scoring_es.score([timed_out, run("e16-anadido-corto", gold_answer("e16-anadido-corto"))], SCRIPTS)
+
+    crossed = {name: over for name, over, _ in scoring_es.thresholds(metrics)}
+    assert crossed[next(name for name in crossed if name.startswith("a script not sorted"))]
+    assert metrics["fields"]["detection"]["fn"] == sum(bool(s) for s in SCRIPTS["e14-nino-sano"].statements.values())
+    assert metrics["fields"]["content"]["recall"] < 1.0
+    with_gold = sum(bool(g.value) for g in SCRIPTS["e14-nino-sano"].gold.values())
+    assert metrics["discarded"]["discarded"] == with_gold  # e16's gold answer discards nothing
+    gap = run_a.incomplete([dataclasses.asdict(timed_out)], TEST_SET)
+    assert gap.startswith("no item for e01-hta-control") and "e14" not in gap  # timed out is there, as a failure
+    assert run_a.summary(metrics, None, gap).startswith("INCOMPLETE, not run A")
 
 
 def test_a_run_of_the_held_out_scripts_is_scored_again_against_them():
@@ -276,8 +311,9 @@ def test_a_run_of_the_held_out_scripts_is_scored_again_against_them():
 # ---- The results file, written as the run goes ----------------------------------------------------------------------
 
 
-def run_a_with(tmp_path, monkeypatch, fault: str) -> dict:  # noqa: ANN001
-    """Run A on e14 alone, with a stand-in for llama-server and a fault in the checks or the scoring: what it left."""
+def run_a_with(tmp_path, monkeypatch, fault: str, only: tuple[str, ...] = ("--only", "e14")) -> dict:  # noqa: ANN001
+    """Run A (on e14 alone, unless `only` says otherwise) with a stand-in for llama-server answering e14's gold, and a
+    fault in the checks or the scoring: what it left."""
     content = gold_answer("e14-nino-sano")
     monkeypatch.setattr(run_a, "LlamaServer", lambda url, key: llama_server(content))
     monkeypatch.setattr(run_a.provenance, "load", lambda models_dir, verify: Models(
@@ -291,21 +327,22 @@ def run_a_with(tmp_path, monkeypatch, fault: str) -> dict:  # noqa: ANN001
     monkeypatch.setattr(*{"scoring": (scoring_es, "score"), "checks": (translation, "check")}[fault], fails)
     out = tmp_path / "run-a.json"
     with pytest.raises(RuntimeError, match=f"a fault in the {fault}"):
-        run_a.main(["--llama-url", "http://llama.test", "--models-dir", str(tmp_path), "--only", "e14",
+        run_a.main(["--llama-url", "http://llama.test", "--models-dir", str(tmp_path), *only,
                     "--machine", "stand-ins", "--out", str(out)])
     monkeypatch.undo()
     return json.loads(out.read_text(encoding="utf-8"))
 
 
 def test_a_fault_in_the_scoring_leaves_every_answer_for_rescore_to_finish(tmp_path, monkeypatch, capsys):
-    stored = run_a_with(tmp_path, monkeypatch, "scoring")
-    (item,) = stored["items"]
-    assert "metrics" not in stored and "thresholds" not in stored and item["fields"]["objective"]["status"] == "pending"
+    stored = run_a_with(tmp_path, monkeypatch, "scoring", only=())  # the whole set: a partial run isn't scored again
+    e14 = next(item for item in stored["items"] if item["script"] == "e14-nino-sano")
+    assert "metrics" not in stored and "thresholds" not in stored and e14["fields"]["objective"]["status"] == "pending"
+    assert sorted(item["script"] for item in stored["items"]) == TEST_SET
 
     (tmp_path / "stopped.json").write_text(json.dumps(stored), encoding="utf-8")
     assert run_a.main(["--rescore", str(tmp_path / "stopped.json"), "--out", str(tmp_path / "finished.json")]) == 0
     finished = json.loads((tmp_path / "finished.json").read_text(encoding="utf-8"))
-    assert finished["metrics"]["fields"]["content"]["f1"] == 1.0 and len(finished["thresholds"]) == 5
+    assert finished["metrics"]["fields"]["content"]["f1"] is not None and len(finished["thresholds"]) == 5
     assert "discarded before: not scored" in capsys.readouterr().out
 
 

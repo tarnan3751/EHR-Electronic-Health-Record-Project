@@ -247,6 +247,20 @@ def test_an_item_not_sorted_fails(spanish_dir):
     assert "didn't sort every Spanish recording and text" in problem
 
 
+# The product owner's rule: a timed-out item is a failure in every measure, or the run is repeated; never skipped.
+def test_an_item_marked_skipped_fails(spanish_dir):
+    def skipped(item: scoring_es.SpanishItem) -> scoring_es.SpanishItem:
+        if item.variant != "e16-anadido-corto--clean":
+            return item
+        return dataclasses.replace(item, sorting="skipped", fields={})
+
+    save(spanish_dir, "latest-es.json", results(spanish_dir, change=skipped))
+
+    found = problems(spanish_dir)
+    assert any("neither sorted nor failed (e16-anadido-corto--clean)" in p for p in found)
+    assert any("didn't sort every Spanish recording and text" in p for p in found)
+
+
 def test_stored_answers_that_cant_be_scored_again_fail(spanish_dir):
     def misheard(item: scoring_es.SpanishItem) -> scoring_es.SpanishItem:
         return dataclasses.replace(item, hypothesis="Not what was heard.") if item.variant == "e01-hta-control--clean" else item

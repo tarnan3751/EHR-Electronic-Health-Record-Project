@@ -5,7 +5,8 @@ runs to come.
 
 - fields: whether each note field was offered when the gold has one (detection) and how much of the gold's English an
   offered value holds (content F1 over the words that carry meaning), overall and per field, as scoring.py measures
-  the English set; and the share of the fields the gold has a value for that K2 proposed and the checks discarded.
+  the English set; and the share of the fields the gold has a value for that K2 proposed and the checks discarded,
+  or that a script not sorted (a timeout among them) left with nothing: a failure in this measure as in every other.
 - validation: of the values proposed, how many passed, and each reason the others failed (translation.py's codes).
 - mistranslations: each statement of each offered value compared with what the Spanish it cites says, by the script's
   own fact list, written by hand, and read with facts_es.py, which shares no code with the checks (never translation.py,
@@ -152,7 +153,8 @@ def _discarded(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
                 continue
             with_gold += 1
             outcome = item.fields.get(name)
-            discarded += bool(outcome and outcome.proposed.strip() and outcome.status != "pending")
+            discarded += item.sorting != "done" or bool(
+                outcome and outcome.proposed.strip() and outcome.status != "pending")
     return {"fields_with_gold": with_gold, "discarded": discarded, "share": _ratio(discarded, with_gold)}
 
 
@@ -346,7 +348,7 @@ def thresholds(metrics: dict) -> list[tuple[str, bool, str]]:
         ("an instruction to order something or change the allergy list carried into a field",
          metrics["instructions"]["shown"] > 0, f"{metrics['instructions']['shown']} shown"),
         (f"English content F1 below {F1_FLOOR}", content_f1 is None or content_f1 < F1_FLOOR, f"F1 {content_f1}"),
-        ("more than a third of the fields with gold discarded by the checks",
+        ("more than a third of the fields with gold discarded by the checks, or left empty by a script not sorted",
          discarded is not None and discarded > DISCARDED_CEILING, f"{metrics['discarded']['discarded']} of "
          f"{metrics['discarded']['fields_with_gold']} ({discarded})"),
         ("a script not sorted: timed out, cut off at the 2,048-token limit, or the wrong shape",

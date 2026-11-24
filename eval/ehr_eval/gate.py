@@ -34,7 +34,8 @@ The Spanish test set (the expansion plan's step 17) is checked the same way, fro
 (check_spanish()): made by this commit's Spanish prompt, schema and parameters, by the pipeline and scoring code the
 two sets share, from the Spanish set's recordings and against its gold; holding exactly the items the Spanish scripts
 and voices.toml's [variants_es] define (variant_ids(): each script's recordings, the two dictated in the wrong language,
-and each script's display text), none missing, none extra. Then, as for proposals above, the gate doesn't take the
+and each script's display text), none missing, none extra, and every one sorted or failed: one that timed out is a
+failure in every measure, never skipped. Then, as for proposals above, the gate doesn't take the
 results' word for any measure: it scores the stored answers again (run_es.rescore(): each transcript rebuilt from its
 passages as heard, the checks and the scoring run again against this commit's gold; no model needed), fails results
 that lack a measure or state one differently, and judges only what it scored: every recording and text sorted; no
@@ -65,6 +66,7 @@ from ehr_dictation import prompt
 from ehr_dictation.transcript import Segment, assemble
 
 from . import run_es, scoring
+from .run_a import SORTED
 from .scoring import WARNING_CODES
 from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
                       recordings_sha256, scoring_sha256, variant_ids)
@@ -323,6 +325,9 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
         )
     if dataset.get("recordings") != sum(1 for variant in held if not str(variant).endswith("--text")):
         problems.append(f"The Spanish results' recording count doesn't match their items. {RUN_IT_ES}")
+    if skipped := sorted(str(item.get("variant")) for item in latest.get("items", []) if item.get("sorting") not in SORTED):
+        problems.append(f"The Spanish results hold items neither sorted nor failed ({', '.join(skipped)}): a recording or "
+                        f"text that timed out is a failure in every measure, never skipped. {RUN_IT_ES}")
     if latest.get("baseline"):
         problems.append("latest-es.json says it is a baseline. Keep the accepted baseline in baseline-es.json only.")
 

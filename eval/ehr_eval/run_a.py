@@ -31,7 +31,11 @@ checks and scores a run's stored answers again with the current checks, scoring 
 prints, for each script, what the first threshold counted before (as stored) and after, what is misfiled, the fields
 discarded and why, and the content F1, before and after ("not scored" before, for a run that stopped before its
 measures). Answers stored by field, before the answer was one list, are checked field by field. It refuses a script
-whose text has changed since the run.
+whose text has changed since the run, and a results file that isn't a whole run of its set: a script with no item, one
+held twice, or one neither sorted nor failed (incomplete()). A script that timed out is a failure in every measure,
+never left out: it isn't sorted (the last threshold), its gold fields count as missed in content F1 and as discarded,
+and a run without it is repeated. A run made with --only says in its summary's first line that it is incomplete, so
+its thresholds can't be taken for run A's.
 """
 
 from __future__ import annotations
@@ -200,8 +204,27 @@ def diagnostic(timeout: float, keep_answers: bool) -> list[str]:
     return reasons + (["the model's answers kept"] if keep_answers else [])
 
 
-def summary(metrics: dict, diagnosed: list[str] | None = None) -> str:
+SORTED = {"done", "unavailable"}  # an item answered, or failed (a timeout among them): anything else was skipped
+
+
+def incomplete(items: list[dict], scripts: list[str]) -> str | None:
+    """Why a results file isn't a whole run of its set, or None: a script with no item, one held twice, or an item
+    neither answered nor failed. A script that timed out is a failure in every measure (it is not sorted, its gold
+    fields count as missed in F1 and as discarded), never left out: a run without it is repeated."""
+    held = [item.get("script") for item in items]
+    reasons = []
+    if missing := sorted(set(scripts) - set(held)):
+        reasons.append(f"no item for {', '.join(missing)}")
+    if twice := sorted({script for script in held if held.count(script) > 1}):
+        reasons.append(f"held twice: {', '.join(twice)}")
+    if skipped := sorted(item.get("script") for item in items if item.get("sorting") not in SORTED):
+        reasons.append(f"neither sorted nor failed: {', '.join(skipped)}")
+    return "; ".join(reasons) or None
+
+
+def summary(metrics: dict, diagnosed: list[str] | None = None, gap: str | None = None) -> str:
     lines = [f"DIAGNOSTIC, not run A ({'; '.join(diagnosed)}): its thresholds decide nothing."] if diagnosed else []
+    lines += [f"INCOMPLETE, not run A ({gap}): its thresholds decide nothing."] if gap else []
     lines += ["", "Run A against the stop thresholds (any crossed stops the step for the owner):"]
     crossed = False
     for name, over, measured in scoring_es.thresholds(metrics):
@@ -285,7 +308,7 @@ async def main_async(args: argparse.Namespace) -> int:
     await llama.aclose()
     metrics = scoring_es.score(items, scripts)
     save(items, metrics)
-    print(summary(metrics, diagnosed))
+    print(summary(metrics, diagnosed, incomplete([dataclasses.asdict(item) for item in items], list(scripts))))
     print(f"Wrote {args.out}")
     return 0
 
@@ -385,6 +408,10 @@ def main_rescore(args: argparse.Namespace) -> int:
         return 2
     stored = json.loads(args.rescore.read_text(encoding="utf-8"))
     scripts = {s.id: s for s in load_scripts(stored_scripts_dir(stored))}
+    if gap := incomplete(stored["items"], list(scripts)):
+        print(f"{args.rescore} isn't a whole run of its {len(scripts)} scripts ({gap}): a script that timed out is a "
+              "failure in every measure, never left out. Run it again whole.", file=sys.stderr)
+        return 2
     results, _ = rescore(stored, scripts)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
