@@ -22,7 +22,10 @@ runs to come.
   statements that say one. Counted apart from what is changed, under the same rule: any without a warning stops the
   step too (the first scorer counted these as changed; the owner asked that a passage filed in the wrong field still
   count against the score), and the gate holds the Spanish results to it (gate.py). Content F1 counts it as well, per
-  field: the passage's words lower precision where it was filed and recall where it belonged.
+  field: the passage's words lower precision where it was filed and recall where it belonged. Not everything the first
+  scorer counted: facts_es.py reads a number word only before a unit, a period or "times" ("three flights" is
+  invisible), and a drug only by the scripts' names (drug_names()). And any one warning on a field exempts every changed
+  or misfiled value in it from the stop lines (e12's Plan always carries ambiguous_frequency).
 - ambiguous_offered: every statement shown from a passage whose number reads two ways ("5.000", a fact entry that
   says refuse), with the passage as the transcript has it and whether it is written so there; the checks leave its
   field for the clinician while it is, and e16's gold for it is empty. It is compared with what was said all the same

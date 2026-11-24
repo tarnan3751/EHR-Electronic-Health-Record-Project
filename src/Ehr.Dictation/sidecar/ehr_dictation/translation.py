@@ -54,7 +54,8 @@ statement:
      (drug_dropped), so a drug no list knows can't be swapped in for one the clinician said;
    - sides (a capital R or L and "rt", "lt" too), routes (intrathecal, epidural, "IV push" and the others too),
      severity (every degree spanish.SEVERITY allows, from "slight" and "scant" to "excruciating" and "worst", is read in
-     the English: one the Spanish's severity words don't allow is refused, so "Dolor leve" is not "Excruciating pain"),
+     the English: one the Spanish's severity words don't allow is refused, so "Dolor leve" is not "Excruciating pain";
+     its limit: per statement and in order, not per finding, so "Dolor leve y fiebre" as "Pain and mild fever" passes),
      dose forms (tablets, syrup, a patch: spanish.DOSE_FORMS) and abbreviations, however they are written
      ("hiv", "nsaids": CLINICAL_ABBREVIATIONS): no more (side_, route_, severity_, dose_form_ and
      abbreviation_not_in_sources);
@@ -75,7 +76,8 @@ statement:
      the Spanish doesn't name is refused as a drug is (drug_not_in_sources). And where what a change is said of can't
      be read ("suspender la sonda"), the English may say no change of anything that goes the other way from one the
      Spanish says (OPPOSITES: "Keep the catheter"), failing closed; any other change it may, since everyday verbs say
-     changes too ("subir las escaleras", "stop to rest"). The verbs
+     changes too ("subir las escaleras", "stop to rest"). Its limit: only a drug, a class, a dose or a habit within
+     ACTION_REACH words of its verb is read, and a change of anything else only where it goes the other way. The verbs
      are generated from their infinitives (spanish.conjugate()), with the pronouns a command takes ("suspéndala");
      "baja" and "continua", unaccented, are adjectives ("dosis baja");
    - a negation, uncertainty, the past, or someone other than the patient having it, read in the transcript as
@@ -107,7 +109,11 @@ statement:
      are the past, as "years ago", "last year", "in the past", "previously", "prior", "previous", "old" and "remote"
      are (MORE_ENGLISH, read as validation.py's own cues are); and "en la familia" is someone else, as "in the family"
      is. Having had something ("tuvo", "tenía", "padeció") written as having it now ("is having", "currently", "now",
-     "active") is history_dropped, unless the Spanish says now too ("actualmente");
+     "active") is history_dropped, unless the Spanish says now too ("actualmente"). Their limits: each kind is
+     compared per statement, and kept on its clause only for findings both languages spell alike or the glossary names
+     (below), so a negation or a doubt moved between two other findings passes; and who has a finding is read from the
+     relative forward in its clause (a relative clause from its verb on), so an appositive ("su madre, diabética, la
+     acompaña") isn't tied to them;
    - in order, and paired: numbers, how long, drugs, sides, routes, severity, how often, relatives and medication
      changes each come in the English in the Spanish's order, some left out but none moved (order_changed): "TA 142
      sobre 88" is not "BP 88/142", nor "Suspender metformina e iniciar insulina" "Start metformin and stop insulin"; a

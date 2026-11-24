@@ -14,10 +14,12 @@
   discarded, or that a recording not sorted left with nothing, as the Spanish set measures it (scoring_es.py).
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - misfiled: each value an offered value's sentence says (facts_es.py's reading: a number, drug, frequency, date, how
-  long, route, side, severity, polarity or medication change) that its field's rule-following gold doesn't, with
-  whether the field carries a warning, and the share of offered sentences that say one; as the Spanish set counts its
-  statements' values (scoring_es.py), and beside content F1, which counts it too. The gate doesn't judge it here;
-  run_a_en.py sets it against run A's misfiled line.
+  long, route, side, severity, polarity or medication change, as kind, label and value) that its field's rule-following
+  gold doesn't, with whether the field carries a warning, and the share of offered sentences that say one; beside
+  content F1, which counts it too. Near the Spanish set's count (scoring_es.py), not the same: the Spanish counts only a
+  value the facts of the passage it cites back, with the fact list's names as labels; there are no English fact lists,
+  so every value the gold lacks counts, with its label as written (a drug name misheard on a recording reads as a
+  value missing from its field). The gate doesn't judge it here; run_a_en.py sets it against run A's misfiled line.
 - order_allergy (on what the sidecar sends for an offered field: the value with any instruction cut out of it): offered
   values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), found as the
   script says it or as the transcript heard it (_as_heard()), retracted (a value the clinician corrected away), or a
