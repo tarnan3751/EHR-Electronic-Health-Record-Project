@@ -175,7 +175,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         PostFormAsync(client ?? dictated.Session.Client, dictated.ReviewPath + "?handler=DismissProposal", dictated.ReviewPath, ("ChartProposalId", proposal));
 
     // TC-UC10-09, through the web app: what the service proposes comes back with the result as it sent it, at its listed
-    // instructions' places, in no field; staging keeps each as a waiting proposal of its review, in its order, and puts
+    // instructions' places, with what was heard after it, in no field; staging keeps each as a waiting proposal of its review, in its order, and puts
     // nothing on the chart.
     [Fact]
     public async Task TC_UC10_09_a_dictated_order_and_allergy_come_back_proposed_in_no_field_and_are_staged_waiting()
@@ -187,7 +187,8 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["order", "allergy_addition"], proposals.Select(p => (string)p!["kind"]!));
         Assert.Equal([DictationSidecarStub.OrderSaid, DictationSidecarStub.AllergySaid], proposals.Select(p => text[(int)p!["start"]!..(int)p!["end"]!]));
         Assert.Equal(proposals.Select(p => $"{p!["start"]}:{p["end"]}"), json["notCarriedOver"]!.AsArray().Select(i => $"{i!["start"]}:{i["end"]}"));
-        Assert.Equal(["end", "kind", "start", "warnings"], proposals[0]!.AsObject().Select(property => property.Key).Order(StringComparer.Ordinal));
+        Assert.Equal(["end", "heardAfter", "kind", "start", "warnings"], proposals[0]!.AsObject().Select(property => property.Key).Order(StringComparer.Ordinal));
+        Assert.Equal(DictationSidecarStub.AllergySaid + ".", text[(int)proposals[0]!["heardAfter"]!["start"]!..(int)proposals[0]!["heardAfter"]!["end"]!]);
         Assert.DoesNotContain("lipid", json["fields"]!.ToJsonString(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("penicillin", json["fields"]!.ToJsonString(), StringComparison.OrdinalIgnoreCase);
 
@@ -226,9 +227,38 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
                 stopped.Review));
     }
 
+    // TC-UC13-10 with the service's own answer (step 15.1, at the owner's word): a plain order said with a refusal after
+    // it that the service's rules don't read, one of the trick sentences the owner accepted by name, pinned as the
+    // sidecar's real code answers it (src/Ehr.Dictation/contract). The review shows what was heard after each proposal,
+    // exactly where the service found it, as said and beside the way into its form, with nothing that judges it.
+    [Fact]
+    public async Task TC_UC13_10_a_refusal_heard_after_a_proposal_is_shown_beside_it_as_the_service_found_it()
+    {
+        var body = JsonNode.Parse(await File.ReadAllTextAsync(
+            RepositoryRoot.Combine("src/Ehr.Dictation/contract/result-200-done-proposal_heard_after.json"), Cancel))!["body"]!;
+        var text = (string)body["transcript"]!["text"]!;
+        var heard = body["proposals"]!.AsArray().Select(p => text[(int)p!["heardAfter"]!["start"]!..(int)p["heardAfter"]!["end"]!]).ToList();
+        Assert.Equal(["She turned down the blood test.", "She turned down the blood test."], heard);
+        var stopped = await StopAsync(apps);
+        sidecar.Answer = (HttpStatusCode.OK, body.ToJsonString());
+        using (var staged = await StageAsync(stopped))
+        {
+            Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
+        }
+
+        var html = await stopped.Session.Client.GetStringAsync($"/patients/{stopped.Patient}/notes/drafts/{stopped.Draft}/review/{stopped.Review}", Cancel);
+        var section = html[html.IndexOf("<section data-chart-proposals", StringComparison.Ordinal)..];
+        var said = RefillRequestTests.Said(section[..section.IndexOf("</section>", StringComparison.Ordinal)]);
+        Assert.Contains("As heard: Order a CBC. Heard after it: She turned down the blood test. Open in the order form", said);
+        Assert.Equal(2, CountOf(said, "Heard after it: She turned down the blood test."));
+        Assert.DoesNotContain("retract", said, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("refus", said, StringComparison.OrdinalIgnoreCase);
+    }
+
     // TC-UC10-11: a result that proposes anything but its listed instructions, each of its kind, once, from a final
-    // transcript, with a proposal's warnings, at most twenty, is never staged: the service's answer is refused, and neither
-    // a proposal nor a field is kept. A kind the contract doesn't know fails the read itself.
+    // transcript, with a proposal's warnings and what was heard after it in the transcript after it, at most twenty, is
+    // never staged: the service's answer is refused, and neither a proposal nor a field is kept. A kind the contract
+    // doesn't know fails the read itself.
     [Theory]
     [InlineData("not-listed")]
     [InlineData("other-kind")]
@@ -236,6 +266,8 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("too-many")]
     [InlineData("field-warning")]
     [InlineData("warning-range")]
+    [InlineData("heard-after-range")]
+    [InlineData("heard-after-before")]
     [InlineData("not-final")]
     [InlineData("unknown-kind")]
     public async Task TC_UC10_11_a_proposal_that_isnt_one_of_the_listed_instructions_is_never_staged(string fault)
@@ -272,6 +304,13 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             case "warning-range":
                 proposals[1]!["warnings"]![0]!["end"] = 1_000_000;
                 break;
+            case "heard-after-range":
+                proposals[0]!["heardAfter"]!["end"] = 1_000_000;
+                break;
+            case "heard-after-before":
+                // What was heard after it, starting before the instruction ends.
+                proposals[0]!["heardAfter"]!["start"] = (int)proposals[0]!["end"]! - 1;
+                break;
             case "not-final":
                 // Speech recognition failed on the rest of the recording: the transcript is as it was live, not final.
                 json["sorting"] = "unavailable";
@@ -295,7 +334,8 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // TC-UC13-10: the review lists each proposal under "Proposed orders and allergies": its kind, awaiting review, the
-    // clinician's words labelled as heard and marked in the sentence they said them in and the one before, its warnings with the words they point
+    // clinician's words labelled as heard and marked in the sentence they said them in and the one before, what was heard
+    // after it (step 15.1; the allergy's sentence after the order, nothing after the allergy), its warnings with the words they point
     // at, and the way into its form; the order's into the order form, the allergy's into the allergy form. Only the
     // dictating clinician sees them: not a colleague with the patient on their panel (TC-UC1-24 opens the order form
     // with one as the colleague).
@@ -306,8 +346,9 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var html = await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel);
         var said = RefillRequestTests.Said(html);
         Assert.Contains("Proposed orders and allergies", said);
-        Assert.Contains("Dictation proposes these from what you said and places or saves none of them.", said);
-        Assert.Contains($"Order Awaiting review As heard: Chest is clear. {DictationSidecarStub.OrderSaid}.", said);
+        Assert.Contains("Dictation proposes these from what you said and places or saves none of them. Each shows what you said after it.", said);
+        Assert.Contains($"Order Awaiting review As heard: Chest is clear. {DictationSidecarStub.OrderSaid}. Heard after it: {DictationSidecarStub.AllergySaid}. Open in the order form", said);
+        Assert.Equal(1, CountOf(html, "data-chart-proposal-heard-after"));
         Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
         Assert.Contains("Check: you may have corrected this just after it: “penicillin”", said);

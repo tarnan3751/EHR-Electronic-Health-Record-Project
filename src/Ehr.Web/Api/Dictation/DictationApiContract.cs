@@ -159,8 +159,12 @@ public enum Instruction
 // dictated plainly. Where they said it, the place of its listed instruction (offsets as in TranscriptSegment), and where
 // something may have changed it: possible_correction and near_unclear_passage, as on a field. Never anything the model
 // wrote. It is proposed, never placed or saved: only the clinician who dictated it may open it in the order form or the
-// allergy form, which fill in nothing from it, or dismiss it.
-public sealed record ChartProposal(ProposalKind Kind, int Start, int End, IReadOnlyList<FieldWarning> Warnings);
+// allergy form, which fill in nothing from it, or dismiss it. HeardAfter is where what the clinician said after it is
+// (the sentence after its own, and those after that up to another instruction; validation.heard_after()), which the
+// review shows beside it, so a retraction the service's rules don't read is in view; null when nothing follows, and in a
+// result stored before step 15.1. Never written when it is null.
+public sealed record ChartProposal(ProposalKind Kind, int Start, int End, IReadOnlyList<FieldWarning> Warnings,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SourceSpan? HeardAfter = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ProposalKind>))]
 public enum ProposalKind

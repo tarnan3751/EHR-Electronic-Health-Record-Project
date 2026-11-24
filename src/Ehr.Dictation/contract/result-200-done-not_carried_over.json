@@ -103,7 +103,11 @@
         "kind": "order",
         "start": 17,
         "end": 52,
-        "warnings": []
+        "warnings": [],
+        "heardAfter": {
+          "start": 54,
+          "end": 107
+        }
       },
       {
         "kind": "allergy_addition",
@@ -115,7 +119,11 @@
             "start": 91,
             "end": 181
           }
-        ]
+        ],
+        "heardAfter": {
+          "start": 91,
+          "end": 107
+        }
       },
       {
         "kind": "order",
@@ -127,13 +135,18 @@
             "start": 91,
             "end": 181
           }
-        ]
+        ],
+        "heardAfter": {
+          "start": 236,
+          "end": 272
+        }
       },
       {
         "kind": "allergy_addition",
         "start": 236,
         "end": 271,
-        "warnings": []
+        "warnings": [],
+        "heardAfter": null
       }
     ],
     "provenance": {

@@ -151,7 +151,7 @@ They run in the eval project with the scoring and gate tests, as CI runs them.
 uv run --project eval python -m ehr_eval.tricks
 ```
 
-`tests/test_tricks.py` has a case for each sentence held back that reverses the meaning and each control, and checks that what is proposed of what should be held back is exactly the tolerated sentences and those marked `still_proposed`, each accepted by name, and that `most_wrong` is their number.
+`tests/test_tricks.py` has a case for each sentence held back that reverses the meaning and each control, and checks that what is proposed of what should be held back is exactly the tolerated sentences and those marked `still_proposed`, each accepted by name, and that `most_wrong` is their number. It also checks, for every sentence proposed, that the proposal carries all that was heard after its instruction (`validation.heard_after()`, which the review shows beside the proposal's button), so the retraction of every one accepted by name that reverses the meaning is in view there.
 
 To read a script as spoken or as written:
 

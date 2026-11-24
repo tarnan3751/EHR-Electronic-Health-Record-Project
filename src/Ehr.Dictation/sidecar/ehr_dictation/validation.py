@@ -88,8 +88,14 @@ seconds"); names_no_item (no run of its words is an item the reference data name
 prescription", "send it", or "add shellfish", which neither the reference data nor a common name names); not_plain
 (not said in the closed sentence, or a sentence next to it holds it back, as above); too_many (past
 MAX_PROPOSALS). A proposal is its kind (order or allergy_addition), the place of its listed
-instruction, and its warnings, never words: possible_correction, pointing from a correction-like word said after the
-instruction, in its words or within WARNING_REACH words after them; and near_unclear_passage, as for a value.
+instruction, its warnings, and the place of what was heard after it (heard_after()), never words: possible_correction,
+pointing from a correction-like word said after the instruction, in its words or within WARNING_REACH words after them;
+and near_unclear_passage, as for a value. What was heard after it is shown beside it on the review, as heard, so that
+a retraction the rules don't read ("Order a CBC. She turned down the blood test.") is in view where the clinician opens
+it: the sentence after the instruction's own, whole however long (a dictation is three minutes at most), even when it
+is an instruction itself ("The cardiologist will order it with the echo."), read past line breaks and heading lines as
+the rules read it; then each sentence after that, up to the next one holding an instruction or the heading of another
+of the note's own sections, within TAKEN_BACK_REACH words.
 
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
@@ -1783,10 +1789,36 @@ def proposals(transcript: Transcript) -> list[dict]:
                 {"code": code, "start": utf16_offset(text, start), "end": utf16_offset(text, end)}
                 for code, start, end in weighed.warnings
             ],
+            "heardAfter": None if (after := heard_after(text, weighed.start, weighed.end)) is None
+            else {"start": utf16_offset(text, after[0]), "end": utf16_offset(text, after[1])},
         }
         for weighed in weigh(transcript)
         if weighed.held_back is None
     ]
+
+
+def heard_after(text: str, start: int, end: int) -> tuple[int, int] | None:
+    """Where what was heard after an instruction starts and ends in the text (code points), as its review shows it
+    beside the proposal (see the module's header): the sentence after the instruction's own, whole, read past line
+    breaks and heading lines (_next_sentence()), and each sentence after that up to one holding an instruction of its
+    own or the heading of another of the note's own sections, within TAKEN_BACK_REACH words. None when nothing
+    follows."""
+    mark = _sentence_end(text, max(start, end - 1))
+    first = _next_sentence(text, mark)
+    if first is None:
+        return None
+    begin = mark + 1
+    while text[begin].isspace():
+        begin += 1
+    stop, left = first[1], TAKEN_BACK_REACH - len(tokens(text[first[0] : first[1]]))
+    while left > 0 and (after := _next_sentence(text, stop)) is not None:
+        said = text[after[0] : after[1]]
+        if directives(said):
+            break
+        stop, left = after[1], left - len(tokens(said))
+    if stop < len(text) and text[stop] in ".!?":
+        stop += 1
+    return begin, stop
 
 
 def weigh(transcript: Transcript) -> list[Weighed]:

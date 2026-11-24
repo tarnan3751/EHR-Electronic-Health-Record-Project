@@ -21,9 +21,11 @@ and the transcript stays as plain text; or transcription_failed, and it stays as
 notCarriedOver lists each instruction in the transcript to order something or change the allergy list, which no field
 carries: [{reason: "order" or "allergy_change", start, end}], the span of the clinician's own words in the transcript,
 never anything the model wrote. proposals are those of them the dictation proposes once the transcript is final (the
-expansion plan's step 15): [{kind: "order" or "allergy_addition", start, end, warnings: [{code, start, end}]}], each
-at its listed instruction's place, with possible_correction or near_unclear_passage warnings as on a field; never
-words, and never anything the model wrote. provenance is {speech, language, llamaServer, prompt, schema, structuring, code};
+expansion plan's step 15): [{kind: "order" or "allergy_addition", start, end, warnings: [{code, start, end}],
+heardAfter: {start, end} or null}], each at its listed instruction's place, with possible_correction or
+near_unclear_passage warnings as on a field, and the place of what was heard after it, which the review shows beside it
+(validation.heard_after()); never words, and never anything the model wrote. provenance is {speech, language,
+llamaServer, prompt, schema, structuring, code};
 language and llamaServer are null while unknown. Each field is {status: "pending", value, sources: [{start, end}],
 warnings: [{code, start, end}]} or {status: "empty", reasons: [...]}: a value that failed a check is never sent, only
 why; a warning is possible_correction, pointing at a later number, date or drug in the transcript that may be a
