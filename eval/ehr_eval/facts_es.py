@@ -36,7 +36,8 @@ of an age; a weight lifted, carried or borne ("avoid lifting weight") is a load,
 decrease after "has", "was" and the like, in a clause naming no drug, dose or number ("the swelling has decreased"), is
 a trend, not a medication change; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
 said of neither thing it links, with or without a comma before it, so it answers to either one's doubt in the facts and
-is added only if neither has one. Then (compare()), against the items of the entries whose passages the statement cites, it is changed when it
+is added only if neither has one; and "unlikely", "may be" and "could be" are doubt, as "possible" and "might" are
+(DOUBT; "unlikely" only doubt, not a negation, so "probable" given as "unlikely" isn't told apart). Then (compare()), against the items of the entries whose passages the statement cites, it is changed when it
 says a number, unit, frequency, duration, date, route, side, severity, polarity, drug or abbreviation those items
 don't say of what it says it of (a value of another item is changed too: "glucose 140" as "BP 140"), and when it says
 an action, negation, doubt, past or relative other than theirs, or leaves out one they say of something it names.
@@ -164,9 +165,13 @@ NEGATIONS = ["no", "not", "denies", "deny", "denied", "without", "negative for",
              "free of", "absence of", "absent"]
 AFTER_NEGATIONS = ["ruled out", "was ruled out", "were ruled out", "excluded", "was excluded"]
 NEGATION_ENDS = {"but", "however", "although", "though", "except", "with", ";", "."}
-DOUBT = ["possible", "possibly", "probable", "probably", "likely", "suspected", "suspect", "suspicion of", "maybe",
-         "perhaps", "might", "rule out", "r/o", "questionable", "consistent with", "compatible with",
-         "suggestive of", "suggests", "concerning for", "i think", "presumed", "cannot exclude", "can't exclude"]
+# "unlikely", "may be" and "could be" are doubt too (the owner's ruling of 2026-11-24), "may" only before "be": "May 3"
+# is a date and "may take" leave to do something. "unlikely" is read as a doubt and nothing more, so "probable"
+# given as "unlikely" isn't counted (both are doubt).
+DOUBT = ["possible", "possibly", "probable", "probably", "likely", "unlikely", "suspected", "suspect", "suspicion of",
+         "maybe", "perhaps", "might", "may be", "could be", "rule out", "r/o", "questionable", "consistent with",
+         "compatible with", "suggestive of", "suggests", "concerning for", "i think", "presumed", "cannot exclude",
+         "can't exclude"]
 HISTORY = ["history of", "previous", "previously", "prior", "past", "old", "remote", "formerly", "used to",
            "in the past", "last year"]
 PRESENT = ["acute", "current", "currently", "active", "ongoing", "new"]

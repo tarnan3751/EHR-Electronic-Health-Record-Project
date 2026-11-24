@@ -201,6 +201,28 @@ def test_a_doubt_of_a_cause_added_is_counted_and_a_doubt_after_a_comma_is_still_
     assert [(c.kind, c.label) for c in said if c.kind == "doubt"] == [("doubt", "asthma")]
 
 
+# "unlikely", "may be" and "could be" are doubt (the owner's ruling of 2026-11-24): each said of a doubted finding is
+# what the Spanish says, and the finding without it is a doubt dropped; each said of a finding the Spanish states is a
+# doubt added. "May" as a month or leave isn't doubt.
+@pytest.mark.parametrize("hedged", ["A fracture is unlikely.", "It may be a fracture.", "It could be a fracture.",
+                                    "A fracture may be present.", "Fracture unlikely."])
+@pytest.mark.parametrize("doubted", [True, False])
+def test_unlikely_may_be_and_could_be_are_doubt_both_ways(hedged, doubted):
+    entries = facts_es.entries([{"said": "Es poco probable una fractura." if doubted else "Hay una fractura.",
+                                 "items": [{"of": "fracture", "doubt": doubted}]}])
+    lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
+    shown = {kind for kind, _, _ in facts_es.compare(hedged, entries, entries, lexicon)[0]}
+    plain = {kind for kind, _, _ in facts_es.compare("A fracture.", entries, entries, lexicon)[0]}
+    assert (shown, plain) == ((set(), {"certainty"}) if doubted else ({"certainty"}, set()))
+
+
+@pytest.mark.parametrize("english", ["Fracture follow-up on May 3.", "You may take ibuprofen for the fracture.",
+                                     "The fracture was seen in May."])
+def test_may_as_a_month_or_leave_is_no_doubt(english):
+    items = (facts_es.Item("fracture", ("fracture",), {}, None, False, False, None),)
+    assert not [c for c in facts_es.claims(english, facts_es.Lexicon(items, frozenset({"ibuprofen"}))) if c.kind == "doubt"]
+
+
 # An increase or decrease of something named, said as a trend ("the swelling has decreased"), is no medication change;
 # one said of a drug or a dose still is.
 @pytest.mark.parametrize(("english", "action"), [
