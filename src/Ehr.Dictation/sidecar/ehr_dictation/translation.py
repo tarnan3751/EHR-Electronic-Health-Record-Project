@@ -52,7 +52,9 @@ statement:
      endings and exceptions) (drug_not_in_sources); and every drug the Spanish names must be named in the English
      (drug_dropped), so a drug no list knows can't be swapped in for one the clinician said;
    - sides (a capital R or L and "rt", "lt" too), routes (intrathecal, epidural, "IV push" and the others too),
-     severity, dose forms (tablets, syrup, a patch: spanish.DOSE_FORMS) and abbreviations, however they are written
+     severity (every degree spanish.SEVERITY allows, from "slight" and "scant" to "excruciating" and "worst", is read in
+     the English: one the Spanish's severity words don't allow is refused, so "Dolor leve" is not "Excruciating pain"),
+     dose forms (tablets, syrup, a patch: spanish.DOSE_FORMS) and abbreviations, however they are written
      ("hiv", "nsaids": CLINICAL_ABBREVIATIONS): no more (side_, route_, severity_, dose_form_ and
      abbreviation_not_in_sources);
    - what can be ordered (an X-ray, labs, a culture, a referral, a prescription, a refill: ORDERABLES): no more
@@ -648,7 +650,8 @@ def english_sides(text: str) -> list[str]:
     found = [(w.start, ENGLISH_SIDES[w.text]) for w in tokens(text) if w.text in ENGLISH_SIDES]
     found += [(m.start(), "right" if m.group(1) == "R" else "left") for m in SIDE_LETTER.finditer(text)]
     return [side for _, side in sorted(found)]
-ENGLISH_SEVERITY = frozenset({"mild", "moderate", "severe", "intense", "critical"})
+# Every English degree a Spanish severity word allows (spanish.SEVERITY): one the Spanish doesn't say is refused.
+ENGLISH_SEVERITY = frozenset(word for words in spanish.SEVERITY.values() for word in words) | {"excruciating", "worst"}
 # Dose forms, by spanish.DOSE_FORMS' names: an English one must be one the Spanish says ("inhalado" is not "tablets").
 ENGLISH_DOSE_FORMS = {
     "tablet": "tablet", "tablets": "tablet", "tab": "tablet", "tabs": "tablet", "pill": "tablet", "pills": "tablet",

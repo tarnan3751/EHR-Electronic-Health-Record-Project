@@ -416,13 +416,33 @@ def route_items(text: str) -> list[tuple[int, str]]:
     return sorted((match.start(), name) for name, pattern in ROUTES for match in pattern.finditer(folded))
 
 
-# What each severity word allows in English: "intenso" is intense or severe.
-SEVERITY = {
-    "leve": {"mild"}, "leves": {"mild"}, "moderado": {"moderate"}, "moderada": {"moderate"}, "moderados": {"moderate"},
-    "moderadas": {"moderate"}, "grave": {"severe"}, "graves": {"severe"}, "severo": {"severe"}, "severa": {"severe"},
-    "severos": {"severe"}, "severas": {"severe"}, "intenso": {"intense", "severe"}, "intensa": {"intense", "severe"},
-    "intensos": {"intense", "severe"}, "intensas": {"intense", "severe"}, "critico": {"critical"}, "critica": {"critical"},
-}
+# What each severity word allows in English: "intenso" is intense or severe. In each gender and number.
+def _severity(rows: str) -> dict[str, set[str]]:
+    table: dict[str, set[str]] = {}
+    for row in rows.strip().split("\n"):
+        spanish_words, english_words = row.split(":")
+        table.update({word: set(english_words.split()) for word in spanish_words.split()})
+    return table
+
+
+SEVERITY = _severity("""
+leve leves ligero ligera ligeros ligeras: mild slight
+minimo minima minimos minimas: minimal slight
+escaso escasa escasos escasas: scant minimal slight
+moderado moderada moderados moderadas: moderate
+grave graves severo severa severos severas: severe
+intenso intensa intensos intensas: intense severe
+fuerte fuertes: severe intense strong
+importante importantes significativo significativa significativos significativas: significant marked
+marcado marcada marcados marcadas: marked significant
+extremo extrema extremos extremas intensisimo intensisima insoportable insoportables: extreme excruciating severe
+profundo profunda profundos profundas: profound
+masivo masiva masivos masivas: massive
+abundante abundantes copioso copiosa copiosos copiosas: abundant copious profuse heavy
+pesado pesada pesados pesadas: heavy
+peor: worst
+critico critica: critical
+""")
 
 # ---- Dates ----------------------------------------------------------------------------------------------------------
 

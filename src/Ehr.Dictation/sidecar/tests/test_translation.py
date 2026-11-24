@@ -760,6 +760,23 @@ def test_a_class_is_a_drug_named_and_anti_inflammatory_only_after_anti():
     assert reasons(text, [text], "Left knee osteoarthritis with inflammatory flare.") == []
 
 
+# A degree of severity the Spanish doesn't say is refused, beyond the five words of before; one it says passes.
+@pytest.mark.parametrize(("text", "changed", "kept"), [
+    ("Dolor leve.", "Excruciating pain.", "Mild pain."),
+    ("Dolor leve.", "Significant pain.", "Slight pain."),
+    ("Dolor leve en la rodilla.", "Worst knee pain of her life.", "Mild knee pain."),
+    ("Dolor intenso en la rodilla.", "Slight knee pain.", "Severe knee pain."),
+    ("Sangrado escaso.", "Massive bleeding.", "Scant bleeding."),
+    ("Sangrado abundante.", "Scant bleeding.", "Heavy bleeding."),
+    ("Edema leve.", "Marked edema.", "Mild edema."),
+    ("Deshidratación leve.", "Profound dehydration.", "Mild dehydration."),
+    ("Dolor fuerte en la espalda.", "Mild back pain.", "Severe back pain."),
+])
+def test_a_degree_of_severity_the_spanish_doesnt_say_is_refused(text, changed, kept):
+    assert reasons(text, [text], changed) == ["severity_not_in_sources"]
+    assert reasons(text, [text], kept) == []
+
+
 # ---- A qualifier over a list, and a passage quoting its tail (sentences outside the test set) ------------------------
 
 LIST = "Niega fiebre, tos, disnea, dolor torácico y síncope."
