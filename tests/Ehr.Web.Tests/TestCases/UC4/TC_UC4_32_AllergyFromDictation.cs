@@ -7,8 +7,8 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 
 // Test Case ID: TC-UC4-32
 // Purpose / scenario: The allergy form opened from an allergy a dictation proposed to add (step 15): it shows the
-//   clinician's words, marked in the sentence they said them in, as proposed from dictation, and fills in nothing from
-//   them; the substance is picked from the codes as for any allergy, and the allergy added is active. Saving it adds a
+//   clinician's words, labelled as heard and marked in the sentence they said them in, as proposed from dictation, and
+//   fills in nothing from them; the substance is picked from the codes as for any allergy, and the allergy added is active. Saving it adds a
 //   coded allergy, as the form adds any, "No known allergies" made inactive with it, and decides the proposal with it,
 //   then goes back to the review.
 // Type: Functional (successful flow)
@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   1. Open the allergy form from the proposal.
 //   2. Save Penicillin G with the reaction Hives.
 // Expected result: Step 1: "Proposed from dictation: check every field. Nothing here was filled in from it." with the
-//   words marked; the substance is empty; the only status offered is Active. Step 2: back on the review; the patient has
+//   words after "As heard:", marked; the substance is empty; the only status offered is Active. Step 2: back on the review; the patient has
 //   Penicillin G (RxNorm 7980), active, with Hives, and "No known allergies" inactive; the proposal is decided with it.
 // Creator: Tahseen Arnan
 public class TC_UC4_32_AllergyFromDictation(WebApps apps) : IClassFixture<WebApps>
@@ -42,6 +42,7 @@ public class TC_UC4_32_AllergyFromDictation(WebApps apps) : IClassFixture<WebApp
         var said = Said(html);
         Assert.Contains("Proposed from dictation: check every field. Nothing here was filled in from it. It adds one allergy", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.AllergySaid}</mark>", html);
+        Assert.Contains($"As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.DoesNotMatch("name=\"Name\" value=\"[^\"]", html);
         Assert.Contains("<option value=\"active\"", html);
         Assert.DoesNotContain("<option value=\"inactive\"", html);

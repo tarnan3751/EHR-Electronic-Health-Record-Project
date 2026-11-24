@@ -8,8 +8,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 
 // Test Case ID: TC-UC1-23
 // Purpose / scenario: The order form opened from an order a dictation proposed (step 15): it shows the clinician's
-//   words, marked in the sentence they said them in, as proposed from dictation, and fills in nothing from them; the type,
-//   the item and the details are the clinician's, and every check of an order applies unchanged: an active order for the
+//   words, labelled as heard and marked in the sentence they said them in, as proposed from dictation, and fills in
+//   nothing from them; the type, the item and the details are the clinician's, and every check of an order applies unchanged: an active order for the
 //   same product under the clinic's other catalog code needs the duplicate's reason (FR-05), and an allergy needs the
 //   override's (FR-47). Signing it signs an ordinary order and decides the proposal with it, and goes back to the review.
 // Type: Functional (successful flow, and the checks of an order)
@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. Sign Lipid panel.
 //   3. From the second proposal, sign lisinopril 10 MG Oral Tablet without reasons, then with both.
 // Expected result: Step 1: "Proposed from dictation: check every field. Nothing here was filled in from it." with the
-//   words marked after "Chest is clear."; each type's link keeps the proposal; the item and the details are empty. Step 2:
+//   words after "As heard:", marked after "Chest is clear."; each type's link keeps the proposal; the item and the details are empty. Step 2:
 //   back on the review; one active lab order for Lipid panel, signed by Dr. Test, decides the proposal. Step 3: first 422, "Already ordered" and the safety reason asked for, nothing saved and the
 //   proposal waiting; then the order is signed, keeping both reasons, and decides the second proposal.
 // Creator: Tahseen Arnan
@@ -42,7 +42,7 @@ public class TC_UC1_23_OrderFromDictation(WebApps apps) : IClassFixture<WebApps>
         var html = await dictated.Session.Client.GetStringAsync(OrderFormPath(dictated.Patient, dictated.Order), Cancel);
         var said = Said(html);
         Assert.Contains("Proposed from dictation: check every field. Nothing here was filled in from it.", said);
-        Assert.Contains($"Chest is clear. {DictationSidecarStub.OrderSaid}.", said);
+        Assert.Contains($"As heard: Chest is clear. {DictationSidecarStub.OrderSaid}.", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
         Assert.Contains("Choose the type of order.", said);
         Assert.Contains($"type=lab&amp;proposal={dictated.Order}", html);

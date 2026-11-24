@@ -295,7 +295,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // TC-UC13-10: the review lists each proposal under "Proposed orders and allergies": its kind, awaiting review, the
-    // clinician's words marked in the sentence they said them in and the one before, its warnings with the words they point
+    // clinician's words labelled as heard and marked in the sentence they said them in and the one before, its warnings with the words they point
     // at, and the way into its form; the order's into the order form, the allergy's into the allergy form. Only the
     // dictating clinician sees them: not a colleague with the patient on their panel (TC-UC1-24 opens the order form
     // with one as the colleague).
@@ -307,8 +307,8 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var said = RefillRequestTests.Said(html);
         Assert.Contains("Proposed orders and allergies", said);
         Assert.Contains("Dictation proposes these from what you said and places or saves none of them.", said);
-        Assert.Contains($"Order Awaiting review Chest is clear. {DictationSidecarStub.OrderSaid}.", said);
-        Assert.Contains($"Allergy to add Awaiting review {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
+        Assert.Contains($"Order Awaiting review As heard: Chest is clear. {DictationSidecarStub.OrderSaid}.", said);
+        Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
         Assert.Contains("Check: you may have corrected this just after it: “penicillin”", said);
         Assert.Contains($"href=\"{OrderFormPath(dictated.Patient, dictated.Order)}\"", html.Replace("&amp;", "&", StringComparison.Ordinal));
@@ -518,7 +518,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         var said = RefillRequestTests.Said(await ReadAsync(page));
         Assert.Contains("Opening or dismissing a proposal needs the clinic's server. The review remains readable.", said);
-        Assert.Contains($"Allergy to add Awaiting review {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
+        Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.DoesNotContain("Open in the allergy form", said);
         Assert.DoesNotContain("Dismiss proposal", said);
         using (var refused = await cutOff.PostAsync(dictated.ReviewPath + "?handler=DismissProposal",
