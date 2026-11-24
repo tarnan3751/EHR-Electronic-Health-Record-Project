@@ -698,6 +698,37 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
+    // Steps 16 and 17 together: a visit is in English and a dictation, in either language, names no speakers. Staging
+    // takes the service's own answer of each kind, and refuses a visit's said to be in Spanish and a Spanish dictation's
+    // that names who spoke.
+    [Fact]
+    public async Task A_visit_said_to_be_in_spanish_or_a_spanish_dictation_naming_a_speaker_is_never_staged()
+    {
+        // As the API reads the service's answers (DictationApi.ServiceJson).
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            AllowOutOfOrderMetadataProperties = true,
+            RespectNullableAnnotations = true,
+            RespectRequiredConstructorParameters = true,
+        };
+        async Task<JsonNode> BodyAsync(string name) => JsonNode.Parse(await File.ReadAllTextAsync(ContractFile(name), Cancel))!["body"]!;
+        DictationResult Read(JsonNode body) => body.Deserialize<DictationResult>(json)!;
+
+        // Drafted, and left undrafted with no field to hold a sentence the Spanish checks would want.
+        foreach (var name in new[] { "result-ambient-200-done", "result-ambient-200-unavailable-model_timeout" })
+        {
+            var visit = await BodyAsync(name);
+            Assert.NotNull(DictationApi.TrustedResult(Read(visit), ambient: true));
+            visit["spokenLanguage"] = "es";
+            Assert.Null(DictationApi.TrustedResult(Read(visit), ambient: true));
+        }
+
+        var spanish = await BodyAsync("result-200-done-es");
+        Assert.NotNull(DictationApi.TrustedResult(Read(spanish)));
+        spanish["transcript"]!["segments"]![0]!["speaker"] = "patient";
+        Assert.Null(DictationApi.TrustedResult(Read(spanish)));
+    }
+
     public static TheoryData<string> ContractAnswers() =>
         [.. Directory.EnumerateFiles(ContractFile(""), "*.json").Select(path => System.IO.Path.GetFileNameWithoutExtension(path.AsSpan()).ToString()).Order(StringComparer.Ordinal)];
 
