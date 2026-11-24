@@ -748,6 +748,25 @@ def test_an_answer_heard_with_a_letter_lost_answers_the_last_clause_of_a_turn():
     assert validation.HEARD_ANSWERS["ys"] == "yes" and "up" not in validation.HEARD_ANSWERS
 
 
+# A modal opening a sentence asks, its subject unheard (c11's room recording heard the patient's "Will it need an
+# injection?" as "will need an injection"), and the patient's statement beside it still passes; before be, have, been
+# or not it is a hedge or a prediction, and a modal after its subject is a statement.
+def test_a_modal_opening_a_sentence_asks_whatever_follows_but_be_have_been_or_not():
+    text = heard(("clinician", "you can use ibuprofen gel on it at bedtime {period}"),
+                 ("patient", "will need an injection {period} I would rather try the exercises first {period}"),
+                 ("clinician", "possibly if the exercises have not helped after a couple of months {period}"))
+    stated = heard(("clinician", "could be a viral cough {period} should be drier by the weekend {period} would have "
+                                 "been worse without the inhaler {period} can not see any redness {period}"))
+
+    asked = checked(text, subjective=("Will need an injection.", ["will need an injection"]))["subjective"]
+    rather = checked(text, subjective=("I would rather try the exercises first.",
+                                       ["I would rather try the exercises first"]))["subjective"]
+
+    assert "source_is_a_question" in asked.reasons
+    assert rather.pending
+    assert validation.conversation_questions(stated.text, stated.passages()) == []
+
+
 # The conversation's own names live beside the common ones in one module: none may stand in for a common one, which
 # would change what a dictation's checks do.
 def test_no_name_in_the_checks_is_defined_twice():

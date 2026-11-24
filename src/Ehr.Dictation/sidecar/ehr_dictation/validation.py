@@ -2300,7 +2300,8 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #   -ing verb where the auxiliary wasn't heard ("until the pain is gone and how you holding up"), the sentence before
 #   one that is only an answer in the same line ("so I read you the last week. yes please.", where the answer was too
 #   short to be a turn of its own), a sentence opening with an auxiliary before a determiner or an indefinite ("does the
-#   medicine taste yucky", "is anything serious"), a short follow-up ("and alcohol", "what about the blood test"), and
+#   medicine taste yucky", "is anything serious"), or with a modal before anything but be, have, been or not ("will
+#   need an injection", its subject unheard), a short follow-up ("and alcohol", "what about the blood test"), and
 #   a turn, whoever's, or its last words from such an opener, when the next speaker answers it ("no", "not really", "a
 #   bit", "I doubt it", "nothing that worries me", or "ys please", one letter lost), with the last clause of a turn not
 #   the clinician's, and an Unsure passage answered in its own line by the patient's or someone else's. bare_answer: an
@@ -2451,7 +2452,8 @@ CONVERSATION_QUALIFIERS = (
 # turn or a sentence, with a wh-word or "any", "ever", "anything" ("any chest pain", "how long has it been"), or after
 # a conjunction with a wh-word and its auxiliary and subject or its subject and an -ing verb
 # (QUESTION_AFTER_A_CONJUNCTION); a sentence opening with an auxiliary before a determiner or an indefinite ("does the
-# medicine taste yucky", "is anything serious"), a follow-up of at most three words opening with "and" or "or" ("and
+# medicine taste yucky", "is anything serious"), or with a modal before anything but be, have, been or not
+# (_ASKING_MODALS: "will need an injection"), a follow-up of at most three words opening with "and" or "or" ("and
 # alcohol"), one of at most five whose second word is "about" ("what about the blood test", whatever its first word was
 # heard as); the sentence before one that is only an answer in the same line (ANSWER, ANSWER_ALONE); and a turn's last
 # words when the next speaker's turn opens with an answer: any answer to the clinician's (ANSWER, "I doubt it" and
@@ -2478,6 +2480,13 @@ _ASKED_ABOUT = frozenset(
     """the your my her his their our this that these those anything anyone anybody everything everyone something
     someone""".split()
 )
+# Opening a sentence, a modal asks whatever follows, its subject unheard ("will need an injection", heard from "will it
+# need an injection"; the record model session's fix round), but not before "be", "have", "been" or "not": a hedge or a
+# prediction whose subject wasn't heard ("could be a viral cough", "should be drier").
+_ASKING_MODALS = frozenset(
+    "will would can could should shall may might must won't can't wouldn't couldn't shouldn't".split()
+)
+_NOT_ASKED_AFTER_A_MODAL = frozenset("be have been not".split())
 QUESTION_AFTER_A_CONJUNCTION = re.compile(
     rf"\b(?:and|but|so|or)[^\S\n]+((?:what|when|where|which|who|whom|whose|why|how)[^\S\n]+"
     rf"(?:(?:{_AUXILIARY})(?:n['’]t)?[^\S\n]+(?:you|i|he|she|it|they|we|there)\b|(?:you|i|he|she|it|they|we)[^\S\n]+[a-z]+ing\b))",
@@ -2554,9 +2563,11 @@ def conversation_questions(text: str, passages: tuple[tuple[int, int, str, int |
             found.append(stretch(i))
     for match in QUESTION_AFTER_A_CONJUNCTION.finditer(text):
         found.append(stretch(next(k for k, word in enumerate(words) if word.start >= match.start(1))))
-    # Sentence by sentence in each line: one opening with an auxiliary asked of something; a follow-up asked with a noun
-    # alone ("and alcohol", "and the weighing") or about something ("what about the blood test", however its first word
-    # was heard); and the sentence before one that is only an answer, however that one was heard.
+    # Sentence by sentence in each line: one opening with an auxiliary asked of something, or with a modal whatever
+    # follows but be, have, been or not; a follow-up asked with a noun alone ("and alcohol", "and the weighing") or
+    # about something ("what about the blood test", however its first word was heard); and the sentence before one
+    # that is only an answer, however that one was heard.
+    position = {word.start: k for k, word in enumerate(words)}
     for line in re.finditer(r"[^\n]+", text):
         sentences = [(m.start() + line.start(), m.end() + line.start()) for m in re.finditer(r"[^.!?]+[.!?]*", line.group())]
         said = [[word for word in words if start <= word.start and word.end <= end] for start, end in sentences]
@@ -2568,6 +2579,9 @@ def conversation_questions(text: str, passages: tuple[tuple[int, int, str, int |
                     and any(word.text not in STOPWORDS for word in sentence[1:])
                     or 2 < len(sentence) <= 5 and sentence[1].text == "about"):
                 found.append((sentence[0].start, sentence[-1].end))
+            elif (len(sentence) > lead + 1 and sentence[lead].text in _ASKING_MODALS
+                    and sentence[lead + 1].text not in _NOT_ASKED_AFTER_A_MODAL):
+                found.append(stretch(position[sentence[lead].start]))
         for before, answer in zip(said, said[1:], strict=False):
             if before and answer and ANSWER.match(text[answer[0].start :]) and _alone(answer) and not _alone(before):
                 found.append((before[0].start, before[-1].end))
