@@ -8,9 +8,9 @@ someone committed instead:
    commit's checks and scoring code and against its gold (the scoring and gold hashes); if only they changed,
    re-scoring the stored answers (rescore.py) is enough.
 2. Every recording's fields were sorted: a run where K2 Horizon was unavailable or too slow for any of them measured
-   nothing about the fields, so it can't be committed. And none said to be sorted took longer than the sidecar's
-   limit to sort (Settings.structuring_seconds), which the sidecar would have cancelled: a timeout relabelled sorted
-   would count its gold fields as never discarded.
+   nothing about the fields, so it can't be committed. And each said to be sorted says how long it took to sort,
+   within the sidecar's limit (Settings.structuring_seconds), past which the sidecar would have cancelled it: a
+   timeout relabelled sorted, its time past the limit or deleted, would count its gold fields as never discarded.
 3. No offered value contains an order or an allergy change a script tried to slip in, and none without a warning
    contains a retracted value or a drug a script names but no gold value carries, unless the owner has accepted it in
    eval/known-limitations.toml; and each accepted there still occurs, so the list stays true. The results say which
@@ -37,9 +37,10 @@ The Spanish test set (the expansion plan's step 17) is checked the same way, fro
 two sets share, from the Spanish set's recordings and against its gold; holding exactly the items the Spanish scripts
 and voices.toml's [variants_es] define (variant_ids(): each script's recordings, the two dictated in the wrong language,
 and each script's display text), none missing, none extra, and every one sorted or failed: one that timed out is a
-failure in every measure, never skipped; and none said to be sorted past the sidecar's limit to sort. Then, as for proposals above, the gate doesn't take the
-results' word for any measure: it scores the stored answers again (run_es.rescore(): each transcript rebuilt from its
-passages as heard, the checks and the scoring run again against this commit's gold; no model needed), fails results
+failure in every measure, never skipped; and each said to be sorted says how long it took, within the sidecar's
+limit to sort. Then, as for proposals above, the gate doesn't take the results' word for any measure: it scores the
+stored answers again (run_es.rescore(): each transcript rebuilt from its passages as heard, the checks and the scoring
+run again against this commit's gold; no model needed), fails results
 that lack a measure or state one differently, and judges only what it scored: every recording and text sorted; no
 instruction to order something or change the allergy list in any offered value, the wrong-language recordings
 included (FR-14); every mistranslation shown without a warning (a number, unit, drug, frequency, date, duration, route,
@@ -157,7 +158,7 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
             f"reachable and fast enough (README.md, \"Dictation server hardware\"), then: {RUN_IT}"
         )
     if late := _sorted_too_late(latest):
-        problems.append(f"The results say {', '.join(late)} sorted after more than the sidecar's "
+        problems.append(f"The results say {', '.join(late)} sorted with no time to sort, or one past the sidecar's "
                         f"{Settings.structuring_seconds:g} seconds, when it would have given up: {RUN_IT}")
     if latest.get("baseline"):
         problems.append("latest.json says it is a baseline. Keep the accepted baseline in baseline.json only.")
@@ -337,8 +338,8 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
         problems.append(f"The Spanish results hold items neither sorted nor failed ({', '.join(skipped)}): a recording or "
                         f"text that timed out is a failure in every measure, never skipped. {RUN_IT_ES}")
     if late := _sorted_too_late(latest):
-        problems.append(f"The Spanish results say {', '.join(late)} sorted after more than the sidecar's "
-                        f"{Settings.structuring_seconds:g} seconds, when it would have given up: {RUN_IT_ES}")
+        problems.append(f"The Spanish results say {', '.join(late)} sorted with no time to sort, or one past the "
+                        f"sidecar's {Settings.structuring_seconds:g} seconds, when it would have given up: {RUN_IT_ES}")
     if latest.get("baseline"):
         problems.append("latest-es.json says it is a baseline. Keep the accepted baseline in baseline-es.json only.")
 
@@ -404,9 +405,11 @@ _MISSING = object()
 
 
 def _sorted_too_late(latest: dict) -> list[str]:
-    """Each item said to be sorted that took longer to sort than the sidecar allows: a timeout relabelled."""
+    """Each item said to be sorted that doesn't say how long it took to sort, or took longer than the sidecar allows: a
+    timeout relabelled, its time past the limit or deleted. Every run times each item it sorts."""
     return sorted(str(item.get("variant")) for item in latest.get("items", []) if item.get("sorting") == "done"
-                  and (item.get("timings") or {}).get("structure", 0) > Settings.structuring_seconds)
+                  and not (isinstance(took := (item.get("timings") or {}).get("structure"), (int, float))
+                           and took <= Settings.structuring_seconds))
 
 
 def _paths(metrics: dict, at: tuple[str, ...] = ()) -> list[tuple[str, ...]]:

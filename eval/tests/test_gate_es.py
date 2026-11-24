@@ -66,7 +66,7 @@ def recording(variant: str, script, run_as: str | None = None) -> scoring_es.Spa
     item = scoring_es.SpanishItem(
         variant=variant, script=script.id, tags=variant_tags(spec, list(script.tags)), hypothesis=transcript.text,
         sorting="done", run_as=run_as, segments=[dataclasses.asdict(p.segment) for p in transcript.placed],
-        not_carried_over=[(kind, s, e) for s, e, kind in spanish.directives(transcript.text)])
+        not_carried_over=[(kind, s, e) for s, e, kind in spanish.directives(transcript.text)], timings={"structure": 12.0})
     if run_as == "en":
         run_es.check_english(item, {name: {"value": "", "sources": []} for name in FIELDS}, [], transcript)
     else:
@@ -77,7 +77,7 @@ def recording(variant: str, script, run_as: str | None = None) -> scoring_es.Spa
 def text(script) -> scoring_es.SpanishItem:  # noqa: ANN001
     transcript, _ = text_transcript(script)
     item = scoring_es.SpanishItem(variant=f"{script.id}--text", script=script.id, tags=list(script.tags),
-                                  hypothesis=transcript.text, sorting="done")
+                                  hypothesis=transcript.text, sorting="done", timings={"structure": 12.0})
     check(item, gold(script), [], transcript)
     return item
 
@@ -261,17 +261,19 @@ def test_an_item_marked_skipped_fails(spanish_dir):
     assert any("didn't sort every Spanish recording and text" in p for p in found)
 
 
-# The review's case: a timed-out item relabelled sorted, nothing proposed, its time past the limit, would have counted
-# its gold fields as never discarded.
-def test_an_item_said_to_be_sorted_past_the_limit_fails(spanish_dir):
+# The review's cases: a timed-out item relabelled sorted, nothing proposed, its time past the limit or deleted, would
+# have counted its gold fields as never discarded. A text is timed as a recording is.
+@pytest.mark.parametrize("variant", ["e16-anadido-corto--clean", "e16-anadido-corto--text"])
+@pytest.mark.parametrize("timings", [{"structure": 95.0}, {}, {"decode": 0.4, "transcribe": 3.0}])
+def test_an_item_said_to_be_sorted_past_the_limit_or_untimed_fails(spanish_dir, variant, timings):
     def relabelled(item: scoring_es.SpanishItem) -> scoring_es.SpanishItem:
-        if item.variant != "e16-anadido-corto--clean":
+        if item.variant != variant:
             return item
-        return dataclasses.replace(item, sorting="done", fields={}, timings={"structure": 95.0})
+        return dataclasses.replace(item, sorting="done", fields={}, timings=timings)
 
     save(spanish_dir, "latest-es.json", results(spanish_dir, change=relabelled))
 
-    assert any("e16-anadido-corto--clean sorted after more than the sidecar's 90 seconds" in p
+    assert any(f"{variant} sorted with no time to sort, or one past the sidecar's 90 seconds" in p
                for p in problems(spanish_dir))
 
 
