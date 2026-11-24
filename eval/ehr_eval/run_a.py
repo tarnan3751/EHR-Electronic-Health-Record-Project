@@ -396,10 +396,18 @@ def rescore_table(stored: dict, results: dict, scripts: dict[str, Script]) -> st
         lines.append(f"    discarded before: {discarded(old) if scored else 'not scored'}")
         lines.append(f"    discarded after:  {discarded(new)}")
     lines.append("")
-    for was, now in zip(stored.get("thresholds") or [None] * len(results["thresholds"]), results["thresholds"]):
-        before_text = f"{'CROSSED' if was['crossed'] else 'ok'} ({was['measured']})" if was else "not scored"
+    # Each threshold with the stored one of the same name, never by its place: a line added or reworded since leaves
+    # the others where they were. A stored line no threshold has any more is listed after them.
+    stored_lines = {line["threshold"]: line for line in stored.get("thresholds") or []}
+    for now in results["thresholds"]:
+        was = stored_lines.pop(now["threshold"], None)
+        before_text = (f"{'CROSSED' if was['crossed'] else 'ok'} ({was['measured']})" if was
+                       else "not scored under this name" if "thresholds" in stored else "not scored")
         lines.append(f"{now['threshold']}:\n    before {before_text}; after "
                      f"{'CROSSED' if now['crossed'] else 'ok'} ({now['measured']})")
+    for name, was in stored_lines.items():
+        lines.append(f"{name} (no longer a threshold under this name):\n    before "
+                     f"{'CROSSED' if was['crossed'] else 'ok'} ({was['measured']})")
     return "\n".join(lines)
 
 

@@ -220,6 +220,20 @@ def test_stored_answers_scored_again_score_the_same_and_say_what_they_were_score
     assert "e09-depresion" in run_a.rescore_table(stored, results, SCRIPTS)
 
 
+def test_the_thresholds_before_and_after_are_paired_by_name_not_place():
+    # A stored run scored before the misfiled line was inserted second: each line still meets its own.
+    stored = stored_run("e01-hta-control")
+    misfiled = stored["thresholds"].pop(1)
+    stored["thresholds"].append({"threshold": "a line since reworded", "crossed": True, "measured": "x"})
+    results, _ = run_a.rescore(stored, SCRIPTS)
+    table = run_a.rescore_table(stored, results, SCRIPTS).split("\n\n")[-1]
+
+    sorting = next(line for line in stored["thresholds"] if line["threshold"].startswith("a script not sorted"))
+    assert f"{sorting['threshold']}:\n    before ok ({sorting['measured']}); after ok" in table
+    assert f"{misfiled['threshold']}:\n    before not scored under this name; after ok" in table
+    assert "a line since reworded (no longer a threshold under this name):\n    before CROSSED (x)" in table
+
+
 def test_answers_stored_field_by_field_are_scored_again():
     # Run A's answers were stored before the answer was one list: no statement has its place in the answer.
     stored = stored_run("e14-nino-sano")
