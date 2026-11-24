@@ -702,6 +702,52 @@ def test_a_voice_named_unsure_has_no_lean():
     assert fields["subjective"].pending and fields["subjective"].speakers == ["unsure"]
 
 
+# Turn-taking where the voices weren't told apart: the clinician's question pulled into the patient's voice, Unsure,
+# answered in the same line by the patient (c11's clean recording heard "Do you nap during the day?" as "ate nap during
+# the day"), is a question, and the patient's answer beside it still passes; the clinician's finding after an Unsure
+# reading, in the clinician's own line, isn't one (c06: "is 118/74. no tenderness over your kidneys").
+def test_an_unsure_passage_the_patient_answers_in_their_line_is_a_question():
+    text = heard(("clinician", "anything in particular"),
+                 ("patient", "nothing much whether I've done the right thing {period}"),
+                 ("patient", "ate nap during the day {period}", True),
+                 ("patient", "sometimes after lunch for half an hour or so {period}"))
+    reading = heard(("clinician", "your blood pressure {period}"), ("clinician", "is 118/74 {period}", True),
+                    ("clinician", "no tenderness over your kidneys {period}"), ("patient", "okay"))
+
+    asked = checked(text, subjective=("Ate nap during the day.", ["ate nap during the day"]))["subjective"]
+    answered = checked(text, subjective=("Sometimes after lunch for half an hour or so.",
+                                         ["sometimes after lunch for half an hour or so"]))["subjective"]
+    examined = checked(reading, objective=("Blood pressure is 118/74. No tenderness over your kidneys.",
+                                           ["your blood pressure is 118/74", "no tenderness over your kidneys"]))[
+        "objective"]
+
+    assert "source_is_a_question" in asked.reasons
+    assert answered.pending and answered.speakers == ["patient"]
+    assert examined.pending, examined.reasons
+
+
+# Answers as MedASR hears them: "ys please" answers the last clause of the patient's turn (c11's room recording heard
+# "…like you asked me to. Shall I read you the last week?" as "…like you me to, so I redow the last week"), and what
+# the patient said before it, and after, still passes; the clinician's statement answered "ys" is still a statement.
+def test_an_answer_heard_with_a_letter_lost_answers_the_last_clause_of_a_turn():
+    text = heard(("patient", "I did I wrote them all in a little notebook like you asked me to {comma} so I redow the "
+                             "last week {period}"),
+                 ("clinician", "ys please {period}"), ("patient", "This morning it was 142/88 {period}"))
+    told = heard(("clinician", "your tummy is a little tender just above the pubic bone"), ("patient", "ys"),
+                 ("clinician", "I'll have you back in two weeks"))
+
+    offered = checked(text, subjective=("So I redow the last week.", ["so I redow the last week"]))["subjective"]
+    wrote = checked(text, subjective=("I wrote them all in a little notebook.",
+                                      ["I wrote them all in a little notebook"]))["subjective"]
+    reading = checked(text, subjective=("This morning it was 142/88.", ["This morning it was 142/88"]))["subjective"]
+    tender = checked(told, objective=("Tender just above the pubic bone.", ["tender just above the pubic bone"]))
+
+    assert "source_is_a_question" in offered.reasons
+    assert wrote.pending and reading.pending
+    assert tender["objective"].pending
+    assert validation.HEARD_ANSWERS["ys"] == "yes" and "up" not in validation.HEARD_ANSWERS
+
+
 # The conversation's own names live beside the common ones in one module: none may stand in for a common one, which
 # would change what a dictation's checks do.
 def test_no_name_in_the_checks_is_defined_twice():

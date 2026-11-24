@@ -2302,8 +2302,11 @@ def _proposal_warnings(text: str, words: list[Token], unclear: list[tuple[int, i
 #   short to be a turn of its own), a sentence opening with an auxiliary before a determiner or an indefinite ("does the
 #   medicine taste yucky", "is anything serious"), a short follow-up ("and alcohol", "what about the blood test"), and
 #   a turn, whoever's, or its last words from such an opener, when the next speaker answers it ("no", "not really", "a
-#   bit", "I doubt it", "nothing that worries me"). bare_answer: an answer alone ("not really") is never a value's
-#   source (the prompt's rule 5).
+#   bit", "I doubt it", "nothing that worries me", or "ys please", one letter lost), with the last clause of a turn not
+#   the clinician's, and an Unsure passage answered in its own line by the patient's or someone else's. bare_answer: an
+#   answer alone ("not really") is never a value's source (the prompt's rule 5). Speech recognition writes no question
+#   mark and can lose a question's first word ("can I still go to the gym" heard as "and I still go to the gym"), so not
+#   every question is found: a question is never a source only where these find it.
 # - The value is read as the transcript is: without commas, which nobody says.
 # - Instructions said to the patient as well as dictated ones (conversation_directives(), beside directives()): talk of
 #   an ordering act or of the prescription itself is cut from every value and listed, as dictation's instructions are;
@@ -2453,7 +2456,9 @@ CONVERSATION_QUALIFIERS = (
 # heard as); the sentence before one that is only an answer in the same line (ANSWER, ANSWER_ALONE); and a turn's last
 # words when the next speaker's turn opens with an answer: any answer to the clinician's (ANSWER, "I doubt it" and
 # "nothing" among them), and to anyone else's a reply that is nothing else (REPLY) or a sentence that is only an
-# answer, since "no fever on exam today" after a patient's words is the clinician's finding, not a reply. A question is
+# answer, since "no fever on exam today" after a patient's words is the clinician's finding, not a reply, and then its
+# last clause too; an answer heard with a letter lost ("ys please"); and, where the voices weren't told apart, a
+# passage diarize.py was unsure of answered in the same line by the patient's or someone else's. A question is
 # never a finding's source, in any field (source_is_a_question), and an answer that is only "yes", "no" or the like is
 # never a value's source on its own (bare_answer): the conversation prompt's rule 5, checked.
 _AUXILIARY = r"do|does|did|have|has|had|is|are|was|were|can|could|will|would|should|shall|may|might|am"
@@ -2500,6 +2505,13 @@ ANSWER_WORDS = frozenset(
 )
 # The words a sentence that is only an answer is made of ("yes please", "no never", "not at all").
 ANSWER_ALONE = ANSWER_WORDS | {"please"}
+# A one-word answer of three letters or more as MedASR may hear it, one letter lost ("ys" for "yes"), and the answer it
+# is read as; never one that is a word of its own ("up", from "yup", or "ah").
+HEARD_ANSWERS = {
+    word[:k] + word[k + 1 :]: word
+    for word in ("yes", "yeah", "yep", "yup", "nope", "nah") for k in range(len(word))
+    if word[:k] + word[k + 1 :] not in ("up", "ah")
+}
 QUESTION_REACH = 12  # at most, words in a question from its opener, when nothing ends it sooner
 QUESTION_TAIL = 6  # words at the end of the clinician's turn in which an answered question is looked for
 # Words that start a statement after a question in speech nobody punctuates ("any fever okay let me listen").
@@ -2562,23 +2574,44 @@ def conversation_questions(text: str, passages: tuple[tuple[int, int, str, int |
     # Turn-taking: a turn answered by the next speaker, whoever said it. Its question is the whole turn when the turn is
     # no longer than QUESTION_TAIL words ("chest pain at all", "so nothing serious then"), or else from an opener among
     # its last QUESTION_TAIL words ("your chest is clear any fever"); a statement answered "yes" is still a statement.
-    for (start, end, who, _), (next_start, _, _, _) in zip(passages, passages[1:], strict=False):
-        if "\n" not in text[end : next_start + 1]:
+    # From the record model session's fix round: where the voices weren't told apart, a passage diarize.py was unsure
+    # of is a turn of its own when the next passage, in the same voice's line, is surely the patient's or someone
+    # else's and opens with an answer, as the clinician's question pulled into the patient's voice ("ate nap during the
+    # day. sometimes after lunch", heard from "Do you nap during the day?"); a reply is read as MedASR may hear an
+    # answer, one letter lost ("ys please", HEARD_ANSWERS); and a turn not the clinician's asks its last clause too,
+    # after its last mark, when that is at most QUESTION_TAIL words ("I wrote them all down, so I redow the last week"
+    # / "ys please", heard from "Shall I read you the last week?"). The clinician's turns keep the rule above.
+    for (start, end, who, _), (next_start, _, next_who, _) in zip(passages, passages[1:], strict=False):
+        doubted = who == "unsure" and next_who in ("patient", "other") and "\n" not in text[end : next_start + 1]
+        if "\n" not in text[end : next_start + 1] and not doubted:
             continue
-        reply = text[next_start : _sentence_end(text, next_start)]
-        if not (ANSWER.match(reply) if who == "clinician"
+        reply = _as_answered(text[next_start : _sentence_end(text, next_start)])
+        if not (ANSWER.match(reply) if who == "clinician" or doubted
                 else REPLY.match(reply) or ANSWER.match(reply) and _alone(tokens(reply))):
             continue
-        line_start = text.rfind("\n", 0, end) + 1
-        turn = [word for word in words if line_start <= word.start and word.end <= end]
+        turn_start = start if doubted else text.rfind("\n", 0, end) + 1
+        turn = [word for word in words if turn_start <= word.start and word.end <= end]
         tail = turn[-QUESTION_TAIL:]
         opener = next((word for word in tail if QUESTION_OPENER.match(word.text)
                        or QUESTION_INVERSION.match(text, word.start)), None)
         if len(turn) <= QUESTION_TAIL:
             found.append((turn[0].start, turn[-1].end))
-        elif opener is not None:
+            continue
+        if opener is not None:
             found.append((opener.start, turn[-1].end))
+        if who != "clinician" and not doubted:
+            marks = [k for k in range(1, len(turn))
+                     if any(mark in text[turn[k - 1].end : turn[k].start] for mark in ".,;!?")]
+            clause = turn[marks[-1] :] if marks else turn
+            if len(clause) <= QUESTION_TAIL:
+                found.append((clause[0].start, clause[-1].end))
     return sorted(found)
+
+
+def _as_answered(reply: str) -> str:
+    """The reply with its first word read as the answer MedASR may have heard it from (HEARD_ANSWERS)."""
+    return re.sub(r"\A(\W*)([a-z]+)\b", lambda m: m.group(1) + HEARD_ANSWERS.get(m.group(2).lower(), m.group(2)), reply,
+                  count=1, flags=re.IGNORECASE)
 
 
 def _alone(sentence: list[Token]) -> bool:
