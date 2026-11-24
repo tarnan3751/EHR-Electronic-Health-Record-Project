@@ -18,6 +18,9 @@ from ehr_dictation.llama import LlamaServer, Structurer
 from ehr_dictation.provenance import Models
 from ehr_eval import run_a, scoring_es
 
+# The English text run's misfiled measure, the cap's English side, as scoring.py writes it: none in 100 statements, so the
+# Spanish texts' cap is 2 percentage points (scoring_es.CAP_POINTS).
+ENGLISH = {"statements": 100, "unflagged_statements": 0, "unflagged_total": 0, "rate": 0.0}
 SCRIPTS = {script.id: script for script in load_scripts() + load_scripts(HOLDOUT_DIR)}  # the held-out ones too
 
 
@@ -71,7 +74,7 @@ def test_the_gold_answer_passes_scores_full_marks_and_crosses_no_threshold():
     assert metrics["mistranslations"]["unflagged_total"] == 0 and metrics["instructions"]["shown"] == 0
     assert metrics["instructions"]["reported_not_carried_over"] == metrics["instructions"]["said"] == 2
     assert metrics["timing"]["statements_spanish_first"] == {"written": 11, "in_order": 11}
-    assert not any(crossed for _, crossed, _ in scoring_es.thresholds(metrics))
+    assert not any(crossed for _, crossed, _ in scoring_es.thresholds(metrics, ENGLISH))
 
 
 def test_a_changed_number_the_checks_discard_is_counted_as_discarded_not_shown():
@@ -93,7 +96,7 @@ def test_a_mistranslation_the_checks_let_through_is_shown_and_crosses_the_first_
 
     assert item.fields["subjective"].status == "pending"
     assert metrics["mistranslations"]["unflagged"]["negation"] == 1
-    crossed = dict((name, over) for name, over, _ in scoring_es.thresholds(metrics))
+    crossed = dict((name, over) for name, over, _ in scoring_es.thresholds(metrics, ENGLISH))
     assert crossed[next(iter(crossed))] is True
     assert "STOP" in run_a.summary(metrics)
 
@@ -104,7 +107,7 @@ def test_an_answer_cut_off_at_the_token_limit_is_not_sorted_and_crosses_the_last
 
     assert item.sorting == "unavailable" and "cut off" in item.detail
     assert metrics["sorting"]["cut_off_at_the_token_limit"] == 1
-    assert scoring_es.thresholds(metrics)[-1][1] is True
+    assert scoring_es.thresholds(metrics, ENGLISH)[-1][1] is True
 
 
 def test_the_order_the_model_wrote_each_statements_keys_in_is_counted():
@@ -124,10 +127,10 @@ def test_every_scripts_gold_answer_changes_nothing_and_misfiles_nothing():
     assert mistranslations["listed"] == [] and mistranslations["misfiled"]["listed"] == []
 
 
-def test_a_passage_filed_in_another_field_is_misfiled_not_changed_and_stops_the_step_apart():
+def test_a_passage_filed_in_another_field_is_misfiled_not_changed_and_counted_against_the_cap():
     # The Plan said again as Subjective, its own field left out: every number and change in it is what the clinician
-    # said, so the first threshold isn't crossed; Subjective's gold doesn't have them, which is counted apart, and
-    # crosses the second, as the first scorer counted it as changed.
+    # said, so the first threshold isn't crossed; Subjective's gold lacks them and Plan's has them, which is counted
+    # apart as misfiled, and one statement of the answer's few holding them is over English's rate plus 2 points.
     plan = SCRIPTS["e09-depresion"].statements["plan"]
     moved = [{"spanish": list(plan[0].spanish), "english": plan[0].english}]
     item = run("e09-depresion", gold_answer("e09-depresion", subjective=moved, plan=[]))
@@ -137,9 +140,24 @@ def test_a_passage_filed_in_another_field_is_misfiled_not_changed_and_stops_the_
     assert metrics["mistranslations"]["unflagged_total"] == 0
     assert {(e["kind"], e["shown"]) for e in metrics["mistranslations"]["misfiled"]["listed"]} == {
         ("number", "100 mg"), ("action", "increase")}
-    changed, misfiled, *_ = scoring_es.thresholds(metrics)
-    assert not changed[1] and misfiled[1] and misfiled[0].startswith("a value the Spanish it cites says, filed in")
+    changed, misfiled, *_ = scoring_es.thresholds(metrics, ENGLISH)
+    assert not changed[1] and misfiled[1] and misfiled[0] == scoring_es.MISFILED_LINE
+    assert "Spanish 1 of" in misfiled[2] and "English 0 of 100 (0.0)" in misfiled[2] and "cap 0.02" in misfiled[2]
     assert "STOP" in run_a.summary(metrics)
+
+
+# The cap (the owner's ruling, 2026-11-24): English's rate on the same kind of text plus 2 percentage points, at most;
+# with no English to cap at, the line is crossed.
+@pytest.mark.parametrize(("statements", "holding", "english", "over"), [
+    (100, 4, {"statements": 100, "unflagged_statements": 2}, False),
+    (100, 5, {"statements": 100, "unflagged_statements": 2}, True),
+    (50, 1, {"statements": 1009, "unflagged_statements": 19}, False),
+    (50, 2, {"statements": 1009, "unflagged_statements": 19}, True),
+    (0, 0, {"statements": 100, "unflagged_statements": 0}, False),
+    (100, 0, None, True),
+])
+def test_values_filed_in_the_wrong_field_are_capped_at_englishs_rate_plus_two_points(statements, holding, english, over):
+    assert scoring_es.over_the_cap(statements, holding, english) is over
 
 
 def test_a_passage_filed_in_the_wrong_field_counts_against_content_f1_and_apart():
@@ -163,8 +181,23 @@ def test_a_passage_filed_in_the_wrong_field_counts_against_content_f1_and_apart(
         ("number", "11 kg", False), ("number", "81 cm", False)}
     assert misfiled["unflagged_total"] == misfiled["unflagged"]["number"] == 2
     assert wrong["mistranslations"]["unflagged_total"] == 0
-    assert [crossed for _, crossed, _ in scoring_es.thresholds(wrong)][:2] == [False, True]
-    assert not any(crossed for _, crossed, _ in scoring_es.thresholds(right))
+    assert [crossed for _, crossed, _ in scoring_es.thresholds(wrong, ENGLISH)][:2] == [False, True]
+    assert not any(crossed for _, crossed, _ in scoring_es.thresholds(right, ENGLISH))
+
+
+def test_a_value_in_its_own_field_worded_unlike_the_gold_is_listed_apart_not_misfiled():
+    # The owner's ruling: misfiled is a value its field's gold lacks and another field's gold has. Run A3's "In 4 weeks."
+    # for the gold's "Follow-up in 4 weeks.": the facts back it, in the right field, worded otherwise: content F1's,
+    # listed apart as in no field's gold, never counted against the cap.
+    plan = [{"spanish": ["Control en 4 semanas."], "english": "In 4 weeks."} if "Control en 4 semanas." in s["spanish"]
+            else s for s in gold_answer("e01-hta-control")["statements"] if s["field"] == "plan"]
+    plan = [{"spanish": s["spanish"], "english": s["english"]} for s in plan]
+    metrics = scoring_es.score([run("e01-hta-control", gold_answer("e01-hta-control", plan=plan))], SCRIPTS)
+
+    assert metrics["mistranslations"]["misfiled"]["listed"] == []
+    assert metrics["mistranslations"]["misfiled"]["unflagged_statements"] == 0
+    assert [(e["field"], e["kind"], e["shown"]) for e in metrics["mistranslations"]["no_gold"]["listed"]] == [
+        ("plan", "duration", "4 weeks")]
 
 
 def test_a_drug_named_as_said_is_neither_changed_nor_misfiled_when_the_gold_names_it_otherwise():
@@ -185,8 +218,8 @@ def test_what_a_statement_changes_from_the_spanish_it_cites_is_marked_moved_when
     text = script.display
     start = text.index("PHQ-9 de 12")
     span = (start, start + len("PHQ-9 de 12, previamente 18"))
-    changed, misfiled = scoring_es._statement_items("Increase sertraline to 100 mg daily.", [span], text,
-                                                    script.gold["objective"].value, script)
+    changed, misfiled, _ = scoring_es._statement_items("Increase sertraline to 100 mg daily.", [span], text,
+                                                       script.gold["objective"].value, script)
     assert {(kind, what, moved) for kind, what, moved in changed} == {
         ("number", "100 mg (sertraline)", True), ("drug", "sertraline", True), ("action", "increase (sertraline)", True),
         ("frequency", "daily (sertraline)", True)}
@@ -207,7 +240,7 @@ def stored_run(*script_ids: str) -> dict:
     metrics = scoring_es.score(items, SCRIPTS)
     return {"provenance": {"checks": "earlier"}, "dataset": {"scripts_sha256": "earlier"}, "metrics": metrics,
             "thresholds": [{"threshold": name, "crossed": over, "measured": measured}
-                           for name, over, measured in scoring_es.thresholds(metrics)],
+                           for name, over, measured in scoring_es.thresholds(metrics, ENGLISH)],
             "items": [dataclasses.asdict(item) for item in items]}
 
 
@@ -311,7 +344,7 @@ def test_a_script_that_timed_out_is_a_failure_in_every_measure_and_a_partial_run
                                        sorting="unavailable", reason="model_timeout")
     metrics = scoring_es.score([timed_out, run("e16-anadido-corto", gold_answer("e16-anadido-corto"))], SCRIPTS)
 
-    crossed = {name: over for name, over, _ in scoring_es.thresholds(metrics)}
+    crossed = {name: over for name, over, _ in scoring_es.thresholds(metrics, ENGLISH)}
     assert crossed[next(name for name in crossed if name.startswith("a script not sorted"))]
     assert metrics["fields"]["detection"]["fn"] == sum(bool(s) for s in SCRIPTS["e14-nino-sano"].statements.values())
     assert metrics["fields"]["content"]["recall"] < 1.0

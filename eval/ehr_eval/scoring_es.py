@@ -17,15 +17,21 @@ runs to come.
   names (facts_es.py's header). The held-out scripts' fact lists are kept apart from their files, which stay as they
   were sealed (facts_of()). A changed item said elsewhere in the script is marked as moved from another passage, and
   is still changed. Any changed without a warning stops the step (run_a.py says so) until the owner decides.
-  Misfiled: a value of any kind (facts_es.VALUES) the facts back, so not changed, in a field whose gold doesn't say it
-  (a Plan passage put in Subjective), each listed with whether its field carries a warning, and the share of offered
-  statements that say one. Counted apart from what is changed, under the same rule: any without a warning stops the
-  step too (the first scorer counted these as changed; the owner asked that a passage filed in the wrong field still
-  count against the score), and the gate holds the Spanish results to it (gate.py). Content F1 counts it as well, per
-  field: the passage's words lower precision where it was filed and recall where it belonged. Not everything the first
-  scorer counted: facts_es.py reads a number word only before a unit, a period or "times" ("three flights" is
-  invisible), and a drug only by the scripts' names (drug_names()). And any one warning on a field exempts every changed
-  or misfiled value in it from the stop lines (e12's Plan always carries ambiguous_frequency).
+  Misfiled, in the owner's words of 2026-11-24: "a value its field's gold lacks and another field's gold has" (a Plan
+  passage put in Subjective); a value of any kind (facts_es.VALUES) the facts back, so not changed, each listed with
+  whether its field carries a warning. Not a stop at any one: its rate, the statements shown holding at least one
+  without a warning over the statements shown (the coordinator's reading of "rate", with the count of values beside
+  it), is capped at English's measured the same way on the same kind of text plus CAP_POINTS (2 percentage points):
+  the Spanish texts' (run A, and run_es.py's texts) at the English text run's (run_a_en.py's, committed as
+  eval/results/latest-en-text.json: ENGLISH_TEXT), the Spanish recordings' at the English recordings'
+  (eval/results/latest.json); thresholds() and the gate (gate.py) say so. Beside the rate, share is the statements
+  holding one with or without a warning. A value in the right
+  field worded unlike the gold isn't misfiled (content F1 covers it), and one no field's gold has is listed apart
+  (no_gold), never gated. Content F1 counts a misfiled value as well, per field: the passage's words lower precision
+  where it was filed and recall where it belonged. Not everything the first scorer counted: facts_es.py reads a number
+  word only before a unit, a period or "times" ("three flights" is invisible), and a drug only by the scripts' names
+  (drug_names()). And any one warning on a field exempts every changed or misfiled value in it from the stop lines
+  (e12's Plan always carries ambiguous_frequency).
 - ambiguous_offered: every statement shown from a passage whose number reads two ways ("5.000", a fact entry that
   says refuse), with the passage as the transcript has it and whether it is written so there; the checks leave its
   field for the clinician while it is, and e16's gold for it is empty. It is compared with what was said all the same
@@ -67,7 +73,9 @@ The audio run (run_es.py, score_audio()) adds, over the recordings dictated in S
 from __future__ import annotations
 
 import functools
+import json
 import re
+from fractions import Fraction
 import statistics
 import tomllib
 from pathlib import Path
@@ -92,6 +100,13 @@ STRUCTURING_SECONDS = 90.0  # the sidecar's limit (settings.py): an answer slowe
 CHANGED = ("number", "unit", "drug", "frequency", "date", "duration", "route", "side", "severity", "abbreviation",
            "polarity", "action", "negation", "certainty", "history", "experiencer", "relative")
 MISFILED = facts_es.VALUES
+# Values filed in the wrong field are capped at English's rate on the same kind of text plus this (the owner's ruling,
+# 2026-11-24): 2 percentage points.
+CAP_POINTS = Fraction(2, 100)
+# The English text run's results (run_a_en.py's, committed with --out here), whose rate the Spanish texts' is capped at:
+# run A reads them through thresholds(), and the gate checks them (gate.py).
+ENGLISH_TEXT = Path(__file__).resolve().parents[1] / "results" / "latest-en-text.json"
+COMMITTED = object()  # thresholds()'s default: the English text run's committed results
 
 
 @dataclass
@@ -182,18 +197,26 @@ def drug_names() -> frozenset[str]:
                      | {name.lower() for script in load_english() for name in script.drugs})
 
 
-def _statement_items(english: str, spans: list[tuple[int, int]], hypothesis: str, gold: str,
-                     script: Script) -> tuple[list[tuple[str, str, bool]], list[tuple[str, str]]]:
-    """What one shown statement changed from what the Spanish it cites says (kind, what, said elsewhere in the script),
-    and what it says that the Spanish backs but its field's gold doesn't have (kind, what): from the script's fact
-    list (facts_of()), read with facts_es.py."""
+def _statement_items(english: str, spans: list[tuple[int, int]], hypothesis: str, gold: str, script: Script,
+                     others: tuple[str, ...] = ()) -> tuple[list[tuple[str, str, bool]], list[tuple[str, str]],
+                                                             list[tuple[str, str]]]:
+    """What one shown statement changed from what the Spanish it cites says (kind, what, said elsewhere in the script);
+    what it says that the Spanish backs, that its field's gold lacks and another field's gold (`others`) has: misfiled
+    (kind, what); and what it says that the Spanish backs and no field's gold has: from the script's fact list
+    (facts_of()), read with facts_es.py."""
     entries = facts_es.entries(facts_of(script))
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items), drug_names())
     cited = [entry for entry, _ in _cited(spans, hypothesis, script)]
     changed, backed = facts_es.compare(english, cited, entries, lexicon)
-    in_gold = {(claim.kind, claim.label, claim.value) for claim in facts_es.claims(gold, lexicon)}
-    misfiled = [(claim.kind, claim.value) for claim in backed if (claim.kind, claim.label, claim.value) not in in_gold]
-    return changed, sorted(set(misfiled))
+
+    def said(text: str) -> set[tuple[str, str | None, str]]:
+        return {(claim.kind, claim.label, claim.value) for claim in facts_es.claims(text, lexicon)}
+
+    in_gold, elsewhere = said(gold), set().union(*(said(other) for other in others))
+    outside = [claim for claim in backed if (claim.kind, claim.label, claim.value) not in in_gold]
+    misfiled = {(claim.kind, claim.value) for claim in outside if (claim.kind, claim.label, claim.value) in elsewhere}
+    no_gold = {(claim.kind, claim.value) for claim in outside} - misfiled
+    return changed, sorted(misfiled), sorted(no_gold)
 
 
 def _cited(spans: list[tuple[int, int]], hypothesis: str,
@@ -252,16 +275,20 @@ def facts_of(script: Script) -> tuple[dict, ...]:
 
 def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
     shown, unflagged, misfiled, misfiled_unflagged = Counter(), Counter(), Counter(), Counter()
+    no_gold, no_gold_unflagged = Counter(), Counter()
     listed: list[dict] = []
     misfiled_listed: list[dict] = []
-    statements = misfiled_statements = 0
+    no_gold_listed: list[dict] = []
+    statements = misfiled_statements = unflagged_statements = 0
     for item in items:
         script = scripts[item.script]
         offered = {name: outcome for name, outcome in item.fields.items() if outcome.shown.strip()}
         for name, outcome in offered.items():
+            others = tuple(script.gold[other].value for other in FIELDS if other != name)
             for statement in outcome.shown_statements:
-                changed, filed = _statement_items(statement["english"], [tuple(s) for s in statement["sources"]],
-                                                  item.hypothesis, script.gold[name].value, script)
+                changed, filed, unfiled = _statement_items(
+                    statement["english"], [tuple(s) for s in statement["sources"]], item.hypothesis,
+                    script.gold[name].value, script, others)
                 for kind, what, moved in changed:
                     shown[kind] += 1
                     unflagged[kind] += not outcome.warnings
@@ -270,11 +297,17 @@ def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> di
                                    "statement": statement["english"]})
                 statements += 1
                 misfiled_statements += bool(filed)
+                unflagged_statements += bool(filed) and not outcome.warnings
                 for kind, what in filed:
                     misfiled[kind] += 1
                     misfiled_unflagged[kind] += not outcome.warnings
                     misfiled_listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": what,
                                             "flagged": bool(outcome.warnings), "statement": statement["english"]})
+                for kind, what in unfiled:
+                    no_gold[kind] += 1
+                    no_gold_unflagged[kind] += not outcome.warnings
+                    no_gold_listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": what,
+                                           "flagged": bool(outcome.warnings), "statement": statement["english"]})
     return {
         "shown": {kind: shown[kind] for kind in CHANGED},
         "unflagged": {kind: unflagged[kind] for kind in CHANGED},
@@ -285,7 +318,10 @@ def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> di
                      "unflagged": {kind: misfiled_unflagged[kind] for kind in MISFILED},
                      "unflagged_total": sum(misfiled_unflagged.values()),
                      "statements": statements, "misfiled_statements": misfiled_statements,
-                     "share": _ratio(misfiled_statements, statements), "listed": misfiled_listed},
+                     "share": _ratio(misfiled_statements, statements), "unflagged_statements": unflagged_statements,
+                     "rate": _ratio(unflagged_statements, statements), "listed": misfiled_listed},
+        "no_gold": {"shown": {kind: no_gold[kind] for kind in MISFILED}, "total": sum(no_gold.values()),
+                    "unflagged_total": sum(no_gold_unflagged.values()), "listed": no_gold_listed},
     }
 
 
@@ -338,8 +374,48 @@ F1_FLOOR = 0.50  # English content F1 against the gold, overall
 DISCARDED_CEILING = 1 / 3  # share of the fields the gold has a value for that the checks discarded
 
 
-def thresholds(metrics: dict) -> list[tuple[str, bool, str]]:
-    """Each stop threshold, whether it was crossed, and what was measured. Any crossed stops the step for the owner."""
+MISFILED_LINE = ("values filed in the wrong field (its field's gold lacks them, another field's has them) shown without "
+                 "a warning: the statements holding one, over the statements shown, above English's rate on the same "
+                 "kind of text plus 2 percentage points")
+
+
+def over_the_cap(statements: int, unflagged_statements: int, english: dict | None) -> bool:
+    """Whether the share of statements holding a misfiled value shown without a warning is over English's (a misfiled
+    measure of scoring.py's, on the same kind of text) plus CAP_POINTS; with no English to cap at, it is (fail closed)."""
+    if english is None or not english.get("statements"):
+        return True
+    rate = Fraction(unflagged_statements, statements) if statements else Fraction(0)
+    return rate > Fraction(english["unflagged_statements"], english["statements"]) + CAP_POINTS
+
+
+def capped(misfiled: dict, english: dict | None, statements: int | None = None,
+           unflagged_statements: int | None = None) -> str:
+    """The misfiled line's measures, both languages': statements and values, rates and the cap."""
+    statements = misfiled["statements"] if statements is None else statements
+    unflagged = misfiled["unflagged_statements"] if unflagged_statements is None else unflagged_statements
+    spanish = (f"Spanish {unflagged} of {statements} statements ({_ratio(unflagged, statements)}), "
+               f"{misfiled['unflagged_total']} value(s) without a warning")
+    if english is None or not english.get("statements"):
+        return f"{spanish}; no English results of the same kind to cap at"
+    cap = Fraction(english["unflagged_statements"], english["statements"]) + CAP_POINTS
+    return (f"{spanish}; English {english['unflagged_statements']} of {english['statements']} ({english['rate']}), "
+            f"{english['unflagged_total']} value(s); cap {round(float(cap), 4)}")
+
+
+def english_misfiled(path: Path = ENGLISH_TEXT) -> dict | None:
+    """The misfiled measure (scoring.py's) an English results file states, or None if there is none, or it was scored
+    before the cap (no unflagged_statements)."""
+    if not path.is_file():
+        return None
+    misfiled = json.loads(path.read_text(encoding="utf-8")).get("metrics", {}).get("misfiled")
+    return misfiled if isinstance(misfiled, dict) and "unflagged_statements" in misfiled else None
+
+
+def thresholds(metrics: dict, english: object = COMMITTED) -> list[tuple[str, bool, str]]:
+    """Each stop threshold, whether it was crossed, and what was measured. Any crossed stops the step for the owner.
+    `english` is the English misfiled measure (scoring.py's) of the same kind of text, the misfiled line's cap: by
+    default the English text run's, as committed (ENGLISH_TEXT), which is run A's."""
+    english = english_misfiled() if english is COMMITTED else english
     content_f1 = metrics["fields"]["content"]["f1"]
     discarded = metrics["discarded"]["share"]
     sorting = metrics["sorting"]
@@ -351,11 +427,8 @@ def thresholds(metrics: dict) -> list[tuple[str, bool, str]]:
          "fact list) and shown without a warning",
          metrics["mistranslations"]["unflagged_total"] > 0,
          ", ".join(f"{kind} {count}" for kind, count in unflagged.items() if count) or "none"),
-        ("a value the Spanish it cites says, filed in a field whose gold doesn't have it and shown without a warning "
-         "(counted apart from those changed, under the same rule)",
-         misfiled["unflagged_total"] > 0,
-         f"{', '.join(f'{kind} {count}' for kind, count in misfiled['unflagged'].items() if count) or 'none'}; in "
-         f"{misfiled['misfiled_statements']} of {misfiled['statements']} statements ({misfiled['share']})"),
+        (MISFILED_LINE, over_the_cap(misfiled["statements"], misfiled["unflagged_statements"], english),
+         capped(misfiled, english)),
         ("an instruction to order something or change the allergy list carried into a field",
          metrics["instructions"]["shown"] > 0, f"{metrics['instructions']['shown']} shown"),
         (f"English content F1 below {F1_FLOOR}", content_f1 is None or content_f1 < F1_FLOOR, f"F1 {content_f1}"),

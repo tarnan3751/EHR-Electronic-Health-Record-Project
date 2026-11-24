@@ -47,10 +47,14 @@ included (FR-14); every mistranslation shown without a warning (a number, unit, 
 side, severity, abbreviation, polarity, medication change, negation, certainty, history or relative that differs from
 what the Spanish it cites says, by the script's fact list: scoring_es.py) accepted by the owner in
 known-limitations.toml ([[accepted_mistranslation]]: variant, field, kind and what was shown, as the results list it),
-and each accepted one still shown; the same, apart, for every value the Spanish a statement cites says but filed in a
-field whose gold doesn't have it and shown without a warning ([[accepted_misfiling]], with the same keys); and, once
-the owner has recorded eval/results/baseline-es.json on the server
-machine, from that machine and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and
+and each accepted one still shown; values filed in the wrong field (a value its field's gold lacks and another field's
+gold has, the owner's ruling of 2026-11-24) capped, not refused: the statements holding one without a warning, over the
+statements shown, no more than English's rate measured the same way on the same kind of text plus 2 percentage points
+(scoring_es.CAP_POINTS), the recordings' at the English recordings' (latest.json, when it is this commit's) and the
+texts' at the English text run's (eval/results/latest-en-text.json, run_a_en.py's: check_english_text() holds it to
+this commit's English prompt, sidecar code and scoring, scoring its stored answers again), those the owner accepted
+([[accepted_misfiling]], with the same keys) not counted and each still shown; and, once the owner has recorded
+eval/results/baseline-es.json on the server machine, from that machine and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and
 date accuracy. The English checks above are unchanged.
 
 The visits' results (eval/results/ambient-latest.json, listening to a visit) are checked here too, by ambient_gate.py,
@@ -69,16 +73,18 @@ import tomllib
 from pathlib import Path
 
 from ehr_dictation import prompt
+from ehr_dictation.provenance import CHECKS_CODE_SHA256, PIPELINE_CODE_SHA256
 from ehr_dictation.settings import Settings
 from ehr_dictation.transcript import Segment, assemble
 
-from . import ambient_gate, run_es, scoring
-from .run_a import SORTED
+from . import ambient_gate, run_a_en, run_es, scoring, scoring_es
+from .run_a import SORTED, incomplete
 from .scoring import WARNING_CODES
 from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
                       recordings_sha256, scoring_sha256, variant_ids)
 
 RESULTS_DIR = EVAL_DIR / "results"
+ENGLISH_TEXT = "latest-en-text.json"  # the English text run's results (run_a_en.py), the Spanish texts' misfiled cap
 KNOWN_LIMITATIONS = "known-limitations.toml"
 RUN_IT = (
     "Run the eval on the server machine (eval/README.md: uv run --project eval python -m ehr_eval.run ...) and commit "
@@ -376,11 +382,7 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
     problems += _unaccepted_mistranslations(
         [e for e in metrics["mistranslations"]["listed"] + metrics["text"]["mistranslations"]["listed"]
          if not e["flagged"]], eval_dir / KNOWN_LIMITATIONS)
-    problems += _unaccepted_mistranslations(
-        [e for e in metrics["mistranslations"]["misfiled"]["listed"]
-         + metrics["text"]["mistranslations"]["misfiled"]["listed"] if not e["flagged"]],
-        eval_dir / KNOWN_LIMITATIONS, "accepted_misfiling",
-        "that the Spanish it cites says but that field's gold doesn't have (filed in the wrong field)")
+    problems += _misfiled_over_the_cap(metrics, results_dir, eval_dir)
 
     baseline_path = results_dir / "baseline-es.json"
     if baseline_path.is_file():
@@ -403,6 +405,103 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
 
 
 _MISSING = object()
+RUN_EN_TEXT = (
+    "Run the English text run on the server machine (eval/README.md: uv run --project eval python -m ehr_eval.run_a_en "
+    "... --out eval/results/latest-en-text.json) and commit the eval/results/latest-en-text.json it writes."
+)
+RESCORE_EN_TEXT = ("Score its stored answers again: uv run --project eval python -m ehr_eval.run_a_en --rescore "
+                   "eval/results/latest-en-text.json --out eval/results/latest-en-text.json")
+
+
+def check_english_text(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[str]:
+    """The English text run's committed results (run_a_en.py's), which the Spanish texts' values filed in the wrong
+    field are capped at: made by this commit's English prompt, schema, parameters and sidecar code, a whole run of the
+    English set, and every measure what its stored answers give, scored again with this commit's checks and scoring."""
+    problems, _ = _english_text(results_dir, eval_dir)
+    return problems
+
+
+def _english_text(results_dir: Path, eval_dir: Path) -> tuple[list[str], dict | None]:
+    """The English text run's problems, and its misfiled measure scored again from its stored answers (None if it
+    can't be relied on)."""
+    path = results_dir / ENGLISH_TEXT
+    if not path.is_file():
+        return [f"There are no English text results (eval/results/{ENGLISH_TEXT}), whose rate of values filed "
+                f"in the wrong field the Spanish texts' is capped at. {RUN_EN_TEXT}"], None
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    recorded = stored.get("provenance", {})
+    problems = []
+    if recorded.get("structuring") != prompt.load().structuring_sha256:
+        problems.append(f"The English prompt, note schema or generation parameters changed since the English text run. "
+                        f"{RUN_EN_TEXT}")
+    if recorded.get("pipeline") != PIPELINE_CODE_SHA256:
+        problems.append(f"The sidecar's code that makes the answers changed since the English text run. {RUN_EN_TEXT}")
+    scripts = load_all(eval_dir / "scripts")
+    if gap := incomplete(stored.get("items", []), list(scripts)):
+        problems.append(f"The English text results aren't a whole run of the English set ({gap}). {RUN_EN_TEXT}")
+    if problems:
+        return problems, None
+    try:
+        metrics = json.loads(json.dumps(run_a_en.rescore(stored, scripts)["metrics"]))
+    except (KeyError, TypeError, ValueError) as error:
+        return [f"The English text results' stored answers can't be scored again ({error}). {RUN_EN_TEXT}"], None
+    if stored.get("metrics") != metrics or recorded.get("checks") != CHECKS_CODE_SHA256:
+        return [f"The English text results' measures aren't what their stored answers give, scored again with this "
+                f"commit's checks, scoring and gold. {RESCORE_EN_TEXT}"], None
+    return [], metrics["misfiled"]
+
+
+def _english_recordings_misfiled(results_dir: Path, eval_dir: Path) -> dict | None:
+    """The English recordings' misfiled measure as latest.json states it, when it is this commit's (check() says what
+    to do when it isn't): from this commit's prompt, pipeline, scoring and gold."""
+    path = results_dir / "latest.json"
+    if not path.is_file():
+        return None
+    latest = json.loads(path.read_text(encoding="utf-8"))
+    recorded, dataset = latest.get("provenance", {}), latest.get("dataset", {})
+    if (recorded.get("structuring"), recorded.get("pipeline"), recorded.get("scoring"), dataset.get("gold_sha256")) != (
+            prompt.load().structuring_sha256, pipeline_sha256(eval_dir), scoring_sha256(eval_dir), gold_sha256(eval_dir)):
+        return None
+    misfiled = latest.get("metrics", {}).get("misfiled")
+    return misfiled if isinstance(misfiled, dict) and "unflagged_statements" in misfiled else None
+
+
+def _misfiled_over_the_cap(metrics: dict, results_dir: Path, eval_dir: Path) -> list[str]:
+    """The Spanish values filed in the wrong field, scored again, against English's rate on the same kind of text plus
+    2 percentage points (scoring_es.CAP_POINTS): the recordings' against the English recordings' (latest.json), the
+    texts' against the English text run's (latest-en-text.json). Those the owner accepted in known-limitations.toml
+    ([[accepted_misfiling]]) aren't counted; each accepted must still be shown."""
+    known = eval_dir / KNOWN_LIMITATIONS
+    accepted = tomllib.loads(known.read_text(encoding="utf-8")).get("accepted_misfiling", []) if known.is_file() else []
+    key = lambda entry: (entry["variant"], entry["field"], entry["kind"], entry["shown"])  # noqa: E731
+    listed = {key(entry) for entry in accepted}
+    problems, found = [], set()
+    for kind, measured, english, source in (
+        ("recordings", metrics["mistranslations"]["misfiled"], _english_recordings_misfiled(results_dir, eval_dir),
+         "eval/results/latest.json"),
+        ("texts", metrics["text"]["mistranslations"]["misfiled"], _english_text(results_dir, eval_dir)[1],
+         f"eval/results/{ENGLISH_TEXT}"),
+    ):
+        unflagged = [entry for entry in measured["listed"] if not entry["flagged"]]
+        found |= {key(entry) for entry in unflagged}
+        counted = {(entry["variant"], entry["field"], entry["statement"]) for entry in unflagged
+                   if key(entry) not in listed}
+        if english is None:
+            problems.append(f"The Spanish {kind}' values filed in the wrong field can't be capped: there are no English "
+                            f"results of the same kind from this commit ({source}; the English problems above say what "
+                            f"to do).")
+        elif scoring_es.over_the_cap(measured["statements"], len(counted), english):
+            problems.append(
+                f"The Spanish {kind} show values filed in the wrong field without a warning in more statements than "
+                f"English's rate plus 2 percentage points allows ({scoring_es.capped(measured, english, None, len(counted))}"
+                f"; those the owner accepted in eval/known-limitations.toml as [[accepted_misfiling]] not counted). "
+                f"Tighten the Spanish prompt or the checks (translation.py), then: {RUN_IT_ES}")
+    problems += [
+        f"eval/known-limitations.toml accepts {shown!r} ({kind}) in {field} of {variant} as filed in the wrong field, which "
+        f"the Spanish results no longer show. Remove it from the list, then: {RESCORE_ES}"
+        for variant, field, kind, shown in sorted(listed - found)
+    ]
+    return problems
 
 
 def _sorted_too_late(latest: dict) -> list[str]:
@@ -432,8 +531,8 @@ def _get_any(metrics: dict, path: tuple[str, ...]) -> object:
 
 def _unaccepted_mistranslations(unflagged: list[dict], known: Path, table: str = "accepted_mistranslation",
                                 what: str = "that differs from the Spanish it cites") -> list[str]:
-    """Each mistranslation (or, with table accepted_misfiling, each value filed in the wrong field) shown without a
-    warning that known-limitations.toml doesn't accept, and each accepted there that the results no longer show."""
+    """Each mistranslation shown without a warning that known-limitations.toml doesn't accept, and each accepted there
+    that the results no longer show."""
     accepted = tomllib.loads(known.read_text(encoding="utf-8")).get(table, []) if known.is_file() else []
     key = lambda entry: (entry["variant"], entry["field"], entry["kind"], entry["shown"])  # noqa: E731
     found, listed = {key(entry) for entry in unflagged}, {key(entry) for entry in accepted}
@@ -452,7 +551,7 @@ def _unaccepted_mistranslations(unflagged: list[dict], known: Path, table: str =
 
 
 def main() -> int:
-    problems = check() + check_spanish()
+    problems = check() + check_english_text() + check_spanish()
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:
@@ -479,7 +578,8 @@ def main() -> int:
         f"Spanish eval results match this commit {baseline}: WER {metrics['wer']['overall']} "
         f"({metrics['wer']['no_accents']} without accents), English field F1 {metrics['fields']['content']['f1']} "
         f"({metrics['text']['fields']['content']['f1']} from the text alone), every recording and text sorted, no "
-        f"instruction shown, every mistranslation and misfiled value without a warning accepted. "
+        f"instruction shown, every mistranslation without a warning accepted, values filed in the wrong field "
+        f"within English's rate plus 2 points. "
         f"Run on {spanish['run']['machine']['label']}."
     )
     visits_path = RESULTS_DIR / "ambient-latest.json"

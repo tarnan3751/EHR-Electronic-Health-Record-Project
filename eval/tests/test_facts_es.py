@@ -68,9 +68,10 @@ def test_every_gold_statement_changes_nothing_and_misfiles_nothing(script):
     for name, statements in script.statements.items():
         for statement in statements:
             spans = [(script.display.index(q), script.display.index(q) + len(q)) for q in statement.spanish]
-            changed, misfiled = scoring_es._statement_items(statement.english, spans, script.display,
-                                                            script.gold[name].value, script)
-            assert (changed, misfiled) == ([], []), statement.english
+            others = tuple(script.gold[other].value for other in script.gold if other != name)
+            changed, misfiled, no_gold = scoring_es._statement_items(statement.english, spans, script.display,
+                                                                     script.gold[name].value, script, others)
+            assert (changed, misfiled, no_gold) == ([], [], []), statement.english
 
 
 @pytest.mark.parametrize(("fact", "says"), [
@@ -88,7 +89,7 @@ def changes(key: str, said: str, english: str, hypothesis: str | None = None) ->
     script = SCRIPTS[key]
     heard = hypothesis or script.display
     at = facts_es.places([said], script.display, heard)[0]
-    changed, _ = scoring_es._statement_items(english, [at], heard, "", script)
+    changed, *_ = scoring_es._statement_items(english, [at], heard, "", script)
     return {(kind, what) for kind, what, _ in changed}
 
 

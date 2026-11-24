@@ -15,11 +15,15 @@
 - unsupported_content: the share of words in proposed and in offered values that the transcript doesn't contain.
 - misfiled: each value an offered value's sentence says (facts_es.py's reading: a number, drug, frequency, date, how
   long, route, side, severity, polarity or medication change, as kind, label and value) that its field's rule-following
-  gold doesn't, with whether the field carries a warning, and the share of offered sentences that say one; beside
-  content F1, which counts it too. Near the Spanish set's count (scoring_es.py), not the same: the Spanish counts only a
-  value the facts of the passage it cites back, with the fact list's names as labels; there are no English fact lists,
-  so every value the gold lacks counts, with its label as written (a drug name misheard on a recording reads as a
-  value missing from its field). The gate doesn't judge it here; run_a_en.py sets it against run A's misfiled line.
+  gold lacks and another field's has (the owner's ruling of 2026-11-24: a value in the right field worded unlike the
+  gold is content F1's, not misfiled), with whether the field carries a warning; and its rate, the offered sentences
+  holding at least one without a warning over the offered sentences, with the count of values beside it. Values no
+  field's gold has are listed apart (no_gold), never gated. Near the Spanish set's count (scoring_es.py), not the same:
+  the Spanish counts only a value the facts of the passage it cites back, with the fact list's names as labels; there
+  are no English fact lists, so every value counts, backed or not, with its label as written (a drug name misheard on a
+  recording reads as a value no gold has). English isn't gated on it: its rate is what the Spanish set's is capped at,
+  plus 2 percentage points (scoring_es.CAP_POINTS), the recordings' for the Spanish recordings' and the English text
+  run's (run_a_en.py) for the Spanish texts'.
 - order_allergy (on what the sidecar sends for an offered field: the value with any instruction cut out of it): offered
   values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), found as the
   script says it or as the transcript heard it (_as_heard()), retracted (a value the clinician corrected away), or a
@@ -132,7 +136,7 @@ def score(items: list[Item], scripts: dict[str, Script]) -> dict:
         "validation": _validation(items),
         "discarded": _discarded(items, scripts),
         "unsupported_content": _unsupported(items),
-        "misfiled": misfiled(items, scripts),
+        **dict(zip(("misfiled", "no_gold"), misfiled(items, scripts), strict=True)),
         "order_allergy": _order_allergy(items, scripts),
         **proposal_scores(items, scripts),
         "warnings": _warnings(items, scripts),
@@ -275,31 +279,45 @@ def _unsupported(items: list[Item]) -> dict:
 SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
 
-def misfiled(items: list[Item], scripts: dict[str, Script]) -> dict:
-    """Each value a sentence of an offered value says that its field's rule-following gold doesn't (the module's
-    header), as scoring_es.py counts a Spanish statement's: kind by kind, and without a warning."""
+def misfiled(items: list[Item], scripts: dict[str, Script]) -> tuple[dict, dict]:
+    """Each value a sentence of an offered value says that its field's rule-following gold lacks and another field's
+    has, and apart, each one no field's gold has (the module's header), as scoring_es.py counts a Spanish statement's:
+    kind by kind, and without a warning."""
     lexicon = facts_es.Lexicon(drugs=frozenset(drug.lower() for script in scripts.values() for drug in script.drugs))
 
     def values(text: str) -> set[tuple[str, str | None, str]]:
         return {(c.kind, c.label, c.value) for c in facts_es.claims(text, lexicon) if c.kind in facts_es.VALUES}
 
-    shown, unflagged, statements, sentences, listed = Counter(), Counter(), 0, 0, []
+    filed_count, unflagged, no_gold, no_gold_unflagged = Counter(), Counter(), Counter(), Counter()
+    sentences = filed_sentences = unflagged_sentences = 0
+    listed, no_gold_listed = [], []
     for item in items:
         gold = {name: values(g.value) for name, g in scripts[item.script].gold_rules.items()}
         for name, outcome in item.fields.items():
+            elsewhere = set().union(*(found for other, found in gold.items() if other != name))
             for sentence in (s for s in SENTENCE.split(outcome.shown.strip()) if s):
                 sentences += 1
-                filed = sorted(values(sentence) - gold.get(name, set()), key=str)
-                statements += bool(filed)
+                outside = sorted(values(sentence) - gold.get(name, set()), key=str)
+                filed = [value for value in outside if value in elsewhere]
+                filed_sentences += bool(filed)
+                unflagged_sentences += bool(filed) and not outcome.warnings
                 for kind, _, value in filed:
-                    shown[kind] += 1
+                    filed_count[kind] += 1
                     unflagged[kind] += not outcome.warnings
                     listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": value,
                                    "flagged": bool(outcome.warnings), "statement": sentence})
-    return {"shown": {kind: shown[kind] for kind in facts_es.VALUES}, "total": sum(shown.values()),
-            "unflagged": {kind: unflagged[kind] for kind in facts_es.VALUES}, "unflagged_total": sum(unflagged.values()),
-            "statements": sentences, "misfiled_statements": statements, "share": _ratio(statements, sentences),
-            "listed": listed}
+                for kind, _, value in (value for value in outside if value not in elsewhere):
+                    no_gold[kind] += 1
+                    no_gold_unflagged[kind] += not outcome.warnings
+                    no_gold_listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": value,
+                                           "flagged": bool(outcome.warnings), "statement": sentence})
+    return ({"shown": {kind: filed_count[kind] for kind in facts_es.VALUES}, "total": sum(filed_count.values()),
+             "unflagged": {kind: unflagged[kind] for kind in facts_es.VALUES}, "unflagged_total": sum(unflagged.values()),
+             "statements": sentences, "misfiled_statements": filed_sentences,
+             "share": _ratio(filed_sentences, sentences), "unflagged_statements": unflagged_sentences,
+             "rate": _ratio(unflagged_sentences, sentences), "listed": listed},
+            {"shown": {kind: no_gold[kind] for kind in facts_es.VALUES}, "total": sum(no_gold.values()),
+             "unflagged_total": sum(no_gold_unflagged.values()), "listed": no_gold_listed})
 
 
 def _contains(text: str, phrase: str) -> bool:

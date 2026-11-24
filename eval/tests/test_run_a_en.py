@@ -117,7 +117,8 @@ def test_the_two_sets_are_set_side_by_side_line_by_line(tmp_path, capsys):
     table = capsys.readouterr().out
     first, misfiled, *_, sorting = table.split("\n\n")[1:]
     assert "English: n/a: not applicable" in first and "Spanish: ok: none" in first
-    assert "English: ok: 0 value(s)" in misfiled and "Spanish: ok: none; in 0 of 0 statements" in misfiled
+    assert "English: ok: 0 value(s)" in misfiled and "Spanish: ok: Spanish 0 of 0 statements (None)" in misfiled
+    assert "; English " in misfiled and "cap " in misfiled  # capped at the English text run's committed rate
     assert "English: ok: unavailable none" in sorting and "Spanish: CROSSED: unavailable {'model_timeout': 1}" in sorting
 
 

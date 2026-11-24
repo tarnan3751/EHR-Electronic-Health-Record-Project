@@ -370,4 +370,19 @@ def test_a_sentence_filed_in_the_wrong_field_is_counted_apart_and_against_conten
     assert misfiled["misfiled_statements"] == 1 and misfiled["unflagged_total"] == misfiled["total"] > 0
     assert {(e["field"], e["statement"]) for e in misfiled["listed"]} == {("subjective", weight)}
     assert ("number", "96 kg") in {(e["kind"], e["shown"]) for e in misfiled["listed"]}
+    assert misfiled["unflagged_statements"] == 1 and misfiled["rate"] == round(1 / misfiled["statements"], 4)
     assert scored_wrong["fields"]["content"]["f1"] < scored_right["fields"]["content"]["f1"]
+
+
+def test_a_value_no_fields_gold_has_is_listed_apart_and_never_counted_as_misfiled():
+    # The owner's ruling: a value no field's gold has (a weight from last year, said nowhere in the gold) is reported
+    # under its own name; only one another field's gold has is misfiled.
+    scripts = load_all()
+    gold = scripts["d02-t2dm-bexagliflozin"].gold_rules
+    extra = item("d02-t2dm-bexagliflozin", "", subjective=pending(f"{gold['subjective'].value} Weighed 99 kg last year."),
+                 objective=pending(gold["objective"].value))
+
+    scored = score([extra], scripts)
+
+    assert scored["misfiled"]["total"] == scored["misfiled"]["unflagged_statements"] == 0
+    assert ("subjective", "number", "99 kg") in {(e["field"], e["kind"], e["shown"]) for e in scored["no_gold"]["listed"]}

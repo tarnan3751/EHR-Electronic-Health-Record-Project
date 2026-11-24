@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from conftest import ScriptedRecognizer
+from conftest import ScriptedRecognizer, english_results_to_cap_at
 
 from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import load_scripts
@@ -50,6 +50,7 @@ def spanish_dir(eval_dir: Path) -> Path:
         shutil.copy(EVAL_DIR / "scripts-es" / f"{name}.toml", eval_dir / "scripts-es")
     with (eval_dir / "voices.toml").open("a", encoding="utf-8") as voices:
         voices.write(VARIANTS_ES)
+    english_results_to_cap_at(eval_dir, eval_dir / "results")
     return eval_dir
 
 
@@ -296,6 +297,7 @@ def test_a_mistranslation_shown_without_a_warning_fails_unless_the_owner_accepte
         f'[[accepted_mistranslation]]\nvariant = "e14-nino-sano--{kind}"\nfield = "objective"\nkind = "number"\n'
         f'shown = "11 kg (weight)"\nwhy = "synthetic"\n' for kind in ("clean", "text"))
     (spanish_dir / "known-limitations.toml").write_text(accepting, encoding="utf-8")
+    english_results_to_cap_at(spanish_dir, spanish_dir / "results")  # scored with the list that is now there
     save(spanish_dir, "latest-es.json", results(spanish_dir))
     assert problems(spanish_dir) == []
 
@@ -305,10 +307,11 @@ def test_a_mistranslation_shown_without_a_warning_fails_unless_the_owner_accepte
     assert len(stale) == 2 and all("no longer show" in p for p in stale)
 
 
-def test_a_value_filed_in_the_wrong_field_without_a_warning_fails_unless_the_owner_accepted_it(spanish_dir):
+def test_values_filed_in_the_wrong_field_over_englishs_rate_fail_unless_the_owner_accepted_them(spanish_dir):
     # e14's text answered with its gold, but its weight and height, Objective's first statement, filed in Subjective:
-    # what the Spanish it cites says, in a field whose gold doesn't have it. Counted apart from a mistranslation, under
-    # the same rule.
+    # what the Spanish it cites says, in a field whose gold lacks it and Objective's has it. Counted apart from a
+    # mistranslation, and capped: one statement of the texts' 32 holds them, over the English text run's none plus 2
+    # percentage points; the owner's acceptance takes them out of the count, and each accepted must still be shown.
     script = {s.id: s for s in load_scripts(spanish_dir / "scripts-es")}["e14-nino-sano"]
     answer = gold(script)
     weight, *rest = answer["objective"]
@@ -323,15 +326,15 @@ def test_a_value_filed_in_the_wrong_field_without_a_warning_fails_unless_the_own
         return item
 
     save(spanish_dir, "latest-es.json", results(spanish_dir, change=refiled))
-    found = problems(spanish_dir)
-    assert [p.split(", a number ")[0] for p in found] == [
-        "e14-nino-sano--text shows '11 kg' in subjective", "e14-nino-sano--text shows '81 cm' in subjective"]
-    assert all("filed in the wrong field" in p and "[[accepted_misfiling]]" in p for p in found)
+    (found,) = problems(spanish_dir)
+    assert found.startswith("The Spanish texts show values filed in the wrong field without a warning in more statements")
+    assert "Spanish 1 of 32 statements (0.0312), 2 value(s) without a warning" in found and "cap 0.02" in found
 
     accepting = "".join(
         f'[[accepted_misfiling]]\nvariant = "e14-nino-sano--text"\nfield = "subjective"\nkind = "number"\n'
         f'shown = "{shown}"\nwhy = "synthetic"\n' for shown in ("11 kg", "81 cm"))
     (spanish_dir / "known-limitations.toml").write_text(accepting, encoding="utf-8")
+    english_results_to_cap_at(spanish_dir, spanish_dir / "results")  # scored with the list that is now there
     save(spanish_dir, "latest-es.json", results(spanish_dir, change=refiled))
     assert problems(spanish_dir) == []
 
