@@ -531,6 +531,33 @@ def test_a_doubt_the_spanish_doesnt_say_is_never_added(text, english, dropped):
     assert reasons("Tiene neumonía.", ["Tiene neumonía."], english) == [r.replace("dropped", "added") for r in dropped]
 
 
+# "may be", "might be" and "could be" are doubt after any subject, not only after a pronoun (validation.py's), and
+# "unlikely" is doubt as validation.py reads it (the owner's ruling of 2026-11-24): a translation that says them of what
+# the Spanish doubts is offered, and one that says them where the Spanish doubts nothing is refused. Before, "Blood
+# pressure may be rising" for "Puede que esté subiendo la tensión" was refused, and "A fracture could be present" for
+# "Hay una fractura" passed.
+HEDGES = [
+    ("Puede que esté subiendo la tensión.", "Blood pressure may be rising.", "Sube la tensión."),
+    ("Puede que esté subiendo la tensión.", "Blood pressure might be rising.", "Sube la tensión."),
+    ("Puede que esté subiendo la tensión.", "Blood pressure could be rising.", "Sube la tensión."),
+    ("Podría ser una fractura.", "A fracture could be present.", "Hay una fractura."),
+    ("Posible fractura.", "A fracture may be present.", "Hay una fractura."),
+    ("Es poco probable una fractura.", "A fracture is unlikely.", "Hay una fractura."),
+    ("Fractura poco probable en la radiografía.", "Fracture unlikely on the X-ray.", "Fractura en la radiografía."),
+]
+
+
+@pytest.mark.parametrize(("doubted", "english", "stated"), HEDGES)
+def test_may_might_could_be_and_unlikely_are_doubt_kept_where_said_and_refused_where_added(doubted, english, stated):
+    assert reasons(doubted, [doubted], english, field="assessment") == []
+    assert "certainty_added" in reasons(stated, [stated], english, field="assessment")
+
+
+def test_may_be_as_leave_is_read_as_doubt_too_a_known_false_refusal():
+    text = "Se puede repetir la dosis de paracetamol."
+    assert reasons(text, [text], "The acetaminophen dose may be repeated.") == ["certainty_added"]
+
+
 # What validation.py reads as doubt in English, the Spanish reads in its words: "I doubt" is a negation as well.
 DOUBT_WORDS = [
     ("Dudo que tenga faringitis.", "I doubt she has pharyngitis.", ["negation_dropped", "certainty_dropped"]),

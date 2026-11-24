@@ -110,7 +110,10 @@ statement:
      "wonder", "a chance", "presumably", "consistent with" and "suggestive of" are; "parece", "aparentemente",
      "orientado como", "se plantea", "diagnóstico de presunción" (past its colon), "pudiera tratarse de" and "a
      valorar" are doubt, as "seems", "appears to be", "apparently", "looks like", "working diagnosis", "presumptive",
-     "being considered" and "to be evaluated" are; "nada de" is a negation; "se descartó" and "descartado" are
+     "being considered" and "to be evaluated" are, and "may be", "might be" and "could be" after any subject, where
+     validation.py reads them only after a pronoun (the owner's ruling of 2026-11-24, "Blood pressure may be rising"),
+     so a "may be" of leave ("the dose may be repeated") is refused as doubt added, a known false refusal; "nada de" is
+     a negation; "se descartó" and "descartado" are
      a negation, as "ruled out" is; "hace años", "el año pasado", "en el pasado", "previamente", "previo" and "antiguo"
      are the past, as "years ago", "last year", "in the past", "previously", "prior", "previous", "old" and "remote"
      are (MORE_ENGLISH, read as validation.py's own cues are); and "en la familia" is someone else, as "in the family"
@@ -1166,7 +1169,7 @@ MORE_ENGLISH = (
         "certainty_dropped", re.compile(
             r"\b(?:doubtful|presumed|presumptive|consistent with|compatible with|suggestive of|suggesting|"
             r"in keeping with|seems?(?: to(?: be| have)?)?|appears? to(?: be| have)?|apparently|looks? like|"
-            r"working diagnosis)\b", re.I),
+            r"working diagnosis|(?:may|might|could) be)\b", re.I),
         re.compile(r"\b(?:under (?:investigation|study)|cannot (?:be )?ruled? out|can't (?:be )?ruled? out|"
                    r"not ruled out|doubtful|presumed|being considered|to be (?:evaluated|assessed|ruled out|excluded))\b",
                    re.I),
