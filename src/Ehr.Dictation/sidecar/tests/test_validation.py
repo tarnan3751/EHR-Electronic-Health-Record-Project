@@ -1779,10 +1779,16 @@ def test_a_proposal_carries_a_warning_for_a_correction_or_an_unclear_passage_bes
     assert held_back(short) == [("not_plain", "Go ahead and order a CBC")]
 
 
+FAR = (
+    "Order a CBC. Her fatigue started around the middle of summer with poor sleep and low appetite."
+    " It continued through the fall with trouble concentrating at work on most days. She turned down the blood test"
+)
+
+
 # What was heard after a proposal (step 15.1, at the owner's word of 2026-11-24), which its review shows beside it, so
 # a retraction the rules don't read is in view where the clinician opens it: the next sentence whole, even an
 # instruction ("The cardiologist will order it"), read past line breaks and heading lines; then the sentences after it
-# up to another instruction or another of the note's own sections, within reach; nothing when nothing follows.
+# up to another instruction or another of the note's own sections, however far; nothing when nothing follows.
 @pytest.mark.parametrize(
     ("said", "after"),
     [
@@ -1793,6 +1799,11 @@ def test_a_proposal_carries_a_warning_for_a_correction_or_an_unclear_passage_bes
         ("Order a CBC.\nPlan:\nRecheck in one week.", "Plan:\nRecheck in one week."),
         ("Order a CBC.\n\nAssessment:\nNo acute distress.", None),
         ("Order a CBC.", None),
+        # However far the next instruction or heading is: a refusal three sentences on, past the rules' reach, which
+        # don't hold the order back for it, is shown; and the reading still stops at an instruction or a heading.
+        (FAR + ".", FAR[13:] + "."),
+        (FAR + ". Order a BMP.", FAR[13:] + "."),
+        (FAR + ".\n\nAssessment:\nFatigue.", FAR[13:] + "."),
     ],
 )
 def test_a_proposal_carries_where_what_was_heard_after_it_is(said, after):

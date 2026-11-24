@@ -95,7 +95,8 @@ a retraction the rules don't read ("Order a CBC. She turned down the blood test.
 it: the sentence after the instruction's own, whole however long (a dictation is three minutes at most), even when it
 is an instruction itself ("The cardiologist will order it with the echo."), read past line breaks and heading lines as
 the rules read it; then each sentence after that, up to the next one holding an instruction or the heading of another
-of the note's own sections, within TAKEN_BACK_REACH words.
+of the note's own sections, however far that is (not within the rules' reach: a refusal said three sentences on is
+shown too).
 
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
@@ -1801,8 +1802,7 @@ def heard_after(text: str, start: int, end: int) -> tuple[int, int] | None:
     """Where what was heard after an instruction starts and ends in the text (code points), as its review shows it
     beside the proposal (see the module's header): the sentence after the instruction's own, whole, read past line
     breaks and heading lines (_next_sentence()), and each sentence after that up to one holding an instruction of its
-    own or the heading of another of the note's own sections, within TAKEN_BACK_REACH words. None when nothing
-    follows."""
+    own or the heading of another of the note's own sections, however far. None when nothing follows."""
     mark = _sentence_end(text, max(start, end - 1))
     first = _next_sentence(text, mark)
     if first is None:
@@ -1810,12 +1810,9 @@ def heard_after(text: str, start: int, end: int) -> tuple[int, int] | None:
     begin = mark + 1
     while text[begin].isspace():
         begin += 1
-    stop, left = first[1], TAKEN_BACK_REACH - len(tokens(text[first[0] : first[1]]))
-    while left > 0 and (after := _next_sentence(text, stop)) is not None:
-        said = text[after[0] : after[1]]
-        if directives(said):
-            break
-        stop, left = after[1], left - len(tokens(said))
+    stop = first[1]
+    while (after := _next_sentence(text, stop)) is not None and not directives(text[after[0] : after[1]]):
+        stop = after[1]
     if stop < len(text) and text[stop] in ".!?":
         stop += 1
     return begin, stop
