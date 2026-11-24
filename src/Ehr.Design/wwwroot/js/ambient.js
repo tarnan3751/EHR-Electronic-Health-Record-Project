@@ -39,6 +39,7 @@
     const speakersArea = part("speakers");
     const voicesArea = part("voices");
     const draftButton = part("draft");
+    const draftHint = part("draft-hint");
     const title = document.title;
 
     const chunkMs = 5000;
@@ -579,6 +580,14 @@
             && count("clinician") === 1 && count("patient") === 1 && count("other") <= 1
             && roles.filter((role) => role !== "unsure").length <= state.consented;
         draftButton.disabled = !complete;
+        // Why it can't be pressed yet, beside it and tied to it for a screen reader, until it can.
+        draftHint.hidden = complete;
+        if (complete) {
+            draftButton.removeAttribute("aria-describedby");
+        } else {
+            draftButton.setAttribute("aria-describedby", draftHint.id);
+        }
+
         return complete;
     }
 

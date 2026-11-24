@@ -102,9 +102,11 @@ else
             <p data-ambient-voices-two hidden>You said only the patient and you would speak, so any other voice can only be “I can't tell”.</p>
             <div class="sc-stack" data-ambient-voices></div>
             <div class="sc-actions">
-                <button type="button" class="sc-btn sc-btn--primary" data-ambient-draft disabled>Draft the note</button>
+                <button type="button" class="sc-btn sc-btn--primary" data-ambient-draft disabled aria-describedby="ambient-draft-hint">Draft the note</button>
                 <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard-recording>Discard the recording</button>
             </div>
+            @* Why Draft the note can't be pressed yet, tied to it; the script hides it once every voice is named. *@
+            <p class="sc-field__hint" id="ambient-draft-hint" data-ambient-draft-hint>Name every voice to draft the note.</p>
         </section>
     </section>
 }

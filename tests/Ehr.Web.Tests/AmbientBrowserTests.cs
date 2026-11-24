@@ -315,9 +315,15 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Tab");
         await page.Keyboard.TypeAsync("T");
         Assert.True(await page.IsDisabledAsync("[data-ambient-draft]"));
+        // Why, beside it and tied to it for a screen reader (looking at the pages), until every voice is named.
+        Assert.True(await page.IsVisibleAsync("[data-ambient-draft-hint]"));
+        Assert.Equal("Name every voice to draft the note.", await page.TextContentAsync("[data-ambient-draft-hint]"));
+        Assert.Equal("ambient-draft-hint", await page.GetAttributeAsync("[data-ambient-draft]", "aria-describedby"));
         await page.Keyboard.PressAsync("Tab");
         await page.Keyboard.TypeAsync("I");
         Assert.True(await page.IsEnabledAsync("[data-ambient-draft]"));
+        Assert.True(await page.IsHiddenAsync("[data-ambient-draft-hint]"));
+        Assert.Null(await page.GetAttributeAsync("[data-ambient-draft]", "aria-describedby"));
         await AiReviewBrowserTests.TabToAsync(page, "[data-ambient-draft]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/review/*");
