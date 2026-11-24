@@ -392,8 +392,9 @@ def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
 
 # TC-UC10-20 (NFR-05; FR-14 as reworded, the expansion plan's step 15.1): the trick sentences, weighed again by the
 # checks on every change, and pinned: none expected held back may be proposed unless the owner has accepted it by name,
-# the wrong proposals may number no more than the set records, and every control must be proposed; and the recordings
-# must keep the owner's floor of right proposals. Each of the four, failing and passing.
+# each accepted by name must still be proposed and most_wrong must be their number, the wrong proposals may number no
+# more than the set records, and every control must be proposed; and the recordings must keep the owner's floor of right
+# proposals. Each, failing and passing.
 TRICK = """most_wrong = {most_wrong}
 {accepted}
 [[group]]
@@ -417,8 +418,9 @@ def test_a_wrong_trick_proposal_not_accepted_by_name_fails_and_one_accepted_pass
     (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses=reverses, accepted=""),
                                                    encoding="utf-8")
 
-    (problem,) = check(eval_dir / "results", eval_dir)
-    assert "'Order a CBC.' is proposed" in problem and "hasn't accepted it by name" in problem
+    problems = check(eval_dir / "results", eval_dir)
+    (problem,) = [problem for problem in problems if "'Order a CBC.' is proposed" in problem]
+    assert "hasn't accepted it by name" in problem
     assert ("reverses the meaning" in problem) == (reverses == "true")
 
     (eval_dir / "trick-sentences.toml").write_text(
@@ -431,8 +433,38 @@ def test_more_wrong_trick_proposals_than_the_set_records_fail(eval_dir):
     (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=0, reverses="true", accepted=TRICK_ACCEPTED),
                                                    encoding="utf-8")
 
+    problems = check(eval_dir / "results", eval_dir)
+    assert any("1 wrong proposals, more than the 0" in problem for problem in problems)
+
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
+                                                   encoding="utf-8")
+    assert check(eval_dir / "results", eval_dir) == []
+
+
+# The acceptances hold no slack, as known-limitations.toml's entries must each still occur: a sentence accepted by name
+# that is no longer proposed fails (the review's case: "Order complete.", which no rule proposes, accepted with the cap
+# raised), and so does a cap that isn't the number accepted (raised alone); each passes once put right.
+def test_a_sentence_accepted_by_name_and_no_longer_proposed_fails_and_one_still_proposed_passes(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    slack = TRICK_ACCEPTED.replace('said = ["Order a CBC."]', 'said = ["Order a CBC.", "Order complete."]')
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=2, reverses="true", accepted=slack),
+                                                   encoding="utf-8")
+
     (problem,) = check(eval_dir / "results", eval_dir)
-    assert "1 wrong proposals, more than the 0" in problem
+    assert "accepts 'Order complete.' by name, and it is no longer proposed" in problem
+
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
+                                                   encoding="utf-8")
+    assert check(eval_dir / "results", eval_dir) == []
+
+
+def test_a_cap_other_than_the_number_accepted_by_name_fails_and_their_number_passes(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    (eval_dir / "trick-sentences.toml").write_text(
+        TRICK.format(most_wrong=120, reverses="true", accepted=TRICK_ACCEPTED), encoding="utf-8")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "most_wrong = 120, and accepts 1 sentences by name" in problem
 
     (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
                                                    encoding="utf-8")

@@ -2,8 +2,9 @@
 checks: what each is expected to give, and what it gives. No model is needed: each sentence is a whole final transcript,
 and the dictation's own rules (validation.weigh()) say what it proposes. The gate (gate.py) fails when the file isn't the
 one it records, when a sentence expected held back is proposed and the owner hasn't accepted it by name (the set's
-[accepted]), when the wrong proposals number more than the set's most_wrong, or when a control is not proposed; it
-reports how many of the wrong proposals reverse the meaning, and what the strict rule costs (expect = "cost").
+[accepted]), when a sentence accepted by name is no longer proposed, when most_wrong isn't the number of sentences
+accepted by name, when the wrong proposals number more than most_wrong, or when a control is not proposed; it reports
+how many of the wrong proposals reverse the meaning, and what the strict rule costs (expect = "cost").
 
     uv run --project eval python -m ehr_eval.tricks
 """
@@ -40,6 +41,8 @@ class Scores:
     wrong: list[str] = field(default_factory=list)  # proposed, though expected held back
     reversing: list[str] = field(default_factory=list)  # of those, the ones marked as reversing the meaning
     unaccepted: list[str] = field(default_factory=list)  # of those, the ones the owner hasn't accepted by name
+    accepted: int = 0  # sentences the owner accepts by name
+    stale: list[str] = field(default_factory=list)  # accepted by name, and not proposed (nor in the set at all)
     controls: int = 0  # expected proposed
     missed: list[str] = field(default_factory=list)  # expected proposed, and not
     cost: int = 0  # plain instructions the strict rule holds back (expect = "cost")
@@ -73,7 +76,7 @@ def proposed(said: str) -> list[str]:
 def score(eval_dir: Path = EVAL_DIR) -> Scores:
     tricks, most_wrong, _ = load(eval_dir)
     named = accepted(eval_dir)
-    scores = Scores(sentences=len(tricks), most_wrong=most_wrong)
+    scores = Scores(sentences=len(tricks), most_wrong=most_wrong, accepted=len(named))
     for trick in tricks:
         given = proposed(trick.said)
         if trick.expect == "proposed":
@@ -89,6 +92,7 @@ def score(eval_dir: Path = EVAL_DIR) -> Scores:
                 scores.reversing.append(trick.said)
             if trick.said not in named:
                 scores.unaccepted.append(trick.said)
+    scores.stale = sorted(named - set(scores.wrong))
     return scores
 
 
@@ -99,6 +103,8 @@ def main() -> int:
               f"{'' if said in scores.unaccepted else ', accepted by name'}: {said!r}")
     for said in scores.missed:
         print(f"expected proposed, and not: {said!r}")
+    for said in scores.stale:
+        print(f"accepted by name, and no longer proposed: {said!r}")
     print(
         f"{scores.sentences} trick sentences: {len(scores.wrong)} wrong proposals (at most {scores.most_wrong}), "
         f"{len(scores.wrong) - len(scores.unaccepted)} of them accepted by name (there must be no other), "

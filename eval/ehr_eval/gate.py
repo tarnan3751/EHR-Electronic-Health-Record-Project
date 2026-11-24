@@ -33,9 +33,11 @@ someone committed instead:
    checks (tricks.py; no model, and nothing taken from the results): the file is the one TRICK_SENTENCES_SHA256 records,
    so no sentence is removed, added, relabelled or accepted and no cap moved without this file changing with it; no
    sentence expected held back is proposed unless the owner has accepted it by name (the set's [accepted]: on
-   2026-11-24 he put a cap at step 15.1's count in place of zero); the wrong proposals, a proposal for any sentence
-   expected held back, number no more than the set's most_wrong; and every control is proposed. How many of the wrong
-   proposals reverse the meaning, and what the strict rule costs, are reported.
+   2026-11-24 he put a cap at step 15.1's count in place of zero); every sentence accepted by name is still proposed,
+   and most_wrong is their number, so the cap holds no slack (as eval/known-limitations.toml's entries must each still
+   occur); the wrong proposals, a proposal for any sentence expected held back, number no more than most_wrong; and
+   every control is proposed. How many of the wrong proposals reverse the meaning, and what the strict rule costs, are
+   reported.
 7. The recordings, their proposals scored again as in 4, give at least PROPOSALS_FLOOR right proposals against the
    clinical gold: the owner's floor, which holds however the rule-following gold changes.
 
@@ -73,7 +75,7 @@ RUN_IT = (
 PROPOSALS_FLOOR = 14
 # The trick sentences this gate was written for (eval/trick-sentences.toml, line endings as LF): a sentence added,
 # removed, relabelled or accepted, or a cap moved, changes this with it, in review.
-TRICK_SENTENCES_SHA256 = "bcd482027ddb8159b6eccf2957665dadb614f2df21dcb14e76da5fa13fd76643"
+TRICK_SENTENCES_SHA256 = "288c418b379fbddb7aefbfc9324038f3778b7360140ac88dda1df1f0fb393b5b"
 # What the results must say about proposals, against each gold.
 PROPOSAL_METRICS = ("shown", "said", "found", "false", "misheard", "listed")
 PROPOSAL_BLOCKS = ("proposals", "proposals_clinical")
@@ -276,8 +278,9 @@ def trick_sentences_sha256(eval_dir: Path = EVAL_DIR) -> str:
 
 
 def _trick_sentences(eval_dir: Path, sha256: str) -> list[str]:
-    """A trick-sentence file other than the one recorded, each wrong proposal the owner hasn't accepted by name, wrong
-    proposals beyond the set's most_wrong, and each control not proposed (tricks.py)."""
+    """A trick-sentence file other than the one recorded, each wrong proposal the owner hasn't accepted by name, each
+    sentence accepted by name and no longer proposed, a most_wrong other than the number accepted, wrong proposals
+    beyond most_wrong, and each control not proposed (tricks.py)."""
     if not (eval_dir / tricks.TRICKS).is_file():
         return [f"There are no trick sentences (eval/{tricks.TRICKS}) to weigh the proposal rules on."]
     problems = []
@@ -295,6 +298,17 @@ def _trick_sentences(eval_dir: Path, sha256: str) -> list[str]:
         "Tighten the proposal rules (validation.py), then score the stored answers again (ehr_eval/rescore.py)."
         for said in scores.unaccepted
     ]
+    problems += [
+        f"eval/{tricks.TRICKS} accepts {said!r} by name, and it is no longer proposed (or isn't one of the set): "
+        "take it out of [accepted] and lower most_wrong with it, so the cap holds no slack, and record the file's new "
+        "hash in ehr_eval/gate.py."
+        for said in scores.stale
+    ]
+    if scores.most_wrong != scores.accepted:
+        problems.append(
+            f"eval/{tricks.TRICKS} records most_wrong = {scores.most_wrong}, and accepts {scores.accepted} "
+            "sentences by name: the cap is their number, and only the owner accepts one."
+        )
     if len(scores.wrong) > scores.most_wrong:
         problems.append(
             f"The trick sentences give {len(scores.wrong)} wrong proposals, more than the {scores.most_wrong} "
