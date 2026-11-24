@@ -82,12 +82,16 @@ A diagnosis is sensitive when its ICD-10-CM code is in one of these ranges, or w
 | X71–X83 | Intentional self-harm |
 | T14.91 | Suicide attempt |
 | R45.851 | Suicidal ideations |
+| R45.88 | Nonsuicidal self-harm |
 | Z91.51, Z91.52 | Personal history of suicidal behavior, and of nonsuicidal self-harm |
 | T36–T65 with intent 2 | Poisoning by drugs, and toxic effects of other substances, by intentional self-harm |
+| T71.1x2, T71.2x2 | Asphyxiation by intentional self-harm (smothering, plastic bag, bed linens, furniture, hanging, other causes, car trunk, refrigerator) |
 
 A code matches by its start, so every code under a category listed is covered (T14.91XA under T14.91, F41.1 under F01–F99). Case, the dot and spaces round the code don't matter.
 
 In T36–T65 the intent is one character of the code, and "2" means intentional self-harm. In most of these codes it is the sixth character (T39.012A, T43.212D). In the codes of a four-character subcategory it is the fifth, with an X filling the sixth (T36.92XA). The rule takes both forms. Checked against the fiscal year 2027 code file, they are exactly its 954 "intentional self-harm" codes in T36–T65, and no other code in that range.
+
+In T71 (asphyxiation) the intent is the sixth character of the T71.1 and T71.2 codes, and "2" again means intentional self-harm (T71.162A, hanging; T71.222A, trapped in a car trunk). The rule takes those, and no other T71 code: checked against the fiscal year 2027 code file, they are exactly its 24 "intentional self-harm" codes in T71 (eight kinds, each with A, D and S). R45.88 and these T71 codes were added after step 2b's review; step 2b's subset of the codes holds R45.88 but none of the T71 codes, which can be picked once step 2a loads the full list.
 
 When the rule widens, the migration job marks the diagnoses already recorded that it now covers, on its next run, and the audit page stops showing their values.
 

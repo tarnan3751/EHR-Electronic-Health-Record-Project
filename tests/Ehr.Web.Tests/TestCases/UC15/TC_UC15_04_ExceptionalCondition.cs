@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 //   lists the second item with no "Mark done" button and says "Marking an item done needs the clinic's server. Your
 //   inbox remains readable."; the app bar shows the count. Step 3: the post is answered 503 and the item still
 //   needs action.
-// Creator: Tahseen Arnan
+// Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;

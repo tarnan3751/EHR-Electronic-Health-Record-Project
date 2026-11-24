@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   4. Press Tab to the dose, replace it, and press Enter.
 // Expected result: Step 1 opens the discontinue page with the cursor in the reason field. Step 2 returns to the chart,
 //   which says "Order discontinued:" and no longer lists the CBC order. Step 3 opens the change form with the cursor
-//   in the item, filled in. Step 4 returns to the chart, which says "Order signed:" and lists Metformin with dose
+//   in the item, filled in. Step 4 returns to the chart, which says "Order changed:" and lists Metformin with dose
 //   850 mg. Every focused control shows the focus ring (an outline), and the page reports no script errors.
 // Creator: Tahseen Arnan
 //
@@ -70,7 +70,7 @@ public class TC_UC1_12_Nfr12_ChangeKeyboardFirst(WebApps apps) : IClassFixture<W
         await page.Keyboard.InsertTextAsync("850 mg");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("ordered=", StringComparison.Ordinal));
-        Assert.Contains("Order signed:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Order changed:", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Contains("Dose: 850 mg", await page.Locator("#chart-orders ~ ul").TextContentAsync());
 
         Assert.Equal(1, await ActiveAsync(apps, patient));

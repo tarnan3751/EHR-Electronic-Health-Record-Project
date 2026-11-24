@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ehr.Migrations
 {
     [DbContext(typeof(EhrDbContext))]
-    [Migration("20261118185826_Messages")]
+    [Migration("20261123190030_Messages")]
     partial class Messages
     {
         /// <inheritdoc />
@@ -1350,6 +1350,11 @@ namespace Ehr.Migrations
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_allergy_intolerances_patient_id");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_allergy_intolerances_one_no_known_allergy")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allergy_intolerances_one_no_known_allergy")
+                        .HasFilter("code = 'no-known-allergy' AND clinical_status = 'active'");
 
                     b.ToTable("allergy_intolerances", "ehr", t =>
                         {

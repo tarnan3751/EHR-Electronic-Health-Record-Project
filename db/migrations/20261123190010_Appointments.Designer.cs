@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ehr.Migrations
 {
     [DbContext(typeof(EhrDbContext))]
-    [Migration("20261118183905_AppointmentVersion")]
-    partial class AppointmentVersion
+    [Migration("20261123190010_Appointments")]
+    partial class Appointments
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1255,6 +1255,11 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_allergy_intolerances_patient_id");
 
+                    b.HasIndex(new[] { "PatientId" }, "ix_allergy_intolerances_one_no_known_allergy")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allergy_intolerances_one_no_known_allergy")
+                        .HasFilter("code = 'no-known-allergy' AND clinical_status = 'active'");
+
                     b.ToTable("allergy_intolerances", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_allergy_intolerances_category", "category IN ('food', 'medication', 'environment', 'biologic')");
@@ -2256,13 +2261,6 @@ namespace Ehr.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("version");
 
                     b.HasKey("Id")
                         .HasName("pk_appointments");
