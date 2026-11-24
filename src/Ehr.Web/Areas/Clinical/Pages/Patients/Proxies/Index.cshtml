@@ -100,21 +100,31 @@ else
         </div>
         <div class="sc-field">
             <label for="proxy-scope">Can see</label>
-            <select id="proxy-scope" class="sc-field__input" name="Scope">
+            <select id="proxy-scope" class="sc-field__input" name="Scope"
+                    aria-invalid="@(Model.Errors.ContainsKey("Scope") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Scope") ? "proxy-scope-error" : null)">
                 @foreach (var scope in ProxyScope.All)
                 {
                     <!option value="@scope" @(Model.Scope == scope ? "selected" : null)>@ProxyAccess.ScopeLabel(scope)</!option>
                 }
             </select>
+            @if (Model.Errors.TryGetValue("Scope", out var scopeError))
+            {
+                <p class="sc-field__error" id="proxy-scope-error">@scopeError</p>
+            }
         </div>
         <div class="sc-field">
             <label for="proxy-days">For</label>
-            <select id="proxy-days" class="sc-field__input" name="Days">
+            <select id="proxy-days" class="sc-field__input" name="Days"
+                    aria-invalid="@(Model.Errors.ContainsKey("Days") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Days") ? "proxy-days-error" : null)">
                 @foreach (var (days, label) in ProxyAccess.Durations)
                 {
                     <!option value="@days" @(Model.Days == days ? "selected" : null)>@label</!option>
                 }
             </select>
+            @if (Model.Errors.TryGetValue("Days", out var daysError))
+            {
+                <p class="sc-field__error" id="proxy-days-error">@daysError</p>
+            }
         </div>
         <div class="sc-actions">
             <button type="submit" class="sc-btn sc-btn--primary">Record proxy</button>
