@@ -29,11 +29,11 @@
   "prompt": "f06ae1fa7c90f4db0b15d0f6225d2b815d1390947ee4eeee54b13fecdbb4eff0",
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
-  "checks": "b30486487807453d0e18514139b7229c591e1efedc0215c1d6336b0eb078454e",
+  "checks": "bf42b385029c730605710156112078c754190923dc4a1c23a7f9a16772f83777",
   "pipeline": "d33a25844a0d1be1066cda57e24c9c779bc8cee9d74578370ccb97d207d0dc3d"
  },
  "dataset": {
-  "scripts_sha256": "61429091112d84d3075f72bfd96d0e6116e272faa63d84d38ad627986a0c5f64",
+  "scripts_sha256": "4afed80b193779c47a24614788da003cfdac7b77218edbaa384b99db12a93a0f",
   "scripts": 51,
   "complete": true
  },
@@ -70,7 +70,7 @@
   }
  ],
  "rescored": {
-  "at": "2026-11-24T23:39:12+00:00",
+  "at": "2026-11-24T23:43:58+00:00",
   "note": "the stored answers checked and scored again; no model was run",
   "before": {
    "checks": "2f4e6d54363b70b318eebf8f3e2ab7c9a75420d1cb9c38639011b9162dbacabf"
@@ -1374,10 +1374,10 @@
    "false_discard_rate": 0.0
   },
   "proposals": {
-   "shown": 9,
-   "said": 9,
-   "found": 9,
-   "right": 9,
+   "shown": 12,
+   "said": 12,
+   "found": 12,
+   "right": 12,
    "false": 0,
    "misheard": 0,
    "recall": 1.0,
@@ -1387,10 +1387,10 @@
     "for_later": 2,
     "hedged": 5,
     "in_the_past": 1,
-    "names_no_item": 13,
+    "names_no_item": 9,
     "negated": 1,
     "not_an_addition": 3,
-    "not_plain": 12,
+    "not_plain": 13,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 4
@@ -1398,23 +1398,23 @@
    "listed": []
   },
   "proposals_clinical": {
-   "shown": 9,
+   "shown": 12,
    "said": 28,
-   "found": 9,
-   "right": 9,
+   "found": 12,
+   "right": 12,
    "false": 0,
    "misheard": 0,
-   "recall": 0.3214,
+   "recall": 0.4286,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
     "hedged": 5,
     "in_the_past": 1,
-    "names_no_item": 13,
+    "names_no_item": 9,
     "negated": 1,
     "not_an_addition": 3,
-    "not_plain": 12,
+    "not_plain": 13,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 4
@@ -6212,19 +6212,20 @@
     }
    ],
    "chunk_seconds": [],
-   "proposals": [],
+   "proposals": [
+    [
+     "allergy_addition",
+     2016,
+     2050,
+     []
+    ]
+   ],
    "held_back": [
     [
      "order",
      1977,
      2014,
      "not_plain"
-    ],
-    [
-     "allergy_addition",
-     2016,
-     2050,
-     "names_no_item"
     ]
    ]
   },
@@ -7052,6 +7053,12 @@
    "chunk_seconds": [],
    "proposals": [
     [
+     "allergy_addition",
+     1170,
+     1206,
+     []
+    ],
+    [
      "order",
      1253,
      1288,
@@ -7063,12 +7070,6 @@
      "order",
      1074,
      1107,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
-     1170,
-     1206,
      "names_no_item"
     ],
     [
@@ -7363,6 +7364,12 @@
      360,
      402,
      []
+    ],
+    [
+     "allergy_addition",
+     562,
+     605,
+     []
     ]
    ],
    "held_back": [
@@ -7386,15 +7393,9 @@
     ],
     [
      "allergy_addition",
-     562,
-     605,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
      607,
      643,
-     "names_no_item"
+     "not_plain"
     ]
    ]
   }

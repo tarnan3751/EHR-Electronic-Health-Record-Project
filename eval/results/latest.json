@@ -37,11 +37,11 @@
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
   "pipeline": "e51298e314fcc4e71e4def42a41c8c0f9759b341b2d278563029fa76cab13701",
-  "scoring": "f36573b982cb7a338126b611e38b818bf03e32c4aa6802d47d5a7ecb28f972aa"
+  "scoring": "6d5749d5ddb8214bfdb6aca500a8389c1f008c3f28d4e1bb714ee53600969411"
  },
  "dataset": {
   "recordings_sha256": "085cd012cb694caf10410c548ad2a61ee2d624b4e3714b0dd79fd57a9ed54d06",
-  "gold_sha256": "9387c74ab394b41a8844923e2563cc17c5164c965d51e419571d111f2fb77cd8",
+  "gold_sha256": "b8a36a520a4986aaea34a8252a4263a7d9a04d5778daea8a1391163527d94264",
   "scripts": 51,
   "recordings": 100,
   "complete": true,
@@ -4743,23 +4743,23 @@
    "false_discard_rate": 0.0
   },
   "proposals": {
-   "shown": 14,
-   "said": 18,
-   "found": 14,
-   "right": 14,
+   "shown": 18,
+   "said": 24,
+   "found": 18,
+   "right": 18,
    "false": 0,
    "misheard": 0,
-   "recall": 0.7778,
+   "recall": 0.75,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
     "hedged": 5,
     "in_the_past": 1,
-    "names_no_item": 24,
+    "names_no_item": 18,
     "negated": 1,
     "not_an_addition": 7,
-    "not_plain": 19,
+    "not_plain": 21,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
@@ -4768,23 +4768,23 @@
    "listed": []
   },
   "proposals_clinical": {
-   "shown": 14,
+   "shown": 18,
    "said": 63,
-   "found": 14,
-   "right": 14,
+   "found": 18,
+   "right": 18,
    "false": 0,
    "misheard": 0,
-   "recall": 0.2222,
+   "recall": 0.2857,
    "precision": 1.0,
    "with_warnings": 0,
    "held_back": {
     "for_later": 2,
     "hedged": 5,
     "in_the_past": 1,
-    "names_no_item": 24,
+    "names_no_item": 18,
     "negated": 1,
     "not_an_addition": 7,
-    "not_plain": 19,
+    "not_plain": 21,
     "quoted": 1,
     "taken_back": 3,
     "to_the_software": 5,
@@ -21692,19 +21692,20 @@
     0.1499730420182459,
     0.14689212501980364
    ],
-   "proposals": [],
+   "proposals": [
+    [
+     "allergy_addition",
+     2028,
+     2062,
+     []
+    ]
+   ],
    "held_back": [
     [
      "order",
      1989,
      2026,
      "not_plain"
-    ],
-    [
-     "allergy_addition",
-     2028,
-     2062,
-     "names_no_item"
     ]
    ]
   },
@@ -23866,6 +23867,12 @@
    "chunk_seconds": [],
    "proposals": [
     [
+     "allergy_addition",
+     1179,
+     1215,
+     []
+    ],
+    [
      "order",
      1262,
      1297,
@@ -23877,12 +23884,6 @@
      "order",
      1083,
      1116,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
-     1179,
-     1215,
      "names_no_item"
     ],
     [
@@ -24160,6 +24161,12 @@
    "chunk_seconds": [],
    "proposals": [
     [
+     "allergy_addition",
+     1176,
+     1212,
+     []
+    ],
+    [
      "order",
      1259,
      1294,
@@ -24171,12 +24178,6 @@
      "order",
      1081,
      1114,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
-     1176,
-     1212,
      "names_no_item"
     ],
     [
@@ -24362,7 +24363,7 @@
      "allergy_addition",
      1175,
      1211,
-     "names_no_item"
+     "not_plain"
     ],
     [
      "order",
@@ -24939,6 +24940,12 @@
      367,
      409,
      []
+    ],
+    [
+     "allergy_addition",
+     569,
+     612,
+     []
     ]
    ],
    "held_back": [
@@ -24962,15 +24969,9 @@
     ],
     [
      "allergy_addition",
-     569,
-     612,
-     "names_no_item"
-    ],
-    [
-     "allergy_addition",
      614,
      650,
-     "names_no_item"
+     "not_plain"
     ]
    ]
   }
