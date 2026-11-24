@@ -69,7 +69,7 @@ else
                         {
                             <form method="post" asp-page="/Messages/New" asp-page-handler="About">
                                 <input type="hidden" name="Subject" value="@($"About my {result.Display} result from {result.EffectiveAt.UtcDateTime:MMM d, yyyy}")">
-                                <button type="submit" class="sc-btn">Ask your care team about this result</button>
+                                <button type="submit" class="sc-btn">Ask about this result</button>
                             </form>
                         }
                     </div>

@@ -23,7 +23,7 @@ public class NewModel(SecureMessages messages) : PageModel
 
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
-    // Opened from a result's "Ask your care team about this result": the subject is filled in, and the message box
+    // Opened from a result's "Ask about this result": the subject is filled in, and the message box
     // has the focus.
     public bool About { get; private set; }
 

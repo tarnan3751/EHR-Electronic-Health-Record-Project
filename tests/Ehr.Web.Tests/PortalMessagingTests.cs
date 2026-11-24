@@ -44,7 +44,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         var results = await portal.Client.GetStringAsync("/portal/results", Cancel);
         Assert.Contains("action=\"/portal/messages/new?handler=About\"", results);
         Assert.Contains(WebUtility.HtmlEncode(subject), results);
-        Assert.Contains("Ask your care team about this result", results);
+        Assert.Contains("Ask about this result", results);
 
         using var about = await PostFormAsync(portal.Client, "/portal/messages/new?handler=About", "/portal/results", ("Subject", subject));
         var form = await ReadAsync(about);
