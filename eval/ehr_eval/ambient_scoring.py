@@ -32,6 +32,11 @@ not labelled right (missed_at_turn_change), since that is where a short answer g
   without a speaker_unsure warning on it; any chart proposal, as the sidecar's own result for a visit has them; and an
   instruction listed as the clinician's that a patient or someone else said. Requests listed from a passage whose
   speaker couldn't be told are counted beside, not gated.
+- questions: the scripts' questions (every sentence that ends with a question mark, as asked_as_finding reads them),
+  by who asked, and how many of them the checks find none of: a question is found when a word it was heard as (the
+  alignment above) lies inside a stretch conversation_questions() finds, mapped to heard words as a source is; one
+  none of whose words was heard (not_heard) is found by nothing. Reported, not gated: MedASR writes no question mark and
+  can lose a question's first word, so "no question offered as a finding" holds for a run's drafts, not as a promise.
 - warnings: how many offered values carry each warning.
 - sorting and timing: how many recordings were drafted, left undrafted (and why) or couldn't have their voices named;
   how long decoding, telling the voices apart, transcribing and drafting took, each window, and each five-second chunk
@@ -235,6 +240,7 @@ def score(items: list[VisitItem], visits: dict) -> dict:
         "unsupported_content": scoring._unsupported(drafted),
         "order_allergy": scoring._order_allergy(_flags_only(drafted), visits),
         "safety": _safety(drafted, visits, aligned),
+        "questions": _questions(items, aligned),
         "warnings": _warnings(drafted),
         "sorting": _sorting(items),
         "timing": _timing(items),
@@ -252,6 +258,7 @@ class _Aligned:
     heard: list[str]
     roles: list[str]  # each word said, its turn's role
     asked: set[int]  # the words said in a question (a sentence of the script that ends with a question mark)
+    questions: list[tuple[str, range]]  # each question: who asked it, and its words said
     to_said: dict[int, int]  # a heard word to the word said it is paired with
     passage: list[int]  # each heard word's passage
     errors: Counter  # by role: words said that were misheard or missed, and words heard that nobody said
@@ -259,12 +266,13 @@ class _Aligned:
 
 
 def _aligned(item: VisitItem, visit) -> _Aligned:  # noqa: ANN001
-    said, roles, asked = [], [], set()
+    said, roles, asked, questions = [], [], set(), []
     for turn in visit.turns:
         for sentence in re.split(r"(?<=[.!?])\s+", turn.display):
             these = words(sentence)
             if sentence.rstrip().endswith("?"):
                 asked |= set(range(len(said), len(said) + len(these)))
+                questions.append((turn.role, range(len(said), len(said) + len(these))))
             said += these
             roles += [turn.role] * len(these)
     heard = words(item.hypothesis)
@@ -287,13 +295,33 @@ def _aligned(item: VisitItem, visit) -> _Aligned:  # noqa: ANN001
     passage: list[int] = []
     for index, placed in enumerate(rebuild(item).placed):
         passage += [index] * (len(words(item.hypothesis[: placed.end])) - len(passage))
-    return _Aligned(heard, roles, asked, to_said, passage, errors, missed)
+    return _Aligned(heard, roles, asked, questions, to_said, passage, errors, missed)
 
 
 def _asked(item: VisitItem, aligned: _Aligned, start: int, end: int) -> bool:
     """Whether a word heard from start to end (code points) was said in a question."""
     first, last = len(words(item.hypothesis[:start])), len(words(item.hypothesis[:end]))
     return any(aligned.to_said.get(i) in aligned.asked for i in range(first, last))
+
+
+def _questions(items: list[VisitItem], every: dict[str, _Aligned]) -> dict:
+    """The scripts' questions and those the checks find none of (see the header)."""
+    asked: Counter = Counter()
+    not_heard: Counter = Counter()
+    not_found: Counter = Counter()
+    for item in items:
+        heard = rebuild(item)
+        aligned = every[item.variant]
+        found: set[int] = set()
+        for start, end in validation.conversation_questions(heard.text, heard.passages()):
+            found |= set(range(len(words(item.hypothesis[:start])), len(words(item.hypothesis[:end]))))
+        for role, said in aligned.questions:
+            heard_as = {h for h, s in aligned.to_said.items() if s in said}
+            asked[role] += 1
+            not_heard[role] += not heard_as
+            not_found[role] += not heard_as & found
+    return {"asked": sum(asked.values()), "by_role": dict(sorted(asked.items())), "not_heard": sum(not_heard.values()),
+            "not_found": sum(not_found.values()), "not_found_by_role": dict(sorted(not_found.items()))}
 
 
 def _said_by(item: VisitItem, aligned: _Aligned, start: int, end: int) -> set[str]:

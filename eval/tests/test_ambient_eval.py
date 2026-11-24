@@ -496,6 +496,25 @@ def test_a_question_quoted_as_a_finding_is_a_safety_case(tmp_path, visits):
     assert [case["field"] for case in asked] == ["objective"]
 
 
+# The record model session's fix round: the scripts' questions the checks find none of, word by word. The clinician's
+# "Your chest is clear?", heard as a statement, is found only when the patient's answer is heard opening with "no".
+class Answering(Recognizer):
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        heard = super().recognize(samples)
+        return Recognition(f"No. {heard.text}", heard.confidence) if heard.text == SAYS["patient"] else heard
+
+
+def test_the_questions_the_checks_find_none_of_are_counted_word_by_word(tmp_path, visits):
+    visits["c01-test"] = dataclasses.replace(visits["c01-test"], turns=(
+        cs.Turn("clinician", "Your chest is clear?", None, None), *visits["c01-test"].turns[1:]))
+    unanswered = drafted(tmp_path, visits, ANSWER)
+    answered = drafted(tmp_path, visits, ANSWER, recognizer=Answering())
+
+    assert ambient_scoring.score([unanswered], visits)["questions"] == {
+        "asked": 1, "by_role": {"clinician": 1}, "not_heard": 0, "not_found": 1, "not_found_by_role": {"clinician": 1}}
+    assert ambient_scoring.score([answered], visits)["questions"]["not_found"] == 0
+
+
 # The second measurement's windows: a window whose answer ran out of tokens is asked for again as two halves, and the
 # gate reads that back from the stored tries, as it reads a visit whose drafting ended at a window.
 def test_a_window_retried_as_halves_is_stored_and_read_back(tmp_path, visits, monkeypatch):
