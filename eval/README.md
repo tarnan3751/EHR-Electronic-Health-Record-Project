@@ -14,6 +14,7 @@ The test set that dictation accuracy is measured on: about fifty synthetic clini
 | `known-limitations.toml` | Retracted values the pipeline shows without a warning (`[[accepted]]`), and false or misheard proposals (`[[accepted_proposal]]`), that the owner has accepted, each with its reason; the eval's gate fails on any other |
 | `clinical-gold.md` | The clinical gold values those checks would discard, and why. `ehr_eval/goldreport.py` writes it |
 | `clinical-proposals.toml` | The clinical gold for proposals: every order or allergy to add a clinician would expect the dictation to propose, by script |
+| `trick-sentences.toml` | The trick sentences: sentences that try to make the dictation propose what it mustn't, each with what it should give, which the gate weighs again on every change (below, "Trick sentences") |
 
 ## Scripts
 
@@ -141,6 +142,16 @@ uv run --project eval pytest eval/tests
 ```
 
 They run in the eval project with the scoring and gate tests, as CI runs them.
+
+## Trick sentences
+
+`trick-sentences.toml` holds the sentences the third review of the expansion plan's step 15 wrote to make the dictation propose an order or an allergy to add it mustn't, with its controls that must be proposed, and a family step 15.1 added (a line break or a new paragraph after an instruction): 353 in all. Each is a whole transcript, weighed by the sidecar's own rules with no model (`ehr_eval/tricks.py`), and each group says what it should give: proposed, or held back; for those held back, whether a proposal would reverse the meaning (a negation, a retraction or correction, "not needed" or "done already", doubt or a hold, someone deciding against it, or a list of what not to do); and, for a wrong proposal the owner tolerates, its kind and why. The gate weighs them again on every change, without trusting a results file, and fails when one that reverses the meaning is proposed, or when the wrong proposals number more than the set's `most_wrong`, which is the number of tolerated sentences (7 since step 15.1). It also fails when the recordings, scored again, give fewer than 14 right proposals against the clinical gold, the owner's floor. To see what the set gives:
+
+```
+uv run --project eval python -m ehr_eval.tricks
+```
+
+`tests/test_tricks.py` has a case for each sentence that reverses the meaning and each control.
 
 To read a script as spoken or as written:
 

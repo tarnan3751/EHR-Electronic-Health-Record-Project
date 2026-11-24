@@ -3,8 +3,9 @@ plan's step 15): every word of the instruction's sentence is a lead-in, the verb
 data names, its quantities or a trailer, in that order. Everything else is held back, and still listed as not carried
 over. The sentences that must be held back are both reviews', every one of them (the first's here, the second's in
 tests/review/held_back_*.txt), with the near misses of each lead-in and trailing phrase, and a case of each of step
-15.1's rules for the sentences next to it, both ways; those proposed are the plain controls and each lead-in and
-trailer said plainly, and the second review's plain sentences (tests/review/plain.txt) are each proposed or listed in
+15.1's rules for the sentences next to it, both ways (the third review's sentences are the eval's trick sentences,
+eval/trick-sentences.toml); those proposed are the plain controls and each lead-in and trailer said plainly, and the
+second review's plain sentences (tests/review/plain.txt) are each proposed or listed in
 tests/review/plain_not_proposed.txt with why. And as properties, so the next sentence no one wrote is covered too: a
 word from outside the closed classes and the reference data, put anywhere into a plain instruction, makes it not plain,
 and so does a word from a name its item shares nothing with. A sentence's "[unclear]" is a passage marked unclear, as

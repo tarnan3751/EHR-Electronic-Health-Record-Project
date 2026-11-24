@@ -9,8 +9,7 @@ import pytest
 
 from ehr_dictation import prompt
 from ehr_dictation.transcript import Segment, assemble
-from ehr_eval import scoring
-from ehr_eval.gate import check
+from ehr_eval import gate, scoring
 from ehr_eval.scripts import (
     EVAL_DIR,
     PIPELINE_FILES,
@@ -21,6 +20,12 @@ from ehr_eval.scripts import (
     recordings_sha256,
     scoring_sha256,
 )
+
+
+def check(results_dir, eval_dir, floor: int = 0) -> list[str]:
+    """The gate, with no floor of right proposals: the small test set has one at most (d02's chest X-ray), and the
+    owner's floor is tested on its own."""
+    return gate.check(results_dir, eval_dir, floor=floor)
 
 
 # Plain, and heard right: d02's chest X-ray is proposed where the script says it.
@@ -131,9 +136,10 @@ def test_the_code_feeding_the_models_needs_a_new_run_and_the_rest_only_scoring_a
 def test_every_eval_module_is_hashed_with_the_answers_or_the_scoring():
     modules = {f"ehr_eval/{path.name}" for path in (EVAL_DIR / "ehr_eval").glob("*.py")}
 
-    # Neither the package, the gate nor the clinical gold report makes or scores an answer.
+    # Neither the package, the gate, the clinical gold report nor the trick sentences' scorer (which the gate runs
+    # itself every time) makes or scores an answer.
     assert modules - set(PIPELINE_FILES) - set(SCORING_FILES) == {
-        "ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/goldreport.py"}
+        "ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/goldreport.py", "ehr_eval/tricks.py"}
     assert not set(PIPELINE_FILES) & set(SCORING_FILES)
 
 
@@ -378,3 +384,51 @@ def test_an_accepted_retracted_value_doesnt_accept_a_proposal(eval_dir):
 
     (problem,) = check(eval_dir / "results", eval_dir)
     assert "a misheard proposal" in problem
+
+
+# TC-UC10-13 (NFR-05; FR-14 as reworded, the expansion plan's step 15.1): the trick sentences, weighed again by the
+# checks on every change: none that reverses the meaning may be proposed, and the wrong proposals may number no more
+# than the set records; and the recordings must keep the owner's floor of right proposals.
+TRICK = """most_wrong = {most_wrong}
+
+[[group]]
+family = "f"
+expect = "held_back"
+reverses = {reverses}
+said = ["Order a CBC."]
+"""
+
+
+def test_a_trick_sentence_that_reverses_the_meaning_proposed_fails(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true"), encoding="utf-8")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "'Order a CBC.' is proposed" in problem and "reverses the meaning" in problem
+
+
+def test_more_wrong_trick_proposals_than_the_set_records_fail(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=0, reverses="false"), encoding="utf-8")
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "1 wrong proposals, more than the 0" in problem
+
+    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="false"), encoding="utf-8")
+    assert check(eval_dir / "results", eval_dir) == []
+
+
+def test_no_trick_sentences_fail(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+    (eval_dir / "trick-sentences.toml").unlink()
+
+    (problem,) = check(eval_dir / "results", eval_dir)
+    assert "no trick sentences" in problem
+
+
+def test_fewer_right_proposals_on_the_recordings_than_the_floor_fail(eval_dir):
+    save(eval_dir, "latest.json", results(eval_dir))
+
+    (problem,) = check(eval_dir / "results", eval_dir, floor=2)
+    assert "1 right proposals against the clinical gold, under the owner's floor of 2" in problem
+    assert gate.PROPOSALS_FLOOR == 14

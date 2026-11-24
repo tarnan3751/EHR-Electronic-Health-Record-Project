@@ -29,6 +29,11 @@ someone committed instead:
    rate, note-field F1 against the rule-following gold (fields.content.f1; the F1 against the clinical gold,
    fields_clinical, is reported beside it and not gated), date and drug-name accuracy, and the share of offered words
    the transcript doesn't support.
+6. The trick sentences (eval/trick-sentences.toml; the expansion plan's step 15.1), weighed again by this commit's
+   checks (tricks.py; no model, and nothing taken from the results): none marked as reversing the meaning is proposed,
+   and the wrong proposals, a proposal for any sentence expected held back, number no more than the set's most_wrong.
+7. The recordings, their proposals scored again as in 4, give at least PROPOSALS_FLOOR right proposals against the
+   clinical gold: the owner's floor, which holds however the rule-following gold changes.
 
 Other results files (such as compare-low256.json, a comparison run) aren't checked.
 
@@ -47,7 +52,7 @@ from pathlib import Path
 from ehr_dictation import prompt
 from ehr_dictation.transcript import Segment, assemble
 
-from . import scoring
+from . import scoring, tricks
 from .scoring import WARNING_CODES
 from .scripts import EVAL_DIR, gold_sha256, load_all, pipeline_sha256, recordings_sha256, scoring_sha256, variant_ids
 
@@ -58,6 +63,8 @@ RUN_IT = (
     "the eval/results/latest.json it writes."
 )
 
+# The owner's floor (2026-11-24, step 15.1): right proposals on the recordings, against the clinical gold.
+PROPOSALS_FLOOR = 14
 # What the results must say about proposals, against each gold.
 PROPOSAL_METRICS = ("shown", "said", "found", "false", "misheard", "listed")
 PROPOSAL_BLOCKS = ("proposals", "proposals_clinical")
@@ -72,7 +79,7 @@ GATED = [
 ]
 
 
-def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[str]:
+def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR, floor: int = PROPOSALS_FLOOR) -> list[str]:
     latest_path = results_dir / "latest.json"
     if not latest_path.is_file():
         return [f"There are no eval results ({latest_path.relative_to(eval_dir.parent)}). {RUN_IT}"]
@@ -157,6 +164,14 @@ def check(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) -> list[st
                 "uv run --project eval python -m ehr_eval.rescore eval/results/latest.json --out eval/results/latest.json"
             )
         problems += _unaccepted_proposals(again["proposals"]["listed"], eval_dir / KNOWN_LIMITATIONS)
+        right = again["proposals_clinical"]["right"]
+        if right < floor:
+            problems.append(
+                f"The recordings give {right} right proposals against the clinical gold, under the owner's floor of "
+                f"{floor}. Find which instructions the proposal rules (validation.py) or the catalog no longer take, "
+                "and score again or: " + RUN_IT
+            )
+    problems += _trick_sentences(eval_dir)
     warnings = latest.get("metrics", {}).get("warnings", {})
     if "shown" not in warnings or any("flagged" not in warnings.get(key, {}) for key in (*WARNING_CODES, "any")):
         problems.append(f"The results don't say which offered values carry a warning. {RUN_IT}")
@@ -246,6 +261,26 @@ def _unaccepted_proposals(listed: list[dict], known: Path) -> list[str]:
     return problems
 
 
+def _trick_sentences(eval_dir: Path) -> list[str]:
+    """Each trick sentence that reverses the meaning and is proposed, and wrong proposals beyond the set's most_wrong
+    (tricks.py)."""
+    if not (eval_dir / tricks.TRICKS).is_file():
+        return [f"There are no trick sentences (eval/{tricks.TRICKS}) to weigh the proposal rules on."]
+    scores = tricks.score(eval_dir)
+    problems = [
+        f"The trick sentence {said!r} is proposed, and a proposal for it reverses the meaning; there must be none. "
+        "Tighten the proposal rules (validation.py), then score the stored answers again (ehr_eval/rescore.py)."
+        for said in scores.reversing
+    ]
+    if len(scores.wrong) > scores.most_wrong:
+        problems.append(
+            f"The trick sentences give {len(scores.wrong)} wrong proposals, more than the {scores.most_wrong} "
+            f"eval/{tricks.TRICKS} records ({', '.join(repr(said) for said in scores.wrong)}). Tighten the proposal "
+            "rules (validation.py); only the owner tolerates another wrong proposal there."
+        )
+    return problems
+
+
 def _get(metrics: dict, path: tuple[str, ...]) -> float | None:
     value = metrics
     for key in path:
@@ -265,6 +300,7 @@ def main() -> int:
     metrics = latest["metrics"]
     again = _proposals_again(latest, EVAL_DIR)
     proposals, clinical = again["proposals"], again["proposals_clinical"]
+    trick = tricks.score(EVAL_DIR)
     baseline = "against the accepted baseline" if (RESULTS_DIR / "baseline.json").is_file() else "(no accepted baseline yet)"
     print(
         f"Eval results match this commit {baseline}: WER {metrics['wer']['overall']}, "
@@ -273,7 +309,9 @@ def main() -> int:
         f"{metrics['warnings']['any']['flagged']} of {metrics['warnings']['shown']} offered values carry a warning, "
         f"{proposals['shown']} proposals scored again from the recordings ({proposals['right']} right, recall "
         f"{proposals['recall']} against the rule-following gold and {clinical['recall']} against the clinical gold, "
-        f"precision {proposals['precision']}, every false or misheard one accepted). "
+        f"precision {proposals['precision']}, every false or misheard one accepted; at least {PROPOSALS_FLOOR} right "
+        f"against the clinical gold), {trick.sentences} trick sentences weighed again ({len(trick.wrong)} wrong "
+        f"proposals, at most {trick.most_wrong}, none reversing the meaning). "
         f"Run on {latest['run']['machine']['label']}."
     )
     return 0
