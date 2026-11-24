@@ -23,7 +23,23 @@ public class NewModel(SecureMessages messages) : PageModel
 
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
+    // Opened from a result's "Ask your care team about this result": the subject is filled in, and the message box
+    // has the focus.
+    public bool About { get; private set; }
+
     public void OnGet() => Response.Headers.CacheControl = "no-store";
+
+    // The results page posts the subject here, so it stays out of the address. Nothing is saved: the form comes back
+    // with the subject filled in, for the patient to write the message and send it. The subject is the patient's to
+    // change, like any they type, and is cut to the length a subject may have.
+    public void OnPostAbout()
+    {
+        Response.Headers.CacheControl = "no-store";
+        About = true;
+        var subject = Subject?.Trim();
+        Subject = subject?.Length > SecureMessages.MaximumSubject ? subject[..SecureMessages.MaximumSubject] : subject;
+        Body = null;
+    }
 
     public async Task<IActionResult> OnPostAsync()
     {
