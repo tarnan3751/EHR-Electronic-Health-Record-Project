@@ -165,6 +165,10 @@ CREATE OR REPLACE TRIGGER chart_history_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.chart_history
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
+CREATE OR REPLACE TRIGGER inbox_items_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.inbox_items
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
 CREATE OR REPLACE TRIGGER orders_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.orders
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();

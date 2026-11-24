@@ -74,6 +74,13 @@ GRANT SELECT ON ehr.chart_history TO ehr_app, ehr_read;
 -- nothing at runtime changes it. Its rows are db/reference/*.sql, applied as ehr_owner after these files.
 GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
 
+-- The rest of the reference data, none of it about a patient: what a result or vital sign is and this clinic's range
+-- for it, which results an order produces, the PHQ-9 and GAD-7 questionnaires, what each drug product is made of, the
+-- classes its ingredients belong to and which of those cross-react, and known interactions between ingredients. Read
+-- by both apps; nothing at runtime changes any of it. Its rows are db/reference's generated SQL.
+GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
+    ehr.drug_class_cross_reactions, ehr.drug_interactions TO ehr_app, ehr_read;
+
 -- Test results (observations). PHI, like the chart: row-level security and the write-audit trigger follow. Read only:
 -- results will come from the lab interface, and no page changes them. The portal reads them on either server.
 GRANT SELECT ON ehr.observations TO ehr_app, ehr_read;
@@ -111,6 +118,13 @@ GRANT SELECT ON ehr.order_catalog_items TO ehr_app, ehr_read;
 GRANT SELECT, INSERT ON ehr.orders TO ehr_app;
 GRANT UPDATE (status, discontinue_reason, replaced_by_order_id) ON ehr.orders TO ehr_app;
 GRANT SELECT ON ehr.orders TO ehr_read;
+
+-- The staff inbox: what needs a staff member's action. PHI: row-level security and the write-audit trigger follow.
+-- Read by its recipient. The one change is marking an item done: UPDATE on that column alone, and a trigger sets the
+-- time and refuses anything else (70-inbox.sql). No INSERT yet: each kind of item gets its grant, or its trigger, with
+-- the feature that creates it. Never DELETE.
+GRANT SELECT ON ehr.inbox_items TO ehr_app, ehr_read;
+GRANT UPDATE (done_at) ON ehr.inbox_items TO ehr_app;
 
 -- UC 13: private, auditable proposals and decisions; replica reads use identical forced ownership RLS.
 GRANT SELECT, INSERT, UPDATE ON ehr.ai_note_reviews, ehr.ai_field_proposals TO ehr_app;

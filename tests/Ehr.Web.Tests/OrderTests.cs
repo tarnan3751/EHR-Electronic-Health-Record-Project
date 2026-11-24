@@ -275,6 +275,36 @@ public class OrderTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Order discontinued:", Words(await session.Client.GetStringAsync($"/patients/{patient}?discontinued={Guid.NewGuid()}", Cancel)));
     }
 
+    // The order form lists the clinic's common items, and finds the rest of the catalog, LOINC's lab orders and RxNorm's
+    // clinical drugs, as the clinician types; an item found that way is ordered under its standard code.
+    [Fact]
+    public async Task The_order_form_lists_common_items_and_finds_standard_ones_by_search()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps);
+
+        var form = await session.Client.GetStringAsync(FormPath(patient, "lab"), Cancel);
+        Assert.Equal(8, System.Text.RegularExpressions.Regex.Matches(form, "<option value=").Count);
+        Assert.Contains("data-code-search=\"order-lab\"", form);
+        Assert.Contains("/_content/Ehr.Design/js/code-search.", form);
+
+        var labs = await session.Client.GetStringAsync("/codes?kind=order-lab&q=ferritin", Cancel);
+        Assert.Contains("<option value=\"Ferritin [Mass/volume] in Serum or Plasma\"", labs);
+        // A common item comes first, by any part of its name.
+        Assert.StartsWith("<option value=\"Complete blood count (CBC)\"", (await session.Client.GetStringAsync("/codes?kind=order-lab&q=cbc", Cancel)).TrimStart());
+        var medications = await session.Client.GetStringAsync("/codes?kind=order-medication&q=losartan+50", Cancel);
+        Assert.Contains("<option value=\"losartan potassium 50 MG Oral Tablet\"", medications);
+        Assert.DoesNotContain("<option", await session.Client.GetStringAsync("/codes?kind=order-surgery&q=ferritin", Cancel));
+
+        using var lab = await SignAsync(session.Client, patient, "lab", "Ferritin [Mass/volume] in Serum or Plasma", Cbc);
+        using var medication = await SignAsync(session.Client, patient, "medication", "Losartan potassium 50 mg oral tablet",
+            [("dose", "50 mg"), ("route", "By mouth"), ("frequency", "Once a day")]);
+        Assert.Equal(HttpStatusCode.OK, lab.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, medication.StatusCode);
+        Assert.Equal(1, await OrdersAsync(apps, patient, "2276-4"));
+        Assert.Equal(1, await OrdersAsync(apps, patient, "979492"));
+        Assert.Contains("<strong>Ferritin [Mass/volume] in Serum or Plasma</strong> (Lab)", await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
+    }
+
     // Cancel goes back to the chart and saves nothing.
     [Fact]
     public async Task Cancel_saves_nothing()

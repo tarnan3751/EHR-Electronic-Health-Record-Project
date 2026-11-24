@@ -825,3 +825,218 @@ VALUES ('20261121224028_OneNoKnownAllergy', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.medication_statements ALTER COLUMN display TYPE character varying(300);
+
+ALTER TABLE ehr.conditions ALTER COLUMN display TYPE character varying(300);
+
+ALTER TABLE ehr.allergy_intolerances ALTER COLUMN display TYPE character varying(300);
+
+CREATE INDEX ix_clinical_codes_display ON ehr.clinical_codes USING GIN (to_tsvector('simple', display));
+
+CREATE INDEX ix_clinical_codes_kind_code ON ehr.clinical_codes (kind, code text_pattern_ops);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261123180010_ClinicalCodeSearch', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE ehr.order_catalog_items ADD common boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE ehr.order_catalog_items ADD standard_code character varying(20);
+
+ALTER TABLE ehr.order_catalog_items ADD standard_system character varying(20);
+
+ALTER TABLE ehr.order_catalog_items ADD display_key character varying(200) GENERATED ALWAYS AS (lower(display)) STORED NOT NULL;
+
+CREATE TABLE ehr.drug_class_cross_reactions (
+    class_a character varying(200) NOT NULL,
+    class_b character varying(200) NOT NULL,
+    note character varying(500) NOT NULL,
+    source character varying(500) NOT NULL,
+    CONSTRAINT pk_drug_class_cross_reactions PRIMARY KEY (class_a, class_b)
+);
+
+CREATE TABLE ehr.drug_classes (
+    ingredient_code character varying(20) NOT NULL,
+    class_name character varying(200) NOT NULL,
+    CONSTRAINT pk_drug_classes PRIMARY KEY (ingredient_code, class_name)
+);
+
+CREATE TABLE ehr.drug_ingredients (
+    product_code character varying(20) NOT NULL,
+    ingredient_code character varying(20) NOT NULL,
+    CONSTRAINT pk_drug_ingredients PRIMARY KEY (product_code, ingredient_code)
+);
+
+CREATE TABLE ehr.drug_interactions (
+    ingredient_a character varying(20) NOT NULL,
+    ingredient_b character varying(20) NOT NULL,
+    level character varying(20) NOT NULL,
+    CONSTRAINT pk_drug_interactions PRIMARY KEY (ingredient_a, ingredient_b),
+    CONSTRAINT ck_drug_interactions_level CHECK (level IN ('major', 'moderate', 'minor')),
+    CONSTRAINT ck_drug_interactions_order CHECK (ingredient_a < ingredient_b)
+);
+
+CREATE TABLE ehr.observation_codes (
+    code character varying(20) NOT NULL,
+    display character varying(300) NOT NULL,
+    kind character varying(20) NOT NULL,
+    unit character varying(40),
+    reference_low numeric,
+    reference_high numeric,
+    range_source character varying(300),
+    copyright text,
+    CONSTRAINT pk_observation_codes PRIMARY KEY (code),
+    CONSTRAINT ck_observation_codes_kind CHECK (kind IN ('lab', 'vital', 'survey'))
+);
+
+CREATE TABLE ehr.questionnaires (
+    code character varying(20) NOT NULL,
+    title character varying(200) NOT NULL,
+    definition jsonb NOT NULL,
+    copyright text,
+    CONSTRAINT pk_questionnaires PRIMARY KEY (code),
+    CONSTRAINT ck_questionnaires_definition CHECK (jsonb_typeof(definition) = 'object')
+);
+
+CREATE TABLE ehr.order_result_codes (
+    catalog_code character varying(20) NOT NULL,
+    observation_code character varying(20) NOT NULL,
+    CONSTRAINT pk_order_result_codes PRIMARY KEY (catalog_code, observation_code),
+    CONSTRAINT fk_order_result_codes_observation_codes_observation_code FOREIGN KEY (observation_code) REFERENCES ehr.observation_codes (code) ON DELETE CASCADE,
+    CONSTRAINT fk_order_result_codes_order_catalog_items_catalog_code FOREIGN KEY (catalog_code) REFERENCES ehr.order_catalog_items (code) ON DELETE CASCADE
+);
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-IMG-001';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-IMG-002';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-IMG-003';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-IMG-004';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-IMG-005';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-IMG-006';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '58410-2', standard_system = 'loinc'
+WHERE code = 'SYN-LAB-001';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-LAB-002';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '24323-8', standard_system = 'loinc'
+WHERE code = 'SYN-LAB-003';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '57698-3', standard_system = 'loinc'
+WHERE code = 'SYN-LAB-004';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-LAB-005';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '3016-3', standard_system = 'loinc'
+WHERE code = 'SYN-LAB-006';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '24356-8', standard_system = 'loinc'
+WHERE code = 'SYN-LAB-007';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '62292-8', standard_system = 'loinc'
+WHERE code = 'SYN-LAB-008';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '314076', standard_system = 'rxnorm'
+WHERE code = 'SYN-MED-001';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '861007', standard_system = 'rxnorm'
+WHERE code = 'SYN-MED-002';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '617310', standard_system = 'rxnorm'
+WHERE code = 'SYN-MED-003';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '197361', standard_system = 'rxnorm'
+WHERE code = 'SYN-MED-004';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '308191', standard_system = 'rxnorm'
+WHERE code = 'SYN-MED-005';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-MED-006';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '312941', standard_system = 'rxnorm'
+WHERE code = 'SYN-MED-007';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = '197805', standard_system = 'rxnorm'
+WHERE code = 'SYN-MED-008';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-REF-001';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-REF-002';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-REF-003';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-REF-004';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-REF-005';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-REF-006';
+
+UPDATE ehr.order_catalog_items SET common = TRUE, standard_code = NULL, standard_system = NULL
+WHERE code = 'SYN-REF-007';
+
+CREATE INDEX ix_order_catalog_items_display ON ehr.order_catalog_items USING GIN (to_tsvector('simple', display));
+
+CREATE INDEX ix_order_catalog_items_type_display_key ON ehr.order_catalog_items (type, display_key text_pattern_ops);
+
+CREATE INDEX ix_drug_classes_class_name ON ehr.drug_classes (class_name);
+
+CREATE INDEX ix_drug_interactions_ingredient_b ON ehr.drug_interactions (ingredient_b);
+
+CREATE INDEX ix_order_result_codes_observation_code ON ehr.order_result_codes (observation_code);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261123180020_ReferenceTables', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE ehr.inbox_items (
+    id uuid NOT NULL,
+    recipient_id uuid NOT NULL,
+    kind character varying(40) NOT NULL,
+    patient_id uuid,
+    source_table character varying(63),
+    source_id uuid,
+    summary character varying(300) NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    done_at timestamp with time zone,
+    CONSTRAINT pk_inbox_items PRIMARY KEY (id),
+    CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review')),
+    CONSTRAINT ck_inbox_items_source CHECK ((source_table IS NULL) = (source_id IS NULL)),
+    CONSTRAINT fk_inbox_items_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_inbox_items_staff_users_recipient_id FOREIGN KEY (recipient_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_inbox_items_patient_id ON ehr.inbox_items (patient_id);
+
+CREATE INDEX ix_inbox_items_recipient_id_created_at ON ehr.inbox_items (recipient_id, created_at) WHERE done_at IS NULL;
+
+CREATE INDEX ix_inbox_items_recipient_id_done_at ON ehr.inbox_items (recipient_id, done_at) WHERE done_at IS NOT NULL;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261123180030_InboxItems', '10.0.13');
+
+COMMIT;
+

@@ -396,6 +396,41 @@ public sealed class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext 
         return charts;
     }
 
+    // The signed-in staff member's inbox: the items that still need action, oldest first, or the ones done, newest
+    // first. Row-level security returns only their own. Each patient named is a recorded read of that patient, as in a
+    // list of patients: for a clinician. An admin can't read patients, so gets none of their names and records none.
+    public async Task<InboxPage> InboxAsync(bool done, int limit, CancellationToken cancellationToken)
+    {
+        // Two plain conditions, not one compared with a parameter: each matches its own partial index whatever the plan.
+        var mine = db.InboxItems.AsNoTracking().Where(i => i.RecipientId == user.UserId);
+        mine = done ? mine.Where(i => i.DoneAt != null) : mine.Where(i => i.DoneAt == null);
+        var ordered = done ? mine.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id) : mine.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id);
+        var items = await (
+            from item in ordered.Take(limit + 1)
+            join patient in db.Patients on item.PatientId equals patient.Id into patients
+            from patient in patients.DefaultIfEmpty()
+            select new InboxEntry(item.Id, item.Kind, item.Summary, item.CreatedAt, item.DoneAt, item.PatientId,
+                patient == null ? null : patient.FamilyName + ", " + patient.GivenName, patient == null ? null : patient.Mrn, item.SourceTable, item.SourceId))
+            .ToListAsync(cancellationToken);
+        items = [.. done ? items.OrderByDescending(i => i.DoneAt).ThenBy(i => i.Id) : items.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id)];
+        var more = items.Count > limit;
+        items = [.. items.Take(limit)];
+
+        var named = items.Where(i => i.PatientName is not null).Select(i => i.PatientId!.Value).Distinct().ToList();
+        if (named.Count > 0)
+        {
+            audit.RecordReads(PatientsTable, named.Select(patient => (patient, patient)));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return new InboxPage(items, more);
+    }
+
+    // How many items in the signed-in staff member's inbox still need action, for the app bar. A number about their
+    // own work, which says nothing about any patient: not a recorded read.
+    public Task<int> InboxCountAsync(CancellationToken cancellationToken) =>
+        db.InboxItems.CountAsync(i => i.RecipientId == user.UserId && i.DoneAt == null, cancellationToken);
+
     const string DraftsTable = "clinical_drafts";
 
     public Task<bool> IsAssignedAsync(Guid patient, CancellationToken cancellationToken) =>

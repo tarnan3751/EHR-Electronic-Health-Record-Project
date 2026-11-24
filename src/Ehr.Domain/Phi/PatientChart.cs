@@ -39,6 +39,14 @@ public sealed record PatientChart(
     public string? NoKnownAllergiesRecordedBy { get; init; }
 }
 
+// One item of a staff member's inbox as its page lists it: what it is, the patient it is about (by name for a
+// clinician, who may read patients; by ID alone for an admin, who may not), and where it came from.
+public sealed record InboxEntry(
+    Guid Id, string Kind, string Summary, DateTimeOffset CreatedAt, DateTimeOffset? DoneAt, Guid? PatientId, string? PatientName, string? PatientMrn,
+    string? SourceTable, Guid? SourceId);
+
+public sealed record InboxPage(IReadOnlyList<InboxEntry> Items, bool More);
+
 // An entry of one of the chart's lists just saved, as the chart's notice describes it: its list (by table), name,
 // status, whether it is among the lists the chart shows now (Listed), and whether the chart left it out as sensitive
 // (Hidden), in which case the notice doesn't name it.

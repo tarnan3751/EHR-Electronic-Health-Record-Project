@@ -1,0 +1,84 @@
+@page "/inbox"
+@using Ehr.Data.Inbox
+@model Ehr.Web.Areas.Clinical.Pages.Inbox.IndexModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // Patients are named here. Without htmx, nothing keeps the page in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    ViewData["Title"] = "Inbox";
+    var clinician = User.IsInRole(StaffRoles.Clinician);
+}
+<h1>Inbox</h1>
+<nav aria-label="Inbox views">
+    <ul class="sc-tabs">
+        <li><a asp-page="Index" aria-current="@(Model.Done ? null : "page")">Needs action</a></li>
+        <li><a asp-page="Index" asp-route-done="true" aria-current="@(Model.Done ? "page" : null)">Done</a></li>
+    </ul>
+</nav>
+@if (Model.AlreadyDone)
+{
+    <p class="sc-notice sc-notice--info" role="status"><span class="sc-notice__state">Nothing to mark:</span> that item isn't waiting in your inbox. It may have been marked done before. Nothing changed.</p>
+}
+@if (!Model.Done && !OnPrem.IsReachable)
+{
+    <p class="sc-muted">Marking an item done needs the clinic's server. Your inbox remains readable.</p>
+}
+@if (Model.Items.Items.Count == 0)
+{
+    <p class="sc-muted">@(Model.Done ? "Nothing done yet." : "Nothing needs your action.")</p>
+}
+else
+{
+    <div class="sc-table-wrap">
+        <table class="sc-table">
+            <thead>
+                <tr>
+                    <th scope="col">@(Model.Done ? "Done" : "Received")</th>
+                    <th scope="col">What</th>
+                    <th scope="col">Patient</th>
+                    @if (!Model.Done)
+                    {
+                        <th scope="col"><span class="sc-visually-hidden">Actions</span></th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items.Items)
+                {
+                    <tr data-inbox-item="@item.Kind">
+                        <td class="sc-table__mono">@((item.DoneAt ?? item.CreatedAt).UtcDateTime.ToString("yyyy-MM-dd HH:mm")) UTC</td>
+                        <td><span class="sc-tag">@InboxItemKind.Names.GetValueOrDefault(item.Kind, item.Kind)</span> @item.Summary</td>
+                        @if (item.PatientName is not null && clinician)
+                        {
+                            <td><a asp-page="/Patients/Chart" asp-route-id="@item.PatientId">@item.PatientName</a> <span class="sc-table__mono">@item.PatientMrn</span></td>
+                        }
+                        else if (item.PatientId is { } patient)
+                        {
+                            @* An admin has no access to patient data: the patient by ID, as on the audit page. *@
+                            <td class="sc-table__id">@patient</td>
+                        }
+                        else
+                        {
+                            <td class="sc-table__muted">—</td>
+                        }
+                        @if (!Model.Done)
+                        {
+                            <td>
+                                @if (OnPrem.IsReachable)
+                                {
+                                    <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
+                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary">Mark done</button>
+                                    </form>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.Items.More)
+    {
+        <p class="sc-muted">Showing the first @IndexModel.Limit. Finish some to see the rest.</p>
+    }
+}

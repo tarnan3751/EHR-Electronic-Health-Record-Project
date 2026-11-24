@@ -71,6 +71,64 @@ public class SeedRollbackTests(MigratedDatabase database) : IClassFixture<Migrat
     }
 }
 
+// The expansion plan's step 2a, in a clinic of its own: the seed fills only an empty one.
+public class SeedCoherenceTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
+{
+    // Step 2a: the clinic is coded and coherent. Every code a seeded chart carries is in the reference data, under the
+    // same name; each medication treats a condition the patient has, and none contains something they are allergic to;
+    // a diagnosis in a sensitive range is marked by the database, and so is the medication that treats it; and a
+    // condition moves the results it is followed with, such as hemoglobin A1c with diabetes.
+    [Fact]
+    public async Task The_seeded_clinic_is_coded_from_the_reference_data_and_clinically_coherent()
+    {
+        var clinic = new SyntheticClinic(400);
+        await Seeder.LoadAsync(database.OwnerConnectionString, clinic, TestContext.Current.CancellationToken);
+
+        foreach (var (table, kind, system) in new[]
+        {
+            ("conditions", "condition", "'icd-10-cm'"), ("medication_statements", "medication", "'rxnorm'"), ("allergy_intolerances", "allergen", "t.code_system"),
+        })
+        {
+            Assert.Equal(0L, await Seeded.ScalarAsync<long>(database,
+                $"""
+                SELECT count(*) FROM ehr.{table} t
+                WHERE t.code IS DISTINCT FROM 'no-known-allergy' AND NOT EXISTS (
+                    SELECT 1 FROM ehr.clinical_codes c WHERE c.kind = '{kind}' AND c.system = {system} AND c.code = t.code AND c.display = t.display)
+                """));
+        }
+
+        Assert.Equal(0L, await Seeded.ScalarAsync<long>(database,
+            "SELECT count(*) FROM ehr.observations o WHERE NOT EXISTS (SELECT 1 FROM ehr.observation_codes c WHERE c.code = o.code)"));
+        // No medication with an ingredient the patient has an active allergy to.
+        Assert.Equal(0L, await Seeded.ScalarAsync<long>(database,
+            """
+            SELECT count(*) FROM ehr.medication_statements m
+            JOIN ehr.drug_ingredients i ON i.product_code = m.code
+            JOIN ehr.allergy_intolerances a ON a.patient_id = m.patient_id AND a.code_system = 'rxnorm' AND a.code = i.ingredient_code AND a.clinical_status = 'active'
+            """));
+        // Sensitive by the code's range, set by the database; and the medication that treats it, set by the seed.
+        Assert.Equal(0L, await Seeded.ScalarAsync<long>(database, "SELECT count(*) FROM ehr.conditions WHERE sensitive <> ehr.icd10cm_is_sensitive(code)"));
+        Assert.True(await Seeded.ScalarAsync<long>(database, "SELECT count(*) FROM ehr.conditions WHERE sensitive") > 20);
+        Assert.Equal(0L, await Seeded.ScalarAsync<long>(database,
+            """
+            SELECT count(*) FROM ehr.medication_statements m
+            WHERE m.sensitive <> EXISTS (SELECT 1 FROM ehr.conditions c WHERE c.patient_id = m.patient_id AND c.sensitive)
+              AND m.code IN ('312941', '349332', '351267')
+            """));
+        // Diabetes raises hemoglobin A1c above the range; without it, most results are inside.
+        Assert.True(await Seeded.ScalarAsync<bool>(database,
+            """
+            SELECT bool_and(o.value > o.reference_high) FROM ehr.observations o
+            WHERE o.code = '4548-4' AND EXISTS (SELECT 1 FROM ehr.conditions c WHERE c.patient_id = o.patient_id AND c.code = 'E11.9')
+            """));
+        Assert.True(await Seeded.ScalarAsync<long>(database,
+            "SELECT count(*) FROM ehr.medication_statements m JOIN ehr.conditions c ON c.patient_id = m.patient_id AND c.code = 'E11.9' WHERE m.display LIKE 'metformin%'") > 5);
+        // Still protected, with no history and no write-audit rows for seeded entries.
+        await Seeded.AssertProtectedAsync(database);
+        Assert.Equal(0L, await Seeded.ScalarAsync<long>(database, "SELECT count(*) FROM ehr.chart_history"));
+    }
+}
+
 // What the seed left behind, read as the superuser.
 static class Seeded
 {
@@ -104,7 +162,7 @@ static class Seeded
         }
     }
 
-    static async Task<T> ScalarAsync<T>(MigratedDatabase database, string sql)
+    public static async Task<T> ScalarAsync<T>(MigratedDatabase database, string sql)
     {
         await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);

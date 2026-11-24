@@ -12,7 +12,7 @@ namespace Ehr.Domain.Patients;
 // on their panel: db/policies/30-rls.sql); the database also keeps the history of every change, marks a diagnosis in a
 // sensitive range sensitive whatever is sent, and records the write (65-chart-lists.sql, 40-audit.sql). Nothing
 // deletes an entry: it is marked inactive, resolved or stopped.
-public sealed class ChartLists(EhrDbContext db)
+public sealed partial class ChartLists(EhrDbContext db)
 {
     // How many names the search offers as a clinician types.
     public const int Suggestions = 20;
@@ -36,8 +36,10 @@ public sealed class ChartLists(EhrDbContext db)
 
     public static string DisplayOf(string? code, string display) => code == AllergyIntolerance.NoKnownAllergy ? NoKnownAllergies : display;
 
-    // Names of one kind that match what was typed: first those that start with it, then those with a word that does,
-    // then a diagnosis whose code starts with it. Nothing for fewer than two characters.
+    // Names of one kind that match what was typed: first those that start with it; then a diagnosis whose code starts
+    // with it; then those with words that start with each word typed ("diab mell" finds "Type 2 diabetes mellitus
+    // ..."). Each is an index lookup that stops at its first matches (ClinicalCodeConfiguration): there are about a
+    // hundred thousand names. Nothing for fewer than two characters.
     public async Task<IReadOnlyList<ClinicalCode>> SearchAsync(string kind, string? typed, CancellationToken cancellationToken)
     {
         var key = typed?.Trim().ToLowerInvariant() ?? "";
@@ -46,14 +48,33 @@ public sealed class ChartLists(EhrDbContext db)
             return [];
         }
 
-        var pattern = Like(key);
-        return await db.ClinicalCodes.AsNoTracking()
-            .Where(c => c.Kind == kind && (EF.Functions.Like(c.DisplayKey, pattern + "%") || EF.Functions.Like(c.DisplayKey, "% " + pattern + "%")
-                || EF.Functions.ILike(c.Code, pattern + "%")))
-            .OrderBy(c => EF.Functions.Like(c.DisplayKey, pattern + "%") ? 0 : 1).ThenBy(c => c.DisplayKey).ThenBy(c => c.Code)
-            .Take(Suggestions)
-            .ToListAsync(cancellationToken);
+        var codes = db.ClinicalCodes.AsNoTracking().Where(c => c.Kind == kind);
+        var found = await codes.Where(c => EF.Functions.Like(c.DisplayKey, Like(key) + "%"))
+            .OrderBy(c => c.DisplayKey).ThenBy(c => c.Code).Take(Suggestions).ToListAsync(cancellationToken);
+        if (found.Count < Suggestions && kind == ClinicalCodeKind.Condition)
+        {
+            Add(await codes.Where(c => EF.Functions.Like(c.Code, Like(key.ToUpperInvariant()) + "%"))
+                .OrderBy(c => c.Code).Take(Suggestions).ToListAsync(cancellationToken));
+        }
+
+        // Words of letters and digits only, so nothing typed can be read as the query's own syntax; a word of one
+        // character would match too much to be worth asking for.
+        var words = Word().Matches(key).Select(match => match.Value).Where(word => word.Length > 1).Take(6).ToList();
+        if (found.Count < Suggestions && words.Count > 0)
+        {
+            var query = string.Join(" & ", words.Select(word => word + ":*"));
+            Add(await codes.Where(c => EF.Functions.ToTsVector("simple", c.Display).Matches(EF.Functions.ToTsQuery("simple", query)))
+                .OrderBy(c => c.DisplayKey.Length).ThenBy(c => c.DisplayKey).ThenBy(c => c.Code).Take(Suggestions).ToListAsync(cancellationToken));
+        }
+
+        return found;
+
+        void Add(List<ClinicalCode> more) =>
+            found.AddRange(more.Where(code => found.All(have => (have.System, have.Code) != (code.System, code.Code))).Take(Suggestions - found.Count));
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex("[a-z0-9]+")]
+    private static partial System.Text.RegularExpressions.Regex Word();
 
     // Whether a diagnosis's ICD-10-CM code is sensitive by the rule (ehr.icd10cm_is_sensitive), as the loaded reference
     // codes record it: the entry form shows such a diagnosis's "Sensitive" box checked and fixed. The database marks it

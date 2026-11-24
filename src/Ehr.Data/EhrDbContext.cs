@@ -56,6 +56,24 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
 
     public DbSet<ChartHistoryEntry> ChartHistory => Set<ChartHistoryEntry>();
 
+    // What needs a staff member's action (PHI: an item names a patient).
+    public DbSet<Inbox.InboxItem> InboxItems => Set<Inbox.InboxItem>();
+
+    // The rest of the reference data (Ehr.Data.Reference): not PHI.
+    public DbSet<Reference.ObservationCode> ObservationCodes => Set<Reference.ObservationCode>();
+
+    public DbSet<Reference.OrderResultCode> OrderResultCodes => Set<Reference.OrderResultCode>();
+
+    public DbSet<Reference.Questionnaire> Questionnaires => Set<Reference.Questionnaire>();
+
+    public DbSet<Reference.DrugIngredient> DrugIngredients => Set<Reference.DrugIngredient>();
+
+    public DbSet<Reference.DrugClass> DrugClasses => Set<Reference.DrugClass>();
+
+    public DbSet<Reference.DrugClassCrossReaction> DrugClassCrossReactions => Set<Reference.DrugClassCrossReaction>();
+
+    public DbSet<Reference.DrugInteraction> DrugInteractions => Set<Reference.DrugInteraction>();
+
     public DbSet<Encounter> Encounters => Set<Encounter>();
 
     public DbSet<ClinicalDraft> ClinicalDrafts => Set<ClinicalDraft>();

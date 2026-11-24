@@ -33,6 +33,8 @@ builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Si
 builder.Services.AddScoped<Ehr.Domain.Orders.ClinicalOrders>();
 // Adding to and changing allergies, medications and diagnoses (Ehr.Domain.Patients).
 builder.Services.AddScoped<Ehr.Domain.Patients.ChartLists>();
+// The staff inbox (Ehr.Domain.Inbox).
+builder.Services.AddScoped<Ehr.Domain.Inbox.StaffInbox>();
 
 // Accounts, sign-in and the authorization policies (Ehr.Domain). The audit log names which server recorded an event.
 builder.Services.AddEhrAccounts(builder.Configuration);
@@ -115,6 +117,8 @@ builder.Services.AddRazorPages(options =>
     .AddMvcOptions(options =>
     {
         options.Filters.Add(new TypeFilterAttribute(typeof(DatabaseTransactionFilter)) { Arguments = [site == Site.OnPrem] });
+        // After the transaction filter, so it runs inside the page's transaction, as the signed-in user.
+        options.Filters.Add(new TypeFilterAttribute(typeof(InboxCountFilter)));
         options.Filters.Add(new Ehr.Web.Areas.Clinical.Pages.Patients.Notes.NoteWriteExceptionFilter());
     })
     // Validation runs on the server only, so pages don't need the jQuery validation attributes.

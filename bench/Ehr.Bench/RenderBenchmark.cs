@@ -84,7 +84,9 @@ internal static partial class RenderBenchmark
                 Console.WriteLine($"Starting PostgreSQL 18 and seeding {patients:N0} synthetic patients...");
                 database = MigratedDatabase.Durable();
                 await database.InitializeAsync();
-                await Seeder.LoadAsync(database.OwnerConnectionString, new SyntheticClinic(patients), CancellationToken.None);
+                var seeding = Stopwatch.StartNew();
+                var seeded = await Seeder.LoadAsync(database.OwnerConnectionString, new SyntheticClinic(patients), CancellationToken.None);
+                Console.WriteLine($"Seeded in {seeding.Elapsed.TotalSeconds:F1} s: {string.Join(", ", seeded.Select(table => $"{table.Value:N0} {table.Key}"))}");
                 connectionString = database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
             }
 
@@ -115,6 +117,7 @@ internal static partial class RenderBenchmark
             {
                 var panel = await AssignPanelAsync(app, clinicianId, patients);
                 var labOrders = await SignOrdersAsync(app, clinicianId, panel);
+                await FillInboxAsync(database, clinicianId, panel);
                 var session = new CookieContainer();
                 using var client = await SignInAsync(app, session, email, password, key);
                 await SettleAsync(database);
@@ -243,6 +246,12 @@ internal static partial class RenderBenchmark
                 () => $"/patients/{panel[random.Next(panel.Count)]}/diagnoses"),
             await MeasureAsync(client, times, prefix + "Code search, first 3 letters", typing: false,
                 () => $"/codes?kind=condition&q={CodeSearches[random.Next(CodeSearches.Length)]}"),
+            // The same search by words inside the names, which goes through the text-search index.
+            await MeasureAsync(client, times, prefix + "Code search, words inside the name", typing: false,
+                () => $"/codes?kind=condition&q={Uri.EscapeDataString(CodeWords[random.Next(CodeWords.Length)])}"),
+            // The staff inbox (the expansion plan's step 3): its items, each naming a patient, which is a recorded read
+            // of each. Every row above also counted the inbox for the app bar.
+            await MeasureAsync(client, times, prefix + $"Inbox, {InboxSize} items", typing: false, () => "/inbox"),
             await MeasureAsync(client, times, prefix + "Chart history, a patient on the panel", typing: false,
                 () => $"/patients/{panel[random.Next(panel.Count)]}/chart-history"),
         ];
@@ -250,6 +259,8 @@ internal static partial class RenderBenchmark
 
     // What a clinician might have typed so far when looking for a diagnosis.
     static readonly string[] CodeSearches = ["typ", "ess", "anx", "ast", "hyp", "dia", "dep", "alc", "low", "mig"];
+
+    static readonly string[] CodeWords = ["diabetes", "mellitus compl", "fracture femur", "pneumonia", "kidney chronic", "pain", "infarction", "left", "unspecified site", "encounter"];
 
     // UC 2 (Tahseen Arnan): the same requests to the cloud app, with the on-site session's cookies, during an outage. Its
     // audit queue goes in a folder of its own, deleted at the end.
@@ -272,9 +283,19 @@ internal static partial class RenderBenchmark
         }
         finally
         {
-            if (Directory.Exists(queue))
+            // Best effort: on Windows the cloud app's queue file can still be open here, and Windows refuses to delete an
+            // open file (Linux and macOS don't). The folder is in the temp directory; leaving it beats losing every
+            // result measured.
+            try
             {
-                Directory.Delete(queue, recursive: true);
+                if (Directory.Exists(queue))
+                {
+                    Directory.Delete(queue, recursive: true);
+                }
+            }
+            catch (IOException error)
+            {
+                Console.Error.WriteLine($"Couldn't delete the off-site audit queue's temporary folder {queue}: {error.Message}");
             }
         }
     }
@@ -743,6 +764,31 @@ internal static partial class RenderBenchmark
             .SetProperty(order => order.DiscontinueReason, "Synthetic: no longer needed"));
         await transaction.CommitAsync();
         return labOrders;
+    }
+
+    const int InboxSize = 40;
+
+    // Items in the benchmark clinician's inbox, each about a different patient on their panel, so the inbox page has
+    // names to read and the app bar a count. Nothing at runtime creates items yet, so they go in as the database's
+    // superuser, in the benchmark's own database only: with --stack the inbox is measured empty.
+    static async Task FillInboxAsync(MigratedDatabase? database, Guid clinicianId, List<Guid> panel)
+    {
+        if (database is null)
+        {
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at)
+            SELECT uuidv7(), @recipient, 'message', patient, 'Synthetic: a message to read', now() - make_interval(mins => n::int)
+            FROM unnest(@patients) WITH ORDINALITY AS p(patient, n)
+            """, connection);
+        command.Parameters.AddWithValue("recipient", clinicianId);
+        command.Parameters.AddWithValue("patients", panel.Take(InboxSize).ToArray());
+        await command.ExecuteNonQueryAsync();
     }
 
     // Signs in as a browser does, password then authenticator code, and returns a client with the session's cookies, which

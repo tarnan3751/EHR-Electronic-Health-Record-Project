@@ -281,6 +281,19 @@ CREATE POLICY audit_events_owner_select ON ehr.audit_events FOR SELECT TO ehr_ow
 DROP POLICY IF EXISTS audit_events_owner_mark ON ehr.audit_events;
 CREATE POLICY audit_events_owner_mark ON ehr.audit_events FOR UPDATE TO ehr_owner USING (NOT sensitive) WITH CHECK (sensitive);
 
+-- The staff inbox (PHI). An item is its recipient's alone: they read it and mark it done, while their account is a
+-- staff account that may sign in (a clinician or an admin). Nobody else sees it: not another clinician, not an admin
+-- who isn't the recipient, not the patient. Nothing at runtime inserts or deletes one yet (10-grants.sql).
+ALTER TABLE ehr.inbox_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.inbox_items FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inbox_items_own_select ON ehr.inbox_items;
+CREATE POLICY inbox_items_own_select ON ehr.inbox_items FOR SELECT
+    USING (((SELECT ehr.is_clinician()) OR (SELECT ehr.is_admin())) AND recipient_id = (SELECT ehr.current_user_id()));
+DROP POLICY IF EXISTS inbox_items_own_update ON ehr.inbox_items;
+CREATE POLICY inbox_items_own_update ON ehr.inbox_items FOR UPDATE
+    USING (((SELECT ehr.is_clinician()) OR (SELECT ehr.is_admin())) AND recipient_id = (SELECT ehr.current_user_id()))
+    WITH CHECK (((SELECT ehr.is_clinician()) OR (SELECT ehr.is_admin())) AND recipient_id = (SELECT ehr.current_user_id()));
+
 -- Drafts are private to their author and require an active panel assignment.
 ALTER TABLE ehr.clinical_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.clinical_drafts FORCE ROW LEVEL SECURITY;
