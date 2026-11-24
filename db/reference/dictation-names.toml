@@ -1,6 +1,7 @@
 # Common names a clinician dictates for an item the reference data holds under another name (the expansion plan's step
-# 15.1): "penicillin" for penicillin G or V, "latex" for natural latex rubber, "CRP" for C reactive protein, "A1c" for
-# hemoglobin A1c (read as one word: validation.py's ONE_WORD).
+# 15.1): "penicillin" for penicillin G or V, "latex" for natural latex rubber, "CRP" for C reactive protein, "A1c" and
+# "HbA1c" for hemoglobin A1c. A name written as one word of letters and digits ("A1c") is the only such word a proposal
+# reads whole (validation.py's ONE_WORD); every other ("B12", "T4") keeps its digits apart.
 # Hand-written, unlike the rest of db/reference, and read by src/Ehr.Dictation/sidecar/generate_catalog.py alone, which
 # writes each name into the dictation's catalog (ehr_dictation/catalog.py) as a name of its own, of its kind only, so an
 # instruction said plainly with it can be proposed (validation.py, "plain"). Nothing else reads it: the migration job and
@@ -43,3 +44,10 @@ kind = "orderable"
 codes = ["SYN-LAB-005"]  # Hemoglobin A1c, the clinic's common item
 source = """The clinic's common item, "Hemoglobin A1c"; LOINC 2.83's related names for 4548-4 and 17856-6, "HbA1c" and \
 "Hgb A1c"."""
+
+[[name]]
+name = "HbA1c"
+kind = "orderable"
+codes = ["SYN-LAB-005"]  # Hemoglobin A1c, the clinic's common item
+source = """LOINC 2.83: "HbA1c" is the short name's first word ("HbA1c MFr Bld") and a related name of 4548-4 and \
+17856-6, Hemoglobin A1c/Hemoglobin.total in Blood."""

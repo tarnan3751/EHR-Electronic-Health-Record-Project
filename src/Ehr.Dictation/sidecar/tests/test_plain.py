@@ -695,20 +695,26 @@ def test_a_word_from_an_unrelated_name_never_joins_an_item(said, item, kind):
     assert strangers and let_through == []
 
 
-# Step 15.1: a word written as letters, digits and letters, or as one letter and digits, with nothing between them, is
-# one word in a plain instruction, compared with the catalog's names by its letters (validation.ONE_WORD). "A1c" is the
-# common name of Hemoglobin A1c, and "B12" and "D3" read whole make "vitamin B12" and "vitamin D3" items; "HbA1c" is read
-# whole but no name holds it; a count ("x2"), a number and its unit ("10mg") and a name and a number ("CBC2") are read as
-# before. FR-14's rule reads none of them whole: what it lists and cuts is unchanged.
+# Step 15.1: a word written as letters and digits with nothing between them is one word in a plain instruction only
+# when the whole word is a common name written so (validation.ONE_WORD; catalog.WHOLE_WORDS, from
+# db/reference/dictation-names.toml): "A1c" and "HbA1c", the common names of Hemoglobin A1c, compared with the
+# catalog's names by their letters. Any other keeps its digits apart, as before: "B12", "D3", "T4", "K2" and "B7" make no
+# item of "vitamin B" or "T", and neither does "A9c", whose digit no name holds; a count ("x2"), a number and its unit
+# ("10mg") and a name and a number ("CBC2") are read as before. FR-14's rule reads none of them whole: what it lists and
+# cuts is unchanged.
 @pytest.mark.parametrize(("said", "words", "listed"), [
     ("Order an A1c.", ["order", "an", "a1c"], ["Order an A1c"]),
     ("Go ahead and order an A1C today.", ["go", "ahead", "and", "order", "an", "a1c", "today"],
      ["Go ahead and order an A1C today"]),
     ("Order a hemoglobin A1c.", ["order", "a", "hemoglobin", "a1c"], ["Order a hemoglobin A1c"]),
-    ("Order an HbA1c.", ["order", "an", "hba1c"], []),
-    ("Order a vitamin B12.", ["order", "a", "vitamin", "b12"], ["Order a vitamin B12"]),
-    ("Order vitamin D3 1000 units daily.", ["order", "vitamin", "d3", "1000", "units", "daily"],
-     ["Order vitamin D3 1000 units daily"]),
+    ("Order an HbA1c.", ["order", "an", "hba1c"], ["Order an HbA1c"]),
+    ("Order an A9c.", ["order", "an", "a", "9", "c"], []),
+    ("Order a vitamin B12.", ["order", "a", "vitamin", "b", "12"], []),
+    ("Order vitamin D3 1000 units daily.", ["order", "vitamin", "d", "3", "1000", "units", "daily"], []),
+    ("Order a vitamin B7.", ["order", "a", "vitamin", "b", "7"], []),
+    ("Order a T4.", ["order", "a", "t", "4"], []),
+    ("Prescribe vitamin K2.", ["prescribe", "vitamin", "k", "2"], []),
+    ("Add vitamin B12 to her allergies.", ["add", "vitamin", "b", "12", "to", "her", "allergies"], []),
     ("Refill her lisinopril x2 weeks.", ["refill", "her", "lisinopril", "x", "2", "weeks"],
      ["Refill her lisinopril x2 weeks"]),
     ("Refill lisinopril 10mg.", ["refill", "lisinopril", "10", "mg"], ["Refill lisinopril 10mg"]),

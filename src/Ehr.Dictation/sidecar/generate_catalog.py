@@ -8,8 +8,10 @@
 - Allergens: every allergen the chart's codes hold (db/reference/10-clinical-codes.sql, kind allergen: RxNorm
   ingredients and UNII foods and environmental substances).
 - Common names (db/reference/dictation-names.toml, the expansion plan's step 15.1): a name a clinician dictates for an
-  item the reference data holds under another name ("penicillin", "latex", "CRP"), each written whole as a name of its
-  own, of its kind only, and refused unless every code it stands for is in the reference data as that kind.
+  item the reference data holds under another name ("penicillin", "latex", "CRP", "A1c"), each written whole as a name
+  of its own, of its kind only, and refused unless every code it stands for is in the reference data as that kind; and
+  those written as one word of letters and digits ("A1c", "HbA1c") listed again, in WHOLE_WORDS, the only such words a
+  proposal reads whole.
 
 An orderable that is a medication (an RxNorm drug, medication or ingredient, or a common catalog item of type
 medication) is marked "+" before its name: only a medication can be refilled, prescribed, renewed, called in or sent to
@@ -184,6 +186,13 @@ def names(repository: Path = REPOSITORY) -> tuple[list[str], list[str], dict[str
     return marked, sorted((allergens | named_allergens) - {""}), counts
 
 
+def whole_words(repository: Path = REPOSITORY) -> tuple[str, ...]:
+    """The common names (NAMES) written as one word of letters and digits ("A1c"), in lower case, which a plain
+    instruction reads whole (validation.ONE_WORD); every other word of letters and digits is read with its digits apart."""
+    entries = tomllib.loads((repository / NAMES).read_text(encoding="utf-8")).get("name", [])
+    return tuple(sorted(entry["name"].lower() for entry in entries if re.fullmatch(r"[A-Za-z]+\d+[A-Za-z]*", entry["name"])))
+
+
 def render(repository: Path = REPOSITORY) -> str:
     orderables, allergens, counts = names(repository)
     sources = "; ".join(f"{source} {count}" for source, count in counts.items())
@@ -192,7 +201,8 @@ def render(repository: Path = REPOSITORY) -> str:
         "(db/reference/dictation-names.toml): change that script or the files it reads, not this one. The names a dictated\n"
         "order (ORDERABLES) or allergy to add (ALLERGENS) may name to be proposed (validation.py, \"plain\"), one a line, as\n"
         "their words in lower case without numbers, each standalone run marked \"^\" before its first word and \"$\" after\n"
-        "its last, and a medication's \"+\" before it. Read only when a proposal is weighed.\n"
+        "its last, and a medication's \"+\" before it; and the common names written as one word of letters and digits\n"
+        "(WHOLE_WORDS), which a proposal reads whole. Read only when a proposal is weighed.\n"
         f"From: {sources} rows.\n\n"
         "A derived copy of names from three sources, which ask for these notices (docs/expansion/reference-data.md):\n"
         "- RxNorm: This product uses publicly available data courtesy of the U.S. National Library of Medicine (NLM),\n"
@@ -206,7 +216,8 @@ def render(repository: Path = REPOSITORY) -> str:
         "  license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc.\n"
         '  The version used is 2.83."""\n\n'
         f'ORDERABLES = """\n{chr(10).join(orderables)}\n"""\n\n'
-        f'ALLERGENS = """\n{chr(10).join(allergens)}\n"""\n'
+        f'ALLERGENS = """\n{chr(10).join(allergens)}\n"""\n\n'
+        f"WHOLE_WORDS = {whole_words(repository)!r}\n"
     )
 
 
