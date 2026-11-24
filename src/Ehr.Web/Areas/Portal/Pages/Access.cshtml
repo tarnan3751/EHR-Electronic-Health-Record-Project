@@ -114,7 +114,8 @@ else
             </div>
             <div class="sc-field">
                 <label for="access-scope">What they can see</label>
-                <select id="access-scope" class="sc-field__input" name="Scope">
+                <select id="access-scope" class="sc-field__input" name="Scope"
+                        aria-invalid="@(Model.Errors.ContainsKey("Scope") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Scope") ? "access-scope-error" : null)">
                     @foreach (var scope in ProxyScope.All)
                     {
                         <!option value="@scope" @(Model.Scope == scope ? "selected" : null)>@ProxyAccess.ScopeLabel(scope)</!option>
@@ -122,7 +123,7 @@ else
                 </select>
                 @if (Model.Errors.TryGetValue("Scope", out var scopeError))
                 {
-                    <p class="sc-field__error">@scopeError</p>
+                    <p class="sc-field__error" id="access-scope-error">@scopeError</p>
                 }
             </div>
             <div class="sc-field">
@@ -130,7 +131,8 @@ else
             </div>
             <div class="sc-field">
                 <label for="access-days">For how long</label>
-                <select id="access-days" class="sc-field__input" name="Days">
+                <select id="access-days" class="sc-field__input" name="Days"
+                        aria-invalid="@(Model.Errors.ContainsKey("Days") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Days") ? "access-days-error" : null)">
                     @foreach (var (days, label) in ProxyAccess.Durations)
                     {
                         <!option value="@days" @(Model.Days == days ? "selected" : null)>@label</!option>
@@ -138,7 +140,7 @@ else
                 </select>
                 @if (Model.Errors.TryGetValue("Days", out var daysError))
                 {
-                    <p class="sc-field__error">@daysError</p>
+                    <p class="sc-field__error" id="access-days-error">@daysError</p>
                 }
             </div>
             <div class="sc-actions">
