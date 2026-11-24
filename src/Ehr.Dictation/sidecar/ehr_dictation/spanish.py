@@ -334,7 +334,7 @@ FREQUENCIES = [
     (re.compile(r"\b(?:semanal(?:es|mente)?|cada semana|a la semana|por semana)\b"), lambda m: {"1/w"}),
     (re.compile(r"\b(?:mensual(?:es|mente)?|cada mes|al mes|por mes)\b"), lambda m: {"1/m"}),
     (re.compile(r"\b(?:si es necesario|si lo necesita|si precisa|en caso de|a demanda|segun necesidad|por razon "
-                r"necesaria|prn)\b"), lambda m: {"prn"}),
+                r"necesaria|prn|si (?:hay |tiene )?dolor)\b"), lambda m: {"prn"}),
     (re.compile(r"\b(?:al acostarse|antes de dormir|por la noche|en la noche|cada noche|por las noches|en las noches)\b"),
      lambda m: {"hs"}),
     (re.compile(r"\b(?:por la manana|en la manana|cada manana|por las mananas)\b"), lambda m: {"am"}),
@@ -523,6 +523,7 @@ ABBREVIATIONS = {
     "trombosis venosa profunda": {"DVT"}, "fa": {"AF", "AFIB"}, "fibrilacion auricular": {"AF", "AFIB"},
     "phq": {"PHQ"}, "cbc": {"CBC"}, "aine": {"NSAID"}, "aines": {"NSAID", "NSAIDS"},
     "antiinflamatorio": {"NSAID"}, "antiinflamatorios": {"NSAID", "NSAIDS"}, "ira": {"AKI"}, "lesion renal aguda": {"AKI"}, "ivu": {"UTI"},
+    "leucocitos": {"WBC"}, "globulos blancos": {"WBC"},
 }
 
 
@@ -552,7 +553,7 @@ DRUG_EXCEPTIONS = {
     "clorfenamina": {"chlorpheniramine"}, "ceftriaxona": {"ceftriaxone"}, "amoxicilina": {"amoxicillin"},
     "nitroglicerina": {"nitroglycerin"}, "teofilina": {"theophylline"}, "levetiracetam": {"levetiracetam"},
     "lamotrigina": {"lamotrigine"}, "clonazepam": {"clonazepam"}, "warfarina": {"warfarin"},
-    "atorvastatina": {"atorvastatin"},
+    "atorvastatina": {"atorvastatin"}, "metotrexato": {"methotrexate"},
 }
 # Endings, longest first: the Spanish ending and the English ones it may be.
 DRUG_ENDINGS = [
@@ -599,12 +600,13 @@ def _phrases(text: str) -> list[tuple[str, ...]]:
 NEGATION_BEFORE = _phrases(
     """no; ni; niega; nego; niegan; negaba; sin; nunca; jamas; ningun; ninguno; ninguna; tampoco; negativo para;
     negativa para; negativos para; ausencia de; libre de; no presenta; no refiere; no hay; no se observa; no se observan;
-    no se palpa; no se palpan; nada de; se descarta; se descartan; descarta; dudo que; dudamos que; se descarto; se
+    no se palpa; no se palpan; nada de; dudoso; dudosa; se descarta; se descartan; descarta; dudo que; dudamos que; se descarto; se
     descartaron; descarto; descartaron; fue descartado; fue descartada; fueron descartados; fueron descartadas; ha sido
     descartado; ha sido descartada; se ha descartado; no se puede descartar; no se descarta; no se descartan; no estoy
     seguro; no estoy segura; no estamos seguros; no es seguro"""
 )
-NEGATION_AFTER = _phrases("negativo; negativa; negativos; negativas; ausente; ausentes; descartado; descartada; descartados; descartadas")
+NEGATION_AFTER = _phrases("negativo; negativa; negativos; negativas; ausente; ausentes; descartado; descartada; descartados; "
+                         "descartadas; dudoso; dudosa")
 # Words that negate themselves, a finding and its absence in one ("afebril" is without fever, "indoloro" without pain):
 # each is a negation of its own, as translation.py reads "afebrile" or "nontender" in English.
 SELF_NEGATING = frozenset(

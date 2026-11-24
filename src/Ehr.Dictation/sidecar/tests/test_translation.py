@@ -823,6 +823,29 @@ def test_the_glossary_names_each_word_once():
     assert len(spanish_words) == len(set(spanish_words)) and len(english_words) == len(set(english_words))
 
 
+# Faithful translations the checks refused, failing closed, that they now take; each beside the wrong one it still
+# refuses.
+@pytest.mark.parametrize(("text", "faithful", "wrong", "reason"), [
+    ("Metotrexato 15 mg semanal.", "Methotrexate 15 mg weekly.", "Methylphenidate 15 mg weekly.", "drug_not_in_sources"),
+    ("Paracetamol 1 g cada 8 horas.", "Acetaminophen 1 g three times a day.", "Acetaminophen 1 g four times a day.",
+     "number_not_in_sources"),
+    ("Nitroglicerina sublingual si dolor torácico.", "Sublingual nitroglycerin as needed for chest pain.",
+     "Sublingual nitroglycerin at bedtime for chest pain.", "frequency_not_in_sources"),
+    ("Leucocitos doce mil quinientos.", "WBC 12,500.", "CRP 12,500.", "abbreviation_not_in_sources"),
+    ("Dudosa neumonía.", "Doubtful pneumonia.", "Possible pneumonia.", "negation_dropped"),
+])
+def test_a_faithful_translation_refused_before_is_taken_and_the_wrong_one_still_isnt(text, faithful, wrong, reason):
+    assert reasons(text, [text], faithful) == []
+    assert reason in reasons(text, [text], wrong)
+
+
+def test_cada_tercer_dia_written_both_ways_counts_one_readings_words():
+    field = one("Cada tercer día.", ["Cada tercer día."], "Every other day or every third day.")
+    assert field.pending and [w[0] for w in field.warnings][:1] == ["ambiguous_frequency"]
+    assert reasons("Cada tercer día.", ["Cada tercer día."], "Every other day or every third day, and check kidney function.") == [
+        "translation_adds_words"]
+
+
 # ---- A qualifier over a list, and a passage quoting its tail (sentences outside the test set) ------------------------
 
 LIST = "Niega fiebre, tos, disnea, dolor torácico y síncope."

@@ -32,7 +32,8 @@ statement:
    - numbers, as digits (Spanish decimal commas, number words, 1 for "un", "una" or "uno" even as an article, and
      halves and quarters however said: "un gramo y medio" 1.5, "un cuarto de tableta" 0.25, "1/2 tableta" 0.5, "half
      a tablet" 0.5): no more (number_not_in_sources), and none the clinician took back (source_superseded); a fraction
-     with no exact decimal ("un tercio", "a third") can't be compared (number_unreadable); and a number written with a
+     with no exact decimal ("un tercio", "a third") can't be compared (number_unreadable); a number inside how often
+     the Spanish says it is that frequency's ("three times a day" for "cada 8 horas"); and a number written with a
      point or a comma before exactly three digits ("5.000", "2,500") is refused whatever the English writes
      (ambiguous_number), since Spain writes 2.500 for two thousand five hundred and Mexico for two and a half, and the
      checks can't know which was meant;
@@ -127,7 +128,8 @@ statement:
      (finding_not_in_sources), so the words the next check allows can't add "suicidal ideation" or "cancer
      diagnosed";
    - the English no more than EXTRA_WORDS content words longer than the Spanish (translation_adds_words): a clause the
-     model added ("continue metformin and check kidney function" from "continuar metformina"). Any other content word
+     model added ("continue metformin and check kidney function" from "continuar metformina"); "cada tercer día"
+     written both ways, as its warning asks, counts one reading's words. Any other content word
      is unchecked: what it means is the clinician's to compare.
 5. If any statement fails, the whole field is discarded, as an English value is.
 
@@ -600,15 +602,19 @@ def english_frequencies(text: str) -> set[str]:
 
 
 def english_frequency_items(text: str) -> list[tuple[int, frozenset[str]]]:
+    return [(span[0], read) for span, read in _english_frequency_spans(text)]
+
+
+def _english_frequency_spans(text: str) -> list[tuple[tuple[int, int], frozenset[str]]]:
     lowered = text.lower()
     taken: list[tuple[int, int]] = []
-    found: list[tuple[int, frozenset[str]]] = []
+    found: list[tuple[tuple[int, int], frozenset[str]]] = []
     for pattern, read in ENGLISH_FREQUENCIES:
         for match in pattern.finditer(lowered):
             if any(match.start() < end and start < match.end() for start, end in taken):
                 continue
             taken.append(match.span())
-            found.append((match.start(), frozenset(read(match))))
+            found.append((match.span(), frozenset(read(match))))
     return sorted(found, key=lambda item: item[0])
 
 
@@ -1902,7 +1908,13 @@ def _compare(result: _Statement, ctx: _Context) -> None:
     def values(kind: str, group: list[_Term]) -> set[str]:
         return {value for term in group if term.kind == kind for value in term.values}
 
-    english_nums = set(english_numbers(english))
+    # A number inside how often the Spanish says it ("three times a day" for "cada 8 horas") is that frequency's,
+    # which the frequency check compares: not a number of its own.
+    spoken_frequencies = spanish.frequencies(said_text)
+    frequency_spans = [span for span, read in _english_frequency_spans(english) if read <= spoken_frequencies]
+    english_nums = {value for value, start in english_number_items(english)
+                    if not any(a <= start < b for a, b in frequency_spans)} | (set(english_numbers(english)) - {
+                        value for value, _ in english_number_items(english)})
     # A fraction with no exact decimal ("un tercio", "a third") can't be compared: refused, for the clinician to write.
     if any(term.kind == "number" and not term.values for term in terms) or UNREADABLE in english_fractions(english):
         reasons.add("number_unreadable")
@@ -2007,10 +2019,16 @@ def _compare(result: _Statement, ctx: _Context) -> None:
     if _findings(english, said):
         reasons.add("finding_not_in_sources")
 
-    if english_content(english) > spanish_content(said) + EXTRA_WORDS:
+    # "Cada tercer día" written both ways, as the warning asks ("every other day or every third day"): one reading's
+    # words are counted.
+    counted = (BOTH_WAYS.sub("", english) if spanish.AMBIGUOUS_FREQUENCY.search(spanish.fold(said_text)) else english)
+    if english_content(counted) > spanish_content(said) + EXTRA_WORDS:
         reasons.add("translation_adds_words")
     if not reasons:
         result.warnings += _possible_corrections(english_nums, english_drugs, terms, ctx)
+
+
+BOTH_WAYS = re.compile(r"\s*(?:,\s*)?\bor\s+every\s+(?:other|third|3rd)\s+day\b", re.IGNORECASE)
 
 
 def _possible_corrections(english_nums: set[str], english_drugs: set[str], terms: list[_Term],
