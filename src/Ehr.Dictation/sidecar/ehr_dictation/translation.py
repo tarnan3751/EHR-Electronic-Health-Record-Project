@@ -113,7 +113,10 @@ statement:
      number measures what the Spanish says it measures, the vital sign, result (LABELS) or drug named before it in its
      clause (label_changed): "Glucosa de 140" is not "Blood pressure 140", nor "Reading of 140"; and a qualifier stays
      on the clause it qualifies in the Spanish, with the findings both languages spell alike ("neumonía" and
-     "pneumonia", _skeleton()) (order_changed): "Posible neumonía, asma conocida" is not "Pneumonia, possible asthma",
+     "pneumonia", _skeleton()) and those a small glossary of the commonest findings and habits spelled differently
+     names (GLOSSARY: "fiebre" and "fever", "fuma" and "smokes") (order_changed): "Niega fiebre, escalofríos o
+     sudoración nocturna" is not "Denies fever; reports chills and night sweats", nor "Fuma pero no bebe" "Drinks but
+     does not smoke"; "Posible neumonía, asma conocida" is not "Pneumonia, possible asthma",
      nor "Madre con diabetes y padre con hipertensión" "Mother with hypertension and father with diabetes". English
      that says the Spanish in another order is refused as well ("Amlodipino y losartán" as "Losartan and amlodipine"):
      the checks can't tell a reordering from a swap. A frequency read two ways may be written both ways in its place
@@ -130,8 +133,9 @@ statement:
 
 What these don't check: the meaning of every other word. "dolor abdominal leve" translated "mild chest pain" passes
 (the severity and the length agree), and so does a finding moved inside a statement, from one severity, side or
-qualifier to another, when the two languages spell it differently ("Dolor leve en la rodilla e intenso en la cadera"
-as "Mild hip pain and severe knee pain", "Posible gripe, tos conocida" as "Flu, possible cough"); nor a drug name no
+qualifier to another, when the two languages spell it differently and the glossary doesn't name it ("Dolor leve en la
+rodilla e intenso en la cadera" as "Mild hip pain and severe knee pain", "Posible gripe, catarro conocido" as "Flu,
+possible cold"): the glossary is a few dozen words, not a dictionary; nor a drug name no
 list knows,
 written with no dose just after it, for one no list knows either ("continuar plixor" written "continue vortanex"); nor
 a word left in the English that isn't English, if the transcript says it or it is written in English's letters: a
@@ -1391,6 +1395,50 @@ def _skeleton(word: str) -> str | None:
     return word[:5] if len(word) >= 5 and word.isalpha() else None
 
 
+# A glossary of the commonest findings and habits the two languages spell differently, so a qualifier moved between
+# them meets them as it meets "neumonía" and "pneumonia": "Niega fiebre, refiere tos" is not "Denies cough, reports
+# fever", nor "Fuma pero no bebe" "Drinks but does not smoke". Each row: its Spanish keys, then its English words. Only
+# these: a finding outside it, spelled differently, can still be moved unseen (the module's header). Every row is for a
+# Spanish-speaking clinician's reading, as every Spanish list here is.
+GLOSSARY = {
+    "fever": ("fiebre fiebres febril febriles calentura", "fever fevers febrile"),
+    "chills": ("escalofrio escalofrios", "chill chills"),
+    "sweats": ("sudoracion sudoraciones sudor sudores diaforesis", "sweat sweats sweating diaphoresis"),
+    "cough": ("tos", "cough coughs coughing"),
+    "dyspnea": ("disnea ahogo", "dyspnea dyspnoea breathlessness breath"),
+    "pain": ("dolor dolores", "pain pains ache aches sore"),
+    "chest": ("torax toracico toracica pecho", "chest thoracic"),
+    "headache": ("cefalea cefaleas", "headache headaches"),
+    "dizziness": ("mareo mareos vertigo", "dizziness dizzy lightheadedness vertigo"),
+    "bleeding": ("sangrado sangrados hemorragia hemorragias", "bleeding bleed hemorrhage"),
+    "weight": ("peso", "weight"),
+    "loss": ("perdida", "loss"),
+    "throat": ("garganta", "throat"),
+    "weakness": ("debilidad", "weakness weak"),
+    "fatigue": ("cansancio fatiga astenia", "fatigue tiredness tired asthenia"),
+    "swelling": ("hinchazon", "swelling swollen"),
+    "itching": ("picor prurito comezon", "itching itch itchy pruritus"),
+    "rash": ("erupcion exantema sarpullido", "rash eruption"),
+    "hives": ("habones urticaria", "hives urticaria"),
+    "wheezes": ("sibilancias", "wheezes wheezing wheeze"),
+    "crackles": ("crepitantes estertores", "crackles rales"),
+    "murmur": ("soplo soplos", "murmur murmurs"),
+    "stiffness": ("rigidez", "stiffness rigidity"),
+    "numbness": ("entumecimiento hormigueo parestesias", "numbness tingling paresthesia paresthesias"),
+    "sleep": ("sueno insomnio", "sleep insomnia"),
+    "smoking": ("fuma fumar fumo fumaba fumador fumadora tabaco tabaquismo cigarrillos", "smokes smoke smoking smoked "
+                "smoker tobacco cigarettes"),
+    "alcohol": ("bebe beber bebo bebia bebedor alcohol", "drinks drink drinking drank drinker alcohol"),
+}
+SPANISH_GLOSSARY = {key: f"={name}" for name, (keys, _) in GLOSSARY.items() for key in keys.split()}
+ENGLISH_GLOSSARY = {word: f"={name}" for name, (_, words) in GLOSSARY.items() for word in words.split()}
+
+
+def _finding(word: str, glossary: dict[str, str]) -> str | None:
+    """What a finding's word is, to be met in the other language: its glossary row, or else its skeleton."""
+    return glossary.get(word) or _skeleton(word)
+
+
 @dataclass(frozen=True)
 class _Part:
     """A clause of a statement: the kinds of qualifier said in it or reaching a finding of it, the relatives it names,
@@ -1402,7 +1450,8 @@ class _Part:
 
 
 def _parts(words: list[str], gaps: list[str], content: list[bool], flagged: dict[str, set[int]],
-           cues: dict[str, set[int]], relatives: list[frozenset[str]], joins: frozenset[str]) -> list[_Part]:
+           cues: dict[str, set[int]], relatives: list[frozenset[str]], joins: frozenset[str],
+           glossary: dict[str, str]) -> list[_Part]:
     """The statement's clauses, in order (see _Part). content: the words that are findings (not function words, nor a
     qualifier's cue); flagged and cues: for each kind, the words its cues reach and the cues' own words."""
     parts: list[list[int]] = [[]]
@@ -1419,7 +1468,7 @@ def _parts(words: list[str], gaps: list[str], content: list[bool], flagged: dict
         kinds = {kind for kind in KINDS
                  if any(i in flagged[kind] for i in findings) or any(i in cues[kind] for i in part)}
         found.append(_Part(frozenset(kinds), frozenset().union(*(relatives[i] for i in part)),
-                           frozenset(s for i in findings if (s := _skeleton(words[i])))))
+                           frozenset(s for i in findings if (s := _finding(words[i], glossary)))))
     return found
 
 
@@ -1652,7 +1701,7 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
                 for k, t in enumerate(said)]
     said_parts = _parts([t.key for t in said], gaps, findings,
                         said_flagged, {kind: {position[i] for i in said_cues[kind] if i in position} for kind in KINDS},
-                        [frozenset(spanish.RELATIVES.get(t.text, ())) for t in said], SPANISH_PARTS)
+                        [frozenset(spanish.RELATIVES.get(t.text, ())) for t in said], SPANISH_PARTS, SPANISH_GLOSSARY)
     english_gaps = [english[words[i - 1].end : words[i].start] if i else "" for i in range(len(words))]
     every_cue = set().union(*english_cues.values())
     english_parts = _parts(english_words, english_gaps,
@@ -1660,10 +1709,11 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
                             for i, w in enumerate(english_words)],
                            english_flagged, english_cues,
                            [frozenset({ENGLISH_RELATIVES[w]}) if w in ENGLISH_RELATIVES else frozenset()
-                            for w in english_words], ENGLISH_PARTS)
+                            for w in english_words], ENGLISH_PARTS, ENGLISH_GLOSSARY)
     # The Spanish's findings, not its cues: "palpan" in "no se palpan masas" is no finding for "palpable" to match.
-    skeletons = {s for k, t in enumerate(said) if findings[k] if (s := _skeleton(t.key))}
-    reached = {s for k, t in enumerate(said) if any(k in f for f in said_flagged.values()) if (s := _skeleton(t.key))}
+    skeletons = {s for k, t in enumerate(said) if findings[k] if (s := _finding(t.key, SPANISH_GLOSSARY))}
+    reached = {s for k, t in enumerate(said) if any(k in f for f in said_flagged.values())
+               if (s := _finding(t.key, SPANISH_GLOSSARY))}
 
     # An English clause sits in a run of Spanish ones ("No edema or cyanosis" in "Sin edema, cianosis") that each say
     # the same qualifiers, with the findings both name; or, saying none, in any, unless it names a finding a Spanish

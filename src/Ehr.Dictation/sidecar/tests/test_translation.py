@@ -801,6 +801,28 @@ def test_appears_after_what_appears_is_no_doubt():
     assert reasons(text, [text], "If fever appears, return.") == []
 
 
+# A negation moved between findings the two languages spell differently, which the glossary names, is refused; kept
+# on its findings, it passes.
+@pytest.mark.parametrize(("text", "moved", "kept"), [
+    ("Niega fiebre, escalofríos o sudoración nocturna.", "Denies fever; reports chills and night sweats.",
+     "Denies fever, chills or night sweats."),
+    ("Tiene tos pero no tiene fiebre.", "Has fever but no cough.", "Has a cough but no fever."),
+    ("Fuma pero no bebe.", "Drinks but does not smoke.", "Smokes but does not drink."),
+    ("Niega dolor torácico, refiere disnea.", "Denies dyspnea, reports chest pain.", "Denies chest pain, reports dyspnea."),
+    ("Niega tos, fiebre o dolor de garganta.", "Denies cough; reports fever and sore throat.",
+     "Denies cough, fever or sore throat."),
+])
+def test_a_negation_moved_between_findings_the_glossary_names_is_refused(text, moved, kept):
+    assert reasons(text, [text], moved) == ["order_changed"]
+    assert reasons(text, [text], kept) == []
+
+
+def test_the_glossary_names_each_word_once():
+    spanish_words = [w for keys, _ in translation.GLOSSARY.values() for w in keys.split()]
+    english_words = [w for _, words in translation.GLOSSARY.values() for w in words.split()]
+    assert len(spanish_words) == len(set(spanish_words)) and len(english_words) == len(set(english_words))
+
+
 # ---- A qualifier over a list, and a passage quoting its tail (sentences outside the test set) ------------------------
 
 LIST = "Niega fiebre, tos, disnea, dolor torácico y síncope."
