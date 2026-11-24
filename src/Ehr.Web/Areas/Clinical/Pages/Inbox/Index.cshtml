@@ -91,6 +91,11 @@ else
                                 @* Step 13d: where it gets answered, which is what marks it done. *@
                                 <a asp-page="/Patients/Refills/Review" asp-route-patientId="@item.PatientId" asp-route-requestId="@item.SourceId" data-inbox-source>Review the request</a>
                             }
+                            @if (User.IsInRole(StaffRoles.Admin) && item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses")
+                            {
+                                @* Step 18: where it gets reviewed, which is what marks it done, for every administrator. *@
+                                <a asp-page="/Admin/EmergencyAccess" asp-route-id="@item.SourceId" data-inbox-source>Review the access</a>
+                            }
                             @if (clinician && item.SourceTable == "message_threads" && item.PatientId is not null)
                             {
                                 @* Where it came from: the conversation, which is where it gets answered. *@
@@ -114,10 +119,11 @@ else
                         {
                             <td>
                                 @* An order's results are done by acknowledging them on their own page, which records who and
-                                   when, and a refill request by answering it (step 13d). Anything else, a result item with no
-                                   order behind it included, is marked done here. *@
+                                   when, a refill request by answering it (step 13d), and an emergency access by reviewing it (step
+                                   18). Anything else, a result item with no order behind it included, is marked done here. *@
                                 @if (OnPrem.IsReachable && !(item.Kind == InboxItemKind.Result && item.SourceTable == "orders")
-                                     && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests"))
+                                     && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests")
+                                     && !(item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses"))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
                                         <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary"

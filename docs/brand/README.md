@@ -176,7 +176,7 @@ When a clinician opens a patient who isn't on their panel, a page asks for the r
 
 ### Admin
 
-Admins see "Staff" and "Audit" in the navigation. Audit tables are dense: `mono-id` for times and row IDs, `body-sm` for names and actions, sticky `surface-subtle` headers, and the filters above with a "Show" button. Rows that need review (emergency access) are tinted `row-flagged` and carry a danger tag; the color is never the only signal.
+Admins see "Staff" and "Audit" in the navigation. Audit tables are dense: `mono-id` for times and row IDs, `body-sm` for names and actions, sticky `surface-subtle` headers, and the filters above with a "Show" button. Rows that need review (emergency access) are tinted `row-flagged` and carry a danger tag; the color is never the only signal. Once reviewed (the plan's step 18) a row loses the tint and carries a neutral "Reviewed" tag, with a danger "Not appropriate" beside it when the review found so, and every emergency access keeps its "Open the review" link. The review page lists the access's facts as a record (`dl.record`) and its events as an audit table, the patient by ID, and asks "Was it appropriate?" with two radio buttons and a note before "Mark reviewed".
 
 ### Email
 

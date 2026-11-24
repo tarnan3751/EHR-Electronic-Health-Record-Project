@@ -89,6 +89,7 @@ public static class AccountServiceCollectionExtensions
 
         services.AddScoped<AuditRecorder>();
         services.AddScoped<AuditLog>();
+        services.AddScoped<EmergencyAccessReviews>();
         services.AddScoped<PhiReader>();
         services.AddScoped<StaffSignIn>();
         services.AddScoped<StaffAccounts>();

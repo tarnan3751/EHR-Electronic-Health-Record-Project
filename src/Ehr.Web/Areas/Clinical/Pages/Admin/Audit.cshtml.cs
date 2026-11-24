@@ -8,9 +8,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Ehr.Web.Areas.Clinical.Pages.Admin;
 
-// The audit log, for admins (AuditLog): what to review, and the emergency accesses that need it most. Read-only, and
-// not PHI (patients appear by ID), so the cloud app serves it from the replica.
-public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
+// The audit log, for admins (AuditLog): what to review, and the emergency accesses that need it most, each with its
+// review's state and the way to its review page (step 18). Read-only, and not PHI (patients appear by ID), so the cloud
+// app serves it from the replica.
+public class AuditModel(AuditLog log, StaffAccounts accounts, EmergencyAccessReviews reviews) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public string? Action { get; set; }
@@ -34,6 +35,10 @@ public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
     [BindProperty(SupportsGet = true)]
     public bool Flagged { get; set; }
 
+    // Emergency accesses waiting for review, or reviewed as not appropriate (AuditReviewFilter), or any.
+    [BindProperty(SupportsGet = true)]
+    public string? Review { get; set; }
+
     // The older page starts before this moment.
     [BindProperty(SupportsGet = true)]
     public DateTimeOffset? Before { get; set; }
@@ -41,6 +46,9 @@ public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
     public AuditPage Log { get; private set; } = new([], new Dictionary<Guid, string>(), false);
 
     public IReadOnlyList<StaffUser> Staff { get; private set; } = [];
+
+    // The reviews of the emergency accesses on the page, by the access's ID.
+    public IReadOnlyDictionary<Guid, EmergencyAccessReview> Reviews { get; private set; } = new Dictionary<Guid, EmergencyAccessReview>();
 
     public async Task OnGetAsync()
     {
@@ -51,8 +59,11 @@ public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
             Patient,
             From is { } from ? new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
             Before ?? (To is { } to ? new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null),
-            Part);
+            Part,
+            Review is AuditReviewFilter.Waiting or AuditReviewFilter.NotAppropriate ? Review : null);
         Log = await log.ReadAsync(filter, HttpContext.RequestAborted);
+        Reviews = await reviews.ReviewsAsync(
+            [.. Log.Events.Where(e => e.Action == AuditActions.BreakGlass && e.RowId is not null).Select(e => e.RowId!.Value)], HttpContext.RequestAborted);
     }
 
     // The same filter, continued before the oldest event shown.
@@ -92,6 +103,11 @@ public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
         if (Flagged)
         {
             route["Flagged"] = "true";
+        }
+
+        if (Review is { Length: > 0 })
+        {
+            route["Review"] = Review;
         }
 
         route["Before"] = Log.Events[^1].OccurredAt.ToString("o", CultureInfo.InvariantCulture);
