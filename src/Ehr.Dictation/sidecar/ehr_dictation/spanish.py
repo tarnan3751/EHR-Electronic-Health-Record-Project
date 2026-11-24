@@ -599,7 +599,7 @@ def _phrases(text: str) -> list[tuple[str, ...]]:
 NEGATION_BEFORE = _phrases(
     """no; ni; niega; nego; niegan; negaba; sin; nunca; jamas; ningun; ninguno; ninguna; tampoco; negativo para;
     negativa para; negativos para; ausencia de; libre de; no presenta; no refiere; no hay; no se observa; no se observan;
-    no se palpa; no se palpan; se descarta; se descartan; descarta; dudo que; dudamos que; se descarto; se
+    no se palpa; no se palpan; nada de; se descarta; se descartan; descarta; dudo que; dudamos que; se descarto; se
     descartaron; descarto; descartaron; fue descartado; fue descartada; fueron descartados; fueron descartadas; ha sido
     descartado; ha sido descartada; se ha descartado; no se puede descartar; no se descarta; no se descartan; no estoy
     seguro; no estoy segura; no estamos seguros; no es seguro"""
@@ -620,9 +620,13 @@ CERTAINTY_BEFORE = _phrases(
     dudo que; dudamos que; me pregunto si; nos preguntamos si; preocupa; preocupado; preocupada; preocupados;
     preocupadas; posibilidad de; presuntamente; compatible con; compatibles con; sugestivo de; sugestiva de;
     sugestivos de; sugestivas de; sugerente de; sugerentes de; no estoy seguro; no estoy segura; no estamos seguros; no
-    es seguro"""
+    es seguro; parece; parece que; parecen; aparentemente; orientado como; orientada como; se plantea; se plantea
+    diagnostico de; diagnostico de presuncion; diagnostico presuntivo; pudiera tratarse de; pudiera ser; pudiera tener;
+    a valorar"""
 )
-CERTAINTY_AFTER = _phrases("probable; posible; a descartar; en estudio; dudoso; dudosa")
+CERTAINTY_AFTER = _phrases("probable; posible; a descartar; en estudio; dudoso; dudosa; a valorar")
+# A doubt given as a heading, before a colon: "Diagnóstico de presunción: neumonía" reaches past it.
+DOUBT_HEADING = re.compile(r"diagn[oó]stico\s+(?:de\s+presunci[oó]n|presuntivo)\s*:", re.IGNORECASE)
 # As validation.py reads English: "No creo que tenga neumonía" is a negation and a doubt, as "I don't think she has
 # pneumonia" is ("no" and "creo que" are each read), and "dudo que", "no estoy seguro", "no se puede descartar" and "no
 # se descarta", as "I doubt", "not sure", "cannot rule out" and "not ruled out", are both; "le preocupa", "me pregunto
@@ -913,6 +917,7 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
             last = next(k for k, t in enumerate(toks) if t.start >= relative.end())
         relatives.append((i, last))
     closing = {"certainty": _closing(text, toks, CERTAINTY_CLOSING)}
+    headed = DOUBT_HEADING.sub(lambda m: m.group()[:-1] + " ", text)  # the same length: toks' places hold
     relatives_after += _matches(keys, EXPERIENCER_AFTER)
     out: dict[str, set[int]] = {}
     cue_words: dict[str, set[int]] = {}
@@ -922,8 +927,8 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
         ("history", history, _matches(keys, HISTORY_AFTER), TERMINATORS),
         ("experiencer", sorted(_matches(keys, EXPERIENCER_BEFORE) + relatives), relatives_after, TERMINATORS | REPORTING),
     ):
-        reached, cues = _reach(text, toks, before, after, ends, closing.get(kind, []),
-                               past_the_subject=kind in ("negation", "certainty"))
+        reached, cues = _reach(headed if kind == "certainty" else text, toks, before, after, ends,
+                               closing.get(kind, []), past_the_subject=kind in ("negation", "certainty"))
         if kind == "certainty":
             reached |= _questions(text, toks) - cues
         reached = carry_over_list(text, toks, [t.key for t in toks], reached - cues,

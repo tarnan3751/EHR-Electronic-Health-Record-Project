@@ -98,7 +98,10 @@ statement:
      que tenga", "dudo que", "no estoy seguro", "no se puede descartar" and "no se descarta" are a negation and a
      doubt, as validation.py reads "I don't think she has", "I doubt", "not sure" and "cannot rule out"; "le preocupa",
      "me pregunto si", "posibilidad de", "presuntamente", "compatible con" and "sugestivo de" are doubt, as "worried",
-     "wonder", "a chance", "presumably", "consistent with" and "suggestive of" are; "se descartó" and "descartado" are
+     "wonder", "a chance", "presumably", "consistent with" and "suggestive of" are; "parece", "aparentemente",
+     "orientado como", "se plantea", "diagnóstico de presunción" (past its colon), "pudiera tratarse de" and "a
+     valorar" are doubt, as "seems", "appears to be", "apparently", "looks like", "working diagnosis", "presumptive",
+     "being considered" and "to be evaluated" are; "nada de" is a negation; "se descartó" and "descartado" are
      a negation, as "ruled out" is; "hace años", "el año pasado", "en el pasado", "previamente", "previo" and "antiguo"
      are the past, as "years ago", "last year", "in the past", "previously", "prior", "previous", "old" and "remote"
      are (MORE_ENGLISH, read as validation.py's own cues are); and "en la familia" is someone else, as "in the family"
@@ -1126,9 +1129,11 @@ MORE_ENGLISH = (
     validation.Qualifier(
         "certainty_dropped", re.compile(
             r"\b(?:doubtful|presumed|presumptive|consistent with|compatible with|suggestive of|suggesting|"
-            r"in keeping with)\b", re.I),
+            r"in keeping with|seems?(?: to(?: be| have)?)?|appears? to(?: be| have)?|apparently|looks? like|"
+            r"working diagnosis)\b", re.I),
         re.compile(r"\b(?:under (?:investigation|study)|cannot (?:be )?ruled? out|can't (?:be )?ruled? out|"
-                   r"not ruled out|doubtful|presumed)\b", re.I),
+                   r"not ruled out|doubtful|presumed|being considered|to be (?:evaluated|assessed|ruled out|excluded))\b",
+                   re.I),
         None, False, validation.TERMINATORS),
     validation.Qualifier("experiencer_dropped", _NEVER,
                          re.compile(r"\b(?:in (?:the|her|his|their) family|runs in the family)\b", re.I),
@@ -1138,8 +1143,13 @@ _NAMES = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", 
           "history_dropped": "history"}
 
 
+# A doubt given as a heading, before a colon: "Presumptive diagnosis: pneumonia" reaches past it, as the Spanish does.
+DOUBT_HEADING = re.compile(r"\b(?:presumptive|working) diagnosis\s*:", re.IGNORECASE)
+
+
 def _more_english(text: str) -> list[tuple[str, set[int], set[int]]]:
     """For each MORE_ENGLISH row, its kind, the content words its cues reach in the text, and the cues' words."""
+    text = DOUBT_HEADING.sub(lambda m: m.group()[:-1] + " ", text)  # the same length: the words' places hold
     words = tokens(text)
     found = []
     for qualifier in MORE_ENGLISH:
@@ -1639,9 +1649,9 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
     if not any(said_flagged.values()) and not any(english_flagged.values()) and not any(english_cues.values()):
         return found
     said_cues = ctx.qualifier_cues
-    said_parts = _parts([t.key for t in said], gaps,
-                        [spanish._is_content(t) and not any(said_index[k] in c for c in said_cues.values())
-                         for k, t in enumerate(said)],
+    findings = [spanish._is_content(t) and not any(said_index[k] in c for c in said_cues.values())
+                for k, t in enumerate(said)]
+    said_parts = _parts([t.key for t in said], gaps, findings,
                         said_flagged, {kind: {position[i] for i in said_cues[kind] if i in position} for kind in KINDS},
                         [frozenset(spanish.RELATIVES.get(t.text, ())) for t in said], SPANISH_PARTS)
     english_gaps = [english[words[i - 1].end : words[i].start] if i else "" for i in range(len(words))]
@@ -1652,7 +1662,8 @@ def _in_order(english: str, said_index: list[int], terms: list[_Term], ctx: _Con
                            english_flagged, english_cues,
                            [frozenset({ENGLISH_RELATIVES[w]}) if w in ENGLISH_RELATIVES else frozenset()
                             for w in english_words], ENGLISH_PARTS)
-    skeletons = {s for t in said if (s := _skeleton(t.key))}
+    # The Spanish's findings, not its cues: "palpan" in "no se palpan masas" is no finding for "palpable" to match.
+    skeletons = {s for k, t in enumerate(said) if findings[k] if (s := _skeleton(t.key))}
     reached = {s for k, t in enumerate(said) if any(k in f for f in said_flagged.values()) if (s := _skeleton(t.key))}
 
     # An English clause sits in a run of Spanish ones ("No edema or cyanosis" in "Sin edema, cianosis") that each say

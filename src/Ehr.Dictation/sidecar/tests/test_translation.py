@@ -777,6 +777,30 @@ def test_a_degree_of_severity_the_spanish_doesnt_say_is_refused(text, changed, k
     assert reasons(text, [text], kept) == []
 
 
+# More ways Spanish says a doubt or a negation; each dropped is refused, and kept in English's own words passes.
+@pytest.mark.parametrize(("text", "dropped", "kept", "reason"), [
+    ("Parece una celulitis.", "Cellulitis.", "Appears to be cellulitis.", "certainty_dropped"),
+    ("Aparentemente una gastroenteritis.", "Gastroenteritis.", "Apparently gastroenteritis.", "certainty_dropped"),
+    ("Orientado como crisis de ansiedad.", "Anxiety attack.", "Likely anxiety attack.", "certainty_dropped"),
+    ("Se plantea diagnóstico de apendicitis.", "Appendicitis.", "Appendicitis is being considered.",
+     "certainty_dropped"),
+    ("Diagnóstico de presunción: neumonía.", "Diagnosis: pneumonia.", "Presumptive diagnosis: pneumonia.",
+     "certainty_dropped"),
+    ("Pudiera tratarse de una hernia.", "Hernia.", "Possibly a hernia.", "certainty_dropped"),
+    ("A valorar colecistitis.", "Cholecystitis.", "Cholecystitis to be evaluated.", "certainty_dropped"),
+    ("Nada de fiebre.", "Fever.", "No fever.", "negation_dropped"),
+    ("No se palpan masas.", "Palpable masses.", "No palpable masses.", "negation_dropped"),
+])
+def test_more_doubts_and_negations_said_in_spanish_are_kept(text, dropped, kept, reason):
+    assert reasons(text, [text], dropped) == [reason]
+    assert reasons(text, [text], kept) == []
+
+
+def test_appears_after_what_appears_is_no_doubt():
+    text = "Si aparece fiebre, que vuelva."
+    assert reasons(text, [text], "If fever appears, return.") == []
+
+
 # ---- A qualifier over a list, and a passage quoting its tail (sentences outside the test set) ------------------------
 
 LIST = "Niega fiebre, tos, disnea, dolor torácico y síncope."
