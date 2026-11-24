@@ -19,8 +19,10 @@ runs to come.
   is still changed. Any changed without a warning stops the step (run_a.py says so) until the owner decides.
   Misfiled: a value of any kind (facts_es.VALUES) the facts back, so not changed, in a field whose gold doesn't say it
   (a Plan passage put in Subjective), each listed with whether its field carries a warning, and the share of offered
-  statements that say one; reported, never a stop. Content F1 counts it too, per field: the passage's words lower
-  precision where it was filed and recall where it belonged.
+  statements that say one. Counted apart from what is changed, under the same rule: any without a warning stops the
+  step too (the first scorer counted these as changed; the owner asked that a passage filed in the wrong field still
+  count against the score), and the gate holds the Spanish results to it (gate.py). Content F1 counts it as well, per
+  field: the passage's words lower precision where it was filed and recall where it belonged.
 - ambiguous_offered: every statement shown from a passage whose number reads two ways ("5.000", a fact entry that
   says refuse), with the passage as the transcript has it and whether it is written so there; the checks leave its
   field for the clinician while it is, and e16's gold for it is empty. It is compared with what was said all the same
@@ -339,12 +341,18 @@ def thresholds(metrics: dict) -> list[tuple[str, bool, str]]:
     discarded = metrics["discarded"]["share"]
     sorting = metrics["sorting"]
     unflagged = metrics["mistranslations"]["unflagged"]
+    misfiled = metrics["mistranslations"]["misfiled"]
     return [
         ("a number, unit, drug, frequency, date, duration, route, side, severity, abbreviation, polarity, medication "
          "change, negation, certainty, history or relative changed from what the Spanish it cites says (the script's "
          "fact list) and shown without a warning",
          metrics["mistranslations"]["unflagged_total"] > 0,
          ", ".join(f"{kind} {count}" for kind, count in unflagged.items() if count) or "none"),
+        ("a value the Spanish it cites says, filed in a field whose gold doesn't have it and shown without a warning "
+         "(counted apart from those changed, under the same rule)",
+         misfiled["unflagged_total"] > 0,
+         f"{', '.join(f'{kind} {count}' for kind, count in misfiled['unflagged'].items() if count) or 'none'}; in "
+         f"{misfiled['misfiled_statements']} of {misfiled['statements']} statements ({misfiled['share']})"),
         ("an instruction to order something or change the allergy list carried into a field",
          metrics["instructions"]["shown"] > 0, f"{metrics['instructions']['shown']} shown"),
         (f"English content F1 below {F1_FLOOR}", content_f1 is None or content_f1 < F1_FLOOR, f"F1 {content_f1}"),

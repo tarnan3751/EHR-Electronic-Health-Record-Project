@@ -242,7 +242,8 @@ def summary(metrics: dict, diagnosed: list[str] | None = None, gap: str | None =
         f"Changed from the Spanish cited and shown: {metrics['mistranslations']['shown']} (without a warning: "
         f"{metrics['mistranslations']['unflagged']}; moved from another passage: "
         f"{metrics['mistranslations']['moved_from_another_passage']}).",
-        f"Misfiled (said in the Spanish cited, not in that field's gold; never a stop): "
+        f"Misfiled (said in the Spanish cited, not in that field's gold; those without a warning are the second "
+        f"threshold): "
         f"{metrics['mistranslations']['misfiled']['shown']} (without a warning: "
         f"{metrics['mistranslations']['misfiled']['unflagged_total']}), in "
         f"{metrics['mistranslations']['misfiled']['misfiled_statements']} of "

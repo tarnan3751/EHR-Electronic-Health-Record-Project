@@ -289,6 +289,41 @@ def test_a_mistranslation_shown_without_a_warning_fails_unless_the_owner_accepte
     assert len(stale) == 2 and all("no longer show" in p for p in stale)
 
 
+def test_a_value_filed_in_the_wrong_field_without_a_warning_fails_unless_the_owner_accepted_it(spanish_dir):
+    # e14's text answered with its gold, but its weight and height, Objective's first statement, filed in Subjective:
+    # what the Spanish it cites says, in a field whose gold doesn't have it. Counted apart from a mistranslation, under
+    # the same rule.
+    script = {s.id: s for s in load_scripts(spanish_dir / "scripts-es")}["e14-nino-sano"]
+    answer = gold(script)
+    weight, *rest = answer["objective"]
+    answer |= {"subjective": [*answer["subjective"], weight], "objective": rest}
+
+    def refiled(item: scoring_es.SpanishItem) -> scoring_es.SpanishItem:
+        if item.variant != "e14-nino-sano--text":
+            return item
+        transcript, _ = text_transcript(script)
+        item = dataclasses.replace(item, fields={}, unknown=[])
+        check(item, answer, [], transcript)
+        return item
+
+    save(spanish_dir, "latest-es.json", results(spanish_dir, change=refiled))
+    found = problems(spanish_dir)
+    assert [p.split(", a number ")[0] for p in found] == [
+        "e14-nino-sano--text shows '11 kg' in subjective", "e14-nino-sano--text shows '81 cm' in subjective"]
+    assert all("filed in the wrong field" in p and "[[accepted_misfiling]]" in p for p in found)
+
+    accepting = "".join(
+        f'[[accepted_misfiling]]\nvariant = "e14-nino-sano--text"\nfield = "subjective"\nkind = "number"\n'
+        f'shown = "{shown}"\nwhy = "synthetic"\n' for shown in ("11 kg", "81 cm"))
+    (spanish_dir / "known-limitations.toml").write_text(accepting, encoding="utf-8")
+    save(spanish_dir, "latest-es.json", results(spanish_dir, change=refiled))
+    assert problems(spanish_dir) == []
+
+    save(spanish_dir, "latest-es.json", results(spanish_dir))
+    stale = problems(spanish_dir)
+    assert len(stale) == 2 and all("no longer show" in p for p in stale)
+
+
 @pytest.mark.parametrize(("label", "worse", "says"), [
     ("the server", True, "Spanish word error rate is 0.0, worse"),
     ("a laptop", False, "recorded on 'the server'"),

@@ -99,7 +99,7 @@ def test_a_script_that_timed_out_is_a_failure_in_every_english_measure():
     assert metrics["discarded"]["discarded"] == metrics["discarded"]["fields_with_gold"] == with_gold
     assert metrics["fields"]["content"]["f1"] == 0.0
     crossed = [crossed for _, crossed, _ in run_a_en.thresholds(metrics)]
-    assert crossed == [None, False, True, True, True]
+    assert crossed == [None, False, False, True, True, True]
 
 
 def test_the_two_sets_are_set_side_by_side_line_by_line(tmp_path, capsys):
@@ -115,10 +115,10 @@ def test_the_two_sets_are_set_side_by_side_line_by_line(tmp_path, capsys):
 
     assert run_a_en.main(["--compare", str(tmp_path / "en.json"), str(tmp_path / "es.json")]) == 0
     table = capsys.readouterr().out
-    first, *_, sorting, misfiled = table.split("\n\n")[1:]
+    first, misfiled, *_, sorting = table.split("\n\n")[1:]
     assert "English: n/a: not applicable" in first and "Spanish: ok: none" in first
+    assert "English: ok: 0 value(s)" in misfiled and "Spanish: ok: none; in 0 of 0 statements" in misfiled
     assert "English: ok: unavailable none" in sorting and "Spanish: CROSSED: unavailable {'model_timeout': 1}" in sorting
-    assert misfiled.startswith("reported, never a stop: misfiled")
 
 
 def test_measures_from_before_this_scorer_are_refused_for_the_table(tmp_path, capsys):

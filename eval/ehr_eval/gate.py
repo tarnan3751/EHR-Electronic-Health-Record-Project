@@ -44,7 +44,9 @@ included (FR-14); every mistranslation shown without a warning (a number, unit, 
 side, severity, abbreviation, polarity, medication change, negation, certainty, history or relative that differs from
 what the Spanish it cites says, by the script's fact list: scoring_es.py) accepted by the owner in
 known-limitations.toml ([[accepted_mistranslation]]: variant, field, kind and what was shown, as the results list it),
-and each accepted one still shown; and, once the owner has recorded eval/results/baseline-es.json on the server
+and each accepted one still shown; the same, apart, for every value the Spanish a statement cites says but filed in a
+field whose gold doesn't have it and shown without a warning ([[accepted_misfiling]], with the same keys); and, once
+the owner has recorded eval/results/baseline-es.json on the server
 machine, from that machine and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and
 date accuracy. The English checks above are unchanged.
 
@@ -363,6 +365,11 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
     problems += _unaccepted_mistranslations(
         [e for e in metrics["mistranslations"]["listed"] + metrics["text"]["mistranslations"]["listed"]
          if not e["flagged"]], eval_dir / KNOWN_LIMITATIONS)
+    problems += _unaccepted_mistranslations(
+        [e for e in metrics["mistranslations"]["misfiled"]["listed"]
+         + metrics["text"]["mistranslations"]["misfiled"]["listed"] if not e["flagged"]],
+        eval_dir / KNOWN_LIMITATIONS, "accepted_misfiling",
+        "that the Spanish it cites says but that field's gold doesn't have (filed in the wrong field)")
 
     baseline_path = results_dir / "baseline-es.json"
     if baseline_path.is_file():
@@ -404,16 +411,17 @@ def _get_any(metrics: dict, path: tuple[str, ...]) -> object:
     return value
 
 
-def _unaccepted_mistranslations(unflagged: list[dict], known: Path) -> list[str]:
-    """Each mistranslation shown without a warning that known-limitations.toml doesn't accept, and each accepted there
-    that the results no longer show."""
-    accepted = tomllib.loads(known.read_text(encoding="utf-8")).get("accepted_mistranslation", []) if known.is_file() else []
+def _unaccepted_mistranslations(unflagged: list[dict], known: Path, table: str = "accepted_mistranslation",
+                                what: str = "that differs from the Spanish it cites") -> list[str]:
+    """Each mistranslation (or, with table accepted_misfiling, each value filed in the wrong field) shown without a
+    warning that known-limitations.toml doesn't accept, and each accepted there that the results no longer show."""
+    accepted = tomllib.loads(known.read_text(encoding="utf-8")).get(table, []) if known.is_file() else []
     key = lambda entry: (entry["variant"], entry["field"], entry["kind"], entry["shown"])  # noqa: E731
     found, listed = {key(entry) for entry in unflagged}, {key(entry) for entry in accepted}
     problems = [
-        f"{variant} shows {shown!r} in {field}, a {kind} that differs from the Spanish it cites, without a warning; "
-        "there must be none that the owner hasn't accepted in eval/known-limitations.toml ([[accepted_mistranslation]]). "
-        f"Tighten the Spanish prompt or the checks (translation.py), then: {RUN_IT_ES}"
+        f"{variant} shows {shown!r} in {field}, a {kind} {what}, without a warning; there must be none that the owner "
+        f"hasn't accepted in eval/known-limitations.toml ([[{table}]]). Tighten the Spanish prompt or the checks "
+        f"(translation.py), then: {RUN_IT_ES}"
         for variant, field, kind, shown in sorted(found - listed)
     ]
     problems += [
@@ -452,7 +460,7 @@ def main() -> int:
         f"Spanish eval results match this commit {baseline}: WER {metrics['wer']['overall']} "
         f"({metrics['wer']['no_accents']} without accents), English field F1 {metrics['fields']['content']['f1']} "
         f"({metrics['text']['fields']['content']['f1']} from the text alone), every recording and text sorted, no "
-        f"instruction shown, every mistranslation without a warning accepted. "
+        f"instruction shown, every mistranslation and misfiled value without a warning accepted. "
         f"Run on {spanish['run']['machine']['label']}."
     )
     return 0

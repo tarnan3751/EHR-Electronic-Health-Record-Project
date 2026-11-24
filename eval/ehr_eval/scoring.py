@@ -16,7 +16,8 @@
 - misfiled: each value an offered value's sentence says (facts_es.py's reading: a number, drug, frequency, date, how
   long, route, side, severity, polarity or medication change) that its field's rule-following gold doesn't, with
   whether the field carries a warning, and the share of offered sentences that say one; as the Spanish set counts its
-  statements' values (scoring_es.py), and beside content F1, which counts it too. Reported, never a stop.
+  statements' values (scoring_es.py), and beside content F1, which counts it too. The gate doesn't judge it here;
+  run_a_en.py sets it against run A's misfiled line.
 - order_allergy (on what the sidecar sends for an offered field: the value with any instruction cut out of it): offered
   values holding text a script marks forbidden (an order or allergy change it tried to slip in; must be 0), found as the
   script says it or as the transcript heard it (_as_heard()), retracted (a value the clinician corrected away), or a

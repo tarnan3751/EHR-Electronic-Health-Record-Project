@@ -124,9 +124,10 @@ def test_every_scripts_gold_answer_changes_nothing_and_misfiles_nothing():
     assert mistranslations["listed"] == [] and mistranslations["misfiled"]["listed"] == []
 
 
-def test_a_passage_filed_in_another_field_is_misfiled_not_changed():
+def test_a_passage_filed_in_another_field_is_misfiled_not_changed_and_stops_the_step_apart():
     # The Plan said again as Subjective, its own field left out: every number and change in it is what the clinician
-    # said, so the first threshold isn't crossed; Subjective's gold doesn't have them, which is reported apart.
+    # said, so the first threshold isn't crossed; Subjective's gold doesn't have them, which is counted apart, and
+    # crosses the second, as the first scorer counted it as changed.
     plan = SCRIPTS["e09-depresion"].statements["plan"]
     moved = [{"spanish": list(plan[0].spanish), "english": plan[0].english}]
     item = run("e09-depresion", gold_answer("e09-depresion", subjective=moved, plan=[]))
@@ -136,7 +137,9 @@ def test_a_passage_filed_in_another_field_is_misfiled_not_changed():
     assert metrics["mistranslations"]["unflagged_total"] == 0
     assert {(e["kind"], e["shown"]) for e in metrics["mistranslations"]["misfiled"]["listed"]} == {
         ("number", "100 mg"), ("action", "increase")}
-    assert not scoring_es.thresholds(metrics)[0][1]
+    changed, misfiled, *_ = scoring_es.thresholds(metrics)
+    assert not changed[1] and misfiled[1] and misfiled[0].startswith("a value the Spanish it cites says, filed in")
+    assert "STOP" in run_a.summary(metrics)
 
 
 def test_a_passage_filed_in_the_wrong_field_counts_against_content_f1_and_apart():
@@ -160,6 +163,8 @@ def test_a_passage_filed_in_the_wrong_field_counts_against_content_f1_and_apart(
         ("number", "11 kg", False), ("number", "81 cm", False)}
     assert misfiled["unflagged_total"] == misfiled["unflagged"]["number"] == 2
     assert wrong["mistranslations"]["unflagged_total"] == 0
+    assert [crossed for _, crossed, _ in scoring_es.thresholds(wrong)][:2] == [False, True]
+    assert not any(crossed for _, crossed, _ in scoring_es.thresholds(right))
 
 
 def test_a_drug_named_as_said_is_neither_changed_nor_misfiled_when_the_gold_names_it_otherwise():
@@ -342,7 +347,7 @@ def test_a_fault_in_the_scoring_leaves_every_answer_for_rescore_to_finish(tmp_pa
     (tmp_path / "stopped.json").write_text(json.dumps(stored), encoding="utf-8")
     assert run_a.main(["--rescore", str(tmp_path / "stopped.json"), "--out", str(tmp_path / "finished.json")]) == 0
     finished = json.loads((tmp_path / "finished.json").read_text(encoding="utf-8"))
-    assert finished["metrics"]["fields"]["content"]["f1"] is not None and len(finished["thresholds"]) == 5
+    assert finished["metrics"]["fields"]["content"]["f1"] is not None and len(finished["thresholds"]) == 6
     assert "discarded before: not scored" in capsys.readouterr().out
 
 
