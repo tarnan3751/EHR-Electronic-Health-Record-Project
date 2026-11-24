@@ -1,0 +1,108 @@
+id = "h08-codeswitch-gota"
+language = "es"
+voice = "em_alex"
+tags = ["numbers", "vitals", "dates", "decimal-comma", "units", "frequency", "sides", "severity", "negation", "certainty", "history", "experiencer", "actions", "code-switching"]
+dates = []
+drugs = ["hidroclorotiazida", "colchicina", "amlodipino", "alopurinol"]
+drugs_en = ["hydrochlorothiazide", "colchicine", "amlodipine", "allopurinol"]
+negated = ["fever", "trauma"]
+affirmed = ["swollen"]
+family = [["gout", "father"]]
+text = """
+Hombre de [[58|cincuenta y ocho]] años que viene por dolor en el dedo gordo del pie derecho desde hace [[2|dos]] días.
+Dice que el dolor es intenso, de [[9|nueve]] sobre [[10|diez]], y que no aguanta ni el roce de la sábana. El weekend
+comió mariscos y tomó cerveza. Niega fiebre y niega golpes en el pie. Es el primer episodio. Antecedente de cálculos
+renales en [[2021|dos mil veintiuno]]. Su padre tenía gota. Para la presión toma hidroclorotiazida [[25
+mg|veinticinco miligramos]] en la mañana. En la exploración, temperatura [[36,9|treinta y seis coma nueve]] grados,
+presión arterial [[138/84|ciento treinta y ocho sobre ochenta y cuatro]]. Primer dedo del pie derecho rojo, caliente
+e hinchado, muy doloroso al tacto. Pie izquierdo normal. El ácido úrico del lab de hoy es de [[8,7 mg/dl|ocho coma
+siete miligramos por decilitro]]. Impresión: probable flare de gota en el pie derecho. Artritis séptica poco probable.
+La hidroclorotiazida puede estar subiendo el ácido úrico. Plan: colchicina [[1 mg|un miligramo]] ahora y [[0,5
+mg|cero coma cinco miligramos]] dentro de una hora. Retirar la hidroclorotiazida y empezar amlodipino [[5 mg|cinco
+miligramos]] al día. No empezar alopurinol por ahora. Hielo local y reposo del pie. Evitar el alcohol y los mariscos.
+Follow-up en [[2|dos]] semanas.
+"""
+
+[[gold.subjective]]
+spanish = ["Hombre de 58 años que viene por dolor en el dedo gordo del pie derecho desde hace 2 días."]
+english = "58-year-old man coming with pain in the right big toe for 2 days."
+
+[[gold.subjective]]
+spanish = ["Dice que el dolor es intenso, de 9 sobre 10, y que no aguanta ni el roce de la sábana."]
+english = "Says the pain is severe, 9 out of 10, and that he cannot bear even the touch of the bedsheet."
+
+[[gold.subjective]]
+spanish = ["El weekend comió mariscos y tomó cerveza."]
+english = "Over the weekend he ate shellfish and drank beer."
+
+[[gold.subjective]]
+spanish = ["Niega fiebre y niega golpes en el pie."]
+english = "Denies fever and denies trauma to the foot."
+
+[[gold.subjective]]
+spanish = ["Es el primer episodio."]
+english = "It is the first episode."
+
+[[gold.subjective]]
+spanish = ["Antecedente de cálculos renales en 2021."]
+english = "History of kidney stones in 2021."
+
+[[gold.subjective]]
+spanish = ["Su padre tenía gota."]
+english = "His father had gout."
+
+[[gold.subjective]]
+spanish = ["Para la presión toma hidroclorotiazida 25 mg en la mañana."]
+english = "For blood pressure takes hydrochlorothiazide 25 mg in the morning."
+
+[[gold.objective]]
+spanish = ["temperatura 36,9 grados, presión arterial 138/84."]
+english = "Temperature 36.9 degrees, blood pressure 138/84."
+
+[[gold.objective]]
+spanish = ["Primer dedo del pie derecho rojo, caliente e hinchado, muy doloroso al tacto."]
+english = "Right first toe red, hot and swollen, very tender to touch."
+
+[[gold.objective]]
+spanish = ["Pie izquierdo normal."]
+english = "Left foot normal."
+
+[[gold.objective]]
+spanish = ["El ácido úrico del lab de hoy es de 8,7 mg/dl."]
+english = "Uric acid on today's lab is 8.7 mg/dL."
+
+[[gold.assessment]]
+spanish = ["probable flare de gota en el pie derecho."]
+english = "Probable gout flare in the right foot."
+
+[[gold.assessment]]
+spanish = ["Artritis séptica poco probable."]
+english = "Septic arthritis unlikely."
+
+[[gold.assessment]]
+spanish = ["La hidroclorotiazida puede estar subiendo el ácido úrico."]
+english = "Hydrochlorothiazide may be raising the uric acid."
+
+[[gold.plan]]
+spanish = ["colchicina 1 mg ahora y 0,5 mg dentro de una hora."]
+english = "Colchicine 1 mg now and 0.5 mg in one hour."
+
+[[gold.plan]]
+spanish = ["Retirar la hidroclorotiazida y empezar amlodipino 5 mg al día."]
+english = "Stop hydrochlorothiazide and start amlodipine 5 mg daily."
+
+[[gold.plan]]
+spanish = ["No empezar alopurinol por ahora."]
+english = "Do not start allopurinol for now."
+
+[[gold.plan]]
+spanish = ["Hielo local y reposo del pie."]
+english = "Local ice and rest for the foot."
+
+[[gold.plan]]
+spanish = ["Evitar el alcohol y los mariscos."]
+english = "Avoid alcohol and shellfish."
+
+[[gold.plan]]
+spanish = ["Follow-up en 2 semanas."]
+english = "Follow-up in 2 weeks."

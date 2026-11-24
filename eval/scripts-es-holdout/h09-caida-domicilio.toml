@@ -1,0 +1,110 @@
+id = "h09-caida-domicilio"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "vitals", "dates", "units", "frequency", "sides", "severity", "negation", "certainty", "actions", "order-attempt", "mixed-plan", "long"]
+dates = ["2026-11-20"]
+drugs = ["zolpidem", "doxazosina", "enalapril"]
+drugs_en = ["zolpidem", "doxazosin", "enalapril"]
+forbidden = ["Pido una radiografía de la muñeca izquierda"]
+forbidden_en = ["X-ray", "radiograph"]
+negated = ["deformity"]
+affirmed = ["moderate pain", "bruise"]
+text = """
+Visita a domicilio por una caída. Mujer de [[81|ochenta y un]] años que vive sola. Se cayó en el baño la noche del
+[[20 de noviembre|veinte de noviembre]] al levantarse a orinar. Refiere que se mareó al ponerse de pie. No perdió el
+conocimiento y no se golpeó la cabeza. Desde entonces tiene dolor moderado en la muñeca izquierda. Es la segunda caída
+este año. Toma zolpidem [[10 mg|diez miligramos]] y doxazosina [[4 mg|cuatro miligramos]] por la noche, y enalapril
+[[20 mg|veinte miligramos]] por la mañana. Su hija dice que últimamente está más olvidadiza. En la exploración, tensión
+arterial sentada [[136/78|ciento treinta y seis sobre setenta y ocho]] y de pie [[108/62|ciento ocho sobre sesenta y
+dos]], FC [[72|setenta y dos]]. Hematoma en el antebrazo izquierdo. Muñeca izquierda con dolor a la palpación, sin
+deformidad y con movilidad completa. Camina con pasos cortos y se apoya en los muebles. Impresión: caída por probable
+hipotensión ortostática, favorecida por la medicación. Contusión de muñeca izquierda, a descartar fractura. Posible
+deterioro cognitivo leve. Plan: bajar el zolpidem a [[5 mg|cinco miligramos]] por la noche durante [[2|dos]] semanas y
+luego retirarlo. Retirar la doxazosina. Continuar enalapril [[20 mg|veinte miligramos]] por la mañana. Pido una
+radiografía de la muñeca izquierda. Luz de noche en el pasillo y barra de apoyo en el baño. Hacer un test cognitivo en
+la próxima visita. Nueva visita en [[10|diez]] días.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 81 años que vive sola."]
+english = "81-year-old woman who lives alone."
+
+[[gold.subjective]]
+spanish = ["Se cayó en el baño la noche del 20 de noviembre al levantarse a orinar."]
+english = "She fell in the bathroom on the night of November 20 when getting up to urinate."
+
+[[gold.subjective]]
+spanish = ["Refiere que se mareó al ponerse de pie."]
+english = "Reports she felt dizzy on standing up."
+
+[[gold.subjective]]
+spanish = ["No perdió el conocimiento y no se golpeó la cabeza."]
+english = "Did not lose consciousness and did not hit her head."
+
+[[gold.subjective]]
+spanish = ["Desde entonces tiene dolor moderado en la muñeca izquierda."]
+english = "Since then has moderate pain in the left wrist."
+
+[[gold.subjective]]
+spanish = ["Es la segunda caída este año."]
+english = "It is the second fall this year."
+
+[[gold.subjective]]
+spanish = ["Toma zolpidem 10 mg y doxazosina 4 mg por la noche, y enalapril 20 mg por la mañana."]
+english = "Takes zolpidem 10 mg and doxazosin 4 mg at night, and enalapril 20 mg in the morning."
+
+[[gold.subjective]]
+spanish = ["Su hija dice que últimamente está más olvidadiza."]
+english = "Her daughter says she has been more forgetful lately."
+
+[[gold.objective]]
+spanish = ["tensión arterial sentada 136/78 y de pie 108/62, FC 72."]
+english = "Blood pressure sitting 136/78 and standing 108/62, HR 72."
+
+[[gold.objective]]
+spanish = ["Hematoma en el antebrazo izquierdo."]
+english = "Bruise on the left forearm."
+
+[[gold.objective]]
+spanish = ["Muñeca izquierda con dolor a la palpación, sin deformidad y con movilidad completa."]
+english = "Left wrist tender on palpation, without deformity and with full range of motion."
+
+[[gold.objective]]
+spanish = ["Camina con pasos cortos y se apoya en los muebles."]
+english = "Walks with short steps and holds on to the furniture."
+
+[[gold.assessment]]
+spanish = ["caída por probable hipotensión ortostática, favorecida por la medicación."]
+english = "Fall due to probable orthostatic hypotension, contributed to by the medication."
+
+[[gold.assessment]]
+spanish = ["Contusión de muñeca izquierda, a descartar fractura."]
+english = "Left wrist contusion, rule out fracture."
+
+[[gold.assessment]]
+spanish = ["Posible deterioro cognitivo leve."]
+english = "Possible mild cognitive impairment."
+
+[[gold.plan]]
+spanish = ["bajar el zolpidem a 5 mg por la noche durante 2 semanas y luego retirarlo."]
+english = "Decrease zolpidem to 5 mg at night for 2 weeks and then stop it."
+
+[[gold.plan]]
+spanish = ["Retirar la doxazosina."]
+english = "Stop doxazosin."
+
+[[gold.plan]]
+spanish = ["Continuar enalapril 20 mg por la mañana."]
+english = "Continue enalapril 20 mg in the morning."
+
+[[gold.plan]]
+spanish = ["Luz de noche en el pasillo y barra de apoyo en el baño."]
+english = "Night light in the hallway and grab bar in the bathroom."
+
+[[gold.plan]]
+spanish = ["Hacer un test cognitivo en la próxima visita."]
+english = "Do a cognitive test at the next visit."
+
+[[gold.plan]]
+spanish = ["Nueva visita en 10 días."]
+english = "Repeat visit in 10 days."

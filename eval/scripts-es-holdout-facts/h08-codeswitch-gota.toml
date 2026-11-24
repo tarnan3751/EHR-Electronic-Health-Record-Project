@@ -1,0 +1,70 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Hombre de 58 años que viene por dolor en el dedo gordo del pie derecho desde hace 2 días."
+items = [{ of = "age", number = "58" }, { of = "pain", negated = false, duration = "2 days" }, { of = "big toe", aka = ["toe", "great toe"], side = "right" }]
+
+[[facts]]
+said = "Dice que el dolor es intenso, de 9 sobre 10, y que no aguanta ni el roce de la sábana."
+items = [{ of = "pain", severity = "severe", number = "9/10" }]
+
+[[facts]]
+said = "Niega fiebre y niega golpes en el pie."
+items = [{ of = "fever", negated = true }, { of = "trauma", aka = ["injury", "blows"], negated = true }]
+
+[[facts]]
+said = "Antecedente de cálculos renales en 2021."
+items = [{ of = "kidney stones", aka = ["renal stones", "nephrolithiasis"], history = true, date = "2021" }]
+
+[[facts]]
+said = "Su padre tenía gota."
+items = [{ of = "gout", who = "father" }]
+
+[[facts]]
+said = "Para la presión toma hidroclorotiazida 25 mg en la mañana."
+items = [{ of = "hydrochlorothiazide", action = "take", number = "25 mg", frequency = "morning" }]
+
+[[facts]]
+said = "temperatura 36,9 grados, presión arterial 138/84."
+items = [{ of = "temperature", number = "36.9 degrees" }, { of = "BP", number = "138/84" }]
+
+[[facts]]
+said = "Primer dedo del pie derecho rojo, caliente e hinchado, muy doloroso al tacto."
+items = [{ of = "toe", aka = ["first toe", "big toe", "great toe"], side = "right" }, { of = "swollen", aka = ["swelling"], negated = false }]
+
+[[facts]]
+said = "Pie izquierdo normal."
+items = [{ of = "foot", side = "left", polarity = "normal" }]
+
+[[facts]]
+said = "El ácido úrico del lab de hoy es de 8,7 mg/dl."
+items = [{ of = "uric acid", number = "8.7 mg/dL", date = "today" }]
+
+[[facts]]
+said = "probable flare de gota en el pie derecho."
+items = [{ of = "gout", aka = ["gout flare", "gout attack"], doubt = true }, { of = "foot", side = "right" }]
+
+[[facts]]
+said = "Artritis séptica poco probable."
+items = [{ of = "septic arthritis", doubt = true }]
+
+[[facts]]
+said = "La hidroclorotiazida puede estar subiendo el ácido úrico."
+items = [{ of = "hydrochlorothiazide", doubt = true }, { of = "uric acid", polarity = "high" }]
+
+[[facts]]
+said = "colchicina 1 mg ahora y 0,5 mg dentro de una hora."
+items = [{ of = "colchicine", number = ["1 mg", "0.5 mg"], date = "now", duration = "1 hour" }]
+
+[[facts]]
+said = "Retirar la hidroclorotiazida y empezar amlodipino 5 mg al día."
+items = [{ of = "hydrochlorothiazide", action = "stop" }, { of = "amlodipine", action = "start", number = "5 mg", frequency = "daily" }]
+
+[[facts]]
+said = "No empezar alopurinol por ahora."
+items = [{ of = "allopurinol", action = "start", negated = true }]
+
+[[facts]]
+said = "Follow-up en 2 semanas."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "2 weeks" }]
