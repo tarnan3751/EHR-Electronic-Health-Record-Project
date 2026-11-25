@@ -37,20 +37,24 @@ decrease after "has", "was" and the like, in a clause naming a subject and no dr
 decreased"), is a trend, not a medication change, and is changed when the Spanish says it the other way ("ha
 disminuido", "está disminuyendo" or "va a menos" as "has increased"); one with a pronoun, a relative or no subject
 ("it has decreased", "which was increased") takes the kind of the name said before it, a finding's a trend and a
-drug's a medication change, and a medicine named by its class ("blood pressure medicine") is a drug; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
+drug's a medication change, and a medicine named by its class ("blood pressure medicine") is a drug; and a doubt
+before a cause ("probably due to", CAUSES) is the doubt of that link,
 said of neither thing it links, with or without a comma before it, so it answers to either one's doubt in the facts and
 is added only if neither has one; and "unlikely", "may be" and "could be" are doubt, as "possible" and "might" are
 (DOUBT). "unlikely", "improbable", "not likely" and "less likely" are a negation too, said before or after a doubted
 item's name and whatever its facts say of its negation, read against how the Spanish leans in that item's own clause:
 right where it leans against ("poco probable", "improbable"), a negation added where it leans towards ("probable",
-"posible"), and a negation dropped where it leans against and the English doesn't say so. "May
-be", "could be" and "might" are doubt only of what they're said of, never of a finding named in another clause
-("Chickenpox. School may be resumed"), and with a past participle not doubt at all ("may be resumed", "could be
-arranged": leave, or something that may be done). Then (compare()), against the items of the entries whose passages the statement cites, it is changed when it
-says a number, unit, frequency, duration, date, route, side, severity, polarity, drug or abbreviation those items
-don't say of what it says it of (a value of another item is changed too: "glucose 140" as "BP 140"; one said of
-nothing named is backed only by the one cited item with a value of its kind, or by one the statement names, so "Febrile
-for 2 weeks" for "Fiebre de 3 días y tos de 2 semanas" is changed), and when it says
+"posible"), and a negation dropped where it leans against and the English doesn't say so. "May be", "could be" and
+"might" are doubt only of what they're said of, never of a finding named in another clause ("Chickenpox. School may
+be resumed"), and with a past participle not doubt at all ("may be resumed", "could be arranged": leave, or something
+that may be done). Then (compare()), against the items of the entries whose passages the statement cites, it is
+changed when it says a number, unit, frequency, duration, date, route, side, severity, polarity, drug or abbreviation
+those items don't say of what it says it of (a value of another item is changed too: "glucose 140" as "BP 140"; one
+said of nothing named is backed only by the one cited item with a value of its kind, or by one named in its own
+sentence, so "Febrile for 2 weeks" for "Fiebre de 3 días y tos de 2 semanas" is changed, and so is "Febrile for 2
+weeks; cough."; its limits: "Febrile for 2 weeks with a cough." ties the weeks to the cough named after them and is
+backed, and the faithful "Febrile for 3 days, coughing for 2 weeks." names neither finding and is changed), and when
+it says
 an action, negation, doubt, past or relative other than theirs, or leaves out one they say of something it names.
 What it may leave out: any number, frequency and the like, as the checks allow. What it doesn't read: the meaning of
 any other word.
@@ -59,9 +63,10 @@ any other word.
 from __future__ import annotations
 
 import difflib
+import itertools
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
 # ---- What the English says, in closed lists ---------------------------------------------------------------------
@@ -359,6 +364,7 @@ class Claim:
     kind: str  # one of KINDS, or drug, abbreviation, negated, doubt, history, present, who
     label: str | None  # the item it is said of, by the facts' name, or None
     value: str
+    sentence: int = field(default=0, compare=False)  # which sentence of the English (to a full stop or semicolon)
 
 
 @dataclass
@@ -603,11 +609,12 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
             take(i, i + 1, "abbreviation", tok)
 
     # Each claim tied to the nearest name in its clause.
+    sentence_of = list(itertools.accumulate(tok in (".", ";") for tok in toks))
     found: list[Claim] = []
     for start, end, label, drug in labels:
         if drug:
             found.append(Claim("drug", label, label.lower()))
-        found.append(Claim("named", label, label))
+        found.append(Claim("named", label, label, sentence_of[start]))
     for start, end, kind, value in kinds:
         if kind == "abbreviation":
             found.append(Claim(kind, None, value))
@@ -623,7 +630,7 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
         label = min(near)[2] if near else None
         if kind == "doubt" and any(_match(toks, end, cause) for cause in CAUSES):
             label = None  # the doubt of a cause (CAUSES): satisfied by either thing it links, added if neither has one
-        found.append(Claim("who" if before_only else kind, label, value))
+        found.append(Claim("who" if before_only else kind, label, value, sentence_of[start]))
     found += _negations(toks, labels, clause_of)
     return found
 
@@ -768,11 +775,12 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
         if own is items and claim.kind not in ("date", "action"):
             # A value said of nothing a cited passage names ("Febrile for 2 weeks" for "Fiebre de 3 días y tos de 2
             # semanas"): backed by the cited item with a value of its kind when there is just one (an age holds only its
-            # number); with two or more, only by those the statement names somewhere ("weight 84 kg, 2 kg more than").
-            # Otherwise it can't be told whose it is, and it is changed, never another item's value moved unseen. A
-            # date or a medication change is anyone's, as before.
+            # number); with two or more, only by those named in its own sentence ("weight 84 kg, 2 kg more than"), so
+            # one named in another ("Febrile for 2 weeks; cough.") backs none. Otherwise it can't be told whose it is,
+            # and it is changed, never another item's value moved unseen. A date or a medication change is anyone's.
             holding = [item for item in items if item.of != "age" and any(item.values.get(kind) for kind in kinds)]
-            own = holding if len(holding) == 1 else [item for item in holding if item.of in named]
+            here = {c.label for c in said if c.kind == "named" and c.sentence == claim.sentence}
+            own = holding if len(holding) == 1 else [item for item in holding if item.of in here]
         backed = {value for item in own for kind in kinds for value in item.values.get(kind, ())}
         if claim.kind == "action":
             backed |= {value.removesuffix(", past") for value in backed}  # a present form for one said in the past

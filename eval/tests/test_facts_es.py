@@ -407,6 +407,34 @@ def test_a_value_said_of_nothing_named_is_changed_where_it_could_be_either_items
     assert {(kind, what) for kind, what, _ in facts_es.compare(english, entries, entries, lexicon)[0]} == changed
 
 
+# Only an item named in the value's own sentence backs it: the cough named after a semicolon doesn't back the fever's
+# weeks (the re-check of 2026-11-24).
+@pytest.mark.parametrize(("english", "changed"), [
+    ("Febrile for 2 weeks; cough.", {("duration", "2 weeks")}),
+    ("Fever for 3 days; cough for 2 weeks.", set()),
+])
+def test_a_value_is_backed_only_by_an_item_named_in_its_own_sentence(english, changed):
+    entries = facts_es.entries([{"said": "Fiebre de 3 días y tos de 2 semanas.",
+                                 "items": [{"of": "fever", "duration": "3 days"}, {"of": "cough", "duration": "2 weeks"}]}])
+    lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
+    assert {(kind, what) for kind, what, _ in facts_es.compare(english, entries, entries, lexicon)[0]} == changed
+
+
+# The rule's limits, pinned so a change to them is seen (eval/README.md, the decision log's step 17): no general rule
+# closes them without reading "febrile" as the fever, and the facts name it "fever". A value said before the one name in
+# its clause is tied to it, so the cough's weeks back the fever's; and a faithful sentence naming neither finding by a
+# listed name is changed.
+@pytest.mark.parametrize(("english", "changed"), [
+    ("Febrile for 2 weeks with a cough.", set()),
+    ("Febrile for 3 days, coughing for 2 weeks.", {("duration", "3 days"), ("duration", "2 weeks")}),
+])
+def test_a_limit_of_the_value_rule_a_value_of_an_unlisted_name(english, changed):
+    entries = facts_es.entries([{"said": "Fiebre de 3 días y tos de 2 semanas.",
+                                 "items": [{"of": "fever", "duration": "3 days"}, {"of": "cough", "duration": "2 weeks"}]}])
+    lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
+    assert {(kind, what) for kind, what, _ in facts_es.compare(english, entries, entries, lexicon)[0]} == changed
+
+
 def test_a_value_said_of_nothing_named_is_backed_where_one_item_has_its_kind():
     entries = facts_es.entries([{"said": "Fiebre de 3 días.", "items": [{"of": "fever", "duration": "3 days"}]}])
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
