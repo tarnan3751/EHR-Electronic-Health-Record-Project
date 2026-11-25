@@ -14,7 +14,7 @@ namespace Ehr.Web.Tests;
 [Collection(BrowserTests.Collection)]
 public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
 {
-    const string Hint = "Spanish: speak Spanish. The transcript stays in Spanish and the proposed note is in English for you to check. "
+    const string Hint = "Experimental Spanish: speak Spanish. The transcript stays in Spanish and the proposed note is in English for you to check. "
         + "You don't need to say punctuation. Up to 2 minutes in Spanish.";
 
     // A stand-in microphone that runs a dictation to its limit in a moment: AiReviewBrowserTests' with no end to its
@@ -54,7 +54,7 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // TC-UC9-12 (NFR-12, proposed FR-61), and TC-UC9-07 and TC-UC9-10 on the page: with the keyboard only, the clinician
-    // moves to the language, picks Spanish, reads the hint, dictates and stops with Alt+Shift+D; the choice is fixed
+    // moves to the language, picks Spanish, reads the hint, labelled experimental, dictates and stops with Alt+Shift+D; the choice is fixed
     // while recording; the live transcript is marked Spanish, its passage not heard as Spanish marked and explained; the
     // dictation reaches its review in Spanish. Reloaded, the page is back to English (TC-UC9-08).
     [Fact]
@@ -289,7 +289,8 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // TC-UC9-12 (NFR-12), the themes: the choice and its hint, at 1,280 and 640 pixels in the light theme and the dark,
-    // fit the window, and the hint's words differ in color from what they sit on.
+    // fit the window, and the hint's words differ in color from what they sit on, as do those of its "Experimental"
+    // tag (the owner's ruling of 2026-11-25), which says it in words, not only in color.
     [Fact]
     public async Task The_language_choice_fits_every_width_in_both_themes()
     {
@@ -304,10 +305,13 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
                 const hint = document.querySelector('[data-dictation-language-hint]');
                 const choice = document.querySelector('[data-dictation-language]').getBoundingClientRect();
                 const style = getComputedStyle(hint);
+                const tag = hint.querySelector('.sc-tag');
                 let back = hint;
                 while (back && getComputedStyle(back).backgroundColor === 'rgba(0, 0, 0, 0)') back = back.parentElement;
-                return { scrolls: document.documentElement.scrollWidth > width, inside: choice.right <= width && hint.getBoundingClientRect().right <= width,
-                    color: style.color, background: back ? getComputedStyle(back).backgroundColor : 'none' };
+                return { scrolls: document.documentElement.scrollWidth > width,
+                    inside: choice.right <= width && hint.getBoundingClientRect().right <= width && tag.getBoundingClientRect().right <= width,
+                    color: style.color, background: back ? getComputedStyle(back).backgroundColor : 'none',
+                    tag: tag.textContent, tagColor: getComputedStyle(tag).color, tagBackground: getComputedStyle(tag).backgroundColor };
             }
             """;
         foreach (var scheme in new[] { ColorScheme.Light, ColorScheme.Dark })
@@ -325,6 +329,8 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
                 Assert.False(layout.GetProperty("scrolls").GetBoolean(), $"The page scrolls sideways {where}.");
                 Assert.True(layout.GetProperty("inside").GetBoolean(), $"The choice or its hint runs past the window {where}.");
                 Assert.NotEqual(layout.GetProperty("background").GetString(), layout.GetProperty("color").GetString());
+                Assert.Equal("Experimental", layout.GetProperty("tag").GetString());
+                Assert.NotEqual(layout.GetProperty("tagBackground").GetString(), layout.GetProperty("tagColor").GetString());
             }
         }
     }

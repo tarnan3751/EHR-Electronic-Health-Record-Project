@@ -90,7 +90,7 @@ public class DictationSpanishTests(WebApps apps) : IClassFixture<WebApps>
         var html = await note.Session.Client.GetStringAsync($"/patients/{note.Patient}/dictate", Cancel);
         Assert.Contains("""<select id="dictation-language" class="sc-field__input" autocomplete="off" data-dictation-language>""", html);
         Assert.Contains("""<option value="en" selected>English</option>""", html);
-        Assert.Contains("""<option value="es">Spanish (proposals in English)</option>""", html);
+        Assert.Contains("""<option value="es">Spanish, experimental (proposals in English)</option>""", html);
         Assert.Contains("Dictation supports English and Spanish", html);
 
         using (var started = await StartAsync(note.Session.Client, note.Token, note.Patient, null))

@@ -43,14 +43,15 @@ else
 
         @* The language of this dictation (the expansion plan's step 17): chosen for each, English first, and never
            remembered, by this page or the browser. js/dictation.js shows the hint when Spanish is chosen, and disables
-           the choice while a dictation is under way. *@
+           the choice while a dictation is under way. Spanish is labelled experimental (the owner's ruling of
+           2026-11-25): in its choice's words, and with a tag at the head of its hint. *@
         <div class="sc-field">
             <label for="dictation-language">Language of this dictation</label>
             <select id="dictation-language" class="sc-field__input" autocomplete="off" data-dictation-language>
                 <option value="en" selected>English</option>
-                <option value="es">Spanish (proposals in English)</option>
+                <option value="es">Spanish, experimental (proposals in English)</option>
             </select>
-            <p class="sc-field__hint" id="dictation-language-hint" data-dictation-language-hint hidden>Spanish: speak Spanish. The transcript stays in Spanish and the proposed note is in English for you to check. You don't need to say punctuation. Up to 2 minutes in Spanish.</p>
+            <p class="sc-field__hint" id="dictation-language-hint" data-dictation-language-hint hidden><span class="sc-tag sc-tag--warning">Experimental</span> Spanish: speak Spanish. The transcript stays in Spanish and the proposed note is in English for you to check. You don't need to say punctuation. Up to 2 minutes in Spanish.</p>
         </div>
 
         @* "Dictate" is the page's one primary button; its shortcut is printed on it (js/dictation.js binds it). While
