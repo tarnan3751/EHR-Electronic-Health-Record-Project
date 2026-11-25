@@ -5,7 +5,9 @@
 //
 // It runs `docker compose` in this folder as you would, so COMPOSE_PROJECT_NAME and COMPOSE_ENV_FILES pick a stack other
 // than the default one. What it does, and so proves:
-//   1. Waits until `barman check onprem` passes: a base backup exists and WAL is streaming.
+//   1. Waits until `barman check onprem` passes: a base backup exists and WAL is streaming. Then, saying so first,
+//      removes any restore-db container and anything at /var/lib/barman/restore left from before: a restore by hand in
+//      progress there would be lost, so don't run the drill during one.
 //   2. On the primary, as the superuser over its local socket, writes a "before" row into a database of its own,
 //      restore_drill (never into ehr), then notes the time T and, at that moment, a count and a checksum of a few of
 //      ehr's tables. A moment later it writes an "after" row: the restore must stop between the two, and recovery needs
@@ -16,8 +18,8 @@
 //      the restore-db service on it, which replays to T and pauses there, read-only. Nothing touches the primary's data.
 //   5. Checks that the restored copy started and took connections, holds "before" and not "after", replayed nothing
 //      after T, and has the same counts and checksums as the primary had at T.
-//   6. Cleans up whatever happened: removes restore-db, deletes /var/lib/barman/restore, and drops restore_drill on the
-//      primary. The checksums are taken from one snapshot at T, so a write to those tables in that instant makes the
+//   6. Cleans up whatever happened: removes restore-db with the empty volume its image declares, deletes
+//      /var/lib/barman/restore, and drops restore_drill on the primary. The checksums are taken from one snapshot at T, so a write to those tables in that instant makes the
 //      drill fail, naming the table: run it on a stack nobody is using.
 // infra/compose/README.md ("Backup and point-in-time restore") has the steps by hand, for a restore that is needed.
 
@@ -55,6 +57,7 @@ sealed class Drill(string folder)
         try
         {
             await WaitForBackupsAsync();
+            Say($"Removing any restore-db container and anything at {RestorePath} first (a restore by hand in progress there would be lost)");
             await CleanUpAsync(quiet: true);
 
             await PrimaryAsync("postgres", $"CREATE DATABASE {Database}");
@@ -197,7 +200,8 @@ sealed class Drill(string folder)
     {
         var steps = new[]
         {
-            await ComposeAsync(["--profile", "restore", "rm", "--stop", "--force", "restore-db"], check: false),
+            // --volumes: the anonymous volume the postgres image declares, which would otherwise be left behind.
+            await ComposeAsync(["--profile", "restore", "rm", "--stop", "--force", "--volumes", "restore-db"], check: false),
             await ComposeAsync(["exec", "-T", "-u", "postgres", "barman", "rm", "-rf", RestorePath], check: false),
             await ComposeAsync(["exec", "-T", "-u", "postgres", "onprem-db",
                 "psql", "-qAtX", "-v", "ON_ERROR_STOP=1", "-d", "postgres", "-c", $"DROP DATABASE IF EXISTS {Database} WITH (FORCE)"], check: false),
