@@ -151,6 +151,10 @@ impl Store {
         Ok(charts::panel(&self.connection, owner)?)
     }
 
+    pub fn charts_updated(&self, owner: Uuid) -> Result<Option<charts::Updated>> {
+        Ok(charts::updated(&self.connection, owner)?)
+    }
+
     pub fn offline_chart(
         &self,
         owner: Uuid,

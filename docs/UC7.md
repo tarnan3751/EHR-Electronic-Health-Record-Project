@@ -26,6 +26,15 @@ asks for (Tahseen's ruling 11b of 25 November 2026, proposed FR-68; `src/Ehr.Web
 - **Off-site.** The cloud app forwards it to the on-site app, which records it. While the clinic's server can't be
   reached, the cloud app answers 503.
 
+## When the offline charts were last updated (the plan's step 19a)
+
+The offline charts are refreshed only by **Download my charts**; nothing in the background refreshes them. Since step
+19a stops every sync 12 hours after a sign-in until the next one (`docs/UC8.md`), a computer left running can hold a
+copy older than it would have, so the offline charts now say how old they are: "Offline charts last updated 2026-11-25
+14:05 CST.", on the clinic's clock as the charts' own times are (step 10d), under the section's description. The time is
+recorded with each download, by this computer's clock, in the encrypted store (`charts.rs`); charts downloaded by an
+earlier build say that when isn't recorded, until they are downloaded again.
+
 ## Test cases
 
 - **TC-UC7-07** (`tests/Ehr.Web.Tests/TestCases/UC7/TC_UC7_07_DesktopUnlock.cs`): the right password unlocks, on the
@@ -33,3 +42,5 @@ asks for (Tahseen's ruling 11b of 25 November 2026, proposed FR-68; `src/Ehr.Web
   in the request is ignored; with no token it's 401; cut off, the cloud app answers 503; five wrong passwords lock the
   account and its token is then refused with no `Ehr-Sign-In` header; at 12 hours the right password is refused with
   `Ehr-Sign-In: ended`, and nothing is recorded as an unlock.
+- **The download's time** (`charts.rs`, `a_download_records_when_it_was_made`): a download records when it was made and
+  the clinic's time zone, for that clinician only, and the next one moves it on.

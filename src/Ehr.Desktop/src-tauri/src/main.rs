@@ -76,6 +76,8 @@ struct View {
     status: Status,
     offline_available: bool,
     clinical_waiting: usize,
+    /// When the offline charts were last downloaded, which the page shows beside them.
+    charts_updated: Option<charts::Updated>,
 }
 
 #[tauri::command]
@@ -89,6 +91,10 @@ fn view(app: State<'_, App>) -> Result<View, String> {
         clinical_waiting: match app.sync().and_then(|sync| sync.with_clinician(None, Ok)) {
             Ok(owner) => store.clinical_waiting(owner)?,
             Err(_) => 0,
+        },
+        charts_updated: match app.sync().and_then(|sync| sync.with_clinician(None, Ok)) {
+            Ok(owner) => store.charts_updated(owner)?,
+            Err(_) => None,
         },
         status: Status {
             account: app.sync.as_ref().ok().and_then(sync::Sync::account),

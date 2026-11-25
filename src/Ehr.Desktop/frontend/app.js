@@ -45,6 +45,8 @@ async function refresh() {
     renderStatus(view.status, view.waiting);
     renderAccount(view.status.account);
     renderOfflineAccess(view.offlineAvailable, signedIn);
+    chartsUpdated = view.chartsUpdated;
+    renderChartsUpdated();
     byId('clinical-waiting').textContent = view.clinicalWaiting
       ? `${view.clinicalWaiting} draft or recording changes need sync or review.`
       : 'No draft or recording changes waiting.';
@@ -317,6 +319,9 @@ let chartRequest = 0;
 let panelRequest = 0;
 let editingDraft = null;
 let recording = null;
+// When the offline charts were last downloaded (view.chartsUpdated), and how many there are.
+let chartsUpdated = null;
+let panelSize = 0;
 
 function resetDraftEditor() {
   editingDraft = null;
@@ -364,6 +369,7 @@ function renderOfflineAccess(available, signedIn) {
     loadPanel();
   } else {
     panelRequest++;
+    panelSize = 0;
     byId('offline-panel').replaceChildren();
     byId('offline-message').textContent = '';
     clearChart();
@@ -374,6 +380,8 @@ async function loadPanel() {
   const request = ++panelRequest;
   const panel = await call('offline_panel');
   if (!offlineAvailable || request !== panelRequest || !panel) return;
+  panelSize = panel.length;
+  renderChartsUpdated();
   const list = byId('offline-panel');
   list.replaceChildren(...panel.map((patient) =>
     el('li', {}, button(`${patient.name} · MRN ${patient.mrn}`, () => openChart(patient.id), 'sc-btn sc-btn--quiet')),
@@ -382,6 +390,17 @@ async function loadPanel() {
     list.append(el('li', { className: 'sc-muted', textContent: 'No charts downloaded. Add patients to your panel in the web app, then download here.' }));
   }
   if (selectedPatient && !panel.some((patient) => patient.id === selectedPatient)) clearChart();
+}
+
+// "Offline charts last updated …", on the clinic's clock when the charts named it. Only Download my charts refreshes
+// them, so this says how old the copy is; charts downloaded by a build that didn't record it say so.
+function chartsUpdatedText(updated) {
+  if (updated) return `Offline charts last updated ${clinicStamp(new Date(updated.at).toISOString(), updated.clinicTimeZone)}.`;
+  return panelSize ? 'When these charts were downloaded isn\'t recorded: download them again to record it.' : '';
+}
+
+function renderChartsUpdated() {
+  byId('charts-updated').textContent = chartsUpdatedText(chartsUpdated);
 }
 
 function chartSection(title, rows, none = 'None recorded.') {
