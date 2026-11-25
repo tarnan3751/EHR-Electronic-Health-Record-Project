@@ -4,3 +4,4 @@ pub mod charts;
 pub mod draft_sync;
 pub mod drafts;
 pub mod recordings;
+pub mod unlock;

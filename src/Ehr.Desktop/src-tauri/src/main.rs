@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ehr_desktop::{charts, draft_sync, recordings};
+use ehr_desktop::{charts, draft_sync, recordings, unlock};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -257,16 +257,43 @@ async fn sign_in(
     code: String,
 ) -> Result<(), String> {
     app.sync()?.sign_in(&email, &password, &code).await?;
+    let remembered = remember_sign_in(&app, &email, password).await;
     app.wake.notify_one();
-    Ok(())
+    remembered
 }
 
-/// Signs out, and starts a round so the status says so. The local copy stays, to read.
+/// After a sign-in with both factors, what the lock needs to open without a server (ehr_desktop::unlock): the password's
+/// slow hash, made off the async threads, never the password.
+async fn remember_sign_in(app: &App, email: &str, password: String) -> Result<(), String> {
+    let verifier = tauri::async_runtime::spawn_blocking(move || unlock::hash(&password))
+        .await
+        .map_err(|error| error.to_string())?;
+    let store = app.store()?;
+    app.sync()?.with_clinician(None, |owner| {
+        store
+            .unlock(|db| unlock::remember(db, owner, email, &verifier, unix_now()))
+            .map_err(Into::into)
+    })
+}
+
+/// Signs out, and starts a round so the status says so. The local copy stays, to read; the lock's record goes.
 #[tauri::command]
 async fn sign_out(app: State<'_, App>) -> Result<(), String> {
     let signed_out = app.sync()?.sign_out().await;
+    let forgotten = app
+        .store()
+        .and_then(|store| store.unlock(unlock::forget).map_err(Into::into));
     app.wake.notify_one();
-    signed_out
+    signed_out.and(forgotten)
+}
+
+/// Seconds since 1970, by this computer's clock.
+fn unix_now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| {
+            i64::try_from(since.as_secs()).unwrap_or(i64::MAX)
+        })
 }
 
 fn save(app: &App, edit: Option<(Uuid, i64)>, shortcut: &str, body: &str) -> Result<Save, String> {
