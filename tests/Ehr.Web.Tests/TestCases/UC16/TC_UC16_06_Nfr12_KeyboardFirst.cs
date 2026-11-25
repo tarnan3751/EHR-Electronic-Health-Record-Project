@@ -44,7 +44,7 @@ public class TC_UC16_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/appointments/new");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#appointment-clinician')"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('#appointment-clinician') === true");
         Assert.True(await page.EvaluateAsync<bool>("document.querySelector('#appointment-day').value !== ''"));
 
         await AiReviewBrowserTests.TabToAsync(page, "#appointment-time");

@@ -3,10 +3,10 @@
 @model Ehr.Web.Areas.Portal.Pages.Messages.NewModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
-    ViewData["Title"] = "Write to your care team";
+    ViewData["Title"] = Model.Acting ? "Write to the care team" : "Write to your care team";
 }
-<p><a asp-page="Index">Back to your messages</a></p>
-<h1>Write to your care team</h1>
+<p><a asp-page="Index">@(Model.Acting ? "Back to the messages" : "Back to your messages")</a></p>
+<h1>@ViewData["Title"]</h1>
 @if (!OnPrem.IsReachable)
 {
     <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> messages can't be sent until the clinic's server is back.</p>
@@ -14,14 +14,14 @@
 else
 {
     <p class="sc-muted">For an emergency, call your local emergency number. Messages are read during clinic hours.</p>
-    <form method="post" class="sc-form">
+    <form method="post" asp-page="New" class="sc-form">
         @if (Model.Errors.Count > 0)
         {
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> fix what is marked below and send again.</p>
         }
         <div class="sc-field">
             <label for="message-subject">Subject</label>
-            <input id="message-subject" class="sc-field__input" name="Subject" value="@Model.Subject" maxlength="@SecureMessages.MaximumSubject" autocomplete="off" required autofocus
+            <input id="message-subject" class="sc-field__input" name="Subject" value="@Model.Subject" maxlength="@SecureMessages.MaximumSubject" autocomplete="off" required autofocus="@(!Model.About)"
                    aria-invalid="@(Model.Errors.ContainsKey("Subject") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Subject") ? "message-subject-error" : null)">
             @if (Model.Errors.TryGetValue("Subject", out var subjectError))
             {
@@ -30,7 +30,7 @@ else
         </div>
         <div class="sc-field">
             <label for="message-body">Message</label>
-            <textarea id="message-body" class="sc-field__input" name="Body" rows="8" maxlength="@SecureMessages.MaximumBody" required
+            <textarea id="message-body" class="sc-field__input" name="Body" rows="8" maxlength="@SecureMessages.MaximumBody" required autofocus="@Model.About"
                       aria-invalid="@(Model.Errors.ContainsKey("Body") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Body") ? "message-body-error" : null)">@Model.Body</textarea>
             @if (Model.Errors.TryGetValue("Body", out var bodyError))
             {

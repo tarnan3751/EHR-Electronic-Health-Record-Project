@@ -17,6 +17,9 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
     // False for a proxy whose grant doesn't include messages (FR-19): nothing is read, and the page says so.
     public bool Allowed => subject.MayMessage;
 
+    // Whether these are someone else's messages, read as a proxy (FR-19): the page then doesn't call them "yours".
+    public bool Acting => subject.Acting is not null;
+
     public async Task OnGetAsync()
     {
         Response.Headers.CacheControl = "no-store";

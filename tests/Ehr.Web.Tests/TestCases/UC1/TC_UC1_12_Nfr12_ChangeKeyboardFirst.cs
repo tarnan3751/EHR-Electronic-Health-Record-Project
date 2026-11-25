@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   4. Press Tab to the dose, replace it, and press Enter.
 // Expected result: Step 1 opens the discontinue page with the cursor in the reason field. Step 2 returns to the chart,
 //   which says "Order discontinued:" and no longer lists the CBC order. Step 3 opens the change form with the cursor
-//   in the item, filled in. Step 4 returns to the chart, which says "Order signed:" and lists Metformin with dose
+//   in the item, filled in. Step 4 returns to the chart, which says "Order changed:" and lists Metformin with dose
 //   850 mg. Every focused control shows the focus ring (an outline), and the page reports no script errors.
 // Creator: Tahseen Arnan
 //
@@ -50,7 +50,9 @@ public class TC_UC1_12_Nfr12_ChangeKeyboardFirst(WebApps apps) : IClassFixture<W
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/discontinue");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#discontinue-reason')"));
+        // autofocus is applied after the page loads, at the browser's next chance to render: wait for it rather than
+        // checking at the instant of the load event, which a busy runner can reach first.
+        await page.WaitForFunctionAsync("document.activeElement?.matches('#discontinue-reason') === true");
         await page.Keyboard.InsertTextAsync("Synthetic: keyboard only");
         await page.Keyboard.PressAsync("Tab");
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('form[data-order-form] button[type=submit]')"));
@@ -63,14 +65,15 @@ public class TC_UC1_12_Nfr12_ChangeKeyboardFirst(WebApps apps) : IClassFixture<W
         await AiReviewBrowserTests.TabToAsync(page, "a[data-change-order]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("replaces=", StringComparison.Ordinal));
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#order-item') && document.activeElement.value === 'Metformin 500 mg tablet'"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('#order-item') === true");
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.value === 'Metformin 500 mg tablet'"));
         await page.Keyboard.PressAsync("Tab");
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#order-dose')"));
         await page.Keyboard.PressAsync("ControlOrMeta+A");
         await page.Keyboard.InsertTextAsync("850 mg");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("ordered=", StringComparison.Ordinal));
-        Assert.Contains("Order signed:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Order changed:", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Contains("Dose: 850 mg", await page.Locator("#chart-orders ~ ul").TextContentAsync());
 
         Assert.Equal(1, await ActiveAsync(apps, patient));

@@ -93,5 +93,11 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
         message.HasOne<Patient>().WithMany().HasForeignKey(m => m.PatientId).OnDelete(DeleteBehavior.Restrict);
         // A thread's messages in order.
         message.HasIndex(m => new { m.ThreadId, m.SentAt });
+        // A patient's unread messages from their care team, which the portal's home counts on every visit: only the
+        // unread ones are in it, so it stays small however many messages a patient has.
+        // Named, beside the foreign key's own index on patient_id, which stays.
+        message.HasIndex(m => m.PatientId, "ix_messages_patient_id");
+        message.HasIndex(m => m.PatientId, "ix_messages_unread_from_staff").HasDatabaseName("ix_messages_unread_from_staff")
+            .HasFilter($"sender_kind = '{MessageSender.Staff}' AND read_at IS NULL");
     }
 }

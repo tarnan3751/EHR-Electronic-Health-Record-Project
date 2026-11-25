@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ehr.Migrations
 {
     [DbContext(typeof(EhrDbContext))]
-    [Migration("20261118195958_ProxyGrants")]
-    partial class ProxyGrants
+    [Migration("20261125210010_OrderResults")]
+    partial class OrderResults
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -640,11 +640,15 @@ namespace Ehr.Migrations
                     b.HasKey("Id")
                         .HasName("pk_messages");
 
-                    b.HasIndex("PatientId")
-                        .HasDatabaseName("ix_messages_patient_id");
-
                     b.HasIndex("ThreadId", "SentAt")
                         .HasDatabaseName("ix_messages_thread_id_sent_at");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_messages_patient_id")
+                        .HasDatabaseName("ix_messages_patient_id");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_messages_unread_from_staff")
+                        .HasDatabaseName("ix_messages_unread_from_staff")
+                        .HasFilter("sender_kind = 'staff' AND read_at IS NULL");
 
                     b.ToTable("messages", "ehr", t =>
                         {
@@ -1132,6 +1136,52 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcknowledgedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("AcknowledgedBy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("acknowledged_by")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_result_acknowledgments");
+
+                    b.HasIndex("AcknowledgedBy")
+                        .HasDatabaseName("ix_result_acknowledgments_acknowledged_by");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_result_acknowledgments_order_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_result_acknowledgments_patient_id");
+
+                    b.HasIndex("OrderId", "PatientId")
+                        .HasDatabaseName("ix_result_acknowledgments_order_id_patient_id");
+
+                    b.ToTable("result_acknowledgments", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1350,6 +1400,11 @@ namespace Ehr.Migrations
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_allergy_intolerances_patient_id");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_allergy_intolerances_one_no_known_allergy")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allergy_intolerances_one_no_known_allergy")
+                        .HasFilter("code = 'no-known-allergy' AND clinical_status = 'active'");
 
                     b.ToTable("allergy_intolerances", "ehr", t =>
                         {
@@ -1876,6 +1931,11 @@ namespace Ehr.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_observations");
+
+                    b.HasIndex("OrderId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_observations_order_id_code")
+                        .HasFilter("order_id IS NOT NULL AND code IS NOT NULL");
 
                     b.HasIndex("OrderId", "PatientId")
                         .HasDatabaseName("ix_observations_order_id_patient_id");
@@ -2674,6 +2734,24 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_orders_order_catalog_items_type_catalog_code");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("AcknowledgedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_acknowledgments_staff_users_acknowledged_by");
+
+                    b.HasOne("Ehr.Data.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_acknowledgments_orders_order_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>

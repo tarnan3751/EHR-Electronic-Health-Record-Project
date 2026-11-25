@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ehr.Migrations
 {
     [DbContext(typeof(EhrDbContext))]
-    [Migration("20261118230602_ProxyOnlyAccounts")]
-    partial class ProxyOnlyAccounts
+    [Migration("20261123180020_ReferenceTables")]
+    partial class ReferenceTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -96,11 +96,6 @@ namespace Ehr.Migrations
                         .HasColumnType("text")
                         .HasColumnName("concurrency_stamp");
 
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("display_name");
-
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
@@ -132,7 +127,7 @@ namespace Ehr.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
-                    b.Property<Guid?>("PatientId")
+                    b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
 
@@ -531,168 +526,6 @@ namespace Ehr.Migrations
                         .HasDatabaseName("ix_change_log_transaction_id");
 
                     b.ToTable("change_log", "ehr");
-                });
-
-            modelBuilder.Entity("Ehr.Data.Inbox.InboxItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("DoneAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("done_at");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("kind");
-
-                    b.Property<Guid?>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<Guid>("RecipientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("recipient_id");
-
-                    b.Property<Guid?>("SourceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("source_id");
-
-                    b.Property<string>("SourceTable")
-                        .HasMaxLength(63)
-                        .HasColumnType("character varying(63)")
-                        .HasColumnName("source_table");
-
-                    b.Property<string>("Summary")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
-                        .HasColumnName("summary");
-
-                    b.HasKey("Id")
-                        .HasName("pk_inbox_items");
-
-                    b.HasIndex("PatientId")
-                        .HasDatabaseName("ix_inbox_items_patient_id");
-
-                    b.HasIndex("RecipientId", "CreatedAt")
-                        .HasDatabaseName("ix_inbox_items_recipient_id_created_at")
-                        .HasFilter("done_at IS NULL");
-
-                    b.HasIndex("RecipientId", "DoneAt")
-                        .HasDatabaseName("ix_inbox_items_recipient_id_done_at")
-                        .HasFilter("done_at IS NOT NULL");
-
-                    b.ToTable("inbox_items", "ehr", t =>
-                        {
-                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review')");
-
-                            t.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
-                        });
-                });
-
-            modelBuilder.Entity("Ehr.Data.Messaging.Message", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("body");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<DateTimeOffset?>("ReadAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("read_at");
-
-                    b.Property<Guid>("SenderId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("sender_id")
-                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
-
-                    b.Property<string>("SenderKind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("sender_kind");
-
-                    b.Property<DateTimeOffset>("SentAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("ThreadId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("thread_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_messages");
-
-                    b.HasIndex("PatientId")
-                        .HasDatabaseName("ix_messages_patient_id");
-
-                    b.HasIndex("ThreadId", "SentAt")
-                        .HasDatabaseName("ix_messages_thread_id_sent_at");
-
-                    b.ToTable("messages", "ehr", t =>
-                        {
-                            t.HasCheckConstraint("ck_messages_sender_kind", "sender_kind IN ('patient', 'staff')");
-                        });
-                });
-
-            modelBuilder.Entity("Ehr.Data.Messaging.MessageThread", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("LastMessageAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_message_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<DateTimeOffset>("StartedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Subject")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("subject");
-
-                    b.HasKey("Id")
-                        .HasName("pk_message_threads");
-
-                    b.HasIndex("PatientId", "LastMessageAt")
-                        .HasDatabaseName("ix_message_threads_patient_id_last_message_at");
-
-                    b.ToTable("message_threads", "ehr");
                 });
 
             modelBuilder.Entity("Ehr.Data.Orders.Order", b =>
@@ -1137,52 +970,6 @@ namespace Ehr.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("AcknowledgedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("acknowledged_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("AcknowledgedBy")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("acknowledged_by")
-                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("order_id");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_result_acknowledgments");
-
-                    b.HasIndex("AcknowledgedBy")
-                        .HasDatabaseName("ix_result_acknowledgments_acknowledged_by");
-
-                    b.HasIndex("OrderId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_result_acknowledgments_order_id");
-
-                    b.HasIndex("PatientId")
-                        .HasDatabaseName("ix_result_acknowledgments_patient_id");
-
-                    b.HasIndex("OrderId", "PatientId")
-                        .HasDatabaseName("ix_result_acknowledgments_order_id_patient_id");
-
-                    b.ToTable("result_acknowledgments", "ehr");
-                });
-
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1401,6 +1188,11 @@ namespace Ehr.Migrations
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_allergy_intolerances_patient_id");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_allergy_intolerances_one_no_known_allergy")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allergy_intolerances_one_no_known_allergy")
+                        .HasFilter("code = 'no-known-allergy' AND clinical_status = 'active'");
 
                     b.ToTable("allergy_intolerances", "ehr", t =>
                         {
@@ -1928,11 +1720,6 @@ namespace Ehr.Migrations
                     b.HasKey("Id")
                         .HasName("pk_observations");
 
-                    b.HasIndex("OrderId", "Code")
-                        .IsUnique()
-                        .HasDatabaseName("ix_observations_order_id_code")
-                        .HasFilter("order_id IS NOT NULL AND code IS NOT NULL");
-
                     b.HasIndex("OrderId", "PatientId")
                         .HasDatabaseName("ix_observations_order_id_patient_id");
 
@@ -2110,134 +1897,6 @@ namespace Ehr.Migrations
                         .HasDatabaseName("ix_patient_enrollments_patient_id");
 
                     b.ToTable("patient_enrollments", "ehr");
-                });
-
-            modelBuilder.Entity("Ehr.Data.Proxies.ProxyGrant", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<DateTimeOffset>("GrantedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("granted_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("GrantedBy")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("granted_by")
-                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
-
-                    b.Property<string>("GrantedByKind")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("patient")
-                        .HasColumnName("granted_by_kind");
-
-                    b.Property<bool>("IncludeSensitive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("include_sensitive");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<string>("ProxyEmail")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("proxy_email");
-
-                    b.Property<DateTimeOffset?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("revoked_at");
-
-                    b.Property<Guid?>("RevokedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revoked_by");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("scope");
-
-                    b.HasKey("Id")
-                        .HasName("pk_proxy_grants");
-
-                    b.HasIndex("ProxyEmail")
-                        .HasDatabaseName("ix_proxy_grants_proxy_email");
-
-                    b.HasIndex("PatientId", "ProxyEmail")
-                        .IsUnique()
-                        .HasDatabaseName("ix_proxy_grants_patient_id_proxy_email")
-                        .HasFilter("revoked_at IS NULL");
-
-                    b.ToTable("proxy_grants", "ehr", t =>
-                        {
-                            t.HasCheckConstraint("ck_proxy_grants_granted_by_kind", "granted_by_kind IN ('patient', 'staff')");
-
-                            t.HasCheckConstraint("ck_proxy_grants_scope", "scope IN ('record', 'record-and-messages')");
-                        });
-                });
-
-            modelBuilder.Entity("Ehr.Data.Proxies.ProxyInvitation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("CodeHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("code_hash");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("email");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<Guid>("GrantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("grant_id");
-
-                    b.Property<DateTimeOffset>("IssuedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("issued_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTimeOffset?>("RedeemedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("redeemed_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_proxy_invitations");
-
-                    b.HasIndex("CodeHash")
-                        .IsUnique()
-                        .HasDatabaseName("ix_proxy_invitations_code_hash");
-
-                    b.HasIndex("GrantId")
-                        .HasDatabaseName("ix_proxy_invitations_grant_id");
-
-                    b.ToTable("proxy_invitations", "ehr");
                 });
 
             modelBuilder.Entity("Ehr.Data.QuickText", b =>
@@ -2481,97 +2140,6 @@ namespace Ehr.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Ehr.Data.Scheduling.Appointment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("BookedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("booked_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("BookedById")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("booked_by_id")
-                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
-
-                    b.Property<string>("CancelReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("cancel_reason");
-
-                    b.Property<Guid>("ClinicianId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("clinician_id");
-
-                    b.Property<Guid?>("EncounterId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("encounter_id");
-
-                    b.Property<int>("Minutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("minutes");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("reason");
-
-                    b.Property<DateTimeOffset>("StartsAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("starts_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("version");
-
-                    b.HasKey("Id")
-                        .HasName("pk_appointments");
-
-                    b.HasIndex("BookedById")
-                        .HasDatabaseName("ix_appointments_booked_by_id");
-
-                    b.HasIndex("EncounterId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_appointments_encounter_id");
-
-                    b.HasIndex("ClinicianId", "StartsAt")
-                        .HasDatabaseName("ix_appointments_clinician_id_starts_at");
-
-                    b.HasIndex("PatientId", "StartsAt")
-                        .HasDatabaseName("ix_appointments_patient_id_starts_at");
-
-                    b.ToTable("appointments", "ehr", t =>
-                        {
-                            t.HasCheckConstraint("ck_appointments_cancelled", "(status = 'cancelled') = (cancel_reason IS NOT NULL)");
-
-                            t.HasCheckConstraint("ck_appointments_minutes", "minutes BETWEEN 5 AND 240");
-
-                            t.HasCheckConstraint("ck_appointments_status", "status IN ('booked', 'cancelled', 'fulfilled', 'noshow')");
-
-                            t.HasCheckConstraint("ck_appointments_visit", "(status = 'fulfilled') = (encounter_id IS NOT NULL)");
-                        });
-                });
-
             modelBuilder.Entity("Ehr.Data.SyncOperation", b =>
                 {
                     b.Property<Guid>("IdempotencyKey")
@@ -2632,6 +2200,7 @@ namespace Ehr.Migrations
                         .WithMany()
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("fk_patient_users_patients_patient_id");
                 });
 
@@ -2695,49 +2264,6 @@ namespace Ehr.Migrations
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
                 });
 
-            modelBuilder.Entity("Ehr.Data.Inbox.InboxItem", b =>
-                {
-                    b.HasOne("Ehr.Data.Patients.Patient", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_inbox_items_patients_patient_id");
-
-                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
-                        .WithMany()
-                        .HasForeignKey("RecipientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_inbox_items_staff_users_recipient_id");
-                });
-
-            modelBuilder.Entity("Ehr.Data.Messaging.Message", b =>
-                {
-                    b.HasOne("Ehr.Data.Patients.Patient", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_messages_patients_patient_id");
-
-                    b.HasOne("Ehr.Data.Messaging.MessageThread", null)
-                        .WithMany()
-                        .HasForeignKey("ThreadId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_messages_message_threads_thread_id");
-                });
-
-            modelBuilder.Entity("Ehr.Data.Messaging.MessageThread", b =>
-                {
-                    b.HasOne("Ehr.Data.Patients.Patient", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_message_threads_patients_patient_id");
-                });
-
             modelBuilder.Entity("Ehr.Data.Orders.Order", b =>
                 {
                     b.HasOne("Ehr.Data.Accounts.StaffUser", null)
@@ -2779,24 +2305,6 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_orders_order_catalog_items_type_catalog_code");
-                });
-
-            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
-                {
-                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
-                        .WithMany()
-                        .HasForeignKey("AcknowledgedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_result_acknowledgments_staff_users_acknowledged_by");
-
-                    b.HasOne("Ehr.Data.Orders.Order", null)
-                        .WithMany()
-                        .HasForeignKey("OrderId", "PatientId")
-                        .HasPrincipalKey("Id", "PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_result_acknowledgments_orders_order_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
@@ -2998,26 +2506,6 @@ namespace Ehr.Migrations
                         .HasConstraintName("fk_patient_enrollments_patients_patient_id");
                 });
 
-            modelBuilder.Entity("Ehr.Data.Proxies.ProxyGrant", b =>
-                {
-                    b.HasOne("Ehr.Data.Patients.Patient", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_proxy_grants_patients_patient_id");
-                });
-
-            modelBuilder.Entity("Ehr.Data.Proxies.ProxyInvitation", b =>
-                {
-                    b.HasOne("Ehr.Data.Proxies.ProxyGrant", null)
-                        .WithMany()
-                        .HasForeignKey("GrantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_proxy_invitations_proxy_grants_grant_id");
-                });
-
             modelBuilder.Entity("Ehr.Data.Reference.OrderResultCode", b =>
                 {
                     b.HasOne("Ehr.Data.Orders.OrderCatalogItem", null)
@@ -3033,36 +2521,6 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_result_codes_observation_codes_observation_code");
-                });
-
-            modelBuilder.Entity("Ehr.Data.Scheduling.Appointment", b =>
-                {
-                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
-                        .WithMany()
-                        .HasForeignKey("BookedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_appointments_staff_users_booked_by_id");
-
-                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
-                        .WithMany()
-                        .HasForeignKey("ClinicianId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_appointments_staff_users_clinician_id");
-
-                    b.HasOne("Ehr.Data.Patients.Encounter", null)
-                        .WithOne()
-                        .HasForeignKey("Ehr.Data.Scheduling.Appointment", "EncounterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_appointments_encounters_encounter_id");
-
-                    b.HasOne("Ehr.Data.Patients.Patient", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_appointments_patients_patient_id");
                 });
 #pragma warning restore 612, 618
         }

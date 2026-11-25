@@ -12,7 +12,7 @@
 }
 @if (OnPrem.IsReachable)
 {
-    <p><a asp-page="New" class="sc-btn sc-btn--primary">Write to your care team</a></p>
+    <p><a asp-page="New" class="sc-btn sc-btn--primary">@(Model.Acting ? "Write to the care team" : "Write to your care team")</a></p>
 }
 else
 {
@@ -21,11 +21,11 @@ else
 <p class="sc-muted">For an emergency, call your local emergency number. Messages are read during clinic hours.</p>
 @if (Model.Threads is not { } threads)
 {
-    <p class="sc-notice sc-notice--danger">Your messages are not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(Model.Acting ? "The messages are" : "Your messages are") not available right now. Contact the clinic if this continues.</p>
 }
 else if (threads.Threads.Count == 0)
 {
-    <p class="sc-muted">You have no messages.</p>
+    <p class="sc-muted">@(Model.Acting ? "There are no messages." : "You have no messages.")</p>
 }
 else
 {
@@ -44,4 +44,8 @@ else
             </li>
         }
     </ul>
+    @if (threads.Threads.Count == Ehr.Web.Areas.Portal.Pages.Messages.IndexModel.Limit)
+    {
+        <p class="sc-muted">These are the @Ehr.Web.Areas.Portal.Pages.Messages.IndexModel.Limit latest conversations. For an older one, contact the clinic.</p>
+    }
 }

@@ -13,7 +13,7 @@
     }
     else
     {
-        <p class="sc-muted">You have no appointments booked.</p>
+        <p class="sc-muted">@(Model.Acting ? "No appointments are booked." : "You have no appointments booked.")</p>
     }
     <p>To book, change or cancel an appointment, contact the clinic.</p>
     <h2>Earlier</h2>
@@ -28,5 +28,5 @@
 }
 else
 {
-    <p class="sc-notice sc-notice--danger">Your appointments are not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(Model.Acting ? "The appointments are" : "Your appointments are") not available right now. Contact the clinic if this continues.</p>
 }

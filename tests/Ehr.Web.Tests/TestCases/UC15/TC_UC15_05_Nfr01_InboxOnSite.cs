@@ -19,7 +19,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Expected result: The p99 of the whole request, the commit of its audit events included, is under 15 ms for the rows
 //   "Inbox, 40 items" and "Chart, a patient on the panel" (which now counts the inbox). Acceptance criterion: p99 <
 //   15 ms, each.
-// Creator: Tahseen Arnan
+// Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_05_Nfr01_InboxOnSite
 {
     const double LimitMilliseconds = 15;
