@@ -8,8 +8,8 @@
 //   Paused, or waiting for its voices to be named ("waiting"), it may be warned, and the warning says what the dictation
 //   service does with it.
 // - The warning: when 2 minutes are left, a check (a request that renews nothing) confirms it, and a dialog takes the
-//   focus. "Stay signed in" sends a keep-alive; the page isn't reloaded. At the 12-hour end nothing moves the end, and
-//   the dialog says so.
+//   focus. "Stay signed in" sends a keep-alive; the page isn't reloaded; if the server can't be reached, the dialog stays
+//   and says so. At the 12-hour end nothing moves the end, and the dialog says so; once closed, it isn't shown again.
 // - The end: once the server says the session is over, the page is taken off the screen. What was typed on it, or a
 //   recording in it, is kept in this tab's memory, out of sight, never in browser storage; the same account signing in
 //   again, in the frame the page shows or in another tab, gets it back as it was. Anyone else signing in clears it and
@@ -48,6 +48,9 @@
     let asking = false;
     let opener = null;
     let countdown = 0;
+    // The 12-hour warning, once dismissed ("Keep working", or Escape), isn't opened again for this sign-in: nothing
+    // moves that end, and the person is finishing their work. The end itself still ends the page.
+    let finalDismissed = false;
     const typedFields = new Set();
 
     const remaining = () => known.left - (Date.now() - known.at) / 1000;
@@ -141,13 +144,13 @@
                 return;
             }
 
-            if (remaining() <= warn) {
+            if (remaining() <= warn && !(known.final && finalDismissed && remaining() > 0)) {
                 const answer = await ask(true);
                 if (answer?.ended) {
                     end(known.final ? "longest" : "idle");
                 } else if (answer === null && remaining() <= 0) {
                     end(known.final ? "longest" : "idle");
-                } else if (remaining() <= warn) {
+                } else if (remaining() <= warn && !(known.final && finalDismissed)) {
                     open();
                 }
             }
@@ -182,6 +185,7 @@
         part("carry-on").hidden = !known.final;
         part("typed").hidden = !typed();
         part("waiting").hidden = recording() !== "waiting";
+        part("unreachable").hidden = true;
         showCountdown();
         opener = document.activeElement;
         dialog.showModal();
@@ -203,9 +207,17 @@
         const answer = await keepAlive();
         if (answer?.ended) {
             end("idle");
+        } else if (answer === null) {
+            // The server couldn't be asked: the warning stays, and says so, rather than closing on a session it can't vouch for.
+            part("unreachable").hidden = false;
         } else {
             close();
         }
+    }
+
+    function keepWorking() {
+        finalDismissed = true;
+        close();
     }
 
     // Takes the page off the screen. What was typed, or a recording, stays in this tab's memory until the same account
@@ -304,6 +316,8 @@
 
         const { nodes, title, scroll, focus } = kept;
         kept = null;
+        // A new sign-in: its own 12-hour warning will be shown.
+        finalDismissed = false;
         body.replaceChildren(...nodes);
         document.title = title;
         window.scrollTo(scroll[0], scroll[1]);
@@ -356,11 +370,11 @@
     }
 
     part("stay").addEventListener("click", () => void stay());
-    part("carry-on").addEventListener("click", close);
+    part("carry-on").addEventListener("click", keepWorking);
     dialog.addEventListener("cancel", (event) => {
         event.preventDefault();
         if (known.final) {
-            close();
+            keepWorking();
         } else {
             void stay();
         }
