@@ -54,6 +54,46 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("This account is locked", await ReadAsync(response));
     }
 
+    // Wrong codes lock the account as wrong passwords do, and then the right code signs it in no more than the right
+    // password would (step 19's fix: before it, the code step took a correct code from a locked account).
+    [Fact]
+    public async Task Five_wrong_codes_lock_the_account_and_then_the_right_code_is_refused()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Guessed Codes", StaffRoles.Clinician);
+        var client = Client(apps.OnPrem, new CookieContainer());
+        using var codePage = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            using var wrong = await PostFormAsync(client, "/sign-in/code", "/sign-in/code", ("Code", Totp.WrongCode(account.AuthenticatorKey)));
+            Assert.Contains("That code did not match.", await ReadAsync(wrong));
+        }
+
+        using var response = await PostFormAsync(client, "/sign-in/code", "/sign-in/code", ("Code", Totp.Code(account.AuthenticatorKey)));
+
+        Assert.Equal("/sign-in/code", PathOf(response));
+        Assert.Contains("This account is locked after too many failed attempts. Try again in 15 minutes.", await ReadAsync(response));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+        Assert.Contains("locked out", await ReasonsAsync(account));
+    }
+
+    // Why the account's sign-ins failed, as the audit log says.
+    async Task<List<string>> ReasonsAsync(StaffAccount account)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new Npgsql.NpgsqlCommand(
+            "SELECT reason FROM ehr.audit_events WHERE action = @action AND actor_id = @actor ORDER BY occurred_at, id", connection);
+        command.Parameters.AddWithValue("action", AuditActions.SignInFailed);
+        command.Parameters.AddWithValue("actor", account.Id);
+        await using var reader = await command.ExecuteReaderAsync(Cancel);
+        var reasons = new List<string>();
+        while (await reader.ReadAsync(Cancel))
+        {
+            reasons.Add(reader.GetString(0));
+        }
+
+        return reasons;
+    }
+
     [Fact]
     public async Task The_password_alone_signs_nobody_in()
     {

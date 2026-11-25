@@ -49,6 +49,13 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
             return Page();
         }
 
+        // Wrong codes lock the account as wrong passwords do, and a locked account takes no code either (step 19).
+        if (await signIn.LockedOutAsync(user, HttpContext.RequestAborted))
+        {
+            ModelState.AddModelError("", Locked);
+            return Page();
+        }
+
         if (!await signIn.VerifyCodeAsync(user, Code!, HttpContext.RequestAborted))
         {
             ModelState.AddModelError("", "That code did not match. Try the current code from your app, or a recovery code.");
