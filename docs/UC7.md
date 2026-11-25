@@ -39,7 +39,10 @@ focus included, which come back when it opens. The lock panel fills the window: 
 offline charts were last updated, whose sign-in it is, and **Sign out** for someone else, which says first that it closes
 the offline charts and loses anything typed and not saved. The window's title never names a patient, and the app sends
 no notifications. While it's up the app refuses to read the offline charts for the page (a reload or a second copy of
-the app gets nothing either); saves already under way finish; sync, uploads included, carries on.
+the app gets nothing either); saves already under way finish; sync, uploads included, carries on. Only the lock's own
+word opens the window: its events, and the answers to unlocking, locking now and signing out. Each view of the lock
+carries a count that moves on with every lock and opening, and the page drops one older than it has shown, so an answer
+computed just before a lock can't uncover the page (step 19a's final review).
 
 **What opens it**
 

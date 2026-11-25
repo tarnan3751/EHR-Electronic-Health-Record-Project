@@ -141,6 +141,9 @@ pub struct Lock {
     session_over: bool,
     /// The 12-hour warning was dismissed, and isn't shown again for this sign-in.
     last_warning_dismissed: bool,
+    /// How many times the window has locked, opened or changed what opens it: the page drops a view of the lock older
+    /// than one it has already shown (step 19a's final review).
+    generation: u64,
 }
 
 impl Lock {
@@ -161,14 +164,15 @@ impl Lock {
             ended: false,
             session_over: false,
             last_warning_dismissed: false,
+            generation: 0,
         };
         if signed_in_at.is_some() {
             lock.ended = lock.past_longest(now);
-            lock.locked = Some(if lock.ended {
+            lock.set_locked(Some(if lock.ended {
                 (Need::SignIn, Why::Longest)
             } else {
                 (Need::Password, Why::Started)
-            });
+            }));
         }
         lock
     }
@@ -182,10 +186,10 @@ impl Lock {
             // A lock asks for more when there is more to ask: a full sign-in once the 12 hours are over, and nothing
             // but one once the session is over.
             if need != Need::SignedOut && self.session_over {
-                self.locked = Some((Need::SignedOut, Why::Ended));
+                self.set_locked(Some((Need::SignedOut, Why::Ended)));
             } else if need == Need::Password && self.past_longest(now) {
                 self.ended = true;
-                self.locked = Some((Need::SignIn, Why::Longest));
+                self.set_locked(Some((Need::SignIn, Why::Longest)));
             }
             let (need, why) = self.locked.unwrap_or((need, Why::Started));
             return State::Locked { need, why };
@@ -255,20 +259,20 @@ impl Lock {
             } else {
                 Need::Password
             };
-            self.locked = Some((need, Why::Asked));
+            self.set_locked(Some((need, Why::Asked)));
         }
     }
 
     /// Too many wrong passwords here: only a full sign-in opens the lock now.
     pub fn require_sign_in(&mut self) {
         if self.locked.is_some_and(|(need, _)| need == Need::Password) {
-            self.locked = Some((Need::SignIn, Why::WrongPasswords));
+            self.set_locked(Some((Need::SignIn, Why::WrongPasswords)));
         }
     }
 
     /// The lock opened: with the password, or a full sign-in (`signed_in`).
     pub fn unlocked(&mut self, now: Moment) {
-        self.locked = None;
+        self.set_locked(None);
         self.last = now;
     }
 
@@ -276,13 +280,17 @@ impl Lock {
     pub fn signed_in(&mut self, at: SystemTime, now: Moment) {
         *self = Lock {
             recording: self.recording,
+            generation: self.generation + 1,
             ..Lock::new(self.times, None, false, now)
         };
         self.signed_in_at = Some(at);
     }
 
     pub fn signed_out(&mut self, now: Moment) {
-        *self = Lock::new(self.times, None, false, now);
+        *self = Lock {
+            generation: self.generation + 1,
+            ..Lock::new(self.times, None, false, now)
+        };
     }
 
     /// The server refused the token because the sign-in's 12 hours are over.
@@ -313,8 +321,19 @@ impl Lock {
         self.session_over
     }
 
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    fn set_locked(&mut self, locked: Option<(Need, Why)>) {
+        if self.locked != locked {
+            self.locked = locked;
+            self.generation += 1;
+        }
+    }
+
     fn lock(&mut self, need: Need, why: Why) -> State {
-        self.locked = Some((need, why));
+        self.set_locked(Some((need, why)));
         State::Locked { need, why }
     }
 
@@ -623,6 +642,34 @@ mod tests {
         ended.tick(at(start, MINUTE));
         ended.require_sign_in();
         assert_eq!(ended.need(), Some(Need::SignedOut));
+    }
+
+    /// Step 19a's final review: every lock, opening and change of what opens it moves the generation on, sign-ins and
+    /// sign-outs included, so the page can tell a view computed before a lock from one after it.
+    #[test]
+    fn each_lock_and_opening_moves_the_generation_on() {
+        let start = Moment::now();
+        let mut lock = Lock::new(Times::STANDARD, Some(start.wall), false, start);
+        let mut seen = vec![lock.generation()];
+        lock.unlocked(start);
+        seen.push(lock.generation());
+        lock.tick(at(start, 15 * MINUTE));
+        seen.push(lock.generation());
+        lock.tick(at(start, 16 * MINUTE));
+        assert_eq!(
+            lock.generation(),
+            seen[2],
+            "a tick that changes nothing moves nothing"
+        );
+        lock.server_ended_session();
+        lock.tick(at(start, 16 * MINUTE));
+        seen.push(lock.generation());
+        lock.signed_in(at(start, 17 * MINUTE).wall, at(start, 17 * MINUTE));
+        seen.push(lock.generation());
+        lock.signed_out(at(start, 18 * MINUTE));
+        seen.push(lock.generation());
+
+        assert!(seen.windows(2).all(|pair| pair[0] < pair[1]), "{seen:?}");
     }
 
     /// The times for checking by hand are only ever shorter, the warning in proportion.

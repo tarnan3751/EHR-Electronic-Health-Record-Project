@@ -89,9 +89,15 @@ impl App {
     /// The lock as the page shows it, locking the window if it's time.
     fn lock_view(&self) -> LockView {
         let now = Moment::now();
-        let (state, sign_in_ended, session_over) = {
+        let (state, sign_in_ended, session_over, generation) = {
             let mut lock = self.lock();
-            (lock.tick(now), lock.sign_in_ended(now), lock.session_over())
+            let state = lock.tick(now);
+            (
+                state,
+                lock.sign_in_ended(now),
+                lock.session_over(),
+                lock.generation(),
+            )
         };
         let (name, need, why, last, left) = match state {
             lock::State::SignedOut => ("signedOut", None, None, false, Duration::ZERO),
@@ -117,6 +123,7 @@ impl App {
             sign_in_ended,
             session_over,
             charts_updated,
+            generation,
         }
     }
 
@@ -165,6 +172,9 @@ struct LockView {
     session_over: bool,
     /// When the offline charts were last downloaded.
     charts_updated: Option<charts::Updated>,
+    /// Moves on with each lock, opening or change of what opens it (lock.rs): the page drops a view older than one it
+    /// has shown, so an answer computed before a lock can't open the window.
+    generation: u64,
 }
 
 /// The last sync round, and who is signed in, for the page.

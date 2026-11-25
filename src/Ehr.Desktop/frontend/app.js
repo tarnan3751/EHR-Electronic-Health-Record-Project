@@ -314,7 +314,8 @@ async function signOut() {
     await call('sign_out');
   } finally {
     offlineSigningOut = false;
-    applyLock(await invoke('lock_state'));
+    // The answer to the sign-out the person asked for, so it may take the lock away.
+    applyLock(await invoke('lock_state'), true);
     await refresh();
   }
 }
@@ -658,9 +659,15 @@ let focusBeforeLock = null;
 let countdown = null;
 // Whether the last sync round reached a server, for the words of the banner after the 12 hours.
 let serverAnswered = false;
+// The newest view of the lock shown (LockView.generation): an older one, computed before a lock, is dropped.
+let lockGeneration = -1;
 
-// The lock's view from the Rust side (LockView in main.rs).
-function applyLock(view) {
+// The lock's view from the Rust side (LockView in main.rs). Anything may lock the window, but only `uncover` may open
+// it: the lock's own events, and the answers to unlocking, locking now and signing out (step 19a's final review). A
+// view the page asked for along the way, such as the one with each redraw, never does.
+function applyLock(view, uncover = false) {
+  if (view.generation < lockGeneration) return;
+  lockGeneration = view.generation;
   renderSignInNeeded(view);
   if (view.state === 'locked') {
     closeWarning();
@@ -668,15 +675,18 @@ function applyLock(view) {
     renderLock(view);
     return;
   }
-  if (locked) unlockWindow();
+  if (locked) {
+    if (!uncover) return;
+    unlockWindow();
+  }
   if (view.state === 'warning') openWarning(view);
   else closeWarning();
 }
 
-// applyLock, and a redraw if it opened the window.
+// applyLock with the right to open the window, and a redraw if it did.
 function applyLockAndRedraw(view) {
   const wasLocked = locked;
-  applyLock(view);
+  applyLock(view, true);
   if (wasLocked && !locked) refresh();
 }
 
@@ -802,8 +812,8 @@ warning.addEventListener('cancel', (event) => {
   event.preventDefault();
   stay();
 });
-byId('lock-now').addEventListener('click', async () => applyLock(await invoke('lock_now')));
-byId('sign-in-now').addEventListener('click', async () => applyLock(await invoke('lock_now')));
+byId('lock-now').addEventListener('click', async () => applyLockAndRedraw(await invoke('lock_now')));
+byId('sign-in-now').addEventListener('click', async () => applyLockAndRedraw(await invoke('lock_now')));
 byId('lock-sign-out').addEventListener('click', signOut);
 
 lockForm.addEventListener('submit', async (event) => {
@@ -825,8 +835,8 @@ lockForm.addEventListener('submit', async (event) => {
   }
 });
 
-// Coming back to the window: the Rust side may have locked it meanwhile.
-const askLock = async () => applyLockAndRedraw(await invoke('lock_state'));
+// Coming back to the window: the Rust side may have locked it meanwhile. Asking can only lock it.
+const askLock = async () => applyLock(await invoke('lock_state'));
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) askLock();
 });
