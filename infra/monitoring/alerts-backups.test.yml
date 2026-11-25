@@ -1,5 +1,5 @@
-# BackupTooOld held to its threshold (alerts.yml), apart from alerts.test.yml since it takes a day of evaluations:
-# evaluated every 5 minutes, it runs in seconds.
+# BackupTooOld and BackupStateMissing held to their thresholds (alerts.yml), apart from alerts.test.yml since they take
+# hours of evaluations: evaluated every 5 minutes, they run in seconds.
 rule_files: [alerts.yml]
 evaluation_interval: 5m
 
@@ -29,3 +29,28 @@ tests:
             exp_annotations:
               summary: "No new base backup for over 25 hours"
               description: "The last base backup that succeeded began over 25 hours ago: see barman list-backups onprem and the backup host's log."
+
+  # Barman's state never reported for an hour is an alert, not before; reported, never.
+  - interval: 5m
+    input_series:
+      - series: 'up{job="node", instance="node-exporter:9100"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: BackupStateMissing
+        exp_alerts: []
+      - eval_time: 1h
+        alertname: BackupStateMissing
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "Barman hasn't reported its backups' state for an hour"
+              description: "No barman_check_ok from the node exporter: a first base backup still running or stuck, or Barman or the node exporter down. See the backup host's log and barman list-backups onprem."
+  - interval: 5m
+    input_series:
+      - series: 'barman_check_ok{job="node", instance="node-exporter:9100"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: BackupStateMissing
+        exp_alerts: []

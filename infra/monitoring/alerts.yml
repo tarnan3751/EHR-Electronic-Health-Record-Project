@@ -55,6 +55,17 @@ groups:
           summary: "barman check onprem has been failing for 30 minutes"
           description: "Run barman check onprem on the backup host; its log says which check fails."
 
+      # Barman's loop has never reported its state: it writes it only after a pass, so a first base backup still running
+      # or stuck, or Barman or the node exporter down, leaves nothing for the rules above to read. This database's first
+      # backup over the WAN takes minutes; an hour is well past it (raise it for a much larger database).
+      - alert: BackupStateMissing
+        expr: absent(barman_check_ok)
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "Barman hasn't reported its backups' state for an hour"
+          description: "No barman_check_ok from the node exporter: a first base backup still running or stuck, or Barman or the node exporter down. See the backup host's log and barman list-backups onprem."
+
       # No new base backup for 25 hours, where one is taken every 23: the 6-day restore window, and nothing older than
       # 7 days being restorable, both rest on them.
       - alert: BackupTooOld

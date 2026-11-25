@@ -1,6 +1,6 @@
 # Each alert in alerts.yml held to its threshold and its wait, on made-up series: just under, nothing; past it, the
-# alert. BackupTooOld's day is in alerts-backups.test.yml, evaluated every 5 minutes rather than every 15 seconds so
-# that it takes seconds. CI's stack job runs both, and so can you, from this folder:
+# alert. BackupTooOld's day and BackupStateMissing's hour are in alerts-backups.test.yml, evaluated every 5 minutes
+# rather than every 15 seconds so that they take seconds. CI's stack job runs both, and so can you, from this folder:
 #   docker run --rm -v "$PWD:/m:ro" -w /m --entrypoint promtool prom/prometheus:v3.16.0 test rules alerts.test.yml alerts-backups.test.yml
 rule_files: [alerts.yml]
 evaluation_interval: 15s
