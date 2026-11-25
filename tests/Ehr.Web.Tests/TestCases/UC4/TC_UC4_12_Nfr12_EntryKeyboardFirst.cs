@@ -53,7 +53,7 @@ public class TC_UC4_12_Nfr12_EntryKeyboardFirst(WebApps apps) : IClassFixture<We
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/diagnoses");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#entry-name')"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('#entry-name') === true");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         // A name that isn't a code: the form comes back with the cursor in the field, marked invalid.
