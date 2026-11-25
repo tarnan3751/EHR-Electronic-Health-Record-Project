@@ -22,6 +22,10 @@ SCRIPTS = {script.id[:3]: script for script in load_scripts() + HOLDOUT}  # the 
 # run A2 recorded: their fact lists are kept apart.
 SEALED = "7180abd6707bf9f62b19c3b94ee21a3879fc33698f15c866752e7aef032005a9"
 SEALED_HELD_OUT = "39bb769c8ba101dfc4a346ef23aeb86c3f229683faed58ec88cab791b72e4fcb"
+# Their fact lists (eval/scripts-es-holdout-facts) are sealed the same way, each five apart, as they stand after the
+# rulings round (the review of 2026-11-24): a fact list changed to suit a reading changes its seal with it.
+SEALED_FACTS = "7210f3bbd0ba938dd7a466ea4d677b5f45889a19639418fe9137fad89c4bcf87"
+SEALED_FACTS_HELD_OUT = "0c288696317af65d396456d022dc85f7f03970f517047ca28896f675641417e6"
 
 
 def test_the_reading_imports_nothing_but_the_standard_library():
@@ -44,10 +48,14 @@ def test_every_script_has_a_fact_list_the_run_only_when_asked_ones_kept_apart_so
     assert not any(script.facts for script in HOLDOUT)
     kept_apart = {path.name for path in scoring_es.facts_dir(HOLDOUT_DIR).glob("*.toml")}
     assert kept_apart == {s.path.name for s in HOLDOUT}
-    for scripts, seal in (([s for s in HOLDOUT if s.id[:3] in SEEN], SEALED),
-                          ([s for s in HOLDOUT if s.id[:3] not in SEEN], SEALED_HELD_OUT)):
-        sealed = b"".join(script.path.read_bytes() for script in sorted(scripts, key=lambda s: s.path.name))
-        assert hashlib.sha256(sealed).hexdigest() == seal
+    facts_dir = scoring_es.facts_dir(HOLDOUT_DIR)
+    for scripts, seal, facts_seal in (([s for s in HOLDOUT if s.id[:3] in SEEN], SEALED, SEALED_FACTS),
+                                      ([s for s in HOLDOUT if s.id[:3] not in SEEN], SEALED_HELD_OUT,
+                                       SEALED_FACTS_HELD_OUT)):
+        ordered = sorted(scripts, key=lambda s: s.path.name)
+        assert hashlib.sha256(b"".join(s.path.read_bytes() for s in ordered)).hexdigest() == seal
+        facts = b"".join((facts_dir / s.path.name).read_bytes() for s in ordered)
+        assert hashlib.sha256(facts).hexdigest() == facts_seal
 
 
 def test_a_script_with_no_fact_list_anywhere_is_refused(tmp_path):

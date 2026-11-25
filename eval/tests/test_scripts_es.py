@@ -84,6 +84,9 @@ def test_the_gold_quotes_the_display_text_and_writes_no_markup(script):
         for statement in script.statements[name]:
             for quote in statement.spanish:
                 assert quote in script.display, f"{name}: {quote!r} isn't in the display text"
+                # Whole words: a source the checks would place word for word (translation._locate()), never one cut
+                # inside a word ("Niega dis"); structure, so every script is held to it.
+                assert re.search(rf"(?<!\w){re.escape(quote)}(?!\w)", script.display), f"{name}: {quote!r} cuts a word"
             assert not re.search(r"[\[\]{}<>|]", statement.english)
             if not held_out(script):  # the English checks' reading of an instruction: words, not structure
                 assert validation._without_instructions(statement.english, "", [])[1] == 0, "an English instruction"
@@ -213,6 +216,7 @@ def test_a_held_out_script_with_a_word_off_the_checks_lists_passes_the_format_te
 
 @pytest.mark.parametrize("broken", [
     [("spanish = [\"No está embarazada.\"]", "spanish = [\"No está embarazada ahora.\"]")],  # a source not in the text
+    [("spanish = [\"No está embarazada.\"]", "spanish = [\"No está embaraz\"]")],  # a source cut inside a word
     [("drugs = [\"azitromicina\"]", "drugs = [\"fosfomicina\"]")],  # a drug listed that the text doesn't say
     [("negated = [\"fever\", \"low back pain\"]", "negated = [\"fever\", \"chest pain\"]")],  # a finding not in the gold
     [("retracted = [\"50 mg\", \"3 días\"]", "retracted = [\"50 mg\", \"4 días\"]")],  # a retraction not in the text
