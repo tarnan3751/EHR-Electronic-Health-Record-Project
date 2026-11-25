@@ -33,6 +33,10 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public int OpenForms { get; private set; }
 
+    // How many messages from the care team the patient hasn't opened (FR-18), part of the same page view: read only
+    // when the session may message, so a proxy whose access leaves messages out is told nothing about them.
+    public int UnreadMessages { get; private set; }
+
     public async Task OnGetAsync()
     {
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
@@ -44,6 +48,11 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
         if (Patient is not null && MaySeeForms)
         {
             OpenForms = await phi.OpenFormsAsync(patientId, HttpContext.RequestAborted);
+        }
+
+        if (Patient is not null && MayMessage)
+        {
+            UnreadMessages = await phi.UnreadFromStaffAsync(patientId, HttpContext.RequestAborted);
         }
     }
 }

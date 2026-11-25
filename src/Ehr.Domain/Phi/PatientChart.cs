@@ -15,8 +15,14 @@ public sealed record PatientChart(
     IReadOnlyList<ActiveOrder> Orders)
 {
     // UC 1: set when the chart was asked to confirm a discontinuation and that order is this patient's and
-    // discontinued. Part of the same recorded read.
-    public bool ConfirmsDiscontinued { get; init; }
+    // discontinued: the order's name. Part of the same recorded read.
+    public string? DiscontinuedName { get; init; }
+
+    public bool ConfirmsDiscontinued => DiscontinuedName is not null;
+
+    // UC 1: set when the chart was asked to confirm an order just signed that replaced another (a change): the name
+    // of the order it replaced. Part of the same recorded read.
+    public string? ReplacedName { get; init; }
 
     // Sensitive diagnoses and medications are left out unless asked for: how many were left out, and whether they
     // were asked for (and so are in the lists, and the asking was recorded).
@@ -60,6 +66,14 @@ public sealed record PatientChart(
 
     // Lab orders whose results are in (step 7): those still to acknowledge first, abnormal ones before the rest.
     public IReadOnlyList<Ehr.Domain.Results.ResultedOrder> Resulted { get; init; } = [];
+
+    // Set when the entry form sent the clinician here after saving an entry, and that entry is this patient's: what
+    // the chart's "Saved:" notice says about it. Part of the same recorded read.
+    public SavedEntry? Saved { get; init; }
+
+    // When "No known allergies" is the allergy list's state: who recorded it, when the history knows (seeded entries
+    // have none). Part of the same recorded read.
+    public string? NoKnownAllergiesRecordedBy { get; init; }
 }
 
 // The vital signs a visit shows on the chart; null where one wasn't taken. The blood pressure is one reading's two
@@ -230,6 +244,11 @@ public sealed record InboxEntry(
 
 public sealed record InboxPage(IReadOnlyList<InboxEntry> Items, bool More);
 
+// An entry of one of the chart's lists just saved, as the chart's notice describes it: its list (by table), name,
+// status, whether it is among the lists the chart shows now (Listed), and whether the chart left it out as sensitive
+// (Hidden), in which case the notice doesn't name it.
+public sealed record SavedEntry(string Table, string Display, string Status, bool Listed, bool Hidden);
+
 // A patient with their current allergies, for the banner of a page that isn't the chart. One recorded read.
 public sealed record PatientHeader(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies);
 
@@ -247,7 +266,9 @@ public sealed record DictatedProposal(AiChartProposal Proposal, AiNoteReview Rev
 // One change to a patient's allergies, medications or diagnoses, as the history page lists it.
 public sealed record ChartChange(string TableName, Guid RowId, DateTimeOffset ChangedAt, string? ChangedBy, string? Before, string After);
 
-public sealed record ChartHistory(Patient Patient, IReadOnlyList<ChartChange> Changes, bool More, int SensitiveHidden, bool SensitiveShown);
+// The history page: with the banner's allergies, read in the same recorded read.
+public sealed record ChartHistory(
+    Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<ChartChange> Changes, bool More, int SensitiveHidden, bool SensitiveShown);
 
 // UC 1 (Tahseen Arnan): a patient as the order form shows them, already recorded as one read of the patient: the
 // banner's name and allergies, and, once an item is picked, the patient's active orders for it, for the duplicate warning.
@@ -269,9 +290,9 @@ public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance
     public DictatedProposal? Proposal { get; init; }
 }
 
-// UC 1: a patient's discontinued orders as their page lists them, already recorded as one read of the patient. More is
-// set when there are more than the page asked for.
-public sealed record DiscontinuedOrders(Patient Patient, IReadOnlyList<DiscontinuedOrder> Orders, bool More);
+// UC 1: a patient's discontinued orders as their page lists them, with the banner's allergies, already recorded as one
+// read of the patient. More is set when there are more than the page asked for.
+public sealed record DiscontinuedOrders(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<DiscontinuedOrder> Orders, bool More);
 
 // Entries of one kind for one patient, as the FHIR API reads them (the expansion plan's step 11), already recorded as
 // one read of the patient. Total counts every entry that matched, of which Entries holds up to the limit asked for;

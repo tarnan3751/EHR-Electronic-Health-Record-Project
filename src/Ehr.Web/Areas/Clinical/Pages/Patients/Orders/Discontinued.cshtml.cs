@@ -19,6 +19,11 @@ public class DiscontinuedModel(PhiReader phi, PatientAssignments assignments, Br
 
     public DiscontinuedOrders Orders { get; private set; } = null!;
 
+    // For the banner, as on the chart: whether the patient is on the clinician's panel, or until when emergency access lasts.
+    public bool OnPanel { get; private set; }
+
+    public DateTimeOffset? EmergencyUntil { get; private set; }
+
     public Dictionary<string, string> ChartLink
     {
         get
@@ -32,10 +37,14 @@ public class DiscontinuedModel(PhiReader phi, PatientAssignments assignments, Br
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
         Response.Headers.CacheControl = "no-store";
-        if (!await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted)
-            && await breakGlass.ActiveUntilAsync(id, HttpContext.RequestAborted) is null)
+        OnPanel = await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted);
+        if (!OnPanel)
         {
-            return RedirectToPage("/Patients/Reason", Search.ChartRouteValues(id));
+            EmergencyUntil = await breakGlass.ActiveUntilAsync(id, HttpContext.RequestAborted);
+            if (EmergencyUntil is null)
+            {
+                return RedirectToPage("/Patients/Reason", Search.ChartRouteValues(id));
+            }
         }
 
         if (await phi.DiscontinuedOrdersAsync(id, Limit, HttpContext.RequestAborted) is not { } orders)

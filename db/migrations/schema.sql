@@ -803,6 +803,29 @@ VALUES ('20261118095004_AuditSensitive', '10.0.13');
 COMMIT;
 
 START TRANSACTION;
+ALTER TABLE ehr.allergy_intolerances NO FORCE ROW LEVEL SECURITY;
+UPDATE ehr.allergy_intolerances SET clinical_status = 'inactive'
+WHERE code = 'no-known-allergy' AND clinical_status = 'active'
+  AND id NOT IN (
+      SELECT DISTINCT ON (patient_id) id FROM ehr.allergy_intolerances
+      WHERE code = 'no-known-allergy' AND clinical_status = 'active'
+      ORDER BY patient_id, recorded_at, id);
+DO $$
+BEGIN
+    IF (SELECT relrowsecurity FROM pg_class WHERE oid = 'ehr.allergy_intolerances'::regclass) THEN
+        ALTER TABLE ehr.allergy_intolerances FORCE ROW LEVEL SECURITY;
+    END IF;
+END
+$$;
+
+CREATE UNIQUE INDEX ix_allergy_intolerances_one_no_known_allergy ON ehr.allergy_intolerances (patient_id) WHERE code = 'no-known-allergy' AND clinical_status = 'active';
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261121224028_OneNoKnownAllergy', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
 ALTER TABLE ehr.medication_statements ALTER COLUMN display TYPE character varying(300);
 
 ALTER TABLE ehr.conditions ALTER COLUMN display TYPE character varying(300);
@@ -814,7 +837,7 @@ CREATE INDEX ix_clinical_codes_display ON ehr.clinical_codes USING GIN (to_tsvec
 CREATE INDEX ix_clinical_codes_kind_code ON ehr.clinical_codes (kind, code text_pattern_ops);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118105016_ClinicalCodeSearch', '10.0.13');
+VALUES ('20261123180010_ClinicalCodeSearch', '10.0.13');
 
 COMMIT;
 
@@ -984,7 +1007,7 @@ CREATE INDEX ix_drug_interactions_ingredient_b ON ehr.drug_interactions (ingredi
 CREATE INDEX ix_order_result_codes_observation_code ON ehr.order_result_codes (observation_code);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118105915_ReferenceTables', '10.0.13');
+VALUES ('20261123180020_ReferenceTables', '10.0.13');
 
 COMMIT;
 
@@ -1013,7 +1036,7 @@ CREATE INDEX ix_inbox_items_recipient_id_created_at ON ehr.inbox_items (recipien
 CREATE INDEX ix_inbox_items_recipient_id_done_at ON ehr.inbox_items (recipient_id, done_at) WHERE done_at IS NOT NULL;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118120345_InboxItems', '10.0.13');
+VALUES ('20261123180030_InboxItems', '10.0.13');
 
 COMMIT;
 
@@ -1050,7 +1073,7 @@ CREATE UNIQUE INDEX ix_appointments_encounter_id ON ehr.appointments (encounter_
 CREATE INDEX ix_appointments_patient_id_starts_at ON ehr.appointments (patient_id, starts_at);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118124810_Appointments', '10.0.13');
+VALUES ('20261123190010_Appointments', '10.0.13');
 
 COMMIT;
 
@@ -1058,7 +1081,7 @@ START TRANSACTION;
 ALTER TABLE ehr.appointments ADD version integer NOT NULL DEFAULT 1;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118183905_AppointmentVersion', '10.0.13');
+VALUES ('20261123190020_AppointmentVersion', '10.0.13');
 
 COMMIT;
 
@@ -1095,7 +1118,15 @@ CREATE INDEX ix_messages_patient_id ON ehr.messages (patient_id);
 CREATE INDEX ix_messages_thread_id_sent_at ON ehr.messages (thread_id, sent_at);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118185826_Messages', '10.0.13');
+VALUES ('20261123190030_Messages', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE INDEX ix_messages_unread_from_staff ON ehr.messages (patient_id) WHERE sender_kind = 'staff' AND read_at IS NULL;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261124052432_UnreadMessagesIndex', '10.0.13');
 
 COMMIT;
 
@@ -1123,7 +1154,7 @@ CREATE UNIQUE INDEX ix_proxy_grants_patient_id_proxy_email ON ehr.proxy_grants (
 CREATE INDEX ix_proxy_grants_proxy_email ON ehr.proxy_grants (proxy_email);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118195958_ProxyGrants', '10.0.13');
+VALUES ('20261125010100_ProxyGrants', '10.0.13');
 
 COMMIT;
 
@@ -1150,7 +1181,7 @@ CREATE INDEX ix_result_acknowledgments_order_id_patient_id ON ehr.result_acknowl
 CREATE INDEX ix_result_acknowledgments_patient_id ON ehr.result_acknowledgments (patient_id);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118215809_OrderResults', '10.0.13');
+VALUES ('20261125020100_OrderResults', '10.0.13');
 
 COMMIT;
 
@@ -1176,7 +1207,7 @@ CREATE UNIQUE INDEX ix_proxy_invitations_code_hash ON ehr.proxy_invitations (cod
 CREATE INDEX ix_proxy_invitations_grant_id ON ehr.proxy_invitations (grant_id);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118230602_ProxyOnlyAccounts', '10.0.13');
+VALUES ('20261125020200_ProxyOnlyAccounts', '10.0.13');
 
 COMMIT;
 
@@ -1198,7 +1229,7 @@ ALTER TABLE ehr.drug_interactions ADD CONSTRAINT ck_drug_interactions_level CHEC
 ALTER TABLE ehr.drug_interactions ADD CONSTRAINT ck_drug_interactions_source CHECK (source IN ('ddinter', 'onc', 'fda-label'));
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119014012_InteractionSources', '10.0.13');
+VALUES ('20261125020300_InteractionSources', '10.0.13');
 
 COMMIT;
 
@@ -1208,7 +1239,7 @@ ALTER TABLE ehr.orders ADD safety_override_reason character varying(500);
 ALTER TABLE ehr.orders ADD safety_warnings jsonb;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119014501_OrderSafety', '10.0.13');
+VALUES ('20261125020400_OrderSafety', '10.0.13');
 
 COMMIT;
 
@@ -1268,7 +1299,7 @@ ALTER TABLE ehr.encounters DROP COLUMN heart_rate_per_minute;
 ALTER TABLE ehr.encounters DROP COLUMN systolic_mm_hg;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119025658_VitalSigns', '10.0.13');
+VALUES ('20261125020500_VitalSigns', '10.0.13');
 
 COMMIT;
 
@@ -1276,7 +1307,7 @@ START TRANSACTION;
 CREATE UNIQUE INDEX ux_observations_vital_sign_once ON ehr.observations (patient_id, code, effective_at, encounter_id) NULLS NOT DISTINCT WHERE category = 'vital-signs';
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119035421_VitalSignOnce', '10.0.13');
+VALUES ('20261125020600_VitalSignOnce', '10.0.13');
 
 COMMIT;
 
@@ -1309,7 +1340,7 @@ CREATE INDEX ix_note_addenda_note_id_signed_at ON ehr.note_addenda (note_id, sig
 CREATE INDEX ix_note_addenda_patient_id ON ehr.note_addenda (patient_id);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119053453_NoteAddenda', '10.0.13');
+VALUES ('20261125020700_NoteAddenda', '10.0.13');
 
 COMMIT;
 
@@ -1399,7 +1430,7 @@ END
 $$;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119072440_VitalCorrections', '10.0.13');
+VALUES ('20261125020800_VitalCorrections', '10.0.13');
 
 COMMIT;
 
@@ -1453,7 +1484,7 @@ END
 $$;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119083741_NoteSensitivity', '10.0.13');
+VALUES ('20261125020900_NoteSensitivity', '10.0.13');
 
 COMMIT;
 
@@ -1493,7 +1524,7 @@ END
 $$;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261119191644_InheritedSensitivity', '10.0.13');
+VALUES ('20261125021000_InheritedSensitivity', '10.0.13');
 
 COMMIT;
 
@@ -1731,7 +1762,7 @@ CREATE UNIQUE INDEX ux_observations_vital_sign_once ON ehr.observations (patient
 ALTER TABLE ehr.observations ADD CONSTRAINT ck_observations_reading CHECK ((reading_id IS NOT NULL) = (category = 'vital-signs' AND code IS NOT NULL AND code IN ('8480-6', '8462-4')));
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261120032936_VitalReadings', '10.0.13');
+VALUES ('20261125021100_VitalReadings', '10.0.13');
 
 COMMIT;
 
@@ -2037,7 +2068,7 @@ END
 $$;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261120071837_ChildrenRanges', '10.0.13');
+VALUES ('20261125021200_ChildrenRanges', '10.0.13');
 
 COMMIT;
 
@@ -2049,7 +2080,7 @@ CREATE TABLE ehr.lab_keys (
 );
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261121021505_LabKeys', '10.0.13');
+VALUES ('20261125030100_LabKeys', '10.0.13');
 
 COMMIT;
 
@@ -2102,7 +2133,7 @@ CREATE INDEX ix_visit_summaries_sensitive_marked_by ON ehr.visit_summaries (sens
 CREATE INDEX ix_visit_summaries_withdrawn_by ON ehr.visit_summaries (withdrawn_by);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261121072854_VisitSummaries', '10.0.13');
+VALUES ('20261125040100_VisitSummaries', '10.0.13');
 
 COMMIT;
 
@@ -2146,7 +2177,7 @@ CREATE INDEX ix_refill_requests_requested_by ON ehr.refill_requests (requested_b
 CREATE UNIQUE INDEX ux_refill_requests_open ON ehr.refill_requests (medication_statement_id) WHERE status = 'requested';
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261121181613_RefillRequests', '10.0.13');
+VALUES ('20261125040200_RefillRequests', '10.0.13');
 
 COMMIT;
 
@@ -2229,7 +2260,7 @@ CREATE INDEX ix_questionnaire_responses_questionnaire_code ON ehr.questionnaire_
 CREATE UNIQUE INDEX ix_questionnaire_responses_request_id ON ehr.questionnaire_responses (request_id);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261122061618_PreVisitForms', '10.0.13');
+VALUES ('20261125040300_PreVisitForms', '10.0.13');
 
 COMMIT;
 
@@ -2249,7 +2280,7 @@ ALTER TABLE ehr.audit_events ADD CONSTRAINT ck_audit_events_part
                         'download', 'views', 'refills', 'forms')) NOT VALID;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261122064253_AuditEventParts', '10.0.13');
+VALUES ('20261125040400_AuditEventParts', '10.0.13');
 
 COMMIT;
 
@@ -2306,7 +2337,7 @@ END
 $$;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261122105343_SoapNotes', '10.0.13');
+VALUES ('20261125050100_SoapNotes', '10.0.13');
 
 COMMIT;
 
@@ -2344,7 +2375,7 @@ CREATE UNIQUE INDEX ix_ai_chart_proposals_review_id_ordinal ON ehr.ai_chart_prop
 CREATE INDEX ix_ai_chart_proposals_review_id_patient_id ON ehr.ai_chart_proposals (review_id, patient_id);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261122164730_AiChartProposals', '10.0.13');
+VALUES ('20261125050200_AiChartProposals', '10.0.13');
 
 COMMIT;
 
@@ -2403,7 +2434,7 @@ CREATE INDEX ix_ambient_transcripts_id_patient_id ON ehr.ambient_transcripts (id
 ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT fk_ai_note_reviews_ambient_consents_consent_id_patient_id FOREIGN KEY (consent_id, patient_id) REFERENCES ehr.ambient_consents (id, patient_id) ON DELETE RESTRICT;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261122182450_AmbientListening', '10.0.13');
+VALUES ('20261125050300_AmbientListening', '10.0.13');
 
 COMMIT;
 
@@ -2426,7 +2457,7 @@ CREATE INDEX ix_emergency_access_reviews_reviewer_id ON ehr.emergency_access_rev
 CREATE INDEX ix_audit_events_break_glass ON ehr.audit_events (occurred_at DESC, id DESC) WHERE action = 'break_glass';
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261124201447_EmergencyAccessReviews', '10.0.13');
+VALUES ('20261125060100_EmergencyAccessReviews', '10.0.13');
 
 COMMIT;
 

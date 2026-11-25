@@ -25,6 +25,14 @@ public class ResultsModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public bool Available { get; private set; }
 
+    // Whether the session may write to the care team, which a proxy's access may leave out (FR-19): "Ask about this
+    // result" is a message.
+    public bool MayMessage => subject.MayMessage;
+
+    // Whether this is someone else's record, read under a proxy grant: a message about one of its results says "the
+    // result", not "my result".
+    public bool Acting => subject.Acting is not null;
+
     public async Task OnGetAsync()
     {
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.

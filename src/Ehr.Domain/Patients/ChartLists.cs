@@ -17,7 +17,12 @@ public sealed partial class ChartLists(EhrDbContext db)
     // How many names the search offers as a clinician types.
     public const int Suggestions = 20;
 
+    // The longest name, reaction or dosage the form takes: the width of those columns in all three tables
+    // (AllergyIntoleranceConfiguration, MedicationStatementConfiguration, ConditionConfiguration).
     public const int MaximumLength = 200;
+
+    // What "No known allergies" is called, stored and shown: one wording everywhere.
+    public const string NoKnownAllergies = AllergyIntolerance.NoKnownAllergyDisplay;
 
     // What a patient can have when exposed, offered as the clinician types; anything else can be typed.
     public static readonly string[] Reactions =
@@ -25,6 +30,11 @@ public sealed partial class ChartLists(EhrDbContext db)
         "Anaphylaxis", "Contact dermatitis", "Diarrhea", "Hives", "Itching", "Nausea", "Rash", "Shortness of breath", "Sneezing",
         "Stomach cramps", "Swelling of the lips", "Vomiting", "Wheezing",
     ];
+
+    // What the chart calls an allergy entry: "No known allergies" for that entry, whatever name it was stored with.
+    public static string DisplayOf(AllergyIntolerance allergy) => DisplayOf(allergy.Code, allergy.Display);
+
+    public static string DisplayOf(string? code, string display) => code == AllergyIntolerance.NoKnownAllergy ? NoKnownAllergies : display;
 
     // Names of one kind that match what was typed: first those that start with it; then a diagnosis whose code starts
     // with it; then those with words that start with each word typed ("diab mell" finds "Type 2 diabetes mellitus
@@ -66,27 +76,57 @@ public sealed partial class ChartLists(EhrDbContext db)
     [System.Text.RegularExpressions.GeneratedRegex("[a-z0-9]+")]
     private static partial System.Text.RegularExpressions.Regex Word();
 
-    // The code whose name is exactly what was picked or typed, in any case.
-    public Task<ClinicalCode?> FindAsync(string kind, string? display, CancellationToken cancellationToken)
+    // Whether a diagnosis's ICD-10-CM code is sensitive by the rule (ehr.icd10cm_is_sensitive), as the loaded reference
+    // codes record it: the entry form shows such a diagnosis's "Sensitive" box checked and fixed. The database marks it
+    // whatever the form sends, so a code missing from the reference list is still marked; the form just can't say so.
+    public Task<bool> IsSensitiveDiagnosisAsync(string? code, CancellationToken cancellationToken) =>
+        code is null
+            ? Task.FromResult(false)
+            : db.ClinicalCodes.AsNoTracking().AnyAsync(c => c.Kind == ClinicalCodeKind.Condition && c.Code == code && c.Sensitive, cancellationToken);
+
+    // The code whose name is exactly what was picked or typed, in any case; or, for a diagnosis, the ICD-10-CM code
+    // itself, typed in any case, with or without its dot ("i10", "E11.9", "e119"), as the form's hint offers.
+    public async Task<ClinicalCode?> FindAsync(string kind, string? display, CancellationToken cancellationToken)
     {
-        var key = display?.Trim().ToLowerInvariant() ?? "";
-        return db.ClinicalCodes.AsNoTracking().Where(c => c.Kind == kind && c.DisplayKey == key).OrderBy(c => c.System).ThenBy(c => c.Code)
+        var typed = display?.Trim() ?? "";
+        var key = typed.ToLowerInvariant();
+        var named = await db.ClinicalCodes.AsNoTracking().Where(c => c.Kind == kind && c.DisplayKey == key).OrderBy(c => c.System).ThenBy(c => c.Code)
             .FirstOrDefaultAsync(cancellationToken);
+        if (named is not null || kind != ClinicalCodeKind.Condition || IcdCode(typed) is not { } code)
+        {
+            return named;
+        }
+
+        return await db.ClinicalCodes.AsNoTracking().FirstOrDefaultAsync(c => c.Kind == kind && c.Code == code, cancellationToken);
     }
 
-    // Adds the entry, or, when it has an ID already, saves every field of it a form can change. False when the database
-    // refused: the patient isn't on the clinician's panel, or the entry isn't theirs to change. Nothing is saved then.
-    public Task<bool> SaveAsync(AllergyIntolerance allergy, bool isNew, CancellationToken cancellationToken) =>
+    // What was typed as an ICD-10-CM code, written as the list writes it (upper case, the dot after the third
+    // character), or null when it can't be one: a letter, two characters, then up to four more.
+    static string? IcdCode(string typed)
+    {
+        var bare = typed.Replace(".", "", StringComparison.Ordinal).ToUpperInvariant();
+        if (bare.Length is < 3 or > 7 || !char.IsAsciiLetter(bare[0]) || !bare.All(char.IsAsciiLetterOrDigit))
+        {
+            return null;
+        }
+
+        return bare.Length == 3 ? bare : $"{bare[..3]}.{bare[3..]}";
+    }
+
+    // Adds the entry, or, when it has an ID already, saves every field of it a form can change. Refused when the
+    // database refused: the patient isn't on the clinician's panel, or the entry isn't theirs to change. Nothing is
+    // saved then.
+    public Task<ChartSave> SaveAsync(AllergyIntolerance allergy, bool isNew, CancellationToken cancellationToken) =>
         SaveAsync(allergy, isNew, cancellationToken, nameof(AllergyIntolerance.Code), nameof(AllergyIntolerance.CodeSystem),
             nameof(AllergyIntolerance.Display), nameof(AllergyIntolerance.ClinicalStatus), nameof(AllergyIntolerance.Category),
             nameof(AllergyIntolerance.Criticality), nameof(AllergyIntolerance.Reaction), nameof(AllergyIntolerance.Severity));
 
-    public Task<bool> SaveAsync(MedicationStatement medication, bool isNew, CancellationToken cancellationToken) =>
+    public Task<ChartSave> SaveAsync(MedicationStatement medication, bool isNew, CancellationToken cancellationToken) =>
         SaveAsync(medication, isNew, cancellationToken, nameof(MedicationStatement.Code), nameof(MedicationStatement.Display),
             nameof(MedicationStatement.Dosage), nameof(MedicationStatement.Status), nameof(MedicationStatement.EffectiveStart),
             nameof(MedicationStatement.EffectiveEnd), nameof(MedicationStatement.Sensitive));
 
-    public Task<bool> SaveAsync(Condition condition, bool isNew, CancellationToken cancellationToken) =>
+    public Task<ChartSave> SaveAsync(Condition condition, bool isNew, CancellationToken cancellationToken) =>
         SaveAsync(condition, isNew, cancellationToken, nameof(Condition.Code), nameof(Condition.Display), nameof(Condition.ClinicalStatus),
             nameof(Condition.OnsetDate), nameof(Condition.Sensitive));
 
@@ -99,7 +139,7 @@ public sealed partial class ChartLists(EhrDbContext db)
         const string savepoint = "proposed_allergy";
         var transaction = db.Database.CurrentTransaction!;
         await transaction.CreateSavepointAsync(savepoint, cancellationToken);
-        if (!await SaveAsync(allergy, isNew: true, cancellationToken))
+        if (await SaveAsync(allergy, isNew: true, cancellationToken) != ChartSave.Saved)
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
             return ProposedAllergy.Refused;
@@ -138,21 +178,37 @@ public sealed partial class ChartLists(EhrDbContext db)
 
     // Records that the patient has no known allergies: an entry of its own, so a chart can tell it from no allergy
     // information at all. The database refuses it for a patient with an active allergy recorded, and makes it inactive
-    // when one is added (db/policies/65-chart-lists.sql). False when it was refused.
-    public Task<bool> RecordNoKnownAllergiesAsync(Guid patient, CancellationToken cancellationToken) =>
+    // when one is added (db/policies/65-chart-lists.sql). AllergyRecorded when an active allergy is why it was refused.
+    public Task<ChartSave> RecordNoKnownAllergiesAsync(Guid patient, CancellationToken cancellationToken) =>
         SaveAsync(new AllergyIntolerance
         {
             Id = Guid.CreateVersion7(),
             PatientId = patient,
             Code = AllergyIntolerance.NoKnownAllergy,
-            Display = "No known allergy",
+            Display = NoKnownAllergies,
             ClinicalStatus = AllergyClinicalStatus.Active,
             RecordedAt = DateTimeOffset.UtcNow,
         }, isNew: true, cancellationToken);
 
     // An insert, or an update of the named columns of the row with the entry's ID. Reads nothing: the page read the
     // entry as this patient's through PhiReader, and row-level security decides whether the write may happen.
-    async Task<bool> SaveAsync(object entry, bool isNew, CancellationToken cancellationToken, params string[] changed)
+    //
+    // A new entry's ID comes with the form, chosen when it was opened, so a form posted twice (a double click, or
+    // Back and post again) finds its row there already: the insert then becomes an update of it, not a second entry.
+    // Updating one of the patient's entries by its ID is what changing it is, with the same policies; an ID that is
+    // another patient's entry's is refused, as moving an entry is (65-chart-lists.sql).
+    async Task<ChartSave> SaveAsync(object entry, bool isNew, CancellationToken cancellationToken, params string[] changed)
+    {
+        var saved = await TrySaveAsync(entry, isNew, cancellationToken, changed);
+        // The update names the patient too: for another patient's row that would be a move, which the guard refuses,
+        // so a form can only ever write its own patient's entry.
+        return saved == RepeatedInsert ? await TrySaveAsync(entry, isNew: false, cancellationToken, [.. changed, "PatientId"]) : saved;
+    }
+
+    // An insert that found its ID taken: try it as an update. Never returned by SaveAsync.
+    const ChartSave RepeatedInsert = (ChartSave)(-1);
+
+    async Task<ChartSave> TrySaveAsync(object entry, bool isNew, CancellationToken cancellationToken, string[] changed)
     {
         const string savepoint = "chart_entry";
         var transaction = db.Database.CurrentTransaction!;
@@ -170,22 +226,42 @@ public sealed partial class ChartLists(EhrDbContext db)
         {
             await db.SaveChangesAsync(cancellationToken);
             await transaction.ReleaseSavepointAsync(savepoint, cancellationToken);
-            return true;
+            return ChartSave.Saved;
         }
         catch (DbUpdateConcurrencyException)
         {
             // No row: not an entry this clinician may change.
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-            return false;
+            return ChartSave.Refused;
         }
-        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: var state }
-            // Refused by row-level security; or, for "No known allergies" only, by the rule that a patient with an
-            // allergy recorded has none. Any other broken constraint is a fault, and is thrown.
-            && (state == PostgresErrorCodes.InsufficientPrivilege
-                || state == PostgresErrorCodes.CheckViolation && entry is AllergyIntolerance { Code: AllergyIntolerance.NoKnownAllergy }))
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.InsufficientPrivilege })
         {
+            // Refused by row-level security.
             await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
-            return false;
+            return ChartSave.Refused;
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.CheckViolation }
+            && entry is AllergyIntolerance { Code: AllergyIntolerance.NoKnownAllergy })
+        {
+            // "No known allergies" only: refused because the patient has an allergy recorded. Any other broken
+            // constraint is a fault, and is thrown.
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            return ChartSave.AllergyRecorded;
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } unique
+            && unique.ConstraintName == AllergyIntoleranceConfiguration.OneNoKnownAllergyIndex
+            && entry is AllergyIntolerance { Code: AllergyIntolerance.NoKnownAllergy })
+        {
+            // "No known allergies" is already recorded (a second click, or another tab): nothing more to save.
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            return ChartSave.AlreadyRecorded;
+        }
+        catch (DbUpdateException e) when (isNew && e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: { } key }
+            && key.StartsWith("pk_", StringComparison.Ordinal))
+        {
+            // The form was posted before: its entry exists.
+            await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+            return RepeatedInsert;
         }
         finally
         {
@@ -208,4 +284,19 @@ public enum ProposedAllergy
 
     // The proposal was decided first, in another tab. Nothing is saved, the allergy included.
     Decided,
+}
+
+// What saving a chart entry did. Nothing was saved unless Saved.
+public enum ChartSave
+{
+    Saved,
+
+    // The database refused the write: the patient isn't on the clinician's panel, or the entry isn't theirs.
+    Refused,
+
+    // "No known allergies" only: refused because the patient has an active allergy recorded.
+    AllergyRecorded,
+
+    // "No known allergies" only: it is already recorded, so nothing more was saved. As good as Saved to the clinician.
+    AlreadyRecorded,
 }

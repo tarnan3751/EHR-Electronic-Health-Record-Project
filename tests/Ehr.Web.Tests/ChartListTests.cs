@@ -1,7 +1,12 @@
 using System.Net;
+using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Data.Patients;
+using Ehr.Domain.Audit;
+using Ehr.Domain.Phi;
+using Ehr.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
@@ -197,6 +202,348 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(reads + 1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
         using var created = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NewNote", $"/patients/{patient}");
         Assert.Contains("<strong>Peanut</strong>: Anaphylaxis", await ReadAsync(created));
+    }
+
+    // After a save the chart says what happened: the entry named and where it is listed; an entry given a status that
+    // takes it off the chart, and why it isn't listed; and a sensitive entry the chart leaves out, without its name.
+    [Fact]
+    public async Task After_a_save_the_chart_says_what_was_saved_without_naming_a_hidden_sensitive_entry()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Confirmed");
+
+        using var added = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Essential (primary) hypertension"), ("Status", "active"));
+        var chart = await ReadAsync(added);
+        Assert.Equal($"/patients/{patient}", PathOf(added));
+        Assert.Contains("Saved: Essential (primary) hypertension is listed under Diagnoses.", Words(chart));
+
+        using var medication = await SaveAsync(session.Client, patient, "medications", null, ("Name", "lisinopril 10 MG Oral Tablet"), ("Status", "active"));
+        var entry = await IdAsync(apps, "medication_statements", patient);
+        using var stopped = await SaveAsync(session.Client, patient, "medications", entry, ("Name", "lisinopril 10 MG Oral Tablet"), ("Status", "stopped"));
+        Assert.Contains("Saved: lisinopril 10 MG Oral Tablet is now stopped, so it is no longer listed.", Words(await ReadAsync(stopped)));
+
+        using var anxiety = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Generalized anxiety disorder"), ("Status", "active"));
+        var hidden = await ReadAsync(anxiety);
+        Assert.Contains("Saved: the diagnosis is sensitive, so it is kept with the sensitive items.", Words(hidden));
+        Assert.DoesNotContain("anxiety", hidden, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Sensitive items hidden: 1 diagnosis or medication is not shown.", Words(hidden));
+
+        // An address naming another patient's entry, or none that exists, confirms nothing.
+        var other = await apps.InsertPatientAsync("Synthetic", "Not confirmed");
+        await apps.AssignAsync(await apps.ClinicianAsync(), other);
+        var elsewhere = await session.Client.GetStringAsync($"/patients/{other}?saved={entry}&savedList=medications", Cancel);
+        Assert.DoesNotContain("Saved:", Words(elsewhere));
+        Assert.DoesNotContain("lisinopril", elsewhere);
+    }
+
+    // When the save can't happen, the clinician is told, and what they typed isn't lost. A patient taken off the panel
+    // between opening the form and saving it: a page that says so, with the typed name to copy, and nothing about the
+    // patient on it, since nothing about them may be read now.
+    [Fact]
+    public async Task A_save_for_a_patient_no_longer_on_the_panel_says_it_was_not_saved_and_keeps_what_was_typed()
+    {
+        var (clinician, patient, session) = await OnPanelAsync(apps, "Left the panel");
+        using var form = await session.Client.GetAsync(EntryPath(patient, "diagnoses"), Cancel);
+        await using (var db = await apps.OpenDatabaseAsync())
+        {
+            await using var end = new NpgsqlCommand("UPDATE ehr.patient_assignments SET ended_at = now() WHERE patient_id = @patient AND clinician_id = @clinician", db);
+            end.Parameters.AddWithValue("patient", patient);
+            end.Parameters.AddWithValue("clinician", clinician.Id);
+            Assert.Equal(1, await end.ExecuteNonQueryAsync(Cancel));
+        }
+
+        var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
+        using var posted = await PostFormAsync(session.Client, EntryPath(patient, "diagnoses"), form, ("Name", "Essential (primary) hypertension"), ("Status", "active"));
+
+        Assert.Equal(HttpStatusCode.Conflict, posted.StatusCode);
+        var page = await posted.Content.ReadAsStringAsync(Cancel);
+        Assert.Contains("Not saved: this patient isn't on your panel, so nothing was changed. What you entered is below, to copy.", Words(page));
+        Assert.Contains("Essential (primary) hypertension</textarea>", page);
+        Assert.DoesNotContain("Left the panel", page);
+        Assert.DoesNotContain("sc-banner", page);
+        Assert.Equal(reads, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+        Assert.Empty(await RowsAsync(apps, "conditions", patient, "display"));
+    }
+
+    // "No known allergies" posted from a chart opened before a colleague recorded an allergy: the database refuses it,
+    // and the chart says so, with the allergy listed.
+    [Fact]
+    public async Task No_known_allergies_after_a_colleague_recorded_an_allergy_is_not_saved_and_the_chart_says_why()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Colleague recorded");
+        using var chart = await session.Client.GetAsync($"/patients/{patient}", Cancel);
+        var colleague = await apps.CreateStaffAsync("Dr. Colleague Allergy", StaffRoles.Clinician);
+        await apps.AssignAsync(colleague, patient);
+        var theirs = await SignInAsync(apps.OnPrem, colleague);
+        using var peanut = await SaveAsync(theirs.Client, patient, "allergies", null, ("Name", "Peanut"), ("Reaction", "Hives"), ("Status", "active"));
+
+        using var refused = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", chart);
+        var page = Words(await ReadAsync(refused));
+
+        Assert.Contains("Not saved: an allergy is recorded for this patient, so \"No known allergies\" wasn't recorded. Their allergies are listed below.", page);
+        Assert.Equal(["Peanut active"], await RowsAsync(apps, "allergy_intolerances", patient, "display || ' ' || clinical_status"));
+
+        // The notice can't be made to claim what isn't so: with an allergy listed, "saved" says nothing.
+        Assert.DoesNotContain("Saved:", Words(await session.Client.GetStringAsync($"/patients/{patient}?noKnownAllergies=saved", Cancel)));
+    }
+
+    // "Record no known allergies" pressed twice, or from two tabs, records one: the second finds it recorded already,
+    // and the chart confirms it the same way.
+    [Fact]
+    public async Task No_known_allergies_posted_twice_is_recorded_once()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Double click");
+        using var chart = await session.Client.GetAsync($"/patients/{patient}", Cancel);
+        var token = Token(await chart.Content.ReadAsStringAsync(Cancel));
+
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            using var posted = await session.Client.PostAsync($"/patients/{patient}?handler=NoKnownAllergies", Form(("__RequestVerificationToken", token)), Cancel);
+            Assert.Contains("Saved: no known allergies recorded for this patient.", Words(await ReadAsync(posted)));
+        }
+
+        Assert.Equal(["no-known-allergy active"], await RowsAsync(apps, "allergy_intolerances", patient, "code || ' ' || clinical_status"));
+    }
+
+    // Who recorded "No known allergies" is read in the chart's patient statement: about a third of the seeded charts
+    // say "No known allergies", and the chart is the page nearest the render gate, so it costs no statement of its own
+    // (step 7a; VisitSummaryTests holds the same for the summary tag).
+    [Fact]
+    public async Task Who_recorded_no_known_allergies_costs_the_chart_no_statement_of_its_own()
+    {
+        var (clinician, patient, session) = await OnPanelAsync(apps, "Recorded by");
+        async Task<(int Commands, PatientChart Chart)> ChartAsync()
+        {
+            var commands = new PatientSearchQueryTests.CapturedCommands();
+            var user = new UserContext { UserId = clinician.Id };
+            var options = new DbContextOptionsBuilder<EhrDbContext>();
+            EhrDbContext.Configure(options, apps.Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+            options.AddInterceptors(new UserContextInterceptor(user), commands);
+            await using var db = new EhrDbContext(options.Options);
+            var reader = new PhiReader(db, new AuditRecorder(db, user, new AuditSource(AuditSources.OnPrem)), user);
+            await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+            var chart = (await reader.ChartAsync(patient, 5, AuditParts.Chart, Cancel))!;
+            await transaction.RollbackAsync(Cancel);
+            return (commands.Executed.Count, chart);
+        }
+
+        var (unasked, nothingRecorded) = await ChartAsync();
+        Assert.Null(nothingRecorded.NoKnownAllergiesRecordedBy);
+        using var recorded = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", $"/patients/{patient}");
+        Assert.Contains("Saved: no known allergies recorded for this patient.", Words(await ReadAsync(recorded)));
+
+        var (noneKnown, chart) = await ChartAsync();
+
+        Assert.Equal("Dr. Test", chart.NoKnownAllergiesRecordedBy);
+        Assert.Equal(unasked, noneKnown);
+    }
+
+    // A diagnosis sensitive by its code has its "Sensitive" box checked and fixed, with a hint that says why, and
+    // stays sensitive whatever is posted; any other diagnosis's box can be checked and cleared.
+    [Fact]
+    public async Task A_diagnosis_sensitive_by_its_code_has_its_sensitive_box_fixed()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Fixed box");
+        using var anxiety = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Generalized anxiety disorder"), ("Status", "active"));
+        using var hypertension = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Essential (primary) hypertension"), ("Status", "active"));
+        var ids = (await RowsAsync(apps, "conditions", patient, "id::text", "display")).Select(Guid.Parse).ToList();
+        var (anxietyId, hypertensionId) = (ids[1], ids[0]);
+        const string fixedBox = "<input type=\"checkbox\" id=\"entry-sensitive\" checked disabled aria-describedby=\"entry-sensitive-hint\">";
+
+        var byCode = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", anxietyId), Cancel);
+        Assert.Contains(fixedBox, byCode);
+        Assert.Contains("Sensitive by its code.", Words(byCode));
+        var other = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", hypertensionId), Cancel);
+        Assert.DoesNotContain("disabled", other);
+        Assert.Contains("name=\"Sensitive\" value=\"true\"", other);
+
+        // Posted without the box, as a disabled box is: still sensitive. And a form shown again after a mistake keeps it fixed.
+        using var changed = await SaveAsync(session.Client, patient, "diagnoses", anxietyId, ("Name", "Generalized anxiety disorder"), ("Status", "remission"));
+        Assert.Equal(["Essential (primary) hypertension false", "Generalized anxiety disorder true"],
+            await RowsAsync(apps, "conditions", patient, "display || ' ' || sensitive"));
+        using var mistake = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Generalized anxiety disorder"), ("Status", "active"), ("Onset", "2999-01-01"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, mistake.StatusCode);
+        Assert.Contains(fixedBox, await mistake.Content.ReadAsStringAsync(Cancel));
+    }
+
+    // The form comes back with the cursor in the first field to fix, in the form's order, whichever it is; and the
+    // chart's notice after a save is the one thing marked to take the focus.
+    [Fact]
+    public async Task The_first_field_with_an_error_takes_the_focus()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Focused");
+        static string Focused(string html) =>
+            string.Join(" ", System.Text.RegularExpressions.Regex.Matches(html, "<(?:input|select)[^>]*\\sautofocus=\"autofocus\"[^>]*\\sid=\"([^\"]+)\"|<(?:input|select)[^>]*\\sid=\"([^\"]+)\"[^>]*\\sautofocus=\"autofocus\"")
+                .Select(match => match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value));
+
+        using var onset = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Essential (primary) hypertension"), ("Status", "active"), ("Onset", "2999-01-01"));
+        Assert.Equal("entry-onset", Focused(await onset.Content.ReadAsStringAsync(Cancel)));
+        using var both = await SaveAsync(session.Client, patient, "medications", null, ("Name", "lisinopril 10 MG Oral Tablet"), ("Status", "deleted"), ("Started", "2024-02-30"));
+        Assert.Equal("entry-started", Focused(await both.Content.ReadAsStringAsync(Cancel)));
+        using var allergy = await SaveAsync(session.Client, patient, "allergies", null, ("Name", "Peanut"), ("Status", "active"), ("Criticality", "extreme"));
+        Assert.Equal("entry-criticality", Focused(await allergy.Content.ReadAsStringAsync(Cancel)));
+        Assert.Equal("entry-name", Focused(await session.Client.GetStringAsync(EntryPath(patient, "diagnoses"), Cancel)));
+
+        using var saved = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Essential (primary) hypertension"), ("Status", "active"));
+        var chart = await ReadAsync(saved);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(chart, "data-focus-on-load"));
+        Assert.Matches("<p class=\"sc-notice sc-notice--success\" role=\"status\" tabindex=\"-1\" data-focus-on-load data-saved>", chart);
+    }
+
+    // An "Add" form posted twice (a double click, or Back and post again) saves one entry: its ID came with the form,
+    // so the second post updates the first's row. Two posts at the same moment do too. And an ID that is another
+    // patient's entry's can't be used to change that entry from this patient's form.
+    [Fact]
+    public async Task An_add_form_posted_twice_saves_one_entry()
+    {
+        var (clinician, patient, session) = await OnPanelAsync(apps, "Posted twice");
+        using var page = await session.Client.GetAsync(EntryPath(patient, "allergies"), Cancel);
+        var html = await page.Content.ReadAsStringAsync(Cancel);
+        var newId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(html, "name=\"NewEntryId\" value=\"([^\"]+)\"").Groups[1].Value);
+        var token = Token(html);
+        Task<HttpResponseMessage> PostAsync(string reaction) => session.Client.PostAsync(EntryPath(patient, "allergies"),
+            Form(("__RequestVerificationToken", token), ("NewEntryId", newId), ("Name", "Peanut"), ("Reaction", reaction), ("Status", "active")), Cancel);
+
+        using (var first = await PostAsync("Hives"))
+        using (var second = await PostAsync("Rash"))
+        {
+            Assert.Contains("Saved: Peanut is listed under Allergies.", Words(await ReadAsync(second)));
+        }
+
+        Assert.Equal([$"{newId} Peanut Rash"], await RowsAsync(apps, "allergy_intolerances", patient, "concat_ws(' ', id, display, reaction)"));
+        // At once: still one.
+        var other = await apps.InsertPatientAsync("Synthetic", "Posted at once");
+        await apps.AssignAsync(clinician, other);
+        var form = await session.Client.GetStringAsync(EntryPath(other, "diagnoses"), Cancel);
+        var otherId = System.Text.RegularExpressions.Regex.Match(form, "name=\"NewEntryId\" value=\"([^\"]+)\"").Groups[1].Value;
+        var posts = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => session.Client.PostAsync(EntryPath(other, "diagnoses"),
+            Form(("__RequestVerificationToken", Token(form)), ("NewEntryId", otherId), ("Name", "Essential (primary) hypertension"), ("Status", "active")), Cancel)));
+        Assert.All(posts, posted => Assert.Equal(HttpStatusCode.OK, posted.StatusCode));
+        Assert.Equal(["Essential (primary) hypertension"], await RowsAsync(apps, "conditions", other, "display"));
+
+        // Another patient's entry's ID, posted from this patient's form: refused, and that entry is unchanged.
+        using var crossed = await session.Client.PostAsync(EntryPath(other, "allergies"),
+            Form(("__RequestVerificationToken", token), ("NewEntryId", newId), ("Name", "Penicillin G"), ("Status", "active")), Cancel);
+        Assert.Equal(HttpStatusCode.Conflict, crossed.StatusCode);
+        Assert.Contains("Not saved: the database refused the change", Words(await crossed.Content.ReadAsStringAsync(Cancel)));
+        Assert.Equal([$"{newId} Peanut Rash"], await RowsAsync(apps, "allergy_intolerances", patient, "concat_ws(' ', id, display, reaction)"));
+        Assert.Empty(await RowsAsync(apps, "allergy_intolerances", other, "display"));
+    }
+
+    // With sensitive items shown, the way from the chart to the history or a form, and back, keeps them shown: each
+    // such view is recorded as one, as asked for. Without, nothing adds them.
+    [Fact]
+    public async Task Sensitive_items_shown_stay_shown_through_the_history_and_the_entry_form()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Kept shown");
+        using var anxiety = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Generalized anxiety disorder"), ("Status", "active"));
+        var entry = await IdAsync(apps, "conditions", patient);
+
+        var shown = await session.Client.GetStringAsync($"/patients/{patient}?sensitive=true", Cancel);
+        Assert.Contains($"href=\"/patients/{patient}/chart-history?sensitive=true\"", shown);
+        Assert.Contains($"href=\"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true\"", shown);
+        Assert.Contains($"href=\"{EntryPath(patient, "medications")}?showSensitive=true\"", shown);
+        var history = await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel);
+        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to the chart", history);
+        var form = await session.Client.GetStringAsync($"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true", Cancel);
+        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to the chart", form);
+
+        var path = $"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true";
+        using var saved = await PostFormAsync(session.Client, path, path, ("Name", "Generalized anxiety disorder"), ("Status", "active"), ("Onset", "2024-01-02"));
+        Assert.Contains("sensitive=true", saved.RequestMessage!.RequestUri!.Query);
+        var back = await ReadAsync(saved);
+        Assert.Contains("Saved: Generalized anxiety disorder is listed under Diagnoses.", Words(back));
+        Assert.Contains("Sensitive items shown:", Words(back));
+
+        // Hidden, nothing carries them.
+        var hidden = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
+        Assert.DoesNotContain("showSensitive", hidden);
+        Assert.Contains($"href=\"/patients/{patient}/chart-history\"", hidden);
+    }
+
+    // The history and the discontinued orders show the banner with the patient's allergies, read in the page's one
+    // recorded read, and, under emergency access, its tag with the time it ends.
+    [Fact]
+    public async Task The_history_and_discontinued_orders_show_the_allergy_banner_and_emergency_access()
+    {
+        var (clinician, patient, session) = await OnPanelAsync(apps, "Bannered pages");
+        using var peanut = await SaveAsync(session.Client, patient, "allergies", null, ("Name", "Peanut"), ("Reaction", "Hives"), ("Criticality", "high"), ("Status", "active"));
+
+        foreach (var path in new[] { $"/patients/{patient}/chart-history", $"/patients/{patient}/orders/discontinued" })
+        {
+            var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
+            var page = await session.Client.GetStringAsync(path, Cancel);
+            Assert.Matches("<section class=\"sc-banner\"[\\s\\S]*High risk: <strong>Peanut</strong>: Hives[\\s\\S]*</section>", page);
+            Assert.Contains("<span class=\"sc-tag\">Yours</span>", page);
+            Assert.Equal(reads + 1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
+        }
+
+        var covering = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Dr. Covering Banner", StaffRoles.Clinician));
+        using var opened = await PostFormAsync(covering.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));
+        foreach (var path in new[] { $"/patients/{patient}/chart-history", $"/patients/{patient}/orders/discontinued" })
+        {
+            var page = Words(await covering.Client.GetStringAsync(path, Cancel));
+            Assert.Contains("Emergency access until", page);
+            Assert.Contains("High risk: Peanut: Hives", page);
+        }
+    }
+
+    // A diagnosis can be saved by its ICD-10-CM code, typed in any case and with or without the dot, as the form's
+    // hint offers: it saves that code's diagnosis. Something code-like that isn't one is still refused.
+    [Fact]
+    public async Task A_diagnosis_can_be_saved_by_its_typed_code()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Typed code");
+
+        using var byCode = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", " i10 "), ("Status", "active"));
+        using var noDot = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "e119"), ("Status", "active"));
+        Assert.Contains("Saved: Type 2 diabetes mellitus without complications is listed under Diagnoses.", Words(await ReadAsync(noDot)));
+        using var notACode = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Z99.999"), ("Status", "active"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, notACode.StatusCode);
+        // Codes are for diagnoses only: a medication's isn't looked up that way.
+        using var medication = await SaveAsync(session.Client, patient, "medications", null, ("Name", "314076"), ("Status", "active"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, medication.StatusCode);
+
+        Assert.Equal(["Essential (primary) hypertension I10", "Type 2 diabetes mellitus without complications E11.9"],
+            await RowsAsync(apps, "conditions", patient, "concat_ws(' ', display, code)"));
+    }
+
+    // The entry form is never kept by the browser, opened to add or to change, and a sensitive entry's form included:
+    // the page says so itself, whatever else on it would.
+    [Fact]
+    public async Task The_entry_form_is_never_cached()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Uncached");
+        using var added = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Generalized anxiety disorder"), ("Status", "active"));
+        var entry = await IdAsync(apps, "conditions", patient);
+
+        foreach (var path in new[] { EntryPath(patient, "diagnoses"), EntryPath(patient, "medications"), EntryPath(patient, "allergies"), EntryPath(patient, "diagnoses", entry) })
+        {
+            using var form = await session.Client.GetAsync(path, Cancel);
+            Assert.Equal(HttpStatusCode.OK, form.StatusCode);
+            Assert.True(form.Headers.CacheControl?.NoStore, $"{path} may be cached: {form.Headers.CacheControl}");
+        }
+    }
+
+    // The search the clinician came from travels through the form and back to the chart, and the entry's own name
+    // never becomes a search criterion: it would put the name, a sensitive diagnosis's too, in the chart's address.
+    [Fact]
+    public async Task Saving_an_entry_keeps_the_search_and_never_puts_the_entrys_name_in_the_address()
+    {
+        var (_, patient, session) = await OnPanelAsync(apps, "Addressed");
+        var form = $"{EntryPath(patient, "diagnoses")}?name=Addressed";
+
+        using var saved = await PostFormAsync(session.Client, form, form, ("Name", "Generalized anxiety disorder"), ("Status", "active"));
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var address = saved.RequestMessage!.RequestUri!;
+        Assert.Equal($"/patients/{patient}", address.AbsolutePath);
+        Assert.Contains("name=Addressed", address.Query);
+        Assert.DoesNotContain("anxiety", Uri.UnescapeDataString(address.Query), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("anxiety", await saved.Content.ReadAsStringAsync(Cancel), StringComparison.OrdinalIgnoreCase);
+
+        // Without a search, nothing at all is added for one.
+        using var plain = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Essential (primary) hypertension"), ("Status", "active"));
+        Assert.DoesNotContain("name=", plain.RequestMessage!.RequestUri!.Query);
     }
 
     // Off-site, a saved entry is forwarded to the on-site server; the history is read from the cloud copy.

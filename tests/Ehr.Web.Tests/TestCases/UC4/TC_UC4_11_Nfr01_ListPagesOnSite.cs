@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Run this test case against that file.
 // Expected result: The p99 of the whole request, the commit of its audit events included, is under 15 ms for each of
 //   the four rows. Acceptance criterion: p99 < 15 ms, each.
-// Creator: Tahseen Arnan
+// Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_11_Nfr01_ListPagesOnSite
 {
     const double LimitMilliseconds = 15;

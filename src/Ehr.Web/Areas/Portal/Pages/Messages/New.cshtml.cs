@@ -23,11 +23,34 @@ public class NewModel(PortalSubject subject, SecureMessages messages) : PageMode
 
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
+    // Opened from a result's "Ask about this result": the subject is filled in, and the message box
+    // has the focus.
+    public bool About { get; private set; }
+
     public IActionResult OnGet()
     {
         Response.Headers.CacheControl = "no-store";
         // A proxy whose grant doesn't include messages (FR-19) is sent to the page that says so.
         return subject.MayMessage ? Page() : RedirectToPage("Index");
+    }
+
+    // The results page posts the subject here, so it stays out of the address. Nothing is saved: the form comes back
+    // with the subject filled in, for the patient to write the message and send it. The subject is the patient's to
+    // change, like any they type, and is cut to the length a subject may have. A proxy whose grant doesn't include
+    // messages (FR-19) is sent to the page that says so, as from the form itself.
+    public IActionResult OnPostAbout()
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (!subject.MayMessage)
+        {
+            return RedirectToPage("Index");
+        }
+
+        About = true;
+        var typed = Subject?.Trim();
+        Subject = typed?.Length > SecureMessages.MaximumSubject ? typed[..SecureMessages.MaximumSubject] : typed;
+        Body = null;
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
