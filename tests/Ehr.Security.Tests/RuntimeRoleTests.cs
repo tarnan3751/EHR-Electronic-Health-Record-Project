@@ -182,6 +182,36 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         Assert.Equal([false], owner);
     }
 
+    // Step 21: a runtime role's session left idle in an open transaction is ended after a minute (db/policies/00-roles.sql),
+    // so it can't hold back the lab's hand-over for long (LabSecurityTests). It is each role's own setting, and the
+    // migration owner's sessions keep PostgreSQL's default, no limit.
+    [Fact]
+    public async Task Runtime_roles_end_a_transaction_left_idle_for_a_minute()
+    {
+        var settings = await QueryAsync(
+            """
+            SELECT r.rolname, s.setconfig FROM pg_db_role_setting s JOIN pg_roles r ON r.oid = s.setrole
+            WHERE s.setdatabase = 0 AND r.rolname = ANY(@roles)
+            """,
+            reader => (Role: reader.GetString(0), Config: reader.GetFieldValue<string[]>(1)),
+            ("roles", RuntimeRoles));
+
+        Assert.Equal(RuntimeRoles.Order(), settings.Select(s => s.Role).Order());
+        Assert.All(settings, s => Assert.Contains("idle_in_transaction_session_timeout=60s", s.Config));
+
+        Assert.Equal("1min", await IdleLimitAsync(database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword)));
+        Assert.Equal("1min", await IdleLimitAsync(database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword)));
+        Assert.Equal("0", await IdleLimitAsync(database.OwnerConnectionString));
+    }
+
+    static async Task<string> IdleLimitAsync(string connectionString)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand("SHOW idle_in_transaction_session_timeout", connection);
+        return (string)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
+    }
+
     [Fact]
     public async Task Runtime_roles_own_nothing()
     {

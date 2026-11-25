@@ -167,6 +167,23 @@ jobs:
           [ "$(docker compose exec -T -u postgres cloud-db psql -Atc 'select pg_is_in_recovery()')" = t ]
           echo "cloud-db is a read-only standby"
 
+      # The apps' roles end a transaction left idle for a minute (db/policies/00-roles.sql). Role settings are catalog
+      # rows, so the replica has them too, for the cloud app's ehr_read.
+      - name: The apps' roles have their idle limit on both databases
+        run: |
+          query="select string_agg(r.rolname || ' ' || array_to_string(s.setconfig, ','), '; ' order by r.rolname)
+                 from pg_db_role_setting s join pg_roles r on r.oid = s.setrole where r.rolname in ('ehr_app', 'ehr_read')"
+          expected="ehr_app idle_in_transaction_session_timeout=60s; ehr_read idle_in_transaction_session_timeout=60s"
+          for db in onprem-db cloud-db; do
+            for _ in $(seq 15); do
+              settings=$(docker compose exec -T -u postgres "$db" psql -Atc "$query" || true)
+              [ "$settings" = "$expected" ] && break
+              sleep 2
+            done
+            echo "$db: $settings"
+            [ "$settings" = "$expected" ]
+          done
+
       # Barman's first base backup takes about a minute; `barman check` fails until it's done.
       - name: Backups are healthy
         run: |
