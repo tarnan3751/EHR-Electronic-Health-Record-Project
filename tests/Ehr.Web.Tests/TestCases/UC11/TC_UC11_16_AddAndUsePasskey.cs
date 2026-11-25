@@ -86,4 +86,26 @@ public class TC_UC11_16_AddAndUsePasskey(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await page.Locator("[data-passkey-use]").CountAsync());
         Assert.Empty(errors);
     }
+
+    // The final review's remark: at 360 pixels a clinician's app bar row scrolls sideways, and "Passkeys", its fifth link,
+    // starts past the edge; reached from the keyboard, it is scrolled into view (app-bar.js).
+    [Fact]
+    public async Task At_360_pixels_the_passkeys_link_reached_from_the_keyboard_is_in_view()
+    {
+        var clinician = await apps.CreateStaffAsync("Dr. Narrow Window", StaffRoles.Clinician);
+        var session = await Browser.SignInAsync(apps.OnPrem, clinician);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
+        await using var context = await browser.NewContextAsync(new() { IgnoreHTTPSErrors = true, ViewportSize = new() { Width = 360, Height = 800 } });
+        await context.AddCookiesAsync(session.Jar.GetCookies(Browser.Base).Cast<System.Net.Cookie>().Select(c => new Microsoft.Playwright.Cookie
+        { Name = c.Name, Value = c.Value, Domain = "localhost", Path = c.Path, Secure = true, HttpOnly = c.HttpOnly, SameSite = SameSiteAttribute.Strict }));
+        var page = await context.NewPageAsync();
+        await page.GotoAsync($"{server.Url}/quick-texts");
+        const string Edge = "() => { const r = document.querySelector('.sc-appbar__nav a[href=\"/passkeys\"]').getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }";
+        Assert.False(await page.EvaluateAsync<bool>(Edge));
+
+        await AiReviewBrowserTests.TabToAsync(page, ".sc-appbar__nav a[href='/passkeys']");
+        await page.WaitForFunctionAsync(Edge);
+    }
 }

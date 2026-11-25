@@ -68,6 +68,11 @@
         @* The warning before the session ends, and what happens when it does (step 18). *@
         <script src="~/_content/Ehr.Design/js/session.js" defer></script>
     }
+    @if (signedIn && !isPatient)
+    {
+        @* A staff app bar link reached from the keyboard is scrolled into view on a narrow window (step 19's review). *@
+        <script src="~/_content/Ehr.Design/js/app-bar.js" defer></script>
+    }
     @* A page's own scripts, such as dictation's, so no other page loads them. *@
     @await RenderSectionAsync("Scripts", required: false)
 </head>

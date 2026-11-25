@@ -623,8 +623,8 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
     // The app bar's navigation is left out: on a narrow window it is a row of its own that scrolls sideways by itself
-    // (ehr.css), so a link past its edge, as a clinician's fifth since the passkeys page (step 19) and an administrator's
-    // before it, is scrolled to, never a page wider than the window, which "scrolls" still checks.
+    // (ehr.css), so a link past its edge, as a clinician's fifth since the passkeys page (step 19), is scrolled to, by a
+    // swipe or from the keyboard (app-bar.js), never a page wider than the window, which "scrolls" still checks.
     [Fact]
     public async Task TC_UC23_06_a_visits_review_fits_every_width_in_both_themes()
     {
