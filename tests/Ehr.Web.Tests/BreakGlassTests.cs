@@ -38,11 +38,12 @@ public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Emergency access", html);
 
         // Open to them now without asking again, and every step is in the log: the grant with its reason, the trigger's
-        // record of the grant row, and the two chart views.
+        // record of the grant row, and the two chart views. (Since step 18 the grant also writes each administrator's
+        // inbox item to review it, which TC-UC12-04 counts.)
         using var again = await Client(apps.OnPrem, session.Jar, followRedirects: false).GetAsync($"/patients/{patient}", Cancel);
         Assert.Equal(HttpStatusCode.OK, again.StatusCode);
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.BreakGlass, actorId: clinician.Id, patientId: patient));
-        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Insert, actorId: clinician.Id, patientId: patient));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Insert, actorId: clinician.Id, patientId: patient, table: "break_glass_accesses"));
         Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient));
         Assert.Equal(["Covering the night shift"], await apps.ReasonsAsync(AuditActions.BreakGlass, clinician.Id, patient));
     }

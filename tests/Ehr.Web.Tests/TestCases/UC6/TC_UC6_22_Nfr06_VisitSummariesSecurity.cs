@@ -80,7 +80,7 @@ public class TC_UC6_22_Nfr06_VisitSummariesSecurity(WebApps apps) : IClassFixtur
 
             Assert.DoesNotMatch(new Regex("[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}", RegexOptions.IgnoreCase), markup);
             Assert.All(Regex.Matches(markup, "data-[a-z-]+=\"([^\"]*)\"").Select(m => m.Groups[1].Value),
-                value => Assert.Contains(value, new[] { "standing", "withdrawn", "hidden", "shown", "" }));
+                value => Assert.Contains(value, new[] { "standing", "withdrawn", "hidden", "shown", "" }.Concat(SessionBrowser.PortalSettings)));
 
             foreach (var path in new[] { "/portal", "/portal/summaries", "/portal/results", "/portal/appointments", "/portal/messages", "/portal/access" })
             {

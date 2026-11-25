@@ -14,6 +14,7 @@ using Ehr.Web.Api.Desktop;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -81,6 +82,9 @@ public sealed class WebApps : IAsyncLifetime
     public RecordingEmailSender Emails { get; } = new();
 
     public DictationSidecarStub Dictation { get; } = new();
+
+    // The sign-in cookies' clock, which a test of a session's end moves on (step 18).
+    public ShiftedClock Clock { get; } = new();
 
     // Rather than 20 seconds, so the test of a service that doesn't answer is quick.
     public static readonly TimeSpan DictationTimeout = TimeSpan.FromSeconds(2);
@@ -406,18 +410,19 @@ public sealed class WebApps : IAsyncLifetime
         return (long)(await command.ExecuteScalarAsync())!;
     }
 
-    public async Task<long> AuditEventsAsync(string action, Guid? actorId = null, Guid? patientId = null, string? source = null)
+    public async Task<long> AuditEventsAsync(string action, Guid? actorId = null, Guid? patientId = null, string? source = null, string? table = null)
     {
         await using var connection = await OpenDatabaseAsync();
         await using var command = new NpgsqlCommand(
             """
             SELECT count(*) FROM ehr.audit_events
             WHERE action = @action AND (@actor IS NULL OR actor_id = @actor) AND (@patient IS NULL OR patient_id = @patient)
-              AND (@source IS NULL OR source = @source)
+              AND (@source IS NULL OR source = @source) AND (@table IS NULL OR table_name = @table)
             """,
             connection);
         command.Parameters.AddWithValue("action", action);
         command.Parameters.AddWithValue("source", NpgsqlTypes.NpgsqlDbType.Text, (object?)source ?? DBNull.Value);
+        command.Parameters.AddWithValue("table", NpgsqlTypes.NpgsqlDbType.Text, (object?)table ?? DBNull.Value);
         command.Parameters.AddWithValue("actor", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)actorId ?? DBNull.Value);
         command.Parameters.AddWithValue("patient", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)patientId ?? DBNull.Value);
         return (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
@@ -503,6 +508,11 @@ public sealed class WebApps : IAsyncLifetime
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IEmailSender>(emails);
+                foreach (var scheme in new[] { AccountSchemes.Staff, AccountSchemes.Patient, AccountSchemes.StaffPending })
+                {
+                    services.PostConfigure<CookieAuthenticationOptions>(scheme, options => options.TimeProvider = apps.Clock);
+                }
+
                 if (onPrem is not null)
                 {
                     services.AddSingleton(onPrem);

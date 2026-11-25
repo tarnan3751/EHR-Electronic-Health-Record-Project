@@ -69,7 +69,8 @@ public partial class TC_UC6_48_Nfr06_WhoViewedSecurity(WebApps apps) : IClassFix
             Assert.DoesNotContain(WebApps.MrnOf(first.Patient), markup);
             Assert.DoesNotContain(WebApps.MrnOf(second.Patient), markup);
             Assert.All(LogWords, word => Assert.DoesNotContain(word, Words(markup), StringComparison.Ordinal));
-            Assert.All(DataAttribute().Matches(markup), value => Assert.Contains(value.Groups[1].Value, (string[])["you", "staff", "proxy", "lab", "explained"]));
+            Assert.All(DataAttribute().Matches(markup),
+                value => Assert.Contains(value.Groups[1].Value, (string[])["you", "staff", "proxy", "lab", "explained", .. SessionBrowser.PortalSettings]));
             Assert.Contains(Lines(html), line => line.StartsWith("staff | Dr. Test", StringComparison.Ordinal));
         }
 

@@ -59,6 +59,12 @@ GRANT SELECT ON ehr.patient_assignments TO ehr_read;
 GRANT SELECT, INSERT ON ehr.break_glass_accesses TO ehr_app;
 GRANT SELECT ON ehr.break_glass_accesses TO ehr_read;
 
+-- An administrator's review of an emergency access (step 18). Restricted, like the audit log: row-level security
+-- follows, and no write-audit trigger, since the row is its own record. Added once, never changed: no UPDATE and no
+-- DELETE. The cloud app reads them, for the audit page, and forwards a review to the clinic's server.
+GRANT SELECT, INSERT ON ehr.emergency_access_reviews TO ehr_app;
+GRANT SELECT ON ehr.emergency_access_reviews TO ehr_read;
+
 -- The rest of the chart: allergies, medications, diagnoses (conditions) and visits (encounters). PHI, like patients:
 -- row-level security and the write-audit trigger follow. The on-prem app reads them as ehr_app, the cloud app as
 -- ehr_read. Clinicians add and change allergies, medications and diagnoses, and mark them inactive: INSERT and UPDATE
