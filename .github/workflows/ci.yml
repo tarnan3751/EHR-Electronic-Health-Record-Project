@@ -54,6 +54,11 @@ jobs:
       - name: Check the brand files
         run: dotnet run tools/brand/sync.cs -- --check
 
+      # The Tailscale access rules parse, name only what they define, and have a test for every opening
+      # (infra/tailscale/check.cs). Syntax only: they have never been applied to a tailnet.
+      - name: Check the Tailscale policy file
+        run: dotnet run infra/tailscale/check.cs
+
       - name: Test
         run: dotnet test --solution Ehr.slnx --configuration Release --no-build
 

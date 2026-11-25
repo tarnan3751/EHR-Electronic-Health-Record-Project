@@ -209,7 +209,7 @@ In the real deployment the cross-site links also run inside Tailscale, which enc
 
 ## What this doesn't reproduce
 
-- **Tailscale:** the Docker networks copy who can reach whom, not Tailscale's device identity or access rules.
+- **Tailscale:** the Docker networks copy who can reach whom, not Tailscale's device identity or access rules. The rules for a real deployment are in `infra/tailscale/policy.hujson`, checked for syntax only (`infra/tailscale/check.cs`) and never applied to a tailnet.
 - **DNS and certificates:** the hosts file stands in for split-horizon DNS, and mkcert stands in for the ACME wildcard certificate.
 - **Disk encryption:** the volumes are as encrypted as the host's disk, and no more (see [Encryption](#encryption)).
 - **Network timing:** the TCP handshake latency and HTTP/3 limits above.
