@@ -9,12 +9,17 @@ namespace Ehr.Web.Tests;
 // window.__ambient, each time it asked for the microphone and each call it made and the answer, so the tests can say in
 // which order things happened. Each recorder's chunks say which recorder made them ("synthetic audio 2" for the second),
 // and, as a real recorder's, its last chunk and its stop come after stop() returns: later still while a test holds them
-// (window.__ambient.hold, then release()). In the browser tests' collection, for the reason AiReviewBrowserTests gives.
+// (window.__ambient.hold, then release()). A real recorder makes a chunk every five seconds; this one makes one every 60
+// ms, but only while no audio the page sent is still waiting for its answer (window.__ambient.uploading), so the page
+// never has more than its next chunk queued behind the one on its way, however slow the machine. Without that, a test's
+// few seconds made dozens of chunks, all to be sent one at a time before Stop could ask for the voices, which on a busy
+// machine outlasted a test's 30-second wait (TC-UC23-06's limit test). In the browser tests' collection, for the reason
+// AiReviewBrowserTests gives.
 [Collection(BrowserTests.Collection)]
 public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
 {
     internal const string FakeMicrophone = """
-        window.__ambient = { events: [], recorders: 0, hold: false, held: [], release() { this.held.splice(0).forEach((fire) => fire()); } };
+        window.__ambient = { events: [], recorders: 0, hold: false, held: [], uploading: 0, release() { this.held.splice(0).forEach((fire) => fire()); } };
         Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: async () => {
             window.__ambient.events.push('microphone');
             const track = { enabled: true, stopped: false, stop() { this.stopped = true; } };
@@ -24,17 +29,23 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         const fetched = window.fetch.bind(window);
         window.fetch = async (url, options) => {
             const call = `${options?.method ?? 'GET'} ${new URL(url, location.href).pathname}`;
+            const audio = call.endsWith('/audio');
             window.__ambient.events.push(`sent ${call}`);
-            const response = await fetched(url, options);
-            window.__ambient.events.push(`${call} ${response.status}`);
-            return response;
+            if (audio) window.__ambient.uploading++;
+            try {
+                const response = await fetched(url, options);
+                window.__ambient.events.push(`${call} ${response.status}`);
+                return response;
+            } finally {
+                if (audio) window.__ambient.uploading--;
+            }
         };
         window.MediaRecorder = class extends EventTarget {
             constructor() { super(); this.state = 'inactive'; this.mimeType = 'audio/webm'; this.number = ++window.__ambient.recorders; }
             chunk() { return new BlobEvent('dataavailable', { data: new Blob([`synthetic audio ${this.number}`], { type: this.mimeType }) }); }
             start() {
                 this.state = 'recording';
-                this.timer = setInterval(() => { if (this.state === 'recording') this.dispatchEvent(this.chunk()); }, 60);
+                this.timer = setInterval(() => { if (this.state === 'recording' && !window.__ambient.uploading) this.dispatchEvent(this.chunk()); }, 60);
             }
             pause() { this.state = 'paused'; }
             resume() { this.state = 'recording'; }
