@@ -2,8 +2,9 @@
 //
 // UNTESTED AGAINST A NETWORK. Nobody has applied this file to a tailnet: there is no account (the expansion plan's step
 // 21, the owner's decision 18a). `dotnet run infra/tailscale/check.cs` (CI runs it) checks only that it parses, uses only
-// the sections and shapes below, names nothing it doesn't define, and that every opening is accepted by a test. Whether
-// Tailscale accepts it, and whether its tests pass under Tailscale's own evaluation, is known only once it is applied.
+// the sections and shapes below, names nothing it doesn't define, that every opening is accepted by a test, and that
+// no two tests contradict each other. Whether Tailscale accepts it, and whether its tests pass under Tailscale's own
+// evaluation, is known only once it is applied.
 // The syntax follows Tailscale's public docs, read on 2026-11-25 (tailscale.com/kb/1324/grants, kb/1337/policy-syntax).
 //
 // Who reaches what, over Tailscale:

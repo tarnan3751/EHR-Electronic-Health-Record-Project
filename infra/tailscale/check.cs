@@ -5,8 +5,9 @@
 //
 // What it checks: the file parses as HuJSON (JSON with comments and trailing commas); it has exactly the sections this
 // project uses (groups, tagOwners, grants, tests), each in the shape below; every group, tag and user it names is
-// defined; every port is a single TCP or UDP port; nothing is a wildcard; and every opening a grant makes (a source, a
-// tagged destination and a port) is accepted by some test from that source.
+// defined; every port is a single TCP or UDP port; nothing is a wildcard; every opening a grant makes (a source, a
+// tagged destination and a port) is accepted by some test from that source; and no source's tests both accept and deny
+// the same destination and port.
 // What it doesn't: that Tailscale accepts the file (its own schema may differ from this one), that the tests pass under
 // Tailscale's own evaluation, that a deny in the tests is really denied, or that devices are tagged as the rules assume.
 // The rules are untested against a network until the owner applies them to a tailnet (policy.hujson's header).
@@ -86,6 +87,7 @@ if (problems.Count == 0)
     }
 
     var accepted = new List<(string Source, string Destination, string Port)>();
+    var denied = new List<(string Source, string Destination, string Port)>();
     number = 0;
     foreach (var test in Objects(root.GetProperty("tests"), "tests"))
     {
@@ -110,12 +112,18 @@ if (problems.Count == 0)
                 var match = Patterns.Destination().Match(entry);
                 Require(match.Success && tags.Contains(match.Groups[1].Value) && Port(match.Groups[2].Value),
                     $"{where} {kind}: \"{entry}\" isn't <defined tag>:<port>");
-                if (match.Success && kind == "accept")
+                if (match.Success)
                 {
-                    accepted.Add((source, match.Groups[1].Value, $"{proto}:{match.Groups[2].Value}"));
+                    (kind == "accept" ? accepted : denied).Add((source, match.Groups[1].Value, $"{proto}:{match.Groups[2].Value}"));
                 }
             }
         }
+    }
+
+    // Tests that contradict each other: one of them must be wrong.
+    foreach (var contradiction in accepted.Intersect(denied).Distinct())
+    {
+        problems.Add($"tests both accept and deny {contradiction.Source} to {contradiction.Destination} on {contradiction.Port}");
     }
 
     // A test from a user counts for the groups it is in.
