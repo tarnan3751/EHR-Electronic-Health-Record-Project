@@ -125,7 +125,7 @@ public class OrderSafetySecurityTests(MigratedDatabase database) : IClassFixture
     }
 
     // A medication marked sensitive is named to the clinician who is ordering, and not in what the order keeps: an
-    // order's audit details are open to admins, who never see sensitive items (step 2b).
+    // order's audit details were open to admins, who never see sensitive items (step 2b).
     [Fact]
     public async Task A_sensitive_medication_is_not_named_in_what_the_order_and_its_audit_keep()
     {
@@ -138,12 +138,22 @@ public class OrderSafetySecurityTests(MigratedDatabase database) : IClassFixture
         await SignAsync(clinician, patient, "SYN-MED-007", "Synthetic: washout complete", order);
         Assert.Equal(["a medication marked sensitive"], (await Accounts.QueryAsync(database.SuperuserConnectionString, null,
             "SELECT DISTINCT w->>'against' FROM ehr.orders o, jsonb_array_elements(o.safety_warnings) w WHERE o.id = @id", ("id", order))));
+        // Since step 18a an administrator gets an order's fields by name alone, never a value, and not the names that
+        // would say it had safety warnings at all.
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
-        Assert.Equal(["false"], await Accounts.QueryAsync(App, admin,
+        var shown = await Accounts.QueryAsync(App, admin,
             """
-            SELECT bool_or(d.details::text ILIKE '%phenelzine%')::text
+            SELECT coalesce(d.details::text, 'no details') || ' ' || coalesce(array_to_string(d.fields, ','), '')
             FROM ehr.audit_events e, ehr.shown_audit_details(ARRAY[e.id]) d WHERE e.table_name = 'orders' AND e.row_id = @id
-            """, ("id", order)));
+            """, ("id", order));
+        Assert.NotEmpty(shown);
+        Assert.All(shown, line =>
+        {
+            Assert.StartsWith("no details ", line);
+            Assert.Contains("catalog_code", line);
+            Assert.DoesNotContain("phenelzine", line, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("safety", line);
+        });
     }
 
     // A product with two ingredients that interact with each other, ordered again while the patient takes it: a

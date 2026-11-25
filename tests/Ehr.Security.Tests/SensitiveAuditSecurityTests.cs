@@ -5,11 +5,12 @@ using Xunit;
 
 namespace Ehr.Security.Tests;
 
-// The expansion plan's step 2b: what an admin can see of a write to a sensitive item, as the runtime roles, in SQL of
-// its own (db/policies/10-grants.sql, 30-rls.sql and 40-audit.sql). The write audit keeps the full record. The runtime
-// roles can't read its values column at all; ehr.shown_audit_details gives an admin the values of ordinary writes and
-// never those of a sensitive item, including the events written before the item was marked; and an audit event is
-// never edited, by anyone, beyond being marked.
+// The expansion plan's steps 2b and 18a: what an admin can see of a write, as the runtime roles, in SQL of its own
+// (db/policies/10-grants.sql, 30-rls.sql and 40-audit.sql). The write audit keeps the full record. The runtime roles
+// can't read its values column at all; ehr.shown_audit_details gives an admin, of a write to patient data, the names of
+// the fields it changed and never a value (step 18a), nothing of a sensitive item's, including the events written before
+// the item was marked, and the details of an event about no patient as recorded; and an audit event is never edited, by
+// anyone, beyond being marked.
 public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
@@ -17,7 +18,7 @@ public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixt
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
 
     const string Shown = """
-        SELECT e.action || ' ' || e.sensitive || ' ' || coalesce(d.details::text, 'hidden')
+        SELECT e.action || ' ' || e.sensitive || ' ' || coalesce(d.details::text, 'fields ' || array_to_string(d.fields, ','), 'hidden')
         FROM ehr.audit_events e LEFT JOIN ehr.shown_audit_details(ARRAY(SELECT id FROM ehr.audit_events WHERE row_id = @row)) d ON d.id = e.id
         WHERE e.row_id = @row ORDER BY e.occurred_at, e.action
         """;
@@ -34,7 +35,7 @@ public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixt
         Accounts.QueryAsync(database.SuperuserConnectionString, null, sql, parameters);
 
     [Fact]
-    public async Task An_admin_sees_the_values_of_an_ordinary_write_and_never_those_of_a_sensitive_item()
+    public async Task An_admin_sees_the_fields_of_an_ordinary_write_and_nothing_of_a_sensitive_item()
     {
         var (clinician, patient, admin) = await AccountsAsync();
         var hypertension = Guid.CreateVersion7();
@@ -47,8 +48,10 @@ public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixt
         foreach (var connection in new[] { App, Read })
         {
             var ordinary = Assert.Single(await Accounts.QueryAsync(connection, admin, Shown, ("row", hypertension)));
-            Assert.StartsWith("insert false {", ordinary);
-            Assert.Contains("Essential (primary) hypertension", ordinary);
+            Assert.StartsWith("insert false fields ", ordinary);
+            Assert.Contains("clinical_status,code,display", ordinary);
+            Assert.DoesNotContain("hypertension", ordinary, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("I10", ordinary);
             Assert.Equal(["insert true hidden", "update true hidden"], await Accounts.QueryAsync(connection, admin, Shown, ("row", anxiety)));
         }
 
@@ -84,7 +87,7 @@ public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixt
         await Accounts.ExecuteAsync(App, clinician,
             "INSERT INTO ehr.medication_statements (id, patient_id, code, display, status) VALUES (@id, @patient, '312941', 'sertraline 50 MG Oral Tablet', 'active')",
             ("id", id), ("patient", patient));
-        Assert.Contains("sertraline", Assert.Single(await Accounts.QueryAsync(App, admin, Shown, ("row", id))));
+        Assert.StartsWith("insert false fields ", Assert.Single(await Accounts.QueryAsync(App, admin, Shown, ("row", id))));
 
         await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.medication_statements SET sensitive = true WHERE id = @id", ("id", id));
 
@@ -92,6 +95,68 @@ public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixt
         // Unmarking the item later doesn't bring them back: what was hidden stays hidden.
         await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.medication_statements SET sensitive = false WHERE id = @id", ("id", id));
         Assert.DoesNotContain(await Accounts.QueryAsync(App, admin, Shown, ("row", id)), row => row.Contains("sertraline", StringComparison.Ordinal));
+    }
+
+    // Step 18a: what "the fields changed" are, for each kind of write, worked out from what the trigger stored, so the
+    // same for an event written before the step. An update names the columns whose value changed; an insert those it gave
+    // a value; a delete those that held one, stored under "deleteed" as the trigger has always spelled it. An order's
+    // safety_warnings and safety_override_reason are never named: their being set says the patient has an allergy or a
+    // medication that weighs against the order. Both runtime roles get the same, and nothing but names.
+    [Fact]
+    public async Task The_fields_of_a_write_to_patient_data_are_named_and_never_a_value()
+    {
+        var (clinician, patient, admin) = await AccountsAsync();
+        var condition = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, clinician,
+            "INSERT INTO ehr.conditions (id, patient_id, code, display, clinical_status) VALUES (@id, @patient, 'I10', 'Essential (primary) hypertension', 'active')",
+            ("id", condition), ("patient", patient));
+        await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.conditions SET clinical_status = 'resolved' WHERE id = @id", ("id", condition));
+        // As the trigger stores a delete, and an order signed with a warning overridden: the runtime roles may do neither.
+        var (deleted, order) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, details) VALUES
+                (uuidv7(), now(), @clinician, 'delete', 'conditions', @deleted, @patient, 'onprem', false,
+                 jsonb_build_object('deleteed', jsonb_build_object('id', @deleted, 'patient_id', @patient, 'display', 'Synthetic deleted', 'onset_date', NULL))),
+                (uuidv7(), now(), @clinician, 'insert', 'orders', @order, @patient, 'onprem', false,
+                 jsonb_build_object('inserted', jsonb_build_object('id', @order, 'patient_id', @patient, 'catalog_code', 'SYN-MED-001', 'status', 'active',
+                     'safety_warnings', '[{"kind": "allergy", "against": "Synthetic allergen"}]'::jsonb, 'safety_override_reason', 'Synthetic override',
+                     'duplicate_reason', NULL)))
+            """,
+            ("clinician", clinician), ("deleted", deleted), ("patient", patient), ("order", order));
+
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal(["insert false fields clinical_status,code,display,id,patient_id,sensitive", "update false fields clinical_status"],
+                await Accounts.QueryAsync(connection, admin, Shown, ("row", condition)));
+            Assert.Equal(["delete false fields display,id,patient_id"], await Accounts.QueryAsync(connection, admin, Shown, ("row", deleted)));
+            Assert.Equal(["insert false fields catalog_code,id,patient_id,status"], await Accounts.QueryAsync(connection, admin, Shown, ("row", order)));
+        }
+    }
+
+    // Step 18a: an event about no patient, such as a desktop sign-in, keeps its details as recorded; an event that names a
+    // patient gets none, whatever it holds; and details of a shape no write stores never make the function fail.
+    [Fact]
+    public async Task An_event_about_no_patient_keeps_its_details_and_odd_shapes_show_nothing()
+    {
+        var (_, patient, admin) = await AccountsAsync();
+        var (signIn, named, odd, scalar) = (Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            """
+            INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, sensitive, details) VALUES
+                (@signIn, now(), NULL, 'sign_in', NULL, NULL, NULL, 'onprem', false, '{"client": "desktop", "device": "Synthetic laptop"}'),
+                (@named, now(), NULL, 'sign_in', NULL, NULL, @patient, 'onprem', false, '{"client": "desktop", "note": "Synthetic text"}'),
+                (@odd, now(), NULL, 'update', 'conditions', gen_random_uuid(), @patient, 'onprem', false, '[1, 2]'),
+                (@scalar, now(), NULL, 'insert', 'orders', gen_random_uuid(), @patient, 'onprem', false, '{"inserted": "Synthetic text"}')
+            """,
+            ("signIn", signIn), ("named", named), ("odd", odd), ("scalar", scalar), ("patient", patient));
+
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal(["{\"client\": \"desktop\", \"device\": \"Synthetic laptop\"} none"], await Accounts.QueryAsync(connection, admin,
+                "SELECT d.details::text || ' ' || coalesce(array_to_string(d.fields, ','), 'none') FROM ehr.shown_audit_details(ARRAY[@signIn, @named, @odd, @scalar]) d",
+                ("signIn", signIn), ("named", named), ("odd", odd), ("scalar", scalar)));
+        }
     }
 
     // The lists' history rows copy the items, sensitive ones included: an admin never gets their values.
@@ -156,7 +221,7 @@ public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixt
         // Marked behind the triggers' back, as data from before the rule would be.
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             "SET LOCAL session_replication_role = replica; UPDATE ehr.medication_statements SET sensitive = true WHERE id = @id", ("id", id));
-        Assert.Contains("sertraline", Assert.Single(await Accounts.QueryAsync(App, admin, Shown, ("row", id))));
+        Assert.StartsWith("insert false fields ", Assert.Single(await Accounts.QueryAsync(App, admin, Shown, ("row", id))));
 
         await database.ApplyAsync();
 
