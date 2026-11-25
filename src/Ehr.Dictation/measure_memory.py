@@ -7,6 +7,7 @@ so the cap can be set to that peak plus 25%, rounded up to the next whole GB (th
 the machine and in the model window of run B, never in CI:
 
     uv run src/Ehr.Dictation/measure_memory.py [--out <results.json>] [--cap-while-measuring 12g] [--keep-raised]
+        [--llama-url http://host.docker.internal:8080]
 
 What it needs:
 
@@ -19,9 +20,25 @@ What it needs:
   models-manifest.json; it checks that the manifest names whisper and speaker.
 - Run B's Spanish recordings in eval/audio-es (generate_audio.py --set es) and the visits' recordings in
   eval/audio/conversations (generate_conversations.py).
+- Or, with --llama-url (the owner's ruling of 2026-11-24, for a Docker Desktop too small for the llama container and
+  the dictation container with every model): llama-server running natively on the Mac, as in run B, serving K2 Horizon
+  with the stack's settings (-c 8192 -np 2 --reasoning off --no-webui --no-slots, on 127.0.0.1:8080) and a throwaway
+  key in its --api-key-file, with the same key in LLAMA_API_KEY in the environment this runs in. Only `dictation` runs
+  in Docker, recreated with --no-deps, so the stack's llama service isn't needed. This measures the same thing: the cap
+  is the dictation container's own cgroup limit, and its memory.peak counts that container's processes only; llama
+  ran in a container of its own before, outside that cgroup, and runs outside Docker now. What changes is only where
+  the dictation container sends its sorting and drafting. The override then also sets the container's
+  DICTATION_LLAMA_URL and LLAMA_API_KEY (the key written only there, in a temporary file readable by its owner alone
+  and removed on every way out), attaches a network of the measurement's own (MEASURE_NETWORK) beside `inference`,
+  which is internal and has no way out to the host, and maps host.docker.internal to the host (host-gateway; Docker
+  Desktop maps it already). Before the load it checks llama-server answers /health from inside the container.
+- Docker's memory (docker info's MemTotal, Docker Desktop's VM): a --cap-while-measuring above it is refused, and a
+  peak within 1.5 GiB of it is suspect, held down by the VM: no cap is given, and the owner raises Docker Desktop's
+  memory. This script never changes Docker's settings.
 - Nothing else. It never reads, prints or passes on a key: the load is sent from inside the dictation container, with
   the key the stack gave it. Its compose calls leave DICTATION_API_KEY and LLAMA_API_KEY out of their environment, so
-  the recreated container takes infra/compose/.env's, never a value set in the shell that runs this.
+  the recreated container takes infra/compose/.env's, never a value set in the shell that runs this (with --llama-url,
+  LLAMA_API_KEY is the native server's, set in the override above).
 
 What it does:
 
@@ -79,6 +96,8 @@ DICTATION_CHUNK_SECONDS = 5.0
 SENDER_SECONDS = 2 * 3600  # the whole load, at most
 KEYS = ("DICTATION_API_KEY", "LLAMA_API_KEY")  # never passed from the shell to compose
 NOT_CACHE = ("anon", "shmem", "kernel")  # memory.stat's lines that aren't the page cache
+MEASURE_NETWORK = "ehr-measure-memory"  # with --llama-url: a network with a way out, for the measurement only
+NEAR_THE_VM = int(1.5 * GIB)  # a peak this close to Docker's memory is suspect
 
 
 def cap_gib(peak_bytes: int) -> int:
@@ -113,12 +132,53 @@ def compose(*args: str, override: Path | None = None) -> subprocess.CompletedPro
                           capture_output=True, text=True, env=compose_env())
 
 
-def override_yaml(cap: str) -> str:
-    """The compose override the measurement runs under: the raised cap, and this file and the recordings read-only."""
+def override_yaml(cap: str, llama_url: str | None = None, llama_key: str | None = None) -> str:
+    """The compose override the measurement runs under: the raised cap, and this file and the recordings read-only.
+    With a llama-server outside the stack (--llama-url), also its address and key, and what reaching it takes: the
+    inference network is internal, with no way out, so a network of the measurement's own, and host.docker.internal
+    mapped to the host where the engine doesn't do so itself (Docker Desktop does)."""
     mounts = [(Path(__file__).resolve(), "/measure/measure_memory.py"), (SPANISH_AUDIO, "/measure/audio-es"),
               (VISIT_AUDIO, "/measure/conversations")]
     volumes = "".join(f'      - "{source}:{target}:ro"\n' for source, target in mounts)
-    return f"services:\n  dictation:\n    mem_limit: {cap}\n    volumes:\n{volumes}"
+    yaml = f"services:\n  dictation:\n    mem_limit: {cap}\n    volumes:\n{volumes}"
+    if llama_url is None:
+        return yaml
+    # JSON strings are YAML strings; "$" is doubled, or compose would read it as a variable.
+    def quoted(value: str) -> str:
+        return json.dumps(value).replace("$", "$$")
+    return (f"{yaml}    environment:\n      DICTATION_LLAMA_URL: {quoted(llama_url)}\n"
+            f"      LLAMA_API_KEY: {quoted(llama_key or '')}\n"
+            f"    networks: [inference, measure]\n    extra_hosts: [\"host.docker.internal:host-gateway\"]\n"
+            f"networks:\n  measure:\n    name: {MEASURE_NETWORK}\n")
+
+
+def write_private(path: Path, text: str) -> None:
+    """The file, created readable by its owner only (it may hold a key)."""
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf-8") as file:
+        file.write(text)
+
+
+def size_bytes(size: str) -> int:
+    """A Docker size ("12g", "512m", "1073741824"), in bytes: b, k, m and g are powers of 1024."""
+    units = {"b": 1, "k": 1 << 10, "m": 1 << 20, "g": 1 << 30}
+    text = size.strip().lower()
+    if text[-1:] in units:
+        return int(float(text[:-1]) * units[text[-1]])
+    return int(text)
+
+
+def docker_memory() -> int:
+    """Docker's memory (docker info's MemTotal): on Docker Desktop, its VM's."""
+    out = subprocess.run(["docker", "info", "--format", "{{.MemTotal}}"], check=True, capture_output=True,
+                         text=True).stdout
+    return int(out.strip())
+
+
+def reaches_llama(container_id: str, llama_url: str) -> bool:
+    """Whether llama-server answers /health (no key needed) from inside the container."""
+    probe = "import sys, urllib.request; urllib.request.urlopen(sys.argv[1].rstrip('/') + '/health', timeout=10)"
+    return subprocess.run(["docker", "exec", container_id, "python", "-c", probe, llama_url], capture_output=True,
+                          text=True, timeout=60).returncode == 0
 
 
 def container() -> str:
@@ -190,14 +250,28 @@ def sent(stdout: str) -> dict:
 
 
 def measure(args: argparse.Namespace) -> dict:
+    llama_key = None
+    if args.llama_url:
+        llama_key = os.environ.get("LLAMA_API_KEY", "")
+        if not llama_key.strip():
+            raise SystemExit("With --llama-url, set LLAMA_API_KEY to the key in the native llama-server's "
+                             "--api-key-file (it is written only to the measurement's temporary override, never "
+                             "printed).")
+    vm = docker_memory()
+    if size_bytes(args.cap_while_measuring) > vm:
+        raise SystemExit(f"--cap-while-measuring {args.cap_while_measuring} is more than Docker's memory "
+                         f"({round(vm / GIB, 2)} GiB): measure under a cap Docker has, or have the owner raise Docker "
+                         "Desktop's memory. This script never changes it.")
     spanish, visits = preflight()
     results: dict = {"measured_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                     "cap_while_measuring": args.cap_while_measuring, "load": {"dictations_in_spanish": [entry["id"] for entry in spanish],
+                     "cap_while_measuring": args.cap_while_measuring, "docker_memory_bytes": vm,
+                     "llama": args.llama_url or "the stack's llama service",
+                     "load": {"dictations_in_spanish": [entry["id"] for entry in spanish],
                               "visits": [entry["id"] for entry in visits]}, "sessions": []}
     try:
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory() as folder:  # removed on every way out, the override with it
             override = Path(folder) / "measure.yaml"
-            override.write_text(override_yaml(args.cap_while_measuring), encoding="utf-8")
+            write_private(override, override_yaml(args.cap_while_measuring, args.llama_url, llama_key))
             print(f"Recreating dictation with its cap at {args.cap_while_measuring} while it is measured...",
                   flush=True)
             compose("up", "-d", "--no-deps", "--force-recreate", "dictation", override=override)
@@ -206,6 +280,9 @@ def measure(args: argparse.Namespace) -> dict:
         results["image"] = {"name": image["image"], "id": image["image_id"]}
         print(f"Measuring {image['image']} ({image['image_id']}).", flush=True)
         wait_healthy(container_id)
+        if args.llama_url and not reaches_llama(container_id, args.llama_url):
+            raise SystemExit(f"llama-server doesn't answer at {args.llama_url} from inside the container: start it "
+                             "on the Mac first (eval/README.md's run B; the commands in this file's header).")
         results["after_loading"] = {"peak": number(cgroup(container_id, "memory.peak")),
                                     "not_cache": not_cache(cgroup(container_id, "memory.stat"))}
         print(f"Loaded: {results['after_loading']}", flush=True)
@@ -267,6 +344,8 @@ def measure(args: argparse.Namespace) -> dict:
             except subprocess.CalledProcessError as error:
                 print(f"Couldn't put dictation back as compose.yaml has it: {error.stderr[-500:]}. Run docker compose "
                       "--profile ai up -d --no-deps --force-recreate dictation from infra/compose.", file=sys.stderr)
+            if args.llama_url:
+                subprocess.run(["docker", "network", "rm", MEASURE_NETWORK], capture_output=True, text=True)
 
 
 # The sender's processes in the container, found by their command line and stopped: run with docker exec, it outlives
@@ -299,6 +378,11 @@ def whole(results: dict) -> list[str]:
                  if s.get("error") or s.get("sorting") != "done"]
     if results.get("oom_killed") or results.get("restarts"):
         problems.append("the container was killed for memory or restarted")
+    vm, peak = results.get("docker_memory_bytes"), results.get("peak_bytes")
+    if vm and peak is not None and peak >= vm - NEAR_THE_VM:
+        problems.append(f"the peak ({round(peak / GIB, 2)} GiB) came within 1.5 GiB of Docker's memory "
+                        f"({round(vm / GIB, 2)} GiB), so it may have been held down: suspect. The owner must raise "
+                        "Docker Desktop's memory (Settings, Resources) and measure again; this script never changes it")
     return problems
 
 
@@ -422,6 +506,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, help="where to write the measurement as JSON")
     parser.add_argument("--cap-while-measuring", default="12g", help="the dictation container's cap while it is measured")
     parser.add_argument("--keep-raised", action="store_true", help="leave dictation with the raised cap afterwards")
+    parser.add_argument("--llama-url", help="a llama-server outside the stack, such as "
+                        "http://host.docker.internal:8080, with its key in LLAMA_API_KEY; the stack's llama service "
+                        "isn't needed then")
     parser.add_argument("--drive", action="store_true", help=argparse.SUPPRESS)  # the sender, inside the container
     parser.add_argument("--dictations", nargs="*", default=[], help=argparse.SUPPRESS)
     parser.add_argument("--visits", nargs="*", default=[], help=argparse.SUPPRESS)

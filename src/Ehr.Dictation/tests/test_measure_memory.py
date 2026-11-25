@@ -51,14 +51,25 @@ KEY = "a-key-from-the-shell"
 class Docker:
     """A stand-in for the docker CLI: the stack's answers, every call recorded with its environment."""
 
-    def __init__(self, sender):  # noqa: ANN001
+    def __init__(self, sender, memory: int = 16 * GIB, llama_answers: bool = True):  # noqa: ANN001
         self.calls: list[tuple[list[str], dict | None]] = []
         self.sender = sender
+        self.memory, self.llama_answers = memory, llama_answers
+        self.overrides: list[tuple[str, int]] = []  # each override's text and permissions, as compose read it
 
     def run(self, args, **kwargs):  # noqa: ANN001, ANN201
         self.calls.append((list(args), kwargs.get("env")))
         out = ""
-        if args[:2] == ["docker", "compose"] and "ps" in args:
+        if args[:2] == ["docker", "compose"] and "up" in args and args[3:].count("-f") == 1:
+            override = Path(args[args.index("-f", 3) + 1])
+            self.overrides.append((override.read_text(encoding="utf-8"), override.stat().st_mode & 0o777))
+        if args[:2] == ["docker", "info"]:
+            out = f"{self.memory}\n"
+        elif args[:2] == ["docker", "network"]:
+            pass
+        elif args[:2] == ["docker", "exec"] and args[4] == "-c" and "/health" in args[5]:
+            return subprocess.CompletedProcess(args, 0 if self.llama_answers else 1, "", "")
+        elif args[:2] == ["docker", "compose"] and "ps" in args:
             out = "c0ffee\n"
         elif args[:2] == ["docker", "inspect"]:
             out = '{"Health": {"Status": "healthy"}, "OOMKilled": false}|sha256:1234|ehr-dictation:dev|0\n'
@@ -187,3 +198,77 @@ def test_it_needs_nothing_but_the_standard_library():
     imported = {alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
     imported |= {(node.module or "").split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
     assert imported - {"__future__"} <= set(sys.stdlib_module_names), imported
+
+
+LLAMA_KEY = "a-throwaway-llama-key-$x"
+
+
+def native(monkeypatch, docker, argv=()):  # noqa: ANN001, ANN201
+    monkeypatch.setenv("LLAMA_API_KEY", LLAMA_KEY)
+    return measured(monkeypatch, None, ["--llama-url", "http://host.docker.internal:8080", *argv], docker=docker)
+
+
+def test_with_a_native_llama_server_the_override_gives_its_address_and_key_privately_and_a_way_out(monkeypatch, capsys):
+    docker = Docker(answering(DONE))
+    _, code = native(monkeypatch, docker)
+    assert code == 0 and docker.restored()
+    (text, mode), = docker.overrides
+    assert mode == 0o600 and 'DICTATION_LLAMA_URL: "http://host.docker.internal:8080"' in text
+    assert 'LLAMA_API_KEY: "a-throwaway-llama-key-$$x"' in text  # "$" doubled for compose
+    assert "networks: [inference, measure]" in text and "host.docker.internal:host-gateway" in text
+    assert f"name: {measure_memory.MEASURE_NETWORK}" in text
+    # The key is in the override only: never in a command, never printed; the measurement's network is removed.
+    assert not any(LLAMA_KEY in " ".join(args) for args, _ in docker.calls) and LLAMA_KEY not in capsys.readouterr().out
+    assert ["docker", "network", "rm", measure_memory.MEASURE_NETWORK] in [args for args, _ in docker.calls]
+    # Still --no-deps: the stack's llama service isn't started.
+    assert all("--no-deps" in args for args, _ in docker.calls if args[:2] == ["docker", "compose"] and "up" in args)
+
+
+def test_the_override_is_gone_however_the_measurement_ends(monkeypatch):
+    docker = Docker(answering(DONE), llama_answers=False)
+    with pytest.raises(SystemExit, match="llama-server doesn't answer"):
+        native(monkeypatch, docker)
+    assert docker.restored()
+    up = next(args for args, _ in docker.calls if args[:2] == ["docker", "compose"] and "up" in args)
+    assert not Path(up[up.index("-f", 3) + 1]).exists()
+
+
+def test_without_the_native_servers_key_it_stops_before_touching_the_stack(monkeypatch):
+    docker = Docker(answering(DONE))
+    monkeypatch.delenv("LLAMA_API_KEY", raising=False)
+    monkeypatch.setattr(measure_memory.subprocess, "run", docker.run)
+    with pytest.raises(SystemExit, match="LLAMA_API_KEY"):
+        measure_memory.main(["--llama-url", "http://host.docker.internal:8080"])
+    assert docker.calls == []
+
+
+def test_without_the_option_the_override_holds_no_llama_address_nor_key(monkeypatch):
+    docker = Docker(answering(DONE))
+    monkeypatch.setenv("LLAMA_API_KEY", LLAMA_KEY)
+    measured(monkeypatch, None, docker=docker)
+    (text, _), = docker.overrides
+    assert "LLAMA" not in text and "networks" not in text and "extra_hosts" not in text
+
+
+@pytest.mark.parametrize(("size", "bytes_"), [("12g", 12 * GIB), ("512m", 512 << 20), ("2048", 2048),
+                                              ("1.5G", int(1.5 * GIB))])
+def test_a_docker_size_is_read_in_powers_of_1024(size, bytes_):
+    assert measure_memory.size_bytes(size) == bytes_
+
+
+def test_a_cap_above_dockers_memory_is_refused_before_touching_the_stack(monkeypatch):
+    docker = Docker(answering(DONE), memory=int(11.7 * GIB))
+    with pytest.raises(SystemExit, match="more than Docker's memory"):
+        measured(monkeypatch, None, docker=docker)
+    assert [args for args, _ in docker.calls] == [["docker", "info", "--format", "{{.MemTotal}}"]]
+
+
+def test_a_peak_near_dockers_memory_is_suspect_and_gives_no_cap(monkeypatch, tmp_path, capsys):
+    # The stand-in's peak is 5,000,000,000 bytes (4.66 GiB): within 1.5 GiB of 6 GiB.
+    docker = Docker(answering(DONE), memory=6 * GIB)
+    _, code = measured(monkeypatch, None, ["--cap-while-measuring", "6g", "--out", str(tmp_path / "m.json")],
+                       docker=docker)
+    results = json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))
+    assert code == 1 and results["cap_gib"] is None
+    err = capsys.readouterr().err
+    assert "suspect" in err and "raise Docker Desktop's memory" in err and "No cap" in err
