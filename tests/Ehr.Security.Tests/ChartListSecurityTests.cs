@@ -170,6 +170,24 @@ public class ChartListSecurityTests(MigratedDatabase database) : IClassFixture<M
     [InlineData("T35.2", false)]
     [InlineData("T66.XXXA", false)]
     [InlineData(" t43.212a ", true)]
+    // After step 2b's review: nonsuicidal self-harm, and asphyxiation by intentional self-harm, where the 2 is the
+    // sixth character of a T71.1 or T71.2 code. The accidental, assault and undetermined codes beside them are not.
+    [InlineData("R45.88", true)]
+    [InlineData("r4588", true)]
+    [InlineData("R45.87", false)]
+    [InlineData("R45.89", false)]
+    [InlineData("T71.112A", true)]
+    [InlineData("T71.162S", true)]
+    [InlineData("T71.192D", true)]
+    [InlineData("T71.222A", true)]
+    [InlineData("T71.232S", true)]
+    [InlineData("T71.111A", false)]
+    [InlineData("T71.113A", false)]
+    [InlineData("T71.114A", false)]
+    [InlineData("T71.221A", false)]
+    [InlineData("T71.20XA", false)]
+    [InlineData("T71.9XXA", false)]
+    [InlineData("T70.3XXA", false)]
     [InlineData("I10", false)]
     [InlineData("E11.9", false)]
     [InlineData("", false)]
@@ -204,18 +222,22 @@ public class ChartListSecurityTests(MigratedDatabase database) : IClassFixture<M
     }
 
     // A diagnosis that was recorded before the rule, or by something that skipped the trigger, is marked the next time
-    // the policies are applied, as the migration job does on every start; and a code with spaces round it is still caught.
-    [Fact]
-    public async Task Applying_the_policies_again_marks_existing_diagnoses_in_a_sensitive_range()
+    // the policies are applied, as the migration job does on every start; and a code with spaces round it is still
+    // caught. The codes added to the rule after step 2b (R45.88, T71 self-harm) are marked the same way.
+    [Theory]
+    [InlineData(" f41.1 ")]
+    [InlineData("R45.88")]
+    [InlineData("T71.162A")]
+    public async Task Applying_the_policies_again_marks_existing_diagnoses_in_a_sensitive_range(string code)
     {
         var (clinician, patient) = await OnPanelAsync();
         var id = Guid.CreateVersion7();
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
             """
             SET LOCAL session_replication_role = replica;
-            INSERT INTO ehr.conditions (id, patient_id, code, display, clinical_status, sensitive) VALUES (@id, @patient, ' f41.1 ', 'Synthetic', 'active', false)
+            INSERT INTO ehr.conditions (id, patient_id, code, display, clinical_status, sensitive) VALUES (@id, @patient, @code, 'Synthetic', 'active', false)
             """,
-            ("id", id), ("patient", patient));
+            ("id", id), ("patient", patient), ("code", code));
         Assert.Equal(["false"], await AsSuperuserAsync("SELECT sensitive::text FROM ehr.conditions WHERE id = @id", ("id", id)));
 
         await database.ApplyAsync();
@@ -240,6 +262,16 @@ public class ChartListSecurityTests(MigratedDatabase database) : IClassFixture<M
             "SELECT display || ' ' || clinical_status FROM ehr.allergy_intolerances WHERE patient_id = @patient ORDER BY recorded_at, display", ("patient", patient));
         Assert.Equal(["No known allergy active"], await ListAsync());
 
+        // A second one, while the first is active, is refused as a unique violation of the index that also holds it,
+        // so the app can tell it from the refusals below; and the index holds with the triggers off, as the seed has them.
+        var second = await Assert.ThrowsAsync<PostgresException>(() =>
+            Accounts.ExecuteAsync(App, clinician, none, ("id", Guid.CreateVersion7()), ("patient", patient)));
+        Assert.Equal((PostgresErrorCodes.UniqueViolation, "ix_allergy_intolerances_one_no_known_allergy"), (second.SqlState, second.ConstraintName));
+        var bypassed = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "SET LOCAL session_replication_role = replica; " + none, ("id", Guid.CreateVersion7()), ("patient", patient)));
+        Assert.Equal((PostgresErrorCodes.UniqueViolation, "ix_allergy_intolerances_one_no_known_allergy"), (bypassed.SqlState, bypassed.ConstraintName));
+        Assert.Equal(["No known allergy active"], await ListAsync());
+
         // Adding an allergy makes it inactive, in the same transaction, by the same clinician, and the history says so.
         var peanut = Guid.CreateVersion7();
         await Accounts.ExecuteAsync(App, clinician, Statements["allergy_intolerances"].Insert, ("id", peanut), ("patient", patient));
@@ -261,8 +293,8 @@ public class ChartListSecurityTests(MigratedDatabase database) : IClassFixture<M
         Assert.Equal(["No known allergy inactive", "Peanut inactive", "No known allergy active"], await ListAsync());
     }
 
-    // Recorded at the same moment, "No known allergies" and an allergy can't both stay active: each patient's allergy
-    // entries are written one at a time, so whichever comes second sees the first.
+    // Recorded at the same moment, "No known allergies" and an allergy can't both stay active, and no two "No known
+    // allergies" can: each patient's allergy entries are written one at a time, so whichever comes second sees the first.
     [Fact]
     public async Task No_known_allergies_and_an_allergy_recorded_at_once_never_both_stay_active()
     {
@@ -277,15 +309,16 @@ public class ChartListSecurityTests(MigratedDatabase database) : IClassFixture<M
                     await Accounts.ExecuteAsync(App, clinician, i % 2 == 0 ? none : Statements["allergy_intolerances"].Insert,
                         ("id", Guid.CreateVersion7()), ("patient", patient));
                 }
-                catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.CheckViolation)
+                catch (PostgresException e) when (e.SqlState is PostgresErrorCodes.CheckViolation or PostgresErrorCodes.UniqueViolation)
                 {
-                    // "No known allergies" arrived after an allergy: refused.
+                    // "No known allergies" arrived after an allergy, or after another "No known allergies": refused.
                 }
             }));
 
-            Assert.Equal(["false"], await AsSuperuserAsync(
+            Assert.Equal(["false false"], await AsSuperuserAsync(
                 """
                 SELECT (bool_or(code = 'no-known-allergy') AND bool_or(code <> 'no-known-allergy'))::text
+                    || ' ' || (count(*) FILTER (WHERE code = 'no-known-allergy') > 1)::text
                 FROM ehr.allergy_intolerances WHERE patient_id = @patient AND clinical_status = 'active'
                 """,
                 ("patient", patient)));
@@ -324,5 +357,8 @@ public class ChartListSecurityTests(MigratedDatabase database) : IClassFixture<M
             "SELECT count(*) FROM ehr.clinical_codes WHERE sensitive <> (kind = 'condition' AND ehr.icd10cm_is_sensitive(code))"));
         Assert.Equal(["Generalized anxiety disorder true"], await Accounts.QueryAsync(Read, null,
             "SELECT display || ' ' || sensitive FROM ehr.clinical_codes WHERE kind = 'condition' AND code = 'F41.1'"));
+        // A code added to the rule later is flagged in the loaded list too: loading the reference data compares the flag.
+        Assert.Equal(["Nonsuicidal self-harm true"], await Accounts.QueryAsync(Read, null,
+            "SELECT display || ' ' || sensitive FROM ehr.clinical_codes WHERE kind = 'condition' AND code = 'R45.88'"));
     }
 }

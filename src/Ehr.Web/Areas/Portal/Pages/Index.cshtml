@@ -21,7 +21,13 @@
             <dt>Date of birth</dt><dd>@patient.BirthDate.ToString("yyyy-MM-dd")</dd>
         </dl>
     </section>
-    <p><a asp-page="/Results" class="sc-btn sc-btn--primary">@(own ? "See your test results" : "See test results")</a></p>
+    @* Results, appointments and messages as three panels of one shape (docs/brand: the portal, one column). A proxy
+       reads about someone else (FR-19), so the panels don't call the record "yours". *@
+    <section class="sc-panel" aria-labelledby="home-results">
+        <h2 class="sc-panel__title" id="home-results">@(own ? "Your test results" : "Test results")</h2>
+        <p>Released results, with what each one means.</p>
+        <p><a asp-page="/Results" class="sc-btn sc-btn--primary">@(own ? "See your test results" : "See test results")</a></p>
+    </section>
     <section class="sc-panel" aria-labelledby="home-appointments">
         <h2 class="sc-panel__title" id="home-appointments">@(own ? "Your next appointments" : "Next appointments")</h2>
         @if (Model.Upcoming.Count > 0)
@@ -34,9 +40,22 @@
         }
         <p><a asp-page="/Appointments">@(own ? "All your appointments" : "All appointments")</a></p>
     </section>
+    @* Only when the session may read messages: a proxy's grant may not include them (FR-19). *@
     @if (Model.MayMessage)
     {
-        <p><a asp-page="/Messages/Index" class="sc-btn">@(own ? "Messages with your care team" : "Messages with the care team")</a></p>
+        <section class="sc-panel" aria-labelledby="home-messages">
+            <h2 class="sc-panel__title" id="home-messages">@(own ? "Messages with your care team" : "Messages with the care team")</h2>
+            @if (Model.UnreadMessages > 0)
+            {
+                var count = $"{Model.UnreadMessages} new {(Model.UnreadMessages == 1 ? "message" : "messages")}";
+                <p><span class="sc-tag sc-tag--info">New</span> @(own ? $"You have {count} from your care team." : $"There {(Model.UnreadMessages == 1 ? "is" : "are")} {count} from the care team.")</p>
+            }
+            else
+            {
+                <p class="sc-muted">No new messages.</p>
+            }
+            <p><a asp-page="/Messages/Index" class="sc-btn">@(own ? "Open your messages" : "Open messages")</a></p>
+        </section>
     }
 }
 else

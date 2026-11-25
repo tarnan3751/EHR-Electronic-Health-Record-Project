@@ -42,20 +42,52 @@
 {
     <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Emergency access:</span> this patient is not on your panel. Your access and the reason you gave are recorded for review. It lasts until @until.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
 }
+@* The notices after an action take the focus (data-focus-on-load, js/patient-search.js), so the keyboard and a
+   screen reader start from what just happened. *@
 @if (Model.Chart.ConfirmsDiscontinued)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Order discontinued:</span> it is listed under this chart's discontinued orders.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order discontinued:</span> <strong>@Model.Chart.DiscontinuedName</strong> is listed under this chart's discontinued orders.</p>
 }
-@if (Model.SignedOrder is { } signed)
+@if (Model.SignedOrder is { } signed && Model.Chart.ReplacedName is { } replaced)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Order signed:</span> <strong>@signed.Display</strong>, @signed.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order changed:</span> <strong>@signed.Display</strong> replaces <strong>@replaced</strong>, @signed.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC. The order it replaces is listed under this chart's discontinued orders.</p>
+}
+else if (Model.SignedOrder is { } newOrder)
+{
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order signed:</span> <strong>@newOrder.Display</strong>, @newOrder.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+}
+@* After the entry form saved an entry. A sensitive one the chart leaves out isn't named: the notice says where it is. *@
+@if (Model.Chart.Saved is { Hidden: true } hiddenSave)
+{
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved:</span> the @Ehr.Domain.Patients.ChartListWords.Lists[hiddenSave.Table].One is sensitive, so it is kept with the sensitive items.</p>
+}
+else if (Model.Chart.Saved is { } saved)
+{
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved:</span> <strong>@saved.Display</strong>@ChartModel.SavedWhere(saved)</p>
+}
+@switch (Model.NoKnownAllergiesNotice)
+{
+    case "saved":
+        <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved:</span> no known allergies recorded for this patient.</p>
+        break;
+    case "allergy-recorded":
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved:</span> an allergy is recorded for this patient, so "No known allergies" wasn't recorded. Their allergies are listed below.</p>
+        break;
+    case "refused":
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved:</span> you can't change this patient's allergies now, so nothing was recorded.</p>
+        break;
 }
 
 @* Sensitive diagnoses and medications aren't sent with the chart until the clinician asks, and the asking is recorded. *@
 @{
     var sensitiveRoute = Model.Search.RouteData();
     sensitiveRoute["id"] = Model.Patient.Id.ToString();
+    // While sensitive items are shown, the history shows them too, as the next view the clinician asked for.
     var historyRoute = new Dictionary<string, string>(sensitiveRoute);
+    if (Model.Chart.SensitiveShown)
+    {
+        historyRoute["sensitive"] = "true";
+    }
 }
 @if (Model.Chart.SensitiveShown)
 {
@@ -280,7 +312,7 @@ else if (Model.Chart.SensitiveHidden > 0)
         }
         else if (Model.NoKnownAllergies is { } none)
         {
-            <p>No known allergies (recorded @none.RecordedAt.UtcDateTime.ToString("yyyy-MM-dd")).</p>
+            <p>No known allergies (recorded @none.RecordedAt.UtcDateTime.ToString("yyyy-MM-dd")@(Model.Chart.NoKnownAllergiesRecordedBy is { } recorder ? $" by {recorder}" : "")).</p>
         }
         else
         {
@@ -288,7 +320,7 @@ else if (Model.Chart.SensitiveHidden > 0)
             @if (Model.OnPanel && OnPrem.IsReachable)
             {
                 @* Asked and none: recorded as an entry of its own, which adding an allergy later clears. *@
-                <form method="post" asp-page-handler="NoKnownAllergies" asp-all-route-data="Model.Search.RouteData()">
+                <form method="post" asp-page-handler="NoKnownAllergies" asp-all-route-data="Model.SensitiveRouteData()">
                     <button class="sc-btn sc-btn--compact" data-no-known-allergies>Record no known allergies</button>
                 </form>
             }
@@ -413,11 +445,21 @@ else if (Model.Chart.SensitiveHidden > 0)
             // A plain link: a method like this one can't hold a tag helper.
             var route = Model.Search.ChartRouteValues(Model.Patient.Id);
             route["list"] = list;
+            KeepSensitiveShown(route);
             <p class="sc-actions"><a href="@Url.Page("Lists/Entry", route)" class="sc-btn sc-btn--compact" data-add-entry="@list">@label</a></p>
         }
         else if (Model.OnPanel)
         {
             <p class="sc-muted">Changes to @list need the clinic's server.</p>
+        }
+    }
+
+    // While sensitive items are shown, the entry form brings the clinician back to them (Lists/Entry's showSensitive).
+    void KeepSensitiveShown(RouteValueDictionary route)
+    {
+        if (Model.Chart.SensitiveShown)
+        {
+            route["showSensitive"] = "true";
         }
     }
 
@@ -429,6 +471,7 @@ else if (Model.Chart.SensitiveHidden > 0)
             var route = Model.Search.ChartRouteValues(Model.Patient.Id);
             route["list"] = list;
             route["entryId"] = entry;
+            KeepSensitiveShown(route);
             <span class="sc-list__actions"><a href="@Url.Page("Lists/Entry", route)" aria-label="Change: @display" data-change-entry="@list">Change</a></span>
         }
     }

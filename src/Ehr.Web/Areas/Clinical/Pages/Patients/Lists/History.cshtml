@@ -7,10 +7,10 @@
     ViewData["Title"] = $"History of allergies, medications and diagnoses: {patient.FamilyName}, {patient.GivenName}";
 }
 @section Banner {
-    <partial name="_PatientBanner" model="new PatientBanner(patient)" />
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.History.Allergies, Model.OnPanel, Model.EmergencyUntil)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.Route(sensitive: false)">Back to the chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.Route(sensitive: Model.History.SensitiveShown)">Back to the chart</a></p>
 </div>
 <h1>History of allergies, medications and diagnoses: @patient.FamilyName, @patient.GivenName</h1>
 

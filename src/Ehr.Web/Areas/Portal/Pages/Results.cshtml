@@ -1,6 +1,7 @@
 @page "/portal/results"
 @using Ehr.Domain.Results
 @model ResultsModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = "Test results";
 }
@@ -11,7 +12,7 @@
 }
 else if (Model.Results.Count == 0)
 {
-    <p>@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "There are no test results yet. If one is expected, contact the care team." : "You have no test results yet. If you are waiting for one, contact your care team.")</p>
+    <p>@(Model.Acting ? "There are no test results yet. If one is expected, contact the care team." : "You have no test results yet. If you are waiting for one, contact your care team.")</p>
 }
 else
 {
@@ -46,7 +47,7 @@ else
                         <dl class="record">
                             @if (ResultExplanation.Value(result) is { } value)
                             {
-                                <dt>@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "Result" : "Your result")</dt><dd>@value</dd>
+                                <dt>@(Model.Acting ? "Result" : "Your result")</dt><dd>@value</dd>
                             }
                             @if (ResultExplanation.Range(result) is { } range)
                             {
@@ -61,10 +62,20 @@ else
                         {
                             <p><strong>Note from your care team:</strong> @note</p>
                         }
+                        @* UC 6's "question about a result": a message to the care team, its subject filled in. Posted, so the
+                           test's name stays out of the address and the browser's history. Hidden while the site is read-only,
+                           as every form that sends something is, and from a proxy whose grant doesn't include messages. *@
+                        @if (OnPrem.IsReachable && Model.MayMessage)
+                        {
+                            <form method="post" asp-page="/Messages/New" asp-page-handler="About">
+                                <input type="hidden" name="Subject" value="@($"About {(Model.Acting ? "the" : "my")} {result.Display} result from {result.EffectiveAt.UtcDateTime:MMM d, yyyy}")">
+                                <button type="submit" class="sc-btn">Ask about this result</button>
+                            </form>
+                        }
                     </div>
                 </details>
             </li>
         }
     </ul>
 }
-<p><a asp-page="/Index">@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "Back to the record" : "Back to my record")</a></p>
+<p><a asp-page="/Index">@(Model.Acting ? "Back to the record" : "Back to my record")</a></p>

@@ -27,12 +27,13 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   1. As the second clinician, open the chart with a reason; request the add and change forms; post each.
 //   2. Off-site with the link down, open the chart as the first clinician.
 //   3. Post a new diagnosis with the form token read before the link went down.
-// Expected result: In step 1 the chart lists the diagnosis with no "Add" or "Change"; each form request and post is
-//   answered with a redirect to the chart; no new read is recorded and nothing changes. In step 2 the chart lists the
+// Expected result: In step 1 the chart lists the diagnosis with no "Add" or "Change"; each form request is answered
+//   with a redirect to the chart, and each post with 409 and "Not saved: this patient isn't on your panel, so nothing
+//   was changed.", the typed name to copy and nothing about the patient; no new read is recorded and nothing changes. In step 2 the chart lists the
 //   diagnosis, offers no "Add" or "Change", and says "Changes to diagnoses need the clinic's server." In step 3 the
 //   post is answered 503 with "Nothing was saved, because the clinic's server can't be reached." and the typed name
 //   shown again. The patient still has exactly one diagnosis.
-// Creator: Tahseen Arnan
+// Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_10_EntryExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -60,7 +61,11 @@ public class TC_UC4_10_EntryExceptionalCondition(WebApps apps) : IClassFixture<W
             Assert.Equal($"/patients/{patient}", new Uri(Base, form.Headers.Location!).AbsolutePath);
             using var post = await noRedirects.PostAsync(path,
                 Form(("__RequestVerificationToken", Token(chart)), ("Name", "Unspecified asthma, uncomplicated"), ("Status", "resolved")), Cancel);
-            Assert.Equal($"/patients/{patient}", new Uri(Base, post.Headers.Location!).AbsolutePath);
+            Assert.Equal(HttpStatusCode.Conflict, post.StatusCode);
+            var offPanel = await post.Content.ReadAsStringAsync(Cancel);
+            Assert.Contains("Not saved: this patient isn't on your panel, so nothing was changed.", Words(offPanel));
+            Assert.Contains("Unspecified asthma, uncomplicated</textarea>", offPanel);
+            Assert.DoesNotContain("Listed, Synthetic", offPanel);
         }
 
         Assert.Equal(reads, await apps.AuditEventsAsync(AuditActions.Read, covering.Id, patient));

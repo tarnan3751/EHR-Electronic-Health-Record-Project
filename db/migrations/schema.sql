@@ -803,6 +803,29 @@ VALUES ('20261118095004_AuditSensitive', '10.0.13');
 COMMIT;
 
 START TRANSACTION;
+ALTER TABLE ehr.allergy_intolerances NO FORCE ROW LEVEL SECURITY;
+UPDATE ehr.allergy_intolerances SET clinical_status = 'inactive'
+WHERE code = 'no-known-allergy' AND clinical_status = 'active'
+  AND id NOT IN (
+      SELECT DISTINCT ON (patient_id) id FROM ehr.allergy_intolerances
+      WHERE code = 'no-known-allergy' AND clinical_status = 'active'
+      ORDER BY patient_id, recorded_at, id);
+DO $$
+BEGIN
+    IF (SELECT relrowsecurity FROM pg_class WHERE oid = 'ehr.allergy_intolerances'::regclass) THEN
+        ALTER TABLE ehr.allergy_intolerances FORCE ROW LEVEL SECURITY;
+    END IF;
+END
+$$;
+
+CREATE UNIQUE INDEX ix_allergy_intolerances_one_no_known_allergy ON ehr.allergy_intolerances (patient_id) WHERE code = 'no-known-allergy' AND clinical_status = 'active';
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261121224028_OneNoKnownAllergy', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
 ALTER TABLE ehr.medication_statements ALTER COLUMN display TYPE character varying(300);
 
 ALTER TABLE ehr.conditions ALTER COLUMN display TYPE character varying(300);
@@ -814,7 +837,7 @@ CREATE INDEX ix_clinical_codes_display ON ehr.clinical_codes USING GIN (to_tsvec
 CREATE INDEX ix_clinical_codes_kind_code ON ehr.clinical_codes (kind, code text_pattern_ops);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118105016_ClinicalCodeSearch', '10.0.13');
+VALUES ('20261123180010_ClinicalCodeSearch', '10.0.13');
 
 COMMIT;
 
@@ -984,7 +1007,7 @@ CREATE INDEX ix_drug_interactions_ingredient_b ON ehr.drug_interactions (ingredi
 CREATE INDEX ix_order_result_codes_observation_code ON ehr.order_result_codes (observation_code);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118105915_ReferenceTables', '10.0.13');
+VALUES ('20261123180020_ReferenceTables', '10.0.13');
 
 COMMIT;
 
@@ -1013,7 +1036,7 @@ CREATE INDEX ix_inbox_items_recipient_id_created_at ON ehr.inbox_items (recipien
 CREATE INDEX ix_inbox_items_recipient_id_done_at ON ehr.inbox_items (recipient_id, done_at) WHERE done_at IS NOT NULL;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118120345_InboxItems', '10.0.13');
+VALUES ('20261123180030_InboxItems', '10.0.13');
 
 COMMIT;
 
@@ -1050,7 +1073,7 @@ CREATE UNIQUE INDEX ix_appointments_encounter_id ON ehr.appointments (encounter_
 CREATE INDEX ix_appointments_patient_id_starts_at ON ehr.appointments (patient_id, starts_at);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118124810_Appointments', '10.0.13');
+VALUES ('20261123190010_Appointments', '10.0.13');
 
 COMMIT;
 
@@ -1058,7 +1081,7 @@ START TRANSACTION;
 ALTER TABLE ehr.appointments ADD version integer NOT NULL DEFAULT 1;
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118183905_AppointmentVersion', '10.0.13');
+VALUES ('20261123190020_AppointmentVersion', '10.0.13');
 
 COMMIT;
 
@@ -1095,7 +1118,15 @@ CREATE INDEX ix_messages_patient_id ON ehr.messages (patient_id);
 CREATE INDEX ix_messages_thread_id_sent_at ON ehr.messages (thread_id, sent_at);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118185826_Messages', '10.0.13');
+VALUES ('20261123190030_Messages', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE INDEX ix_messages_unread_from_staff ON ehr.messages (patient_id) WHERE sender_kind = 'staff' AND read_at IS NULL;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261124052432_UnreadMessagesIndex', '10.0.13');
 
 COMMIT;
 
@@ -1123,7 +1154,7 @@ CREATE UNIQUE INDEX ix_proxy_grants_patient_id_proxy_email ON ehr.proxy_grants (
 CREATE INDEX ix_proxy_grants_proxy_email ON ehr.proxy_grants (proxy_email);
 
 INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
-VALUES ('20261118195958_ProxyGrants', '10.0.13');
+VALUES ('20261125200010_ProxyGrants', '10.0.13');
 
 COMMIT;
 
