@@ -2471,3 +2471,19 @@ VALUES ('20261125152540_UnroutedResults', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.staff_user_passkeys (
+    credential_id bytea NOT NULL,
+    user_id uuid NOT NULL,
+    data jsonb NOT NULL,
+    CONSTRAINT pk_staff_user_passkeys PRIMARY KEY (credential_id),
+    CONSTRAINT fk_staff_user_passkeys_staff_users_user_id FOREIGN KEY (user_id) REFERENCES ehr.staff_users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_staff_user_passkeys_user_id ON ehr.staff_user_passkeys (user_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261125183406_StaffPasskeys', '10.0.13');
+
+COMMIT;
+

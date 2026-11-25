@@ -39,14 +39,15 @@ public static class AccountServiceCollectionExtensions
 
         // The explicit store types matter: the default registration would give both kinds of account the same claim,
         // login and token entities, which can only map to one table. ProtectedTokenStore encrypts the authenticator key
-        // and recovery codes before they are saved; the host configures where Data Protection keeps its keys.
+        // and recovery codes before they are saved; the host configures where Data Protection keeps its keys. Only staff
+        // accounts have passkeys (step 19): the patient store's passkey type is mapped to no table.
         services.AddDataProtection();
         services.AddIdentityCore<StaffUser>()
-            .AddUserStore<ProtectedTokenStore<StaffUser, StaffUserClaim, StaffUserLogin, StaffUserToken>>()
+            .AddUserStore<ProtectedTokenStore<StaffUser, StaffUserClaim, StaffUserLogin, StaffUserToken, StaffUserPasskey>>()
             .AddClaimsPrincipalFactory<StaffClaimsPrincipalFactory>()
             .AddDefaultTokenProviders();
         services.AddIdentityCore<PatientUser>()
-            .AddUserStore<ProtectedTokenStore<PatientUser, PatientUserClaim, PatientUserLogin, PatientUserToken>>()
+            .AddUserStore<ProtectedTokenStore<PatientUser, PatientUserClaim, PatientUserLogin, PatientUserToken, IdentityUserPasskey<Guid>>>()
             .AddClaimsPrincipalFactory<PatientClaimsPrincipalFactory>()
             .AddDefaultTokenProviders();
 
