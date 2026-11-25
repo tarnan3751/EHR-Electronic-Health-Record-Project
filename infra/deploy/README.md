@@ -40,7 +40,7 @@ NFR-16's budget is roughly $50. The cloud server alone is about half of that eac
 1. Ubuntu Server LTS, the current release, with unattended security upgrades on.
 2. Docker Engine and the Compose plugin from Docker's own apt repository (docs.docker.com, "Install Docker Engine on Ubuntu"), not a provider's image or marketplace.
 3. Disk encryption: LUKS on the clinic server; on the cloud server, the provider's encrypted volumes or LUKS. PostgreSQL, Barman and the cloud app's audit queue don't encrypt their files (`infra/compose/README.md`, "Encryption").
-4. A firewall (`ufw`): on the cloud server, only 443 open to the internet; on both, SSH only on the Tailscale address (OpenSSH's `ListenAddress`), with keys, no passwords.
+4. A firewall (`ufw`): on the cloud server, only 443 open to the internet; on both, SSH only on the Tailscale address (OpenSSH's `ListenAddress`), with keys, no passwords. **`ufw` doesn't close a port Docker publishes:** Docker writes its own firewall rules, ahead of `ufw`'s. So each port is limited by the address the Compose file publishes it on: the clinic's 5432 (the primary) and 9100 (`node-exporter`) on its Tailscale address only, its 443 on its address on the clinic's network and its Tailscale address; the cloud's 443 on its public address and its Tailscale address; Prometheus's and Alertmanager's on 127.0.0.1. Check with `ss -ltnp` and from another machine that nothing else answers.
 5. Check out the repository at the commit being deployed: the services' configuration files (`infra/compose/postgres`, `infra/barman`, `infra/monitoring`) come from it.
 
 ## Tailscale
@@ -96,7 +96,7 @@ Barman on the cloud server streams the primary's WAL as it is written and takes 
 ## Restoring
 
 - **To rehearse,** on the cloud server: restore the newest base backup that ended before a chosen time, with `barman recover` into the Barman volume, start `restore-db` on it, and compare, as `infra/compose/README.md` does by hand. `infra/compose/restore-drill.cs` automates this against the local stack only: it writes marker rows on the primary through its superuser's local socket, which a real primary doesn't allow from the cloud server.
-- **When one is needed** (the record damaged at a known time, or the clinic server lost): find the moment by restoring to a throwaway copy first; restore that moment onto the clinic server (`barman recover` with `--remote-ssh-command`, over Tailscale, or copied there); start it as the new primary; clone the replica again, since the primary's history has forked; and take a new base backup at once, since Barman's earlier ones are on the old timeline.
+- **When one is needed** (the record damaged at a known time, or the clinic server lost): find the moment by restoring to a throwaway copy first; restore that moment on the cloud server, into the Barman volume, as for a rehearsal; have an administrator copy the restored folder to the clinic server through their own machine, since they reach both servers over SSH (for example `ssh <cloud server> sudo tar -C <restored folder> -c . | ssh <clinic server> sudo tar -C <new data folder> -x`, keeping the files owned by the postgres user, UID 999). The cloud server itself has no SSH to the clinic, by design (`infra/tailscale/policy.hujson`), so `barman recover --remote-ssh-command` from it is refused. Then start the copy as the new primary; clone the replica again, since the primary's history has forked; and take a new base backup at once, since Barman's earlier ones are on the old timeline.
 
 ## Upgrades and migrations
 
@@ -107,6 +107,7 @@ Deploy only a commit on `main` whose CI passed. Take a base backup first. Pull t
 On the cloud server, the monitoring profile as the stack runs it (`infra/compose/README.md`, "Monitoring", which says what each alert means and what to do), with these differences:
 
 - `prometheus.yml`: the sites by their real addresses; the clinic's app by the name the cloud app uses for it; the clinic's `node-exporter` at its Tailscale address, port 9100, which the clinic server publishes on that address alone.
+- `blackbox.yml`: every probe verifies against the stack's root (`ca_file: /certs/rootCA.pem`), and the off-site and portal probes name the stack's sites (`server_name`). On real sites remove both, so the system's roots verify the sites' certificates and each probe asks for the name in its address; left as they are, every site's probe fails and `SiteDown` fires from the first start.
 - `postgres-exporter`: the clinic's primary at its Tailscale name, verified against the clinic's database certificate authority.
 - `node-exporter` on each server reads the host's filesystems (the host's root mounted read-only, `--path.rootfs`), not the container's.
 - Prometheus and Alertmanager publish on the cloud server's 127.0.0.1 only. An administrator reaches them through SSH: `ssh -L 9090:127.0.0.1:9090 -L 9093:127.0.0.1:9093 <cloud server>`.
