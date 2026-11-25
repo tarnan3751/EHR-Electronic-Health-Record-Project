@@ -18,11 +18,11 @@
 <h1>Proxy access: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Done is "recorded")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> the proxy can open this record in the portal. Their email doesn't say whose record it is, and has a link to create a portal account if they don't have one.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Saved:</span> the proxy can open this record in the portal. Their email doesn't say whose record it is, and has a link to create a portal account if they don't have one.</p>
 }
 else if (Model.Done is "removed")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Removed:</span> that proxy can no longer open this record.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Removed:</span> that proxy can no longer open this record.</p>
 }
 <p class="sc-muted">A proxy signs in to the portal with their own account and sees this patient's record until the access expires or is removed. Only the patient can let a proxy see items marked sensitive.</p>
 @if (Model.Grants.Count == 0)
@@ -91,7 +91,7 @@ else
         }
         <div class="sc-field">
             <label for="proxy-email">The proxy's email <span>(required)</span></label>
-            <input id="proxy-email" class="sc-field__input" type="email" name="Email" value="@Model.Email" maxlength="@ProxyGrantConfiguration.MaximumEmail" autocomplete="off" required autofocus
+            <input id="proxy-email" class="sc-field__input" type="email" name="Email" value="@Model.Email" maxlength="@ProxyGrantConfiguration.MaximumEmail" autocomplete="off" required autofocus="@(Model.Done is null)"
                    aria-invalid="@(Model.Errors.ContainsKey("Email") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "proxy-email-error" : null)">
             @if (Model.Errors.TryGetValue("Email", out var emailError))
             {

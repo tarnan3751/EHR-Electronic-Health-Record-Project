@@ -49,7 +49,7 @@ public class TC_UC1_17_Nfr12_ResultsKeyboardFirst(WebApps apps) : IClassFixture<
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/results");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('input[name^=\"Values[\"]')"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('input[name^=\"Values[\"]') === true");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
         foreach (var value in new[] { "44", "14", "7", "250" })
@@ -70,7 +70,7 @@ public class TC_UC1_17_Nfr12_ResultsKeyboardFirst(WebApps apps) : IClassFixture<
         await AiReviewBrowserTests.TabToAsync(page, "a[data-inbox-source]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/results");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('button[data-acknowledge]')"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('button[data-acknowledge]') === true");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=acknowledged", StringComparison.Ordinal));

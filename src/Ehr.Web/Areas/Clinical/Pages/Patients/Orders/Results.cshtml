@@ -12,6 +12,8 @@
     var waiting = order.Tests.Where(test => test.Value is null).ToList();
     var abnormal = filed.Count(test => test.Flag is not null);
     var canWrite = Model.OnPanel && OnPrem.IsReachable;
+    // A notice that answers what was just done takes the focus instead (docs/brand: data-focus-on-load).
+    var answered = Model.Done is not null || Model.Stale;
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, order.Allergies)" />
@@ -24,15 +26,15 @@
 <p class="sc-muted">Ordered by @order.SignedBy, @order.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
 @if (Model.Done is "filed")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> the results are filed, and the patient can see them in the portal. @order.SignedBy has them in their inbox to acknowledge.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Saved:</span> the results are filed, and the patient can see them in the portal. @order.SignedBy has them in their inbox to acknowledge.</p>
 }
 else if (Model.Done is "acknowledged")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Acknowledged:</span> recorded under your name.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Acknowledged:</span> recorded under your name.</p>
 }
 @if (Model.Stale)
 {
-    <p class="sc-notice sc-notice--warning" role="alert"><span class="sc-notice__state">Not saved:</span> this order changed while the page was open. What is below is how it stands now.</p>
+    <p class="sc-notice sc-notice--warning" role="alert" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Not saved:</span> this order changed while the page was open. What is below is how it stands now.</p>
 }
 
 @if (filed.Count == 0)
@@ -80,7 +82,7 @@ else
         <form method="post" asp-page-handler="Acknowledge" asp-route-patientId="@patient.Id" asp-route-orderId="@order.OrderId">
             <input type="hidden" name="Seen" value="@order.Seen">
             <p class="sc-muted">Acknowledging records that you have seen these results, under your name and the time. It can't be undone.</p>
-            <button type="submit" class="sc-btn sc-btn--primary" data-acknowledge autofocus="@(waiting.Count == 0 || !order.OpenToResults)">Acknowledge results</button>
+            <button type="submit" class="sc-btn sc-btn--primary" data-acknowledge autofocus="@(!answered && (waiting.Count == 0 || !order.OpenToResults))">Acknowledge results</button>
         </form>
     }
     else if (!Model.OnPanel)
@@ -119,7 +121,7 @@ else
                 var error = Model.Errors.GetValueOrDefault(test.Code);
                 <div class="sc-field">
                     <label for="@id">@test.Display <span>(@(string.IsNullOrEmpty(test.Unit) ? "no unit" : test.Unit)@(test.Range.Length > 0 ? $"; reference {test.Range}" : null))</span></label>
-                    <input id="@id" class="sc-field__input" name="Values[@test.Code]" value="@Model.Values.GetValueOrDefault(test.Code)" inputmode="decimal" autocomplete="off" autofocus="@(first && filed.Count == 0)"
+                    <input id="@id" class="sc-field__input" name="Values[@test.Code]" value="@Model.Values.GetValueOrDefault(test.Code)" inputmode="decimal" autocomplete="off" autofocus="@(first && filed.Count == 0 && !answered)"
                            aria-invalid="@(error is null ? null : "true")" aria-describedby="@(error is null ? null : id + "-error")">
                     @if (error is not null)
                     {

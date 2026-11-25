@@ -140,7 +140,7 @@
         @* FR-19: a proxy is never left to wonder whose record is on screen. The band sits under the app bar on every
            portal page while the session is acting for someone, with the way back. *@
         <form method="post" asp-area="Portal" asp-page="/Acting" asp-page-handler="Mine" class="sc-notice sc-notice--info sc-notice--band sc-acting" data-acting>
-            <p><span class="sc-notice__state">Viewing as a proxy:</span> this is <strong>@acting.PatientName</strong>'s record, not your own.</p>
+            <p><span class="sc-notice__state">Viewing as a proxy:</span> this is <strong>@acting.PatientName</strong>'s record@(subject!.OwnPatientId is null ? "." : ", not your own.")</p>
             <button type="submit" class="sc-btn sc-btn--compact">@(subject!.OwnPatientId is null ? "Choose another record" : "Back to my own record")</button>
         </form>
     }
