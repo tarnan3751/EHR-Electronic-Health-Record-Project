@@ -11,33 +11,40 @@ the machine and in the model window of run B, never in CI:
 What it needs:
 
 - The local stack's ai profile running from infra/compose (docker compose --profile ai up -d --build), with `llama`
-  and `dictation` healthy: llama-server serving K2 Horizon, for the dictations' sorting and the visits' drafting.
+  and `dictation` healthy: llama-server serving K2 Horizon, for the dictations' sorting and the visits' drafting. It
+  measures the image the stack last built, ehr-dictation:dev (it recreates the container without --build), and prints
+  that image's id: build it first (docker compose --profile ai build dictation) if the sidecar's code changed since.
 - In infra/compose/models, every model the dictation container can load: MedASR and K2 Horizon, Whisper
   (setup_models.py --only whisper) and the speaker model (setup_models.py --only speaker), all in
   models-manifest.json; it checks that the manifest names whisper and speaker.
 - Run B's Spanish recordings in eval/audio-es (generate_audio.py --set es) and the visits' recordings in
   eval/audio/conversations (generate_conversations.py).
-- DICTATION_API_KEY in the environment it runs in, the same as infra/compose/.env's: read from the environment and
-  passed by name to the container that sends the load, never printed or written anywhere.
+- Nothing else. It never reads, prints or passes on a key: the load is sent from inside the dictation container, with
+  the key the stack gave it. Its compose calls leave DICTATION_API_KEY and LLAMA_API_KEY out of their environment, so
+  the recreated container takes infra/compose/.env's, never a value set in the shell that runs this.
 
 What it does:
 
-1. Recreates `dictation` with its cap raised for the measurement (--cap-while-measuring, a compose override written
-   to a temporary folder), so the peak isn't cut short by the cap it is measuring, and waits until it is healthy. A
-   new container starts its cgroup's memory.peak at zero, so the peak covers loading MedASR, Whisper and the speaker
-   model as well as the load.
-2. Sends the load from a container of its own on the inference network (the dictation image, run with this file in
-   --drive mode, standard library only), so the sender's memory isn't the measured container's: two of the visits'
-   longest recordings at once, each sent in chunks, stopped, its voices told apart, named and its note drafted; and, once
-   both are stopped, the sessions the server takes besides them (max_sessions, 8, less the 2 visits: 6), each one of run
-   B's longest Spanish recordings sent in chunks as a dictation in Spanish (a Whisper pass at each chunk, as live, and a
-   final one after stop) and sorted. Each session has an owner of its own, so the per-owner limit doesn't refuse any.
-3. Reads the container's peak from its cgroup (memory.peak), and memory.current every two seconds as a timeline; if the
-   kernel has no memory.peak, the highest memory.current read, said to be sampled. Checks the container wasn't killed
-   for memory or restarted, and that every session got its answer.
-4. Recreates `dictation` with compose.yaml's own cap (not with --keep-raised), and prints, and writes to --out, the peak,
-   the cap it gives (peak x 1.25, rounded up to the next whole GiB, the unit Docker's "g" is), and what each session
-   came to.
+1. Recreates `dictation` with its cap raised for the measurement (--cap-while-measuring) and this file and the
+   recordings mounted read-only (a compose override written to a temporary folder), so the peak isn't cut short by the
+   cap it is measuring, and waits until it is healthy. A new container starts its cgroup's memory.peak at zero, so the
+   peak covers loading MedASR, Whisper and the speaker model as well as the load. From here on, whatever happens (a
+   failure, a timeout, Ctrl-C), it recreates `dictation` with compose.yaml's own cap at the end (not with
+   --keep-raised).
+2. Sends the load from inside the container (this file in --drive mode, standard library only, run with docker exec):
+   two of the visits' longest recordings at once, each sent in chunks, stopped, its voices told apart, named and its
+   note drafted; and, once both are stopped, the sessions the server takes besides them (max_sessions, 8, less the 2
+   visits: 6), each one of run B's longest Spanish recordings sent in chunks as a dictation in Spanish (a Whisper pass
+   at each chunk, as live, and a final one after stop) and sorted. Each session has an owner of its own, so the
+   per-owner limit doesn't refuse any. The sender's own peak (its maxrss) is reported beside, as it is in the
+   container's cgroup too.
+3. Reads the container's peak from its cgroup (memory.peak), which holds the page cache of the model files and
+   recordings read, and samples memory.current and memory.stat's anon + shmem + kernel every two seconds; reports both
+   peaks, so the owner sees what the cap is computed from; if the kernel has no memory.peak, the highest memory.current
+   read, said to be sampled. Checks the container wasn't killed for memory or restarted.
+4. Prints, and writes to --out, the image measured, both peaks, the cap memory.peak gives (peak x 1.25, rounded up to
+   the next whole GiB, the unit Docker's "g" is), and what each session came to. It fails (exit 1) unless all 8
+   sessions came back done: a partial load never gives a cap.
 
 The cap itself is set by hand from its result: infra/compose/compose.yaml's mem_limit and its comment, and the memory
 figures in infra/compose/README.md (Docker Desktop memory) and the root README (Dictation models).
@@ -49,6 +56,7 @@ import argparse
 import json
 import math
 import os
+import resource
 import subprocess
 import sys
 import tempfile
@@ -59,9 +67,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 COMPOSE_DIR = REPO / "infra" / "compose"
-PROJECT = "ehr"  # compose.yaml's name
-NETWORK = f"{PROJECT}_inference"
-IMAGE = "ehr-dictation:dev"
 SPANISH_AUDIO = REPO / "eval" / "audio-es"
 VISIT_AUDIO = REPO / "eval" / "audio" / "conversations"
 MAX_SESSIONS = 8  # settings.py: sessions at once, visits among them
@@ -70,6 +75,9 @@ HEADROOM = 1.25  # the owner's ruling: the peak plus 25%
 GIB = 1 << 30
 CHUNK_BYTES = 1_900_000  # under settings.py's 2 MB a chunk
 DICTATION_CHUNK_SECONDS = 5.0
+SENDER_SECONDS = 2 * 3600  # the whole load, at most
+KEYS = ("DICTATION_API_KEY", "LLAMA_API_KEY")  # never passed from the shell to compose
+NOT_CACHE = ("anon", "shmem", "kernel")  # memory.stat's lines that aren't the page cache
 
 
 def cap_gib(peak_bytes: int) -> int:
@@ -93,10 +101,23 @@ def chunks(data: bytes, pieces: int) -> list[bytes]:
 # ---- The host: the stack, the cgroup, the result ---------------------------------------------------------------------
 
 
+def compose_env() -> dict[str, str]:
+    """This process's environment without the stack's keys, so compose takes infra/compose/.env's (KEYS)."""
+    return {name: value for name, value in os.environ.items() if name not in KEYS}
+
+
 def compose(*args: str, override: Path | None = None) -> subprocess.CompletedProcess:
     files = ["-f", "compose.yaml"] + (["-f", str(override)] if override else [])
     return subprocess.run(["docker", "compose", *files, "--profile", "ai", *args], cwd=COMPOSE_DIR, check=True,
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, env=compose_env())
+
+
+def override_yaml(cap: str) -> str:
+    """The compose override the measurement runs under: the raised cap, and this file and the recordings read-only."""
+    mounts = [(Path(__file__).resolve(), "/measure/measure_memory.py"), (SPANISH_AUDIO, "/measure/audio-es"),
+              (VISIT_AUDIO, "/measure/conversations")]
+    volumes = "".join(f'      - "{source}:{target}:ro"\n' for source, target in mounts)
+    return f"services:\n  dictation:\n    mem_limit: {cap}\n    volumes:\n{volumes}"
 
 
 def container() -> str:
@@ -107,13 +128,29 @@ def container() -> str:
 
 
 def inspect(container_id: str) -> dict:
-    out = subprocess.run(["docker", "inspect", container_id], check=True, capture_output=True, text=True).stdout
-    return json.loads(out)[0]
+    out = subprocess.run(["docker", "inspect", "--format", "{{json .State}}|{{.Image}}|{{.Config.Image}}|"
+                          "{{.RestartCount}}", container_id], check=True, capture_output=True, text=True).stdout
+    state, image_id, image, restarts = out.strip().split("|")
+    return {"State": json.loads(state), "image_id": image_id, "image": image, "restarts": int(restarts)}
 
 
-def cgroup(container_id: str, name: str) -> int | None:
-    read = subprocess.run(["docker", "exec", container_id, "cat", f"/sys/fs/cgroup/{name}"], capture_output=True, text=True)
-    return int(read.stdout.strip()) if read.returncode == 0 and read.stdout.strip().isdigit() else None
+def cgroup(container_id: str, name: str) -> str | None:
+    read = subprocess.run(["docker", "exec", container_id, "cat", f"/sys/fs/cgroup/{name}"], capture_output=True,
+                          text=True)
+    return read.stdout if read.returncode == 0 else None
+
+
+def number(text: str | None) -> int | None:
+    return int(text.strip()) if text and text.strip().isdigit() else None
+
+
+def not_cache(stat: str | None) -> int | None:
+    """memory.stat's anon + shmem + kernel: the memory that isn't the page cache."""
+    if not stat:
+        return None
+    lines = dict(line.split() for line in stat.splitlines() if len(line.split()) == 2)
+    found = [int(lines[name]) for name in NOT_CACHE if name in lines]
+    return sum(found) if found else None
 
 
 def wait_healthy(container_id: str, seconds: float = 600) -> None:
@@ -129,8 +166,6 @@ def wait_healthy(container_id: str, seconds: float = 600) -> None:
 
 
 def preflight() -> tuple[list[dict], list[dict]]:
-    if not os.environ.get("DICTATION_API_KEY"):
-        raise SystemExit("Set DICTATION_API_KEY to the stack's dictation key (infra/compose/.env's); it is never printed.")
     manifest = json.loads((COMPOSE_DIR / "models" / "models-manifest.json").read_text(encoding="utf-8"))
     missing = [name for name in ("medasr", "llm", "whisper", "speaker") if not manifest.get(name)]
     if missing:
@@ -144,81 +179,134 @@ def preflight() -> tuple[list[dict], list[dict]]:
     return spanish, visits
 
 
+def sent(stdout: str) -> dict:
+    """What the sender printed last, as JSON, or nothing if it printed none."""
+    lines = stdout.strip().splitlines()
+    try:
+        return json.loads(lines[-1]) if lines else {}
+    except json.JSONDecodeError:
+        return {}
+
+
 def measure(args: argparse.Namespace) -> dict:
     spanish, visits = preflight()
-    with tempfile.TemporaryDirectory() as folder:
-        override = Path(folder) / "measure.yaml"
-        override.write_text(f"services:\n  dictation:\n    mem_limit: {args.cap_while_measuring}\n", encoding="utf-8")
-        print(f"Recreating dictation with its cap at {args.cap_while_measuring} while it is measured...", flush=True)
-        compose("up", "-d", "--no-deps", "--force-recreate", "dictation", override=override)
-    container_id = container()
-    wait_healthy(container_id)
-    loaded = {"peak": cgroup(container_id, "memory.peak"), "current": cgroup(container_id, "memory.current")}
-    print(f"Loaded: {loaded}", flush=True)
+    results: dict = {"measured_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                     "cap_while_measuring": args.cap_while_measuring, "load": {"dictations_in_spanish": [entry["id"] for entry in spanish],
+                              "visits": [entry["id"] for entry in visits]}, "sessions": []}
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            override = Path(folder) / "measure.yaml"
+            override.write_text(override_yaml(args.cap_while_measuring), encoding="utf-8")
+            print(f"Recreating dictation with its cap at {args.cap_while_measuring} while it is measured...",
+                  flush=True)
+            compose("up", "-d", "--no-deps", "--force-recreate", "dictation", override=override)
+        container_id = container()
+        image = inspect(container_id)
+        results["image"] = {"name": image["image"], "id": image["image_id"]}
+        print(f"Measuring {image['image']} ({image['image_id']}).", flush=True)
+        wait_healthy(container_id)
+        results["after_loading"] = {"peak": number(cgroup(container_id, "memory.peak")),
+                                    "not_cache": not_cache(cgroup(container_id, "memory.stat"))}
+        print(f"Loaded: {results['after_loading']}", flush=True)
 
-    timeline: list[tuple[float, int]] = []
-    sending = threading.Event()
-    started = time.monotonic()
+        timeline: list[tuple[float, int | None, int | None]] = []
+        done = threading.Event()
+        started = time.monotonic()
 
-    def sample() -> None:
-        while not sending.is_set():
-            if (current := cgroup(container_id, "memory.current")) is not None:
-                timeline.append((round(time.monotonic() - started, 1), current))
-            time.sleep(2)
+        def reading() -> tuple[float, int | None, int | None]:
+            return (round(time.monotonic() - started, 1), number(cgroup(container_id, "memory.current")),
+                    not_cache(cgroup(container_id, "memory.stat")))
 
-    sampler = threading.Thread(target=sample, daemon=True)
-    sampler.start()
-    drive = subprocess.run(
-        ["docker", "run", "--rm", "--network", NETWORK, "-e", "DICTATION_API_KEY",
-         "-v", f"{Path(__file__).resolve()}:/measure/measure_memory.py:ro",
-         "-v", f"{SPANISH_AUDIO}:/measure/audio-es:ro", "-v", f"{VISIT_AUDIO}:/measure/conversations:ro",
-         IMAGE, "python", "/measure/measure_memory.py", "--drive",
-         "--dictations", *[entry["file"] for entry in spanish],
-         "--visits", *[f"{entry['file']}:{len(entry['voices'])}" for entry in visits]],
-        capture_output=True, text=True)
-    sending.set()
-    sampler.join()
-    sessions = json.loads(drive.stdout.strip().splitlines()[-1]) if drive.returncode == 0 else []
-    state = inspect(container_id)
-    peak = cgroup(container_id, "memory.peak")
-    sampled = max((current for _, current in timeline), default=0)
-    measured = peak if peak is not None else sampled
-    results = {
-        "measured_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "cap_while_measuring": args.cap_while_measuring,
-        "peak_bytes": measured, "peak_from": "memory.peak" if peak is not None else "memory.current sampled every 2 s",
-        "peak_gib": round(measured / GIB, 3), "cap_gib": cap_gib(measured),
-        "after_loading": loaded, "highest_sampled": sampled, "timeline": timeline,
-        "oom_killed": state["State"].get("OOMKilled"), "restarts": state.get("RestartCount"),
-        "sessions": sessions, "sender_failed": None if drive.returncode == 0 else drive.stderr[-2000:],
-        "load": {"dictations_in_spanish": [entry["id"] for entry in spanish], "visits": [entry["id"] for entry in visits]},
-    }
-    if not args.keep_raised:
-        print("Recreating dictation with compose.yaml's own cap...", flush=True)
-        compose("up", "-d", "--no-deps", "--force-recreate", "dictation")
-    return results
+        def sample() -> None:
+            while not done.wait(2):
+                timeline.append(reading())
+
+        sampler = threading.Thread(target=sample, daemon=True)
+        sampler.start()
+        try:
+            drive = subprocess.run(
+                ["docker", "exec", container_id, "python", "/measure/measure_memory.py", "--drive",
+                 "--dictations", *[entry["file"] for entry in spanish],
+                 "--visits", *[f"{entry['file']}:{len(entry['voices'])}" for entry in visits]],
+                capture_output=True, text=True, timeout=SENDER_SECONDS)
+            sender = sent(drive.stdout)
+            failed = drive.returncode != 0 or not sender
+            results["sender_failed"] = (drive.stderr or "no output")[-2000:] if failed else None
+        except subprocess.TimeoutExpired:
+            sender = {}
+            results["sender_failed"] = f"the load took over {SENDER_SECONDS} s"
+        finally:
+            done.set()
+            sampler.join()
+            timeline.append(reading())  # as the load ends, however short it was
+        results["sessions"] = sender.get("sessions", [])
+        results["sender_maxrss_bytes"] = sender.get("maxrss_bytes")
+        state = inspect(container_id)
+        peak = number(cgroup(container_id, "memory.peak"))
+        sampled = max((current for _, current, _ in timeline if current is not None), default=0)
+        measured = peak if peak is not None else sampled
+        results |= {
+            "peak_bytes": measured,
+            "peak_from": "memory.peak" if peak is not None else "memory.current sampled every 2 s",
+            "peak_gib": round(measured / GIB, 3), "cap_gib": cap_gib(measured),
+            "not_cache_peak_bytes": max((value for *_, value in timeline if value is not None), default=None),
+            "highest_sampled": sampled, "timeline": timeline,
+            "oom_killed": state["State"].get("OOMKilled"), "restarts": state["restarts"],
+        }
+        return results
+    finally:
+        if not args.keep_raised:
+            print("Recreating dictation with compose.yaml's own cap...", flush=True)
+            try:
+                compose("up", "-d", "--no-deps", "--force-recreate", "dictation")
+            except subprocess.CalledProcessError as error:
+                print(f"Couldn't put dictation back as compose.yaml has it: {error.stderr[-500:]}. Run docker compose "
+                      "--profile ai up -d --no-deps --force-recreate dictation from infra/compose.", file=sys.stderr)
 
 
-# ---- The sender, in a container on the inference network (standard library only) -----------------------------------
+def whole(results: dict) -> list[str]:
+    """Why the measurement isn't whole, if it isn't: every one of the 8 sessions must have come back done."""
+    problems = []
+    if results.get("sender_failed"):
+        problems.append(f"the sender failed: {results['sender_failed']}")
+    sessions = results.get("sessions", [])
+    if len(sessions) != MAX_SESSIONS:
+        problems.append(f"{len(sessions)} of {MAX_SESSIONS} sessions came back")
+    problems += [f"{s.get('kind')} {s.get('file')}: {s.get('error') or s.get('sorting')}" for s in sessions
+                 if s.get("error") or s.get("sorting") != "done"]
+    if results.get("oom_killed") or results.get("restarts"):
+        problems.append("the container was killed for memory or restarted")
+    return problems
+
+
+# ---- The sender, inside the container (standard library only) ------------------------------------------------------
+
+
+def decoded(text: bytes) -> dict:
+    """A response's body as JSON, or its first words as the error when it isn't JSON."""
+    try:
+        body = json.loads(text) if text else {}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return {"error": text[:200].decode("utf-8", "replace")}
+    return body if isinstance(body, dict) else {"error": str(body)[:200]}
 
 
 def drive(dictations: list[str], visits: list[str]) -> list[dict]:
     import urllib.error
     import urllib.request
 
-    key = os.environ["DICTATION_API_KEY"]
+    key = os.environ.get("DICTATION_API_KEY", "")  # the stack's, in the container it runs in
 
     def call(method: str, path: str, owner: str, body: bytes | None = None, ambient: bool = False) -> tuple[int, dict]:
         headers = {"Authorization": f"Bearer {key}", "X-Dictation-Owner": owner}
         if ambient:
             headers["X-Dictation-Mode"] = "ambient"
-        request = urllib.request.Request(f"http://dictation:8000{path}", data=body, method=method, headers=headers)
+        request = urllib.request.Request(f"http://127.0.0.1:8000{path}", data=body, method=method, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
-                text = response.read()
-                return response.status, json.loads(text) if text else {}
+                return response.status, decoded(response.read())
         except urllib.error.HTTPError as error:
-            return error.code, json.loads(error.read() or b"{}")
+            return error.code, decoded(error.read())
 
     def send(session: str, owner: str, pieces: list[bytes], ambient: bool) -> None:
         seq = 0
@@ -238,7 +326,7 @@ def drive(dictations: list[str], visits: list[str]) -> list[dict]:
             status, body = call("POST", f"/v1/sessions/{session}/result?wait=10", owner, ambient=ambient)
             if status != 200:
                 raise RuntimeError(f"result: {status} {body.get('error')}")
-            if body["sorting"] in until:
+            if body.get("sorting") in until:
                 return body
         raise RuntimeError("no answer in an hour")
 
@@ -268,10 +356,11 @@ def drive(dictations: list[str], visits: list[str]) -> list[dict]:
                     raise RuntimeError(f"speakers: {status} {body.get('error')}")
                 waiting = settle(session, owner, True, {"done", "unavailable"})
             outcome |= {"sorting": waiting.get("sorting"), "reason": waiting.get("reason")}
-        except (RuntimeError, OSError) as error:
-            outcome["error"] = str(error)
+        except Exception as error:  # noqa: BLE001 -- every session records an outcome, whatever went wrong
+            outcome["error"] = f"{type(error).__name__}: {error}"
+        finally:
             stopped.set()
-        outcomes.append(outcome)
+            outcomes.append(outcome)
 
     def dictation(name: str) -> None:
         owner, outcome = str(uuid.uuid4()), {"kind": "dictation in Spanish", "file": name}
@@ -284,17 +373,19 @@ def drive(dictations: list[str], visits: list[str]) -> list[dict]:
             send(session, owner, chunks(data, math.ceil(seconds / DICTATION_CHUNK_SECONDS)), False)
             call("POST", f"/v1/sessions/{session}/stop", owner)
             done = settle(session, owner, False, {"done", "unavailable"})
-            outcome |= {"sorting": done["sorting"], "reason": done.get("reason")}
-        except (RuntimeError, OSError) as error:
-            outcome["error"] = str(error)
-        outcomes.append(outcome)
+            outcome |= {"sorting": done.get("sorting"), "reason": done.get("reason")}
+        except Exception as error:  # noqa: BLE001 -- every session records an outcome, whatever went wrong
+            outcome["error"] = f"{type(error).__name__}: {error}"
+        finally:
+            outcomes.append(outcome)
 
     stops = [threading.Event() for _ in visits]
     threads = [threading.Thread(target=visit, args=(entry, stop)) for entry, stop in zip(visits, stops, strict=True)]
     for thread in threads:
         thread.start()
-    for stop in stops:
-        stop.wait(3600)
+    for thread, stop in zip(threads, stops, strict=True):
+        while not stop.wait(1) and thread.is_alive():
+            pass  # a visit that ends without stopping never holds the dictations back
     talking = [threading.Thread(target=dictation, args=(name,)) for name in dictations]
     for thread in talking:
         thread.start()
@@ -308,24 +399,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, help="where to write the measurement as JSON")
     parser.add_argument("--cap-while-measuring", default="12g", help="the dictation container's cap while it is measured")
     parser.add_argument("--keep-raised", action="store_true", help="leave dictation with the raised cap afterwards")
-    parser.add_argument("--drive", action="store_true", help=argparse.SUPPRESS)  # the sender, in its own container
+    parser.add_argument("--drive", action="store_true", help=argparse.SUPPRESS)  # the sender, inside the container
     parser.add_argument("--dictations", nargs="*", default=[], help=argparse.SUPPRESS)
     parser.add_argument("--visits", nargs="*", default=[], help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.drive:
-        print(json.dumps(drive(args.dictations, args.visits)))
+        sessions = drive(args.dictations, args.visits)
+        maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024  # Linux gives kilobytes
+        print(json.dumps({"sessions": sessions, "maxrss_bytes": maxrss}))
         return 0
     results = measure(args)
     if args.out:
         args.out.write_text(json.dumps(results, indent=1) + "\n", encoding="utf-8")
-    unanswered = [s for s in results["sessions"] if s.get("error")]
-    print(f"Peak {results['peak_gib']} GiB ({results['peak_from']}); the cap it gives: {results['cap_gib']} GiB "
-          f"(peak x {HEADROOM}, rounded up). Killed for memory: {results['oom_killed']}; restarts: {results['restarts']}; "
-          f"sessions {len(results['sessions'])}, {len(unanswered)} without an answer.")
-    if results["sender_failed"] or unanswered or results["oom_killed"] or not results["sessions"]:
-        print("The measurement isn't whole: see the sessions and sender_failed in the results.", file=sys.stderr)
-        return 1
-    return 0
+    not_cache_peak = results.get("not_cache_peak_bytes")
+    print(f"Image {results['image']['name']} ({results['image']['id']}). Peak {results['peak_gib']} GiB "
+          f"({results['peak_from']}, page cache included); anon + shmem + kernel at most "
+          f"{round(not_cache_peak / GIB, 3) if not_cache_peak else 'unread'} GiB; the sender's own peak "
+          f"{results.get('sender_maxrss_bytes')} bytes. The cap memory.peak gives: {results['cap_gib']} GiB "
+          f"(peak x {HEADROOM}, rounded up).")
+    problems = whole(results)
+    for problem in problems:
+        print(f"Not whole: {problem}", file=sys.stderr)
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":
