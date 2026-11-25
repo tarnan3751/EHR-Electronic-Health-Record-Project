@@ -493,13 +493,25 @@ def spanish_words(text: str, *, accents: bool = True) -> list[str]:
     out: list[str] = []
     i = 0
     while i < len(toks):
-        if (number := starts.get(i)) is not None:
-            out.append(max(number.readings, key=float))
+        # A token of digits glued to letters ("1C" in "la 1C", A1C heard) is a word, not a number: the checks' reader
+        # gives it as a reading of its own, which no float reads.
+        number = starts.get(i)
+        values = [reading for reading in number.readings if _is_float(reading)] if number else []
+        if values:
+            out.append(max(values, key=float))
             i = number.last + 1
             continue
         out.append(toks[i].text if accents else toks[i].key)
         i += 1
     return out
+
+
+def _is_float(text: str) -> bool:
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
 
 
 def _wer(items: list[SpanishItem], scripts: dict[str, Script]) -> dict:
