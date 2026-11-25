@@ -376,6 +376,22 @@ def test_a_trend_said_of_a_finding_named_before_is_read_as_one(said, item, right
     assert facts_changes(said, item, wrong) == {"polarity"}
 
 
+# A trend said with "go" ("has gone up", "went down") is a trend, and where no fact entry covers the passage the
+# statement cites, its direction is read from that Spanish (h04's "Dice que el swelling ya bajó...", whose passage has no
+# entry, given as "has gone up": the third review of 2026-11-24).
+@pytest.mark.parametrize(("english", "changed"), [
+    ("Says the swelling has gone up but it still hurts.", {"polarity"}),
+    ("Says the swelling went up but it still hurts.", {"polarity"}),
+    ("Says the swelling has increased but it still hurts.", {"polarity"}),
+    ("Says the swelling has gone down but it still hurts.", set()),
+    ("Says the swelling went down but it still hurts.", set()),
+])
+def test_a_trend_is_read_against_the_cited_spanish_where_no_fact_entry_covers_it(english, changed):
+    lexicon = facts_es.Lexicon((facts_es.Item("swelling", ("swelling",), {}, None, False, False, None),))
+    said = "Dice que el swelling ya bajó pero todavía le duele al correr."
+    assert {kind for kind, _, _ in facts_es.compare(english, [], [], lexicon, said)[0]} == changed
+
+
 def test_a_change_said_of_a_medicine_by_its_class_is_a_medication_change():
     item = {"of": "blood pressure medication", "action": "stopped"}
     assert "action" in facts_changes("Se suspendió la medicación de la tensión.", item,

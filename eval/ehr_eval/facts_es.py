@@ -34,8 +34,9 @@ clause. Four readings it doesn't make (each was a misreading of the scorer's, st
 years old") is the age's number, as "34-year-old" is, not how long something lasted, and nothing but its number is said
 of an age; a weight lifted, carried or borne ("avoid lifting weight") is a load, not the vital sign; an increase or
 decrease after "has", "was" and the like, in a clause naming a subject and no drug, dose or number ("the swelling has
-decreased"), is a trend, not a medication change, and is changed when the Spanish says it the other way ("ha
-disminuido", "está disminuyendo" or "va a menos" as "has increased"); one with a pronoun, a relative or no subject
+decreased", "has gone up", "went down"), is a trend, not a medication change, and is changed when the Spanish says it
+the other way ("ha disminuido", "está disminuyendo" or "va a menos" as "has increased"), read in the passage the
+statement cites where no fact entry covers it; one with a pronoun, a relative or no subject
 ("it has decreased", "which was increased") takes the kind of the name said before it, a finding's a trend and a
 drug's a medication change, and a medicine named by its class ("blood pressure medicine") is a drug; and a doubt
 before a cause ("probably due to", CAUSES) is the doubt of that link,
@@ -233,6 +234,8 @@ PERFECT_OR_PASSIVE = {"has", "have", "had", "been", "is", "are", "was", "were"}
 # What can stand before "has decreased" without naming what changed: a pronoun or a relative ("which was increased",
 # "it has decreased" are said of what was named before them: a trend of a finding, a change of a drug), or an article.
 NOT_A_SUBJECT = {"which", "that", "it", "this", "these", "those", "they", "who", "the", "a", "an", "its", "their"}
+# A trend said with "go": "has gone up", "went down".
+GO = {"go", "goes", "going", "gone", "went"}
 # A subject that is a medicine without naming one: "blood pressure medicine has been increased" is a medication change.
 MEDICATION_WORDS = {"medicine", "medicines", "medication", "medications", "drug", "drugs", "pill", "pills", "tablet",
                     "tablets"}
@@ -568,14 +571,17 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
     for i, tok in enumerate(toks):
         if not free(i, i + 1):
             continue
-        if (tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] + ACTIONS["decrease"][0] + ACTIONS["decrease"][1]
-                and i and toks[i - 1] in PERFECT_OR_PASSIVE and clause_of[i] not in drugs_at | numbers_at
+        went = tok in GO and i + 1 < len(toks) and toks[i + 1] in ("up", "down") and free(i + 1, i + 2)
+        if ((went or (tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] + ACTIONS["decrease"][0]
+                      + ACTIONS["decrease"][1] and i and toks[i - 1] in PERFECT_OR_PASSIVE))
+                and clause_of[i] not in drugs_at | numbers_at
                 and not any(t in DOSE_WORDS for t, c in zip(toks, clause_of, strict=True) if c == clause_of[i])
                 and _a_trend(toks, clause_of, i, labels)):
-            # "the swelling has decreased", "low back pain. it has decreased": a trend, where what changed is a finding
-            # and no drug or dose is named, not a medication change; read for its direction against the Spanish
-            # (compare()).
-            take(i, i + 1, "trend", "increase" if tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] else "decrease")
+            # "the swelling has decreased", "has gone up", "low back pain. it has decreased": a trend, where what
+            # changed is a finding and no drug or dose is named, not a medication change; read for its direction
+            # against the Spanish (compare()).
+            up = toks[i + 1] == "up" if went else tok in ACTIONS["increase"][0] + ACTIONS["increase"][1]
+            take(i, i + 2 if went else i + 1, "trend", "increase" if up else "decrease")
             continue
         if tok in ("use", "uses") and i - 1 in names_at:
             continue  # "alcohol use" names a habit; "uses albuterol" is taking it
@@ -724,9 +730,10 @@ def negated(english: str, phrase: str) -> list[bool]:
 
 
 def compare(english: str, cited: list[Entry], script: list[Entry],
-            lexicon: Lexicon) -> tuple[list[tuple[str, str, bool]], list[Claim]]:
+            lexicon: Lexicon, said_spanish: str = "") -> tuple[list[tuple[str, str, bool]], list[Claim]]:
     """What the English changes from the items of the entries it cites, each (kind, what, said elsewhere in the
-    script); and every value it says that they back (VALUES), which a misfiling is told by."""
+    script); and every value it says that they back (VALUES), which a misfiling is told by. `said_spanish` is the
+    Spanish the statement cites, read for a trend's direction where no entry covers it."""
     items = [item for entry in cited for item in entry.items]
     spanish_of = {id(item): entry.said for entry in cited for item in entry.items}
     leaning = {key: value for entry in cited for key, value in _leanings(entry).items()}
@@ -746,9 +753,10 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
         if claim.kind in ("named", "negated", "who", "doubt", "history", "present"):
             continue
         if claim.kind == "trend":
-            # Said the other way from the Spanish of what it's said of (or of the passages cited): "ha disminuido" as
-            # "has increased". A passage saying both ways leaves it be.
-            spanish = " ".join(spanish_of[id(item)] for item in (of(claim.label, items) or items))
+            # Said the other way from the Spanish of what it's said of (or of the passages cited, or, with no entry
+            # for them, of the Spanish the statement cites): "ha disminuido" as "has increased", "ya bajó" as "has
+            # gone up". A passage saying both ways leaves it be.
+            spanish = " ".join(spanish_of[id(item)] for item in (of(claim.label, items) or items)) or said_spanish
             said_ways = {way for way, pattern in TREND_ES.items() if pattern.search(spanish)}
             if said_ways and claim.value not in said_ways:
                 where = f" ({claim.label})" if claim.label else ""

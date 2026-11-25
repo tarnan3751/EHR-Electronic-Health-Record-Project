@@ -217,7 +217,8 @@ def _statement_items(english: str, spans: list[tuple[int, int]], hypothesis: str
     entries = facts_es.entries(facts_of(script))
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items), drug_names())
     cited = [entry for entry, _ in _cited(spans, hypothesis, script)]
-    changed, backed = facts_es.compare(english, cited, entries, lexicon)
+    changed, backed = facts_es.compare(english, cited, entries, lexicon,
+                                       " ".join(hypothesis[start:end] for start, end in spans))
 
     def said(text: str) -> set[tuple[str, str | None, str]]:
         return {(claim.kind, claim.label, claim.value) for claim in facts_es.claims(text, lexicon)}
