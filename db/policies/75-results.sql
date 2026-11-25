@@ -445,9 +445,15 @@ CREATE OR REPLACE TRIGGER observations_complete_order
 
 -- After an order becomes completed: the clinician who signed it gets an inbox item, "Results are in", naming the
 -- patient and the order and none of the values. If that account can no longer sign in or is no longer a clinician,
--- the item goes to each clinician with the patient on their panel instead, so results never arrive unseen.
+-- the item goes to each clinician with the patient on their panel instead, so results never arrive unseen. And when
+-- there is none of them either (step 18a), to each administrator whose account isn't disabled, as an emergency access
+-- goes (72-emergency-access-review.sql: locked out for good, the 10-year lockout of 80-appointments.sql, is disabled):
+-- "Results are in, and no clinician can receive them", the patient by ID, the order only as the item's source, and
+-- nothing of the test or its values. An administrator reads no patient data and can't acknowledge; the item is done
+-- for every administrator when a clinician acknowledges the results (ehr.clear_result_items, below), and nobody ticks
+-- it off (70-inbox.sql). An order is completed once, so each is told once.
 -- SECURITY DEFINER, because no runtime role may insert inbox items (10-grants.sql); beyond the order's own row it
--- reads the signer's account and, for the fallback, the patient's panel.
+-- reads the signer's account and, for the fallbacks, the patient's panel and the administrators' accounts.
 CREATE OR REPLACE FUNCTION ehr.deliver_result() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -465,6 +471,14 @@ BEGIN
         JOIN ehr.staff_users s ON s.id = a.clinician_id
         WHERE a.patient_id = NEW.patient_id AND a.ended_at IS NULL
           AND s.roles @> ARRAY['Clinician'] AND (s.lockout_end IS NULL OR s.lockout_end <= now());
+
+        IF NOT FOUND THEN
+            INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, source_table, source_id, summary, created_at)
+            SELECT uuidv7(), s.id, 'unrouted-result', NEW.patient_id, 'orders', NEW.id,
+                   'Results are in, and no clinician can receive them', clock_timestamp()
+            FROM ehr.staff_users s
+            WHERE s.roles @> ARRAY['Admin'] AND (s.lockout_end IS NULL OR s.lockout_end < now() + interval '10 years');
+        END IF;
     END IF;
 
     RETURN NULL;
@@ -502,8 +516,9 @@ CREATE OR REPLACE TRIGGER result_acknowledgments_guard
     BEFORE INSERT ON ehr.result_acknowledgments
     FOR EACH ROW EXECUTE FUNCTION ehr.acknowledge_results();
 
--- After an acknowledgment: the order's inbox items are done, whoever's they are. SECURITY DEFINER, as an item is
--- otherwise marked done only by its recipient.
+-- After an acknowledgment: the order's inbox items are done, whoever's they are, the administrators' items for results
+-- no clinician could receive included (step 18a). SECURITY DEFINER, as an item is otherwise marked done only by its
+-- recipient.
 CREATE OR REPLACE FUNCTION ehr.clear_result_items() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -511,7 +526,7 @@ CREATE OR REPLACE FUNCTION ehr.clear_result_items() RETURNS trigger
 AS $$
 BEGIN
     UPDATE ehr.inbox_items SET done_at = clock_timestamp()
-    WHERE source_table = 'orders' AND source_id = NEW.order_id AND kind = 'result' AND done_at IS NULL;
+    WHERE source_table = 'orders' AND source_id = NEW.order_id AND kind IN ('result', 'unrouted-result') AND done_at IS NULL;
     RETURN NULL;
 END
 $$;

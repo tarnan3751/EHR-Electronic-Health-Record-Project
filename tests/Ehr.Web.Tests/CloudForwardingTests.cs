@@ -6,6 +6,7 @@ using Ehr.Data.Audit;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
@@ -203,6 +204,54 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
         using var response = await client.SendAsync(request, Cancel);
 
         Assert.Contains("Still readable", await ReadAsync(response));
+    }
+
+    // A read the replica isn't known to have caught up with is forwarded while the on-prem app is taken as reachable; when
+    // the forward gets no answer, the replica's copy is served after all, and the on-prem app is taken as unreachable from
+    // then on. The tests' cut-off app starts knowing it is cut off (WebApps), so it never tries: this app starts as a
+    // cloud app does, taking the on-prem app as reachable, over a link that refuses every request but the audit shipper's
+    // check-in, which it holds unanswered, so nothing but the forward can say otherwise before the read.
+    [Fact]
+    public async Task A_read_whose_forward_gets_no_answer_comes_from_the_replica()
+    {
+        await apps.InsertAsync(WebApps.NewShortcut(), "Read after a failed forward");
+        var link = new RefusingLink();
+        await using var cloud = apps.CloudCutOff.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton(new OnPremStatus());
+            services.AddSingleton(new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
+        }));
+        var status = cloud.Services.GetRequiredService<OnPremStatus>();
+        Assert.True(status.IsReachable);
+
+        var signedIn = await CookieHeaderAsync(apps.OnPrem, await apps.ClinicianAsync());
+        using var client = CreateClient(cloud, handleCookies: false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, QuickTexts);
+        request.Headers.Add("Cookie", $"{signedIn}; {LastSaveCookie(position: "FFFFFFFF/FFFFFFFF")}");
+        using var response = await client.SendAsync(request, Cancel);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Read after a failed forward", await ReadAsync(response));
+        Assert.Contains(link.Refused, path => path.StartsWith(QuickTexts, StringComparison.Ordinal));
+        Assert.False(status.IsReachable);
+    }
+
+    // Refuses every request as an on-prem app that can't be reached would, but holds the audit shipper's check-in
+    // unanswered until it is cancelled (the shipper waits 30 seconds), and records what it refused.
+    sealed class RefusingLink : HttpMessageHandler
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<string> Refused { get; } = new();
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath.StartsWith(Ehr.Web.Api.Audit.CloudAuditApi.Path, StringComparison.Ordinal))
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+
+            Refused.Enqueue(request.RequestUri.PathAndQuery);
+            throw new HttpRequestException("Connection refused", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused));
+        }
     }
 
     // A request from a signed-in browser, with the given last-save cookie added. The sign-in goes through the on-prem

@@ -821,7 +821,7 @@ namespace Ehr.Migrations
                         {
                             t.HasCheckConstraint("ck_inbox_items_form_alert_sensitive", "kind <> 'form-alert' OR sensitive");
 
-                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert')");
+                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert', 'unrouted-result')");
 
                             t.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
                         });

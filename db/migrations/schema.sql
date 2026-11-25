@@ -2461,3 +2461,13 @@ VALUES ('20261125060100_EmergencyAccessReviews', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.inbox_items DROP CONSTRAINT ck_inbox_items_kind;
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert', 'unrouted-result'));
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261125152540_UnroutedResults', '10.0.13');
+
+COMMIT;
+

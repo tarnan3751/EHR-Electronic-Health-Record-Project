@@ -54,7 +54,8 @@ public sealed class WebApps : IAsyncLifetime
 
     public WebApplicationFactory<Program> Cloud { get; private set; } = null!;
 
-    // The cloud app with its link to the on-prem app down.
+    // The cloud app with its link to the on-prem app down. It starts knowing so (App's unreachable), as a cloud app is a
+    // moment after it starts.
     public WebApplicationFactory<Program> CloudCutOff { get; private set; } = null!;
 
     // The cloud app linked to an on-prem app that can be made to fail. While PrimaryDown is set, the on-prem app still
@@ -121,7 +122,8 @@ public sealed class WebApps : IAsyncLifetime
         var link = new RecordingLink(OnPrem.Server.CreateHandler(), Forwarded);
         var readOnly = Database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
         Cloud = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
-        CloudCutOff = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())));
+        CloudCutOff = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())),
+            unreachable: true);
         faultLink = new FaultLink(OnPrem.Server.CreateHandler());
         CloudPrimaryDrill = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(faultLink)));
     }
@@ -458,7 +460,7 @@ public sealed class WebApps : IAsyncLifetime
 
     sealed class App(
         Site site, string connectionString, RecordingEmailSender emails, WebApps apps, OnPremApp? onPrem = null, bool bootstrapAdmin = false,
-        string? environment = null, DictationSidecar? dictation = null)
+        string? environment = null, DictationSidecar? dictation = null, bool unreachable = false)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -521,6 +523,16 @@ public sealed class WebApps : IAsyncLifetime
                 if (dictation is not null)
                 {
                     services.AddSingleton(dictation);
+                }
+
+                // A cloud app learns that the on-prem app can't be reached at its audit shipper's first check-in, on a
+                // thread of its own once the app has started; on a busy machine a test's first request could come
+                // before it and find the clinic reachable. The app with its link down starts as it is a moment later.
+                if (unreachable)
+                {
+                    var status = new OnPremStatus();
+                    status.Report(reachable: false);
+                    services.AddSingleton(status);
                 }
             });
         }

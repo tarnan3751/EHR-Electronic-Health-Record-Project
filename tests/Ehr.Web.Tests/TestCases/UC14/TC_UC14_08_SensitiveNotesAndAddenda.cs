@@ -112,11 +112,11 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(drafts, "\"body\":\"\",\"version\":\\d+,\"withheld\":true"));
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(drafts, "\"withheld\":false"));
 
-        // An administrator's audit page: the ordinary note's text is there, as for any write; nothing of the sensitive
-        // note's is, though it was typed and saved as a draft before anyone marked it.
+        // An administrator's audit page: nothing of the sensitive note's text, though it was typed and saved as a draft
+        // before anyone marked it; and since step 18a nothing of the ordinary note's either, as for any patient data.
         var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("The Reviewer of Notes", Ehr.Data.Accounts.StaffRoles.Admin));
         var log = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}", Cancel);
-        Assert.Contains("cough for two days", log);
+        Assert.DoesNotContain("cough for two days", log);
         Assert.DoesNotContain("low mood", log);
         Assert.DoesNotContain("Synthetic sensitive addendum", log);
         Assert.DoesNotContain("the sensitive note", log);

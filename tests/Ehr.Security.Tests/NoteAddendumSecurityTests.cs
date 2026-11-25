@@ -156,29 +156,32 @@ public class NoteAddendumSecurityTests(MigratedDatabase database) : IClassFixtur
 
         // What an administrator's audit page is given: that the sensitive rows were written, never what they say.
         const string shown = """
-            SELECT e.table_name || ' ' || e.sensitive || ' ' || coalesce((SELECT d.details::text FROM ehr.shown_audit_details(ARRAY[e.id]) d), 'hidden')
+            SELECT e.table_name || ' ' || e.sensitive || ' ' || coalesce((SELECT array_to_string(d.fields, ',') FROM ehr.shown_audit_details(ARRAY[e.id]) d), 'hidden')
             FROM ehr.audit_events e WHERE e.patient_id = @patient AND e.table_name IN ('clinical_notes', 'note_addenda') ORDER BY e.table_name, e.sensitive
             """;
         var first = await Accounts.QueryAsync(App, admin, shown, ("patient", patient));
         Assert.Equal(["clinical_notes true hidden", "note_addenda true hidden"], first);
 
         // The sensitive note was a draft first, and the draft's events hold the same text: marked with the note, so an
-        // administrator gets none of it. An ordinary note's draft events are shown as any write is.
+        // administrator gets none of it. An ordinary note's draft events are shown as any write to patient data is, by the
+        // names of the fields they changed and never their text (step 18a).
         const string drafts = """
-            SELECT e.sensitive || ' ' || coalesce((SELECT d.details::text FROM ehr.shown_audit_details(ARRAY[e.id]) d), 'hidden')
+            SELECT e.sensitive || ' ' || coalesce((SELECT array_to_string(d.fields, ',') FROM ehr.shown_audit_details(ARRAY[e.id]) d), 'hidden')
             FROM ehr.audit_events e WHERE e.patient_id = @patient AND e.table_name = 'clinical_drafts' ORDER BY e.occurred_at
             """;
         var sensitiveDraft = await Accounts.QueryAsync(App, admin, drafts, ("patient", patient));
         Assert.NotEmpty(sensitiveDraft);
         Assert.All(sensitiveDraft, line => Assert.Equal("true hidden", line));
         var ordinaryDraft = await Accounts.QueryAsync(App, admin, drafts, ("patient", other));
-        Assert.Contains(ordinaryDraft, line => line.StartsWith("false ", StringComparison.Ordinal) && line.Contains("Synthetic subjective", StringComparison.Ordinal));
+        Assert.Contains(ordinaryDraft, line => line.StartsWith("false ", StringComparison.Ordinal) && line.Contains("subjective", StringComparison.Ordinal));
+        Assert.DoesNotContain(ordinaryDraft, line => line.Contains("Synthetic", StringComparison.Ordinal));
         var second = await Accounts.QueryAsync(App, admin, shown, ("patient", other));
         Assert.Equal(3, second.Count);
-        Assert.Contains("Synthetic subjective", second[0]);
         Assert.StartsWith("clinical_notes false ", second[0]);
-        Assert.Contains("Synthetic ordinary addendum.", second[1]);
+        Assert.Contains("subjective", second[0]);
+        Assert.StartsWith("note_addenda false ", second[1]);
+        Assert.Contains("text", second[1]);
         Assert.Equal("note_addenda true hidden", second[2]);
-        Assert.DoesNotContain(second, line => line.Contains("Synthetic sensitive addendum.", StringComparison.Ordinal));
+        Assert.DoesNotContain(second, line => line.Contains("Synthetic", StringComparison.Ordinal));
     }
 }

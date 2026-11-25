@@ -117,8 +117,9 @@ GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 -- since nothing audits the audit. Append-only: no UPDATE and no DELETE for anyone at runtime. The write-audit
 -- trigger inserts as the table's owner; the app role inserts read and sign-in events.
 GRANT INSERT ON ehr.audit_events TO ehr_app;
--- Every column but details, which holds the values a write changed: admins get those through
--- ehr.shown_audit_details (40-audit.sql), which never gives a sensitive item's.
+-- Every column but details, which holds the values a write changed: through ehr.shown_audit_details (40-audit.sql)
+-- admins get an event's details only when it is about no patient, and of a write to patient data the names of the
+-- fields it changed, never a value (step 18a).
 GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, sensitive, part) ON ehr.audit_events TO ehr_app, ehr_read;
 
 GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;

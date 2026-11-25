@@ -88,7 +88,8 @@ BEGIN
     -- reason typed without reading.
     NEW.safety_warnings := NULL;
     IF NEW.type = 'medication' THEN
-        -- A medication marked sensitive is not named in what is kept: an order's audit details are open to admins.
+        -- A medication marked sensitive is not named in what is kept, nor so in the order's write audit, whose values
+        -- admins could read until step 18a (now only the names of its fields).
         SELECT jsonb_agg(jsonb_build_object('kind', w.kind, 'severity', w.severity, 'ordered', w.ordered,
                              'against', CASE WHEN w.against_sensitive THEN 'a medication marked sensitive' ELSE w.against END, 'source', w.source)
                          ORDER BY w.kind, w.against, w.source)

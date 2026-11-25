@@ -667,7 +667,7 @@ public class VisitSummarySecurityTests(MigratedDatabase database) : IClassFixtur
         var summary = await ReleaseAsync(clinician, patient, note);
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
         const string shown = """
-            SELECT e.action || ' ' || e.sensitive || ' ' || CASE WHEN (SELECT d.details FROM ehr.shown_audit_details(ARRAY[e.id]) d) IS NULL THEN 'hidden' ELSE 'shown' END
+            SELECT e.action || ' ' || e.sensitive || ' ' || CASE WHEN (SELECT d.id FROM ehr.shown_audit_details(ARRAY[e.id]) d) IS NULL THEN 'hidden' ELSE 'shown' END
             FROM ehr.audit_events e WHERE e.table_name = 'visit_summaries' AND e.row_id = @id ORDER BY e.occurred_at
             """;
         Assert.Equal(["insert false shown"], await Accounts.QueryAsync(App, admin, shown, ("id", summary)));
