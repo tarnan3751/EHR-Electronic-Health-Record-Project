@@ -96,11 +96,19 @@ public sealed record DictationResult(
     public const string UnsortedMessage = "The fields couldn't be sorted, so the transcript is kept as plain text.";
     public const string BusyMessage = "The dictation service was busy for too long to draft this visit. The conversation is kept "
         + "with this review until you finish it: write the note from it, or discard it.";
+    public const string NotEnglishMessage = "This dictation doesn't read as English, so no fields were proposed and the transcript "
+        + "is kept as plain text. If you dictated in Spanish, choose Spanish as the language and dictate it again.";
 
     // Ours, never the service's, and only when the fields couldn't be sorted (UC 10): a visit left undrafted because
-    // dictations had K2 Horizon all along (model_busy) says so.
+    // dictations had K2 Horizon all along (model_busy) says so, and a dictation in English that is mostly not English
+    // words (transcript_not_english) points at the Spanish choice.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Message => Sorting != Sorting.Unavailable ? null : Reason == SortingFailure.ModelBusy ? BusyMessage : UnsortedMessage;
+    public string? Message => Sorting != Sorting.Unavailable ? null : Reason switch
+    {
+        SortingFailure.ModelBusy => BusyMessage,
+        SortingFailure.TranscriptNotEnglish => NotEnglishMessage,
+        _ => UnsortedMessage,
+    };
 
     // Whether a stored review's dictation was in Spanish, from its saved result, for its line among the saved reviews.
     // Never throws, whatever the stored evidence holds: only a result whose spokenLanguage is exactly "es" is Spanish, and
@@ -195,6 +203,11 @@ public enum SortingFailure
     // A recorded visit (step 16) whose windows waited ten minutes in all for K2 Horizon, which dictations had first.
     [JsonStringEnumMemberName("model_busy")]
     ModelBusy,
+
+    // A dictation in English whose transcript is mostly not English words (the owner's ruling of 2026-11-25): Spanish
+    // dictated with English chosen, which MedASR writes as words of English and of no language. Nothing is offered.
+    [JsonStringEnumMemberName("transcript_not_english")]
+    TranscriptNotEnglish,
 }
 
 // An instruction the clinician dictated that the note doesn't carry: its kind, and where they said it in the transcript

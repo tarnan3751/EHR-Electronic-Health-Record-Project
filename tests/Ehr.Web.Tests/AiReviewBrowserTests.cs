@@ -299,6 +299,34 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("0 of 3", await page.Locator("[data-review-progress]").TextContentAsync());
     }
 
+    // A dictation in English that is mostly not English words, Spanish dictated with English chosen (the expansion plan's
+    // step 17): it goes on to its review like any unsorted dictation, which shows the transcript as plain text and the
+    // app's own sentence, pointing at the Spanish choice, and nothing to accept.
+    [Fact]
+    public async Task A_dictation_mostly_not_english_reaches_its_review_saying_to_choose_spanish()
+    {
+        var (patient, session) = await AccountAsync();
+        apps.Dictation.Sorting = StubSorting.NotEnglish;
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await LaunchAsync(playwright);
+        await using var context = await ContextAsync(browser, session);
+        var page = await context.NewPageAsync();
+        var errors = new List<string>();
+        page.PageError += (_, error) => errors.Add(error);
+        await page.GotoAsync($"{server.Url}/patients/{patient}/dictate");
+        await page.Keyboard.PressAsync("Alt+Shift+D");
+        await page.WaitForFunctionAsync("document.querySelector('[data-dictation-transcript]').textContent.includes('Fluids and rest.')");
+        await page.Keyboard.PressAsync("Alt+Shift+D");
+        await page.WaitForURLAsync("**/review/*");
+
+        Assert.Equal(Ehr.Web.Api.Dictation.DictationResult.NotEnglishMessage,
+            await page.Locator("[data-dictation-sort-message]").TextContentAsync());
+        Assert.Contains("Cough for three days.", await page.Locator("[data-dictation-transcript]").TextContentAsync());
+        Assert.Equal(0, await page.Locator("[data-field-value] button").CountAsync());
+        Assert.Empty(errors);
+    }
+
     // The words the transcript highlights while a translated sentence has the focus.
     static Task<string> HighlightedAsync(IPage page) =>
         page.EvaluateAsync<string>("[...document.querySelectorAll('[data-dictation-transcript] mark.sc-transcript__source')].map(m => m.textContent).join('')");

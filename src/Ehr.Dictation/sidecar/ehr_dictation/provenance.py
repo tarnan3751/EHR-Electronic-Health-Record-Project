@@ -135,8 +135,8 @@ CODE_SHA256 = code_sha256()
 # and those that make the transcript and the model's answer, which it may not. Neither are the HTTP layer (api.py),
 # which the eval doesn't go through, or this file, since results record the models' own hashes. catalog.py is the
 # reference data's names the checks read (generate_catalog.py writes it). The checks of a Spanish dictation (the
-# expansion plan's step 17) are checks too.
-CHECKS = ("validation.py", "textnorm.py", "catalog.py", "spanish.py", "translation.py", "drugnames.py")
+# expansion plan's step 17) are checks too, and so is englishwords.py, the words they count as English.
+CHECKS = ("validation.py", "textnorm.py", "catalog.py", "spanish.py", "translation.py", "drugnames.py", "englishwords.py")
 CHECKS_CODE_SHA256 = code_sha256(names=CHECKS)
 PIPELINE_CODE_SHA256 = code_sha256(
     names=[path.name for path in PACKAGE.glob("*.py") if path.name not in {*CHECKS, "api.py", "provenance.py"}]

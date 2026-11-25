@@ -70,8 +70,9 @@ The audio run (run_es.py, score_audio()) adds, over the recordings dictated in S
   and how long Spanish passes held the one transcription lock English dictations share: its longest hold while the
   chunks came in and its hold for the final pass after stop, each recording's and the longest of all, which is how
   long an English dictation on that machine skips its live updates, and how long its stop waits, at most;
-- wrong_language: the two recordings dictated in the wrong language, for what was marked and for no instruction
-  carried into a field (FR-14), never for the fields' content;
+- wrong_language: the two recordings dictated in the wrong language, for what was marked, whether and why they went
+  unsorted (the Spanish one dictated as English is refused, transcript_not_english), and for no instruction carried
+  into a field (FR-14), never for the fields' content;
 - text: the measures above that don't need speech recognition, on each script's display text alone (run A's).
 """
 
@@ -676,7 +677,8 @@ def _wrong_language(items: list[SpanishItem], scripts: dict) -> dict:
         listed.append({
             "variant": item.variant, "run_as": item.run_as, "passages": len(item.segments),
             "marked": dict(sorted(marked.items())), "marked_share": _ratio(sum(marked.values()), len(item.segments)),
-            "sorting": item.sorting, "offered": sorted(name for name, outcome in item.fields.items() if outcome.shown),
+            "sorting": item.sorting, "reason": item.reason,
+            "offered": sorted(name for name, outcome in item.fields.items() if outcome.shown),
             "instructions_shown": shown,
         })
     return {"items": listed, "instructions_shown": sum(len(entry["instructions_shown"]) for entry in listed)}

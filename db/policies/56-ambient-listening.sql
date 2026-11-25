@@ -52,7 +52,8 @@ CREATE OR REPLACE TRIGGER ambient_consents_guard
 --     {repository, commit, file, sha256}, and llamaServer, prompt, schema, structuring and code, each null or a string;
 --     every string short and code-shaped (letters, digits and . _ : / + -, at most 128);
 --   message: none, null, or the app's own sentence for a result that couldn't be sorted: for model_busy, that the
---     service was too busy (DictationResult.BusyMessage), and otherwise DictationResult.UnsortedMessage.
+--     service was too busy (DictationResult.BusyMessage), for transcript_not_english (a dictation's alone; a visit never
+--     has it) DictationResult.NotEnglishMessage, and otherwise DictationResult.UnsortedMessage.
 -- So the one place left for words is a pending field's value: the words a proposal offers, kept as a dictation's are.
 -- Every comparison here is null-safe: what isn't there, or isn't of its type, fails.
 CREATE OR REPLACE FUNCTION ehr.ambient_result_is_bare(result jsonb) RETURNS boolean
@@ -77,7 +78,8 @@ AS $$
         -- SortingFailure's codes (DictationApiContract.cs), and only those: a new one from the service is added there and
         -- here; DictationApiTests fails until the two lists are the same.
         AND (result -> 'reason' IS NULL OR result -> 'reason' IN ('"model_unavailable"', '"model_timeout"',
-             '"model_output_invalid"', '"transcript_too_long"', '"transcription_failed"', '"model_busy"'))
+             '"model_output_invalid"', '"transcript_too_long"', '"transcription_failed"', '"model_busy"',
+             '"transcript_not_english"'))
         -- The fields: the note's four at most, each with its status, and only what that status has.
         AND coalesce(jsonb_typeof(result -> 'fields'), 'null') IN ('object', 'null')
         AND NOT EXISTS (
@@ -134,9 +136,13 @@ AS $$
                                 OR m.value #>> '{}' !~ '^[A-Za-z0-9._:/+-]{1,128}$'))))
         -- The app's own sentence, the one for its reason (DictationResult.Message).
         AND (result -> 'message' IS NULL OR result -> 'message' = 'null'
-             OR result ->> 'message' = CASE WHEN result ->> 'reason' = 'model_busy'
+             OR result ->> 'message' = CASE result ->> 'reason'
+                 WHEN 'model_busy'
                  THEN 'The dictation service was busy for too long to draft this visit. The conversation is kept with this '
                       || 'review until you finish it: write the note from it, or discard it.'
+                 WHEN 'transcript_not_english'
+                 THEN 'This dictation doesn''t read as English, so no fields were proposed and the transcript is kept as '
+                      || 'plain text. If you dictated in Spanish, choose Spanish as the language and dictate it again.'
                  ELSE 'The fields couldn''t be sorted, so the transcript is kept as plain text.' END),
         false)
 $$;

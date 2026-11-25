@@ -115,6 +115,14 @@ class Retracting(FakeRecognizer):
         return Recognition("Order a CBC {period} She turned down the blood test {period}", 0.9)
 
 
+class HeardInSpanish(FakeRecognizer):
+    """Hears a dictation in Spanish recorded with English chosen, as MedASR writes one: words of English and of no
+    language, in every passage."""
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        return Recognition("Ctrol hypertension thecta dose annus cononypertension arterial {period}", 0.9)
+
+
 def client(settings: Settings, llama: FakeLlama, recognizer: FakeRecognizer | None = None, model_timeout: float = 0.5,
            spanish: tuple[FakeWhisper, FakeLlama] | None = None, **limits) -> TestClient:
     settings = dataclasses.replace(settings, **limits)
@@ -216,6 +224,13 @@ def answers(settings: Settings) -> dict[str, dict]:
             session = stopped(http)
             keep(f"result-200-unavailable-{reason}", "result",
                  http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
+
+    # A dictation in Spanish recorded with English chosen, mostly not English words (the owner's ruling of 2026-11-25):
+    # nothing offered, the transcript kept as plain text, with a reason of its own.
+    with client(settings, FakeLlama(GROUNDED), HeardInSpanish()) as http:
+        session = stopped(http)
+        keep("result-200-unavailable-transcript_not_english", "result",
+             http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
 
     # MedASR failed on the rest of the recording: the live transcript stays, not final, and nothing is sorted.
     failing = FailingAtTheEnd()
@@ -432,7 +447,8 @@ def test_the_contract_covers_every_answer_the_on_prem_app_must_read(settings):
         "start", "audio", "stop", "result", "cancel",
         "start-ambient", "audio-ambient", "stop-ambient", "speakers-ambient", "result-ambient", "cancel-ambient",
     }
-    reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long", "transcription_failed")
+    reasons = ("model_unavailable", "model_timeout", "model_output_invalid", "transcript_too_long", "transcription_failed",
+               "transcript_not_english")
     assert {bodies[f"result-200-unavailable-{r}"]["reason"] for r in reasons} == set(reasons)
     planned = bodies["result-200-done-not_carried_over"]
     assert planned["fields"]["plan"]["value"] == "Start metformin."

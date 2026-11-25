@@ -60,11 +60,13 @@ namespace Ehr.Web.Api.Dictation;
 // value's sources, or "one_field_holds_dictation", on the only field proposed when it quotes nearly the whole transcript,
 // pointing at what it quotes; the review screen shows it beside the field. When sorting is
 // "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid",
-// "transcript_too_long" or "transcription_failed" (the transcript is then as it was live, not final), or for a visit
-// "model_busy" (its windows waited ten minutes for K2 Horizon), fields is null or all empty, and message is
-// DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is kept as plain text.", or for
-// model_busy DictationResult.BusyMessage, "The dictation service was busy for too long to draft this visit. The
-// conversation is kept with this review until you finish it: write the note from it, or discard it." notCarriedOver:
+// "transcript_too_long", "transcription_failed" (the transcript is then as it was live, not final) or
+// "transcript_not_english" (a dictation in English mostly not English words), or for a visit "model_busy" (its windows
+// waited ten minutes for K2 Horizon), fields is null or all empty, and message is DictationResult.UnsortedMessage, "The
+// fields couldn't be sorted, so the transcript is kept as plain text.", for transcript_not_english
+// DictationResult.NotEnglishMessage, which points at the Spanish choice, or for model_busy DictationResult.BusyMessage,
+// "The dictation service was busy for too long to draft this visit. The conversation is kept with this review until you
+// finish it: write the note from it, or discard it." notCarriedOver:
 // [{reason: "order" or "allergy_change", start, end}], each instruction in the
 // transcript to order something or change the allergy list, which no field carries (FR-14): the screen says it still
 // has to be placed, and can highlight the clinician's own words at start and end. A visit's (AmbientApi) also has

@@ -110,6 +110,32 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.False(string.IsNullOrEmpty((string?)json["transcript"]!["text"]));
     }
 
+    // A dictation in Spanish recorded with English chosen, mostly not English words (the expansion plan's step 17): the
+    // transcript comes back as plain text, with the service's reason and the app's own sentence, which points at the
+    // Spanish choice. The service's side is test_sessions.py's and test_validation.py's.
+    [Fact]
+    public async Task A_dictation_mostly_not_english_comes_back_unsorted_with_words_pointing_at_spanish()
+    {
+        service.Sorting = StubSorting.NotEnglish;
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Quinn", "Notenglish");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        var token = Token(await session.Client.GetStringAsync(DictatePath(patient), Cancel));
+
+        using var started = await SendAsync(session.Client, token, HttpMethod.Post, DictationApi.Path);
+        var id = (string)(await JsonAsync(started))["sessionId"]!;
+        using var chunk = await SendAsync(session.Client, token, HttpMethod.Post, $"{DictationApi.Path}/{id}/audio?seq=0", Audio([1, 2, 3]));
+        using var stopped = await SendAsync(session.Client, token, HttpMethod.Post, $"{DictationApi.Path}/{id}/stop");
+
+        var json = await JsonAsync(stopped);
+        Assert.Equal(("unavailable", "transcript_not_english"), ((string?)json["sorting"], (string?)json["reason"]));
+        Assert.Null(json["fields"]);
+        Assert.Equal(DictationResult.NotEnglishMessage, (string?)json["message"]);
+        Assert.Contains("If you dictated in Spanish, choose Spanish as the language", DictationResult.NotEnglishMessage);
+        Assert.False(string.IsNullOrEmpty((string?)json["transcript"]!["text"]));
+    }
+
     [Fact]
     public async Task Cancel_from_the_page_discards_the_dictation()
     {

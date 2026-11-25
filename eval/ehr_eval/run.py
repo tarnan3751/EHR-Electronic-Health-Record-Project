@@ -66,7 +66,11 @@ async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: St
     scoring.weigh_proposals(item, transcript)
     if proposal is None:
         return item
-    checks = validation.check(proposal.fields, proposal.unknown, transcript)
+    try:
+        checks = validation.check(proposal.fields, proposal.unknown, transcript)
+    except validation.NotEnglish as refused:  # as the sidecar reports it: unsorted, its reason, no field
+        item.sorting, item.reason, item.fields = "unavailable", refused.reason, {}
+        return item
     item.unknown = list(checks.unknown)
     item.fields = {
         name: scoring.FieldOutcome(

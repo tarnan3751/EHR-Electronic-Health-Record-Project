@@ -230,6 +230,23 @@ def test_when_the_model_fails_the_transcript_stays_and_says_why(settings, llama,
     assert result["transcript"]["text"].startswith("speech")
 
 
+# The owner's ruling of 2026-11-25: a dictation in Spanish recorded with English chosen, which MedASR writes as words of
+# English and of no language, offers nothing: no field and no proposal, the transcript kept as plain text, and a reason
+# of its own. The model is asked first: the checks refuse its answer (validation.py).
+def test_a_dictation_mostly_not_english_words_offers_nothing_and_says_why(settings):
+    async def run():
+        sessions = Sessions(settings, FakeRecognizer("manganas"), FakeLlama(GROUNDED).structurer(), MODELS, clock=Clock(),
+                            decoder=raw_decoder)
+        session_id = await dictate(sessions)
+        return await sessions.stop(session_id, ALICE)
+
+    result = asyncio.run(run())
+
+    assert (result["sorting"], result["reason"], result["fields"], result["proposals"]) == (
+        "unavailable", "transcript_not_english", None, [])
+    assert result["transcript"]["text"].startswith("manganas")
+
+
 def test_an_empty_dictation_has_empty_fields_without_asking_the_model(settings):
     async def run():
         llama = FakeLlama(GROUNDED)

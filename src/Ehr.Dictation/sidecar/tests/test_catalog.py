@@ -35,7 +35,7 @@ def test_the_catalog_is_one_of_the_checks_not_the_pipeline():
     assert provenance.PIPELINE_CODE_SHA256 == provenance.code_sha256(
         names=[path.name for path in provenance.PACKAGE.glob("*.py")
                if path.name not in {"validation.py", "textnorm.py", "catalog.py", "spanish.py", "translation.py",
-                                    "drugnames.py", "api.py", "provenance.py"}]
+                                    "drugnames.py", "englishwords.py", "api.py", "provenance.py"}]
     )
 
 
