@@ -12,7 +12,8 @@ namespace Ehr.Domain.Accounts;
 // (db/policies/30-rls.sql); this makes the page say so. The last check's time is kept in the ticket (SessionTimes), since
 // the cookie's renewal once a minute moves its issue time. It also ends a sign-in 12 hours after it began, on every
 // request, whatever the activity (SessionTimes); a ticket written before that was kept counts from its first request
-// since. A check (SessionTimes.CheckHeader) is never renewed here either.
+// since, takes the idle time from then on, and has its account checked at once. A check (SessionTimes.CheckHeader) is
+// never renewed here either.
 public static class CookieSecurityStamp
 {
     static readonly TimeSpan Interval = TimeSpan.FromMinutes(5);
@@ -32,13 +33,20 @@ public static class CookieSecurityStamp
         }
         else if (!check)
         {
+            // A ticket written before step 18: a renewal keeps a ticket's own life, 30 minutes for staff and 20 for the
+            // portal then, so it is cut to the idle time first.
             SessionTimes.MarkSignedIn(context.Properties, now);
+            if (context.Properties.IssuedUtc is { } issued)
+            {
+                context.Properties.ExpiresUtc = issued + SessionTimes.Idle;
+            }
+
             context.ShouldRenew = true;
             SessionTimes.Renewed(context.HttpContext);
         }
 
-        // The last check, or for a ticket written before that was kept, its issue time.
-        if ((SessionTimes.Checked(context.Properties) ?? context.Properties.IssuedUtc) is { } last && now - last < Interval)
+        // The last check; a ticket that holds none, written before that was kept, is checked now.
+        if (SessionTimes.Checked(context.Properties) is { } last && now - last < Interval)
         {
             return;
         }

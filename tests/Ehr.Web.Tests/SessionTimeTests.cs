@@ -4,8 +4,10 @@ using Ehr.Data.Accounts;
 using Ehr.Domain.Accounts;
 using Ehr.Testing;
 using Ehr.Web.Api.Dictation;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -73,6 +75,47 @@ public class SessionTimeTests(WebApps apps) : IClassFixture<WebApps>
         var (kept, renewedByRequest) = await AskAsync(session.Client, check: false);
         Assert.True(renewedByRequest);
         Assert.Equal(900, (int)kept["left"]!);
+    }
+
+    // The session's cookie made as a sign-in before step 18 wrote it: a ticket of the old 30-minute life, with neither
+    // the sign-in's time nor the account check's.
+    static void MakeOldShaped(WebApps apps, Session session)
+    {
+        var format = apps.OnPrem.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(AccountSchemes.Staff).TicketDataFormat;
+        var cookie = session.Jar.GetCookies(Base)[StaffCookie]!;
+        var ticket = format.Unprotect(cookie.Value)!;
+        ticket.Properties.Items.Remove("ehr:signed-in");
+        ticket.Properties.Items.Remove("ehr:account-checked");
+        var issued = apps.Clock.GetUtcNow();
+        ticket.Properties.IssuedUtc = issued;
+        ticket.Properties.ExpiresUtc = issued + TimeSpan.FromMinutes(30);
+        session.Jar.Add(Base, new System.Net.Cookie(StaffCookie, format.Protect(ticket), "/") { Secure = true, HttpOnly = true });
+    }
+
+    // A cookie from before step 18 takes the new rules at its first request: the idle time, not its own 30 minutes, and an
+    // account check at once.
+    [Fact]
+    public async Task A_cookie_from_before_step_18_idles_out_at_15_minutes_and_has_its_account_checked_at_once()
+    {
+        var session = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Dr. Old Cookie", StaffRoles.Clinician));
+        MakeOldShaped(apps, session);
+        apps.Clock.Pass(TimeSpan.FromMinutes(1));
+        Assert.True(await SignedInAsync(apps.OnPrem, session));
+        apps.Clock.Pass(JustOver);
+        Assert.False(await SignedInAsync(apps.OnPrem, session));
+
+        var disabledAccount = await apps.CreateStaffAsync("Dr. Old Cookie Disabled", StaffRoles.Clinician);
+        var disabled = await SignInAsync(apps.OnPrem, disabledAccount);
+        MakeOldShaped(apps, disabled);
+        await using (var scope = apps.OnPrem.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+            var user = (await users.FindByIdAsync(disabledAccount.Id.ToString()))!;
+            Assert.True((await users.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100))).Succeeded);
+        }
+
+        apps.Clock.Pass(TimeSpan.FromSeconds(30));
+        Assert.False(await SignedInAsync(apps.OnPrem, disabled));
     }
 
     // Renewed once a minute, an active sign-in still has its account checked every 5 minutes (CookieSecurityStamp): an
