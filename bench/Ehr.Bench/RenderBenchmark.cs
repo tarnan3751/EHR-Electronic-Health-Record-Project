@@ -55,7 +55,7 @@ namespace Ehr.Bench;
 // app's own settings instead, as `dotnet run --project src/Ehr.Web` does, against a primary already seeded with as many
 // patients. Either way it creates a clinician of its own, with a random password nobody keeps, puts 100 of the seeded
 // patients on their panel, signs six orders for each of them and discontinues two (UC 1), so the chart it measures lists active orders,
-// signs in with password and authenticator code like a browser, and locks the account at the end; and an administrator of its own, the same way, to review emergency access (step 18). It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
+// signs in with password and authenticator code like a browser, and locks the account at the end; and an administrator of its own, the same way, to review emergency access (step 18) and read a patient's audit log (step 18a). It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
 //
 // UC 2, off-site (Tahseen Arnan): then the same requests, in the same order, to the cloud app (OffSiteApp), reading as
 // ehr_read with its link to the on-prem app down, as in an on-site outage, with the same session. Each row's name starts
@@ -300,6 +300,12 @@ internal static partial class RenderBenchmark
                             () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
                         results.Add(await MeasureAsync(admin, times, "Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
                     }
+
+                    // The audit log of a patient with a signed note (step 18a): its writes, the note's and its draft's among
+                    // them, each listed by the names of the fields it changed, worked out from what the trigger stored.
+                    var auditRandom = new Random(20261125);
+                    results.Add(await MeasureAsync(admin, times, "Audit, a patient with a signed note", typing: false,
+                        () => $"/admin/audit?Patient={noted[auditRandom.Next(noted.Count)].Patient}"));
 
                     // The review of a dictation (UC 13), in English and, since the expansion plan's step 17, in Spanish, each
                     // English sentence beside the Spanish it was translated from: staged on new drafts of the patients with
@@ -624,6 +630,10 @@ internal static partial class RenderBenchmark
             results.Add(await MeasureAsync(admin, times, "Off-site, Emergency access review, an ended access", typing: false,
                 () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
             results.Add(await MeasureAsync(admin, times, "Off-site, Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
+            // The audit log of a patient with a signed note (step 18a), with the same generator's draws as on-site.
+            var auditRandom = new Random(20261125);
+            results.Add(await MeasureAsync(admin, times, "Off-site, Audit, a patient with a signed note", typing: false,
+                () => $"/admin/audit?Patient={noted[auditRandom.Next(noted.Count)].Patient}"));
             // Last: the dictation reviews, staged now, after every row that reads those patients' drafts.
             var reviewed = await stageReviews();
             results.AddRange(await MeasureReviewsAsync(client, times, "Off-site, ", reviewed));
