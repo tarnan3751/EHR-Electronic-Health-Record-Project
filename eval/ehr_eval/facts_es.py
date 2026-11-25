@@ -33,8 +33,10 @@ up to the end of the sentence, a semicolon, "but" or "with", and "ruled out" or 
 clause. Four readings it doesn't make (each was a misreading of the scorer's, step 17): an age said in words ("34
 years old") is the age's number, as "34-year-old" is, not how long something lasted, and nothing but its number is said
 of an age; a weight lifted, carried or borne ("avoid lifting weight") is a load, not the vital sign; an increase or
-decrease after "has", "was" and the like, in a clause naming no drug, dose or number ("the swelling has decreased"), is
-a trend, not a medication change; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
+decrease after "has", "was" and the like, in a clause naming a subject and no drug, dose or number ("the swelling has
+decreased"), is a trend, not a medication change, and is changed when the Spanish says it the other way ("ha
+disminuido" as "has increased"), while one said of something named before ("which was increased", "it was
+decreased") is still a medication change; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
 said of neither thing it links, with or without a comma before it, so it answers to either one's doubt in the facts and
 is added only if neither has one; and "unlikely", "may be" and "could be" are doubt, as "possible" and "might" are
 (DOUBT). "unlikely" and "improbable" are a negation too, read against what the Spanish says of a doubt its facts don't
@@ -210,6 +212,16 @@ LOADS = {"lift", "lifts", "lifting", "lifted", "carry", "carries", "carrying", "
          "heavy"}
 # Before an increase or decrease said of something already named ("the swelling has decreased"), a finding's trend.
 PERFECT_OR_PASSIVE = {"has", "have", "had", "been", "is", "are", "was", "were"}
+# What can stand before "has decreased" without naming what changed: a pronoun or a relative ("which was increased",
+# "it was decreased" are said of something named before, a drug as often as not), or an article.
+NOT_A_SUBJECT = {"which", "that", "it", "this", "these", "those", "they", "who", "the", "a", "an", "its", "their"}
+# A trend's direction as the Spanish says it, past or perfect ("ha disminuido", "bajó", "ha aumentado", "subió").
+TREND_ES = {
+    "decrease": re.compile(r"\b(?:disminuid[oa]s?|disminuy[oó]|bajad[oa]s?|baj[oó]|descendid[oa]s?|descendi[oó]|"
+                           r"reducid[oa]s?|reduj[oe]|decrecid[oa]s?)\b", re.IGNORECASE),
+    "increase": re.compile(r"\b(?:aumentad[oa]s?|aument[oó]|subid[oa]s?|subi[oó]|incrementad[oa]s?|increment[oó]|"
+                           r"crecid[oa]s?|creci[oó])\b", re.IGNORECASE),
+}
 DOSE_WORDS = {"dose", "doses", "dosage", "dosing"}
 
 TOKEN = re.compile(r"\d+(?:[.,]\d+)*(?:/\d+(?:[.,]\d+)?)?|°[cf]?|%|[a-zμ][a-z0-9μ]*(?:[-'/.][a-z0-9]+)*|[,;:.()]")
@@ -534,8 +546,12 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
             continue
         if (tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] + ACTIONS["decrease"][0] + ACTIONS["decrease"][1]
                 and i and toks[i - 1] in PERFECT_OR_PASSIVE and clause_of[i] not in drugs_at | numbers_at
-                and not any(t in DOSE_WORDS for t, c in zip(toks, clause_of, strict=True) if c == clause_of[i])):
-            continue  # "the swelling has decreased": a trend, where no drug or dose is named, not a medication change
+                and not any(t in DOSE_WORDS for t, c in zip(toks, clause_of, strict=True) if c == clause_of[i])
+                and _subject_named(toks, clause_of, i)):
+            # "the swelling has decreased": a trend, where a subject is named and no drug or dose, not a medication
+            # change; read for its direction against the Spanish (compare()).
+            take(i, i + 1, "trend", "increase" if tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] else "decrease")
+            continue
         if tok in ("use", "uses") and i - 1 in names_at:
             continue  # "alcohol use" names a habit; "uses albuterol" is taking it
         if tok in ACTIONS["take"][0] and i and any(toks[i - 1] in forms for pair in ACTIONS.values() for forms in pair):
@@ -591,6 +607,16 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
         found.append(Claim("who" if before_only else kind, label, value))
     found += _negations(toks, labels, clause_of)
     return found
+
+
+def _subject_named(toks: list[str], clause_of: list[int], verb: int) -> bool:
+    """Whether the words of the verb's clause before its auxiliaries name a subject: one at least that isn't a pronoun,
+    relative or article (NOT_A_SUBJECT). "Which was increased" and "it was decreased" say it of something named before."""
+    start = verb
+    while start and clause_of[start - 1] == clause_of[verb]:
+        start -= 1
+    before = [t for t in toks[start:verb] if t not in PERFECT_OR_PASSIVE and t.isalpha()]
+    return any(t not in NOT_A_SUBJECT for t in before)
 
 
 def _leave(toks: list[str], at: int) -> bool:
@@ -674,6 +700,15 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
 
     for claim in said:
         if claim.kind in ("named", "negated", "who", "doubt", "history", "present"):
+            continue
+        if claim.kind == "trend":
+            # Said the other way from the Spanish of what it's said of (or of the passages cited): "ha disminuido" as
+            # "has increased". A passage saying both ways leaves it be.
+            spanish = " ".join(spanish_of[id(item)] for item in (of(claim.label, items) or items))
+            said_ways = {way for way, pattern in TREND_ES.items() if pattern.search(spanish)}
+            if said_ways and claim.value not in said_ways:
+                where = f" ({claim.label})" if claim.label else ""
+                changed.append(("polarity", f"{claim.value}d{where}, said the other way", False))
             continue
         if claim.kind == "drug":
             if not of(claim.label, items):

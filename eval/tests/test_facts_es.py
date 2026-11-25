@@ -300,6 +300,26 @@ def test_a_trend_is_no_medication_change_and_a_drugs_change_still_is(english, ac
     assert next((c.value for c in facts_es.claims(english, lexicon) if c.kind == "action"), None) == action
 
 
+# A trend is read only where its clause names a subject, and for its direction against the Spanish: given the other way
+# round it is changed, the right way it isn't. A change said of something named before ("which was increased", "it was
+# decreased") is a medication change, counted where the Spanish says none (the review of 2026-11-24).
+@pytest.mark.parametrize(("said", "of", "right", "reversed_"), [
+    ("La hinchazón ha disminuido.", "swelling", "The swelling has decreased.", "The swelling has increased."),
+    ("El dolor ha disminuido.", "pain", "Pain has decreased.", "Pain has increased."),
+    ("El dolor ha aumentado desde el lunes.", "pain", "Pain has increased since Monday.", "Pain has decreased since Monday."),
+])
+def test_a_trend_given_the_other_way_round_is_changed_and_the_right_way_is_not(said, of, right, reversed_):
+    assert facts_changes(said, {"of": of}, right) == set()
+    assert facts_changes(said, {"of": of}, reversed_) == {"polarity"}
+
+
+@pytest.mark.parametrize("english", ["Lisinopril 10 mg daily, which was increased.", "Lisinopril 10 mg daily. It was decreased."])
+def test_a_change_said_of_a_drug_named_before_is_a_medication_change(english):
+    item = {"of": "lisinopril", "number": "10 mg", "frequency": "daily"}
+    assert facts_changes("Lisinopril 10 mg al día.", item, english, frozenset({"lisinopril"})) == {"action"}
+    assert facts_changes("Lisinopril 10 mg al día.", item, "Lisinopril 10 mg daily.", frozenset({"lisinopril"})) == set()
+
+
 def test_a_number_the_spanish_says_without_a_unit_may_be_given_a_unit_of_measurement_only():
     assert changes("e01", "TA 152/94, FC 78, peso 88 kg.", "BP 152/94 mmHg, HR 78 bpm, weight 88 kg.") == set()
     assert changes("e01", "TA 152/94, FC 78, peso 88 kg.", "BP 152/94, HR 78, weight 88 lb.") == {
