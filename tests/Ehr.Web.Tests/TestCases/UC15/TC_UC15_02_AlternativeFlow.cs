@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Expected result: Step 1: "Nothing needs your action.", "Nothing done yet.", and an Inbox link with no count. Step 2:
 //   the admin's app bar shows Inbox with 1; the item shows the patient's ID, not their name or MRN, and no link to a
 //   chart; no read of the patient is recorded. Step 3: the item is done and the inbox is empty.
-// Creator: Tahseen Arnan
+// Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;

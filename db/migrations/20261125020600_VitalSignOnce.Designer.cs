@@ -645,11 +645,15 @@ namespace Ehr.Migrations
                     b.HasKey("Id")
                         .HasName("pk_messages");
 
-                    b.HasIndex("PatientId")
-                        .HasDatabaseName("ix_messages_patient_id");
-
                     b.HasIndex("ThreadId", "SentAt")
                         .HasDatabaseName("ix_messages_thread_id_sent_at");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_messages_patient_id")
+                        .HasDatabaseName("ix_messages_patient_id");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_messages_unread_from_staff")
+                        .HasDatabaseName("ix_messages_unread_from_staff")
+                        .HasFilter("sender_kind = 'staff' AND read_at IS NULL");
 
                     b.ToTable("messages", "ehr", t =>
                         {
@@ -1410,6 +1414,11 @@ namespace Ehr.Migrations
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_allergy_intolerances_patient_id");
+
+                    b.HasIndex(new[] { "PatientId" }, "ix_allergy_intolerances_one_no_known_allergy")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allergy_intolerances_one_no_known_allergy")
+                        .HasFilter("code = 'no-known-allergy' AND clinical_status = 'active'");
 
                     b.ToTable("allergy_intolerances", "ehr", t =>
                         {

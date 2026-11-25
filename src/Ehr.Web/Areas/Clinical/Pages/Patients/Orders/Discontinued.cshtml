@@ -8,7 +8,7 @@
     ViewData["Title"] = $"Discontinued orders: {patient.FamilyName}, {patient.GivenName}";
 }
 @section Banner {
-    <partial name="_PatientBanner" model="new PatientBanner(patient)" />
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Orders.Allergies, Model.OnPanel, Model.EmergencyUntil)" />
 }
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to the chart</a></p>

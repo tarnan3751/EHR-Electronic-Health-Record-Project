@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 //   3. Press Tab until the remaining item's patient link has the focus, and press Enter.
 // Expected result: Step 1 opens the inbox. Step 2 leaves one item, and the app bar's count goes from 2 to 1. Step 3
 //   opens the patient's chart. Every focused control shows the focus ring, and the page reports no script errors.
-// Creator: Tahseen Arnan
+// Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
 [Collection(BrowserTests.Collection)]

@@ -7,6 +7,8 @@ namespace Ehr.Data.Patients;
 // the columns FHIR binds to a fixed list of codes to that list.
 public sealed class AllergyIntoleranceConfiguration : IEntityTypeConfiguration<AllergyIntolerance>
 {
+    public const string OneNoKnownAllergyIndex = "ix_allergy_intolerances_one_no_known_allergy";
+
     public void Configure(EntityTypeBuilder<AllergyIntolerance> allergy)
     {
         allergy.ToTable("allergy_intolerances", table =>
@@ -28,5 +30,10 @@ public sealed class AllergyIntoleranceConfiguration : IEntityTypeConfiguration<A
         allergy.Property(a => a.Severity).HasMaxLength(20);
         // Read by patient, for the chart.
         allergy.HasOne<Patient>().WithMany().HasForeignKey(a => a.PatientId).OnDelete(DeleteBehavior.Restrict);
+        allergy.HasIndex(a => a.PatientId);
+        // At most one active "No known allergies" per patient: a second click, or a second tab, can't record another.
+        // db/policies/65-chart-lists.sql refuses one first, with this index's name, so the app can tell it apart.
+        allergy.HasIndex(a => a.PatientId, OneNoKnownAllergyIndex).IsUnique().HasDatabaseName(OneNoKnownAllergyIndex)
+            .HasFilter($"code = '{AllergyIntolerance.NoKnownAllergy}' AND clinical_status = '{AllergyClinicalStatus.Active}'");
     }
 }

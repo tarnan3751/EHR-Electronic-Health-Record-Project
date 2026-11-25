@@ -17,17 +17,18 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Inputs and system conditions: GET and POST /patients/{id}/medications/{entry} and /patients/{id}/allergies/{entry};
 //   GET /patients/{id}/chart-history; on the on-site app.
 // Test data: Patient Synthetic Listed. Medication "metformin hydrochloride 500 MG Oral Tablet", stopped 2026-10-01.
-//   Allergy "Sulfonamides", reaction changed to "Rash".
+//   Allergy "Sulfonamides", reaction changed to "Rash", risk to high and severity to moderate.
 // Steps:
 //   1. Add the medication; follow its "Change" link.
 //   2. Set its status to Stopped with the stop date, and save.
-//   3. Follow the allergy's "Change" link, enter the reaction, leave the name as it is, and save.
+//   3. Follow the allergy's "Change" link, enter the reaction, risk and severity, leave the name as it is, and save.
 //   4. Open the chart and the history.
 // Expected result: The change form is titled "Change medication" and opens filled in. After step 2 the chart says "No
 //   active medications recorded." and the row still exists, stopped. After step 3 the allergy is still "Sulfonamides"
-//   with no code, and shows "Rash". No row was deleted. The history shows "Status: active → stopped", "Stopped: not
-//   recorded → 2026-10-01" and "Reaction: not recorded → Rash".
-// Creator: Tahseen Arnan
+//   with no code, and shows "Rash". No row was deleted. The history shows, in the form's words, "Status: Active →
+//   Stopped", "Stopped: not recorded → 2026-10-01", "Reaction: not recorded → Rash", "Risk: not recorded → High
+//   risk" and "Severity: not recorded → Moderate".
+// Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_08_ChangeEntryAlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -50,7 +51,8 @@ public class TC_UC4_08_ChangeEntryAlternativeFlow(WebApps apps) : IClassFixture<
 
         using var stopped = await SaveAsync(session.Client, patient, "medications", medication,
             ("Name", "metformin hydrochloride 500 MG Oral Tablet"), ("Status", MedicationStatementStatus.Stopped), ("Stopped", "2026-10-01"));
-        using var reaction = await SaveAsync(session.Client, patient, "allergies", allergy, ("Name", "sulfonamides"), ("Reaction", "Rash"), ("Status", "active"));
+        using var reaction = await SaveAsync(session.Client, patient, "allergies", allergy, ("Name", "sulfonamides"), ("Reaction", "Rash"), ("Status", "active"),
+            ("Criticality", "high"), ("Severity", "moderate"));
 
         var after = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Contains("No active medications recorded.", after);
@@ -60,8 +62,11 @@ public class TC_UC4_08_ChangeEntryAlternativeFlow(WebApps apps) : IClassFixture<
         Assert.Equal(["Sulfonamides - Rash"], await RowsAsync(apps, "allergy_intolerances", patient, "concat_ws(' ', display, coalesce(code, '-'), reaction)"));
 
         var history = Words(await session.Client.GetStringAsync($"/patients/{patient}/chart-history", Cancel));
-        Assert.Contains("Status: active → stopped", history);
+        Assert.Contains("Status: Active → Stopped", history);
         Assert.Contains("Stopped: not recorded → 2026-10-01", history);
         Assert.Contains("Reaction: not recorded → Rash", history);
+        Assert.Contains("Risk: not recorded → High risk", history);
+        Assert.Contains("Severity: not recorded → Moderate", history);
+        Assert.DoesNotContain("→ stopped", history);
     }
 }

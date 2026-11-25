@@ -28,7 +28,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 //   button; the patient's name being shown is one recorded read of the patient. Step 3: the inbox lists only the
 //   result and the app bar shows 1; the item has a done time, and the write audit names the clinician. Step 4: the
 //   message is listed as done.
-// Creator: Tahseen Arnan
+// Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
