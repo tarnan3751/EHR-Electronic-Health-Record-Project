@@ -48,9 +48,35 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "break_glass_accesses")] = ["SELECT"],
         // Chart lists: clinicians add and change entries, and nothing deletes one. Their history is the database's to write.
         [("ehr_app", "allergy_intolerances")] = ["SELECT", "INSERT", "UPDATE"],
+        // Messages: sent by insert, never edited; marking one read is a column grant.
+        [("ehr_app", "message_threads")] = ["SELECT", "INSERT"],
+        [("ehr_read", "message_threads")] = ["SELECT"],
+        [("ehr_app", "messages")] = ["SELECT", "INSERT"],
+        [("ehr_read", "messages")] = ["SELECT"],
+        // Appointments: booked by insert; rescheduling, cancelling, checking in and no-shows are column grants.
+        [("ehr_app", "appointments")] = ["SELECT", "INSERT"],
+        [("ehr_read", "appointments")] = ["SELECT"],
+        // The staff inbox: read; marking an item done is a column grant.
+        [("ehr_app", "inbox_items")] = ["SELECT"],
+        [("ehr_read", "inbox_items")] = ["SELECT"],
         [("ehr_app", "chart_history")] = ["SELECT"],
         [("ehr_read", "chart_history")] = ["SELECT"],
         [("ehr_app", "clinical_codes")] = ["SELECT"],
+        // The rest of the reference data: read only.
+        [("ehr_app", "observation_codes")] = ["SELECT"],
+        [("ehr_read", "observation_codes")] = ["SELECT"],
+        [("ehr_app", "order_result_codes")] = ["SELECT"],
+        [("ehr_read", "order_result_codes")] = ["SELECT"],
+        [("ehr_app", "questionnaires")] = ["SELECT"],
+        [("ehr_read", "questionnaires")] = ["SELECT"],
+        [("ehr_app", "drug_ingredients")] = ["SELECT"],
+        [("ehr_read", "drug_ingredients")] = ["SELECT"],
+        [("ehr_app", "drug_classes")] = ["SELECT"],
+        [("ehr_read", "drug_classes")] = ["SELECT"],
+        [("ehr_app", "drug_class_cross_reactions")] = ["SELECT"],
+        [("ehr_read", "drug_class_cross_reactions")] = ["SELECT"],
+        [("ehr_app", "drug_interactions")] = ["SELECT"],
+        [("ehr_read", "drug_interactions")] = ["SELECT"],
         [("ehr_read", "clinical_codes")] = ["SELECT"],
         [("ehr_read", "allergy_intolerances")] = ["SELECT"],
         [("ehr_app", "medication_statements")] = ["SELECT", "INSERT", "UPDATE"],
@@ -72,7 +98,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "orders")] = ["SELECT"],
         [("ehr_app", "order_catalog_items")] = ["SELECT"],
         [("ehr_read", "order_catalog_items")] = ["SELECT"],
-        [("ehr_app", "encounters")] = ["SELECT"],
+        // A visit is created by checking a patient in for an appointment; nothing updates or deletes one.
+        [("ehr_app", "encounters")] = ["SELECT", "INSERT"],
         [("ehr_read", "encounters")] = ["SELECT"],
         [("ehr_app", "observations")] = ["SELECT"],
         [("ehr_read", "observations")] = ["SELECT"],
@@ -234,6 +261,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     {
         // UC 1: discontinuing an order.
         [("ehr_app", "orders", "UPDATE")] = ["discontinue_reason", "replaced_by_order_id", "status"],
+        [("ehr_app", "appointments", "UPDATE")] = ["cancel_reason", "encounter_id", "minutes", "reason", "starts_at", "status"],
+        [("ehr_app", "messages", "UPDATE")] = ["read_at"],
+        // Marking an inbox item done.
+        [("ehr_app", "inbox_items", "UPDATE")] = ["done_at"],
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.
         [("ehr_app", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
         [("ehr_read", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],

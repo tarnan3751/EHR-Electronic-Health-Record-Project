@@ -84,7 +84,9 @@ internal static partial class RenderBenchmark
                 Console.WriteLine($"Starting PostgreSQL 18 and seeding {patients:N0} synthetic patients...");
                 database = MigratedDatabase.Durable();
                 await database.InitializeAsync();
-                await Seeder.LoadAsync(database.OwnerConnectionString, new SyntheticClinic(patients), CancellationToken.None);
+                var seeding = Stopwatch.StartNew();
+                var seeded = await Seeder.LoadAsync(database.OwnerConnectionString, new SyntheticClinic(patients), CancellationToken.None);
+                Console.WriteLine($"Seeded in {seeding.Elapsed.TotalSeconds:F1} s: {string.Join(", ", seeded.Select(table => $"{table.Value:N0} {table.Key}"))}");
                 connectionString = database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
             }
 
@@ -115,18 +117,34 @@ internal static partial class RenderBenchmark
             {
                 var panel = await AssignPanelAsync(app, clinicianId, patients);
                 var labOrders = await SignOrdersAsync(app, clinicianId, panel);
+                await FillInboxAsync(database, clinicianId, panel);
+                var (scheduleDay, appointments) = await BookDayAsync(app, clinicianId, panel);
+                var threads = await WriteThreadsAsync(app, clinicianId, panel);
                 var session = new CookieContainer();
                 using var client = await SignInAsync(app, session, email, password, key);
                 await SettleAsync(database);
                 var results = await MeasureEachAsync(client, times, "", panel, labOrders, patients);
+                results.AddRange(await MeasureScheduleAsync(client, times, "", panel, scheduleDay, appointments));
+                // A conversation's page for the clinician (FR-18): its messages, and a recorded read of the thread.
+                var threadRandom = new Random(20261119);
+                results.Add(await MeasureAsync(client, times, "Conversation, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, thread) = threads[threadRandom.Next(threads.Count)];
+                    return $"/patients/{patient}/messages/{thread}";
+                }));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
-                var (patientUserId, patientEmail, patientPassword) = await CreatePatientAccountAsync(app, patients);
+                var (patientUserId, patientEmail, patientPassword, portalPatient) = await CreatePatientAccountAsync(app, patients);
+                var portalThread = await WritePortalThreadAsync(app, clinicianId, portalPatient);
                 try
                 {
                     using var portal = await PortalSignInAsync(app, patientEmail, patientPassword);
                     results.Add(await MeasureAsync(portal, times, "Portal results, the patient's own", typing: false, () => "/portal/results"));
+                    results.Add(await MeasureAsync(portal, times, "Portal appointments, the patient's own", typing: false, () => "/portal/appointments"));
+                    results.Add(await MeasureAsync(portal, times, "Portal home, the patient's own", typing: false, () => "/portal"));
+                    results.Add(await MeasureAsync(portal, times, "Portal messages, the patient's own", typing: false, () => "/portal/messages"));
+                    results.Add(await MeasureAsync(portal, times, "Portal conversation, the patient's own", typing: false, () => $"/portal/messages/{portalThread}"));
                 }
                 finally
                 {
@@ -140,7 +158,7 @@ internal static partial class RenderBenchmark
                 else
                 {
                     await SettleAsync(database);
-                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients));
+                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments));
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -243,6 +261,12 @@ internal static partial class RenderBenchmark
                 () => $"/patients/{panel[random.Next(panel.Count)]}/diagnoses"),
             await MeasureAsync(client, times, prefix + "Code search, first 3 letters", typing: false,
                 () => $"/codes?kind=condition&q={CodeSearches[random.Next(CodeSearches.Length)]}"),
+            // The same search by words inside the names, which goes through the text-search index.
+            await MeasureAsync(client, times, prefix + "Code search, words inside the name", typing: false,
+                () => $"/codes?kind=condition&q={Uri.EscapeDataString(CodeWords[random.Next(CodeWords.Length)])}"),
+            // The staff inbox (the expansion plan's step 3): its items, each naming a patient, which is a recorded read
+            // of each. Every row above also counted the inbox for the app bar.
+            await MeasureAsync(client, times, prefix + $"Inbox, {InboxSize} items", typing: false, () => "/inbox"),
             await MeasureAsync(client, times, prefix + "Chart history, a patient on the panel", typing: false,
                 () => $"/patients/{panel[random.Next(panel.Count)]}/chart-history"),
         ];
@@ -251,10 +275,13 @@ internal static partial class RenderBenchmark
     // What a clinician might have typed so far when looking for a diagnosis.
     static readonly string[] CodeSearches = ["typ", "ess", "anx", "ast", "hyp", "dia", "dep", "alc", "low", "mig"];
 
+    static readonly string[] CodeWords = ["diabetes", "mellitus compl", "fracture femur", "pneumonia", "kidney chronic", "pain", "infarction", "left", "unspecified site", "encounter"];
+
     // UC 2 (Tahseen Arnan): the same requests to the cloud app, with the on-site session's cookies, during an outage. Its
     // audit queue goes in a folder of its own, deleted at the end.
     static async Task<List<Result>> MeasureOffSiteAsync(
-        BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients)
+        BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
+        string scheduleDay, List<Guid> appointments)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -268,13 +295,25 @@ internal static partial class RenderBenchmark
             }
 
             using var client = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
-            return await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
+            var results = await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
+            results.AddRange(await MeasureScheduleAsync(client, times, "Off-site, ", panel, scheduleDay, appointments));
+            return results;
         }
         finally
         {
-            if (Directory.Exists(queue))
+            // Best effort: on Windows the cloud app's queue file can still be open here, and Windows refuses to delete an
+            // open file (Linux and macOS don't). The folder is in the temp directory; leaving it beats losing every
+            // result measured.
+            try
             {
-                Directory.Delete(queue, recursive: true);
+                if (Directory.Exists(queue))
+                {
+                    Directory.Delete(queue, recursive: true);
+                }
+            }
+            catch (IOException error)
+            {
+                Console.Error.WriteLine($"Couldn't delete the off-site audit queue's temporary folder {queue}: {error.Message}");
             }
         }
     }
@@ -636,7 +675,7 @@ internal static partial class RenderBenchmark
 
     // A confirmed portal account, with a random password nobody keeps, for the last patient in the clinic with at least
     // three released results.
-    static async Task<(Guid Id, string Email, string Password)> CreatePatientAccountAsync(BenchApp app, int patients)
+    static async Task<(Guid Id, string Email, string Password, Guid Patient)> CreatePatientAccountAsync(BenchApp app, int patients)
     {
         var patient = Enumerable.Range(0, patients).Reverse()
             .Select(SyntheticClinic.Chart)
@@ -648,7 +687,7 @@ internal static partial class RenderBenchmark
         var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
         var user = new PatientUser { UserName = email, Email = email, EmailConfirmed = true, PatientId = patient };
         Check(await users.CreateAsync(user, password));
-        return (user.Id, email, password);
+        return (user.Id, email, password, patient);
     }
 
     // Signs a patient in at the portal, as a browser does, and returns a client with the session's cookies.
@@ -743,6 +782,124 @@ internal static partial class RenderBenchmark
             .SetProperty(order => order.DiscontinueReason, "Synthetic: no longer needed"));
         await transaction.CommitAsync();
         return labOrders;
+    }
+
+    // A conversation of six messages, all from staff (a clinician can't write as the patient), for each of the first
+    // 24 patients on the panel, written through the database's own rules.
+    static async Task<List<(Guid Patient, Guid Thread)>> WriteThreadsAsync(BenchApp app, Guid clinicianId, List<Guid> panel)
+    {
+        var threads = new List<(Guid, Guid)>();
+        foreach (var patient in panel.Take(DaySize))
+        {
+            threads.Add((patient, await WriteThreadAsync(app, clinicianId, patient)));
+        }
+
+        return threads;
+    }
+
+    static async Task<Guid> WriteThreadAsync(BenchApp app, Guid clinicianId, Guid patient)
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var thread = new Ehr.Data.Messaging.MessageThread { Id = Guid.CreateVersion7(), PatientId = patient, Subject = "Synthetic: follow-up" };
+        db.Add(thread);
+        await db.SaveChangesAsync();
+        db.AddRange(Enumerable.Range(0, 6).Select(i => new Ehr.Data.Messaging.Message
+        {
+            Id = Guid.CreateVersion7(),
+            ThreadId = thread.Id,
+            PatientId = patient,
+            SenderKind = Ehr.Data.Messaging.MessageSender.Staff,
+            Body = $"Synthetic message {i + 1}: your results are in, and we can go over them at your next visit.",
+        }));
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return thread.Id;
+    }
+
+    // The portal patient's own conversation: the clinician puts them on the panel first, since only the care team writes.
+    static async Task<Guid> WritePortalThreadAsync(BenchApp app, Guid clinicianId, Guid patient)
+    {
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+            var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await scope.ServiceProvider.GetRequiredService<PatientAssignments>().AssignAsync(patient, CancellationToken.None);
+            await transaction.CommitAsync();
+        }
+
+        return await WriteThreadAsync(app, clinicianId, patient);
+    }
+
+    const int DaySize = 24;
+
+    // A day of appointments for the benchmark's clinician (FR-17), each with a different patient on their panel,
+    // booked through the database's own rules, so the schedule has a full day to list and the charts an appointment
+    // to show. With --stack they stay on the primary afterwards, as its orders do.
+    static async Task<(string Day, List<Guid> Appointments)> BookDayAsync(BenchApp app, Guid clinicianId, List<Guid> panel)
+    {
+        var day = DateTime.UtcNow.Date.AddDays(7);
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var appointments = panel.Take(DaySize).Select((patient, slot) => new Ehr.Data.Scheduling.Appointment
+        {
+            Id = Guid.CreateVersion7(),
+            PatientId = patient,
+            ClinicianId = clinicianId,
+            StartsAt = new DateTimeOffset(day.AddHours(8).AddMinutes(20 * slot), TimeSpan.Zero),
+            Minutes = 20,
+            Reason = "Synthetic: follow-up",
+            Status = Ehr.Data.Scheduling.AppointmentStatus.Booked,
+        }).ToList();
+        db.AddRange(appointments);
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return (day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), [.. appointments.Select(appointment => appointment.Id)]);
+    }
+
+    // The schedule's pages: a clinician's day, each patient named a recorded read; the form that books an appointment;
+    // and one appointment's page.
+    static async Task<List<Result>> MeasureScheduleAsync(HttpClient client, DatabaseTimes times, string prefix, List<Guid> panel, string day, List<Guid> appointments)
+    {
+        var random = new Random(20261118);
+        return
+        [
+            await MeasureAsync(client, times, prefix + $"Schedule, a day of {DaySize} appointments", typing: false, () => $"/schedule?day={day}"),
+            await MeasureAsync(client, times, prefix + "Book appointment form, a patient on the panel", typing: false,
+                () => $"/patients/{panel[random.Next(panel.Count)]}/appointments/new"),
+            await MeasureAsync(client, times, prefix + "Appointment, a patient on the panel", typing: false,
+                () => $"/appointments/{appointments[random.Next(appointments.Count)]}"),
+        ];
+    }
+
+    const int InboxSize = 40;
+
+    // Items in the benchmark clinician's inbox, each about a different patient on their panel, so the inbox page has
+    // names to read and the app bar a count. Nothing at runtime creates items yet, so they go in as the database's
+    // superuser, in the benchmark's own database only: with --stack the inbox is measured empty.
+    static async Task FillInboxAsync(MigratedDatabase? database, Guid clinicianId, List<Guid> panel)
+    {
+        if (database is null)
+        {
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO ehr.inbox_items (id, recipient_id, kind, patient_id, summary, created_at)
+            SELECT uuidv7(), @recipient, 'message', patient, 'Synthetic: a message to read', now() - make_interval(mins => n::int)
+            FROM unnest(@patients) WITH ORDINALITY AS p(patient, n)
+            """, connection);
+        command.Parameters.AddWithValue("recipient", clinicianId);
+        command.Parameters.AddWithValue("patients", panel.Take(InboxSize).ToArray());
+        await command.ExecuteNonQueryAsync();
     }
 
     // Signs in as a browser does, password then authenticator code, and returns a client with the session's cookies, which

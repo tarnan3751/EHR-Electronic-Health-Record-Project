@@ -1,0 +1,41 @@
+@page "/patients/{id:guid}/appointments/new"
+@using Ehr.Domain.Scheduling
+@model Ehr.Web.Areas.Clinical.Pages.Schedule.NewModel
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Header.Patient;
+    ViewData["Title"] = $"Book appointment: {patient.FamilyName}, {patient.GivenName}";
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Header.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to the chart</a></p>
+</div>
+<h1>Book appointment: @patient.FamilyName, @patient.GivenName</h1>
+<form method="post" class="sc-form">
+    @if (Model.Errors.Count > 0)
+    {
+        <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> fix the highlighted fields and book again.</p>
+    }
+    <div class="sc-field">
+        <label for="appointment-clinician">Clinician <span>(required)</span></label>
+        <select id="appointment-clinician" class="sc-field__input" name="Clinician" required autofocus="@(Model.Errors.Count == 0)"
+                aria-invalid="@(Model.Errors.ContainsKey("Clinician") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Clinician") ? "appointment-clinician-error" : null)">
+            @foreach (var (id, name) in Model.Clinicians)
+            {
+                <option value="@id" selected="@(id == Model.Clinician)">@name</option>
+            }
+        </select>
+        @if (Model.Errors.TryGetValue("Clinician", out var clinicianError))
+        {
+            <p class="sc-field__error" id="appointment-clinician-error">@clinicianError</p>
+        }
+    </div>
+    <partial name="_When" model="new WhenFields(Model.Day, Model.Time, Model.Minutes, Model.Reason, Model.Errors)" />
+    <div class="sc-actions">
+        <button type="submit" class="sc-btn sc-btn--primary">Book appointment</button>
+        <a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Cancel</a>
+    </div>
+</form>

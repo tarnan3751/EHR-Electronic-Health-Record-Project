@@ -15,8 +15,10 @@
 //   unii.zip    FDA Unique Ingredient Identifiers, 2026-08-04
 //               https://precision.fda.gov/uniisearch/archive/2026-08-04/UNII_Data_20260804.zip
 //
-// For now it keeps a subset: the diagnoses, medications and allergens a primary-care clinic meets most, listed
-// below. The plan's step 2a widens it to the full lists.
+// It takes every ICD-10-CM code valid on a claim; every RxNorm clinical and branded drug that can be prescribed, for
+// medications, and every ingredient, for drug allergens; and a curated list of FDA substances for the allergens that
+// aren't drugs. A name longer than a chart entry can hold (300 characters: a few products of many ingredients) is
+// left out, and the script says how many.
 
 // Run, never published: without this, file-based apps default to native AOT and restore its compiler.
 #:property PublishAot=false
@@ -38,13 +40,9 @@ var sources = args[sourcesAt + 1];
 var root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(ScriptPath())!, "..", ".."));
 var rows = new List<Row>();
 
-// Diagnoses: every code a claim can carry (the order file's flag 1) under these ICD-10-CM categories.
-string[] conditionCategories =
-[
-    "A54", "A56", "A60", "B20", "D50", "E03", "E11", "E55", "E66", "E78", "F10", "F11", "F17", "F20", "F31", "F32", "F33", "F41", "F43",
-    "F90", "G43", "G47", "H66", "I10", "I25", "I48", "J02", "J06", "J30", "J44", "J45", "K21", "K58", "L20", "M17", "M19", "M54", "N18",
-    "N39", "R05", "R51", "R45", "T14", "T39", "T42", "T43", "T50", "T74", "Z21", "Z91",
-];
+// Diagnoses: every code a claim can carry (the order file's flag 1).
+const int MaximumName = 300;
+var tooLong = 0;
 using (var icd = Open("icd.zip", "93e3ad6004badf470c55bfe679b748ae88fd9b2b421851e409eec382c7713b9a", "icd10cm-order-2027.txt"))
 {
     // Fixed width: order number (1-5), code (7-13), 1 when the code is valid on a claim (15), short description
@@ -52,29 +50,14 @@ using (var icd = Open("icd.zip", "93e3ad6004badf470c55bfe679b748ae88fd9b2b421851
     while (icd.ReadLine() is { } line)
     {
         var code = line[6..13].Trim();
-        if (line[14] == '1' && conditionCategories.Contains(code[..3]))
+        if (line[14] == '1')
         {
             rows.Add(new("condition", "icd-10-cm", code.Length > 3 ? $"{code[..3]}.{code[3..]}" : code, line[77..].Trim(), null));
         }
     }
 }
 
-// Medications: RxNorm's clinical drugs (SCD) of one ingredient, for these ingredients. Allergens: the ingredients
-// (IN) themselves, for the drugs people are most often allergic to.
-string[] medicationIngredients =
-[
-    "acetaminophen", "albuterol", "amlodipine", "amoxicillin", "apixaban", "aspirin", "atorvastatin", "azithromycin", "buprenorphine",
-    "bupropion hydrochloride", "cephalexin", "cholecalciferol", "escitalopram", "fluoxetine", "fluticasone propionate", "gabapentin",
-    "hydrochlorothiazide", "ibuprofen", "insulin glargine", "levothyroxine sodium", "lisinopril", "losartan potassium",
-    "metformin hydrochloride", "metoprolol succinate", "metoprolol tartrate", "montelukast", "naloxone hydrochloride", "omeprazole",
-    "penicillin V potassium", "prednisone", "sertraline", "simvastatin", "warfarin sodium",
-];
-string[] drugAllergens =
-[
-    "amoxicillin", "ampicillin", "aspirin", "azithromycin", "cephalexin", "ciprofloxacin", "codeine", "doxycycline", "erythromycin",
-    "ibuprofen", "lidocaine", "lisinopril", "morphine", "naproxen", "oxycodone", "penicillin G", "penicillin V", "sulfamethoxazole",
-    "trimethoprim",
-];
+// Medications: RxNorm's clinical drugs (SCD) and branded drugs (SBD). Allergens: its ingredients (IN).
 using (var rxnorm = Open("rxnorm.zip", "c742a6c4b2995194aa3479400e08a7c1ad707178bfc80fe9c8cd7afa693ae987", "rrf/RXNCONSO.RRF"))
 {
     // Pipe-delimited: RXCUI (1), source (12), term type (13), name (15), suppress flag (17).
@@ -87,12 +70,15 @@ using (var rxnorm = Open("rxnorm.zip", "c742a6c4b2995194aa3479400e08a7c1ad707178
         }
 
         var name = fields[14];
-        if (fields[12] == "SCD" && !name.Contains(" / ", StringComparison.Ordinal)
-            && medicationIngredients.Any(ingredient => name.StartsWith(ingredient + " ", StringComparison.OrdinalIgnoreCase)))
+        if (fields[12] is "SCD" or "SBD" or "IN" && name.Length > MaximumName)
+        {
+            tooLong++;
+        }
+        else if (fields[12] is "SCD" or "SBD")
         {
             rows.Add(new("medication", "rxnorm", fields[0], name, null));
         }
-        else if (fields[12] == "IN" && drugAllergens.Contains(name, StringComparer.OrdinalIgnoreCase))
+        else if (fields[12] == "IN")
         {
             rows.Add(new("allergen", "rxnorm", fields[0], Sentence(name), "medication"));
         }
@@ -137,15 +123,18 @@ sql.Append("-- The codes a chart entry can be picked from. Applied as ehr_owner 
 sql.Append("-- leaves ehr.clinical_codes holding exactly these rows. A diagnosis is sensitive by its code's range\n");
 sql.Append("-- (ehr.icd10cm_is_sensitive, db/policies/65-chart-lists.sql). Sources, versions, licenses and attribution:\n");
 sql.Append("-- docs/expansion/reference-data.md.\n");
+sql.Append("-- The rows are a COPY block, as pg_dump writes one: psql loads it as it stands, and the tests' database through\n");
+sql.Append("-- tests/Ehr.Testing/ReferenceData.cs. Tab-separated; \\N is a null.\n");
 sql.Append("BEGIN;\n");
 sql.Append("CREATE TEMPORARY TABLE incoming_codes (kind text, system text, code text, display text, category text) ON COMMIT DROP;\n");
-foreach (var chunk in rows.Chunk(500))
+sql.Append("COPY incoming_codes (kind, system, code, display, category) FROM stdin;\n");
+foreach (var row in rows)
 {
-    sql.Append("INSERT INTO incoming_codes VALUES\n");
-    sql.AppendJoin(",\n", chunk.Select(row => $"({Quote(row.Kind)}, {Quote(row.System)}, {Quote(row.Code)}, {Quote(row.Display)}, {(row.Category is null ? "NULL" : Quote(row.Category))})"));
-    sql.Append(";\n");
+    sql.Append(row.Kind).Append('\t').Append(row.System).Append('\t').Append(row.Code).Append('\t').Append(Field(row.Display)).Append('\t')
+        .Append(row.Category ?? "\\N").Append('\n');
 }
 
+sql.Append("\\.\n");
 sql.Append("""
     INSERT INTO ehr.clinical_codes (kind, system, code, display, category, sensitive)
     SELECT kind, system, code, display, category, kind = 'condition' AND ehr.icd10cm_is_sensitive(code) FROM incoming_codes
@@ -167,6 +156,7 @@ foreach (var group in rows.GroupBy(row => (row.Kind, row.System)))
     Console.WriteLine($"{group.Key.Kind,-11} {group.Key.System,-10} {group.Count(),6:N0}");
 }
 
+Console.WriteLine($"Left out, with a name over {MaximumName} characters: {tooLong:N0}");
 Console.WriteLine($"Wrote {Path.GetRelativePath(root, output).Replace('\\', '/')}");
 return 0;
 
@@ -195,7 +185,9 @@ static string Sentence(string name)
     return char.ToUpper(lower[0], CultureInfo.InvariantCulture) + lower[1..];
 }
 
-static string Quote(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+// A value as COPY's text format takes it.
+static string Field(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\t", "\\t", StringComparison.Ordinal)
+    .Replace("\n", "\\n", StringComparison.Ordinal).Replace("\r", "\\r", StringComparison.Ordinal);
 
 static string ScriptPath([CallerFilePath] string path = "") => path;
 

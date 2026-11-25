@@ -96,6 +96,9 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     public IReadOnlyList<ClinicalDraft> Drafts { get; private set; } = [];
     public IReadOnlyList<ClinicalNote> Notes { get; private set; } = [];
 
+    // The patient's conversations with their care team (FR-18), latest first.
+    public IReadOnlyList<Ehr.Domain.Messaging.ThreadEntry> Threads => Chart.Threads;
+
     public bool OnPanel { get; private set; }
 
     // Set when the chart is open under emergency access: until when.

@@ -1,0 +1,45 @@
+@page "/patients/{patientId:guid}/messages/new"
+@using Ehr.Domain.Messaging
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Messages.NewModel
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Header.Patient;
+    ViewData["Title"] = $"New message: {patient.FamilyName}, {patient.GivenName}";
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Header.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+</div>
+<h1>New message: @patient.FamilyName, @patient.GivenName</h1>
+<form method="post" class="sc-form">
+    @if (Model.Errors.Count > 0)
+    {
+        <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> fix the highlighted fields and send again.</p>
+    }
+    <div class="sc-field">
+        <label for="message-subject">Subject <span>(required)</span></label>
+        <input id="message-subject" class="sc-field__input" name="Subject" value="@Model.Subject" maxlength="@SecureMessages.MaximumSubject" autocomplete="off" required autofocus
+               aria-invalid="@(Model.Errors.ContainsKey("Subject") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Subject") ? "message-subject-error" : null)">
+        @if (Model.Errors.TryGetValue("Subject", out var subjectError))
+        {
+            <p class="sc-field__error" id="message-subject-error">@subjectError</p>
+        }
+    </div>
+    <div class="sc-field">
+        <label for="message-body">Message <span>(required)</span></label>
+        <textarea id="message-body" class="sc-field__input" name="Body" rows="8" maxlength="@SecureMessages.MaximumBody" required
+                  aria-invalid="@(Model.Errors.ContainsKey("Body") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Body") ? "message-body-error message-body-hint" : "message-body-hint")">@Model.Body</textarea>
+        @if (Model.Errors.TryGetValue("Body", out var bodyError))
+        {
+            <p class="sc-field__error" id="message-body-error">@bodyError</p>
+        }
+        <p class="sc-field__hint" id="message-body-hint">The patient reads this in the portal. Their email says only that there is a new message.</p>
+    </div>
+    <div class="sc-actions">
+        <button type="submit" class="sc-btn sc-btn--primary">Send message</button>
+        <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Cancel</a>
+    </div>
+</form>

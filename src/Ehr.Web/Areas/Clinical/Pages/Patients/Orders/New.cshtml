@@ -14,6 +14,8 @@
    server can't be reached; without JavaScript it posts as a normal form. *@
 @section Scripts {
     <script src="~/_content/Ehr.Design/js/orders.js" defer></script>
+    @* The item's list starts with the clinic's common items; the rest of the catalog comes as the clinician types. *@
+    <script src="~/_content/Ehr.Design/js/code-search.js" defer></script>
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Form.Allergies)" />
@@ -124,6 +126,7 @@ else
             <label for="@id">@label @if (required) { <span>(required)</span> }</label>
             <input id="@id" class="sc-field__input" name="@(name == "Item" ? "Item" : $"Details[{name}]")" value="@value" list="@list" maxlength="@OrderForms.MaximumLength"
                    autocomplete="off" required="@required" aria-invalid="@(error is null ? null : "true")" autofocus="@(name == Focused())"
+                   data-code-search="@(name == "Item" ? $"order-{Model.KnownType}" : null)"
                    aria-describedby="@(error is null ? null : $"{id}-error")">
             @if (error is not null)
             {

@@ -20,7 +20,8 @@ public sealed class AllergyIntoleranceConfiguration : IEntityTypeConfiguration<A
         });
 
         allergy.Property(a => a.Code).HasMaxLength(20);
-        allergy.Property(a => a.Display).HasMaxLength(200);
+        // As long as a reference code's name can be (ClinicalCode).
+        allergy.Property(a => a.Display).HasMaxLength(300);
         allergy.Property(a => a.ClinicalStatus).HasMaxLength(20);
         allergy.Property(a => a.Category).HasMaxLength(20);
         allergy.Property(a => a.Criticality).HasMaxLength(20);

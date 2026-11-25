@@ -29,10 +29,19 @@ builder.Services.AddScoped<QuickTextSaver>();
 builder.Services.AddScoped<Ehr.Domain.Notes.ClinicalNotes>();
 builder.Services.AddScoped<Ehr.Domain.Notes.NoteReviews>();
 builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Site.OnPrem));
+// Which of the two apps this is, for the few pages that write as part of a read (marking a message read) and so must
+// know whether their database takes writes.
+builder.Services.AddSingleton(new Ehr.Web.SiteKind(site));
 // UC 1: placing orders (Ehr.Domain.Orders).
 builder.Services.AddScoped<Ehr.Domain.Orders.ClinicalOrders>();
 // Adding to and changing allergies, medications and diagnoses (Ehr.Domain.Patients).
 builder.Services.AddScoped<Ehr.Domain.Patients.ChartLists>();
+// Secure messages (Ehr.Domain.Messaging).
+builder.Services.AddScoped<Ehr.Domain.Messaging.SecureMessages>();
+// Appointments (Ehr.Domain.Scheduling).
+builder.Services.AddScoped<Ehr.Domain.Scheduling.Appointments>();
+// The staff inbox (Ehr.Domain.Inbox).
+builder.Services.AddScoped<Ehr.Domain.Inbox.StaffInbox>();
 
 // Accounts, sign-in and the authorization policies (Ehr.Domain). The audit log names which server recorded an event.
 builder.Services.AddEhrAccounts(builder.Configuration);
@@ -106,6 +115,7 @@ builder.Services.AddRazorPages(options =>
     // sign in and register, are the only anonymous pages. The database's row-level security is the second layer.
     options.Conventions.AuthorizeAreaFolder("Clinical", "/", EhrPolicies.Staff);
     options.Conventions.AuthorizeAreaFolder("Clinical", "/Patients", EhrPolicies.Clinician);
+    options.Conventions.AuthorizeAreaFolder("Clinical", "/Schedule", EhrPolicies.Clinician);
     options.Conventions.AuthorizeAreaFolder("Clinical", "/Admin", EhrPolicies.Admin);
     options.Conventions.AllowAnonymousToAreaFolder("Clinical", "/Account");
     options.Conventions.AuthorizeAreaFolder("Portal", "/", EhrPolicies.Patient);
@@ -115,6 +125,8 @@ builder.Services.AddRazorPages(options =>
     .AddMvcOptions(options =>
     {
         options.Filters.Add(new TypeFilterAttribute(typeof(DatabaseTransactionFilter)) { Arguments = [site == Site.OnPrem] });
+        // After the transaction filter, so it runs inside the page's transaction, as the signed-in user.
+        options.Filters.Add(new TypeFilterAttribute(typeof(InboxCountFilter)));
         options.Filters.Add(new Ehr.Web.Areas.Clinical.Pages.Patients.Notes.NoteWriteExceptionFilter());
     })
     // Validation runs on the server only, so pages don't need the jQuery validation attributes.

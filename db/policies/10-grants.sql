@@ -62,7 +62,8 @@ GRANT SELECT ON ehr.break_glass_accesses TO ehr_read;
 -- The rest of the chart: allergies, medications, diagnoses (conditions) and visits (encounters). PHI, like patients:
 -- row-level security and the write-audit trigger follow. The on-prem app reads them as ehr_app, the cloud app as
 -- ehr_read. Clinicians add and change allergies, medications and diagnoses, and mark them inactive: INSERT and UPDATE
--- for ehr_app, and never DELETE. Visits are still read only.
+-- for ehr_app, and never DELETE. A visit is created when a patient is checked in for an appointment (INSERT, further
+-- down); nothing updates or deletes one.
 GRANT SELECT ON ehr.allergy_intolerances, ehr.medication_statements, ehr.conditions, ehr.encounters TO ehr_app, ehr_read;
 GRANT INSERT, UPDATE ON ehr.allergy_intolerances, ehr.medication_statements, ehr.conditions TO ehr_app;
 
@@ -73,6 +74,13 @@ GRANT SELECT ON ehr.chart_history TO ehr_app, ehr_read;
 -- The codes a chart entry can be picked from (ICD-10-CM, RxNorm, UNII). Not PHI: grants only. Read by both apps;
 -- nothing at runtime changes it. Its rows are db/reference/*.sql, applied as ehr_owner after these files.
 GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
+
+-- The rest of the reference data, none of it about a patient: what a result or vital sign is and this clinic's range
+-- for it, which results an order produces, the PHQ-9 and GAD-7 questionnaires, what each drug product is made of, the
+-- classes its ingredients belong to and which of those cross-react, and known interactions between ingredients. Read
+-- by both apps; nothing at runtime changes any of it. Its rows are db/reference's generated SQL.
+GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
+    ehr.drug_class_cross_reactions, ehr.drug_interactions TO ehr_app, ehr_read;
 
 -- Test results (observations). PHI, like the chart: row-level security and the write-audit trigger follow. Read only:
 -- results will come from the lab interface, and no page changes them. The portal reads them on either server.
@@ -111,6 +119,30 @@ GRANT SELECT ON ehr.order_catalog_items TO ehr_app, ehr_read;
 GRANT SELECT, INSERT ON ehr.orders TO ehr_app;
 GRANT UPDATE (status, discontinue_reason, replaced_by_order_id) ON ehr.orders TO ehr_app;
 GRANT SELECT ON ehr.orders TO ehr_read;
+
+-- Secure messages (FR-18). PHI: row-level security and the write-audit trigger follow. A patient and their care
+-- team start threads and send messages: INSERT. Nothing edits a thread or a message: the one UPDATE is recording when
+-- the other side first read a message, on that column alone, and a trigger holds it to that (90-messages.sql). Never
+-- DELETE.
+GRANT SELECT, INSERT ON ehr.message_threads, ehr.messages TO ehr_app;
+GRANT UPDATE (read_at) ON ehr.messages TO ehr_app;
+GRANT SELECT ON ehr.message_threads, ehr.messages TO ehr_read;
+
+-- Appointments (FR-17). PHI: row-level security and the write-audit trigger follow. Clinicians book and change them:
+-- INSERT, and UPDATE of the columns a reschedule, a cancellation, a check-in or a no-show writes, which a trigger
+-- holds to those moves (80-appointments.sql). Never DELETE. Checking a patient in creates their visit, so ehr_app
+-- may now INSERT encounters, under a policy of its own (30-rls.sql); nothing updates or deletes a visit.
+GRANT SELECT, INSERT ON ehr.appointments TO ehr_app;
+GRANT UPDATE (starts_at, minutes, reason, status, cancel_reason, encounter_id) ON ehr.appointments TO ehr_app;
+GRANT SELECT ON ehr.appointments TO ehr_read;
+GRANT INSERT ON ehr.encounters TO ehr_app;
+
+-- The staff inbox: what needs a staff member's action. PHI: row-level security and the write-audit trigger follow.
+-- Read by its recipient. The one change is marking an item done: UPDATE on that column alone, and a trigger sets the
+-- time and refuses anything else (70-inbox.sql). No INSERT yet: each kind of item gets its grant, or its trigger, with
+-- the feature that creates it. Never DELETE.
+GRANT SELECT ON ehr.inbox_items TO ehr_app, ehr_read;
+GRANT UPDATE (done_at) ON ehr.inbox_items TO ehr_app;
 
 -- UC 13: private, auditable proposals and decisions; replica reads use identical forced ownership RLS.
 GRANT SELECT, INSERT, UPDATE ON ehr.ai_note_reviews, ehr.ai_field_proposals TO ehr_app;

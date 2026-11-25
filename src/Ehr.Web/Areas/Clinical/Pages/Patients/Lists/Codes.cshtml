@@ -3,7 +3,7 @@
 @{
     Layout = null;
 }
-@foreach (var code in Model.Codes)
+@foreach (var (name, label) in Model.Options)
 {
-    <option value="@code.Display" label="@(code.Kind == Ehr.Data.Patients.ClinicalCodeKind.Condition ? code.Code : null)"></option>
+    <option value="@name" label="@label"></option>
 }

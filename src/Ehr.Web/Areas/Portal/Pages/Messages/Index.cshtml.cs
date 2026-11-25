@@ -1,0 +1,23 @@
+using System.Security.Claims;
+using Ehr.Domain.Accounts;
+using Ehr.Domain.Phi;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Ehr.Web.Areas.Portal.Pages.Messages;
+
+// The patient's conversations with their care team (FR-18), the latest first, with those that have something new
+// marked. Which patient comes from the session, never from the request (AGENTS.md), and row-level security would
+// return nothing else anyway. One recorded read of the patient; off-site it comes from the cloud copy.
+public class IndexModel(PhiReader phi) : PageModel
+{
+    public const int Limit = 50;
+
+    public PatientThreads? Threads { get; private set; }
+
+    public async Task OnGetAsync()
+    {
+        Response.Headers.CacheControl = "no-store";
+        var patientId = Guid.Parse(User.FindFirstValue(EhrClaims.PatientId)!);
+        Threads = await phi.ThreadsAsync(patientId, asPatient: true, Limit, HttpContext.RequestAborted);
+    }
+}

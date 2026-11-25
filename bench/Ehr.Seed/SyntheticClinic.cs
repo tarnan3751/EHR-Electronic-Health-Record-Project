@@ -6,8 +6,13 @@ namespace Ehr.Seed;
 // A synthetic clinic, the same every time (NFR-13: synthetic data only). Patient number i is always the same patient,
 // with the same allergies, medications, diagnoses and visits, whatever the clinic's size, so the benchmark knows whom
 // to search for and whose chart to open without reading anyone. Obviously synthetic: every name carries a number, as
-// the Synthea generator's do ("Larkin807"), and every MRN starts SYN. The codes are real ICD-10-CM and SNOMED CT codes,
-// the people are not.
+// the Synthea generator's do ("Larkin807"), and every MRN starts SYN.
+//
+// Clinically coherent, on Synthea's model but with this project's own code lists (Synthea codes conditions in SNOMED
+// CT, which isn't used here): a patient's conditions, by age, decide the rest of the chart. Someone with type 2
+// diabetes is on metformin, has hemoglobin A1c results above the range, and comes in for diabetes checks. Every code is
+// a real one from the reference data (db/reference): ICD-10-CM for diagnoses, RxNorm for medications and drug
+// allergens, FDA UNII for other allergens, LOINC for results. The people are not real.
 public sealed class SyntheticClinic
 {
     // The clinic's fixed "today", so the data doesn't change with the day it is made: visits run up to it.
@@ -50,6 +55,11 @@ public sealed class SyntheticClinic
             UpdatedAt = made,
         };
 
+        // What the patient has decides the rest of the chart: each condition brings the medications that treat it, the
+        // tests that follow it and their likely values, what the blood pressure looks like, and why they come in.
+        var age = Today.Year - patient.BirthDate.Year;
+        var problems = Problems.Where(problem => age >= problem.FromAge && random.NextDouble() < problem.Share * (age >= 50 ? problem.Older : 1)).ToList();
+
         var allergies = new List<AllergyIntolerance>();
         var allergyRoll = random.NextDouble();
         if (allergyRoll is >= 0.25 and < 0.60)
@@ -66,57 +76,73 @@ public sealed class SyntheticClinic
         }
         else if (allergyRoll >= 0.60)
         {
-            foreach (var (display, category, criticality, reaction) in Distinct(Substances, random.Next(1, 4), random))
+            foreach (var substance in Distinct(Substances, random.Next(1, 4), random))
             {
                 allergies.Add(new AllergyIntolerance
                 {
                     Id = Uuid7(made, random),
                     PatientId = patientId,
-                    Display = display,
+                    Code = substance.Code,
+                    CodeSystem = substance.System,
+                    Display = substance.Display,
                     ClinicalStatus = random.NextDouble() < 0.9 ? AllergyClinicalStatus.Active : AllergyClinicalStatus.Resolved,
-                    Category = category,
-                    Criticality = criticality,
-                    Reaction = reaction,
+                    Category = substance.Category,
+                    Criticality = substance.Criticality,
+                    Reaction = substance.Reaction,
+                    Severity = substance.Criticality == AllergyCriticality.High ? AllergySeverity.Severe : AllergySeverity.Mild,
                     RecordedAt = RecentDay(random),
                 });
             }
         }
 
-        var medications = Distinct(Medications, random.Next(0, 8), random)
-            .Select(medication =>
-            {
-                var start = DateOnly.FromDateTime(RecentDay(random).UtcDateTime);
-                var active = random.NextDouble() < 0.75;
-                return new MedicationStatement
-                {
-                    Id = Uuid7(made, random),
-                    PatientId = patientId,
-                    Display = medication.Display,
-                    Dosage = medication.Dosage,
-                    Status = active ? MedicationStatementStatus.Active : MedicationStatementStatus.Stopped,
-                    EffectiveStart = start,
-                    EffectiveEnd = active ? null : start.AddDays(random.Next(14, 365)),
-                };
-            })
-            .ToList();
-
-        var conditions = Distinct(Diagnoses, random.Next(0, 6), random)
-            .Select(diagnosis => new Condition
+        var conditions = new List<Condition>();
+        var medications = new List<MedicationStatement>();
+        foreach (var problem in problems)
+        {
+            var onset = DateOnly.FromDateTime(RecentDay(random).UtcDateTime);
+            var current = !problem.Passing && random.NextDouble() < 0.9;
+            conditions.Add(new Condition
             {
                 Id = Uuid7(made, random),
                 PatientId = patientId,
-                Code = diagnosis.Code,
-                Display = diagnosis.Display,
-                ClinicalStatus = random.NextDouble() < 0.8 ? ConditionClinicalStatus.Active : ConditionClinicalStatus.Resolved,
-                OnsetDate = DateOnly.FromDateTime(RecentDay(random).UtcDateTime),
-            })
-            .ToList();
+                Code = problem.Code,
+                Display = problem.Display,
+                ClinicalStatus = current ? ConditionClinicalStatus.Active : ConditionClinicalStatus.Resolved,
+                OnsetDate = onset,
+            });
 
-        var visits = Enumerable.Range(0, random.Next(1, 13))
+            // The treatment: one of the condition's usual medications, unless the patient is allergic to what is in it.
+            if (problem.Treatments.Length > 0 && random.NextDouble() < 0.85)
+            {
+                var treatment = Pick(problem.Treatments, random);
+                var allergic = allergies.Any(allergy => allergy.ClinicalStatus == AllergyClinicalStatus.Active && allergy.Code == treatment.Ingredient);
+                if (!allergic && medications.All(medication => medication.Code != treatment.Code))
+                {
+                    medications.Add(new MedicationStatement
+                    {
+                        Id = Uuid7(made, random),
+                        PatientId = patientId,
+                        Code = treatment.Code,
+                        Display = treatment.Display,
+                        Dosage = treatment.Dosage,
+                        Status = current ? MedicationStatementStatus.Active : MedicationStatementStatus.Stopped,
+                        EffectiveStart = onset.AddDays(random.Next(0, 30)),
+                        EffectiveEnd = current ? null : onset.AddDays(random.Next(30, 365)),
+                        // A medication for a sensitive diagnosis says as much as the diagnosis does.
+                        Sensitive = problem.Sensitive,
+                    });
+                }
+            }
+        }
+
+        var has = problems.Select(problem => problem.Code).ToHashSet();
+        var visits = Enumerable.Range(0, Math.Min(12, random.Next(1, 4) + (2 * problems.Count(problem => !problem.Passing))))
             .Select(_ =>
             {
                 var start = Today.AddMinutes(-random.Next(1, 5 * 365 * 24 * 60));
                 var vitals = random.NextDouble() < 0.9;
+                // Higher with hypertension, even treated.
+                var systolic = has.Contains("I10") ? random.Next(128, 166) : random.Next(102, 131);
                 return new Encounter
                 {
                     Id = Uuid7(made, random),
@@ -128,27 +154,38 @@ public sealed class SyntheticClinic
                         < 0.97 => EncounterClass.Virtual,
                         _ => EncounterClass.Emergency,
                     },
-                    Reason = Pick(VisitReasons, random),
+                    Reason = problems.Count > 0 && random.NextDouble() < 0.7 ? problems[random.Next(problems.Count)].Visit : Pick(VisitReasons, random),
                     PeriodStart = start,
                     PeriodEnd = start.AddMinutes(20),
-                    SystolicMmHg = vitals ? (short)random.Next(100, 161) : null,
-                    DiastolicMmHg = vitals ? (short)random.Next(60, 101) : null,
+                    SystolicMmHg = vitals ? (short)systolic : null,
+                    DiastolicMmHg = vitals ? (short)(systolic - random.Next(38, 56)) : null,
                     HeartRatePerMinute = vitals ? (short)random.Next(55, 101) : null,
                 };
             })
             .ToList();
 
-        // Test results (UC6), drawn after everything above so every patient's earlier rows stay as they were. Most are
-        // final and released; about one in ten is still preliminary and not released, which the portal must not show.
-        var results = Distinct(LabTests, random.Next(0, 7), random)
-            .Select(test =>
+        // Test results (UC6): the tests each condition is followed with, more than once over the years, and a routine
+        // one or two. Most are final and released; about one in ten is still preliminary and not released, which the
+        // portal must not show. A value sits where the condition puts it, such as a raised hemoglobin A1c with
+        // diabetes; anything else is mostly inside the normal range and sometimes outside it.
+        var followed = problems.SelectMany(problem => problem.Tests).Distinct().ToList();
+        var tests = followed.SelectMany(code => Enumerable.Repeat(code, random.Next(1, 4)))
+            .Concat(Distinct(LabTests, random.Next(0, 3), random).Select(test => test.Code))
+            .Take(12).ToList();
+        var results = tests
+            .Select(code =>
             {
+                var test = LabTests.First(candidate => candidate.Code == code);
                 var taken = Today.AddMinutes(-random.Next(60, 2 * 365 * 24 * 60));
                 var released = random.NextDouble() < 0.9;
-                // Mostly inside the normal range, sometimes out of it on either side. A range with no lower limit,
-                // such as LDL's "below 100", draws from zero.
+                // A range with no lower limit, such as LDL's "below 100", draws from zero.
                 var low = test.Low ?? 0m;
-                var value = Math.Max(0m, low + ((test.High - low) * (decimal)((random.NextDouble() * 1.4) - 0.2)));
+                var raised = problems.Any(problem => problem.Raises.Contains(code));
+                var lowered = problems.Any(problem => problem.Lowers.Contains(code));
+                var spread = test.High - low;
+                var value = raised ? test.High + (spread * (decimal)(0.05 + (random.NextDouble() * 0.6)))
+                    : lowered ? Math.Max(0m, low - (spread * (decimal)(0.05 + (random.NextDouble() * 0.5))))
+                    : Math.Max(0m, low + (spread * (decimal)((random.NextDouble() * 1.2) - 0.1)));
                 var outOfRange = value < low || value > test.High;
                 return new Observation
                 {
@@ -251,55 +288,85 @@ public sealed class SyntheticClinic
         "Yarborough", "Yewdale", "Zellweger",
     ];
 
-    static readonly (string Display, string Category, string Criticality, string Reaction)[] Substances =
+    // What patients are allergic to, coded as the reference data codes it (db/reference): a drug by its RxNorm
+    // ingredient, anything else by its FDA substance (UNII). The names are the reference data's own; a test checks that.
+    internal static readonly (string System, string Code, string Display, string Category, string Criticality, string Reaction)[] Substances =
     [
-        ("Penicillin", AllergyCategory.Medication, AllergyCriticality.High, "Hives"),
-        ("Amoxicillin", AllergyCategory.Medication, AllergyCriticality.High, "Rash"),
-        ("Sulfonamides", AllergyCategory.Medication, AllergyCriticality.Low, "Rash"),
-        ("Aspirin", AllergyCategory.Medication, AllergyCriticality.Low, "Wheezing"),
-        ("Codeine", AllergyCategory.Medication, AllergyCriticality.Low, "Nausea"),
-        ("Peanut", AllergyCategory.Food, AllergyCriticality.High, "Anaphylaxis"),
-        ("Shellfish", AllergyCategory.Food, AllergyCriticality.High, "Swelling of the lips"),
-        ("Egg", AllergyCategory.Food, AllergyCriticality.Low, "Hives"),
-        ("Milk", AllergyCategory.Food, AllergyCriticality.Low, "Stomach cramps"),
-        ("Latex", AllergyCategory.Environment, AllergyCriticality.Low, "Contact dermatitis"),
-        ("Grass pollen", AllergyCategory.Environment, AllergyCriticality.Low, "Sneezing"),
-        ("Bee venom", AllergyCategory.Environment, AllergyCriticality.High, "Anaphylaxis"),
+        ("rxnorm", "7980", "Penicillin G", AllergyCategory.Medication, AllergyCriticality.High, "Hives"),
+        ("rxnorm", "723", "Amoxicillin", AllergyCategory.Medication, AllergyCriticality.High, "Rash"),
+        ("rxnorm", "10180", "Sulfamethoxazole", AllergyCategory.Medication, AllergyCriticality.Low, "Rash"),
+        ("rxnorm", "1191", "Aspirin", AllergyCategory.Medication, AllergyCriticality.Low, "Wheezing"),
+        ("rxnorm", "2670", "Codeine", AllergyCategory.Medication, AllergyCriticality.Low, "Nausea"),
+        ("rxnorm", "5640", "Ibuprofen", AllergyCategory.Medication, AllergyCriticality.Low, "Hives"),
+        ("unii", "QE1QX6B99R", "Peanut", AllergyCategory.Food, AllergyCriticality.High, "Anaphylaxis"),
+        ("unii", "6T362S6JF6", "American lobster", AllergyCategory.Food, AllergyCriticality.High, "Swelling of the lips"),
+        ("unii", "291P45F896", "Egg", AllergyCategory.Food, AllergyCriticality.Low, "Hives"),
+        ("unii", "917J3173FT", "Cow milk", AllergyCategory.Food, AllergyCriticality.Low, "Stomach cramps"),
+        ("unii", "2LQ0UUW8IN", "Natural latex rubber", AllergyCategory.Environment, AllergyCriticality.Low, "Contact dermatitis"),
+        ("unii", "65M88RW2EG", "Phleum pratense pollen", AllergyCategory.Environment, AllergyCriticality.Low, "Sneezing"),
+        ("unii", "76013O881M", "Apis mellifera venom", AllergyCategory.Environment, AllergyCriticality.High, "Anaphylaxis"),
     ];
 
-    static readonly (string Display, string Dosage)[] Medications =
-    [
-        ("Lisinopril 10 mg tablet", "1 tablet by mouth daily"),
-        ("Metformin 500 mg tablet", "1 tablet by mouth twice daily with meals"),
-        ("Atorvastatin 20 mg tablet", "1 tablet by mouth at bedtime"),
-        ("Levothyroxine 50 mcg tablet", "1 tablet by mouth every morning"),
-        ("Amlodipine 5 mg tablet", "1 tablet by mouth daily"),
-        ("Omeprazole 20 mg capsule", "1 capsule by mouth before breakfast"),
-        ("Albuterol 90 mcg inhaler", "2 puffs every 4 hours as needed"),
-        ("Sertraline 50 mg tablet", "1 tablet by mouth daily"),
-        ("Losartan 50 mg tablet", "1 tablet by mouth daily"),
-        ("Gabapentin 300 mg capsule", "1 capsule by mouth three times daily"),
-        ("Hydrochlorothiazide 25 mg tablet", "1 tablet by mouth daily"),
-        ("Fluticasone 50 mcg nasal spray", "1 spray in each nostril daily"),
-        ("Ibuprofen 400 mg tablet", "1 tablet by mouth every 6 hours as needed"),
-        ("Montelukast 10 mg tablet", "1 tablet by mouth at bedtime"),
-        ("Vitamin D3 1000 unit tablet", "1 tablet by mouth daily"),
-    ];
+    // A medication that treats a condition: its RxNorm clinical drug, the reference data's name for it, the RxNorm
+    // ingredient it is made of (so a patient allergic to that isn't given it), and how it is taken.
+    internal sealed record Treatment(string Code, string Display, string Ingredient, string Dosage);
 
-    static readonly (string Code, string Display)[] Diagnoses =
+    // A condition and what comes with it: its ICD-10-CM code and the reference data's name; how common it is, from what
+    // age, and how much more so from 50; the medications that treat it; the tests it is followed with (LOINC), which of
+    // them it raises or lowers; why its patients come in; whether it passes by itself, like a cold; and whether it is
+    // sensitive, which the database decides again from the code (a medication for it is marked sensitive here).
+    internal sealed record Problem(
+        string Code, string Display, double Share, int FromAge, double Older, Treatment[] Treatments, string[] Tests, string[] Raises, string[] Lowers,
+        string Visit, bool Passing = false, bool Sensitive = false);
+
+    static readonly Treatment Sertraline = new("312941", "sertraline 50 MG Oral Tablet", "36437", "1 tablet by mouth daily");
+
+    static readonly Treatment Escitalopram = new("349332", "escitalopram 10 MG Oral Tablet", "321988", "1 tablet by mouth daily");
+
+    internal static readonly Problem[] Problems =
     [
-        ("I10", "Essential (primary) hypertension"),
-        ("E11.9", "Type 2 diabetes mellitus without complications"),
-        ("E78.5", "Hyperlipidemia, unspecified"),
-        ("J45.909", "Unspecified asthma, uncomplicated"),
-        ("F41.1", "Generalized anxiety disorder"),
-        ("M54.50", "Low back pain, unspecified"),
-        ("K21.9", "Gastro-esophageal reflux disease without esophagitis"),
-        ("E03.9", "Hypothyroidism, unspecified"),
-        ("J30.9", "Allergic rhinitis, unspecified"),
-        ("F32.A", "Depression, unspecified"),
-        ("E66.9", "Obesity, unspecified"),
-        ("J06.9", "Acute upper respiratory infection, unspecified"),
+        new("I10", "Essential (primary) hypertension", 0.14, 30, 3.0,
+            [
+                new("314076", "lisinopril 10 MG Oral Tablet", "29046", "1 tablet by mouth daily"),
+                new("197361", "amlodipine 5 MG Oral Tablet", "17767", "1 tablet by mouth daily"),
+                new("979492", "losartan potassium 50 MG Oral Tablet", "52175", "1 tablet by mouth daily"),
+                new("310798", "hydrochlorothiazide 25 MG Oral Tablet", "5487", "1 tablet by mouth daily"),
+            ],
+            ["2160-0", "2823-3", "2951-2"], [], [], "Blood pressure check"),
+        new("E11.9", "Type 2 diabetes mellitus without complications", 0.07, 30, 2.5,
+            [
+                new("861007", "metformin hydrochloride 500 MG Oral Tablet", "6809", "1 tablet by mouth twice daily with meals"),
+                new("861004", "metformin hydrochloride 1000 MG Oral Tablet", "6809", "1 tablet by mouth twice daily with meals"),
+            ],
+            ["4548-4", "2345-7", "2160-0"], ["4548-4", "2345-7"], [], "Diabetes check"),
+        new("E78.5", "Hyperlipidemia, unspecified", 0.12, 30, 2.5,
+            [new("617310", "atorvastatin 20 MG Oral Tablet", "83367", "1 tablet by mouth at bedtime")],
+            ["2093-3", "13457-7", "2085-9", "2571-8"], ["2093-3", "13457-7"], [], "Cholesterol follow-up"),
+        new("J45.909", "Unspecified asthma, uncomplicated", 0.08, 5, 1.0,
+            [
+                new("630208", "albuterol 0.83 MG/ML Inhalation Solution", "435", "1 vial by nebulizer every 4 hours as needed"),
+                new("200224", "montelukast 10 MG Oral Tablet", "88249", "1 tablet by mouth at bedtime"),
+            ],
+            [], [], [], "Asthma follow-up"),
+        new("F41.1", "Generalized anxiety disorder", 0.07, 14, 1.0, [Sertraline, Escitalopram], [], [], [], "Anxiety follow-up", Sensitive: true),
+        new("F32.A", "Depression, unspecified", 0.08, 14, 1.0, [Sertraline, Escitalopram], [], [], [], "Mood follow-up", Sensitive: true),
+        new("M54.50", "Low back pain, unspecified", 0.10, 18, 1.5,
+            [new("197805", "ibuprofen 400 MG Oral Tablet", "5640", "1 tablet by mouth every 6 hours as needed")], [], [], [], "Back pain"),
+        new("K21.9", "Gastro-esophageal reflux disease without esophagitis", 0.09, 18, 1.5,
+            [new("198051", "omeprazole 20 MG Delayed Release Oral Capsule", "7646", "1 capsule by mouth before breakfast")], [], [], [], "Heartburn"),
+        new("E03.9", "Hypothyroidism, unspecified", 0.05, 18, 1.5,
+            [new("966221", "levothyroxine sodium 0.05 MG Oral Tablet", "10582", "1 tablet by mouth every morning")],
+            ["3016-3"], ["3016-3"], [], "Thyroid check"),
+        new("J30.9", "Allergic rhinitis, unspecified", 0.10, 5, 1.0,
+            [new("1797907", "fluticasone propionate 0.05 MG/ACTUAT Metered Dose Nasal Spray", "41126", "1 spray in each nostril daily")],
+            [], [], [], "Allergy symptoms"),
+        new("E66.9", "Obesity, unspecified", 0.10, 12, 1.2, [], ["2345-7", "2093-3"], [], [], "Weight check"),
+        new("E55.9", "Vitamin D deficiency, unspecified", 0.06, 12, 1.3,
+            [new("199362", "cholecalciferol 0.025 MG Oral Tablet", "2418", "1 tablet by mouth daily")], ["1989-3"], [], ["1989-3"], "Lab results"),
+        new("F11.20", "Opioid dependence, uncomplicated", 0.01, 18, 1.0,
+            [new("351267", "buprenorphine 8 MG / naloxone 2 MG Sublingual Tablet", "1819", "1 tablet under the tongue daily")],
+            [], [], [], "Medication review", Sensitive: true),
+        new("J06.9", "Acute upper respiratory infection, unspecified", 0.15, 0, 0.8, [], [], [], [], "Cough", Passing: true),
     ];
 
     // Common primary-care lab tests: LOINC code, name, unit, the normal range and how many decimals results have.

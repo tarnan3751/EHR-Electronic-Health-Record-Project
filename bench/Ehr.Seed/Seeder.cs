@@ -73,33 +73,37 @@ public static class Seeder
                 },
                 cancellationToken);
             rows["allergy_intolerances"] = await CopyAsync(connection,
-                "COPY ehr.allergy_intolerances (id, patient_id, code, display, clinical_status, category, criticality, reaction, recorded_at) FROM STDIN (FORMAT BINARY)",
+                "COPY ehr.allergy_intolerances (id, patient_id, code, code_system, display, clinical_status, category, criticality, reaction, severity, recorded_at) FROM STDIN (FORMAT BINARY)",
                 clinic.Charts().SelectMany(chart => chart.Allergies),
                 async (row, a, ct) =>
                 {
                     await row.WriteAsync(a.Id, NpgsqlDbType.Uuid, ct);
                     await row.WriteAsync(a.PatientId, NpgsqlDbType.Uuid, ct);
                     await WriteAsync(row, a.Code, ct);
+                    await WriteAsync(row, a.CodeSystem, ct);
                     await row.WriteAsync(a.Display, NpgsqlDbType.Varchar, ct);
                     await row.WriteAsync(a.ClinicalStatus, NpgsqlDbType.Varchar, ct);
                     await WriteAsync(row, a.Category, ct);
                     await WriteAsync(row, a.Criticality, ct);
                     await WriteAsync(row, a.Reaction, ct);
+                    await WriteAsync(row, a.Severity, ct);
                     await row.WriteAsync(a.RecordedAt, NpgsqlDbType.TimestampTz, ct);
                 },
                 cancellationToken);
             rows["medication_statements"] = await CopyAsync(connection,
-                "COPY ehr.medication_statements (id, patient_id, display, dosage, status, effective_start, effective_end) FROM STDIN (FORMAT BINARY)",
+                "COPY ehr.medication_statements (id, patient_id, code, display, dosage, status, effective_start, effective_end, sensitive) FROM STDIN (FORMAT BINARY)",
                 clinic.Charts().SelectMany(chart => chart.Medications),
                 async (row, m, ct) =>
                 {
                     await row.WriteAsync(m.Id, NpgsqlDbType.Uuid, ct);
                     await row.WriteAsync(m.PatientId, NpgsqlDbType.Uuid, ct);
+                    await WriteAsync(row, m.Code, ct);
                     await row.WriteAsync(m.Display, NpgsqlDbType.Varchar, ct);
                     await WriteAsync(row, m.Dosage, ct);
                     await row.WriteAsync(m.Status, NpgsqlDbType.Varchar, ct);
                     await WriteAsync(row, m.EffectiveStart, NpgsqlDbType.Date, ct);
                     await WriteAsync(row, m.EffectiveEnd, NpgsqlDbType.Date, ct);
+                    await row.WriteAsync(m.Sensitive, NpgsqlDbType.Boolean, ct);
                 },
                 cancellationToken);
             rows["conditions"] = await CopyAsync(connection,

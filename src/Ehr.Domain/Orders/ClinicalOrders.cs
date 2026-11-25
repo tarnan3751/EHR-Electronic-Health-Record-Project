@@ -11,13 +11,53 @@ namespace Ehr.Domain.Orders;
 // and the database also sets the time, records the write, and refuses a duplicate without a reason (60-orders.sql). A
 // signed order is never edited: it is discontinued, with a reason, or changed, which signs a new order and discontinues
 // the old one as replaced.
-public sealed class ClinicalOrders(EhrDbContext db)
+public sealed partial class ClinicalOrders(EhrDbContext db)
 {
     // The savepoint the insert runs in, so the request's transaction outlives a refused duplicate.
     const string Savepoint = "sign_order";
 
+    // How many items the search offers as a clinician types.
+    public const int Suggestions = 20;
+
+    // The clinic's common items of a type, which the order form lists without being asked. The rest of the catalog,
+    // LOINC's lab orders and RxNorm's clinical drugs, is thousands of items: the form finds those with SearchAsync.
     public async Task<IReadOnlyList<OrderCatalogItem>> CatalogAsync(string type, CancellationToken cancellationToken) =>
-        await db.OrderCatalogItems.AsNoTracking().Where(i => i.Type == type).OrderBy(i => i.Display).ToListAsync(cancellationToken);
+        await db.OrderCatalogItems.AsNoTracking().Where(i => i.Type == type && i.Common).OrderBy(i => i.Display).ToListAsync(cancellationToken);
+
+    // Items of a type that match what was typed: the common ones first, then names that start with it, then names
+    // with words that start with each word typed. Each is an index lookup (OrderCatalogItemConfiguration). Nothing for
+    // fewer than two characters.
+    public async Task<IReadOnlyList<OrderCatalogItem>> SearchAsync(string type, string? typed, CancellationToken cancellationToken)
+    {
+        var key = typed?.Trim().ToLowerInvariant() ?? "";
+        if (key.Length < 2 || !OrderType.All.Contains(type))
+        {
+            return [];
+        }
+
+        var items = db.OrderCatalogItems.AsNoTracking().Where(i => i.Type == type);
+        var pattern = key.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
+        var found = await items.Where(i => i.Common && EF.Functions.Like(i.DisplayKey, "%" + pattern + "%"))
+            .OrderBy(i => i.DisplayKey).Take(Suggestions).ToListAsync(cancellationToken);
+        Add(await items.Where(i => EF.Functions.Like(i.DisplayKey, pattern + "%"))
+            .OrderBy(i => i.DisplayKey).Take(Suggestions).ToListAsync(cancellationToken));
+        // Words of letters and digits only, so nothing typed can be read as the query's own syntax.
+        var words = Word().Matches(key).Select(match => match.Value).Where(word => word.Length > 1).Take(6).ToList();
+        if (found.Count < Suggestions && words.Count > 0)
+        {
+            var query = string.Join(" & ", words.Select(word => word + ":*"));
+            Add(await items.Where(i => EF.Functions.ToTsVector("simple", i.Display).Matches(EF.Functions.ToTsQuery("simple", query)))
+                .OrderBy(i => i.DisplayKey.Length).ThenBy(i => i.DisplayKey).Take(Suggestions).ToListAsync(cancellationToken));
+        }
+
+        return found;
+
+        void Add(List<OrderCatalogItem> more) =>
+            found.AddRange(more.Where(item => found.All(have => have.Code != item.Code)).Take(Suggestions - found.Count));
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex("[a-z0-9]+")]
+    private static partial System.Text.RegularExpressions.Regex Word();
 
     // What is wrong with an order before it goes to the database, by field: "Item", or a detail's name. The item is the
     // catalog's, as the clinician picked or typed it, in any case.
@@ -28,7 +68,7 @@ public sealed class ClinicalOrders(EhrDbContext db)
         var display = item?.Trim().ToLowerInvariant();
         var found = string.IsNullOrEmpty(display)
             ? null
-            : await db.OrderCatalogItems.AsNoTracking().SingleOrDefaultAsync(i => i.Type == type && i.Display.ToLower() == display, cancellationToken);
+            : await db.OrderCatalogItems.AsNoTracking().SingleOrDefaultAsync(i => i.Type == type && i.DisplayKey == display, cancellationToken);
         if (found is null)
         {
             errors["Item"] = string.IsNullOrWhiteSpace(item) ? "Choose an item." : "Choose an item from the list.";

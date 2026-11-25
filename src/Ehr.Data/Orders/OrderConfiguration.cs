@@ -60,6 +60,13 @@ public sealed class OrderCatalogItemConfiguration : IEntityTypeConfiguration<Ord
         item.Property(i => i.Code).HasMaxLength(20);
         item.Property(i => i.Type).HasMaxLength(20);
         item.Property(i => i.Display).HasMaxLength(200);
+        item.Property(i => i.DisplayKey).HasMaxLength(200).HasComputedColumnSql("lower(display)", stored: true);
+        item.Property(i => i.StandardSystem).HasMaxLength(20);
+        item.Property(i => i.StandardCode).HasMaxLength(20);
+        // The order form's search as a clinician types, and its check of the name picked: a type's names by their start,
+        // and by the words inside them (PostgreSQL's own text search), as for the clinical codes.
+        item.HasIndex(i => new { i.Type, i.DisplayKey }).HasOperators(null!, "text_pattern_ops");
+        item.HasIndex(i => i.Display).HasMethod("GIN").IsTsVectorExpressionIndex("simple");
         // The order form takes an item by what it says.
         item.HasIndex(i => new { i.Type, i.Display }).IsUnique();
         item.HasData(OrderCatalogItem.Seeded);

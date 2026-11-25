@@ -1,0 +1,38 @@
+@page "/portal/messages/{threadId:guid}"
+@using Ehr.Data.Messaging
+@using Ehr.Domain.Messaging
+@model Ehr.Web.Areas.Portal.Pages.Messages.ThreadModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    ViewData["Title"] = Model.Thread.Subject;
+}
+<p><a asp-page="Index">Back to your messages</a></p>
+<h1>@Model.Thread.Subject</h1>
+@if (Model.Sent && Model.Error is null)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent:</span> your care team will see your message. Replies appear here.</p>
+}
+<partial name="_Thread" model="(Model.Thread.Messages, MessageSender.Patient)" />
+@if (!OnPrem.IsReachable)
+{
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> messages can't be sent until the clinic's server is back.</p>
+}
+else
+{
+    <form method="post" class="sc-form">
+        @if (Model.Error is not null)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> fix what is marked below and send again.</p>
+        }
+        <div class="sc-field">
+            <label for="message-body">Your reply</label>
+            <textarea id="message-body" class="sc-field__input" name="Body" rows="6" maxlength="@SecureMessages.MaximumBody" required
+                      aria-invalid="@(Model.Error is null ? null : "true")" aria-describedby="@(Model.Error is null ? null : "message-body-error")">@(Model.Error is null ? null : Model.Body)</textarea>
+            @if (Model.Error is not null)
+            {
+                <p class="sc-field__error" id="message-body-error">@Model.Error</p>
+            }
+        </div>
+        <button type="submit" class="sc-btn sc-btn--primary">Send reply</button>
+    </form>
+}

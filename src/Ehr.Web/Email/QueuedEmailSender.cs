@@ -3,7 +3,7 @@ using Ehr.Domain.Accounts;
 
 namespace Ehr.Web.Email;
 
-// The portal's account emails go out in the background, so a page answers in the same time whether or not it sent
+// The portal's emails (account emails and "you have a new message" notices) go out in the background, so a page answers in the same time whether or not it sent
 // one: how long a response takes doesn't tell anyone which addresses have accounts. The queue is in memory. A message
 // still queued when the app stops is lost, as is one the mail server refuses, which is acceptable: the patient asks again
 // (/portal/resend, /portal/forgot). Past 1,000 waiting messages, new ones are dropped rather than held in memory.

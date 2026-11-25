@@ -1,6 +1,7 @@
 @page "/portal/results"
 @using Ehr.Domain.Results
 @model ResultsModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["Title"] = "Test results";
 }
@@ -60,6 +61,16 @@ else
                         @if (result.Note is { Length: > 0 } note)
                         {
                             <p><strong>Note from your care team:</strong> @note</p>
+                        }
+                        @* UC 6's "question about a result": a message to the care team, its subject filled in. Posted, so the
+                           test's name stays out of the address and the browser's history. Hidden while the site is read-only,
+                           as every form that sends something is. *@
+                        @if (OnPrem.IsReachable)
+                        {
+                            <form method="post" asp-page="/Messages/New" asp-page-handler="About">
+                                <input type="hidden" name="Subject" value="@($"About my {result.Display} result from {result.EffectiveAt.UtcDateTime:MMM d, yyyy}")">
+                                <button type="submit" class="sc-btn">Ask about this result</button>
+                            </form>
                         }
                     </div>
                 </details>
