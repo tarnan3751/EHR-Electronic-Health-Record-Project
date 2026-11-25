@@ -94,15 +94,28 @@ static class PasskeyFlows
         return (devTools, added!.Value.GetProperty("authenticatorId").GetString()!);
     }
 
-    // The password typed on the sign-in page, from the keyboard; on to the code page.
+    // The password typed on the sign-in page, from the keyboard; on to the code page. Typing waits for the page to put the
+    // focus in its email field itself (autofocus): Chromium does that at its next rendering after the page has loaded, so
+    // on a slow machine keys pressed as soon as the page has loaded can land before it, and the first characters of the
+    // email are lost (CI, run 45718664981).
     public static async Task PasswordInBrowserAsync(IPage page, string url, StaffAccount account)
     {
         await page.GotoAsync($"{url}/sign-in");
+        await page.WaitForFunctionAsync("() => document.activeElement?.id === 'Input_Email'");
         await page.Keyboard.TypeAsync(account.Email);
         await page.Keyboard.PressAsync("Tab");
         await page.Keyboard.TypeAsync(account.Password);
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync($"**{CodePage}*");
+    }
+
+    // The current code typed on a code page that offers no passkey, once the page has put the focus in its field itself;
+    // on to the page the sign-in lands on.
+    public static async Task CodeInBrowserAsync(IPage page, StaffAccount account)
+    {
+        await page.WaitForFunctionAsync("() => document.activeElement?.id === 'Code'");
+        await page.Keyboard.TypeAsync(Totp.Code(account.AuthenticatorKey));
+        await page.Keyboard.PressAsync("Enter");
     }
 
     // A passkey added on the passkeys page from the keyboard: the name, the current code, Enter.

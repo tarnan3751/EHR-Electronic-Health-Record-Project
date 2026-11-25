@@ -1,6 +1,5 @@
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
-using Ehr.Testing;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Playwright;
 using Xunit;
@@ -51,8 +50,7 @@ public class TC_UC11_16_AddAndUsePasskey(WebApps apps) : IClassFixture<WebApps>
         // 1.
         await PasswordInBrowserAsync(page, server.Url, clinician);
         Assert.Equal(0, await page.Locator("[data-passkey-use]").CountAsync());
-        await page.Keyboard.TypeAsync(Totp.Code(clinician.AuthenticatorKey));
-        await page.Keyboard.PressAsync("Enter");
+        await CodeInBrowserAsync(page, clinician);
         await page.WaitForURLAsync("**/patients");
 
         // 2.

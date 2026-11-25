@@ -53,8 +53,7 @@ public class TC_UC11_19_PasskeyNotUsed(WebApps apps) : IClassFixture<WebApps>
         page.PageError += (_, error) => errors.Add(error);
         var (devTools, authenticator) = await VirtualAuthenticatorAsync(context, page);
         await PasswordInBrowserAsync(page, server.Url, clinician);
-        await page.Keyboard.TypeAsync(Totp.Code(clinician.AuthenticatorKey));
-        await page.Keyboard.PressAsync("Enter");
+        await CodeInBrowserAsync(page, clinician);
         await page.WaitForURLAsync("**/patients");
         await AddInBrowserAsync(page, server.Url, clinician, "Work laptop");
         await page.ClickAsync(".sc-appbar__signout");
