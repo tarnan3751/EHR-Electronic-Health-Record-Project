@@ -205,18 +205,77 @@ def test_a_doubt_of_a_cause_added_is_counted_and_a_doubt_after_a_comma_is_still_
 
 
 # "unlikely", "may be" and "could be" are doubt (the owner's ruling of 2026-11-24): each said of a doubted finding is
-# what the Spanish says, and the finding without it is a doubt dropped; each said of a finding the Spanish states is a
-# doubt added. "May" as a month or leave isn't doubt.
-@pytest.mark.parametrize("hedged", ["A fracture is unlikely.", "It may be a fracture.", "It could be a fracture.",
-                                    "A fracture may be present.", "Fracture unlikely."])
-@pytest.mark.parametrize("doubted", [True, False])
-def test_unlikely_may_be_and_could_be_are_doubt_both_ways(hedged, doubted):
-    entries = facts_es.entries([{"said": "Es poco probable una fractura." if doubted else "Hay una fractura.",
-                                 "items": [{"of": "fracture", "doubt": doubted}]}])
+# what the Spanish says ("unlikely" where it leans against it, the modal hedges where it says "posible"), and the
+# finding without it is a doubt dropped; each said of a finding the Spanish states is a doubt added. "May" as a month
+# or leave isn't doubt.
+@pytest.mark.parametrize(("hedged", "doubted"), [
+    ("A fracture is unlikely.", "Es poco probable una fractura."), ("Fracture unlikely.", "Es poco probable una fractura."),
+    ("It may be a fracture.", "Posible fractura."), ("It could be a fracture.", "Posible fractura."),
+    ("A fracture may be present.", "Posible fractura."),
+])
+@pytest.mark.parametrize("stated", [True, False])
+def test_unlikely_may_be_and_could_be_are_doubt_both_ways(hedged, doubted, stated):
+    entries = facts_es.entries([{"said": "Hay una fractura." if stated else doubted,
+                                 "items": [{"of": "fracture", "doubt": not stated}]}])
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
     shown = {kind for kind, _, _ in facts_es.compare(hedged, entries, entries, lexicon)[0]}
     plain = {kind for kind, _, _ in facts_es.compare("A fracture.", entries, entries, lexicon)[0]}
-    assert (shown, plain) == ((set(), {"certainty"}) if doubted else ({"certainty"}, set()))
+    if stated:
+        assert (shown, plain) == ({"certainty"}, set())
+    else:
+        assert shown == set() and "certainty" in plain
+
+
+def facts_changes(said: str, item: dict, english: str, drugs: frozenset[str] = frozenset()) -> set[str]:
+    entries = facts_es.entries([{"said": said, "items": [item]}])
+    lexicon = facts_es.Lexicon(tuple(i for entry in entries for i in entry.items), drugs)
+    return {kind for kind, _, _ in facts_es.compare(english, entries, entries, lexicon)[0]}
+
+
+# A hedge of leave ("may", "might" or "could" with "be" and a past participle) is no doubt, and a modal hedge said of
+# nothing named is no doubt of what is named: the review's five, each a doubt dropped without the finding's own hedge and
+# right with it (the checks refuse the same, translation.LEAVE).
+@pytest.mark.parametrize(("said", "of", "dropped", "kept"), [
+    ("Posible varicela. Volver al colegio en una semana.", "chickenpox", "Chickenpox. School may be resumed in 1 week.",
+     "Possible chickenpox. School may be resumed in 1 week."),
+    ("Probable ictus. Se puede trasladar.", "stroke", "Stroke. Transfer could be arranged.",
+     "Probable stroke. Transfer could be arranged."),
+    ("Posible esguince de tobillo, se puede vendar.", "ankle sprain", "Ankle sprain; bandage may be applied.",
+     "Possible ankle sprain; bandage may be applied."),
+    ("Sospecha de gripe. Puede volver al trabajo en tres días.", "influenza",
+     "Influenza. Return to work may be allowed in 3 days.", "Suspected influenza. Return to work may be allowed in 3 days."),
+    ("Posible culebrilla. Se puede aplicar crema.", "shingles", "Shingles. Cream may be applied.",
+     "Possible shingles. Cream may be applied."),
+    ("Probable ictus.", "stroke", "Stroke. It may be.", "It may be a stroke."),
+])
+def test_a_hedge_of_leave_or_of_nothing_named_is_no_doubt_of_the_finding(said, of, dropped, kept):
+    item = {"of": of, "doubt": True}
+    assert "certainty" in facts_changes(said, item, dropped)
+    assert facts_changes(said, item, kept) <= {"number", "duration"}  # the days and weeks aren't in these facts
+
+
+def test_a_hedge_of_leave_said_of_a_drug_is_no_doubt_added():
+    assert facts_changes("Puede tomar ibuprofeno.", {"of": "ibuprofen", "action": "take"}, "Ibuprofen may be taken.",
+                         frozenset({"ibuprofen"})) == set()
+    assert facts_changes("Tiene neumonía.", {"of": "pneumonia", "negated": False}, "Pneumonia may be present.") == {
+        "certainty"}
+
+
+# "unlikely" is a negation too, read against what the Spanish says (the owner's ruling of 2026-11-24): "poco probable"
+# and "improbable" as "unlikely" pass; "probable" or "posible" as "unlikely", and "poco probable" as "likely", are caught.
+@pytest.mark.parametrize(("said", "english", "caught"), [
+    ("Neumonía poco probable.", "Pneumonia unlikely.", False),
+    ("Es poco probable una neumonía.", "Pneumonia is unlikely.", False),
+    ("Es improbable una neumonía.", "Pneumonia is unlikely.", False),
+    ("Es improbable una neumonía.", "Pneumonia is improbable.", False),
+    ("Probable neumonía.", "Pneumonia unlikely.", True),
+    ("Posible neumonía.", "Pneumonia is unlikely.", True),
+    ("Neumonía poco probable.", "Likely pneumonia.", True),
+    ("Neumonía poco probable.", "Probable pneumonia.", True),
+    ("Probable neumonía.", "Probable pneumonia.", False),
+])
+def test_unlikely_is_a_negation_read_against_how_the_spanish_leans(said, english, caught):
+    assert ("negation" in facts_changes(said, {"of": "pneumonia", "doubt": True}, english)) is caught
 
 
 @pytest.mark.parametrize("english", ["Fracture follow-up on May 3.", "You may take ibuprofen for the fracture.",
