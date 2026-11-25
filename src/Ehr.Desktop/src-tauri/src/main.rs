@@ -1,6 +1,13 @@
 //! The EHR desktop app: a window over an encrypted local database (store.rs) that syncs with the servers in the
 //! background (sync.rs) while a clinician is signed in. The page (frontend/) calls the commands below and redraws on
 //! the "changed" event.
+//!
+//! The window locks (the expansion plan's step 19a; ehr_desktop::lock decides when): after 15 idle minutes, at the
+//! sign-in's 12-hour end, when the server ends the session, and at every launch with a sign-in kept. The page covers
+//! itself and keeps everything typed (frontend/app.js); here, the chart reads are refused while it's locked, and sync
+//! carries on. It opens with the password, checked by the server when one answers and otherwise against the hash in
+//! the store (ehr_desktop::unlock); after the 12 hours, with a full sign-in, or the password alone while no server can
+//! complete one; after the server ended the session, with a full sign-in only.
 
 // Release builds on Windows open no console window alongside the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -15,7 +22,9 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ehr_desktop::{charts, draft_sync, recordings, unlock};
+use ehr_desktop::lock::{self, Lock, Moment, Need, Why};
+use ehr_desktop::unlock::{self, Allowed};
+use ehr_desktop::{charts, draft_sync, recordings};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -34,7 +43,12 @@ struct App {
     status: Mutex<Status>,
     /// Starts a sync round now: after a change, or when the person asks.
     wake: Notify,
+    /// When the window locks, and what opens it.
+    lock: Mutex<Lock>,
 }
+
+/// What the commands that read the offline charts answer while the window is locked.
+const LOCKED: &str = "Locked: unlock the window to see the offline charts.";
 
 impl App {
     fn store(&self) -> Result<MutexGuard<'_, Store>, String> {
@@ -51,6 +65,100 @@ impl App {
     fn status(&self) -> MutexGuard<'_, Status> {
         self.status.lock().unwrap_or_else(PoisonError::into_inner)
     }
+
+    /// Held on its own: never while the store or the session is held.
+    fn lock(&self) -> MutexGuard<'_, Lock> {
+        self.lock.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Chart data goes to the page only while the window is unlocked.
+    fn unlocked(&self) -> Result<(), String> {
+        if self.lock().is_locked() {
+            Err(LOCKED.to_owned())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// The lock as the page shows it, locking the window if it's time.
+    fn lock_view(&self) -> LockView {
+        let now = Moment::now();
+        let (state, sign_in_ended, session_over) = {
+            let mut lock = self.lock();
+            (lock.tick(now), lock.sign_in_ended(now), lock.session_over())
+        };
+        let (name, need, why, last, left) = match state {
+            lock::State::SignedOut => ("signedOut", None, None, false, Duration::ZERO),
+            lock::State::Unlocked => ("unlocked", None, None, false, Duration::ZERO),
+            lock::State::Warning { last, left } => ("warning", None, None, last, left),
+            lock::State::Locked { need, why } => {
+                ("locked", Some(need), Some(why), false, Duration::ZERO)
+            }
+        };
+        // The clinician the lock is for, from its own record: the session may be gone.
+        let charts_updated = self.store().ok().and_then(|store| {
+            let owner = store.unlock(unlock::account).ok()??.clinician_id;
+            store.charts_updated(owner).ok()?
+        });
+        LockView {
+            state: name,
+            need,
+            why,
+            last,
+            left: left.as_secs(),
+            idle_minutes: times().idle.as_secs().div_ceil(60),
+            account: self.sync().ok().and_then(sync::Sync::account),
+            sign_in_ended,
+            session_over,
+            charts_updated,
+        }
+    }
+
+    /// The server ended the sign-in's 12 hours, or the session: kept in the lock's record, so a restart knows, and told
+    /// to the lock. A record that can't be written changes nothing the session doesn't: with it over, nothing opens.
+    fn ending(&self, ending: sync::Ending) {
+        if let Ok(store) = self.store() {
+            let _ = store.unlock(match ending {
+                sync::Ending::SignIn => unlock::sign_in_ended,
+                sync::Ending::Session => unlock::session_over,
+            });
+        }
+        let mut lock = self.lock();
+        match ending {
+            sync::Ending::SignIn => lock.server_ended_sign_in(),
+            sync::Ending::Session => lock.server_ended_session(),
+        }
+    }
+
+    fn take_ending(&self) {
+        if let Some(ending) = self.sync().ok().and_then(sync::Sync::take_ending) {
+            self.ending(ending);
+        }
+    }
+}
+
+/// The lock, for the page (frontend/app.js).
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LockView {
+    /// "signedOut" (nothing to lock), "unlocked", "warning" or "locked".
+    state: &'static str,
+    /// What opens it, while locked.
+    need: Option<Need>,
+    why: Option<Why>,
+    /// The warning is for the sign-in's 12-hour end.
+    last: bool,
+    /// Seconds until the warning's end.
+    left: u64,
+    idle_minutes: u64,
+    /// Whose sign-in it is.
+    account: Option<String>,
+    /// The sign-in's 12 hours are over: a full sign-in is needed as soon as a server can complete one.
+    sign_in_ended: bool,
+    /// The server ended the session: the page stays as it is, under the lock.
+    session_over: bool,
+    /// When the offline charts were last downloaded.
+    charts_updated: Option<charts::Updated>,
 }
 
 /// The last sync round, and who is signed in, for the page.
@@ -78,12 +186,15 @@ struct View {
     clinical_waiting: usize,
     /// When the offline charts were last downloaded, which the page shows beside them.
     charts_updated: Option<charts::Updated>,
+    lock: LockView,
 }
 
 #[tauri::command]
 fn view(app: State<'_, App>) -> Result<View, String> {
+    let lock = app.lock_view();
     let store = app.store()?;
     Ok(View {
+        lock,
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
@@ -112,8 +223,11 @@ struct OfflineChart {
 
 #[tauri::command]
 async fn download_panel(app: State<'_, App>) -> Result<(), String> {
+    app.unlocked()?;
     let sync = app.sync()?;
-    let (token, panel) = sync.download_panel().await?;
+    let downloaded = sync.download_panel().await;
+    app.take_ending();
+    let (token, panel) = downloaded?;
     let mut store = app.store()?;
     sync.with_clinician(Some(&token), |owner| {
         store.replace_panel(owner, &panel).map_err(Into::into)
@@ -124,6 +238,7 @@ async fn download_panel(app: State<'_, App>) -> Result<(), String> {
 
 #[tauri::command]
 fn offline_panel(app: State<'_, App>) -> Result<Vec<charts::ChartSummary>, String> {
+    app.unlocked()?;
     let store = app.store()?;
     app.sync()?
         .with_clinician(None, |owner| store.offline_panel(owner).map_err(Into::into))
@@ -131,6 +246,7 @@ fn offline_panel(app: State<'_, App>) -> Result<Vec<charts::ChartSummary>, Strin
 
 #[tauri::command]
 fn offline_chart(app: State<'_, App>, patient: Uuid) -> Result<OfflineChart, String> {
+    app.unlocked()?;
     let store = app.store()?;
     app.sync()?.with_clinician(None, |owner| {
         let (chart, drafts) = store.offline_chart(owner, patient)?;
@@ -264,6 +380,7 @@ async fn sign_in(
 ) -> Result<(), String> {
     app.sync()?.sign_in(&email, &password, &code).await?;
     let remembered = remember_sign_in(&app, &email, password).await;
+    app.lock().signed_in(SystemTime::now(), Moment::now());
     app.wake.notify_one();
     remembered
 }
@@ -282,15 +399,247 @@ async fn remember_sign_in(app: &App, email: &str, password: String) -> Result<()
     })
 }
 
-/// Signs out, and starts a round so the status says so. The local copy stays, to read; the lock's record goes.
+/// Signs out, and starts a round so the status says so. The local copy stays, to read; the lock's record goes, and
+/// there's nothing left to lock. The lock offers it too, to someone else at the computer.
 #[tauri::command]
 async fn sign_out(app: State<'_, App>) -> Result<(), String> {
     let signed_out = app.sync()?.sign_out().await;
     let forgotten = app
         .store()
         .and_then(|store| store.unlock(unlock::forget).map_err(Into::into));
+    app.lock().signed_out(Moment::now());
     app.wake.notify_one();
     signed_out.and(forgotten)
+}
+
+#[tauri::command]
+fn lock_state(app: State<'_, App>) -> LockView {
+    app.lock_view()
+}
+
+/// A key, a click or tap, the wheel or typing in the window (sent at most once every 10 seconds).
+#[tauri::command]
+fn activity(app: State<'_, App>) {
+    app.lock().activity(Moment::now());
+}
+
+/// A recording began or ended: it holds the lock off while it lasts.
+#[tauri::command]
+fn recording(app: State<'_, App>, active: bool) {
+    app.lock().recording(active, Moment::now());
+}
+
+#[tauri::command]
+fn lock_now(app: State<'_, App>) -> LockView {
+    app.lock().lock_now(Moment::now());
+    app.lock_view()
+}
+
+/// Opens the lock, or says why not. For the password alone, the server checks it when one answers, and only when none
+/// can does this computer, against its hash; a server's no stands. For a full sign-in, the same: the password alone
+/// opens it past the 12 hours only when no server can complete a sign-in; after the server ended the session, never.
+#[tauri::command]
+async fn unlock(app: State<'_, App>, password: String, code: String) -> Result<LockView, String> {
+    let Some(need) = app.lock().need() else {
+        return Ok(app.lock_view());
+    };
+    let sync = app.sync()?;
+    let next = if need == Need::Password {
+        after_unlock(sync.unlock(&password).await)
+    } else {
+        let email = app
+            .store()?
+            .unlock(unlock::account)?
+            .map(|account| account.email)
+            .ok_or_else(|| "Sign out, then sign in again.".to_owned())?;
+        let answer = sync.sign_in_answer(&email, &password, &code).await;
+        if answer.is_ok() {
+            remember_sign_in(&app, &email, password).await?;
+            app.lock().signed_in(SystemTime::now(), Moment::now());
+            app.wake.notify_one();
+            return Ok(app.lock_view());
+        }
+        after_sign_in(answer, need, &code)
+    };
+    match next {
+        Next::Opened => app.store()?.unlock(unlock::right)?,
+        Next::CheckHere => open_here(&app, password).await?,
+        Next::Refused(problem) => return Err(problem),
+        Next::Ended(ending, problem) => {
+            app.ending(ending);
+            return Err(problem);
+        }
+    }
+    app.lock().unlocked(Moment::now());
+    Ok(app.lock_view())
+}
+
+/// What the lock does after a server's answer, or none.
+#[derive(Debug, PartialEq)]
+enum Next {
+    Opened,
+    /// No server could check the password: this computer does.
+    CheckHere,
+    /// A server said no, which stands: nothing is checked here.
+    Refused(String),
+    /// The server ended the sign-in or the session, saying so.
+    Ended(sync::Ending, String),
+}
+
+/// After the server's check of the password alone.
+fn after_unlock(answer: sync::Unlock) -> Next {
+    match answer {
+        sync::Unlock::Unlocked => Next::Opened,
+        sync::Unlock::Refused(problem) => Next::Refused(problem),
+        sync::Unlock::SignInEnded => Next::Ended(
+            sync::Ending::SignIn,
+            "A sign-in lasts at most 12 hours: enter the code from your authenticator app too."
+                .to_owned(),
+        ),
+        sync::Unlock::SessionOver => Next::Ended(sync::Ending::Session, SESSION_OVER.to_owned()),
+        sync::Unlock::Unreachable => Next::CheckHere,
+    }
+}
+
+/// After a full sign-in that didn't happen. Past the 12 hours, with no server able to complete it, the password alone
+/// opens the offline charts; never after the server ended the session, and never after a server said no.
+fn after_sign_in(answer: Result<(), sync::SignInFailure>, need: Need, code: &str) -> Next {
+    match answer {
+        Ok(()) => Next::Opened,
+        Err(sync::SignInFailure::Refused(_)) if code.trim().is_empty() => Next::Refused(
+            "Enter the code from your authenticator app too: the clinic's server can be reached, so it takes both."
+                .to_owned(),
+        ),
+        Err(sync::SignInFailure::Refused(problem)) => Next::Refused(problem),
+        Err(sync::SignInFailure::Unreachable(_)) if need == Need::SignIn => Next::CheckHere,
+        Err(sync::SignInFailure::Unreachable(problem)) => Next::Refused(format!(
+            "{problem} Sign in again once the clinic's server can be reached."
+        )),
+    }
+}
+
+const SESSION_OVER: &str = "Signed out: the server ended this sign-in. Sign in again with your password and the code from \
+                            your authenticator app.";
+
+/// The lock's password, checked on this computer against its hash, when no server could check it. Wrong ones are
+/// counted (ehr_desktop::unlock): after 5 it waits 15 minutes, after 10 only a full sign-in opens it.
+async fn open_here(app: &App, password: String) -> Result<(), String> {
+    // Not past the offline copy's 30 days, whatever the password.
+    app.sync()?.with_clinician(None, |_| Ok(()))?;
+    let now = unix_now();
+    let account = app
+        .store()?
+        .unlock(unlock::account)?
+        .ok_or_else(|| SESSION_OVER.to_owned())?;
+    let verifier = match account.may_check(now) {
+        Allowed::Check(verifier) => verifier.to_owned(),
+        Allowed::WaitUntil(until) => return Err(wait_problem(until - now)),
+        Allowed::SignIn if account.verifier.is_none() => return Err(SESSION_OVER.to_owned()),
+        Allowed::SignIn => {
+            app.lock().require_sign_in();
+            return Err(TOO_MANY.to_owned());
+        }
+    };
+    let right = tauri::async_runtime::spawn_blocking(move || unlock::verify(&verifier, &password))
+        .await
+        .map_err(|error| error.to_string())?;
+    let store = app.store()?;
+    if right {
+        store.unlock(unlock::right)?;
+        return Ok(());
+    }
+    let counted = store.unlock(|db| unlock::wrong(db, now))?;
+    drop(store);
+    let allowed = counted.as_ref().map(|account| account.may_check(now));
+    if matches!(allowed, Some(Allowed::SignIn)) {
+        // From now on only a full sign-in opens it, wherever it's checked.
+        app.lock().require_sign_in();
+    }
+    Err(match allowed {
+        Some(Allowed::WaitUntil(until)) => wait_problem(until - now),
+        Some(Allowed::SignIn) => TOO_MANY.to_owned(),
+        _ => "Wrong password. The clinic's server can't be reached, so this computer checked it."
+            .to_owned(),
+    })
+}
+
+const TOO_MANY: &str = "Too many wrong passwords: only a sign-in with your password and the code from your \
+                        authenticator app opens this window now, once the clinic's server can be reached. Nothing on \
+                        this computer was deleted.";
+
+fn wait_problem(seconds: i64) -> String {
+    let minutes = (seconds.max(1) + 59) / 60;
+    format!(
+        "Too many wrong passwords: try again in {minutes} {}.",
+        if minutes == 1 { "minute" } else { "minutes" }
+    )
+}
+
+/// The lock's times. Development builds take shorter ones from EHR_DEBUG_IDLE_SECONDS and EHR_DEBUG_SIGN_IN_SECONDS,
+/// for checking the lock by hand (docs/expansion/19a-hands-on-check.md); release builds never read them.
+fn times() -> lock::Times {
+    if cfg!(debug_assertions) {
+        let seconds = |name| {
+            std::env::var(name)
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .map(Duration::from_secs)
+        };
+        lock::Times::shortened(
+            seconds("EHR_DEBUG_IDLE_SECONDS"),
+            seconds("EHR_DEBUG_SIGN_IN_SECONDS"),
+        )
+    } else {
+        lock::Times::STANDARD
+    }
+}
+
+/// Locked from the start whenever a sign-in is kept, so quitting never skips the lock. A sign-in kept by an earlier
+/// build, which has no record of the lock's (ehr_desktop::unlock), is forgotten here: the server ends it at its 12
+/// hours anyway, and the clinician signs in again. A record with no sign-in goes too.
+fn starting_lock(store: &Result<Mutex<Store>, String>, sync: &Result<sync::Sync, String>) -> Lock {
+    let now = Moment::now();
+    let record = store
+        .as_ref()
+        .ok()
+        .and_then(|store| store::lock(store).unlock(unlock::account).ok().flatten());
+    let clinician = sync.as_ref().ok().and_then(sync::Sync::clinician);
+    if let Some(record) = &record
+        && clinician == Some(record.clinician_id)
+    {
+        let signed_in_at =
+            UNIX_EPOCH + Duration::from_secs(u64::try_from(record.signed_in_at).unwrap_or(0));
+        let mut lock = Lock::new(times(), Some(signed_in_at), record.sign_in_ended, now);
+        if record.wrong >= unlock::WRONG_BEFORE_SIGN_IN {
+            lock.require_sign_in();
+        }
+        return lock;
+    }
+    // With no database there is nothing to show, and nothing is forgotten.
+    if let (Ok(sync), Ok(store)) = (sync, store) {
+        let _ = sync.forget_kept();
+        if record.is_some() {
+            let _ = store::lock(store).unlock(unlock::forget);
+        }
+    }
+    Lock::new(times(), None, false, now)
+}
+
+/// Every second: the lock's state, sent to the page when it changes.
+async fn lock_in_background(handle: AppHandle) {
+    let app = handle.state::<App>();
+    let mut every = tokio::time::interval(Duration::from_secs(1));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut shown = None;
+    loop {
+        every.tick().await;
+        let view = app.lock_view();
+        let showing = (view.state, view.need, view.last, view.sign_in_ended);
+        if shown != Some(showing) {
+            shown = Some(showing);
+            let _ = handle.emit("lock", view);
+        }
+    }
 }
 
 /// Seconds since 1970, by this computer's clock.
@@ -351,6 +700,9 @@ async fn sync_in_background(handle: AppHandle) {
 
     loop {
         let report = client.round(store).await;
+        // Before the page hears of the round: a session the server ended locks the window, rather than clear it.
+        app.take_ending();
+        let _ = handle.emit("lock", app.lock_view());
         {
             let mut status = app.status();
             status.server = report.server;
@@ -401,14 +753,18 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             let store = open_store(app).map(Mutex::new);
+            // After open_store, which chose the credential store that keeps the session.
+            let sync = key::session_entry().and_then(sync::Sync::from_environment);
+            let lock = Mutex::new(starting_lock(&store, &sync));
             app.manage(App {
                 store,
-                // After open_store, which chose the credential store that keeps the session.
-                sync: key::session_entry().and_then(sync::Sync::from_environment),
+                sync,
                 status: Mutex::new(Status::default()),
                 wake: Notify::new(),
+                lock,
             });
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
+            tauri::async_runtime::spawn(lock_in_background(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -426,7 +782,82 @@ fn main() {
             edit_clinical,
             resolve_clinical,
             save_recording,
+            lock_state,
+            activity,
+            recording,
+            lock_now,
+            unlock,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// TC-UC7-10 (proposed FR-68), the lock's choice: the password is checked on this computer only when no server
+    /// could check it; a server's no stands, the 12-hour end asks for the code too, and a session the server ended is
+    /// told to the lock.
+    #[test]
+    fn the_password_alone_is_checked_here_only_when_no_server_could() {
+        assert_eq!(after_unlock(sync::Unlock::Unlocked), Next::Opened);
+        assert_eq!(after_unlock(sync::Unlock::Unreachable), Next::CheckHere);
+        assert_eq!(
+            after_unlock(sync::Unlock::Refused("Wrong password.".to_owned())),
+            Next::Refused("Wrong password.".to_owned())
+        );
+        assert!(matches!(
+            after_unlock(sync::Unlock::SignInEnded),
+            Next::Ended(sync::Ending::SignIn, _)
+        ));
+        assert!(matches!(
+            after_unlock(sync::Unlock::SessionOver),
+            Next::Ended(sync::Ending::Session, _)
+        ));
+    }
+
+    /// TC-UC7-10: past the 12 hours, a full sign-in the servers can't complete (none answers, or the cloud app answers
+    /// 503 with the clinic's server cut off) lets the password alone open the offline charts; a server that answers
+    /// "wrong" or "locked out" is never followed by a check here; after the server ended the session, nothing but a full
+    /// sign-in opens the lock.
+    #[test]
+    fn past_12_hours_the_password_alone_opens_only_when_no_server_can_sign_in() {
+        let unreachable = || {
+            Err(sync::SignInFailure::Unreachable(
+                "Couldn't connect.".to_owned(),
+            ))
+        };
+        assert_eq!(
+            after_sign_in(unreachable(), Need::SignIn, "123456"),
+            Next::CheckHere
+        );
+        assert_eq!(
+            after_sign_in(unreachable(), Need::SignIn, ""),
+            Next::CheckHere
+        );
+        for problem in [
+            "Wrong email, password or code.",
+            "This account is locked after too many failed attempts. Try again in 15 minutes.",
+        ] {
+            let refused = after_sign_in(
+                Err(sync::SignInFailure::Refused(problem.to_owned())),
+                Need::SignIn,
+                "123456",
+            );
+            assert_eq!(refused, Next::Refused(problem.to_owned()));
+        }
+        assert!(matches!(
+            after_sign_in(
+                Err(sync::SignInFailure::Refused("400".to_owned())),
+                Need::SignIn,
+                ""
+            ),
+            Next::Refused(problem) if problem.starts_with("Enter the code")
+        ));
+        assert!(matches!(
+            after_sign_in(unreachable(), Need::SignedOut, "123456"),
+            Next::Refused(_)
+        ));
+    }
 }

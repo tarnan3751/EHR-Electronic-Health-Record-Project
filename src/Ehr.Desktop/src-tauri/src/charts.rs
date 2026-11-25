@@ -127,7 +127,7 @@ pub struct Visit {
 
 /// When a clinician's offline charts were last downloaded: `at` in milliseconds since 1970, shown in the clinic's
 /// time zone when the charts named one.
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Updated {
     pub at: i64,
