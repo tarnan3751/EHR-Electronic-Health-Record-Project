@@ -178,7 +178,7 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - Results are numbers typed in for lab orders whose catalog item has result fields set up (12 items today, including the common panels). Other lab tests, imaging and referrals have no results page content yet. Nothing imports results; the simulated lab is step 12.
 - A filed result can't be corrected or withdrawn. A wrong value needs a new order.
 - The reference ranges are one range for each test, for adults, not by age or sex.
-- The inbox item goes to the clinician who signed the order, even if they have since left the patient's panel; any panel clinician can acknowledge from the chart. If the signer's account is disabled or no longer a clinician's, it goes to each clinician on the patient's panel instead.
+- The inbox item goes to the clinician who signed the order, even if they have since left the patient's panel; any panel clinician can acknowledge from the chart. If the signer's account is disabled or no longer a clinician's, it goes to each clinician on the patient's panel instead; and if there is none, to every administrator whose account isn't disabled, by patient ID alone, until a clinician acknowledges the results (the expansion plan's step 18a, `docs/UC15.md`).
 - The chart lists a patient's eight most relevant resulted orders (unacknowledged and abnormal first); there is no page of older ones yet.
 - The inbox looks at the oldest 500 waiting results when deciding which are abnormal.
 - Results are released to the portal as soon as they are filed, before anyone acknowledges them.
