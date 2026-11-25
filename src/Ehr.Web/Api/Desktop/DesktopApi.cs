@@ -15,8 +15,10 @@ namespace Ehr.Web.Api.Desktop;
 // DesktopApiContract.cs. The cloud app forwards these posts to the on-prem app, which can write (Forwarding/).
 //
 // Sign-in, POST /api/desktop/sign-in: email, password, the authenticator code and the device's name. 200 with the
-// token, until when it works and the account's display name; 401 for a wrong email, password or code, or a locked
-// account; 403 for an account that hasn't finished its web setup or isn't a clinician. Each refusal says why.
+// token, the session's 30-day end, until which the app may open its offline copy (OfflineAccess), and the account's
+// display name; 401 for a wrong email, password or code, or a locked account; 403 for an account that hasn't finished
+// its web setup or isn't a clinician. Each refusal says why. The token itself works for 12 hours: after that every
+// request with it gets a 401 saying the sign-in has ended (DesktopTokenHandler.SignInHeader), and the app signs in again.
 //
 // Sign-out, POST /api/desktop/sign-out with the token: 204, and the token never works again.
 public static class DesktopApi
