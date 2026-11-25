@@ -288,6 +288,9 @@ internal static partial class RenderBenchmark
                     // long it has, staff and portal.
                     results.Add(await MeasureAsync(client, times, "Session keep-alive, staff", typing: false, () => "/session"));
                     results.Add(await MeasureAsync(portal, times, "Session keep-alive, portal", typing: false, () => "/portal/session"));
+                    // A staff member's own passkeys (step 19): the clinician has none, so the page is its list read and
+                    // the add form.
+                    results.Add(await MeasureAsync(client, times, "Passkeys, the staff member's own", typing: false, () => "/passkeys"));
                     // Reviewing emergency access (step 18): the clinician's year of emergency accesses (FillPanelHistoryAsync),
                     // half of them reviewed. The review page of any of them, and the audit page's list of those waiting. A
                     // generator of its own.
@@ -2273,7 +2276,10 @@ internal static partial class RenderBenchmark
                     .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
                     // A lab is connected, as in the tests' databases (step 12), and may ask as fast as the rows do.
                     .UseSetting("Ehr:Lab:Key", MigratedDatabase.LabKey)
-                    .UseSetting("RateLimits:LabRequestsPerMinute", "1000000");
+                    .UseSetting("RateLimits:LabRequestsPerMinute", "1000000")
+                    // Staff passkeys (step 19), as the stack has them, so their page is measured and every page's app
+                    // bar links to it.
+                    .UseSetting("Ehr:Passkeys:Domain", "localhost").UseSetting("Ehr:Passkeys:Origins:0", "https://localhost");
             }
         }
     }
@@ -2300,6 +2306,7 @@ internal static partial class RenderBenchmark
                 .UseSetting("Ehr:Links:ClinicalBaseUrl", "https://localhost").UseSetting("Ehr:Links:PortalBaseUrl", "https://localhost")
                 .UseSetting("Ehr:Clinic:TimeZone", "America/Chicago").UseSetting("Ehr:Clinic:TimeZoneAbbreviations", "CST,CDT")
                 .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
+                .UseSetting("Ehr:Passkeys:Domain", "localhost").UseSetting("Ehr:Passkeys:Origins:0", "https://localhost")
                 .UseSetting("Logging:LogLevel:Default", "Warning")
                 .UseSetting("Logging:LogLevel:Microsoft.AspNetCore.DataProtection", "Critical")
                 .UseSetting("Logging:LogLevel:Ehr.Web.CloudAudit.CloudAuditShipper", "Error")
