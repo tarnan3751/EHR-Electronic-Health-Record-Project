@@ -50,7 +50,9 @@ public class TC_UC1_12_Nfr12_ChangeKeyboardFirst(WebApps apps) : IClassFixture<W
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/discontinue");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#discontinue-reason')"));
+        // autofocus is applied after the page loads, at the browser's next chance to render: wait for it rather than
+        // checking at the instant of the load event, which a busy runner can reach first.
+        await page.WaitForFunctionAsync("document.activeElement?.matches('#discontinue-reason') === true");
         await page.Keyboard.InsertTextAsync("Synthetic: keyboard only");
         await page.Keyboard.PressAsync("Tab");
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('form[data-order-form] button[type=submit]')"));
@@ -63,7 +65,8 @@ public class TC_UC1_12_Nfr12_ChangeKeyboardFirst(WebApps apps) : IClassFixture<W
         await AiReviewBrowserTests.TabToAsync(page, "a[data-change-order]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("replaces=", StringComparison.Ordinal));
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#order-item') && document.activeElement.value === 'Metformin 500 mg tablet'"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('#order-item') === true");
+        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.value === 'Metformin 500 mg tablet'"));
         await page.Keyboard.PressAsync("Tab");
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#order-dose')"));
         await page.Keyboard.PressAsync("ControlOrMeta+A");
