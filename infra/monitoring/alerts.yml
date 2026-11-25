@@ -1,0 +1,95 @@
+# When the monitoring profile emails the clinic's administrators (alertmanager.yml), and why each threshold is what it
+# is. Every alert names a site, a replication slot, a host or a certificate: never a patient or anything from the
+# record. alerts.test.yml holds each rule to its threshold (CI's stack job runs it with promtool), and
+# infra/compose/README.md ("Monitoring") has what each means and what to do.
+groups:
+  - name: swiftchart
+    rules:
+      # A site's pages can't be served: on-site clinicians, off-site clinicians or patients can't work. Two minutes
+      # rides out an app or database restart.
+      - alert: SiteDown
+        expr: probe_success{job="sites"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "The {{ $labels.site }} site isn't answering"
+          description: "{{ $labels.instance }} hasn't answered its sign-in page for 2 minutes."
+
+      # The cloud can't reach the clinic's app: off-site is read-only, saves are refused, and the reads served off-site
+      # wait in the cloud app's audit queue (UC 2).
+      - alert: ClinicUnreachableFromCloud
+        expr: probe_success{job="clinic-link"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "The cloud can't reach the clinic's app"
+          description: "{{ $labels.instance }}, through the link the cloud app forwards saves and ships audit events over, hasn't answered for 2 minutes: off-site is read-only."
+
+      # The replica isn't streaming: off-site pages show the record as it was when it stopped, and grow older, so a
+      # change made at the clinic (a new allergy) isn't seen off-site. The primary keeps WAL for it up to 2 GB; past
+      # that, the replica has to be cloned again.
+      - alert: ReplicaNotStreaming
+        expr: pg_replication_slots_slot_is_active{slot_name="cloud_replica"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "The cloud replica isn't streaming from the primary"
+          description: "Replication slot cloud_replica has had nothing connected for 2 minutes: off-site pages are getting out of date."
+
+      # Barman isn't streaming WAL: changes since are in no backup, so a restore can't reach now.
+      - alert: BackupStreamDown
+        expr: pg_replication_slots_slot_is_active{slot_name="barman"} == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Backups aren't receiving the primary's changes"
+          description: "Replication slot barman has had nothing connected for 5 minutes: changes since aren't backed up."
+
+      # Barman's own check fails: a base backup failed, none exists yet, or WAL isn't arriving. Thirty minutes lets a
+      # first base backup over the WAN finish before it counts.
+      - alert: BackupsUnhealthy
+        expr: barman_check_ok == 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "barman check onprem has been failing for 30 minutes"
+          description: "Run barman check onprem on the backup host; its log says which check fails."
+
+      # No new base backup for 25 hours, where one is taken every 23: the 6-day restore window, and nothing older than
+      # 7 days being restorable, both rest on them.
+      - alert: BackupTooOld
+        expr: barman_last_base_backup_start_timestamp_seconds > 0 and time() - barman_last_base_backup_start_timestamp_seconds > 25 * 3600
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "No new base backup for over 25 hours"
+          description: "The last base backup that succeeded began over 25 hours ago: see barman list-backups onprem and the backup host's log."
+
+      # A disk the databases or backups live on is filling: a full disk stops the database or the backups. Every disk
+      # the host's node exporter reports counts, but memory-backed ones, once however many places it is mounted.
+      - alert: DiskFilling
+        expr: min by (instance, device) (node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|ramfs"}) < 0.15
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "Under 15% of the disk is free"
+          description: "{{ $labels.instance }} {{ $labels.device }}: {{ $value | humanizePercentage }} free."
+
+      # A site's certificate is close to expiring: browsers and the desktop app would refuse the site.
+      - alert: CertificateExpiring
+        expr: probe_ssl_earliest_cert_expiry - time() < 14 * 86400
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "A site's certificate expires within 14 days"
+          description: "{{ $labels.instance }}'s certificate expires in {{ $value | humanizeDuration }}."
+
+      # Something the alerts read from has stopped answering, or the database exporter can't log in, so the alerts it
+      # feeds can't fire.
+      - alert: MonitoringTargetDown
+        expr: up == 0 or pg_up == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Monitoring can't read {{ $labels.job }}"
+          description: "{{ $labels.instance }} hasn't answered, or can't reach what it watches, for 5 minutes, so the alerts that read it can't fire."

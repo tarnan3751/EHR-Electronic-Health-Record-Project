@@ -92,11 +92,23 @@ jobs:
           docker compose -f compose.yaml -f compose.nvidia.yaml config --quiet
           docker compose -f compose.yaml -f compose.backup-drill.yaml config --quiet
 
+      # The monitoring profile's configuration, with the tools of the versions compose.yaml pins: Prometheus's, every
+      # alert held to its threshold and wait by its tests (infra/monitoring/alerts*.test.yml), Alertmanager's (the
+      # stack's, and the example for a real server's relay), and the probes'.
+      - name: Check the monitoring configuration
+        run: |
+          image() { docker compose --profile monitoring config --images "$1"; }
+          docker run --rm -v "$PWD/../monitoring:/m:ro" -w /m --entrypoint promtool "$(image prometheus)" check config prometheus.yml
+          docker run --rm -v "$PWD/../monitoring:/m:ro" -w /m --entrypoint promtool "$(image prometheus)" test rules alerts.test.yml alerts-backups.test.yml
+          docker run --rm -v "$PWD/..:/i:ro" --entrypoint amtool "$(image alertmanager)" check-config /i/monitoring/alertmanager.yml /i/deploy/alertmanager.example.yml
+          docker run --rm -v "$PWD/../monitoring:/m:ro" "$(image blackbox)" --config.file=/m/blackbox.yml --config.check
+
       - name: Build the images
         run: docker compose build
 
+      # With the monitoring profile, which an alert is checked through below.
       - name: Start the stack
-        run: docker compose up --detach --wait --wait-timeout 300
+        run: docker compose --profile monitoring up --detach --wait --wait-timeout 300
 
       # On-site through the LAN, then off-site and the portal through the simulated internet. Nothing is served
       # without signing in: the clinic's home sends an anonymous browser to its sign-in page, the sign-in pages load,
@@ -247,6 +259,36 @@ jobs:
             echo "WAL from before the oldest backup kept is still there"
             exit 1
           fi
+
+      # An alert end to end, as a clinic would get it: the replica stops, and within minutes the administrators have an
+      # email from Alertmanager in the mail catcher. Prometheus must first see the replica's slot active, and no such
+      # email may be there before. ReplicaNotStreaming waits 2 minutes (infra/monitoring/alerts.yml); with a scrape and
+      # Alertmanager's 30 seconds, the email is due about 3 minutes after the stop.
+      - name: An alert is emailed when the replica stops
+        run: |
+          query() { curl --silent --show-error --fail --get --data-urlencode "query=$1" http://127.0.0.1:9090/api/v1/query; }
+          emails() { curl --silent --show-error --fail --get --data-urlencode "query=subject:ReplicaNotStreaming" http://127.0.0.1:8025/api/v1/search; }
+          for _ in $(seq 60); do
+            active=$(query 'pg_replication_slots_slot_is_active{slot_name="cloud_replica"}' | jq -r '.data.result[0].value[1] // "none"')
+            [ "$active" = 1 ] && break
+            sleep 2
+          done
+          echo "The replica's slot, as Prometheus sees it: $active (1 is active)"
+          [ "$active" = 1 ]
+          [ "$(emails | jq '.messages_count')" = 0 ]
+          docker compose stop cloud-db
+          stopped=$(date +%s)
+          until [ "$(emails | jq '.messages_count')" != 0 ]; do
+            if [ "$(($(date +%s) - stopped))" -ge 300 ]; then
+              echo "No email within 5 minutes of the replica stopping"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "Emailed $(($(date +%s) - stopped)) s after the replica stopped:"
+          emails | jq -r '.messages[0] | "\(.Subject) to \([.To[].Address] | join(", "))"'
+          [ "$(emails | jq -r '[.messages[0].To[].Address] | join(",")')" = admins@example.com ]
+          docker compose start cloud-db
 
       - name: Show containers and logs
         if: failure()

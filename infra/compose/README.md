@@ -18,6 +18,7 @@ The whole server architecture on one machine, with Docker Compose: the on-prem p
 | `mail` | The clinic's mail relay | [Mailpit](https://mailpit.axllent.org/): catches every email the on-prem app sends and shows them at http://127.0.0.1:8025; delivers nothing |
 | `llama` | K2 Horizon 7B in llama.cpp's `llama-server`, on the on-prem server | Opt-in `ai` profile, on a network with no internet access |
 | `dictation` | The dictation sidecar on the on-prem server: MedASR (Whisper for a dictation in Spanish), then K2 Horizon through `llama`, then the checks on what it proposes (`src/Ehr.Dictation/sidecar`) | Opt-in `ai` profile, on the same network as `llama`; only the on-prem app reaches it, with a key. Keeps nothing: its file system is read-only apart from a tmpfs |
+| `prometheus`, `alertmanager`, `blackbox`, `postgres-exporter`, `node-exporter` | Monitoring, on the cloud server | Opt-in `monitoring` profile: watches the sites, the link to the clinic, replication, backups and the disk, and emails the administrators (below, "Monitoring") |
 | `restore-db` | A restored copy of the primary | Opt-in `restore` profile, for a restore: `restore-drill.cs` starts it, or you do by hand (below) |
 
 Both apps run the same image; `Ehr__Site` and the connection string decide how each behaves. The on-prem app reads and writes the primary as `ehr_app`. The cloud app reads the replica as `ehr_read` and forwards saves to the on-prem app across the WAN link, which it calls `onprem.example.com`; right after a save, that person's pages come from the on-prem app too, until the replica has the change. Pages that read patient data come from the replica as well; the cloud app records those reads in its own audit queue and ships them to the on-prem app.
@@ -30,7 +31,7 @@ The lab is on-prem only too: `lab` calls the on-prem app at https://ehr.example.
 
 ## One-time setup
 
-1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty. For the `ai` profile, give Docker at least 10 GB, or 18 GB with Whisper installed for Spanish dictation: llama about 7 GB, the `dictation` service up to its cap of 10 GB and the core stack's 150 MB come to just over 17 GB. The cap is the container's peak measured with Whisper and the speaker model loaded under a full load, 7.28 GiB with the page cache (5.19 GiB without it), plus 25%, rounded up (`uv run src/Ehr.Dictation/measure_memory.py`, which says what it needs; `compose.yaml` says when and how it was measured). Measuring it doesn't need the 18 GB: it may be made with only `dictation` in Docker and llama-server running natively on the Mac, as in the Spanish eval (`--llama-url http://host.docker.internal:8080`), as it was, under Docker's 11.67 GiB: the cap is the dictation container's own limit, and llama's memory is never in that container's, so it measures the same peak with less of Docker's memory. A session that times out waiting for the model server leaves the peak sound, since its audio has gone through every model in the container and the model server isn't in it; the script still calls such a load not whole and gives no cap, so the owner reads the peak it reports. The script refuses a cap above Docker's memory and gives no cap from a peak within 1.5 GB of it. On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
+1. **Docker Desktop memory.** The core stack uses about 150 MB, so Docker's default is plenty; the `monitoring` profile adds about 300 MB. For the `ai` profile, give Docker at least 10 GB, or 18 GB with Whisper installed for Spanish dictation: llama about 7 GB, the `dictation` service up to its cap of 10 GB and the core stack's 150 MB come to just over 17 GB. The cap is the container's peak measured with Whisper and the speaker model loaded under a full load, 7.28 GiB with the page cache (5.19 GiB without it), plus 25%, rounded up (`uv run src/Ehr.Dictation/measure_memory.py`, which says what it needs; `compose.yaml` says when and how it was measured). Measuring it doesn't need the 18 GB: it may be made with only `dictation` in Docker and llama-server running natively on the Mac, as in the Spanish eval (`--llama-url http://host.docker.internal:8080`), as it was, under Docker's 11.67 GiB: the cap is the dictation container's own limit, and llama's memory is never in that container's, so it measures the same peak with less of Docker's memory. A session that times out waiting for the model server leaves the peak sound, since its audio has gone through every model in the container and the model server isn't in it; the script still calls such a load not whole and gives no cap, so the owner reads the peak it reports. The script refuses a cap above Docker's memory and gives no cap from a peak within 1.5 GB of it. On macOS: Settings → Resources. On Windows: `memory=` in `%UserProfile%\.wslconfig`.
 2. **Settings file.** Copy `.env.example` to `.env`. The defaults work; `.env` is gitignored. If you already have a `.env`, copy over any lines it's missing from `.env.example`; Compose names the missing setting if you don't. `EHR_LAB_KEY` is optional, so Compose doesn't ask for it: without it there is no lab, and the stack runs as before.
 3. **Certificates.** Install [mkcert](https://github.com/FiloSottile/mkcert) (macOS: `brew install mkcert`; Windows: `winget install FiloSottile.mkcert`), then:
    ```
@@ -52,7 +53,7 @@ The lab is on-prem only too: `lab` calls the on-prem app at https://ehr.example.
 | `docker compose --profile "*" down` | Stops everything and keeps the data. |
 | `docker compose --profile "*" down -v` | Stops everything and deletes all data, for a fresh cluster next time. |
 
-`--profile "*"` makes sure `llama` and `restore-db` stop too; without it, `down -v` can't delete a volume they still use.
+`--profile "*"` makes sure `llama`, `restore-db` and the monitoring profile stop too; without it, `down -v` can't delete a volume they still use.
 
 Add `--wait` to `up` to return only once every container is running and healthy, as CI does.
 
@@ -71,7 +72,8 @@ In VS Code, the same three are under Terminal → Run Task: "Server stack: start
 | https://portal.example.com:9443 | Patient portal: the internet, to the cloud app |
 | `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env`, over TLS (the certificate also names `localhost` and `127.0.0.1`) |
 | http://127.0.0.1:8474 | Toxiproxy API, to change latency or cut links |
-| http://127.0.0.1:8025 | Mailpit: the emails the on-prem app sent |
+| http://127.0.0.1:8025 | Mailpit: the emails the on-prem app sent, and the monitoring profile's alerts |
+| http://127.0.0.1:9090 / 9093 | Prometheus / Alertmanager, with the `monitoring` profile |
 
 The desktop app syncs with the first two: the on-prem address when it answers, the cloud address otherwise.
 
@@ -117,13 +119,13 @@ Two limits: Toxiproxy accepts each TCP connection locally, so a new connection's
 
 These follow the failure table in the project overview.
 
-| Event | Start the drill | End it |
-|---|---|---|
-| On-prem internet link down | `docker compose exec wan /toxiproxy-cli toggle wan_cloud_to_onprem_app`, then the same for `wan_replication` and `wan_backup` | Run the same three toggles again |
-| Primary down | `docker compose stop onprem-db` | `docker compose start onprem-db` |
-| Replica lagging | Raise `wan_replication` latency (see above) | `docker compose up -d --force-recreate wan-latency` |
-| Backup host down | `docker compose stop barman` | `docker compose start barman` |
-| Cloud box compromised | `docker compose stop cloud-app cloud-db` | `docker compose start cloud-db cloud-app` |
+| Event | Start the drill | End it | Alert, with the monitoring profile |
+|---|---|---|---|
+| On-prem internet link down | `docker compose exec wan /toxiproxy-cli toggle wan_cloud_to_onprem_app`, then the same for `wan_replication` and `wan_backup` | Run the same three toggles again | `ClinicUnreachableFromCloud`, `ReplicaNotStreaming`, `BackupStreamDown` |
+| Primary down | `docker compose stop onprem-db` | `docker compose start onprem-db` | `SiteDown` (on-site), `ClinicUnreachableFromCloud` (the on-prem app answers, but can't serve a page), and after 5 minutes `MonitoringTargetDown` (the exporter can't reach the primary) |
+| Replica lagging | Raise `wan_replication` latency (see above) | `docker compose up -d --force-recreate wan-latency` | None: lag isn't measured |
+| Backup host down | `docker compose stop barman` | `docker compose start barman` | `BackupStreamDown` |
+| Cloud box compromised | `docker compose stop cloud-app cloud-db` | `docker compose start cloud-db cloud-app` | `SiteDown` (off-site, portal), `ReplicaNotStreaming` |
 
 With the internet link or the primary down, off-site pages still load from the replica and, within a couple of seconds, say the system is read-only; a save shows "Not saved: the server is unavailable". With the primary down, saving on-site shows the same.
 
@@ -160,6 +162,29 @@ To restore by hand, as you would when one is needed:
    `docker compose --profile restore up -d restore-db`, then `docker compose exec -u postgres restore-db psql -d ehr`
 6. Clean up:
    `docker compose --profile restore rm -sf restore-db`, then `docker compose exec -u postgres barman rm -rf /var/lib/barman/restore`
+
+## Monitoring
+
+The opt-in `monitoring` profile is what the cloud server runs to watch the whole system (`infra/deploy/README.md`): Prometheus, Alertmanager, and three exporters, all Apache-2.0, at the versions `compose.yaml` pins. Start it with the rest: `docker compose --profile monitoring up -d`. Set `MONITOR_PASSWORD` in `.env` before the primary's first start: the primary gives it to the `monitor` role then (`postgres/primary/initdb`), and without it `postgres-exporter` refuses to start. A stack set up before this profile existed has no such role: reset it (`down -v`) to get one.
+
+- **What it watches** (`infra/monitoring/prometheus.yml`, every 15 seconds): each site's sign-in page over HTTPS, verified against the stack's root, from the clinic's network and the cloud's (`blackbox`); the on-prem app as the cloud app reaches it, through the WAN link; the primary's replication slots, read by `postgres-exporter` as `monitor`, a role with no table privileges and no replication, over TLS, with every other collector off so nothing reads a table or a statement; the disk, and Barman's state, which its loop writes after each pass for `node-exporter` (`infra/barman/entrypoint.sh`). Nothing it collects is patient data.
+- **Where alerts go:** by email, through Mailpit here (http://127.0.0.1:8025), to `admins@example.com` (`infra/monitoring/alertmanager.yml`). An email names the alert, the site, slot, host or certificate, and when; never a patient or anything from the record. A real server sends through an outside relay instead (`infra/deploy/alertmanager.example.yml`).
+- **Its pages:** Prometheus at http://127.0.0.1:9090 (the alerts' state under Alerts) and Alertmanager at http://127.0.0.1:9093, both on 127.0.0.1 only. The exporters publish nothing.
+- **To see one work:** with the profile up, `docker compose stop cloud-db`; about three minutes later an email for `ReplicaNotStreaming` is in Mailpit (2 minutes' wait, a scrape and Alertmanager's 30 seconds); `docker compose start cloud-db` ends it, and a resolved email follows within 5 minutes (Alertmanager's `group_interval`). Stopped again before that email, the replica's alert is the same one still firing to Alertmanager, which doesn't email it again for 4 hours (`repeat_interval`). CI's stack job does the same on a fresh stack on every push; on the development Mac, under other agents' test suites, the email came 167 seconds after the stop.
+
+| Alert | When (`infra/monitoring/alerts.yml`) | What it means for the clinic | What to do |
+|---|---|---|---|
+| `SiteDown` | A site's sign-in page hasn't answered 200 for 2 minutes | On-site staff, off-site staff or patients (the alert says which) can't use that site | Look at that app's and its database's logs (`docker compose logs onprem-app onprem-db`, or the cloud's) |
+| `ClinicUnreachableFromCloud` | The cloud's probe of the on-prem app, through the WAN link, has failed for 2 minutes | Off-site is read-only: saves are refused, off-site reads' audit events wait in the cloud app's queue (UC 2) | Check the clinic's internet link and Tailscale, then the on-prem app |
+| `ReplicaNotStreaming` | Nothing has been connected to the `cloud_replica` slot for 2 minutes | Off-site pages show the record as it was when it stopped, getting older; the primary keeps its WAL up to 2 GB, past which the replica must be cloned again | Check `cloud-db` and the link; `select slot_name, active, wal_status, safe_wal_size from pg_replication_slots` on the primary |
+| `BackupStreamDown` | Nothing has been connected to the `barman` slot for 5 minutes | Changes since aren't backed up: a restore can't reach now | Check `barman` and the link; `barman check onprem` |
+| `BackupsUnhealthy` | `barman check onprem` has failed for 30 minutes (long enough for a first base backup) | A backup failed, none exists, or WAL isn't arriving | `barman check onprem` says which check fails; the container's log says why |
+| `BackupTooOld` | The last base backup that succeeded began over 25 hours ago (one is taken every 23) | The 6-day restore window, and nothing older than 7 days being restorable, depend on new backups | `barman list-backups onprem` and the container's log |
+| `DiskFilling` | A filesystem the host's exporter reports has had under 15% free for 10 minutes | A full disk stops the database or the backups | Free space or grow the disk before it fills |
+| `CertificateExpiring` | A site's certificate has had under 14 days left for an hour | Browsers and the desktop app will refuse the site | Renew it (`infra/deploy/README.md`, "Certificates") |
+| `MonitoringTargetDown` | Prometheus hasn't been able to scrape an exporter for 5 minutes | The alerts that read it can't fire | `docker compose logs` of that exporter |
+
+Not watched: how far the replica is behind while it streams, how many audit events wait in the cloud app's queue (its cause, the link, is), and anything while the monitoring host itself is down.
 
 ## AI profile
 

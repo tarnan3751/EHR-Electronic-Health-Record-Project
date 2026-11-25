@@ -1,0 +1,164 @@
+# Each alert in alerts.yml held to its threshold and its wait, on made-up series: just under, nothing; past it, the
+# alert. BackupTooOld's day is in alerts-backups.test.yml, evaluated every 5 minutes rather than every 15 seconds so
+# that it takes seconds. CI's stack job runs both, and so can you, from this folder:
+#   docker run --rm -v "$PWD:/m:ro" -w /m --entrypoint promtool prom/prometheus:v3.16.0 test rules alerts.test.yml alerts-backups.test.yml
+rule_files: [alerts.yml]
+evaluation_interval: 15s
+
+tests:
+  # A site down for 2 minutes is an alert; one that comes back within them isn't.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="sites", site="portal", instance="https://cloud-app:8443/portal/sign-in"}'
+        values: '1 0x9 1x10'
+      - series: 'probe_success{job="sites", site="on-site", instance="https://ehr.example.com:8443/sign-in"}'
+        values: '1 0x6 1x10'
+    alert_rule_test:
+      - eval_time: 1m45s
+        alertname: SiteDown
+        exp_alerts: []
+      - eval_time: 2m15s
+        alertname: SiteDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: sites, site: portal, instance: "https://cloud-app:8443/portal/sign-in"}
+            exp_annotations:
+              summary: "The portal site isn't answering"
+              description: "https://cloud-app:8443/portal/sign-in hasn't answered its sign-in page for 2 minutes."
+
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="clinic-link", instance="https://onprem.example.com:8443/sign-in"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 1m45s
+        alertname: ClinicUnreachableFromCloud
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: ClinicUnreachableFromCloud
+        exp_alerts:
+          - exp_labels: {severity: critical, job: clinic-link, instance: "https://onprem.example.com:8443/sign-in"}
+            exp_annotations:
+              summary: "The cloud can't reach the clinic's app"
+              description: "https://onprem.example.com:8443/sign-in, through the link the cloud app forwards saves and ships audit events over, hasn't answered for 2 minutes: off-site is read-only."
+
+  # The replica's slot idle for 2 minutes is an alert, Barman's for 5; a slot that is active is never one.
+  - interval: 15s
+    input_series:
+      - series: 'pg_replication_slots_slot_is_active{slot_name="cloud_replica", slot_type="physical"}'
+        values: '1 0x30'
+      - series: 'pg_replication_slots_slot_is_active{slot_name="barman", slot_type="physical"}'
+        values: '1 0x30'
+    alert_rule_test:
+      - eval_time: 1m45s
+        alertname: ReplicaNotStreaming
+        exp_alerts: []
+      - eval_time: 2m15s
+        alertname: ReplicaNotStreaming
+        exp_alerts:
+          - exp_labels: {severity: critical, slot_name: cloud_replica, slot_type: physical}
+            exp_annotations:
+              summary: "The cloud replica isn't streaming from the primary"
+              description: "Replication slot cloud_replica has had nothing connected for 2 minutes: off-site pages are getting out of date."
+      - eval_time: 4m45s
+        alertname: BackupStreamDown
+        exp_alerts: []
+      - eval_time: 5m15s
+        alertname: BackupStreamDown
+        exp_alerts:
+          - exp_labels: {severity: critical, slot_name: barman, slot_type: physical}
+            exp_annotations:
+              summary: "Backups aren't receiving the primary's changes"
+              description: "Replication slot barman has had nothing connected for 5 minutes: changes since aren't backed up."
+
+  # barman check failing for 30 minutes is an alert, not before.
+  - interval: 1m
+    input_series:
+      - series: 'barman_check_ok{job="node", instance="node-exporter:9100"}'
+        values: '0x40'
+    alert_rule_test:
+      - eval_time: 29m
+        alertname: BackupsUnhealthy
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: BackupsUnhealthy
+        exp_alerts:
+          - exp_labels: {severity: warning, job: node, instance: "node-exporter:9100"}
+            exp_annotations:
+              summary: "barman check onprem has been failing for 30 minutes"
+              description: "Run barman check onprem on the backup host; its log says which check fails."
+
+  # A disk 14% free for 10 minutes is one alert, however many places it is mounted; 16% free never is, and a tmpfs
+  # never counts.
+  - interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{instance="node-exporter:9100", device="/dev/vda1", mountpoint="/textfile", fstype="ext4"}'
+        values: '14x20'
+      - series: 'node_filesystem_size_bytes{instance="node-exporter:9100", device="/dev/vda1", mountpoint="/textfile", fstype="ext4"}'
+        values: '100x20'
+      - series: 'node_filesystem_avail_bytes{instance="node-exporter:9100", device="/dev/vda1", mountpoint="/etc/hosts", fstype="ext4"}'
+        values: '14x20'
+      - series: 'node_filesystem_size_bytes{instance="node-exporter:9100", device="/dev/vda1", mountpoint="/etc/hosts", fstype="ext4"}'
+        values: '100x20'
+      - series: 'node_filesystem_avail_bytes{instance="node-exporter:9100", device="/dev/vdb1", mountpoint="/data", fstype="ext4"}'
+        values: '16x20'
+      - series: 'node_filesystem_size_bytes{instance="node-exporter:9100", device="/dev/vdb1", mountpoint="/data", fstype="ext4"}'
+        values: '100x20'
+      - series: 'node_filesystem_avail_bytes{instance="node-exporter:9100", device="shm", mountpoint="/dev/shm", fstype="tmpfs"}'
+        values: '1x20'
+      - series: 'node_filesystem_size_bytes{instance="node-exporter:9100", device="shm", mountpoint="/dev/shm", fstype="tmpfs"}'
+        values: '100x20'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: DiskFilling
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: DiskFilling
+        exp_alerts:
+          - exp_labels: {severity: critical, instance: "node-exporter:9100", device: /dev/vda1}
+            exp_annotations:
+              summary: "Under 15% of the disk is free"
+              description: "node-exporter:9100 /dev/vda1: 14% free."
+
+  # A certificate with 13 days left, for an hour, is an alert; one with 15 never is.
+  - interval: 5m
+    input_series:
+      - series: 'probe_ssl_earliest_cert_expiry{job="sites", instance="a"}'
+        values: '1123200x20'
+      - series: 'probe_ssl_earliest_cert_expiry{job="sites", instance="b"}'
+        values: '1296000x20'
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: CertificateExpiring
+        exp_alerts: []
+      - eval_time: 1h
+        alertname: CertificateExpiring
+        exp_alerts:
+          - exp_labels: {severity: warning, job: sites, instance: a}
+            exp_annotations:
+              summary: "A site's certificate expires within 14 days"
+              description: "a's certificate expires in 12d 23h 0m 0s."
+
+  # An exporter that doesn't answer, or the database exporter answering that it can't log in, for 5 minutes.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="node", instance="node-exporter:9100"}'
+        values: '0x10'
+      - series: 'pg_up{job="postgres", instance="postgres-exporter:9187"}'
+        values: '0x10'
+      - series: 'up{job="postgres", instance="postgres-exporter:9187"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: MonitoringTargetDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: MonitoringTargetDown
+        exp_alerts:
+          - exp_labels: {severity: warning, job: node, instance: "node-exporter:9100"}
+            exp_annotations:
+              summary: "Monitoring can't read node"
+              description: "node-exporter:9100 hasn't answered, or can't reach what it watches, for 5 minutes, so the alerts that read it can't fire."
+          - exp_labels: {severity: warning, job: postgres, instance: "postgres-exporter:9187"}
+            exp_annotations:
+              summary: "Monitoring can't read postgres"
+              description: "postgres-exporter:9187 hasn't answered, or can't reach what it watches, for 5 minutes, so the alerts that read it can't fire."

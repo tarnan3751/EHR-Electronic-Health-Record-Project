@@ -1,0 +1,22 @@
+# Where the local stack's alerts go (the monitoring profile): every one by email to the clinic's administrators, through
+# the stack's mail catcher, Mailpit, which delivers nothing and shows them at http://127.0.0.1:8025. A real server
+# sends through an outside mail relay instead, with its password in a file: infra/deploy/alertmanager.example.yml.
+# An alert's email names the alert, its site, slot, host or certificate, and when: never a patient or anything from
+# the record (alerts.yml).
+global:
+  smtp_smarthost: mail:1025
+  smtp_from: swiftchart-alerts@example.com
+  smtp_require_tls: false
+
+route:
+  receiver: administrators
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: administrators
+    email_configs:
+      - to: admins@example.com
+        send_resolved: true

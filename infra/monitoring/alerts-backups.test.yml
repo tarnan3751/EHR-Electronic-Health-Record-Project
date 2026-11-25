@@ -1,0 +1,31 @@
+# BackupTooOld held to its threshold (alerts.yml), apart from alerts.test.yml since it takes a day of evaluations:
+# evaluated every 5 minutes, it runs in seconds.
+rule_files: [alerts.yml]
+evaluation_interval: 5m
+
+tests:
+  # The last base backup began 1 s into the test's clock: at 25 hours, nothing; 15 minutes later, more than the rule's
+  # 10 minutes past the 25 hours, an alert. No backup yet (0) is BackupsUnhealthy's, never this.
+  - interval: 5m
+    input_series:
+      - series: 'barman_last_base_backup_start_timestamp_seconds{job="node", instance="node-exporter:9100"}'
+        values: '0x400'
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: BackupTooOld
+        exp_alerts: []
+  - interval: 5m
+    input_series:
+      - series: 'barman_last_base_backup_start_timestamp_seconds{job="node", instance="node-exporter:9100"}'
+        values: '1x400'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: BackupTooOld
+        exp_alerts: []
+      - eval_time: 25h15m
+        alertname: BackupTooOld
+        exp_alerts:
+          - exp_labels: {severity: warning, job: node, instance: "node-exporter:9100"}
+            exp_annotations:
+              summary: "No new base backup for over 25 hours"
+              description: "The last base backup that succeeded began over 25 hours ago: see barman list-backups onprem and the backup host's log."
