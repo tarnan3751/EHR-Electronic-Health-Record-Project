@@ -403,6 +403,7 @@ There is no `latest` tag: a deployment names the exact commit it runs.
 | llama.cpp build | `infra/compose/compose.yaml` and `infra/compose/compose.nvidia.yaml` (container images); this README for the native builds |
 | Dictation eval | `eval/pyproject.toml`, locked in `eval/uv.lock`, where every package it shares with the sidecar has the sidecar's version |
 | Container images for the local stack | `infra/compose/compose.yaml`, `infra/barman/Dockerfile`, `src/Ehr.Web/Dockerfile`, `src/Ehr.Dictation/sidecar/Dockerfile` |
+| Barman | `infra/barman/Dockerfile` (`BARMAN_VERSION`, pinned: the Dockerfile says what to check before moving it) |
 | GitHub Actions used by CI | `.github/workflows/ci.yml`, each pinned to a commit. Dependabot (`.github/dependabot.yml`) proposes updates weekly. |
 
 ## Dictation server hardware
@@ -428,7 +429,7 @@ K2 Horizon 7B runs in llama.cpp's `llama-server`, pinned to build **b11669** on 
 For local development, PostgreSQL 18, Barman and the WAN simulation (Toxiproxy 2.12) come as containers in the local server stack, so there's nothing to install. The real deployment also needs:
 
 - PostgreSQL 18 (primary and hot standby)
-- Barman, in streaming mode
+- Barman 3.20.1, in streaming mode (the version `infra/barman/Dockerfile` pins)
 - Tailscale
 - llama.cpp `llama-server`, build b11669 (see above)
 - ffmpeg
