@@ -593,6 +593,14 @@ def test_a_hedge_before_what_may_be_so_still_stands_for_the_doubt_and_a_particip
                    "Blood pressure may be elevated.", field="assessment") == ["certainty_dropped"]
 
 
+# A cue with a comma after it whose clause runs to the end of the transcript, with no comma closing it, is read, not a
+# crash (run B, 2026-11-24: spanish._to_the_finding() looked one word past the last for that comma).
+def test_a_cue_whose_comma_clause_runs_to_the_end_of_the_transcript_is_read():
+    text = "No creo que, tenga fiebre"
+    assert reasons(text, [text], "I don't think she has a fever.", field="assessment") == []
+    assert reasons(text, [text], "She has a fever.", field="assessment") == ["negation_dropped", "certainty_dropped"]
+
+
 # What validation.py reads as doubt in English, the Spanish reads in its words: "I doubt" is a negation as well.
 DOUBT_WORDS = [
     ("Dudo que tenga faringitis.", "I doubt she has pharyngitis.", ["negation_dropped", "certainty_dropped"]),

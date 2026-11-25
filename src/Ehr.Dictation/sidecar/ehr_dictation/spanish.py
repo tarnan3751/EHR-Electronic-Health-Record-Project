@@ -783,8 +783,8 @@ def _to_the_finding(text: str, toks: list[Token], last: int) -> int:
     if i < len(toks) and toks[i].key in ("que", "si"):
         i += 1
     if i < len(toks) and text[toks[i - 1].end : toks[i].start].strip() == ",":
-        close = next((k for k in range(i, min(len(toks), i + 15)) if "," in text[toks[k].end : toks[k + 1].start]
-                      if k + 1 < len(toks)), None)
+        close = next((k for k in range(i, min(len(toks) - 1, i + 15)) if "," in text[toks[k].end : toks[k + 1].start]),
+                     None)
         if close is not None and not any(m in text[toks[i].start : toks[close].end] for m in ".;:?!\n"):
             i = close + 1
             if i < len(toks) and toks[i].key in ("que", "si"):
