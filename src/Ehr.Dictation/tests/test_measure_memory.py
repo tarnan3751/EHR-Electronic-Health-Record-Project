@@ -51,10 +51,12 @@ KEY = "a-key-from-the-shell"
 class Docker:
     """A stand-in for the docker CLI: the stack's answers, every call recorded with its environment."""
 
-    def __init__(self, sender, memory: int = 16 * GIB, llama_answers: bool = True):  # noqa: ANN001
+    def __init__(self, sender, memory: int = 16 * GIB, llama_answers: bool = True,  # noqa: ANN001
+                 killed_once_put_back: bool = False):
         self.calls: list[tuple[list[str], dict | None]] = []
         self.sender = sender
         self.memory, self.llama_answers = memory, llama_answers
+        self.killed_once_put_back = killed_once_put_back  # compose.yaml's cap too small for loading the models
         self.overrides: list[tuple[str, int]] = []  # each override's text and permissions, as compose read it
 
     def run(self, args, **kwargs):  # noqa: ANN001, ANN201
@@ -71,6 +73,8 @@ class Docker:
             return subprocess.CompletedProcess(args, 0 if self.llama_answers else 1, "", "")
         elif args[:2] == ["docker", "compose"] and "ps" in args:
             out = "c0ffee\n"
+        elif args[:2] == ["docker", "inspect"] and self.killed_once_put_back and self.ups() == 2:
+            out = '{"Status": "exited", "OOMKilled": true}|sha256:1234|ehr-dictation:dev|0\n'
         elif args[:2] == ["docker", "inspect"]:
             out = '{"Health": {"Status": "healthy"}, "OOMKilled": false}|sha256:1234|ehr-dictation:dev|0\n'
         elif args[:2] == ["docker", "exec"] and args[3] == "cat":
@@ -81,6 +85,9 @@ class Docker:
         elif args[:2] == ["docker", "exec"]:
             return self.sender(args, kwargs)
         return subprocess.CompletedProcess(args, 0, out, "")
+
+    def ups(self) -> int:
+        return len([args for args, _ in self.calls if args[:2] == ["docker", "compose"] and "up" in args])
 
     def stopped_sender(self) -> bool:
         return any(args[:2] == ["docker", "exec"] and args[4] == "-c" and "--drive" in args[5] for args, _ in self.calls)
@@ -162,6 +169,30 @@ def test_the_sender_is_stopped_in_the_container_even_when_the_cap_is_kept_raised
     else:
         measured(monkeypatch, sender, ["--keep-raised"], docker=docker)
     assert docker.stopped_sender() and len([args for args, _ in docker.calls if "up" in args]) == 1
+
+
+def test_the_stack_put_back_is_waited_for_and_a_container_killed_loading_its_models_is_said_so(monkeypatch, capsys):
+    docker = Docker(answering(DONE), killed_once_put_back=True)
+    _, code = measured(monkeypatch, None, docker=docker)
+    assert code == 0 and docker.restored()  # the measurement was whole: its cap stands
+    assert "killed for memory while loading its models, under compose.yaml's own cap" in capsys.readouterr().err
+
+
+def test_the_sender_runs_from_the_file_alone_as_the_container_mounts_it(tmp_path):
+    # In the container the file is /measure/measure_memory.py, alone in its folder, with no repository around it: run
+    # as the container runs it, from a copy with nothing beside it, named by the path it has there (a temporary
+    # folder's own path has more parents than that). With no server it records each session's error, never fails.
+    alone = tmp_path / "measure_memory.py"
+    alone.write_bytes(SCRIPT.read_bytes())
+    mounted = "/measure/measure_memory.py"
+    boot = ("import sys; source = open(sys.argv[1], encoding='utf-8').read(); "
+            f"sys.argv = [{mounted!r}, '--drive', '--dictations', 'd0.webm']; "
+            f"exec(compile(source, {mounted!r}, 'exec'), {{'__name__': '__main__', '__file__': {mounted!r}}})")
+    run = subprocess.run([sys.executable, "-I", "-c", boot, str(alone)], cwd=tmp_path, capture_output=True, text=True,
+                         timeout=120)
+    assert run.returncode == 0, run.stderr
+    (session,) = json.loads(run.stdout.splitlines()[-1])["sessions"]
+    assert session["file"] == "d0.webm" and session["error"]
 
 
 def test_kept_raised_only_when_asked(monkeypatch):

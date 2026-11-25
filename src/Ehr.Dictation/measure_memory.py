@@ -47,9 +47,11 @@ What it does:
    cap it is measuring, and waits until it is healthy. A new container starts its cgroup's memory.peak at zero, so the
    peak covers loading MedASR, Whisper and the speaker model as well as the load. From here on, whatever happens (a
    failure, a timeout, Ctrl-C), it recreates `dictation` with compose.yaml's own cap at the end (not with
-   --keep-raised); on a timeout or Ctrl-C it first stops the sender in the container, which a killed docker exec
-   leaves running, --keep-raised or not.
-2. Sends the load from inside the container (this file in --drive mode, standard library only, run with docker exec):
+   --keep-raised) and waits until it is healthy, saying so if it isn't or was killed for memory while loading its
+   models (memory.peak after loading them alone, the page cache included, can be above that cap); on a timeout or
+   Ctrl-C it first stops the sender in the container, which a killed docker exec leaves running, --keep-raised or not.
+2. Sends the load from inside the container (this file in --drive mode, standard library only, run with docker exec,
+   mounted alone at /measure/measure_memory.py, so the sender reads nothing of the repository's layout):
    two of the visits' longest recordings at once, each sent in chunks, stopped, its voices told apart, named and its
    note drafted; and, once both are stopped, the sessions the server takes besides them (max_sessions, 8, less the 2
    visits: 6), each one of run B's longest Spanish recordings sent in chunks as a dictation in Spanish (a Whisper pass
@@ -83,10 +85,6 @@ import time
 import uuid
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-COMPOSE_DIR = REPO / "infra" / "compose"
-SPANISH_AUDIO = REPO / "eval" / "audio-es"
-VISIT_AUDIO = REPO / "eval" / "audio" / "conversations"
 MAX_SESSIONS = 8  # settings.py: sessions at once, visits among them
 VISITS = 2  # settings.py: ambient_max_sessions
 HEADROOM = 1.25  # the owner's ruling: the peak plus 25%
@@ -121,6 +119,24 @@ def chunks(data: bytes, pieces: int) -> list[bytes]:
 # ---- The host: the stack, the cgroup, the result ---------------------------------------------------------------------
 
 
+def repo() -> Path:
+    """The repository this file is in. The host's alone, and never read at import: in --drive mode the file is mounted
+    by itself in the container (/measure/measure_memory.py), with no repository around it."""
+    return Path(__file__).resolve().parents[2]
+
+
+def compose_dir() -> Path:
+    return repo() / "infra" / "compose"
+
+
+def spanish_audio() -> Path:
+    return repo() / "eval" / "audio-es"
+
+
+def visit_audio() -> Path:
+    return repo() / "eval" / "audio" / "conversations"
+
+
 def compose_env() -> dict[str, str]:
     """This process's environment without the stack's keys, so compose takes infra/compose/.env's (KEYS)."""
     return {name: value for name, value in os.environ.items() if name not in KEYS}
@@ -128,7 +144,7 @@ def compose_env() -> dict[str, str]:
 
 def compose(*args: str, override: Path | None = None) -> subprocess.CompletedProcess:
     files = ["-f", "compose.yaml"] + (["-f", str(override)] if override else [])
-    return subprocess.run(["docker", "compose", *files, "--profile", "ai", *args], cwd=COMPOSE_DIR, check=True,
+    return subprocess.run(["docker", "compose", *files, "--profile", "ai", *args], cwd=compose_dir(), check=True,
                           capture_output=True, text=True, env=compose_env())
 
 
@@ -137,8 +153,8 @@ def override_yaml(cap: str, llama_url: str | None = None, llama_key: str | None 
     With a llama-server outside the stack (--llama-url), also its address and key, and what reaching it takes: the
     inference network is internal, with no way out, so a network of the measurement's own, and host.docker.internal
     mapped to the host where the engine doesn't do so itself (Docker Desktop does)."""
-    mounts = [(Path(__file__).resolve(), "/measure/measure_memory.py"), (SPANISH_AUDIO, "/measure/audio-es"),
-              (VISIT_AUDIO, "/measure/conversations")]
+    mounts = [(Path(__file__).resolve(), "/measure/measure_memory.py"), (spanish_audio(), "/measure/audio-es"),
+              (visit_audio(), "/measure/conversations")]
     volumes = "".join(f'      - "{source}:{target}:ro"\n' for source, target in mounts)
     yaml = f"services:\n  dictation:\n    mem_limit: {cap}\n    volumes:\n{volumes}"
     if llama_url is None:
@@ -226,15 +242,29 @@ def wait_healthy(container_id: str, seconds: float = 600) -> None:
     raise SystemExit("The dictation container didn't become healthy in 10 minutes.")
 
 
+def put_back() -> None:
+    """Dictation recreated as compose.yaml has it, and waited for: memory.peak after loading the models alone, the page
+    cache included, can be above compose.yaml's cap, so a container killed for memory while loading is said so here."""
+    compose("up", "-d", "--no-deps", "--force-recreate", "dictation")
+    restored = container()
+    try:
+        wait_healthy(restored)
+    except SystemExit as stopped:
+        if inspect(restored)["State"].get("OOMKilled"):
+            raise SystemExit("it was killed for memory while loading its models, under compose.yaml's own cap "
+                             "(mem_limit): see docker compose logs dictation.") from None
+        raise
+
+
 def preflight() -> tuple[list[dict], list[dict]]:
-    manifest = json.loads((COMPOSE_DIR / "models" / "models-manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((compose_dir() / "models" / "models-manifest.json").read_text(encoding="utf-8"))
     missing = [name for name in ("medasr", "llm", "whisper", "speaker") if not manifest.get(name)]
     if missing:
         raise SystemExit(f"models-manifest.json has no {', '.join(missing)}: install every model first "
                          "(src/Ehr.Dictation/setup_models.py, --only whisper and --only speaker).")
-    spanish = longest(json.loads((SPANISH_AUDIO / "manifest.json").read_text(encoding="utf-8")), MAX_SESSIONS - VISITS,
-                      lambda entry: not entry.get("run_as"))
-    visits = longest(json.loads((VISIT_AUDIO / "manifest.json").read_text(encoding="utf-8")), VISITS)
+    spanish = longest(json.loads((spanish_audio() / "manifest.json").read_text(encoding="utf-8")),
+                      MAX_SESSIONS - VISITS, lambda entry: not entry.get("run_as"))
+    visits = longest(json.loads((visit_audio() / "manifest.json").read_text(encoding="utf-8")), VISITS)
     if len(spanish) < MAX_SESSIONS - VISITS or len(visits) < VISITS:
         raise SystemExit("Make run B's Spanish audio and the visits' audio first (eval/README.md).")
     return spanish, visits
@@ -340,10 +370,12 @@ def measure(args: argparse.Namespace) -> dict:
         if not args.keep_raised:
             print("Recreating dictation with compose.yaml's own cap...", flush=True)
             try:
-                compose("up", "-d", "--no-deps", "--force-recreate", "dictation")
+                put_back()
             except subprocess.CalledProcessError as error:
                 print(f"Couldn't put dictation back as compose.yaml has it: {error.stderr[-500:]}. Run docker compose "
                       "--profile ai up -d --no-deps --force-recreate dictation from infra/compose.", file=sys.stderr)
+            except SystemExit as error:
+                print(f"Dictation is back as compose.yaml has it, but not healthy: {error.code}", file=sys.stderr)
             if args.llama_url:
                 subprocess.run(["docker", "network", "rm", MEASURE_NETWORK], capture_output=True, text=True)
 
