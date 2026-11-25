@@ -69,6 +69,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # For the restore drill (restore-drill.cs), a dotnet run script.
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
       # The one-time setup from infra/compose/README.md, with a self-signed certificate standing in for mkcert: one
       # certificate for the three sites and both databases, and, being self-signed, its own root for the database
       # clients to verify it against. The key must be readable by the app's non-root user.
@@ -196,6 +201,12 @@ jobs:
           done
           echo "$report"
           exit 1
+
+      # A point-in-time restore from those backups, as restore-drill.cs says: a row written before a chosen time is in
+      # the restored copy, one written after it isn't, and a few tables' counts and checksums are as they were then. It
+      # restores inside the Barman volume, into restore-db, and cleans up after itself.
+      - name: Restore drill
+        run: dotnet run restore-drill.cs
 
       # Old backups are deleted with the WAL before them (infra/barman). The clinic's policy is the one in force: a
       # 6-day recovery window, with a base backup every 23 hours. Then Barman is restarted with compose.backup-drill.yaml (a base
