@@ -1,6 +1,7 @@
-// Staff passkeys (the expansion plan's step 19, UC 11), on the passkeys page: adding one. The browser makes the passkey
-// (navigator.credentials); the server gives the options and checks what comes back (StaffPasskeys), and the person is
-// asked for their PIN, fingerprint or face each time. The options and the passkey travel as WebAuthn's own JSON, through
+// Staff passkeys (the expansion plan's step 19, UC 11): adding one on the passkeys page, and using one in place of the
+// code on the sign-in's code page. The browser makes or uses the passkey (navigator.credentials); the server gives the
+// options and checks what comes back (StaffPasskeys), and the person is asked for their PIN, fingerprint or face each
+// time. On the code page the code stays below: a passkey that fails or is cancelled says so, and the code still works. The options and the passkey travel as WebAuthn's own JSON, through
 // the browser's parse...FromJSON and toJSON: a browser without those, or without JavaScript, isn't offered a passkey and
 // keeps the authenticator code. Nothing is kept in browser storage, and no data is written into the page's markup.
 "use strict";
@@ -94,6 +95,49 @@
                 finish(document.querySelector("[data-passkey-finish]"), credential, answer.body.state);
             } finally {
                 button.disabled = false;
+                // A disabled button loses the focus; it goes back there unless a field that was wrong has it.
+                if (!add.contains(document.activeElement)) {
+                    button.focus();
+                }
+            }
+        });
+    }
+
+    // The code page: "Use a passkey" first, with the focus, where this browser can use one.
+    const use = document.querySelector("[data-passkey-use]");
+    if (use && supported) {
+        use.hidden = false;
+        const problem = use.querySelector("[data-passkey-problem]");
+        const button = use.querySelector("button");
+        button.focus();
+        use.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            say(problem, null);
+            button.disabled = true;
+            try {
+                const answer = await post(use);
+                if (!answer) {
+                    say(problem, "Not signed in: the clinic's server couldn't be reached. Try again in a moment.");
+                    return;
+                }
+
+                if (!answer.ok) {
+                    say(problem, answer.body.problem);
+                    return;
+                }
+
+                let credential;
+                try {
+                    credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(answer.body.options) });
+                } catch {
+                    say(problem, "Not signed in: the passkey wasn't used. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again, or enter a code below.");
+                    return;
+                }
+
+                finish(document.querySelector("[data-passkey-finish]"), credential, answer.body.state);
+            } finally {
+                button.disabled = false;
+                button.focus();
             }
         });
     }

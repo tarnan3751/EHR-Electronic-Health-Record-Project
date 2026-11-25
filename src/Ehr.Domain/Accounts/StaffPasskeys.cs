@@ -14,13 +14,15 @@ using Microsoft.Extensions.Options;
 namespace Ehr.Domain.Accounts;
 
 // A staff member's passkeys (the expansion plan's step 19, UC 11): a second factor in place of the authenticator code,
-// never in place of the password, and never instead of the authenticator app, which every staff account keeps. Added
-// only while signed in, after a current code from the authenticator app; at most MostPerAccount, each named; removed by
-// their owner. Identity's own handler makes and checks each ceremony (IPasskeyHandler), and the person must be verified
-// by the device every time (AddEhrAccounts). Between the options the page is given and the credential it sends back, the
-// handler's state travels in the page, protected by Data Protection, for a few minutes, bound to its purpose, to the
-// account and to this sign-in: a state from another account's page, or from another sign-in of the same account, is
-// refused. Every add, refusal and removal is an audit event that names the passkey by a short hash, never its name.
+// after the password (StaffSignIn), never in place of the password, and never instead of the authenticator app, which
+// every staff account keeps. Added only while signed in, after a current code from the authenticator app; at most
+// MostPerAccount, each named; removed by their owner. Identity's own handler makes and checks each ceremony
+// (IPasskeyHandler), and the person must be verified by the device every time (AddEhrAccounts). Between the options the
+// page is given and the credential it sends back, the handler's state travels in the page, protected by Data
+// Protection, for a few minutes, bound to its purpose, to the account and to this sign-in, or for a sign-in to this
+// password step (StaffSignIn.PendingAsync): a state from another account's page, or from another sign-in or password
+// step of the same account, is refused. Every add, refusal and removal is an audit event that names the passkey by a
+// short hash, never its name.
 public sealed class StaffPasskeys(
     UserManager<StaffUser> users, IPasskeyHandler<StaffUser> handler, IOptions<IdentityPasskeyOptions> options,
     IDataProtectionProvider dataProtection, AuditRecorder audit, EhrDbContext db, ILogger<StaffPasskeys> logger)
@@ -30,6 +32,8 @@ public sealed class StaffPasskeys(
     public const int LongestName = 50;
 
     const string Adding = "add";
+
+    const string SigningIn = "sign-in";
 
     readonly ITimeLimitedDataProtector protector = dataProtection.CreateProtector("Ehr.Accounts.Passkeys").ToTimeLimitedDataProtector();
 
@@ -123,6 +127,41 @@ public sealed class StaffPasskeys(
         audit.Record(AuditActions.PasskeyRemoved, tableName: StaffTable, rowId: user.Id, details: Details(credentialId));
         await db.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    // The options for the browser to use one of the account's passkeys with, for this password step, and the state to
+    // send back with it; refused without a password step. Only the account's own passkeys are allowed, and the state
+    // names the account, so a passkey of anyone else's is refused (SignInAsync).
+    public async Task<PasskeyCeremony> BeginSignInAsync(HttpContext context, StaffUser user, string? pending)
+    {
+        if (pending is null)
+        {
+            return PasskeyCeremony.Refused(null, "Not signed in: this sign-in took too long. Start again with your password.");
+        }
+
+        var made = await handler.MakeRequestOptionsAsync(user, context);
+        return PasskeyCeremony.Ready(made.RequestOptionsJson, Protect(new(SigningIn, user.Id, pending, made.AssertionState!, null)));
+    }
+
+    // The passkey the browser used, checked for this account and password step: its signature, the person verified,
+    // the origin a staff site's, the count gone up. Its new count is kept. The audit log's details for the sign-in, or
+    // null when it is refused, which the caller counts and records (StaffSignIn.VerifyPasskeyAsync).
+    public async Task<string?> SignInAsync(HttpContext context, StaffUser user, string? credentialJson, string? state, string? pending)
+    {
+        if (Unprotect(state, SigningIn, user.Id, pending) is not { } ceremony || string.IsNullOrEmpty(credentialJson))
+        {
+            return null;
+        }
+
+        var used = await handler.PerformAssertionAsync(
+            new PasskeyAssertionContext { HttpContext = context, CredentialJson = credentialJson, AssertionState = ceremony.State });
+        if (!used.Succeeded)
+        {
+            logger.LogWarning("A passkey was refused at sign-in: {Failure}", used.Failure?.Message);
+            return null;
+        }
+
+        return (await users.AddOrUpdatePasskeyAsync(user, used.Passkey)).Succeeded ? Details(used.Passkey.CredentialId) : null;
     }
 
     // A passkey as the audit log names it: the start of a hash of its credential's ID, the same at every event.

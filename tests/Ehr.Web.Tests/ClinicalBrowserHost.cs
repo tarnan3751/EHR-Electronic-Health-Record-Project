@@ -13,16 +13,18 @@ namespace Ehr.Web.Tests;
 
 // Exposes the real in-memory app (the on-site one, or the off-site one a test names) to Chromium over loopback HTTPS. No
 // alternate endpoints or production auth bypass.
-// The normal test fixture's synthetic accounts and owner-checked deterministic model stub are used unchanged.
+// The normal test fixture's synthetic accounts and owner-checked deterministic model stub are used unchanged. A test of
+// passkeys (step 19) gives the app it makes for the host's own address, once that is known: a passkey is tied to the
+// address the browser sees.
 sealed class ClinicalBrowserHost : IAsyncDisposable
 {
     readonly WebApplication host;
-    readonly HttpClient client;
+    HttpClient client = null!;
     readonly X509Certificate2 certificate;
     readonly RSA key;
     public string Url { get; private set; } = "";
 
-    ClinicalBrowserHost(WebApps apps, WebApplicationFactory<Program>? app)
+    ClinicalBrowserHost()
     {
         key = RSA.Create(2048);
         using var created = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)
@@ -34,17 +36,21 @@ sealed class ClinicalBrowserHost : IAsyncDisposable
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(options => options.Listen(System.Net.IPAddress.Loopback, 0, listen => listen.UseHttps(certificate)));
         host = builder.Build();
-        client = (app ?? apps.OnPrem).CreateClient(new WebApplicationFactoryClientOptions
-        { BaseAddress = Browser.Base, AllowAutoRedirect = false, HandleCookies = false });
         host.Run(ForwardAsync);
     }
 
-    public static async Task<ClinicalBrowserHost> StartAsync(WebApps apps, WebApplicationFactory<Program>? app = null)
+    public static Task<ClinicalBrowserHost> StartAsync(WebApps apps, WebApplicationFactory<Program>? app = null) =>
+        StartAsync(_ => app ?? apps.OnPrem);
+
+    // The app to serve, given the address the browser will reach it at.
+    public static async Task<ClinicalBrowserHost> StartAsync(Func<string, WebApplicationFactory<Program>> appAt)
     {
-        var server = new ClinicalBrowserHost(apps, app);
+        var server = new ClinicalBrowserHost();
         await server.host.StartAsync();
         var address = server.host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
         server.Url = address.Replace("127.0.0.1", "localhost", StringComparison.Ordinal);
+        server.client = appAt(server.Url).CreateClient(new WebApplicationFactoryClientOptions
+        { BaseAddress = Browser.Base, AllowAutoRedirect = false, HandleCookies = false });
         return server;
     }
 
