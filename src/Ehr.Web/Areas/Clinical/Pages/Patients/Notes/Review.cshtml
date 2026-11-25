@@ -86,10 +86,15 @@
     {
         <p class="sc-notice sc-notice--info">The note is signed. The review of its fields is read-only.@(Model.ChartProposals.Any(p => p.Waiting) ? " The proposed orders and allergies below can still be opened in their forms or dismissed." : "")</p>
     }
+    @if (Model.Translated)
+    {
+        @* The expansion plan's step 17: the checks compare the kinds of word that carry the most risk, not the meaning of every word. *@
+        <p class="sc-notice sc-notice--info">Translated from Spanish: these proposals are English translations of what you said. Check each sentence against the Spanish beside it before you accept it. The checks compare numbers, doses, units, dates, medicine names, sides, routes, how often, what changes and negations; they don't check the meaning of every word.</p>
+    }
     <div class="sc-review">
         <section>
             <section class="sc-transcript" aria-labelledby="review-transcript">
-                <div class="sc-transcript__head"><h2 class="sc-transcript__title" id="review-transcript">Original transcript</h2></div>
+                <div class="sc-transcript__head"><h2 class="sc-transcript__title" id="review-transcript">@(Model.Translated ? "Original transcript, in Spanish" : "Original transcript")</h2></div>
                 @if (Model.Ambient && !Model.TranscriptKept)
                 {
                     <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder" data-ambient-transcript-gone>@(Model.Review.State == AiReviewStates.Pending ? NoteReviews.TranscriptGone(Keep) : "This visit's transcript was deleted when its review was finished. Each proposal shows who said the words it came from.")</p></div>
@@ -100,7 +105,7 @@
                 }
                 else
                 {
-                    <div class="sc-transcript__body" data-dictation-transcript><p>@(Model.Ambient ? Model.ConversationText : Model.Result?.Transcript.Text)</p></div>
+                    <div class="sc-transcript__body" data-dictation-transcript lang="@(Model.Translated ? "es" : null)"><p>@(Model.Ambient ? Model.ConversationText : Model.Result?.Transcript.Text)</p></div>
                 }
                 <p class="sc-transcript__note" data-dictation-unclear hidden>Marked passages were unclear. Check them before approving.</p>
             </section>
@@ -119,7 +124,19 @@
                     var proposal = Model.Proposals.SingleOrDefault(p => p.Field == field);
                     <div class="sc-proposal" data-dictation-field="@field" data-proposal-id="@proposal?.Id" data-review-state="@proposal?.State">
                         <dt class="sc-proposal__head"><span class="sc-proposal__field">@FieldLabel(field)</span> <span class="@StateTone(proposal?.State)" data-field-status>@StateWords(proposal?.State)</span></dt>
-                        <dd data-field-value>@proposal?.OriginalValue</dd>
+                        <dd data-field-value>@if (Model.Statements(field).ToList() is { Count: > 0 } statements)
+                        {
+                            // From a dictation in Spanish (step 17), each English sentence beside the Spanish it was translated
+                            // from (docs/brand: Translated sentences), each saying it is a translation to check, warning or not,
+                            // so none reads as checked for having no warning; otherwise the value as proposed.
+                            <ol class="sc-translation">
+                                @foreach (var (english, spanish) in statements)
+                                {
+                                    <li class="sc-translation__pair"><p class="sc-translation__check">@ReviewModel.TranslatedSentence</p><p class="sc-translation__english">@english</p><p class="sc-translation__spanish">You said: <span lang="es">“@spanish”</span></p></li>
+                                }
+                            </ol>
+                        }
+                        else { @proposal?.OriginalValue }</dd>
                         @if (proposal is { State: AiProposalStates.Pending } && !Model.Signed && !Model.DecideAtTheClinic)
                         {
                             <dd class="sc-proposal__controls" data-review-controls>
@@ -130,7 +147,7 @@
                                     <div class="sc-actions">
                                         @if (!Model.TranscriptGone)
                                         {
-                                            <button class="sc-btn" name="Decision" value="accepted">Accept @field</button>
+                                            <button class="sc-btn" name="Decision" value="accepted">@(Model.Translated ? "Accept translated" : "Accept") @field</button>
                                         }
                                         <button class="sc-btn" name="Decision" value="rejected">Reject @field</button>
                                     </div>
@@ -223,6 +240,14 @@
                             </li>
                         }
                     </ol>
+                </section>
+            }
+            else if (Model.Translated)
+            {
+                @* The expansion plan's step 17: nothing is proposed beyond the note from a dictation in Spanish. *@
+                <section data-chart-proposals-none aria-labelledby="chart-proposals">
+                    <h2 id="chart-proposals">Proposed orders and allergies</h2>
+                    <p class="sc-prose">Nothing is proposed for orders or the allergy list from a dictation in Spanish. Any order or allergy change you dictated is listed under “Not carried over”, for you to place through its normal clinical workflow.</p>
                 </section>
             }
         </section>

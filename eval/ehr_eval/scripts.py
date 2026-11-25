@@ -12,6 +12,12 @@ test set, or scored against different gold, are told apart (gate.py); only the g
 its checks, the eval's answers.py, and both lockfiles), and the scoring hash what checks and scores them (the sidecar's checks and the eval's
 own code), so results from other answers, or scored differently, are told apart too; only the scoring may be redone
 without the models (rescore.py).
+
+The Spanish test set (eval/scripts-es, the expansion plan's step 17) has recordings and gold hashes of its own,
+recordings_es_sha256() and gold_es_sha256(), over its scripts and the English script the Spanish set dictates as
+Spanish (voices.toml's english_as_spanish). The pipeline and scoring hashes are the two sets' together, the Spanish
+eval's code among them: a change to either set's code asks for both evals again (the decision log's step 17,
+decision 22).
 """
 
 from __future__ import annotations
@@ -32,16 +38,23 @@ from dictation_scripts import (  # noqa: F401 (re-exported for the eval)
 from ehr_dictation.provenance import CHECKS_CODE_SHA256, PIPELINE_CODE_SHA256
 from dictation_scripts import display_text as render_display  # noqa: F401
 from dictation_scripts import spoken_text as render_spoken  # noqa: F401
+from dictation_scripts_es import load_scripts as load_spanish
 
 EVAL_DIR = Path(__file__).resolve().parents[1]
 DATASET_FILES = ("dictation_scripts.py", "voices.toml", "generate_audio.py")
 # What makes a run's answers, the transcript and K2 Horizon's proposals, beside the sidecar's own code: the eval's code
 # that feeds the recordings through it, and both lockfiles. A change to any means running the eval again.
-PIPELINE_FILES = ("ehr_eval/answers.py", "uv.lock", "../src/Ehr.Dictation/sidecar/uv.lock")
+PIPELINE_FILES = ("ehr_eval/answers.py", "ehr_eval/answers_es.py", "ehr_eval/run_a.py", "ehr_eval/run_a_en.py",
+                  "uv.lock",
+                  "../src/Ehr.Dictation/sidecar/uv.lock")
 # What checks and scores those answers, beside the sidecar's checks: a change means scoring the stored answers again
 # (rescore.py), which the gate also asks for when the list of accepted limitations changes.
 SCORING_FILES = ("ehr_eval/scripts.py", "ehr_eval/normalize.py", "ehr_eval/dates.py", "ehr_eval/scoring.py",
-                 "ehr_eval/run.py", "ehr_eval/rescore.py", "known-limitations.toml")
+                 "ehr_eval/run.py", "ehr_eval/rescore.py", "ehr_eval/scoring_es.py", "ehr_eval/facts_es.py",
+                 "ehr_eval/run_es.py", "ehr_eval/refusals.py",
+                 "known-limitations.toml")
+# What makes the Spanish set's recordings, beside its scripts: their renderers, the voices and the audio generator.
+DATASET_FILES_ES = ("dictation_scripts_es.py", "dictation_scripts.py", "voices.toml", "generate_audio.py")
 
 
 def load_all(directory: Path = SCRIPTS_DIR) -> dict[str, Script]:
@@ -78,17 +91,53 @@ def recordings_sha256(eval_dir: Path = EVAL_DIR) -> str:
     return digest.hexdigest()
 
 
-def variant_ids(eval_dir: Path = EVAL_DIR) -> set[str]:
+def variant_ids(eval_dir: Path = EVAL_DIR, language: str = "en") -> set[str]:
     """The recordings the test set defines, by id, as generate_audio.py names them: each script's clean one, each of
-    its noises at each SNR in voices.toml, and one more for each script voices.toml calls unusable."""
-    variants = tomllib.loads((eval_dir / "voices.toml").read_text(encoding="utf-8")).get("variants", {})
+    its noises at each SNR in voices.toml, and one more for each script voices.toml calls unusable. For the Spanish
+    set (language "es"), the same from scripts-es and [variants_es], and the two dictated in the wrong language: the
+    English script it reads as Spanish, and its Spanish script run as English."""
+    voices = tomllib.loads((eval_dir / "voices.toml").read_text(encoding="utf-8"))
+    variants = voices.get("variants" if language == "en" else "variants_es", {})
+    scripts = load_all(eval_dir / "scripts").values() if language == "en" else load_spanish(eval_dir / "scripts-es")
     ids = set()
-    for script in load_all(eval_dir / "scripts").values():
+    for script in scripts:
         ids.add(f"{script.id}--clean")
         ids |= {f"{script.id}--{noise}-{snr}db" for snr in variants.get("snr_db", []) for noise in script.noise}
         if script.id in variants.get("unusable", []):
             ids.add(f"{script.id}--{script.noise[0]}-{variants['unusable_snr_db']}db")
+    if language == "es":
+        ids |= {f"{variants['english_as_spanish']}--clean--as-es", f"{variants['spanish_as_english']}--clean--as-en"}
     return ids
+
+
+def _spanish_set(eval_dir: Path) -> list[Path]:
+    """The Spanish set's script files, and the English script it dictates as Spanish."""
+    voices = tomllib.loads((eval_dir / "voices.toml").read_text(encoding="utf-8"))
+    english = voices.get("variants_es", {}).get("english_as_spanish", "")
+    return sorted((eval_dir / "scripts-es").glob("*.toml")) + sorted((eval_dir / "scripts").glob(f"{english}.toml"))
+
+
+def recordings_es_sha256(eval_dir: Path = EVAL_DIR) -> str:
+    """As recordings_sha256(), for the Spanish set: what its recordings say and who says it how."""
+    digest = hashlib.sha256()
+    for path in _spanish_set(eval_dir):
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        digest.update(json.dumps({key: data.get(key) for key in SPOKEN}, sort_keys=True).encode() + b"\0")
+    for name in DATASET_FILES_ES:
+        path = eval_dir / name
+        content = path.read_bytes().replace(b"\r\n", b"\n") if path.is_file() else b""
+        digest.update(name.encode() + b"\0" + content + b"\0")
+    return digest.hexdigest()
+
+
+def gold_es_sha256(eval_dir: Path = EVAL_DIR) -> str:
+    """As gold_sha256(), for the Spanish set: the rest of each script, what it is scored against."""
+    digest = hashlib.sha256()
+    for path in _spanish_set(eval_dir):
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        rest = {key: value for key, value in data.items() if key not in SPOKEN}
+        digest.update(path.name.encode() + b"\0" + json.dumps(rest, sort_keys=True).encode() + b"\0")
+    return digest.hexdigest()
 
 
 def gold_sha256(eval_dir: Path = EVAL_DIR) -> str:

@@ -1607,6 +1607,22 @@
         background: var(--danger);
     }
 
+    /* Time left: how much of a dictation's limit is left, after its controls while recording. The minutes and seconds
+       in mono-id, so the digits hold still as they count down, then "left" in body-sm. Not a live region. */
+    .sc-timeleft {
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
+        white-space: nowrap;
+    }
+
+    .sc-timeleft__value {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink);
+    }
+
     /* Transcript: the panel a dictation's words appear in. */
     .sc-transcript {
         border: 1px solid var(--line);
@@ -1829,6 +1845,64 @@
 
     .sc-proposal[data-review-state="rejected"] {
         box-shadow: inset 2px 0 0 var(--line-strong);
+    }
+
+    /* Translated sentences: a field proposed from a dictation in Spanish, each English sentence beside the Spanish it was
+       translated from, side by side where both fit and the Spanish under the English where they don't. Hovering or
+       focusing a sentence highlights its Spanish in the transcript and tints the pair. */
+    .sc-translation {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .sc-translation__pair {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+        gap: var(--space-1) var(--space-4);
+        padding: var(--space-2) 0;
+        border-radius: var(--radius-xs);
+    }
+
+    .sc-translation__pair + .sc-translation__pair {
+        border-top: 1px solid var(--line);
+    }
+
+    .sc-translation__pair:hover,
+    .sc-translation__pair:focus {
+        background: var(--highlight-source);
+    }
+
+    /* On the tint the Spanish and the line over the pair are ink, which keeps their contrast there (tokens.json:
+       highlight-source). */
+    .sc-translation__pair:hover .sc-translation__spanish,
+    .sc-translation__pair:focus .sc-translation__spanish,
+    .sc-translation__pair:hover .sc-translation__check,
+    .sc-translation__pair:focus .sc-translation__check {
+        color: var(--ink);
+    }
+
+    .sc-translation__english,
+    .sc-translation__spanish,
+    .sc-translation__check {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Over every pair, across both columns, warning or not: "Translated from Spanish: check it against the Spanish
+       beside it", so no sentence reads as checked for having no warning. */
+    .sc-translation__check {
+        grid-column: 1 / -1;
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--info);
+    }
+
+    .sc-translation__spanish {
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
     }
 
     /* Two versions side by side, such as "Theirs (saved)" and "Mine (not saved)". Never merged silently. */

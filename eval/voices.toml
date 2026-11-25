@@ -129,3 +129,53 @@ floor_db = -24                # the pink floor, relative to the beeps
 snr_db = [20, 10, 5]
 unusable_snr_db = 0
 unusable = ["d01-htn-aprocitentan", "d11-afib-dronedarone", "d16-gout-febuxostat", "d19-migraine-zavegepant"]
+
+# ---- The Spanish test set (the expansion plan's step 17) -------------------------------------------------------------
+# Read by `generate_audio.py --set es` into eval/audio-es. Kokoro reads Spanish with its Spanish pipeline (lang_code
+# "e"), which pronounces every word with espeak-ng's Spanish rules (GPL-3.0, as above: it runs only on the machine
+# making the audio), and a passage a script marks as said in English (<<en|...>>) with its American English rules, in
+# the same voice. Its three Spanish voices read as themselves ("es"); two of its English voices read Spanish with the
+# Spanish rules, as synthetic stand-ins for a clinician whose first language is English ("en-voice"), not a real
+# accent. Every voice file is voices/<name>.pt at the pinned revision above. The noise is the English set's; the
+# babble's talkers stay English (the decision log's step 17, decision 24).
+
+[voices_es.ef_dora]
+accent = "es"
+description = "Kokoro's Spanish female voice"
+grade = "not graded in VOICES.md"
+license = "Apache-2.0"
+
+[voices_es.em_alex]
+accent = "es"
+description = "Kokoro's Spanish male voice"
+grade = "not checked: VOICES.md isn't in the Hugging Face cache, and step 17 downloads nothing to read it"
+license = "Apache-2.0"
+
+[voices_es.em_santa]
+accent = "es"
+description = "Kokoro's second Spanish male voice"
+grade = "not checked: VOICES.md isn't in the Hugging Face cache, and step 17 downloads nothing to read it"
+license = "Apache-2.0"
+
+[voices_es.af_heart]
+accent = "en-voice"
+description = "Kokoro's American English female voice reading Spanish: a synthetic stand-in, not a real accent"
+grade = "A"
+license = "Apache-2.0"
+
+[voices_es.am_michael]
+accent = "en-voice"
+description = "Kokoro's American English male voice reading Spanish: a synthetic stand-in, not a real accent"
+grade = "C+"
+license = "Apache-2.0"
+
+# As [variants], for the Spanish scripts: each script's noise at each SNR, and e01 and e08 once more at 0 dB. Then two
+# recordings dictated in the wrong language, scored for what is marked and for no instruction carried into the note
+# (FR-14), not for the fields: an English script read in English by its own voice and dictated as Spanish, and a
+# Spanish script's clean recording dictated as English.
+[variants_es]
+snr_db = [20, 10, 5]
+unusable_snr_db = 0
+unusable = ["e01-hta-control", "e08-insuficiencia-cardiaca"]
+english_as_spanish = "d43-cough-lipids-orders"
+spanish_as_english = "e01-hta-control"

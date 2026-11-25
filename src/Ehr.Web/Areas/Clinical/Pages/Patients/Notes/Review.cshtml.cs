@@ -50,6 +50,34 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     // what the page shows.
     public object Snapshot => new { Review.State, version = Draft.Version, result = Result, proposals = Proposals };
 
+    // A dictation in Spanish (the expansion plan's step 17): its transcript is Spanish, and each proposed field English,
+    // shown a sentence at a time beside the Spanish it was translated from.
+    public bool Translated => Result?.SpokenLanguage == SpokenLanguage.Spanish;
+
+    // What every translated sentence says, in the owner's words (2026-11-24): no translated sentence reads as checked
+    // because it has no warning. dictation-view.js says the same of the sentences it renders.
+    public const string TranslatedSentence = "Translated from Spanish: check it against the Spanish beside it";
+
+    // A field's sentences, each with the Spanish words it was translated from, when the dictation was in Spanish.
+    public IEnumerable<(string English, string Spanish)> Statements(string field)
+    {
+        if (!Translated || Result?.Fields is not { } fields) yield break;
+        var proposed = field switch
+        {
+            "subjective" => fields.Subjective,
+            "objective" => fields.Objective,
+            "assessment" => fields.Assessment,
+            "plan" => fields.Plan,
+            _ => null,
+        };
+        if (proposed is not PendingField { Statements: { } statements } pending) yield break;
+        foreach (var statement in statements)
+        {
+            yield return (pending.Value[statement.Start..statement.End],
+                string.Join(" … ", statement.Sources.Select(source => Result.Transcript.Text[source.Start..source.End])));
+        }
+    }
+
     // A recorded visit's transcript as this page read it, at the clinic: its JSON, as it was stored and checked, which the
     // page writes in as it is, beside the snapshot, never read into objects and written out again, every "<" escaped so
     // nothing in it can end its script element; and its text, which the page shows without its script. None otherwise.

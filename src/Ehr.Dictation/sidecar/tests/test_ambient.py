@@ -1,7 +1,8 @@
-"""listening.py and its routes in api.py: a visit's session kept apart from dictations', audio taken with nothing
-transcribed and the quiet measured, the voices told apart at stop and named by the clinician, every voice and one
-clinician and one patient, the note drafted a window at a time after every dictation waiting, with who said each source,
-and the limits. Stand-ins for the speaker model, MedASR and llama-server; tones, never a voice."""
+"""listening.py and its routes in api.py: a visit's session kept apart from dictations', in Spanish too, audio taken
+with nothing transcribed and the quiet measured, the voices told apart at stop and named by the clinician, every voice
+and one clinician and one patient, the note drafted a window at a time after every dictation waiting, with who said each
+source, the limits, and the speaker model and Whisper each optional. Stand-ins for the speaker model, MedASR, Whisper and
+llama-server; tones, never a voice."""
 
 from __future__ import annotations
 
@@ -11,14 +12,17 @@ import json
 import threading
 
 import pytest
-from conftest import LISTENING_MODELS, MODELS, FakeLlama, FakeRecognizer, PitchEmbedder, PitchRecognizer, answer, encode, raw_decoder, visit
+from conftest import (
+    LISTENING_MODELS, MODELS, WHISPER, FakeLlama, FakeRecognizer, FakeWhisper, PitchEmbedder, PitchRecognizer, answer, encode,
+    raw_decoder, spanish_answer, visit,
+)
 from fastapi.testclient import TestClient
 
 from ehr_dictation import conversation, prompt, provenance
 from ehr_dictation.api import create_app
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.listening import Listening
-from ehr_dictation.sessions import AMBIENT, GaveWay, SessionError, TooBusy, Turns
+from ehr_dictation.sessions import AMBIENT, GaveWay, SessionError, Spanish, TooBusy, Turns
 
 ALICE = "11111111-1111-1111-1111-111111111111"
 BOB = "22222222-2222-2222-2222-222222222222"
@@ -550,3 +554,98 @@ def test_a_whole_visit_writes_nothing_to_disk(settings, tmp_path, monkeypatch):
 
     assert waiting["sorting"] == "awaiting_speakers" and done["sorting"] == "done"
     assert list(tmp_path.iterdir()) == []
+
+
+# ---- Beside dictation in Spanish (the expansion plan's step 17) ------------------------------------------------------
+# A session's kind and its language are fixed at its start: a visit is in English, a dictation in Spanish is a
+# dictation, and neither reaches the other's sessions or goes through the other's checks. The speaker model and Whisper
+# are each optional, and the session that needs one is refused in words without it.
+
+DICTADO = "Tos seca desde hace 3 días."
+TRADUCIDO = spanish_answer(("subjective", ["Tos seca desde hace 3 días"], "Dry cough for 3 days."))
+BOTH_MODELS = provenance.Models(MODELS.speech, MODELS.language, WHISPER, LISTENING_MODELS.speaker)
+OWNERS = ("33333333-3333-3333-3333-333333333333", "44444444-4444-4444-4444-444444444444")
+
+
+def in_spanish(llama: FakeLlama | None = None) -> Spanish:
+    return Spanish(FakeWhisper(DICTADO), (llama or FakeLlama(TRADUCIDO)).structurer(language="es"))
+
+
+def test_a_visit_and_a_dictation_in_spanish_never_reach_each_others_sessions(settings):
+    with TestClient(create_app(settings, recognizer=PitchRecognizer(), structurer=FakeLlama(DRAFTED).structurer(),
+                               models=BOTH_MODELS, embedder=PitchEmbedder(), spanish=in_spanish())) as http:
+        listening = {**HEADERS, "X-Dictation-Mode": "ambient"}
+        visit_id = http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2}, headers=listening).json()["sessionId"]
+        spanish_id = http.post("/v1/sessions", json={"spokenLanguage": "es"}, headers=HEADERS).json()["sessionId"]
+        crossed = [
+            http.post(f"/v1/sessions/{spanish_id}/audio", params={"seq": 0}, content=b"\0" * 64, headers=listening),
+            http.post(f"/v1/sessions/{spanish_id}/stop", headers=listening),
+            http.post(f"/v1/sessions/{spanish_id}/result", headers=listening),
+            http.post(f"/v1/sessions/{spanish_id}/speakers", json={"speakers": NAMES}, headers=listening),
+            http.delete(f"/v1/sessions/{spanish_id}", headers=listening),
+            http.post(f"/v1/sessions/{visit_id}/audio", params={"seq": 0}, content=b"\0" * 64, headers=HEADERS),
+            http.post(f"/v1/sessions/{visit_id}/stop", headers=HEADERS),
+            http.delete(f"/v1/sessions/{visit_id}", headers=HEADERS),
+        ]
+        in_spanish_too = http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2},
+                                   json={"spokenLanguage": "es"}, headers={**listening, "X-Dictation-Owner": OWNERS[0]})
+        kept = {(s.mode, s.language, s.proposes) for s in http.app.state.sessions._sessions.values()}
+
+    assert [r.status_code for r in crossed] == [404] * 8
+    assert (in_spanish_too.status_code, in_spanish_too.json()["error"]) == (422, "unsupported_language")
+    assert kept == {(AMBIENT, "en", False), ("dictation", "es", False)}
+
+
+# A dictation in Spanish asks K2 Horizon as an English one does: a visit's window being drafted gives way to it. Each
+# result is its own kind's: the visit's has speakers and no translation, the dictation's translated statements and no
+# speaker.
+def test_a_dictation_in_spanish_has_its_turn_before_a_visit_and_neither_gets_the_others_checks(settings):
+    class FirstWindowSlow(FakeLlama):
+        async def handle(self, request):
+            self.delay = 0 if any(r.url.path == "/v1/chat/completions" for r in self.requests) else 10
+            return await super().handle(request)
+
+    async def run():
+        llama = FirstWindowSlow(DRAFTED)
+        sessions = Listening(settings, PitchRecognizer(), llama.structurer(), BOTH_MODELS, decoder=raw_decoder,
+                             embedder=PitchEmbedder(), spanish=in_spanish())
+        visit_id, _ = await stopped(sessions, "clinician", "patient")
+        await sessions.name_speakers(visit_id, ALICE, NAMES)
+        while not any(r.url.path == "/v1/chat/completions" for r in llama.requests):
+            await asyncio.sleep(0.02)
+        dictation = sessions.start(BOB, language="es")
+        for seq, chunk in enumerate(chunks(visit("clinician"))):
+            await sessions.add_audio(dictation.id, BOB, seq, chunk)
+        await sessions.stop(dictation.id, BOB)
+        spanish = await sessions.result(dictation.id, BOB, wait=5)
+        return llama.cancelled, spanish, await sessions.visit_result(visit_id, ALICE, wait=5)
+
+    gave_way, spanish, heard = asyncio.run(run())
+
+    assert gave_way, "a dictation in Spanish is a dictation"
+    assert (spanish["sorting"], heard["sorting"]) == ("done", "done")
+    assert spanish["spokenLanguage"] == "es" and spanish["proposals"] == []
+    assert spanish["fields"]["subjective"]["value"] == "Dry cough for 3 days." and spanish["fields"]["subjective"]["statements"]
+    assert "speaker" not in json.dumps(spanish) and spanish["provenance"]["speech"] == WHISPER
+    assert "spokenLanguage" not in heard and heard["proposals"] == []
+    assert not any("statements" in field for field in heard["fields"].values())
+    assert all(s["speaker"] for s in heard["transcript"]["segments"]) and heard["provenance"]["speech"] == MODELS.speech
+
+
+@pytest.mark.parametrize(("speaker", "whisper"), [(False, False), (True, False), (False, True), (True, True)])
+def test_the_speaker_model_and_whisper_are_each_optional_and_what_needs_one_is_refused_in_words(settings, speaker, whisper):
+    models = provenance.Models(MODELS.speech, MODELS.language, WHISPER if whisper else None,
+                               LISTENING_MODELS.speaker if speaker else None)
+    with TestClient(create_app(settings, recognizer=PitchRecognizer(), structurer=FakeLlama(DRAFTED).structurer(),
+                               models=models, embedder=PitchEmbedder() if speaker else None,
+                               spanish=in_spanish() if whisper else None)) as http:
+        english = http.post("/v1/sessions", headers=HEADERS)
+        spanish = http.post("/v1/sessions", json={"spokenLanguage": "es"}, headers={**HEADERS, "X-Dictation-Owner": OWNERS[0]})
+        listening = http.post("/v1/sessions", params={"mode": "ambient", "speakers": 2},
+                              headers={**HEADERS, "X-Dictation-Owner": OWNERS[1], "X-Dictation-Mode": "ambient"})
+
+    assert english.status_code == 201
+    assert (spanish.status_code, spanish.json().get("detail")) == (
+        (201, None) if whisper else (503, "Spanish dictation isn't installed on this server."))
+    assert (listening.status_code, listening.json().get("detail")) == (
+        (201, None) if speaker else (503, "The speaker model isn't installed (setup_models.py) or couldn't be loaded."))

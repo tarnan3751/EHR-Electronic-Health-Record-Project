@@ -12,8 +12,8 @@ using Ehr.Web.Api.Dictation;
 namespace Ehr.Web.Tests;
 
 // The dictation service in memory, where the on-prem app's DictationSidecar sends its calls: sessions bound to the
-// owner that started them, chunks taken in order, a transcript of one made-up sentence per chunk, and note fields
-// sorted from it. It answers as the service does, error bodies with their detail included, and records every request
+// owner that started them, in the language each was started in, chunks taken in order up to the session's limit, a
+// transcript of one made-up sentence per chunk, and note fields sorted from it. It answers as the service does, error bodies with their detail included, and records every request
 // it gets. The switches make it fail the ways the service can, or propose more of the note's fields. The tests that
 // drive it run one at a time, and each starts it afresh.
 public sealed partial class DictationSidecarStub : HttpMessageHandler
@@ -26,6 +26,28 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
     public const string DiscardedText = "Prescribe a drug nobody mentioned";
 
     static readonly string[] Sentences = ["Cough for three days.", "No fever.", "Chest is clear.", "Likely viral.", "Fluids and rest."];
+
+    // The Spanish mode's dictation, a sentence a chunk: the third spoken in English, which the service marks as not
+    // Spanish, the fourth with an order in it, whose "í" is written as an i and a combining accent (U+0301), so a source
+    // can be cut between the two, and the last long, so a quote of it has to wrap.
+    public static readonly string[] SpanishSentences =
+    [
+        "Tos desde hace tres días y niega fiebre.",
+        "Pulmones limpios.",
+        "Patient was counseled on diet.",
+        "Probable cuadro viral, pido una radiografi\u0301a de tórax.",
+        "Líquidos abundantes y reposo relativo durante los próximos tres a cinco días, paracetamol 1000 mg si tiene dolor o malestar general, hierro cada tercer día, y regresar a consulta si aparece dificultad para respirar o fiebre que no cede.",
+    ];
+
+    // What the Spanish mode proposes from those five chunks: for each field, each English sentence with the Spanish words
+    // of the transcript it was translated from.
+    public static readonly (string Field, (string English, string Spanish)[] Statements)[] SpanishFields =
+    [
+        ("subjective", [("Cough for three days.", "Tos desde hace tres días"), ("Denies fever.", "niega fiebre")]),
+        ("objective", [("Lungs clear.", "Pulmones limpios.")]),
+        ("assessment", [("Likely viral illness.", "Probable cuadro viral")]),
+        ("plan", [("Plenty of fluids and relative rest for the next three to five days, acetaminophen 1000 mg if there is pain or general malaise, iron every other day, and return to clinic if difficulty breathing or a fever that does not go away appears.", SpanishSentences[4])]),
+    ];
 
     readonly ConcurrentDictionary<string, StubSession> sessions = new();
 
@@ -60,6 +82,18 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
 
     public StubSorting Sorting { get; set; }
 
+    // A dictation in Spanish (the expansion plan's step 17): SpanishSentences, a chunk each, and when it is sorted, every
+    // one of the four fields proposed in English with its statements (SpanishFields), from the five chunks. For a session
+    // started in Spanish ({"spokenLanguage": "es"}), or for every session while this is set.
+    public bool Spanish { get; set; }
+
+    // How much audio a session started in Spanish takes, as the service's 2 minutes; a test sets less, so the limit is
+    // reached in a few chunks of the stub's 2 seconds each. A session in English takes the service's 3 minutes.
+    public int SpanishMaxSeconds { get; set; } = 120;
+
+    // Whisper isn't installed: a session started in Spanish is refused, as the service refuses it.
+    public bool SpanishUnavailable { get; set; }
+
     // Every request fails to connect.
     public bool Unreachable { get; set; }
 
@@ -83,6 +117,9 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
         WholeDictation = false;
         Proposals = false;
         ProposalLead = null;
+        Spanish = false;
+        SpanishMaxSeconds = 120;
+        SpanishUnavailable = false;
         Unreachable = false;
         Slow = false;
         Undecodable = false;
@@ -130,9 +167,32 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
 
         if (path is ["v1", "sessions"] && request.Method == HttpMethod.Post)
         {
+            // As the service reads it: no body is English, otherwise {"spokenLanguage": "en" or "es"} and nothing else.
+            var spanish = false;
+            if (body.Length > 0)
+            {
+                try
+                {
+                    var start = JsonDocument.Parse(body).RootElement;
+                    var language = start.ValueKind == JsonValueKind.Object && start.EnumerateObject().All(p => p.Name == "spokenLanguage")
+                        && start.TryGetProperty("spokenLanguage", out var said) && said.ValueKind == JsonValueKind.String ? said.GetString() : null;
+                    spanish = language is "es" ? true : language is "en" ? false : throw new JsonException();
+                }
+                catch (JsonException)
+                {
+                    return Error(HttpStatusCode.BadRequest, "bad_language");
+                }
+            }
+
+            if (spanish && SpanishUnavailable)
+            {
+                return Error(HttpStatusCode.ServiceUnavailable, "language_unavailable");
+            }
+
             var id = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(24));
-            sessions[id] = new StubSession(owner);
-            return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds = 180, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
+            var maxSeconds = spanish ? SpanishMaxSeconds : 180;
+            sessions[id] = new StubSession(owner, spanish, maxSeconds);
+            return Json(HttpStatusCode.Created, new { sessionId = id, maxSeconds, maxChunkBytes = 1024 * 1024, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
         }
 
         if (path is not ["v1", "sessions", var sessionId, ..] || !sessions.TryGetValue(sessionId, out var session) || session.Owner != owner
@@ -162,8 +222,14 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
                         return Error(HttpStatusCode.Conflict, "out_of_order", new { expectedSeq = session.Chunks });
                     }
 
+                    // Two seconds a chunk: one that would take the dictation past its limit is refused, and isn't kept.
+                    if ((session.Chunks + 1) * 2 > session.MaxSeconds)
+                    {
+                        return Error(HttpStatusCode.RequestEntityTooLarge, "too_long");
+                    }
+
                     session.Chunks++;
-                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, audioSeconds = session.Chunks * 2.0, transcript = Transcript(session) });
+                    return Json(HttpStatusCode.OK, new { receivedSeq = seq, audioSeconds = session.Chunks * 2.0, transcript = Transcript(session, SentencesFor(session)) });
 
                 case ([_, _, _, "stop"], "POST"):
                     if (Undecodable)
@@ -188,9 +254,14 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
         }
     }
 
-    static string Text(StubSession session) => string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => Sentences[chunk % Sentences.Length]));
+    bool InSpanish(StubSession session) => Spanish || session.Spanish;
 
-    object Transcript(StubSession session)
+    string[] SentencesFor(StubSession session) => InSpanish(session) ? SpanishSentences : Sentences;
+
+    static string Text(StubSession session, string[] sentences) =>
+        string.Join(' ', Enumerable.Range(0, session.Chunks).Select(chunk => sentences[chunk % sentences.Length]));
+
+    object Transcript(StubSession session, string[] sentences)
     {
         var text = new StringBuilder();
         var segments = new List<object>();
@@ -202,10 +273,11 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
             }
 
             var start = text.Length;
-            text.Append(Sentences[chunk % Sentences.Length]);
+            text.Append(sentences[chunk % sentences.Length]);
             // The last chunk's words may still change until the dictation stops.
             var final = session.Stopped || chunk < session.Chunks - 1;
-            segments.Add(new { start, end = text.Length, startMs = chunk * 2000, endMs = chunk * 2000 + 1800, final, unclear = chunk == 2 ? "too_noisy" : null, confidence = 0.42 });
+            var unclear = chunk != 2 ? null : sentences == SpanishSentences ? "other_language" : "too_noisy";
+            segments.Add(new { start, end = text.Length, startMs = chunk * 2000, endMs = chunk * 2000 + 1800, final, unclear, confidence = 0.42 });
         }
 
         if (Proposals && session.Stopped)
@@ -233,7 +305,12 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
 
     object Sorted(StubSession session, StubSorting sorting)
     {
-        var transcript = Transcript(session);
+        if (InSpanish(session) && sorting is not StubSorting.Discarded)
+        {
+            return SortedSpanish(session, sorting);
+        }
+
+        var transcript = Transcript(session, Sentences);
         var provenance = new
         {
             speech = new { repository = "google/medasr", commit = "1111111", sha256 = new string('a', 64) },
@@ -249,7 +326,7 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
         object? proposals = null;
         if (Proposals && session.Stopped)
         {
-            var at = Text(session).Length + 1 + (ProposalLead is null ? 0 : ProposalLead.Length + 1);
+            var at = Text(session, Sentences).Length + 1 + (ProposalLead is null ? 0 : ProposalLead.Length + 1);
             var (order, allergy) = ((Start: at, End: at + OrderSaid.Length), (Start: at + OrderSaid.Length + 2, End: at + OrderSaid.Length + 2 + AllergySaid.Length));
             notCarriedOver = [new { reason = "order", start = order.Start, end = order.End }, new { reason = "allergy_change", start = allergy.Start, end = allergy.End }];
             proposals = new object[]
@@ -271,9 +348,9 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
                     subjective = new
                     {
                         status = "pending",
-                        value = Text(session),
-                        sources = new[] { new { start = 0, end = Text(session).Length } },
-                        warnings = new[] { new { code = "one_field_holds_dictation", start = 0, end = Text(session).Length } },
+                        value = Text(session, Sentences),
+                        sources = new[] { new { start = 0, end = Text(session, Sentences).Length } },
+                        warnings = new[] { new { code = "one_field_holds_dictation", start = 0, end = Text(session, Sentences).Length } },
                     },
                     objective = new { status = "empty", reasons = new[] { "not_dictated" } },
                     assessment = new { status = "empty", reasons = new[] { "not_dictated" } },
@@ -315,6 +392,17 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
                 reason = "model_timeout",
                 // The service's own words, which the API doesn't pass on.
                 message = "llama-server took longer than 60 seconds",
+                fields = (object?)null,
+                notCarriedOver,
+                proposals,
+                provenance,
+            },
+            // A dictation in English with too few English words (step 17): unsorted, with its own reason.
+            StubSorting.NotEnglish => new
+            {
+                transcript,
+                sorting = "unavailable",
+                reason = "transcript_not_english",
                 fields = (object?)null,
                 notCarriedOver,
                 proposals,
@@ -364,6 +452,81 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
         };
     }
 
+    // The Spanish mode's answer: the transcript in Spanish, the order it holds not carried over, and from five chunks or
+    // more, each field's English sentences, joined by a space as the value, each citing the Spanish words it was
+    // translated from; the plan's "cada tercer día" carries the warning that it reads two ways. With the model too slow
+    // or unavailable, the Spanish transcript and why, as for English.
+    object SortedSpanish(StubSession session, StubSorting sorting)
+    {
+        var transcript = Transcript(session, SpanishSentences);
+        var text = Text(session, SpanishSentences);
+        var provenance = new
+        {
+            speech = new { repository = "openai/whisper-large-v3-turbo", commit = "3333333", sha256 = new string('d', 64) },
+            language = new { repository = "IFM/K2-Horizon-7B-GGUF", commit = "2222222", file = "K2-Horizon-7B-Q4_K_M.gguf", sha256 = new string('b', 64) },
+            llamaServer = "b11669",
+            prompt = "note-prompt-es-1",
+            schema = "note-schema-es-1",
+            structuring = "structuring-es-1",
+            code = "sha256:" + new string('c', 64),
+        };
+        const string Order = "pido una radiografi\u0301a de tórax";
+        var order = text.IndexOf(Order, StringComparison.Ordinal);
+        var notCarriedOver = new[] { new { reason = "order", start = order, end = order + Order.Length } }.Where(item => item.start >= 0).ToArray();
+        if (sorting == StubSorting.Pending)
+        {
+            return new { transcript, sorting = "pending", fields = (object?)null, notCarriedOver, provenance, spokenLanguage = "es" };
+        }
+
+        if (sorting is StubSorting.Timeout or StubSorting.Unavailable)
+        {
+            var reason = sorting == StubSorting.Timeout ? "model_timeout" : "model_unavailable";
+            return new { transcript, sorting = "unavailable", reason, fields = (object?)null, notCarriedOver, provenance, spokenLanguage = "es" };
+        }
+
+        var fields = new Dictionary<string, object>();
+        if (session.Chunks < SpanishSentences.Length)
+        {
+            foreach (var (field, _) in SpanishFields)
+            {
+                fields[field] = new { status = "empty", reasons = new[] { "not_dictated" } };
+            }
+
+            return new { transcript, sorting = "done", fields, notCarriedOver, provenance, spokenLanguage = "es" };
+        }
+
+        foreach (var (field, statements) in SpanishFields)
+        {
+            var value = new StringBuilder();
+            var translated = new List<object>();
+            var sources = new List<object>();
+            foreach (var (english, spanish) in statements)
+            {
+                if (value.Length > 0)
+                {
+                    value.Append(' ');
+                }
+
+                var at = text.IndexOf(spanish, StringComparison.Ordinal);
+                var source = new { start = at, end = at + spanish.Length };
+                translated.Add(new { start = value.Length, end = value.Length + english.Length, sources = new[] { source } });
+                sources.Add(source);
+                value.Append(english);
+            }
+
+            var warnings = new List<object>();
+            if (field == "plan")
+            {
+                var frequency = text.IndexOf("cada tercer día", StringComparison.Ordinal);
+                warnings.Add(new { code = "ambiguous_frequency", start = frequency, end = frequency + "cada tercer día".Length });
+            }
+
+            fields[field] = new { status = "pending", value = value.ToString(), sources, warnings, statements = translated };
+        }
+
+        return new { transcript, sorting = "done", fields, notCarriedOver, provenance, spokenLanguage = "es" };
+    }
+
     // One chunk's sentence, proposed as a field's value, with its place in the transcript as its source.
     static object Offered(int sentence)
     {
@@ -389,9 +552,14 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
         return Json(status, body);
     }
 
-    sealed class StubSession(string owner)
+    // A dictation's, in its language, or a visit's (English, its limit its own).
+    sealed class StubSession(string owner, bool spanish = false, int maxSeconds = 180)
     {
         public string Owner { get; } = owner;
+
+        public bool Spanish { get; } = spanish;
+
+        public int MaxSeconds { get; } = maxSeconds;
 
         public int Chunks { get; set; }
 
@@ -422,6 +590,10 @@ public enum StubSorting
 
     // A recorded visit the service was too busy to draft: unavailable, with model_busy (step 16).
     Busy,
+
+    // A dictation in English with too few English words: unavailable, with transcript_not_english
+    // (step 17).
+    NotEnglish,
 
     Discarded,
 }

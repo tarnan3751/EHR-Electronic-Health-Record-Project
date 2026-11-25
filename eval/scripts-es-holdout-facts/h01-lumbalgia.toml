@@ -1,0 +1,107 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Hombre de 46 años que trabaja en un almacén y carga cajas pesadas todos los días."
+items = [{ of = "age", number = "46" }, { of = "boxes", frequency = "daily" }]
+
+[[facts]]
+said = "No fuma y no toma medicación de forma habitual."
+items = [{ of = "smoking", negated = true }, { of = "medication", aka = ["regular medication", "medications"], action = "take", negated = true }]
+
+[[facts]]
+said = "Refiere dolor lumbar desde hace 10 días, que empezó al levantar una caja del suelo."
+items = [{ of = "low back pain", aka = ["back pain", "lumbar pain"], negated = false, duration = "10 days" }, { of = "lifting", action = "started" }]
+
+[[facts]]
+said = "El dolor baja por la parte de atrás de la pierna derecha hasta la rodilla, sin llegar al pie."
+items = [{ of = "leg", side = "right" }]
+
+[[facts]]
+said = "Lo describe como intenso por las mañanas y moderado por las tardes."
+items = [{ of = "pain", severity = ["severe", "moderate"], frequency = ["morning", "afternoon"] }]
+
+[[facts]]
+said = "Niega pérdida de fuerza en las piernas, niega problemas para orinar y niega fiebre."
+items = [{ of = "leg weakness", aka = ["weakness"], negated = true }, { of = "trouble urinating", aka = ["urinary problems"], negated = true }, { of = "fever", negated = true }]
+
+[[facts]]
+said = "Tampoco ha notado hormigueo en los pies."
+items = [{ of = "tingling", negated = true }]
+
+[[facts]]
+said = "Antecedente de un episodio parecido hace 3 años, que mejoró con reposo relativo en unas semanas."
+items = [{ of = "episode", history = true, duration = "3 years", polarity = "better" }]
+
+[[facts]]
+said = "Ha tomado paracetamol 1 g cada 8 horas, con poca mejoría."
+items = [{ of = "acetaminophen", aka = ["paracetamol"], action = "took", number = "1 g", frequency = "every 8 hours", polarity = "better" }]
+
+[[facts]]
+said = "Duerme mal por el dolor y ha faltado al trabajo 2 días esta semana."
+items = [{ of = "work", duration = "2 days" }]
+
+[[facts]]
+said = "Le preocupa no poder volver pronto al trabajo."
+items = [{ of = "work" }]
+
+[[facts]]
+said = "TA 128/82, FC 76, temperatura 36,6 grados."
+items = [{ of = "BP", number = "128/82" }, { of = "HR", number = "76" }, { of = "temperature", number = "36.6 degrees" }]
+
+[[facts]]
+said = "Camina sin cojera."
+items = [{ of = "limp", negated = true }]
+
+[[facts]]
+said = "Contractura de la musculatura lumbar derecha, con dolor a la palpación."
+items = [{ of = "spasm", aka = ["muscle spasm", "lumbar muscle spasm", "contracture"], side = "right" }]
+
+[[facts]]
+said = "Lasègue positivo en la pierna derecha a los 40 grados."
+items = [{ of = "Lasègue sign", aka = ["Lasègue"], polarity = "positive" }, { of = "leg", side = "right", number = "40 degrees" }]
+
+[[facts]]
+said = "Fuerza y sensibilidad conservadas en ambas piernas."
+items = [{ of = "leg", side = "both" }]
+
+[[facts]]
+said = "Abdomen blando, sin masas palpables."
+items = [{ of = "masses", aka = ["palpable masses"], negated = true }]
+
+[[facts]]
+said = "lumbociática derecha aguda, probablemente por una hernia discal."
+items = [{ of = "sciatica", side = "right" }, { of = "herniated disc", aka = ["disc herniation"], doubt = true }]
+
+[[facts]]
+said = "No hay signos de alarma."
+items = [{ of = "red flags", aka = ["alarm signs", "warning signs"], negated = true }]
+
+[[facts]]
+said = "suspender el paracetamol."
+items = [{ of = "acetaminophen", aka = ["paracetamol"], action = "stop" }]
+
+[[facts]]
+said = "Iniciar ibuprofeno 600 mg cada 8 horas con comida durante 7 días."
+items = [{ of = "ibuprofen", action = "start", number = "600 mg", frequency = ["every 8 hours", "with food"], duration = "7 days" }]
+
+[[facts]]
+said = "Calor local por las noches."
+items = [{ of = "heat", frequency = "night" }]
+
+[[facts]]
+said = "Evitar cargar peso durante 2 semanas."
+items = [{ of = "lifting", aka = ["lifting loads"], duration = "2 weeks" }]
+
+[[facts]]
+said = "Caminar a diario según tolerancia."
+items = [{ of = "walking", aka = ["walk"], frequency = "daily", polarity = "tolerates" }]
+
+# A condition: weakness and trouble urinating are neither said nor denied here.
+[[facts]]
+said = "Se explica al paciente que acuda a urgencias si nota pérdida de fuerza o problemas para orinar."
+items = [{ of = "leg weakness", aka = ["weakness"] }, { of = "trouble urinating", aka = ["urinary problems"] }]
+
+[[facts]]
+said = "Control en 3 semanas, antes si empeora."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "3 weeks", polarity = "worse" }]

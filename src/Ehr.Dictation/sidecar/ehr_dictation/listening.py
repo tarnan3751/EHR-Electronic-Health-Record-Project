@@ -114,9 +114,11 @@ class Listening(Sessions):
         self._embedder = embedder
         self._conversation = conversation or self._structurer.using(prompt.load_conversation())
 
-    def start(self, owner: str, mode: str = DICTATION, speakers: int = 0) -> Session:
+    def start(self, owner: str, mode: str = DICTATION, speakers: int = 0, *, language: str = "en") -> Session:
+        """A dictation in its language; a visit, which is in English (api.py refuses any other), with how many will
+        speak."""
         if mode != AMBIENT:
-            return super().start(owner, mode)
+            return super().start(owner, mode, language=language)
         if self._embedder is None:
             raise SessionError(503, "listening_unavailable",
                                "The speaker model isn't installed (setup_models.py) or couldn't be loaded.")

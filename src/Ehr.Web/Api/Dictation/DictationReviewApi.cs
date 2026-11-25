@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using Ehr.Data;
 using Ehr.Data.Patients;
@@ -11,7 +13,9 @@ namespace Ehr.Web.Api.Dictation;
 
 public static partial class DictationApi
 {
-    public sealed record NoteDictationRequest(Guid ReviewId, Guid PatientId, Guid? DraftId, long? Version);
+    // SpokenLanguage (the expansion plan's step 17): "en" or "es" exactly, English when absent; any other is a 400.
+    public sealed record NoteDictationRequest(Guid ReviewId, Guid PatientId, Guid? DraftId, long? Version,
+        SpokenLanguage SpokenLanguage = SpokenLanguage.English);
     public sealed record StageReviewRequest(long Version);
 
     static void MapNoteReview(RouteGroupBuilder sessions)
@@ -58,7 +62,7 @@ public static partial class DictationApi
         }
 
         // Only a newly created sidecar session may be bound. A posted session ID/result is never accepted.
-        return await CallAsync(context, sidecar, "start-review", HttpMethod.Post, "v1/sessions", null,
+        return await CallAsync(context, sidecar, "start-review", HttpMethod.Post, "v1/sessions", Start(input.SpokenLanguage),
             async (body, token) =>
             {
                 var session = await body.ReadFromJsonAsync<DictationSession>(ServiceJson, token) ?? throw new JsonException();
@@ -183,9 +187,9 @@ public static partial class DictationApi
 
     // Keep exactly UC 9/10's sanitized contract and half-open UTF-16 ranges. Grounding/clinical checks remain in
     // the trusted sidecar pipeline; malformed spans/results are never promoted into reviewable records here.
-    // A recorded visit's (step 16, `ambient`) proposes nothing beyond its note, says who said every passage and source,
-    // marks a Subjective value as the patient's own words, and is stored with its transcript's text apart
-    // (TrustedReviewResult.Transcript); a dictation's says nothing of speakers.
+    // A recorded visit's (step 16, `ambient`) is in English and proposes nothing beyond its note, says who said every
+    // passage and source, marks a Subjective value as the patient's own words, and is stored with its transcript's text
+    // apart (TrustedReviewResult.Transcript); a dictation's, in either language, says nothing of speakers.
     internal static TrustedReviewResult? TrustedResult(DictationResult result, bool ambient = false)
     {
         var text = result.Transcript.Text;
@@ -200,6 +204,9 @@ public static partial class DictationApi
         // once, at most AiChartProposal.MaxPerReview, from a final transcript, with a proposal's warnings only, and what
         // was heard after it (step 15.1) after it in the transcript, with no speaker.
         var proposals = result.Proposals ?? [];
+        // Nothing is proposed from a dictation in Spanish (the expansion plan's step 17): its instructions are listed for the
+        // clinician to place, and a result from Spanish that proposes any is refused whole.
+        if (result.SpokenLanguage == SpokenLanguage.Spanish && proposals.Count > 0) return null;
         if (proposals.Count > AiChartProposal.MaxPerReview || proposals.Count > 0 && !result.Transcript.Final
             || proposals.DistinctBy(p => (p.Start, p.End)).Count() != proposals.Count
             || proposals.Any(p => !result.NotCarriedOver.Any(i => i.Start == p.Start && i.End == p.End
@@ -214,13 +221,47 @@ public static partial class DictationApi
         // time, and a passage with no one's name would read as the turn before's. Each instruction it lists was said by the
         // clinician, or in a passage whose speaker couldn't be told: never the patient's or someone else's.
         if (ambient
-            ? proposals.Count > 0 || result.Transcript.Segments.Any(s => s.Speaker is null)
+            ? proposals.Count > 0 || result.SpokenLanguage != SpokenLanguage.English || result.Transcript.Segments.Any(s => s.Speaker is null)
                 || result.NotCarriedOver.Any(i => i.Speaker is not (Speaker.Clinician or Speaker.Unsure))
                 || !Bare(result)
             : spoken) return null;
         // A live result has the note's four fields only (the expansion plan's step 14). A History is the first of the three
         // fields before then, which only a review stored then holds, read from the database and never through here.
         if (result.Fields?.History is not null) return null;
+        // A source never starts or ends inside a letter and its combining marks ("año" written as n and U+0303, cut after the
+        // n, would show "an"): the surrogate rule above guards only a character in two halves (the expansion plan's step 17).
+        bool Joined(int at) => at > 0 && at < text.Length && Rune.TryGetRuneAt(text, at, out var rune)
+            && Rune.GetUnicodeCategory(rune) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark;
+        bool Source(SourceSpan source) => Range(source.Start, source.End) && !Joined(source.Start) && !Joined(source.End);
+        // A passage speech recognition didn't hear as Spanish was left out of what the model sorts, as the review says: no
+        // source may cite it (step 17). The web checks no other kind of unclear passage here; the dictation service does.
+        var notSpanish = result.Transcript.Segments.Where(s => s.Unclear == Unclear.OtherLanguage).ToList();
+        bool InPassageNotSpanish(SourceSpan source) => notSpanish.Any(s => source.Start < s.End && s.Start < source.End);
+        // A value proposed from Spanish (step 17) is English sentences, each with the Spanish words it was translated from.
+        // The sentences follow each other through the value with exactly one space between them, none at either end and
+        // none doubled; each cites, in order and without overlap, sources of its own that are whole (Source), at most
+        // TranslatedStatement.MaxSpanishLength of the transcript in all; and between them they cite every source the field
+        // has and no other. So the review can put each sentence beside what the clinician said, and a sentence can't cite
+        // more Spanish than the schema lets it quote. A value proposed from English has none.
+        bool Translated(PendingField field)
+        {
+            if (field.Statements is not { } statements) return false;
+            var at = 0;
+            foreach (var statement in statements)
+            {
+                if (statement.Start != at || statement.End <= statement.Start || statement.End > field.Value.Length
+                    || char.IsWhiteSpace(field.Value[statement.Start]) || char.IsWhiteSpace(field.Value[statement.End - 1])
+                    || statement.End < field.Value.Length && field.Value[statement.End] != ' '
+                    || statement.Sources.Count == 0
+                    || statement.Sources.Zip(statement.Sources.Skip(1)).Any(pair => pair.Second.Start < pair.First.End)
+                    || !statement.Sources.All(Source)
+                    || statement.Sources.Sum(s => s.End - s.Start) > TranslatedStatement.MaxSpanishLength) return false;
+                at = statement.End + 1;
+            }
+
+            return at == field.Value.Length + 1 && statements.SelectMany(s => s.Sources).ToHashSet().SetEquals(field.Sources);
+        }
+
         var suggestions = new Dictionary<string, string>();
         if (result.Fields is { } fields)
         {
@@ -229,8 +270,10 @@ public static partial class DictationApi
                 if (field is not PendingField pending) continue;
                 if (result.Sorting != Sorting.Done || string.IsNullOrWhiteSpace(pending.Value) || pending.Value.Contains('\0')
                     || pending.Value.Length > NoteContent.MaximumFieldLength || pending.Sources.Count == 0
-                    || pending.Sources.Any(s => !Range(s.Start, s.End) || ambient && s.Speaker is null)
+                    || !pending.Sources.All(Source) || pending.Sources.Any(InPassageNotSpanish)
+                    || ambient && pending.Sources.Any(s => s.Speaker is null)
                     || pending.Warnings.Any(w => !Range(w.Start, w.End))
+                    || (result.SpokenLanguage == SpokenLanguage.Spanish ? !Translated(pending) : pending.Statements is not null)
                     // A visit's Subjective is the patient's own words, and says so (UC 23).
                     || ambient && name == "subjective" && !pending.Warnings.Any(w => w.Code == WarningCode.PatientsOwnWords)) return null;
                 suggestions.Add(name, pending.Value);

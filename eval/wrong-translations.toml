@@ -1,0 +1,662 @@
+# The review's wrong translations (the expansion plan's step 17, the review of 2026-11-24, attack5.py), as a gated set:
+# English that changes what the Spanish says, each written from words outside the checks' lists, and English that says
+# what it says. Each pair is checked as the review's harness checked it, with no model: the Spanish, said after a
+# sentence of filler (context) so it is one passage of a longer transcript, cited whole as one statement's source, and
+# the English as that statement, in Plan, through the sidecar's Spanish checks (translation.check(); ehr_eval/
+# wrong_translations.py). A wrong pair passes when its field is offered with no reason and no warning; a faithful pair
+# is refused when its field is discarded.
+#
+# The eval's gate (gate.py) fails on every wrong pair marked as reversing the meaning that passes without a warning,
+# unless the owner has accepted it by its id in eval/known-limitations.toml ([[accepted_wrong_translation]]), and on
+# each accepted one that no longer passes; it reports the rest: wrong pairs passing, faithful pairs refused. It also
+# fails when this file isn't the one it was written for (gate.py's WRONG_TRANSLATIONS_SHA256): a change here is a change
+# to the gate, recorded there with it.
+#
+# reverses: read whole, the English says the opposite of the Spanish, or says of the patient what the Spanish says of
+# someone else, or says as certain what the Spanish doubts, or moves a negation from one finding to another; the
+# developer's reading, for the owner to check, and when in doubt a pair is marked as reversing. The file holds 70 wrong
+# pairs; the review counted 69, leaving out w23 ("Su hermano, también diabético"), the appositive the checks' header
+# already names as a limit: marked reversing in doubt ("también" says the patient is diabetic too, and the English
+# drops the brother's).
+
+context = "Consulta programada de seguimiento en el centro de salud, buen estado general, viene caminando y conversa con normalidad durante toda la visita."
+
+[[wrong]]
+id = "w01"
+class = "selfneg"  # a word that negates itself
+spanish = "Paciente atérmico."
+english = "Febrile patient."
+reverses = true
+
+[[wrong]]
+id = "w02"
+class = "selfneg"  # a word that negates itself
+spanish = "Pupilas arreactivas."
+english = "Reactive pupils."
+reverses = true
+
+[[wrong]]
+id = "w03"
+class = "selfneg"  # a word that negates itself
+spanish = "Pulsos pedios imperceptibles."
+english = "Palpable pedal pulses."
+reverses = true
+
+[[wrong]]
+id = "w04"
+class = "selfneg"  # a word that negates itself
+spanish = "Murmullo vesicular abolido en base derecha."
+english = "Breath sounds present at the right base."
+reverses = true
+
+[[wrong]]
+id = "w05"
+class = "selfneg"  # a word that negates itself
+spanish = "Diuresis nula desde ayer."
+english = "Normal urine output since yesterday."
+reverses = true
+
+[[wrong]]
+id = "w06"
+class = "selfneg"  # a word that negates itself
+spanish = "Paciente ileso tras la caída."
+english = "Patient injured after the fall."
+reverses = true
+
+[[wrong]]
+id = "w07"
+class = "selfneg"  # a word that negates itself
+spanish = "Paciente inapetente."
+english = "Patient with good appetite."
+reverses = true
+
+[[wrong]]
+id = "w08"
+class = "selfneg"  # a word that negates itself
+spanish = "Paciente anúrico."
+english = "Patient urinating normally."
+reverses = true
+
+[[wrong]]
+id = "w09"
+class = "selfneg"  # a word that negates itself
+spanish = "Ruidos intestinales inaudibles."
+english = "Bowel sounds audible."
+reverses = true
+
+[[wrong]]
+id = "w10"
+class = "selfneg"  # a word that negates itself
+spanish = "Pie insensible al monofilamento."
+english = "Foot sensitive to monofilament."
+reverses = true
+
+[[wrong]]
+id = "w11"
+class = "selfneg"  # a word that negates itself
+spanish = "Paciente apneico."
+english = "Patient breathing normally."
+reverses = true
+
+[[wrong]]
+id = "w12"
+class = "selfneg"  # a word that negates itself
+spanish = "Paciente afásico."
+english = "Patient speaking fluently."
+reverses = true
+
+[[wrong]]
+id = "w13"
+class = "who"  # who has a finding
+spanish = "Acompañada por su padre, el cual padece epilepsia."
+english = "Accompanied by her father; has epilepsy."
+reverses = true
+
+[[wrong]]
+id = "w14"
+class = "who"  # who has a finding
+spanish = "Viene con su hermana, quien tiene asma."
+english = "Comes with her sister; has asthma."
+reverses = true
+
+[[wrong]]
+id = "w15"
+class = "who"  # who has a finding
+spanish = "La trae su abuela, que es hipertensa."
+english = "Brought by her grandmother; hypertensive."
+reverses = true
+
+[[wrong]]
+id = "w16"
+class = "who"  # who has a finding
+spanish = "Convive con su pareja, que tiene tuberculosis."
+english = "Lives with her partner; has tuberculosis."
+reverses = true
+
+[[wrong]]
+id = "w17"
+class = "who"  # who has a finding
+spanish = "Cuida de su suegra, que padece Alzheimer."
+english = "Cares for her mother-in-law; has Alzheimer disease."
+reverses = true
+
+[[wrong]]
+id = "w18"
+class = "who"  # who has a finding
+spanish = "Contacto estrecho con su hijo, diagnosticado de gripe."
+english = "Close contact with her son; diagnosed with influenza."
+reverses = true
+
+[[wrong]]
+id = "w19"
+class = "who"  # who has a finding
+spanish = "Vive con su madre, a quien le diagnosticaron cáncer."
+english = "Lives with her mother; diagnosed with cancer."
+reverses = true
+
+[[wrong]]
+id = "w20"
+class = "who"  # who has a finding
+spanish = "El niño viene con su madre, que refiere fiebre."
+english = "The mother has a fever."
+reverses = true
+
+[[wrong]]
+id = "w21"
+class = "who"  # who has a finding
+spanish = "Su esposa, que lo acompaña, refiere que ronca."
+english = "His wife snores."
+reverses = true
+
+[[wrong]]
+id = "w22"
+class = "who"  # who has a finding
+spanish = "Hijo de madre con diabetes gestacional."
+english = "Gestational diabetes."
+reverses = true
+
+[[wrong]]
+id = "w23"
+class = "who"  # who has a finding
+spanish = "Su hermano, también diabético, vive con él."
+english = "Diabetic; lives with his brother."
+reverses = true
+
+[[wrong]]
+id = "w24"
+class = "change"  # a medication change
+spanish = "Desescalar el antibiótico."
+english = "Escalate the antibiotic."
+reverses = true
+
+[[wrong]]
+id = "w25"
+class = "change"  # a medication change
+spanish = "Titular al alza la levotiroxina."
+english = "Titrate levothyroxine down."
+reverses = true
+
+[[wrong]]
+id = "w26"
+class = "change"  # a medication change
+spanish = "Ajustar a la baja la dosis de enalapril."
+english = "Increase the enalapril dose."
+reverses = true
+
+[[wrong]]
+id = "w27"
+class = "change"  # a medication change
+spanish = "Recortar la dosis de furosemida."
+english = "Increase the furosemide dose."
+reverses = true
+
+[[wrong]]
+id = "w28"
+class = "change"  # a medication change
+spanish = "Cortar el antibiótico hoy."
+english = "Continue the antibiotic today."
+reverses = true
+
+[[wrong]]
+id = "w29"
+class = "change"  # a medication change
+spanish = "Mantener en suspenso el metotrexato."
+english = "Continue methotrexate."
+reverses = true
+
+[[wrong]]
+id = "w30"
+class = "change"  # a medication change
+spanish = "Discontinuar la aspirina."
+english = "Continue aspirin."
+reverses = true
+
+[[wrong]]
+id = "w31"
+class = "change"  # a medication change
+spanish = "Reintroducir el IECA."
+english = "Stop the ACE inhibitor."
+reverses = true
+
+[[wrong]]
+id = "w32"
+class = "change"  # a medication change
+spanish = "Suspender los opioides."
+english = "Continue opioids."
+reverses = true
+
+[[wrong]]
+id = "w33"
+class = "change"  # a medication change
+spanish = "Iniciar insulinoterapia."
+english = "Stop insulin therapy."
+reverses = true
+
+[[wrong]]
+id = "w34"
+class = "change"  # a medication change
+spanish = "Suspender los anticonvulsivantes."
+english = "Continue anticonvulsants."
+reverses = true
+
+[[wrong]]
+id = "w35"
+class = "change"  # a medication change
+spanish = "Suspender la nutrición parenteral."
+english = "Continue parenteral nutrition."
+reverses = true
+
+[[wrong]]
+id = "w36"
+class = "change"  # a medication change
+spanish = "Retirar la sonda vesical."
+english = "Keep the urinary catheter."
+reverses = true
+
+[[wrong]]
+id = "w37"
+class = "change"  # a medication change
+spanish = "Aumentar la ingesta de líquidos."
+english = "Restrict fluids."
+reverses = true
+
+[[wrong]]
+id = "w38"
+class = "change"  # a medication change
+spanish = "Restringir la sal."
+english = "Increase salt."
+reverses = true
+
+[[wrong]]
+id = "w39"
+class = "change"  # a medication change
+spanish = "Limitar el alcohol."
+english = "Alcohol allowed."
+reverses = true
+
+[[wrong]]
+id = "w40"
+class = "change"  # a medication change
+spanish = "Suspender los antihistamínicos."
+english = "Continue antihistamines."
+reverses = true
+
+[[wrong]]
+id = "w41"
+class = "change"  # a medication change
+spanish = "Retirar los benzodiacepinas poco a poco."
+english = "Increase benzodiazepines gradually."
+reverses = true
+
+[[wrong]]
+id = "w42"
+class = "change"  # a medication change
+spanish = "Pasar el omeprazol a días alternos."
+english = "Take omeprazole twice daily."
+reverses = true
+
+[[wrong]]
+id = "w43"
+class = "change"  # a medication change
+spanish = "Reducir el tabaco."
+english = "Increase smoking."
+reverses = true
+
+[[wrong]]
+id = "w44"
+class = "severity"  # severity
+spanish = "Dolor leve en el hombro."
+english = "Agonizing shoulder pain."
+reverses = true
+
+[[wrong]]
+id = "w45"
+class = "severity"  # severity
+spanish = "Dolor leve en el hombro."
+english = "Unbearable shoulder pain."
+reverses = true
+
+[[wrong]]
+id = "w46"
+class = "severity"  # severity
+spanish = "Dolor intenso en el hombro."
+english = "Trivial shoulder pain."
+reverses = true
+
+[[wrong]]
+id = "w47"
+class = "severity"  # severity
+spanish = "Sangrado abundante."
+english = "Minor bleeding."
+reverses = true
+
+[[wrong]]
+id = "w48"
+class = "severity"  # severity
+spanish = "Dolor leve en el hombro."
+english = "Terrible shoulder pain."
+reverses = true
+
+[[wrong]]
+id = "w49"
+class = "severity"  # severity
+spanish = "Edema leve en tobillos."
+english = "Gross ankle edema."
+reverses = true
+
+[[wrong]]
+id = "w50"
+class = "severity"  # severity
+spanish = "Disnea leve."
+english = "Debilitating dyspnea."
+reverses = true
+
+[[wrong]]
+id = "w51"
+class = "severity"  # severity
+spanish = "Hemorragia leve."
+english = "Life-threatening hemorrhage."
+reverses = true
+
+[[wrong]]
+id = "w52"
+class = "severity"  # severity
+spanish = "Dolor discreto en el hombro."
+english = "Severe shoulder pain."
+reverses = true
+
+[[wrong]]
+id = "w53"
+class = "doubt"  # doubt
+spanish = "Sugiere una apendicitis."
+english = "Appendicitis."
+reverses = true
+
+[[wrong]]
+id = "w54"
+class = "doubt"  # doubt
+spanish = "Habría que pensar en una tuberculosis."
+english = "Tuberculosis."
+reverses = true
+
+[[wrong]]
+id = "w55"
+class = "doubt"  # doubt
+spanish = "Cabe pensar en una diverticulitis."
+english = "Diverticulitis."
+reverses = true
+
+[[wrong]]
+id = "w56"
+class = "doubt"  # doubt
+spanish = "Podría corresponder a una hernia."
+english = "Hernia."
+reverses = true
+
+[[wrong]]
+id = "w57"
+class = "doubt"  # doubt
+spanish = "Con alta sospecha de embolia pulmonar."
+english = "Pulmonary embolism."
+reverses = true
+
+[[wrong]]
+id = "w58"
+class = "doubt"  # doubt
+spanish = "Se sospecha neumonía."
+english = "Pneumonia."
+reverses = true
+
+[[wrong]]
+id = "w59"
+class = "doubt"  # doubt
+spanish = "Hipótesis diagnóstica: colecistitis."
+english = "Diagnosis: cholecystitis."
+reverses = true
+
+[[wrong]]
+id = "w60"
+class = "doubt"  # doubt
+spanish = "Seguramente sea una migraña."
+english = "Migraine."
+reverses = true
+
+[[wrong]]
+id = "w61"
+class = "doubt"  # doubt
+spanish = "Me inclino por una sinusitis."
+english = "Sinusitis."
+reverses = true
+
+[[wrong]]
+id = "w62"
+class = "doubt"  # doubt
+spanish = "Sin poder descartar meningitis."
+english = "No meningitis."
+reverses = true
+
+[[wrong]]
+id = "w63"
+class = "glossary"  # a negation moved between findings
+spanish = "Niega estreñimiento pero refiere acidez."
+english = "Denies heartburn but reports constipation."
+reverses = true
+
+[[wrong]]
+id = "w64"
+class = "glossary"  # a negation moved between findings
+spanish = "Tiene estornudos pero no tiene ronquera."
+english = "Has hoarseness but no sneezing."
+reverses = true
+
+[[wrong]]
+id = "w65"
+class = "glossary"  # a negation moved between findings
+spanish = "Sin desmayos, con caídas frecuentes."
+english = "With fainting, without frequent falls."
+reverses = true
+
+[[wrong]]
+id = "w66"
+class = "glossary"  # a negation moved between findings
+spanish = "Niega sed excesiva, refiere picazón."
+english = "Denies itching, reports excessive thirst."
+reverses = true
+
+[[wrong]]
+id = "w67"
+class = "glossary"  # a negation moved between findings
+spanish = "Hay flemas, no hay moretones."
+english = "No phlegm, bruises present."
+reverses = true
+
+[[wrong]]
+id = "w68"
+class = "glossary"  # a negation moved between findings
+spanish = "Niega ardor al orinar; refiere sangre en las heces."
+english = "Denies blood in the stool; reports burning on urination."
+reverses = true
+
+[[wrong]]
+id = "w69"
+class = "glossary"  # a negation moved between findings
+spanish = "No tose pero estornuda."
+english = "Coughs but does not sneeze."
+reverses = true
+
+[[wrong]]
+id = "w70"
+class = "glossary"  # a negation moved between findings
+spanish = "Niega mocos, refiere ojos llorosos."
+english = "Denies watery eyes, reports a runny nose."
+reverses = true
+
+[[faithful]]
+id = "f01"
+spanish = "Paciente afebril y asintomático."
+english = "Afebrile and asymptomatic patient."
+
+[[faithful]]
+id = "f02"
+spanish = "Acude con su madre, que tiene asma."
+english = "Comes with her mother, who has asthma."
+
+[[faithful]]
+id = "f03"
+spanish = "Suspender los antibióticos."
+english = "Stop the antibiotics."
+
+[[faithful]]
+id = "f04"
+spanish = "Dolor moderado en la espalda."
+english = "Moderate back pain."
+
+[[faithful]]
+id = "f05"
+spanish = "Dolor insoportable en la espalda."
+english = "Excruciating back pain."
+
+[[faithful]]
+id = "f06"
+spanish = "Sangrado escaso."
+english = "Scant bleeding."
+
+[[faithful]]
+id = "f07"
+spanish = "Parece una dermatitis de contacto."
+english = "Appears to be contact dermatitis."
+
+[[faithful]]
+id = "f08"
+spanish = "Niega fiebre, tos o dolor de garganta."
+english = "Denies fever, cough or sore throat."
+
+[[faithful]]
+id = "f09"
+spanish = "Fuma diez cigarrillos al día."
+english = "Smokes 10 cigarettes a day."
+
+[[faithful]]
+id = "f10"
+spanish = "Doblar la dosis de furosemida."
+english = "Double the furosemide dose."
+
+[[faithful]]
+id = "f11"
+spanish = "Evitar los antiinflamatorios."
+english = "Avoid anti-inflammatories."
+
+[[faithful]]
+id = "f12"
+spanish = "Abdomen blando, depresible e indoloro."
+english = "Abdomen soft, depressible and nontender."
+
+[[faithful]]
+id = "f13"
+spanish = "Su padre murió de un infarto a los 60 años."
+english = "Her father died of a heart attack at age 60."
+
+[[faithful]]
+id = "f14"
+spanish = "Probable faringitis viral."
+english = "Probable viral pharyngitis."
+
+[[faithful]]
+id = "f15"
+spanish = "Iniciar amoxicilina 500 mg cada 8 horas durante 7 días."
+english = "Start amoxicillin 500 mg every 8 hours for 7 days."
+
+[[faithful]]
+id = "f16"
+spanish = "Glucemia capilar de 180."
+english = "Capillary glucose 180."
+
+[[faithful]]
+id = "f17"
+spanish = "Tensión arterial 130 sobre 80."
+english = "Blood pressure 130/80."
+
+[[faithful]]
+id = "f18"
+spanish = "Reducir la prednisona a 10 mg al día."
+english = "Reduce prednisone to 10 mg daily."
+
+[[faithful]]
+id = "f19"
+spanish = "Control en dos semanas."
+english = "Follow-up in 2 weeks."
+
+[[faithful]]
+id = "f20"
+spanish = "Herida limpia, sin signos de infección."
+english = "Clean wound, no signs of infection."
+
+[[faithful]]
+id = "f21"
+spanish = "Otoscopia normal en ambos oídos."
+english = "Normal otoscopy in both ears."
+
+[[faithful]]
+id = "f22"
+spanish = "Paciente consciente y orientado en las tres esferas."
+english = "Patient alert and oriented times three."
+
+[[faithful]]
+id = "f23"
+spanish = "Mantener los anticoagulantes."
+english = "Continue the anticoagulants."
+
+[[faithful]]
+id = "f24"
+spanish = "Refiere cansancio desde hace un mes."
+english = "Reports fatigue for a month."
+
+[[faithful]]
+id = "f25"
+spanish = "Hermana con cáncer de mama a los 45 años."
+english = "Sister with breast cancer at age 45."
+
+[[faithful]]
+id = "f26"
+spanish = "Se sospecha una infección urinaria."
+english = "Suspected urinary tract infection."
+
+[[faithful]]
+id = "f27"
+spanish = "Pautar paracetamol 1 g cada 8 horas si hay dolor."
+english = "Acetaminophen 1 g every 8 hours as needed for pain."
+
+[[faithful]]
+id = "f28"
+spanish = "Niega alergias a medicamentos."
+english = "Denies drug allergies."
+
+[[faithful]]
+id = "f29"
+spanish = "Espaciar el salbutamol."
+english = "Use albuterol less often."
+
+[[faithful]]
+id = "f30"
+spanish = "Edema leve con fóvea en ambos tobillos."
+english = "Mild pitting edema in both ankles."

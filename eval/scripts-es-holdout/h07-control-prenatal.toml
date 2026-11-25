@@ -1,0 +1,121 @@
+id = "h07-control-prenatal"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "vitals", "dates", "decimal-comma", "units", "frequency", "severity", "negation", "certainty", "history", "experiencer", "actions", "order-attempt", "mixed-plan", "long"]
+dates = ["2026-11-17", "2027-02-16"]
+drugs = ["ácido fólico", "sulfato ferroso"]
+drugs_en = ["folic acid", "ferrous sulfate"]
+forbidden = ["Pido un hemograma de control para dentro de un mes"]
+forbidden_en = ["CBC", "complete blood count", "blood count"]
+negated = ["bleeding", "contractions", "headache", "edema"]
+affirmed = ["fatigue", "leg cramps"]
+family = [["preeclampsia", "mother"]]
+text = """
+Control prenatal. Mujer de [[31|treinta y un]] años, segundo embarazo, de [[28|veintiocho]] semanas. Fecha probable de
+parto: [[16 de febrero de 2027|dieciséis de febrero de dos mil veintisiete]]. Antecedente de diabetes gestacional en
+el primer embarazo, que terminó en cesárea en [[2023|dos mil veintitrés]]. Su madre tuvo preeclampsia. Refiere que el
+bebé se mueve bien. Niega sangrado, niega pérdida de líquido y niega contracciones. Tiene cansancio y calambres en las
+piernas por las noches. No tiene dolor de cabeza ni alteraciones visuales. Toma ácido fólico [[400
+microgramos|cuatrocientos microgramos]] al día. No fuma. En la exploración, presión arterial [[112/70|ciento doce
+sobre setenta]], peso [[72,5 kg|setenta y dos coma cinco kilos]], [[1,5 kg|un kilo y medio]] más que hace
+[[4|cuatro]] semanas. Altura uterina de [[28 cm|veintiocho centímetros]]. Frecuencia cardiaca fetal de [[146|ciento
+cuarenta y seis]] latidos por minuto. Sin edema en las piernas. Analítica del [[17 de noviembre de 2026|diecisiete de
+noviembre de dos mil veintiséis]]: hemoglobina [[10,4 g/dl|diez coma cuatro gramos por decilitro]], ferritina
+[[9|nueve]], glucosa a la hora de [[128 mg/dl|ciento veintiocho miligramos por decilitro]]. Impresión: embarazo de
+[[28|veintiocho]] semanas de curso normal. Anemia leve, probablemente por falta de hierro. Cribado de diabetes
+gestacional negativo. Plan: iniciar sulfato ferroso [[325 mg|trescientos veinticinco miligramos]] al día con zumo de
+naranja. Continuar ácido fólico. Vacuna de la tosferina hoy. Pido un hemograma de control para dentro de un mes. Se le
+explican los signos de alarma. Próximo control en [[2|dos]] semanas.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 31 años, segundo embarazo, de 28 semanas."]
+english = "31-year-old woman, second pregnancy, at 28 weeks."
+
+[[gold.subjective]]
+spanish = ["Fecha probable de parto: 16 de febrero de 2027."]
+english = "Estimated due date: February 16, 2027."
+
+[[gold.subjective]]
+spanish = ["Antecedente de diabetes gestacional en el primer embarazo, que terminó en cesárea en 2023."]
+english = "History of gestational diabetes in the first pregnancy, which ended in a cesarean section in 2023."
+
+[[gold.subjective]]
+spanish = ["Su madre tuvo preeclampsia."]
+english = "Her mother had preeclampsia."
+
+[[gold.subjective]]
+spanish = ["Refiere que el bebé se mueve bien."]
+english = "Reports that the baby is moving well."
+
+[[gold.subjective]]
+spanish = ["Niega sangrado, niega pérdida de líquido y niega contracciones."]
+english = "Denies bleeding, denies fluid loss and denies contractions."
+
+[[gold.subjective]]
+spanish = ["Tiene cansancio y calambres en las piernas por las noches."]
+english = "Has fatigue and leg cramps at night."
+
+[[gold.subjective]]
+spanish = ["No tiene dolor de cabeza ni alteraciones visuales."]
+english = "No headache or visual disturbances."
+
+[[gold.subjective]]
+spanish = ["Toma ácido fólico 400 microgramos al día."]
+english = "Takes folic acid 400 mcg daily."
+
+[[gold.subjective]]
+spanish = ["No fuma."]
+english = "Does not smoke."
+
+[[gold.objective]]
+spanish = ["presión arterial 112/70, peso 72,5 kg, 1,5 kg más que hace 4 semanas."]
+english = "Blood pressure 112/70, weight 72.5 kg, 1.5 kg more than 4 weeks ago."
+
+[[gold.objective]]
+spanish = ["Altura uterina de 28 cm."]
+english = "Fundal height 28 cm."
+
+[[gold.objective]]
+spanish = ["Frecuencia cardiaca fetal de 146 latidos por minuto."]
+english = "Fetal heart rate 146 beats per minute."
+
+[[gold.objective]]
+spanish = ["Sin edema en las piernas."]
+english = "No edema in the legs."
+
+[[gold.objective]]
+spanish = ["Analítica del 17 de noviembre de 2026: hemoglobina 10,4 g/dl, ferritina 9, glucosa a la hora de 128 mg/dl."]
+english = "Labs from November 17, 2026: hemoglobin 10.4 g/dL, ferritin 9, 1-hour glucose 128 mg/dL."
+
+[[gold.assessment]]
+spanish = ["embarazo de 28 semanas de curso normal."]
+english = "Pregnancy at 28 weeks, progressing normally."
+
+[[gold.assessment]]
+spanish = ["Anemia leve, probablemente por falta de hierro."]
+english = "Mild anemia, probably due to iron deficiency."
+
+[[gold.assessment]]
+spanish = ["Cribado de diabetes gestacional negativo."]
+english = "Gestational diabetes screening negative."
+
+[[gold.plan]]
+spanish = ["iniciar sulfato ferroso 325 mg al día con zumo de naranja."]
+english = "Start ferrous sulfate 325 mg daily with orange juice."
+
+[[gold.plan]]
+spanish = ["Continuar ácido fólico."]
+english = "Continue folic acid."
+
+[[gold.plan]]
+spanish = ["Vacuna de la tosferina hoy."]
+english = "Pertussis vaccine today."
+
+[[gold.plan]]
+spanish = ["Se le explican los signos de alarma."]
+english = "Warning signs are explained to her."
+
+[[gold.plan]]
+spanish = ["Próximo control en 2 semanas."]
+english = "Next follow-up in 2 weeks."

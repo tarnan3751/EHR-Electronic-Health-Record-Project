@@ -39,6 +39,14 @@ VISIT = heard(
 )
 
 
+# A dictation with too few English words offers nothing (the owner's ruling of 2026-11-25; test_validation.py); a visit's
+# window isn't refused so: listening has no such rule.
+def test_a_window_with_too_few_english_words_is_checked_as_ever():
+    text = heard(("clinician", "Ctrol hypertension thecta dose annus cononypertension arterial this theaCD {period}"))
+
+    assert validation.too_little_english(text.text) and set(checked(text)) == set(FIELDS)
+
+
 def test_subjective_quotes_the_patient_and_the_rest_the_clinician():
     fields = checked(
         VISIT,

@@ -550,4 +550,424 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         using var manualSign = await EditorPost(f, "Sign", 2, extra: [("Confirmed", true)]);
         Assert.Equal(HttpStatusCode.OK, manualSign.StatusCode);
     }
+
+    // A dictation in Spanish (the expansion plan's step 17), staged from the stub's Spanish mode: five chunks, every one of
+    // the four fields proposed in English with its statements.
+    async Task<Flow> StageSpanishAsync()
+    {
+        sidecar.Spanish = true;
+        var flow = await BeginAsync();
+        await DictateAsync(flow, 5);
+        using var staged = await Stage(flow, 1);
+        Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
+        return flow;
+    }
+
+    async Task<JsonElement> StoredResultAsync(Flow f)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand("SELECT result_json::text FROM ehr.ai_note_reviews WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", f.Review);
+        return JsonDocument.Parse((string)(await command.ExecuteScalarAsync(Cancel))!).RootElement.Clone();
+    }
+
+    // Each translated sentence as the review shows it, the owner's words over it (2026-11-24).
+    static string Translated(string english, string spanish) =>
+        $"<li class=\"sc-translation__pair\"><p class=\"sc-translation__check\">Translated from Spanish: check it against the Spanish beside it</p><p class=\"sc-translation__english\">{english}</p><p class=\"sc-translation__spanish\">You said: <span lang=\"es\">“{spanish}”</span></p></li>";
+
+    // TC-UC13-15 (successful flow; the expansion plan's step 17, proposed FR-61): a dictation in Spanish is reviewed in the
+    // English screens: its transcript in Spanish, a notice that the proposals are translations to check sentence by
+    // sentence, and each field's English sentences, each beside the Spanish it was translated from, each field accepted
+    // with "Accept translated". The Spanish transcript and each sentence's Spanish words are stored with the review, and
+    // what is approved goes into the note in English.
+    [Fact]
+    public async Task TC_UC13_15_a_dictation_in_spanish_is_reviewed_a_sentence_at_a_time_beside_its_spanish()
+    {
+        var f = await StageSpanishAsync();
+        var html = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
+        Assert.Contains("Original transcript, in Spanish", html);
+        Assert.Contains("<div class=\"sc-transcript__body\" data-dictation-transcript lang=\"es\">", html);
+        Assert.Contains("Translated from Spanish: these proposals are English translations of what you said.", html);
+        Assert.Contains("Nothing is proposed for orders or the allergy list from a dictation in Spanish.", html);
+        Assert.DoesNotContain("data-chart-proposals ", html);
+        foreach (var (field, statements) in DictationSidecarStub.SpanishFields)
+        {
+            var card = html.Split($"data-dictation-field=\"{field}\"")[1];
+            Assert.Matches("^\\s*<ol class=\"sc-translation\">", card[(card.IndexOf("<dd data-field-value>", StringComparison.Ordinal) + "<dd data-field-value>".Length)..]);
+            foreach (var (english, spanish) in statements)
+            {
+                Assert.Contains(Translated(english, spanish), html);
+            }
+
+            Assert.Contains($">Accept translated {field}</button>", html);
+            Assert.DoesNotContain($">Accept {field}</button>", html);
+        }
+
+        var stored = await StoredResultAsync(f);
+
+        // No translated sentence reads as checked for having no warning: the one in Plan, whose field warns of "cada
+        // tercer día", and those in the fields with none each say they are translations to check.
+        Assert.Equal("ambiguous_frequency", stored.GetProperty("fields").GetProperty("plan").GetProperty("warnings")[0].GetProperty("code").GetString());
+        Assert.Equal(0, stored.GetProperty("fields").GetProperty("subjective").GetProperty("warnings").GetArrayLength());
+        foreach (var (field, statements) in DictationSidecarStub.SpanishFields)
+        {
+            var card = html.Split($"data-dictation-field=\"{field}\"")[1];
+            card = card[..card.IndexOf("</ol>", StringComparison.Ordinal)];
+            Assert.Equal(statements.Length, card.Split("<p class=\"sc-translation__check\">Translated from Spanish: check it against the Spanish beside it</p>").Length - 1);
+        }
+
+        Assert.Equal("es", stored.GetProperty("spokenLanguage").GetString());
+        var transcript = stored.GetProperty("transcript").GetProperty("text").GetString()!;
+        Assert.Equal(string.Join(' ', DictationSidecarStub.SpanishSentences), transcript);
+        foreach (var (field, statements) in DictationSidecarStub.SpanishFields)
+        {
+            var proposed = stored.GetProperty("fields").GetProperty(field);
+            var value = proposed.GetProperty("value").GetString()!;
+            var saved = proposed.GetProperty("statements").EnumerateArray().ToArray();
+            Assert.Equal(statements.Select(s => s.English), saved.Select(s => value[s.GetProperty("start").GetInt32()..s.GetProperty("end").GetInt32()]));
+            Assert.Equal(statements.Select(s => s.Spanish), saved.Select(s =>
+            {
+                var source = Assert.Single(s.GetProperty("sources").EnumerateArray().ToArray());
+                return transcript[source.GetProperty("start").GetInt32()..source.GetProperty("end").GetInt32()];
+            }));
+        }
+
+        var version = 2L;
+        foreach (var proposal in await Proposals(f))
+        {
+            using var accepted = await Decide(f, proposal.Id, version++, "accepted");
+            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        }
+
+        using var complete = await ReviewPost(f, "Complete", ("Version", version));
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        Assert.Equal(1, await Scalar(
+            "SELECT count(*) FROM ehr.clinical_drafts WHERE id = @id AND subjective = 'Cough for three days. Denies fever.' AND objective = 'Lungs clear.' AND assessment = 'Likely viral illness.' AND plan LIKE 'Plenty of fluids and relative rest%'",
+            f.Draft));
+    }
+
+    // TC-UC13-16 (alternative flow; step 17): the review of a dictation in Spanish is reopened later, from the draft's and
+    // then the signed note's saved reviews, which say it was in Spanish, and still shows each sentence beside its Spanish,
+    // read-only once signed. A review of a dictation in English says nothing of a language, as before.
+    [Fact]
+    public async Task TC_UC13_16_a_review_in_spanish_reopened_later_and_from_the_signed_note_still_shows_its_spanish()
+    {
+        var f = await StageSpanishAsync();
+        var version = 2L;
+        foreach (var proposal in await Proposals(f))
+        {
+            using var accepted = await Decide(f, proposal.Id, version++, "accepted");
+            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        }
+
+        using (var complete = await ReviewPost(f, "Complete", ("Version", version)))
+        {
+            Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        }
+
+        var editor = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.Editor, Cancel));
+        Assert.Matches($"(?s)Saved AI reviews.*{f.Review}\">Dictation in Spanish and review saved ", editor);
+        using var sign = await EditorPost(f, "Sign", version + 1, extra: [("Confirmed", true)]);
+        Assert.Equal(HttpStatusCode.OK, sign.StatusCode);
+        var signed = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync((await Json(sign)).GetProperty("url").GetString()!, Cancel));
+        Assert.Matches($"(?s)Saved AI reviews.*{f.Review}\">Dictation in Spanish and review saved ", signed);
+
+        var reopened = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
+        Assert.Contains("The review of its fields is read-only.", reopened);
+        Assert.Contains("Translated from Spanish:", reopened);
+        foreach (var (english, spanish) in DictationSidecarStub.SpanishFields.SelectMany(field => field.Statements))
+        {
+            Assert.Contains(Translated(english, spanish), reopened);
+        }
+
+        sidecar.Spanish = false;
+        var inEnglish = await StageAsync(plan: false);
+        version = 2L;
+        foreach (var proposal in await Proposals(inEnglish))
+        {
+            using var accepted = await Decide(inEnglish, proposal.Id, version++, "accepted");
+            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        }
+
+        using (var complete = await ReviewPost(inEnglish, "Complete", ("Version", version)))
+        {
+            Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        }
+
+        Assert.Matches($"(?s)Saved AI reviews.*{inEnglish.Review}\">Dictation and review saved ",
+            WebUtility.HtmlDecode(await inEnglish.Session.Client.GetStringAsync(inEnglish.Editor, Cancel)));
+    }
+
+    // TC-UC13-17 (invalid input; step 17): a result from Spanish whose sentences don't hold is refused at staging and
+    // nothing is stored, so the review never shows a sentence beside Spanish it didn't come from, and no load of it can
+    // fail. Each case but outside is caught by one rule of TrustedResult alone (removing that rule turns that case red
+    // and no other; empty and past-value then fail with an error, not a refusal): a sentence that doesn't start where
+    // the last one ended (gap), sentences that don't reach the value's end (uncovered), a sentence ending inside a word
+    // (mid-word), a sentence of no length (empty) or past the value's end (past-value), a space at the value's start
+    // (leading-space) or end (trailing-space) or two between sentences (double-space), a sentence citing nothing
+    // (uncited), its sources out of order (reversed) or one cited twice (repeated-span), a sentence citing a span the
+    // field doesn't have (extra), a field source no sentence cites (uncited-source), both at once (foreign, and outside,
+    // where the one a sentence cites is past the transcript's end), a source cut between a letter and its combining
+    // accent (combining) or in a passage not heard as Spanish (other-language), and a sentence citing, besides its own,
+    // a span past the transcript's end (extra-outside: the sources' own range check and the rule that the sentences cite
+    // the field's sources each refuse it, so that weakening the second to "at least the field's sources" alone still
+    // stores nothing, while with both gone it would be stored and the review fail on every load), a sentence citing 401
+    // characters of the transcript, more than the 400 the Spanish note schema's two quotes of 200 allow (over-400), a
+    // field from Spanish with no sentences (no-statements), sentences on a field from English (english-statements), a
+    // language the contract doesn't have,
+    // with no sentences anywhere (unknown-language: the read fails), a language that isn't exactly "en" or "es", each in
+    // the shape that a lenient read would stage (5 with no sentences, as an English result; 1, "1", " es", "es " and
+    // "en, es", which a lenient read takes for Spanish, with them), and an order proposed from Spanish, otherwise one the
+    // expansion plan's step 15 would stage (proposal: nothing is proposed from a dictation in Spanish).
+    [Theory]
+    [InlineData("gap")]
+    [InlineData("uncovered")]
+    [InlineData("mid-word")]
+    [InlineData("uncited")]
+    [InlineData("foreign")]
+    [InlineData("outside")]
+    [InlineData("no-statements")]
+    [InlineData("english-statements")]
+    [InlineData("unknown-language")]
+    [InlineData("language-5")]
+    [InlineData("language-1")]
+    [InlineData("language-1-string")]
+    [InlineData("language-padded")]
+    [InlineData("language-trailing")]
+    [InlineData("language-list")]
+    [InlineData("proposal")]
+    [InlineData("empty")]
+    [InlineData("past-value")]
+    [InlineData("leading-space")]
+    [InlineData("trailing-space")]
+    [InlineData("double-space")]
+    [InlineData("reversed")]
+    [InlineData("repeated-span")]
+    [InlineData("extra")]
+    [InlineData("extra-outside")]
+    [InlineData("uncited-source")]
+    [InlineData("combining")]
+    [InlineData("other-language")]
+    [InlineData("over-400")]
+    public async Task TC_UC13_17_a_result_from_spanish_whose_sentences_dont_hold_is_refused_and_nothing_is_staged(string kind)
+    {
+        sidecar.Spanish = kind != "english-statements";
+        var f = await BeginAsync();
+        await DictateAsync(f, 5);
+        using var result = await JsonPost(f.Session.Client, f.Token, $"{Api}/{f.SessionId}/result", new { });
+        var json = System.Text.Json.Nodes.JsonNode.Parse(await result.Content.ReadAsStringAsync(Cancel))!;
+        var subjective = json["fields"]!["subjective"]!;
+        var first = subjective["statements"]?[0];
+        var second = subjective["statements"]?[1];
+        switch (kind)
+        {
+            case "gap":
+                second!["start"] = second["start"]!.GetValue<int>() + 1;
+                break;
+            case "uncovered":
+                subjective["statements"]!.AsArray().RemoveAt(1);
+                subjective["sources"]!.AsArray().RemoveAt(1);
+                break;
+            case "mid-word":
+                first!["end"] = first["end"]!.GetValue<int>() - 2;
+                second!["start"] = first["end"]!.GetValue<int>() + 1;
+                break;
+            case "uncited":
+                second!["sources"]!.AsArray().Insert(0, first!["sources"]![0]!.DeepClone());
+                first["sources"] = new System.Text.Json.Nodes.JsonArray();
+                break;
+            case "foreign":
+                first!["sources"]![0]!["end"] = first["sources"]![0]!["end"]!.GetValue<int>() - 1;
+                break;
+            case "outside":
+                first!["sources"]![0]!["end"] = 1000000;
+                break;
+            case "no-statements":
+                json["fields"]!["plan"]!.AsObject().Remove("statements");
+                break;
+            case "english-statements":
+                subjective["statements"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+                {
+                    ["start"] = 0,
+                    ["end"] = subjective["value"]!.GetValue<string>().Length,
+                    ["sources"] = subjective["sources"]!.DeepClone(),
+                });
+                break;
+            case "empty":
+                subjective["statements"]!.AsArray().Insert(0, new System.Text.Json.Nodes.JsonObject
+                {
+                    ["start"] = 0,
+                    ["end"] = 0,
+                    ["sources"] = first!["sources"]!.DeepClone(),
+                });
+                break;
+            case "past-value":
+                second!["end"] = subjective["value"]!.GetValue<string>().Length + 1;
+                break;
+            case "leading-space":
+                subjective["value"] = " " + subjective["value"]!.GetValue<string>();
+                first!["end"] = first["end"]!.GetValue<int>() + 1;
+                second!["start"] = second["start"]!.GetValue<int>() + 1;
+                second["end"] = second["end"]!.GetValue<int>() + 1;
+                break;
+            case "trailing-space":
+                subjective["value"] = subjective["value"]!.GetValue<string>() + " ";
+                second!["end"] = second["end"]!.GetValue<int>() + 1;
+                break;
+            case "double-space":
+                var words = subjective["value"]!.GetValue<string>();
+                subjective["value"] = words.Insert(first!["end"]!.GetValue<int>(), " ");
+                second!["end"] = second["end"]!.GetValue<int>() + 1;
+                break;
+            case "reversed":
+                second!["sources"]!.AsArray().Add(first!["sources"]![0]!.DeepClone());
+                break;
+            case "repeated-span":
+                second!["sources"]!.AsArray().Add(second["sources"]![0]!.DeepClone());
+                break;
+            case "extra":
+                second!["sources"]!.AsArray().Add(json["fields"]!["objective"]!["sources"]![0]!.DeepClone());
+                break;
+            case "extra-outside":
+                var last = second!["sources"]![0]!["end"]!.GetValue<int>();
+                second["sources"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject { ["start"] = last + 1, ["end"] = 1000000 });
+                break;
+            case "uncited-source":
+                subjective["sources"]!.AsArray().Add(json["fields"]!["objective"]!["sources"]![0]!.DeepClone());
+                break;
+            case "combining":
+                var assessment = json["fields"]!["assessment"]!;
+                var text = json["transcript"]!["text"]!.GetValue<string>();
+                var cut = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["start"] = assessment["sources"]![0]!["start"]!.GetValue<int>(),
+                    ["end"] = text.IndexOf('\u0301', StringComparison.Ordinal),
+                };
+                assessment["sources"] = new System.Text.Json.Nodes.JsonArray(cut);
+                assessment["statements"]![0]!["sources"] = new System.Text.Json.Nodes.JsonArray(cut.DeepClone());
+                break;
+            case "other-language":
+                var objective = json["fields"]!["objective"]!;
+                var passage = json["transcript"]!["segments"]![2]!;
+                var notSpanish = new System.Text.Json.Nodes.JsonObject { ["start"] = passage["start"]!.DeepClone(), ["end"] = passage["end"]!.DeepClone() };
+                objective["sources"] = new System.Text.Json.Nodes.JsonArray(notSpanish);
+                objective["statements"]![0]!["sources"] = new System.Text.Json.Nodes.JsonArray(notSpanish.DeepClone());
+                break;
+            case "over-400":
+                var said = json["transcript"]!["text"]!.GetValue<string>();
+                var own = second!["sources"]![0]!;
+                var more = 401 - (own["end"]!.GetValue<int>() - own["start"]!.GetValue<int>());
+                json["transcript"]!["text"] = said + " " + string.Concat(Enumerable.Repeat("Refiere cansancio por las tardes. ", more / 30 + 1))[..more];
+                var further = new System.Text.Json.Nodes.JsonObject { ["start"] = said.Length + 1, ["end"] = said.Length + 1 + more };
+                second["sources"]!.AsArray().Add(further);
+                subjective["sources"]!.AsArray().Add(further.DeepClone());
+                break;
+            case "proposal":
+                var order = json["notCarriedOver"]![0]!;
+                json["proposals"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+                {
+                    ["kind"] = "order",
+                    ["start"] = order["start"]!.DeepClone(),
+                    ["end"] = order["end"]!.DeepClone(),
+                    ["warnings"] = new System.Text.Json.Nodes.JsonArray(),
+                });
+                break;
+            case "language-5":
+                json["spokenLanguage"] = 5;
+                foreach (var field in json["fields"]!.AsObject())
+                {
+                    field.Value!.AsObject().Remove("statements");
+                }
+
+                break;
+            case "language-1":
+                json["spokenLanguage"] = 1;
+                break;
+            case "language-1-string":
+                json["spokenLanguage"] = "1";
+                break;
+            case "language-padded":
+                json["spokenLanguage"] = " es";
+                break;
+            case "language-trailing":
+                json["spokenLanguage"] = "es ";
+                break;
+            case "language-list":
+                json["spokenLanguage"] = "en, es";
+                break;
+            case "unknown-language":
+                json["spokenLanguage"] = "fr";
+                foreach (var field in json["fields"]!.AsObject())
+                {
+                    field.Value!.AsObject().Remove("statements");
+                }
+
+                break;
+        }
+
+        sidecar.Answer = (HttpStatusCode.OK, json.ToJsonString());
+        using var stage = await Stage(f, 1);
+        Assert.Equal(HttpStatusCode.BadGateway, stage.StatusCode);
+        Assert.Empty(await Proposals(f));
+        Assert.Equal(1, await Scalar("SELECT count(*) FROM ehr.ai_note_reviews WHERE id = @id AND state = 'recording' AND result_json IS NULL", f.Review));
+        Assert.Equal(1, await Scalar("SELECT version FROM ehr.clinical_drafts WHERE id = @id", f.Draft));
+    }
+
+    // Step 17's second series: the result in Spanish that the dictation service itself writes (its pinned contract file,
+    // result-200-done-es.json) is staged as it is, so TrustedResult takes the shape the service writes: sentences joined
+    // by one space, each citing whole Spanish of its own, a Spanish instruction listed, nothing proposed.
+    [Fact]
+    public async Task The_dictation_services_own_result_in_spanish_is_staged()
+    {
+        var f = await BeginAsync();
+        var contract = System.Text.Json.Nodes.JsonNode.Parse(
+            await File.ReadAllTextAsync(Ehr.Testing.RepositoryRoot.Combine("src/Ehr.Dictation/contract/result-200-done-es.json"), Cancel))!;
+        sidecar.Answer = (HttpStatusCode.OK, contract["body"]!.ToJsonString());
+
+        using var stage = await Stage(f, 1);
+
+        Assert.Equal(HttpStatusCode.OK, stage.StatusCode);
+        var stored = await StoredResultAsync(f);
+        Assert.Equal("es", stored.GetProperty("spokenLanguage").GetString());
+        Assert.Equal(2, stored.GetProperty("fields").GetProperty("subjective").GetProperty("statements").GetArrayLength());
+    }
+
+    // Step 17: a stored review's line among the saved reviews says "in Spanish" only when its result's spokenLanguage is
+    // exactly "es", and reading it never throws, whatever the stored evidence holds.
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("{}", false)]
+    [InlineData("[]", false)]
+    [InlineData("5", false)]
+    [InlineData("not JSON", false)]
+    [InlineData("{\"spokenLanguage\":5}", false)]
+    [InlineData("{\"spokenLanguage\":1}", false)]
+    [InlineData("{\"spokenLanguage\":\"1\"}", false)]
+    [InlineData("{\"spokenLanguage\":\" es\"}", false)]
+    [InlineData("{\"spokenLanguage\":\"en, es\"}", false)]
+    [InlineData("{\"spokenLanguage\":[\"es\"]}", false)]
+    [InlineData("{\"spokenLanguage\":\"en\"}", false)]
+    [InlineData("{\"spokenLanguage\":\"es\"}", true)]
+    public void A_stored_reviews_language_is_spanish_only_when_it_says_exactly_es_and_reading_it_never_throws(string? json, bool spanish) =>
+        Assert.Equal(spanish ? SpokenLanguage.Spanish : SpokenLanguage.English, DictationResult.SpokenLanguageOf(json));
+
+    // Step 17: a review of a dictation in English shows nothing of translation, and its result is stored with no language
+    // and no statements, as every review was before Spanish, so one saved before then reads the same.
+    [Fact]
+    public async Task A_review_in_english_shows_nothing_of_translation_and_is_stored_as_before()
+    {
+        var f = await StageAsync(objective: true);
+        var html = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
+        foreach (var translation in new[] { "Accept translated", "sc-translation", "lang=\"es\"", "Translated from Spanish", "in Spanish", "spokenLanguage", "statements" })
+        {
+            Assert.DoesNotContain(translation, html);
+        }
+
+        Assert.Contains(">Accept subjective</button>", html);
+        Assert.Contains("<div class=\"sc-transcript__body\" data-dictation-transcript><p>", html);
+        Assert.DoesNotContain("data-chart-proposals-none", html);
+        var stored = await StoredResultAsync(f);
+        Assert.False(stored.TryGetProperty("spokenLanguage", out _));
+        Assert.All(stored.GetProperty("fields").EnumerateObject(), field => Assert.False(field.Value.TryGetProperty("statements", out _)));
+    }
 }

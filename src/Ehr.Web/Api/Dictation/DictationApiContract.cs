@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Ehr.Web.Api.Dictation;
@@ -11,6 +12,10 @@ namespace Ehr.Web.Api.Dictation;
 // for a session listening to a visit (step 16), which a service too old to listen to one doesn't send.
 public sealed record DictationSession(string SessionId, int MaxSeconds, int MaxChunkBytes,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Mode = null);
+
+// What starting a session asks the service for: the language the clinician dictates in (the expansion plan's step 17),
+// always sent, English unless a note's dictation was started in Spanish.
+public sealed record SessionStart(SpokenLanguage SpokenLanguage);
 
 // The chunk just taken, how many seconds of audio the dictation now holds (of the session's MaxSeconds, so a screen can
 // warn before the cut-off), and the transcript so far.
@@ -62,6 +67,11 @@ public enum Unclear
 
     [JsonStringEnumMemberName("low_confidence")]
     LowConfidence,
+
+    // In a dictation in Spanish, a passage speech recognition didn't hear as Spanish (the expansion plan's step 17): left
+    // out of what the model sorts, for the clinician to dictate again in Spanish or type.
+    [JsonStringEnumMemberName("other_language")]
+    OtherLanguage,
 }
 
 // After stop, and from result. Fields is null until the model has sorted the transcript, or when it couldn't.
@@ -69,7 +79,9 @@ public enum Unclear
 // carries (FR-14), so the screen can say what still has to be placed in Orders or the allergy list. Proposals are those of
 // them the dictation proposes (the expansion plan's step 15; FR-14 as reworded): each an order or an allergy to add,
 // dictated plainly, at the place of its listed instruction. Null from a service older than step 15, and in a result
-// stored before it: none. Never written when it is null.
+// stored before it: none. Never written when it is null. SpokenLanguage is the language the clinician dictated in (the
+// expansion plan's step 17), never written for English, so a result in English, and every one saved before Spanish,
+// reads and is stored as it was. Nothing is proposed from a dictation in Spanish (TrustedResult).
 public sealed record DictationResult(
     Transcript Transcript,
     Sorting Sorting,
@@ -78,16 +90,71 @@ public sealed record DictationResult(
     Provenance Provenance,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SortingFailure? Reason = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ChartProposal>? Proposals = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] SpokenLanguage SpokenLanguage = SpokenLanguage.English,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<SpeakerVoice>? Speakers = null)
 {
     public const string UnsortedMessage = "The fields couldn't be sorted, so the transcript is kept as plain text.";
     public const string BusyMessage = "The dictation service was busy for too long to draft this visit. The conversation is kept "
         + "with this review until you finish it: write the note from it, or discard it.";
+    public const string NotEnglishMessage = "This dictation doesn't read as English, so no fields were proposed and the transcript "
+        + "is kept as plain text. If you dictated in Spanish, choose Spanish as the language and dictate it again.";
 
     // Ours, never the service's, and only when the fields couldn't be sorted (UC 10): a visit left undrafted because
-    // dictations had K2 Horizon all along (model_busy) says so.
+    // dictations had K2 Horizon all along (model_busy) says so, and a dictation in English with too few English words
+    // (transcript_not_english) points at the Spanish choice.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Message => Sorting != Sorting.Unavailable ? null : Reason == SortingFailure.ModelBusy ? BusyMessage : UnsortedMessage;
+    public string? Message => Sorting != Sorting.Unavailable ? null : Reason switch
+    {
+        SortingFailure.ModelBusy => BusyMessage,
+        SortingFailure.TranscriptNotEnglish => NotEnglishMessage,
+        _ => UnsortedMessage,
+    };
+
+    // Whether a stored review's dictation was in Spanish, from its saved result, for its line among the saved reviews.
+    // Never throws, whatever the stored evidence holds: only a result whose spokenLanguage is exactly "es" is Spanish, and
+    // anything else, a result saved before Spanish, none, or one that can't be read, isn't called Spanish, so the line
+    // says nothing of a language rather than something false.
+    public static SpokenLanguage SpokenLanguageOf(string? resultJson)
+    {
+        if (resultJson is null) return SpokenLanguage.English;
+        try
+        {
+            using var json = JsonDocument.Parse(resultJson);
+            return json.RootElement.ValueKind == JsonValueKind.Object
+                && json.RootElement.TryGetProperty("spokenLanguage", out var language)
+                && language.ValueKind == JsonValueKind.String && language.ValueEquals("es")
+                ? SpokenLanguage.Spanish : SpokenLanguage.English;
+        }
+        catch (JsonException)
+        {
+            return SpokenLanguage.English;
+        }
+    }
+}
+
+// The language of a dictation (the expansion plan's step 17). A dictation in Spanish has a Spanish transcript, and its
+// fields are proposed in English, each sentence with the Spanish it was translated from (TranslatedStatement). Read
+// only from the exact strings "en" and "es" (SpokenLanguageConverter).
+[JsonConverter(typeof(SpokenLanguageConverter))]
+public enum SpokenLanguage
+{
+    English,
+
+    Spanish,
+}
+
+// "en" or "es", exactly: a number, another spelling, a padded name or a list of names fails the read, where the
+// framework's enum reading would take 1, "1", " es" and "en, es" for a language.
+public sealed class SpokenLanguageConverter : JsonConverter<SpokenLanguage>
+{
+    public override SpokenLanguage Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType != JsonTokenType.String ? throw new JsonException("A dictation's language is a string.")
+        : reader.ValueTextEquals("en") ? SpokenLanguage.English
+        : reader.ValueTextEquals("es") ? SpokenLanguage.Spanish
+        : throw new JsonException("A dictation's language is \"en\" or \"es\".");
+
+    public override void Write(Utf8JsonWriter writer, SpokenLanguage value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value == SpokenLanguage.Spanish ? "es" : "en");
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<Sorting>))]
@@ -136,6 +203,11 @@ public enum SortingFailure
     // A recorded visit (step 16) whose windows waited ten minutes in all for K2 Horizon, which dictations had first.
     [JsonStringEnumMemberName("model_busy")]
     ModelBusy,
+
+    // A dictation in English fewer than two thirds of whose words are English (the owner's ruling of 2026-11-25): Spanish
+    // dictated with English chosen, which MedASR writes as words of English and of no language. Nothing is offered.
+    [JsonStringEnumMemberName("transcript_not_english")]
+    TranscriptNotEnglish,
 }
 
 // An instruction the clinician dictated that the note doesn't carry: its kind, and where they said it in the transcript
@@ -192,8 +264,20 @@ public sealed record NoteFields(NoteField Subjective, NoteField Objective, NoteF
 public abstract record NoteField;
 
 // The model's proposal, with the parts of the transcript it came from (offsets as in TranscriptSegment), and where the
-// clinician may have corrected what it says.
-public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Sources, IReadOnlyList<FieldWarning> Warnings) : NoteField;
+// clinician may have corrected what it says. From a dictation in Spanish (step 17), Statements says which sentence of the
+// English value was translated from which Spanish words; never written for English.
+public sealed record PendingField(string Value, IReadOnlyList<SourceSpan> Sources, IReadOnlyList<FieldWarning> Warnings,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<TranslatedStatement>? Statements = null) : NoteField;
+
+// One sentence of a value proposed from Spanish: its place in the value (half-open UTF-16 offsets into Value), and the
+// Spanish words of the transcript it was translated from (offsets as in TranscriptSegment). The statements follow each
+// other through the value, one space between, and cite every source the field has and no other (TrustedResult).
+public sealed record TranslatedStatement(int Start, int End, IReadOnlyList<SourceSpan> Sources)
+{
+    // The most of the transcript one sentence may cite, in UTF-16 code units: the Spanish note schema allows a sentence
+    // two quotes of 200 characters (note-fields-es.schema.json), and the dictation service refuses more (translation.py).
+    public const int MaxSpanishLength = 400;
+}
 
 // Nothing dictated, or what was proposed failed validation: the reasons' codes, never the text. Codes are those the
 // service gives (validation.py's REASONS: DictationApiTests reads that file, and db/policies/56-ambient-listening.sql,
@@ -237,6 +321,12 @@ public enum WarningCode
     // the clinician to sort before accepting it.
     [JsonStringEnumMemberName("one_field_holds_dictation")]
     OneFieldHoldsDictation,
+
+    // From a dictation in Spanish (step 17): a frequency that reads two ways ("cada tercer día", every other day or
+    // every third day); it points at those words. A number that reads two ways ("5.000 unidades") is no warning: the
+    // service refuses its field (ambiguous_number, a reason), so a result warning of one is a bad answer.
+    [JsonStringEnumMemberName("ambiguous_frequency")]
+    AmbiguousFrequency,
 
     // A recorded visit's (step 16). The value comes from a passage whose speaker couldn't be told with confidence; from
     // someone else in the room, who may be speaking of themselves; or, in Subjective, from the patient's own words, in

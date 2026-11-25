@@ -534,6 +534,9 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData(403, """{"error":"forbidden","detail":"wrong key"}""", 503, "unavailable")]
     [InlineData(500, """{"error":"internal","detail":"a stack trace"}""", 502, "bad_answer")]
     [InlineData(503, """{"error":"starting","detail":"loading the model"}""", 503, "unavailable")]
+    [InlineData(503, """{"error":"language_unavailable","detail":"no Whisper"}""", 503, "language_unavailable")]
+    [InlineData(400, """{"error":"bad_language","detail":"not en or es"}""", 400, "bad_language")]
+    [InlineData(400, """{"error":"bad_request","detail":"a code the API doesn't know"}""", 502, "bad_answer")]
     [InlineData(200, """{"transcript":"not the contract's shape"}""", 502, "bad_answer")]
     public async Task The_services_refusals_become_the_apis_own(int status, string body, int expected, string error)
     {
@@ -666,6 +669,64 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(
             Enum.GetValues<SortingFailure>().Select(reason => JsonSerializer.Serialize(reason).Trim('"')),
             System.Text.RegularExpressions.Regex.Matches(guarded.Groups[1].Value, "\"([a-z_]+)\"").Select(m => m.Groups[1].Value));
+    }
+
+    // From a dictation in Spanish, a number that reads two ways ("5.000 unidades") is refused by the service, not warned
+    // of (step 17): a result still carrying an ambiguous_number warning is a bad answer, as any code the API doesn't know
+    // is, while "cada tercer día"'s ambiguous_frequency is still a warning the API passes on.
+    [Theory]
+    [InlineData("ambiguous_number", 502)]
+    [InlineData("ambiguous_frequency", 200)]
+    public async Task A_spanish_result_warning_of_a_number_that_reads_two_ways_is_a_bad_answer(string code, int expected)
+    {
+        var body = JsonNode.Parse(await File.ReadAllTextAsync(ContractFile("result-200-done-es"), Cancel))!["body"]!;
+        body["fields"]!["subjective"]!["warnings"] = new JsonArray(new JsonObject { ["code"] = code, ["start"] = 0, ["end"] = 3 });
+        service.Answer = (HttpStatusCode.OK, body.ToJsonString());
+        var page = await OpenAsync(apps, apps.OnPrem);
+
+        using var response = await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result");
+
+        Assert.Equal(expected, (int)response.StatusCode);
+        var answered = await JsonAsync(response);
+        if (expected == 502)
+        {
+            Assert.Equal("bad_answer", (string?)answered["error"]);
+        }
+        else
+        {
+            Assert.Equal(code, (string?)answered["fields"]!["subjective"]!["warnings"]![0]!["code"]);
+        }
+    }
+
+    // Steps 16 and 17 together: a visit is in English and a dictation, in either language, names no speakers. Staging
+    // takes the service's own answer of each kind, and refuses a visit's said to be in Spanish and a Spanish dictation's
+    // that names who spoke.
+    [Fact]
+    public async Task A_visit_said_to_be_in_spanish_or_a_spanish_dictation_naming_a_speaker_is_never_staged()
+    {
+        // As the API reads the service's answers (DictationApi.ServiceJson).
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            AllowOutOfOrderMetadataProperties = true,
+            RespectNullableAnnotations = true,
+            RespectRequiredConstructorParameters = true,
+        };
+        async Task<JsonNode> BodyAsync(string name) => JsonNode.Parse(await File.ReadAllTextAsync(ContractFile(name), Cancel))!["body"]!;
+        DictationResult Read(JsonNode body) => body.Deserialize<DictationResult>(json)!;
+
+        // Drafted, and left undrafted with no field to hold a sentence the Spanish checks would want.
+        foreach (var name in new[] { "result-ambient-200-done", "result-ambient-200-unavailable-model_timeout" })
+        {
+            var visit = await BodyAsync(name);
+            Assert.NotNull(DictationApi.TrustedResult(Read(visit), ambient: true));
+            visit["spokenLanguage"] = "es";
+            Assert.Null(DictationApi.TrustedResult(Read(visit), ambient: true));
+        }
+
+        var spanish = await BodyAsync("result-200-done-es");
+        Assert.NotNull(DictationApi.TrustedResult(Read(spanish)));
+        spanish["transcript"]!["segments"]![0]!["speaker"] = "patient";
+        Assert.Null(DictationApi.TrustedResult(Read(spanish)));
     }
 
     public static TheoryData<string> ContractAnswers() =>

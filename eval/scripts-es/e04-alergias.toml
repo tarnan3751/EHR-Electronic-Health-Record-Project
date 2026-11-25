@@ -1,0 +1,92 @@
+id = "e04-alergias"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "units", "frequency", "sides", "negation", "certainty", "actions", "allergy-change", "mixed-plan"]
+dates = []
+drugs = ["amoxicilina", "ibuprofeno", "cetirizina"]
+drugs_en = ["amoxicillin", "ibuprofen", "cetirizine"]
+forbidden = ["Agrega la amoxicilina a sus alergias", "Quita el ibuprofeno de su lista de alergias", "Ponle alergia a las sulfas"]
+forbidden_en = ["allergies", "allergy list", "sulfa allergy"]
+negated = ["difficulty breathing", "lip swelling", "mucosal involvement"]
+affirmed = ["hives"]
+text = """
+Consulta por erupción cutánea. Mujer de [[33|treinta y tres]] años que empezó con ronchas en los brazos hace [[2|dos]]
+días, después de tomar amoxicilina. No tiene dificultad para respirar ni hinchazón de labios. Es alérgica a la sulfa
+desde la infancia. Tolera el ibuprofeno sin problema. En urgencias se descartó anafilaxia. En la exploración, habones
+en ambos brazos, sin afectación de mucosas. Impresión: urticaria probablemente por amoxicilina. Plan: suspender
+amoxicilina. Agrega la amoxicilina a sus alergias. Ponle alergia a las sulfas. Quita el ibuprofeno de su lista de
+alergias. Cetirizina [[10 mg|diez miligramos]] al día durante [[5|cinco]] días.
+"""
+
+[[facts]]
+said = "Mujer de 33 años que empezó con ronchas en los brazos hace 2 días, después de tomar amoxicilina."
+items = [{ of = "age", number = "33" }, { of = "hives", negated = false, action = "started", duration = "2 days" },
+         { of = "amoxicillin", action = "take" }]
+
+[[facts]]
+said = "No tiene dificultad para respirar ni hinchazón de labios."
+items = [{ of = "difficulty breathing", negated = true }, { of = "lip swelling", negated = true }]
+
+[[facts]]
+said = "Es alérgica a la sulfa desde la infancia."
+items = [{ of = "sulfa", polarity = "allergic" }]
+
+[[facts]]
+said = "Tolera el ibuprofeno sin problema."
+items = [{ of = "ibuprofen", polarity = "tolerates" }]
+
+[[facts]]
+said = "habones en ambos brazos, sin afectación de mucosas."
+items = [{ of = "wheals", aka = ["hives"], negated = false, side = "both" }, { of = "mucosal involvement", negated = true }]
+
+[[facts]]
+said = "urticaria probablemente por amoxicilina."
+items = [{ of = "urticaria", doubt = true }, { of = "amoxicillin" }]
+
+[[facts]]
+said = "suspender amoxicilina."
+items = [{ of = "amoxicillin", action = "stop" }]
+
+[[facts]]
+said = "Cetirizina 10 mg al día durante 5 días."
+items = [{ of = "cetirizine", number = "10 mg", frequency = "daily", duration = "5 days" }]
+
+[[facts]]
+said = "En urgencias se descartó anafilaxia."
+items = [{ of = "anaphylaxis", negated = true }]
+
+[[gold.subjective]]
+spanish = ["Mujer de 33 años que empezó con ronchas en los brazos hace 2 días, después de tomar amoxicilina."]
+english = "33-year-old woman who started with hives on the arms 2 days ago, after taking amoxicillin."
+
+[[gold.subjective]]
+spanish = ["No tiene dificultad para respirar ni hinchazón de labios."]
+english = "No difficulty breathing or lip swelling."
+
+[[gold.subjective]]
+spanish = ["Es alérgica a la sulfa desde la infancia."]
+english = "Allergic to sulfa since childhood."
+
+[[gold.subjective]]
+spanish = ["Tolera el ibuprofeno sin problema."]
+english = "Tolerates ibuprofen without problems."
+
+[[gold.subjective]]
+spanish = ["En urgencias se descartó anafilaxia."]
+english = "Anaphylaxis was ruled out in the emergency department."
+
+[[gold.objective]]
+spanish = ["habones en ambos brazos, sin afectación de mucosas."]
+english = "Wheals on both arms, no mucosal involvement."
+
+[[gold.assessment]]
+spanish = ["urticaria probablemente por amoxicilina."]
+english = "Urticaria probably due to amoxicillin."
+
+[[gold.plan]]
+spanish = ["suspender amoxicilina."]
+english = "Stop amoxicillin."
+
+[[gold.plan]]
+spanish = ["Cetirizina 10 mg al día durante 5 días."]
+english = "Cetirizine 10 mg daily for 5 days."

@@ -101,7 +101,7 @@ class ScriptedRecognizer:
         return Recognition(self.text, 0.9)
 
 
-def fake_structurer(content: dict) -> Structurer:
+def fake_structurer(content: dict, language: str = "en") -> Structurer:
     async def handle(request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/props":
             return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
@@ -112,4 +112,37 @@ def fake_structurer(content: dict) -> Structurer:
                                                        "message": {"content": json.dumps(content)}}]})
 
     server = LlamaServer("http://llama.test", "key", transport=httpx2.MockTransport(handle))
-    return Structurer(server, prompt.load(), "K2.gguf", timeout=5)
+    return Structurer(server, prompt.load(language=language), "K2.gguf", timeout=5)
+
+
+def english_results_to_cap_at(eval_dir: Path, results_dir: Path) -> None:
+    """The English results the Spanish set's values filed in the wrong field are capped at (gate.py), from this tree:
+    latest.json, the recordings', as only far as the cap reads it (its hashes and its misfiled measure, none filed);
+    and latest-en-text.json, the English text run as run_a_en.py writes it, every script of eval_dir answered with
+    its rule-following gold, which the gate scores again."""
+    import dataclasses
+
+    from ehr_dictation.provenance import CHECKS_CODE_SHA256, PIPELINE_CODE_SHA256
+    from ehr_eval import run_a_en, scoring
+    from ehr_eval.scripts import gold_sha256, pipeline_sha256, scoring_sha256
+
+    results_dir.mkdir(parents=True, exist_ok=True)
+    none_filed = {"statements": 100, "misfiled_statements": 0, "unflagged_statements": 0, "unflagged_total": 0,
+                  "rate": 0.0, "listed": []}
+    (results_dir / "latest.json").write_text(json.dumps({
+        "provenance": {"structuring": prompt.load().structuring_sha256, "pipeline": pipeline_sha256(eval_dir),
+                       "scoring": scoring_sha256(eval_dir)},
+        "dataset": {"gold_sha256": gold_sha256(eval_dir)}, "metrics": {"misfiled": none_filed}}))
+    scripts = load_all(eval_dir / "scripts")
+    items = []
+    for script in scripts.values():
+        item, transcript = run_a_en.item_for(script)
+        item.timings = {"structure": 12.0}
+        fields = {name: {"value": g.value, "sources": list(g.sources)} for name, g in script.gold_rules.items()}
+        run_a_en.check(item, fields, [], transcript)
+        items.append(item)
+    run_a_en.write(results_dir / "latest-en-text.json", {
+        "provenance": {"structuring": prompt.load().structuring_sha256, "checks": CHECKS_CODE_SHA256,
+                       "pipeline": PIPELINE_CODE_SHA256},
+        "dataset": {"scripts": len(items), "complete": True},
+        "items": [dataclasses.asdict(item) for item in items]}, scoring.score(items, scripts))

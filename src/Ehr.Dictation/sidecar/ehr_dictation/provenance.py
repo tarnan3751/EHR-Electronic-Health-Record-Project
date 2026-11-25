@@ -7,6 +7,10 @@ plan's step 16) is optional: with no entry in the manifest, speaker is None and 
 one, its weights are checked the same way (and again as ecapa.py loads them). The K2 Horizon file is llama-server's to load: llama.py checks that it
 serves the file the manifest names. The manifest's hashes are the ones Hugging Face publishes.
 
+Whisper, which transcribes dictation in Spanish (the expansion plan's step 17), is optional: setup_models.py fetches it
+only when asked. Without it in the manifest the sidecar starts and refuses Spanish (spanish_speech is None); with it,
+its weights are hashed at startup as MedASR's are, and the sidecar refuses to start if they differ.
+
 CODE_SHA256 is a hash over this package's source: every result names the code that transcribed and checked it, and
 the eval's results are tied to it, so any change to what is measured asks for a new eval run (eval/ehr_eval/gate.py).
 """
@@ -23,6 +27,8 @@ MANIFEST = "models-manifest.json"
 PACKAGE = Path(__file__).resolve().parent
 MEDASR_DIR = "medasr"
 MEDASR_WEIGHTS = "model.safetensors"
+WHISPER_DIR = "whisper"
+WHISPER_WEIGHTS = "model.safetensors"
 SPEAKER_DIR = "speaker"
 SPEAKER_WEIGHTS = "embedding_model.ckpt"
 
@@ -35,6 +41,7 @@ class ProvenanceError(Exception):
 class Models:
     speech: dict
     language: dict | None
+    spanish_speech: dict | None = None  # Whisper, when it is installed
     speaker: dict | None = None
 
     @property
@@ -61,6 +68,21 @@ def load(models_dir: Path, *, verify: bool = True) -> Models:
         )
     speech = {"repository": medasr["repository"], "commit": medasr["commit"], "sha256": weights["sha256"]}
 
+    whisper = manifest.get("whisper")
+    spanish_speech = None
+    if whisper:
+        whisper_weights = next((f for f in whisper.get("files", []) if f.get("path") == WHISPER_WEIGHTS), None)
+        if not whisper_weights:
+            raise ProvenanceError(
+                f"{MANIFEST} records no Whisper weights: run src/Ehr.Dictation/setup_models.py --only whisper."
+            )
+        if verify and _sha256(models_dir / WHISPER_DIR / WHISPER_WEIGHTS) != whisper_weights["sha256"]:
+            raise ProvenanceError(
+                f"Whisper's {WHISPER_WEIGHTS} doesn't match {MANIFEST}: run src/Ehr.Dictation/setup_models.py --verify."
+            )
+        spanish_speech = {"repository": whisper["repository"], "commit": whisper["commit"],
+                          "sha256": whisper_weights["sha256"]}
+
     llm = manifest.get("llm")
     language = (
         {
@@ -72,7 +94,7 @@ def load(models_dir: Path, *, verify: bool = True) -> Models:
         if llm
         else None
     )
-    return Models(speech, language, _speaker(manifest.get("speaker"), models_dir, verify))
+    return Models(speech, language, spanish_speech, _speaker(manifest.get("speaker"), models_dir, verify))
 
 
 def _speaker(entry: dict | None, models_dir: Path, verify: bool) -> dict | None:
@@ -112,8 +134,9 @@ CODE_SHA256 = code_sha256()
 # For the eval: the files that check a proposal, which re-scoring stored answers may change (eval/ehr_eval/rescore.py),
 # and those that make the transcript and the model's answer, which it may not. Neither are the HTTP layer (api.py),
 # which the eval doesn't go through, or this file, since results record the models' own hashes. catalog.py is the
-# reference data's names the checks read (generate_catalog.py writes it).
-CHECKS = ("validation.py", "textnorm.py", "catalog.py")
+# reference data's names the checks read (generate_catalog.py writes it). The checks of a Spanish dictation (the
+# expansion plan's step 17) are checks too, and so is englishwords.py, the words they count as English.
+CHECKS = ("validation.py", "textnorm.py", "catalog.py", "spanish.py", "translation.py", "drugnames.py", "englishwords.py")
 CHECKS_CODE_SHA256 = code_sha256(names=CHECKS)
 PIPELINE_CODE_SHA256 = code_sha256(
     names=[path.name for path in PACKAGE.glob("*.py") if path.name not in {*CHECKS, "api.py", "provenance.py"}]

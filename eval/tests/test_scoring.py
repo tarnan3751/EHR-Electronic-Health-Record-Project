@@ -352,3 +352,39 @@ def test_a_proposal_is_matched_to_gold_by_where_it_was_said_not_by_its_words(eva
 
     assert (proposals["right"], proposals["false"], proposals["found"]) == (1, 1, 1)
     assert proposals["listed"] == [{"variant": "d03-x", "kind": "order", "shown": "order a lipid panel", "why": "false"}]
+
+
+def test_a_sentence_filed_in_the_wrong_field_is_counted_apart_and_against_content_f1():
+    # d02's weight said in Subjective, whose gold doesn't have it (Objective's does): misfiled, beside a field F1 lower
+    # than with the sentence where it belongs.
+    scripts = load_all()
+    gold = scripts["d02-t2dm-bexagliflozin"].gold_rules
+    weight = "Weight is 96 kg, down 2 kg."
+    right = item("d02-t2dm-bexagliflozin", "", subjective=pending(gold["subjective"].value),
+                 objective=pending(gold["objective"].value))
+    wrong = item("d02-t2dm-bexagliflozin", "", subjective=pending(f"{gold['subjective'].value} {weight}"),
+                 objective=pending(gold["objective"].value.replace(f" {weight}", "")))
+
+    scored_right, scored_wrong = score([right], scripts), score([wrong], scripts)
+
+    assert scored_right["misfiled"]["misfiled_statements"] == scored_right["misfiled"]["total"] == 0
+    misfiled = scored_wrong["misfiled"]
+    assert misfiled["misfiled_statements"] == 1 and misfiled["unflagged_total"] == misfiled["total"] > 0
+    assert {(e["field"], e["statement"]) for e in misfiled["listed"]} == {("subjective", weight)}
+    assert ("number", "96 kg") in {(e["kind"], e["shown"]) for e in misfiled["listed"]}
+    assert misfiled["unflagged_statements"] == 1 and misfiled["rate"] == round(1 / misfiled["statements"], 4)
+    assert scored_wrong["fields"]["content"]["f1"] < scored_right["fields"]["content"]["f1"]
+
+
+def test_a_value_no_fields_gold_has_is_listed_apart_and_never_counted_as_misfiled():
+    # The owner's ruling: a value no field's gold has (a weight from last year, said nowhere in the gold) is reported
+    # under its own name; only one another field's gold has is misfiled.
+    scripts = load_all()
+    gold = scripts["d02-t2dm-bexagliflozin"].gold_rules
+    extra = item("d02-t2dm-bexagliflozin", "", subjective=pending(f"{gold['subjective'].value} Weighed 99 kg last year."),
+                 objective=pending(gold["objective"].value))
+
+    scored = score([extra], scripts)
+
+    assert scored["misfiled"]["total"] == scored["misfiled"]["unflagged_statements"] == 0
+    assert ("subjective", "number", "99 kg") in {(e["field"], e["kind"], e["shown"]) for e in scored["no_gold"]["listed"]}

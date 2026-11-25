@@ -1,0 +1,53 @@
+id = "h02-cistitis"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "vitals", "decimal-comma", "units", "frequency", "negation", "self-correction"]
+dates = []
+drugs = ["nitrofurantoína"]
+drugs_en = ["nitrofurantoin"]
+retracted = ["50 mg", "3 días"]
+negated = ["fever", "low back pain"]
+affirmed = ["burning on urination"]
+text = """
+Mujer de [[34|treinta y cuatro]] años con ardor al orinar y ganas de orinar con frecuencia desde hace [[2|dos]] días.
+Niega fiebre y niega dolor lumbar. No está embarazada. Tira reactiva de orina con nitritos positivos. Temperatura
+[[36,8|treinta y seis coma ocho]] grados. Impresión: cistitis aguda no complicada. Plan: nitrofurantoína [[50
+mg|cincuenta miligramos]], no, perdón, [[100 mg|cien miligramos]] cada [[12|doce]] horas durante [[5|cinco]] días.
+Beber abundantes líquidos. Control en [[3|tres]] días, mejor dicho, en [[7|siete]] días si no mejora.
+"""
+
+[[gold.subjective]]
+spanish = ["Mujer de 34 años con ardor al orinar y ganas de orinar con frecuencia desde hace 2 días."]
+english = "34-year-old woman with burning on urination and urinary frequency for 2 days."
+
+[[gold.subjective]]
+spanish = ["Niega fiebre y niega dolor lumbar."]
+english = "Denies fever and denies low back pain."
+
+[[gold.subjective]]
+spanish = ["No está embarazada."]
+english = "She is not pregnant."
+
+[[gold.objective]]
+spanish = ["Tira reactiva de orina con nitritos positivos."]
+english = "Urine dipstick positive for nitrites."
+
+[[gold.objective]]
+spanish = ["Temperatura 36,8 grados."]
+english = "Temperature 36.8 degrees."
+
+[[gold.assessment]]
+spanish = ["cistitis aguda no complicada."]
+english = "Acute uncomplicated cystitis."
+
+[[gold.plan]]
+spanish = ["nitrofurantoína 50 mg, no, perdón, 100 mg cada 12 horas durante 5 días."]
+english = "Nitrofurantoin 100 mg every 12 hours for 5 days."
+
+[[gold.plan]]
+spanish = ["Beber abundantes líquidos."]
+english = "Drink plenty of fluids."
+
+[[gold.plan]]
+spanish = ["Control en 3 días, mejor dicho, en 7 días si no mejora."]
+english = "Follow-up in 7 days if not improving."

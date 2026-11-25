@@ -1,5 +1,5 @@
 """Shared by the sidecar's tests: synthetic audio (tones, silence and noise, never a voice), the containers browsers
-record it in, made with ffmpeg in memory, and stand-ins for MedASR and llama-server. No test needs the models, a
+record it in, made with ffmpeg in memory, and stand-ins for MedASR, Whisper and llama-server. No test needs the models, a
 network or a GPU; the audio tests need ffmpeg on PATH, as the sidecar itself does.
 """
 
@@ -81,6 +81,29 @@ class FakeRecognizer:
         return Recognition(" ".join([self.word] * count), self.confidence if count else None)
 
 
+class FakeWhisper(FakeRecognizer):
+    """Stands in for Whisper in a dictation in Spanish: the same Spanish sentence for every passage, with no
+    confidence and a verdict of its own, `unclear`, for passages the predicate `marks` picks (by their samples)."""
+
+    def __init__(self, text: str = "Tos seca desde hace 3 días.", unclear: str | None = None, marks=None) -> None:  # noqa: ANN001
+        super().__init__()
+        self.text = text
+        self.unclear = unclear
+        self.marks = marks or (lambda samples: True)
+
+    def recognize(self, samples: np.ndarray) -> Recognition:
+        if self.hold is not None:
+            self.hold.wait(10)
+        self.calls.append(samples.size)
+        return Recognition(self.text, None, self.unclear if self.marks(samples) else None)
+
+
+def spanish_answer(*statements: tuple[str, list[str], str], **extra) -> str:
+    """K2 Horizon's answer to the Spanish schema: (field, Spanish passages, English) for each statement."""
+    return json.dumps({"statements": [{"spanish": spanish, "field": field, "english": english}
+                                      for field, spanish, english in statements]} | extra)
+
+
 def raw_decoder(data: bytes, *, partial: bool = False, **_: object) -> np.ndarray:
     """Stands in for ffmpeg in the session tests: the bytes are float32 samples already."""
     return np.frombuffer(data[: len(data) // 4 * 4], dtype="<f4").astype(np.float32)
@@ -136,15 +159,19 @@ class FakeLlama:
             "timings": {"prompt_n": 10, "predicted_n": 20},
         })
 
-    def structurer(self, timeout: float = 5.0) -> Structurer:
+    def structurer(self, timeout: float = 5.0, language: str = "en") -> Structurer:
         server = LlamaServer("http://llama.test", "llama-key", transport=httpx2.MockTransport(self.handle))
-        return Structurer(server, prompt.load(), MODEL_FILE, timeout=timeout)
+        return Structurer(server, prompt.load(language=language), MODEL_FILE, timeout=timeout)
 
 
 MODELS = Models(
     speech={"repository": "google/medasr", "commit": "a" * 40, "sha256": "b" * 64},
     language={"repository": "IFM/K2-Horizon-7B-GGUF", "commit": "c" * 40, "file": MODEL_FILE, "sha256": "d" * 64},
 )
+# With Whisper installed, for dictation in Spanish.
+WHISPER = {"repository": "openai/whisper-large-v3-turbo", "commit": "41f01f3fe87f28c78e2fbf8b568835947dd65ed9",
+           "sha256": "e" * 64}
+MODELS_WITH_WHISPER = Models(MODELS.speech, MODELS.language, WHISPER)
 # With the speaker model a visit's voices are told apart with (the expansion plan's step 16).
 LISTENING_MODELS = Models(
     speech=MODELS.speech, language=MODELS.language,

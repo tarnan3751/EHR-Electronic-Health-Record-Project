@@ -98,6 +98,28 @@ the rules read it; then each sentence after that, up to the next one holding an 
 of the note's own sections, however far that is (not within the rules' reach: a refusal said three sentences on is
 shown too).
 
+A dictation with too few English words offers nothing (the owner's ruling of 2026-11-25, "mostly not English words"):
+a dictation in Spanish recorded with English chosen, which MedASR writes as words of English and of no language.
+check() refuses its fields whole (NotEnglish), which the session reports as it reports the model's failures: sorting
+unavailable, with the reason transcript_not_english, and the transcript kept as plain text; and proposals() proposes
+nothing from it. Too few is fewer than two thirds (ENGLISH_AT_LEAST) of the transcript's words English, a passage
+marked unclear's words among them (english_share()): a line above his "mostly", set by the coordinator as the more
+protective reading, since the one such recording measured fell only just under one half, and a refusal keeps the
+transcript while a wrong offer can mislead. A word is English when SCOWL's lists hold it (englishwords.WORDS: an
+ordinary dictionary's English, American, British and Canadian words) or the reference data's diagnoses do
+(englishwords.CLINICAL: every ICD-10-CM description's words of four letters or more, "cellulitis", "dysuria",
+"lymphadenopathy"), when it is a drug name (drugnames.py) or a word of an orderable's or an allergen's name
+(catalog.py), a clinical abbreviation or a unit the checks read (in this module and translation.py), a standard
+abbreviation of a history and a physical examination or a title (EXAM_ABBREVIATIONS: "HEENT", "NKDA", "Dr"), or when
+it holds a digit (a number, or a code said with one: "A1c", "SpO2"); a possessive is its word's; and a word made of
+English words is too: "non" and one of WORD_PART letters or more ("nontender"), or two of WORD_PART letters or more each
+("echocardiogram", "gastroesophageal"). It holds at any length: a dictation of one word offers nothing if that word
+isn't English. So a short English dictation more than a third of whose words no source holds is refused, its transcript
+kept as plain text: a name ("Okonkwo."), an exam word ("Normocephalic, atraumatic.", "Hepatosplenomegaly noted."), a
+British term ("Bibasal crackles."). And Spanish that reads as English drug names, digits or a clinical word both
+languages spell alike ("Dolor abdominal con urticaria y prurito.", 4 of 6) reaches the checks below, which still ground
+every value in the transcript. A recorded visit's window, checked with a scope, is never refused so.
+
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
 
@@ -157,8 +179,8 @@ and every check reads the cleaned text. The checks, each with the reason code re
   think, given her normal oxygen, that she has pneumonia", "no evidence she has a fracture", "I think her knee pain is
   from arthritis", "it doesn't look like she has cellulitis". The subject is a pronoun (you included), "this", "there",
   "the patient" or a possessive and up to three words; the verb a form of "have" or "be", negated or not, or "does",
-  "did" or "do" with "have". "I don't think", "doubt" and "unlikely" are doubt as well as negation, so "She doesn't
-  have asthma." from "I don't think she doesn't have asthma" is refused. Uncertainty is also: "maybe", "perhaps",
+  "did" or "do" with "have". "I don't think" and "doubt" are doubt as well as negation, so "She doesn't have
+  asthma." from "I don't think she doesn't have asthma" is refused; "unlikely" is doubt only (CERTAINTY, not NEGATION). Uncertainty is also: "maybe", "perhaps",
   "presumably", "think", "believe", "suspect", "wonder", "not sure", "not certain", "not convinced", "either", "a
   chance", "concern that", "worried", "can't exclude" or "rule out"; she, he, it, they, you, this or the patient with
   "might", "may" or "could" and "have" or "be" ("she may have ibuprofen as needed" is read as doubt too, a known false
@@ -204,6 +226,8 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
+from . import drugnames, englishwords
+from .llama import StructuringFailed
 from .prompt import FIELDS
 from .textnorm import ORDINAL_TENS, ORDINAL_UNITS, STOPWORDS, TENS, UNITS, WORD, Token, numbers, stem, tokens
 from .transcript import Transcript, utf16_offset
@@ -219,6 +243,8 @@ CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected
 WARNING_REACH = 8
 NEAR_UNCLEAR = 5  # words between a source and an unclear passage that put a near_unclear_passage warning on the value
 WHOLE_DICTATION = 0.9  # the share of the transcript's words the only value offered may quote before it is warned of
+ENGLISH_AT_LEAST = 2 / 3  # the share of a dictation's words that must be English for it to offer anything (the
+# owner's ruling of 2026-11-25, "mostly not English words", read by the coordinator as the more protective line)
 WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
     "no wait sorry scratch mean correction actually rather make change".split()
 )
@@ -365,7 +391,10 @@ def not_carried_over(transcript: Transcript) -> list[dict]:
 
 
 def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript, *, scope: Scope | None = None) -> Checks:
-    """The fields checked. With a scope, a conversation's window (step 16): see "Conversations" at the end."""
+    """The fields checked. With a scope, a conversation's window (step 16): see "Conversations" at the end. A dictation
+    with too few English words raises NotEnglish (see the module's header)."""
+    if scope is None and too_little_english(transcript.text):
+        raise NotEnglish
     words = tokens(transcript.text)
     terms = _terms(words)
     cues, taken_back, superseded = _corrections(transcript.text, words, terms)
@@ -762,6 +791,67 @@ def _reading(span: tuple[int, int], transcript: _Transcript) -> list[str]:
         for i, word in enumerate(transcript.words)
         if span[0] <= word.start and word.end <= span[1] and i not in transcript.cues and i not in transcript.taken_back
     ])
+
+
+# ---- A dictation in English that isn't ------------------------------------------------------------------------------
+
+
+class NotEnglish(StructuringFailed):
+    """A dictation with too few English words, whose fields check() refuses whole (see the module's
+    header): a StructuringFailed, so the session reports its reason as it reports the model's (sessions.py)."""
+
+    reason = "transcript_not_english"
+
+
+SPOKEN_WORD = re.compile(r"\w+(?:['’]\w+)*")
+
+
+# The standard abbreviations of a history and a physical examination, of the commonest orders and of titles, as
+# English dictation says them ("HEENT", "PERRLA", "NKDA", "Dr"), counted as English beside the clinical abbreviations
+# translation.py keeps, which its checks read for their own purpose. None is a word of Spanish: "HA" (headache), "YO"
+# (years old) and "POS" are left out for that.
+EXAM_ABBREVIATIONS = frozenset(
+    """HEENT PERRL PERRLA EOM EOMI NCAT ATNC RRR CTA CTAB NTND NT ND NABS BS NAD WNL WDWN NKDA NKA ROS HPI PMH PSH FH SH
+    CC JVD LAD ROM DTR DTRS CN MAE CVAT LLE RLE LUE RUE BLE BUE LLQ RLQ LUQ RUQ SOB DOE PND CP HX DX TX RX SX FX PT
+    PTS NEG HLD OA RA BMP CMP BNP TTE TEE CXR UA LFT LFTS PTT ABG VBG KUB EEG EMG PFT PFTS WKS HRS DR MR MRS MS""".split()
+)
+WORD_PART = 4  # the fewest letters of each English word a word made of two is read as
+
+
+@functools.cache
+def _english_words() -> frozenset[str]:
+    """The words english_share() counts as English (see the module's header), read the first time a dictation's are
+    counted. The clinical abbreviations are translation.py's, which imports this module, so it is imported here."""
+    from . import translation
+
+    abbreviations = translation.CLINICAL_ABBREVIATIONS | translation.NOT_ABBREVIATIONS | EXAM_ABBREVIATIONS
+    return (englishwords.WORDS | englishwords.CLINICAL | drugnames.NAMES | _names("order")[2] | _names("allergen")[2]
+            | MEASURES | frozenset(UNIT_SPELLINGS) | frozenset(abbreviation.casefold() for abbreviation in abbreviations))
+
+
+def _is_english(word: str, known: frozenset[str]) -> bool:
+    """One word (in lower case), as english_share() counts it (see the module's header)."""
+    if any(c.isdigit() for c in word) or word in known or word.removesuffix("'s") in known:
+        return True
+    if word.startswith("non") and len(word) - 3 >= WORD_PART and word[3:] in known:  # "nontender"
+        return True
+    # Two English words of WORD_PART letters or more each ("echocardiogram", "gastroesophageal").
+    return any(word[:i] in known and word[i:] in known for i in range(WORD_PART, len(word) - WORD_PART + 1))
+
+
+def english_share(text: str) -> float | None:
+    """The share of the text's words that are English (see the module's header), or None when it has none."""
+    words = [word.casefold().replace("’", "'") for word in SPOKEN_WORD.findall(text)]
+    if not words:
+        return None
+    known = _english_words()
+    return sum(_is_english(word, known) for word in words) / len(words)
+
+
+def too_little_english(text: str) -> bool:
+    """Whether fewer than ENGLISH_AT_LEAST of the text's words are English: a text with no words isn't."""
+    share = english_share(text)
+    return share is not None and share < ENGLISH_AT_LEAST
 
 
 # ---- Format --------------------------------------------------------------------------------------------------------
@@ -1779,8 +1869,11 @@ class Weighed:
 
 def proposals(transcript: Transcript) -> list[dict]:
     """What the dictation proposes (see the module's header): each order or allergy to add the clinician dictated
-    plainly, as its kind, the place of its listed instruction and its warnings, in UTF-16 offsets. Never words."""
+    plainly, as its kind, the place of its listed instruction and its warnings, in UTF-16 offsets. Never words. None
+    from a transcript with too few English words."""
     text = transcript.text
+    if too_little_english(text):
+        return []
     return [
         {
             "kind": weighed.kind,
@@ -1907,7 +2000,8 @@ NEVER_IN_AN_ITEM = (
 def _names(kind: str) -> tuple[list[tuple[str, ...]], dict[str, list[tuple[int, int, int]]], frozenset[str], frozenset[int]]:
     """The names of one kind ("order" or "allergen"), each as its words; their standalone runs, by first word, each as
     the name, its start and its end; every word they hold; and which of them are medications (marked "+"). Read from
-    catalog.py the first time a proposal or a noted allergy is weighed, not at start."""
+    catalog.py the first time a proposal or a noted allergy is weighed, or a dictation's words counted
+    (english_share()), not at start."""
     from . import catalog
 
     names: list[tuple[str, ...]] = []

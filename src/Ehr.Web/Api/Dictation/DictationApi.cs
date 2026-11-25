@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -29,12 +30,14 @@ namespace Ehr.Web.Api.Dictation;
 //
 // POST /api/dictation/sessions: 201 {sessionId, maxSeconds, maxChunkBytes}. The session takes up to maxSeconds of
 // audio, in chunks of up to maxChunkBytes (never over MaxChunkBytes, 2 MB). A session ID is 16 to 64 letters, digits,
-// _ or -; any other is 404 here, without asking the service.
+// _ or -; any other is 404 here, without asking the service. It is always a dictation in English, as is the desktop
+// app's offline one; a note's dictation (POST .../for-note, DictationReviewApi.cs) may be in Spanish.
 //
 // POST /api/dictation/sessions/{id}/audio?seq=N, the body one chunk of the recording, numbered from 0, in the audio/*
 // type the browser records (passed on as it came; WebKit and Chromium record different ones): 200 {receivedSeq,
-// audioSeconds, transcript}, audioSeconds being how much of maxSeconds (3 minutes) the dictation holds, so the screen
-// can warn before the cut-off; the transcript may lag a chunk when the service is busy. 409 out_of_order carries
+// audioSeconds, transcript}, audioSeconds being how much of maxSeconds (3 minutes, 2 in Spanish) the dictation holds,
+// so the screen can warn before the cut-off; the transcript may lag a chunk when the service is busy (a Spanish one
+// shows finished passages only). 409 out_of_order carries
 // expectedSeq, the chunk to send next: after a dropped connection, the client sends again from there and the transcript
 // carries on.
 //
@@ -44,7 +47,8 @@ namespace Ehr.Web.Api.Dictation;
 // dictation is cancelled, its audio and transcript discarded.
 //
 // The transcript: {text, final, segments: [{start, end, startMs, endMs, final, unclear}]}. start and end are half-open
-// UTF-16 offsets into text; unclear is null, "too_quiet", "too_noisy" or "low_confidence".
+// UTF-16 offsets into text; unclear is null, "too_quiet", "too_noisy" or "low_confidence", or in a dictation in
+// Spanish "other_language", a passage not heard as Spanish.
 //
 // The result: {transcript, sorting, reason?, message?, fields, notCarriedOver, proposals?, provenance}, with sorting
 // "pending", "done" or "unavailable". fields is null, or {subjective, objective, assessment, plan}, each either
@@ -56,11 +60,13 @@ namespace Ehr.Web.Api.Dictation;
 // value's sources, or "one_field_holds_dictation", on the only field proposed when it quotes nearly the whole transcript,
 // pointing at what it quotes; the review screen shows it beside the field. When sorting is
 // "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid",
-// "transcript_too_long" or "transcription_failed" (the transcript is then as it was live, not final), or for a visit
-// "model_busy" (its windows waited ten minutes for K2 Horizon), fields is null or all empty, and message is
-// DictationResult.UnsortedMessage, "The fields couldn't be sorted, so the transcript is kept as plain text.", or for
-// model_busy DictationResult.BusyMessage, "The dictation service was busy for too long to draft this visit. The
-// conversation is kept with this review until you finish it: write the note from it, or discard it." notCarriedOver:
+// "transcript_too_long", "transcription_failed" (the transcript is then as it was live, not final) or
+// "transcript_not_english" (a dictation in English with too few English words), or for a visit "model_busy" (its windows
+// waited ten minutes for K2 Horizon), fields is null or all empty, and message is DictationResult.UnsortedMessage, "The
+// fields couldn't be sorted, so the transcript is kept as plain text.", for transcript_not_english
+// DictationResult.NotEnglishMessage, which points at the Spanish choice, or for model_busy DictationResult.BusyMessage,
+// "The dictation service was busy for too long to draft this visit. The conversation is kept with this review until you
+// finish it: write the note from it, or discard it." notCarriedOver:
 // [{reason: "order" or "allergy_change", start, end}], each instruction in the
 // transcript to order something or change the allergy list, which no field carries (FR-14): the screen says it still
 // has to be placed, and can highlight the clinician's own words at start and end. A visit's (AmbientApi) also has
@@ -74,19 +80,21 @@ namespace Ehr.Web.Api.Dictation;
 // service's tests write and DictationApiTests reads through this API.
 //
 // Refusals other than 401 and 403 are {error, message}, words for the clinician, and expectedSeq with out_of_order:
-//   400 bad_form_token, or bad_seq
+//   400 bad_form_token, or bad_seq; or bad_language: the service refused the language a dictation was started in
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop; a visit's says its recording was stopped), or not_stopped (a result
 //       before stop); for a visit (AmbientApi.cs), speakers_given (who each voice is, said already); and, starting a
 //       dictation or a visit, sign_in_ending: the sign-in's 12-hour end (SessionTimes) comes before its longest
 //       recording could finish, so the clinician signs in again first (the expansion plan's step 18)
-//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes)
+//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes,
+//       or 2 in Spanish)
 //   415 unsupported_type: the body isn't audio/*
 //   422 not_audio: "The audio couldn't be decoded."; or unsupported_language: "That language isn't available for this
 //       recording."
 //   429 busy: the service is busy
 //   502 bad_answer: the service answered something this API doesn't know
-//   503 unavailable: not configured, the service can't be reached or says it's unavailable, or it refused the key; or,
+//   503 unavailable: not configured, the service can't be reached or says it's unavailable, or it refused the key;
+//       or language_unavailable: "Spanish dictation isn't installed on this server." (Whisper isn't, step 17); or,
 //       starting a visit, listening_unavailable: the service has no speaker model to tell voices apart
 //   504 timed_out: the service didn't answer within DictationSidecar.DefaultTimeout (20 seconds)
 // A model that is unavailable or too slow isn't a refusal: the result says so. What is logged is the operation and
@@ -194,13 +202,15 @@ public static partial class DictationApi
         return await next(context);
     }
 
+    // English, always: the plain route and the desktop app's offline one (the expansion plan's step 17).
     static async Task<IResult> StartAsync(HttpContext context, DictationSidecar sidecar) =>
-        await SignInEndsTooSoonAsync(context, ambient: false) ?? await CallAsync<DictationSession>(context, sidecar, "start", HttpMethod.Post, "v1/sessions", null,
+        await SignInEndsTooSoonAsync(context, ambient: false) ?? await CallAsync<DictationSession>(context, sidecar, "start", HttpMethod.Post, "v1/sessions", Start(SpokenLanguage.English),
             session => Results.Json(
                 session with { MaxChunkBytes = Math.Min(session.MaxChunkBytes, MaxChunkBytes) }, statusCode: StatusCodes.Status201Created));
 
     // The longest a dictation and a visit record (the dictation service's limits, which its pinned start answers say:
-    // src/Ehr.Dictation/contract).
+    // src/Ehr.Dictation/contract). A dictation in Spanish records 2 minutes at most (the expansion plan's step 17); the
+    // refusal below holds every dictation to English's 3, the longest any records.
     public static readonly TimeSpan LongestDictation = TimeSpan.FromMinutes(3);
 
     public static readonly TimeSpan LongestVisit = TimeSpan.FromMinutes(20);
@@ -274,6 +284,8 @@ public static partial class DictationApi
             ? CallAsync(context, sidecar, "cancel", HttpMethod.Delete, $"v1/sessions/{id}", null, (_, _) => Task.FromResult(Results.NoContent()))
             : Task.FromResult(NotFound());
 
+    static JsonContent Start(SpokenLanguage language) => JsonContent.Create(new SessionStart(language), options: ServiceJson);
+
     // Calls the service, and writes its answer out again from the contract's types.
     static Task<IResult> CallAsync<T>(
         HttpContext context, DictationSidecar sidecar, string operation, HttpMethod method, string path, HttpContent? content,
@@ -333,6 +345,22 @@ public static partial class DictationApi
     {
         switch (response.StatusCode)
         {
+            case HttpStatusCode.BadRequest:
+                // A dictation started in a language the service doesn't take (the expansion plan's step 17).
+                return await ErrorBodyAsync(response, cancellationToken) is { Error: "bad_language" }
+                    ? Refuse(StatusCodes.Status400BadRequest, "bad_language", "Choose English or Spanish for this dictation.")
+                    : Unexpected(response.StatusCode, operation, log);
+            case HttpStatusCode.ServiceUnavailable:
+                // Spanish, on a server without Whisper (step 17), or a visit, on one without the speaker model (step 16); any
+                // other 503 is the service unavailable.
+                return await ErrorBodyAsync(response, cancellationToken) switch
+                {
+                    { Error: "language_unavailable" } => Refuse(StatusCodes.Status503ServiceUnavailable, "language_unavailable",
+                        "Spanish dictation isn't installed on this server."),
+                    { Error: "listening_unavailable" } => Refuse(StatusCodes.Status503ServiceUnavailable, "listening_unavailable",
+                        "Listening to a visit isn't set up on the clinic's dictation server: it has no model to tell voices apart."),
+                    _ => Unexpected(response.StatusCode, operation, log),
+                };
             case HttpStatusCode.NotFound:
                 return NotFound();
             case HttpStatusCode.Conflict:
@@ -349,7 +377,7 @@ public static partial class DictationApi
             case HttpStatusCode.RequestEntityTooLarge:
                 // Too long means stop and start another; too large, a smaller chunk.
                 return await ErrorBodyAsync(response, cancellationToken) is { Error: "too_long" }
-                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its 3-minute limit. Stop it and start another.")
+                    ? Refuse(StatusCodes.Status413PayloadTooLarge, "too_long", "This dictation has reached its time limit. Stop it and start another.")
                     : Refuse(StatusCodes.Status413PayloadTooLarge, "too_large", "This chunk of audio, or the dictation as a whole, is too large.");
             case HttpStatusCode.UnprocessableEntity:
                 // Or, for a visit (AmbientApi), a role missing for a voice the service told apart; or a language the service
@@ -363,9 +391,6 @@ public static partial class DictationApi
                 };
             case HttpStatusCode.TooManyRequests:
                 return Refuse(StatusCodes.Status429TooManyRequests, "busy", "Dictation is busy. Try again in a moment.");
-            case HttpStatusCode.ServiceUnavailable when await ErrorBodyAsync(response, cancellationToken) is { Error: "listening_unavailable" }:
-                return Refuse(StatusCodes.Status503ServiceUnavailable, "listening_unavailable",
-                    "Listening to a visit isn't set up on the clinic's dictation server: it has no model to tell voices apart.");
             case HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden:
                 log.LogError("The dictation service refused the key: Ehr:Dictation:ApiKey doesn't match the service's.");
                 return Unavailable();

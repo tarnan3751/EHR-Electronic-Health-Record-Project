@@ -51,7 +51,12 @@ def rescore(results: dict) -> dict:
         scoring.weigh_proposals(item, transcript)
         if item.sorting == "done" and item.fields:
             proposed = {name: {"value": outcome.proposed, "sources": outcome.sources} for name, outcome in item.fields.items()}
-            checks = validation.check(proposed, item.unknown, transcript)
+            try:
+                checks = validation.check(proposed, item.unknown, transcript)
+            except validation.NotEnglish as refused:  # as the sidecar reports it: unsorted, its reason, no field
+                item.sorting, item.reason, item.fields = "unavailable", refused.reason, {}
+                items.append(item)
+                continue
             for name, checked in checks.fields.items():
                 item.fields[name].status = "pending" if checked.pending else "empty"
                 item.fields[name].reasons = checked.reasons

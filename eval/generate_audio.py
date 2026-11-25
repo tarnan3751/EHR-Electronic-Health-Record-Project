@@ -16,12 +16,19 @@
     uv run eval/generate_audio.py --clean-only         # no noisy variants
     uv run eval/generate_audio.py --skip-existing      # keep items already made from the same text and versions
     uv run eval/generate_audio.py --dry-run            # list the items; make nothing
+    uv run eval/generate_audio.py --set es             # the Spanish test set (any option above applies to it too)
 
 Each script's spoken text is read by the voice it names (eval/voices.toml) with Kokoro-82M, at the revision pinned
 there. That makes one clean item per script. A script that lists `noise` also gets that noise mixed in at each SNR in
 voices.toml, measured over the frames where the speech is active, and a few get one more, too noisy to transcribe.
 Items alternate between the containers browsers record, WebM with Opus (Chromium) and fragmented MP4 with AAC
 (WebKit), so the pipeline is tested on both. eval/audio/manifest.json lists every item for the scoring.
+
+--set es makes the Spanish test set's (eval/scripts-es, the expansion plan's step 17) the same way, into eval/audio-es
+with its own manifest: each script read in Spanish by its voice (voices.toml's [voices_es]), its passages said in
+English read in English, its noise at the SNRs in [variants_es], no item over a Spanish dictation's 2 minutes; and two
+items dictated in the wrong language, an English script read in English to be run as Spanish, and a Spanish script's
+clean item to be run as English. The English set's items, and how they are made, are unchanged.
 
 The first run downloads the model (about 330 MB) and the voices from Hugging Face into its cache, and checks the model
 against the SHA-256 its model card publishes. After that it runs offline. It needs ffmpeg on the PATH, with libopus.
@@ -60,10 +67,12 @@ from huggingface_hub.errors import LocalEntryNotFoundError  # noqa: E402
 from kokoro import KModel, KPipeline  # noqa: E402
 
 import dictation_scripts as ds  # noqa: E402  (beside this file)
+import dictation_scripts_es as dsx  # noqa: E402  (beside this file)
 
 EVAL_DIR = Path(__file__).resolve().parent
 OUT_DIR = EVAL_DIR / "audio"
 MANIFEST = OUT_DIR / "manifest.json"
+OUT_DIR_ES = EVAL_DIR / "audio-es"
 VOICES_FILE = EVAL_DIR / "voices.toml"
 
 SEED = 1
@@ -75,6 +84,8 @@ SPEECH_DBFS = -26.0  # level of the active speech in every item
 ACTIVE_WITHIN_DB = 30.0  # a frame is speech-active within this of the loud (95th percentile) frames
 LEAD_IN, TAIL, GAP = 0.5, 0.7, 0.25  # seconds of silence before, after and between synthesized chunks
 MAX_SECONDS = 180  # the dictation session limit: no item may be longer
+MAX_SECONDS_ES = 120  # a dictation in Spanish's limit (step 17, decision 20)
+MAX_PHONEMES = 510  # Kokoro cuts a piece's phonemes here: a Spanish piece that long would lose words
 CHUNK_CHARS = 250  # Kokoro reads best in pieces of about 100 to 250 phonemes
 PINK_FROM_HZ = 20.0  # the bottom of hearing
 
@@ -110,14 +121,16 @@ def sha256_of(path: Path) -> str:
 
 @dataclass(frozen=True)
 class Variant:
-    script: ds.Script
+    script: ds.Script | dsx.Script
     noise: str | None
     snr_db: int | None
     container: str
+    run_as: str | None = None  # a Spanish set's item dictated in the wrong language: "es" for an English script
 
     @property
     def id(self) -> str:
-        return f"{self.script.id}--clean" if self.noise is None else f"{self.script.id}--{self.noise}-{self.snr_db}db"
+        base = f"{self.script.id}--clean" if self.noise is None else f"{self.script.id}--{self.noise}-{self.snr_db}db"
+        return base + (f"--as-{self.run_as}" if self.run_as else "")
 
     @property
     def file(self) -> str:
@@ -175,6 +188,30 @@ class Voices:
             }
         if any(pipeline.g2p.fallback is None for pipeline in self.pipelines.values()):
             raise GenerationError("espeak-ng didn't load, so words outside misaki's dictionary would be skipped.")
+        self.spanish: KPipeline | None = None
+
+    def speak_runs(self, runs: list[tuple[str, str]], voice: str, seed: int) -> np.ndarray:
+        """A Spanish script read aloud, at 24 kHz: its Spanish with Kokoro's Spanish pipeline (espeak-ng's Spanish
+        rules) and its passages said in English with the American English one, in the same voice, in chunks joined by
+        short pauses."""
+        if self.spanish is None:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")  # Kokoro's notice that its Spanish pipeline doesn't chunk long texts
+                self.spanish = KPipeline(lang_code="e", repo_id=self.repository, model=self.model)
+        voice_file = fetch(self.repository, f"voices/{voice}.pt", self.revision)
+        torch.manual_seed(seed)
+        pieces = []
+        for language, text in runs:
+            pipeline = self.spanish if language == "es" else self.pipelines["us"]
+            for chunk in chunks(text):
+                for result in pipeline(chunk, voice=voice_file, speed=SPEED, split_pattern=None):
+                    if language == "es" and len(result.phonemes) >= MAX_PHONEMES:
+                        raise GenerationError(f"A piece of {voice}'s Spanish is too long for Kokoro: {chunk!r}.")
+                    silent = [t.text for t in result.tokens or [] if re.search("[A-Za-z]", t.text) and not t.phonemes]
+                    if silent:
+                        raise GenerationError(f"The voice has no pronunciation for {silent}; is espeak-ng installed?")
+                    pieces += [result.audio.numpy(), np.zeros(int(GAP * RATE), dtype=np.float32)]
+        return np.concatenate(pieces[:-1])
 
     def speak(self, text: str, voice: str, english: str, seed: int) -> np.ndarray:
         """The text read aloud, at 24 kHz, in chunks joined by short pauses."""
@@ -354,19 +391,19 @@ def provenance(voices: dict, ffmpeg: str) -> dict:
     }
 
 
-def load_manifest() -> dict:
-    if not MANIFEST.is_file():
+def load_manifest(path: Path = MANIFEST) -> dict:
+    if not path.is_file():
         return {}
     try:
-        return json.loads(MANIFEST.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
 
 
-def save_manifest(manifest: dict) -> None:
-    partial = MANIFEST.with_suffix(".part")
+def save_manifest(manifest: dict, path: Path = MANIFEST) -> None:
+    partial = path.with_suffix(".part")
     partial.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    partial.replace(MANIFEST)
+    partial.replace(path)
 
 
 def entry(variant: Variant, accent: str, seconds: float, sha256: str) -> dict:
@@ -385,13 +422,14 @@ def entry(variant: Variant, accent: str, seconds: float, sha256: str) -> dict:
     }
 
 
-def text_sha256(script: ds.Script) -> str:
-    return hashlib.sha256(f"{script.voice}\n{ds.spoken_text(script.text, pauses=True)}".encode()).hexdigest()
+def text_sha256(script: ds.Script | dsx.Script) -> str:
+    spoken = (dsx if isinstance(script, dsx.Script) else ds).spoken_text(script.text, pauses=True)
+    return hashlib.sha256(f"{script.voice}\n{spoken}".encode()).hexdigest()
 
 
-def up_to_date(variant: Variant, old: dict, details: dict) -> bool:
+def up_to_date(variant: Variant, old: dict, details: dict, out_dir: Path = OUT_DIR) -> bool:
     """Whether an item from an earlier run, made with the same versions, was made from this text and is intact."""
-    path = OUT_DIR / variant.file
+    path = out_dir / variant.file
     return (
         old.get("file") == variant.file
         and old.get("noise") == variant.noise
@@ -411,10 +449,14 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--clean-only", action="store_true", help="make the clean items only")
     parser.add_argument("--skip-existing", action="store_true", help="keep items made from the same text and versions")
     parser.add_argument("--dry-run", action="store_true", help="list the items; make nothing")
+    parser.add_argument("--set", choices=["en", "es"], default="en", help="the English test set (default) or the Spanish")
     return parser.parse_args(argv)
 
 
 def run(args: argparse.Namespace) -> None:
+    if args.set == "es":
+        run_spanish(args)
+        return
     started = time.monotonic()
     voices = tomllib.loads(VOICES_FILE.read_text(encoding="utf-8"))
     scripts = ds.load_scripts()
@@ -500,6 +542,119 @@ def run(args: argparse.Namespace) -> None:
     )
 
 
+# ---- The Spanish set (the expansion plan's step 17) ----------------------------------------------------------------
+
+
+def plan_spanish(scripts: list[dsx.Script], variants: dict, english: ds.Script) -> list[Variant]:
+    """The Spanish set's items, made as plan() makes the English set's, then the English script read in English to be
+    dictated as Spanish. The Spanish script dictated as English is its clean item, listed again in the manifest."""
+    return plan(scripts, variants) + [Variant(english, None, None, CONTAINER_ORDER[0], run_as="es")]
+
+
+def run_spanish(args: argparse.Namespace) -> None:
+    started = time.monotonic()
+    voices = tomllib.loads(VOICES_FILE.read_text(encoding="utf-8"))
+    variants = voices["variants_es"]
+    scripts = dsx.load_scripts()
+    for script in scripts:
+        if script.voice not in voices["voices_es"]:
+            raise GenerationError(f"{script.id} names voice {script.voice}, which voices.toml's [voices_es] doesn't list.")
+    english = next((s for s in ds.load_scripts() if s.id == variants["english_as_spanish"]), None)
+    if english is None:
+        raise GenerationError(f"voices.toml's english_as_spanish names {variants['english_as_spanish']}, which isn't a script.")
+    every = plan_spanish(scripts, variants, english)
+    chosen = {s.id for s in dsx.select(scripts, args.only)} if args.only else {s.id for s in scripts} | {english.id}
+    wanted = [v for v in every if v.script.id in chosen and not (args.clean_only and v.noise)]
+    as_english = f"{variants['spanish_as_english']}--clean"
+
+    if args.dry_run:
+        for variant in wanted:
+            print(f"{variant.file:52} {variant.script.voice:11} {variant.script.words:4} words")
+        print(f"{len(wanted)} of {len(every)} items, and {as_english} again, dictated as English.")
+        return
+
+    current = provenance(voices, ffmpeg_version())
+    OUT_DIR_ES.mkdir(exist_ok=True)
+    manifest_path = OUT_DIR_ES / "manifest.json"
+    manifest = load_manifest(manifest_path)
+    same_versions = {k: v for k, v in manifest.get("generator", {}).items() if k != "items"} == current
+    old_entries = {item["id"]: item for item in manifest.get("variants", [])} if same_versions else {}
+    old_details = manifest.get("generator", {}).get("items", {}) if same_versions else {}
+    if manifest and not same_versions:
+        print("The generator, voices.toml or a package version changed: items from earlier runs are dropped.")
+
+    print(f"Loading {voices['model']['name']} ({voices['model']['repository']} at {voices['model']['revision'][:12]})")
+    speaker = Voices(voices["model"])
+    talkers: list[np.ndarray] = []
+
+    entries, details, made = dict(old_entries), dict(old_details), 0
+    order = {variant.id: index for index, variant in enumerate(every)} | {f"{as_english}--as-en": len(every)}
+
+    def save() -> list[dict]:
+        if as_english in entries:
+            entries[f"{as_english}--as-en"] = entries[as_english] | {"id": f"{as_english}--as-en", "run_as": "en"}
+            details[f"{as_english}--as-en"] = details[as_english]
+        kept = sorted((e for e in entries.values() if e["id"] in order), key=lambda e: order[e["id"]])
+        save_manifest({"generator": current | {"items": {e["id"]: details[e["id"]] for e in kept}}, "variants": kept},
+                      manifest_path)
+        return kept
+
+    for script_id in dict.fromkeys(v.script.id for v in wanted):
+        mine = [v for v in wanted if v.script.id == script_id]
+        script = mine[0].script
+        if args.skip_existing:
+            mine = [v for v in mine
+                    if not (v.id in entries and up_to_date(v, entries[v.id], details.get(v.id, {}), OUT_DIR_ES))]
+        if not mine:
+            continue
+        seed = seed_for(f"speech:{script.id}")
+        if isinstance(script, dsx.Script):
+            accent = voices["voices_es"][script.voice]["accent"]
+            speech = place(speaker.speak_runs(dsx.runs(script.text, pauses=True), script.voice, seed))
+        else:
+            voice = voices["voices"][script.voice]
+            accent = voice["accent"]
+            speech = place(speaker.speak(ds.spoken_text(script.text, pauses=True), script.voice, voice["english"], seed))
+        if len(speech) > MAX_SECONDS_ES * RATE:
+            raise GenerationError(f"{script.id} reads in {len(speech) / RATE:.0f} s, over the {MAX_SECONDS_ES} s limit.")
+        for variant in mine:
+            if variant.noise is None:
+                samples, measured = speech * headroom(speech), None
+            else:
+                rng = np.random.default_rng(seed_for(f"noise:{variant.id}"))
+                recipe = voices["noise"][variant.noise]
+                if variant.noise == "hvac":
+                    noise = pink(rng, len(speech), recipe["lowpass_hz"], recipe["lowpass_order"])
+                elif variant.noise == "monitor":
+                    noise = monitor(rng, len(speech), recipe)
+                else:
+                    if not talkers:
+                        talkers = babble_talkers(speaker, recipe)
+                    noise = babble(rng, len(speech), talkers)
+                samples, measured = mix(speech, noise, variant.snr_db)
+            path = OUT_DIR_ES / variant.file
+            encode(samples, variant.container, path)
+            seconds = round(len(samples) / RATE, 2)
+            entries[variant.id] = entry(variant, accent, seconds, sha256_of(path)) | (
+                {"run_as": variant.run_as} if variant.run_as else {})
+            details[variant.id] = {
+                "text_sha256": text_sha256(script),
+                "words": script.words,
+                "snr_db_measured": None if measured is None else round(measured, 2),
+            }
+            made += 1
+            save()
+            print(f"  {variant.file:52} {seconds:6.1f} s" + ("" if measured is None else f"  SNR {measured:5.2f} dB"))
+
+    kept = save()
+    total = sum(e["seconds"] for e in kept)
+    size = sum((OUT_DIR_ES / e["file"]).stat().st_size for e in kept)
+    print(
+        f"\nMade {made} item(s) in {time.monotonic() - started:.0f} s. The manifest lists {len(kept)} of {len(order)}: "
+        f"{total / 60:.1f} minutes of audio, {size / 1e6:.1f} MB, in {OUT_DIR_ES}."
+    )
+
+
 def babble_talkers(speaker: Voices, recipe: dict) -> list[np.ndarray]:
     """Each babble voice reading its text once, at equal level, with the pronunciation of its accent (b: British).
     Made once per run."""
@@ -512,7 +667,7 @@ def babble_talkers(speaker: Voices, recipe: dict) -> list[np.ndarray]:
 def main(argv: list[str] | None = None) -> int:
     try:
         run(parse_arguments(argv))
-    except (GenerationError, ds.ScriptError) as error:
+    except (GenerationError, ds.ScriptError, dsx.ScriptError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

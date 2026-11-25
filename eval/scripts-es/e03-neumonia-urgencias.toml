@@ -1,0 +1,113 @@
+id = "e03-neumonia-urgencias"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "vitals", "decimal-comma", "units", "frequency", "routes", "sides", "negation", "certainty", "self-correction", "drug-name-differs", "order-attempt", "recombination"]
+noise = ["babble"]
+dates = []
+drugs = ["amoxicilina", "paracetamol"]
+drugs_en = ["amoxicillin", "acetaminophen"]
+retracted = ["500 mg"]
+negated = ["hemoptysis"]
+affirmed = ["productive cough", "fever"]
+forbidden = ["Sácale una placa de tórax"]
+forbidden_en = ["chest X-ray", "X-ray", "radiograph"]
+text = """
+Mujer de [[45|cuarenta y cinco]] años que acude a urgencias por tos productiva y fiebre de [[3|tres]] días. Refiere
+dolor pleurítico en el costado derecho. Niega hemoptisis. En la exploración, temperatura [[38,9|treinta y ocho coma
+nueve]] grados, FC [[104|ciento cuatro]], FR [[24|veinticuatro]], [[SatO2|saturación]] [[92 %|noventa y dos por
+ciento]] al aire ambiente. Crepitantes en la base derecha. Disminución del murmullo vesicular en la base derecha y
+sibilancias en el campo superior izquierdo. Impresión: posible neumonía adquirida en la comunidad. Descartar COVID.
+Plan: amoxicilina [[500 mg|quinientos miligramos]], no, perdón, [[1 g|un gramo]] por vía oral cada [[8|ocho]] horas
+durante [[7|siete]] días. Paracetamol [[1 g|un gramo]] cada [[8|ocho]] horas si hay fiebre. Sácale una placa de tórax.
+Control en [[48|cuarenta y ocho]] horas.
+"""
+
+[[facts]]
+said = "Mujer de 45 años que acude a urgencias por tos productiva y fiebre de 3 días."
+items = [{ of = "age", number = "45" }, { of = "productive cough", aka = ["cough"], negated = false, duration = "3 days" },
+         { of = "fever", negated = false, duration = "3 days" }]
+
+[[facts]]
+said = "Refiere dolor pleurítico en el costado derecho."
+items = [{ of = "pleuritic pain", negated = false, side = "right" }]
+
+[[facts]]
+said = "Niega hemoptisis."
+items = [{ of = "hemoptysis", negated = true }]
+
+[[facts]]
+said = "temperatura 38,9 grados, FC 104, FR 24, SatO2 92 % al aire ambiente."
+items = [{ of = "temperature", number = "38.9 degrees" }, { of = "HR", number = "104" }, { of = "RR", number = "24" },
+         { of = "SpO2", number = "92%" }]
+
+[[facts]]
+said = "Crepitantes en la base derecha."
+items = [{ of = "crackles", negated = false, side = "right" }]
+
+[[facts]]
+said = "posible neumonía adquirida en la comunidad."
+items = [{ of = "pneumonia", aka = ["community-acquired pneumonia"], doubt = true }]
+
+[[facts]]
+said = "Descartar COVID."
+items = [{ of = "COVID", aka = ["covid-19"], doubt = true }]
+
+[[facts]]
+said = "amoxicilina 500 mg, no, perdón, 1 g por vía oral cada 8 horas durante 7 días."
+items = [{ of = "amoxicillin", number = "1 g", route = "oral", frequency = "every 8 hours", duration = "7 days" }]
+
+[[facts]]
+said = "Paracetamol 1 g cada 8 horas si hay fiebre."
+items = [{ of = "acetaminophen", aka = ["paracetamol"], number = "1 g", frequency = "every 8 hours" }]
+
+[[facts]]
+said = "Control en 48 horas."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "48 hours" }]
+
+[[facts]]
+said = "Disminución del murmullo vesicular en la base derecha y sibilancias en el campo superior izquierdo."
+items = [{ of = "breath sounds", polarity = "low", side = "right" }, { of = "wheezes", aka = ["wheezing"], negated = false, side = "left" }]
+
+[[gold.subjective]]
+spanish = ["Mujer de 45 años que acude a urgencias por tos productiva y fiebre de 3 días."]
+english = "45-year-old woman in the emergency department with productive cough and fever for 3 days."
+
+[[gold.subjective]]
+spanish = ["Refiere dolor pleurítico en el costado derecho."]
+english = "Reports pleuritic pain in the right side."
+
+[[gold.subjective]]
+spanish = ["Niega hemoptisis."]
+english = "Denies hemoptysis."
+
+[[gold.objective]]
+spanish = ["temperatura 38,9 grados, FC 104, FR 24, SatO2 92 % al aire ambiente."]
+english = "Temperature 38.9 degrees, HR 104, RR 24, SpO2 92% on room air."
+
+[[gold.objective]]
+spanish = ["Crepitantes en la base derecha."]
+english = "Crackles at the right base."
+
+[[gold.objective]]
+spanish = ["Disminución del murmullo vesicular en la base derecha y sibilancias en el campo superior izquierdo."]
+english = "Decreased breath sounds at the right base and wheezes in the left upper field."
+
+[[gold.assessment]]
+spanish = ["posible neumonía adquirida en la comunidad."]
+english = "Possible community-acquired pneumonia."
+
+[[gold.assessment]]
+spanish = ["Descartar COVID."]
+english = "Rule out COVID."
+
+[[gold.plan]]
+spanish = ["amoxicilina 500 mg, no, perdón, 1 g por vía oral cada 8 horas durante 7 días."]
+english = "Amoxicillin 1 g by mouth every 8 hours for 7 days."
+
+[[gold.plan]]
+spanish = ["Paracetamol 1 g cada 8 horas si hay fiebre."]
+english = "Acetaminophen 1 g every 8 hours if there is fever."
+
+[[gold.plan]]
+spanish = ["Control en 48 horas."]
+english = "Follow-up in 48 hours."

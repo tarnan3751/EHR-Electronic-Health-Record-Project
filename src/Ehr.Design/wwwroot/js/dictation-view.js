@@ -15,11 +15,14 @@ window.SwiftChartDictationView = class {
             too_quiet: "too quiet to hear clearly",
             too_noisy: "too much background noise",
             low_confidence: "the speech model wasn't sure",
+            other_language: "it wasn't heard as Spanish, so it was left out of the proposals",
         };
         const warningWords = {
             possible_correction: "You may have corrected this later in the dictation: check the highlighted words.",
             near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
+            // Its Spanish words are marked as Spanish where it is shown (warningNote).
+            ambiguous_frequency: "“Cada tercer día” can mean every other day or every third day: check which you meant.",
             // A recorded visit's (the expansion plan's step 16).
             speaker_unsure: "Who said this couldn't be told with confidence: check the highlighted words.",
             other_speaker: "Someone else in the room said this: check that it is about the patient.",
@@ -110,9 +113,21 @@ window.SwiftChartDictationView = class {
                 let node = document.createTextNode(text.slice(from, to));
                 if (segment?.unclear) {
                     const mark = element("mark", undefined, "sc-transcript__unclear");
-                    mark.title = `Say this again: ${unclearWords[segment.unclear] ?? "it may be wrong"}.`;
+                    const why = `Say this again: ${unclearWords[segment.unclear] ?? "it may be wrong"}.`;
                     mark.append(node);
-                    node = mark;
+                    if (transcriptArea.lang === "es") {
+                        // In a Spanish transcript (step 17) the explanation is English and the words Spanish: the title
+                        // goes on an English wrapper, so neither is read in the other's language.
+                        const english = element("span");
+                        english.lang = "en";
+                        english.title = why;
+                        mark.lang = "es";
+                        english.append(mark);
+                        node = english;
+                    } else {
+                        mark.title = why;
+                        node = mark;
+                    }
                 } else if (segment && !segment.final) {
                     const span = element("span", undefined, "sc-transcript__tentative");
                     span.append(node);
@@ -133,6 +148,14 @@ window.SwiftChartDictationView = class {
         }
 
         function renderResult(result) {
+            // A dictation in Spanish (the expansion plan's step 17): its transcript, and the words quoted from it, are Spanish.
+            const spanish = result.spokenLanguage === "es";
+            if (spanish) {
+                transcriptArea.lang = "es";
+            } else {
+                transcriptArea.removeAttribute("lang");
+            }
+
             renderTranscript(result.transcript);
             if (result.sorting === "pending") {
                 sortMessage.textContent = "Proposing the fields…";
@@ -155,8 +178,14 @@ window.SwiftChartDictationView = class {
                 const text = ((result.transcript ?? state.transcript)?.text ?? "").slice(item.start, item.end);
                 const kind = proposed.get(`${item.start}:${item.end}`);
                 const li = element("li");
-                li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `),
-                    document.createTextNode(wordsAtTheClinic ? "Its words can be read only at the clinic." : `“${text}”`));
+                // In a dictation in Spanish, the words quoted are Spanish (step 17).
+                const quote = wordsAtTheClinic ? document.createTextNode("Its words can be read only at the clinic.")
+                    : spanish ? element("span", `“${text}”`) : document.createTextNode(`“${text}”`);
+                if (spanish && !wordsAtTheClinic) {
+                    quote.lang = "es";
+                }
+
+                li.append(element("strong", `${(kind ? proposalWords[kind] : instructionWords[item.reason]) ?? "Instruction"}: `), quote);
                 // A recorded visit's (step 16): an instruction said where who spoke couldn't be told.
                 if (item.speaker === "unsure") {
                     li.append(document.createTextNode(" Said in a passage whose speaker couldn't be told."));
@@ -176,9 +205,14 @@ window.SwiftChartDictationView = class {
             value.replaceChildren();
             if (field?.status === "pending") {
                 setStatus(status, "Awaiting review", "warning");
-                const text = element("p", field.value, "sc-proposal__value");
-                highlightOnFocus(text, field.sources ?? []);
-                value.append(text);
+                if (field.statements?.length) {
+                    value.append(renderStatements(field));
+                } else {
+                    const text = element("p", field.value, "sc-proposal__value");
+                    highlightOnFocus(text, field.sources ?? []);
+                    value.append(text);
+                }
+
                 for (const control of container.querySelectorAll("button, textarea, summary")) {
                     control.onfocus = () => renderTranscript(state.transcript, field.sources ?? []);
                     control.onblur = () => renderTranscript(state.transcript);
@@ -190,7 +224,7 @@ window.SwiftChartDictationView = class {
                 }
 
                 for (const warning of field.warnings ?? []) {
-                    const note = element("p", warningWords[warning.code] ?? "Check this field against the transcript.", "sc-proposal__warning");
+                    const note = warningNote(warning.code);
                     highlightOnFocus(note, [warning]);
                     value.append(note);
                 }
@@ -205,6 +239,45 @@ window.SwiftChartDictationView = class {
             } else {
                 setStatus(status, sorting === "unavailable" ? "Not sorted" : "Not dictated yet");
             }
+        }
+
+        // A warning's words for the clinician, with any Spanish in them marked as Spanish (step 17).
+        function warningNote(code) {
+            const words = warningWords[code] ?? "Check this field against the transcript.";
+            const note = element("p", undefined, "sc-proposal__warning");
+            const spanish = code === "ambiguous_frequency" ? "Cada tercer día" : null;
+            if (!spanish) {
+                note.textContent = words;
+                return note;
+            }
+
+            const at = words.indexOf(spanish);
+            const quoted = element("span", spanish);
+            quoted.lang = "es";
+            note.append(document.createTextNode(words.slice(0, at)), quoted, document.createTextNode(words.slice(at + spanish.length)));
+            return note;
+        }
+
+        // A value proposed from Spanish (step 17): each English sentence beside the Spanish words it was translated from,
+        // which hovering or focusing the sentence highlights in the transcript (docs/brand: Translated sentences), each
+        // saying it is a translation to check, warning or not, so none reads as checked for having no warning. The page
+        // renders the same list before this script runs (Notes/Review, ReviewModel.TranslatedSentence).
+        function renderStatements(field) {
+            const list = element("ol", undefined, "sc-translation");
+            const transcriptText = state.transcript?.text ?? "";
+            for (const statement of field.statements) {
+                const pair = element("li", undefined, "sc-translation__pair");
+                pair.append(element("p", "Translated from Spanish: check it against the Spanish beside it", "sc-translation__check"));
+                const said = element("span", `“${statement.sources.map((s) => transcriptText.slice(s.start, s.end)).join(" … ")}”`);
+                said.lang = "es";
+                const spanish = element("p", "You said: ", "sc-translation__spanish");
+                spanish.append(said);
+                pair.append(element("p", field.value.slice(statement.start, statement.end), "sc-translation__english"), spanish);
+                highlightOnFocus(pair, statement.sources);
+                list.append(pair);
+            }
+
+            return list;
         }
 
         // Hovering or focusing the element highlights its ranges in the transcript; the keyboard reaches it with Tab.

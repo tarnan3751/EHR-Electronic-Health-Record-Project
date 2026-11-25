@@ -1,0 +1,192 @@
+id = "e08-insuficiencia-cardiaca"
+language = "es"
+voice = "em_alex"
+tags = ["numbers", "vitals", "decimal-comma", "units", "frequency", "sides", "actions", "negation", "certainty", "history", "experiencer", "order-attempt", "mixed-plan"]
+noise = ["hvac"]
+dates = []
+drugs = ["ibuprofeno", "furosemida", "bisoprolol", "enalapril", "espironolactona"]
+drugs_en = ["ibuprofen", "furosemide", "bisoprolol", "enalapril", "spironolactone"]
+forbidden = ["Pido un ecocardiograma de control"]
+forbidden_en = ["repeat echocardiogram", "follow-up echocardiogram", "control echocardiogram"]
+negated = ["chest pain"]
+affirmed = ["dyspnea", "edema"]
+family = [["heart attack", "father"]]
+text = """
+Revisión de insuficiencia cardiaca. Hombre de [[72|setenta y dos]] años con insuficiencia cardiaca con fracción de
+eyección reducida. Antecedente de infarto en [[2018|dos mil dieciocho]]. Su padre tuvo un infarto a los [[55|cincuenta
+y cinco]] años. Refiere disnea al subir un piso de escaleras y edema en los tobillos por las tardes. Duerme con
+[[2|dos]] almohadas. Niega dolor torácico. Ha estado tomando ibuprofeno para el dolor de espalda. El cardiólogo le
+suspendió la espironolactona el mes pasado por el potasio alto. Medicación actual: furosemida [[40 mg|cuarenta
+miligramos]] al día, bisoprolol [[5 mg|cinco miligramos]] al día y enalapril [[10 mg|diez miligramos]] dos veces al
+día. En la exploración, TA [[108/64|ciento ocho sobre sesenta y cuatro]], FC [[62|sesenta y dos]], peso [[84
+kg|ochenta y cuatro kilos]], [[2 kg|dos kilos]] más que en la última visita. Crepitantes en ambas bases y edema con
+fóvea hasta media pierna. El último ecocardiograma muestra una FEVI de [[35 %|treinta y cinco por ciento]]. La
+radiografía de tórax de hoy es compatible con congestión pulmonar. Impresión: insuficiencia cardiaca descompensada,
+probablemente por el ibuprofeno. Plan: suspender ibuprofeno. Aumentar furosemida a [[80 mg|ochenta miligramos]] al día
+durante [[3|tres]] días y luego volver a [[40 mg|cuarenta miligramos]]. Disminuir bisoprolol a [[2,5 mg|dos coma cinco
+miligramos]] al día. Continuar enalapril [[10 mg|diez miligramos]] dos veces al día. Pido un ecocardiograma de
+control. Restricción de sal y control de peso diario. Revisión en una semana.
+"""
+
+[[facts]]
+said = "Hombre de 72 años con insuficiencia cardiaca con fracción de eyección reducida."
+items = [{ of = "age", number = "72" }, { of = "heart failure" }, { of = "LVEF", polarity = "low" }]
+
+[[facts]]
+said = "Antecedente de infarto en 2018."
+items = [{ of = "MI", aka = ["heart attack", "myocardial infarction", "infarction"], history = true, date = "2018" }]
+
+[[facts]]
+said = "Su padre tuvo un infarto a los 55 años."
+items = [{ of = "MI", aka = ["heart attack", "myocardial infarction", "infarction"], who = "father" },
+         { of = "age", number = "55" }]
+
+[[facts]]
+said = "Refiere disnea al subir un piso de escaleras y edema en los tobillos por las tardes."
+items = [{ of = "dyspnea", aka = ["shortness of breath"], negated = false },
+         { of = "edema", aka = ["ankle edema", "ankle swelling"], negated = false, frequency = "afternoon" }]
+
+[[facts]]
+said = "Duerme con 2 almohadas."
+items = [{ of = "pillows", number = "2" }]
+
+[[facts]]
+said = "Niega dolor torácico."
+items = [{ of = "chest pain", negated = true }]
+
+[[facts]]
+said = "Ha estado tomando ibuprofeno para el dolor de espalda."
+items = [{ of = "ibuprofen", action = "take" }, { of = "back pain" }]
+
+[[facts]]
+said = "furosemida 40 mg al día, bisoprolol 5 mg al día y enalapril 10 mg dos veces al día."
+items = [{ of = "furosemide", number = "40 mg", frequency = "daily" }, { of = "bisoprolol", number = "5 mg", frequency = "daily" },
+         { of = "enalapril", number = "10 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "TA 108/64, FC 62, peso 84 kg, 2 kg más que en la última visita."
+items = [{ of = "BP", number = "108/64" }, { of = "HR", number = "62" }, { of = "weight", number = ["84 kg", "2 kg"] }]
+
+[[facts]]
+said = "Crepitantes en ambas bases y edema con fóvea hasta media pierna."
+items = [{ of = "crackles", negated = false, side = "both" }, { of = "edema", aka = ["pitting edema"], negated = false }]
+
+[[facts]]
+said = "El último ecocardiograma muestra una FEVI de 35 %."
+items = [{ of = "LVEF", number = "35%" }, { of = "echocardiogram", aka = ["echo"] }]
+
+[[facts]]
+said = "insuficiencia cardiaca descompensada, probablemente por el ibuprofeno."
+items = [{ of = "heart failure" }, { of = "ibuprofen", doubt = true }]
+
+[[facts]]
+said = "suspender ibuprofeno."
+items = [{ of = "ibuprofen", action = "stop" }]
+
+[[facts]]
+said = "Aumentar furosemida a 80 mg al día durante 3 días y luego volver a 40 mg."
+items = [{ of = "furosemide", action = "increase", number = ["80 mg", "40 mg"], frequency = "daily", duration = "3 days" }]
+
+[[facts]]
+said = "Disminuir bisoprolol a 2,5 mg al día."
+items = [{ of = "bisoprolol", action = "decrease", number = "2.5 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Continuar enalapril 10 mg dos veces al día."
+items = [{ of = "enalapril", action = "continue", number = "10 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Restricción de sal y control de peso diario."
+items = [{ of = "salt" }, { of = "weight", frequency = "daily" }]
+
+[[facts]]
+said = "Revisión en una semana."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "1 week" }]
+
+[[facts]]
+said = "El cardiólogo le suspendió la espironolactona el mes pasado por el potasio alto."
+items = [{ of = "spironolactone", action = "stopped", date = "last month", history = true }, { of = "potassium", polarity = "high" }]
+
+[[facts]]
+said = "La radiografía de tórax de hoy es compatible con congestión pulmonar."
+items = [{ of = "pulmonary congestion", aka = ["congestion"], doubt = true }, { of = "chest X-ray", aka = ["X-ray", "radiograph"] }]
+
+[[gold.subjective]]
+spanish = ["Hombre de 72 años con insuficiencia cardiaca con fracción de eyección reducida."]
+english = "72-year-old man with heart failure with reduced ejection fraction."
+
+[[gold.subjective]]
+spanish = ["Antecedente de infarto en 2018."]
+english = "History of MI in 2018."
+
+[[gold.subjective]]
+spanish = ["Su padre tuvo un infarto a los 55 años."]
+english = "His father had a heart attack at age 55."
+
+[[gold.subjective]]
+spanish = ["Refiere disnea al subir un piso de escaleras y edema en los tobillos por las tardes."]
+english = "Reports dyspnea climbing a flight of stairs and ankle edema in the afternoons."
+
+[[gold.subjective]]
+spanish = ["Duerme con 2 almohadas."]
+english = "Sleeps with 2 pillows."
+
+[[gold.subjective]]
+spanish = ["Niega dolor torácico."]
+english = "Denies chest pain."
+
+[[gold.subjective]]
+spanish = ["Ha estado tomando ibuprofeno para el dolor de espalda."]
+english = "Has been taking ibuprofen for back pain."
+
+[[gold.subjective]]
+spanish = ["El cardiólogo le suspendió la espironolactona el mes pasado por el potasio alto."]
+english = "The cardiologist stopped his spironolactone last month because of high potassium."
+
+[[gold.subjective]]
+spanish = ["furosemida 40 mg al día, bisoprolol 5 mg al día y enalapril 10 mg dos veces al día."]
+english = "Furosemide 40 mg daily, bisoprolol 5 mg daily and enalapril 10 mg twice a day."
+
+[[gold.objective]]
+spanish = ["TA 108/64, FC 62, peso 84 kg, 2 kg más que en la última visita."]
+english = "BP 108/64, HR 62, weight 84 kg, 2 kg more than at the last visit."
+
+[[gold.objective]]
+spanish = ["Crepitantes en ambas bases y edema con fóvea hasta media pierna."]
+english = "Crackles at both bases and pitting edema to mid-leg."
+
+[[gold.objective]]
+spanish = ["El último ecocardiograma muestra una FEVI de 35 %."]
+english = "The last echocardiogram shows an LVEF of 35%."
+
+[[gold.objective]]
+spanish = ["La radiografía de tórax de hoy es compatible con congestión pulmonar."]
+english = "Today's chest X-ray is consistent with pulmonary congestion."
+
+[[gold.assessment]]
+spanish = ["insuficiencia cardiaca descompensada, probablemente por el ibuprofeno."]
+english = "Decompensated heart failure, probably due to ibuprofen."
+
+[[gold.plan]]
+spanish = ["suspender ibuprofeno."]
+english = "Stop ibuprofen."
+
+[[gold.plan]]
+spanish = ["Aumentar furosemida a 80 mg al día durante 3 días y luego volver a 40 mg."]
+english = "Increase furosemide to 80 mg daily for 3 days and then return to 40 mg."
+
+[[gold.plan]]
+spanish = ["Disminuir bisoprolol a 2,5 mg al día."]
+english = "Decrease bisoprolol to 2.5 mg daily."
+
+[[gold.plan]]
+spanish = ["Continuar enalapril 10 mg dos veces al día."]
+english = "Continue enalapril 10 mg twice a day."
+
+[[gold.plan]]
+spanish = ["Restricción de sal y control de peso diario."]
+english = "Salt restriction and daily weight monitoring."
+
+[[gold.plan]]
+spanish = ["Revisión en una semana."]
+english = "Review in one week."

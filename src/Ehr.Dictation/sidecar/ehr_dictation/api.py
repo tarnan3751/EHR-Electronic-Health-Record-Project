@@ -6,15 +6,19 @@ being on it proves nothing. Session routes also need `X-Dictation-Owner`, the si
 app sets from the session and never from the request; a session is invisible to any other owner.
 
     GET    /health                           {"status": "ok"}, nothing more; no key needed
-    POST   /v1/sessions                      201 {sessionId, maxSeconds, maxChunkBytes}
+    POST   /v1/sessions                      body: none, or {"spokenLanguage": "en" or "es"}; 201 {sessionId,
+                                             maxSeconds, maxChunkBytes}, maxSeconds 120 in Spanish and 180 in English
     POST   /v1/sessions/{id}/audio?seq=N     body: the next chunk, any container; 200 {receivedSeq, audioSeconds,
                                              transcript}, audioSeconds being how much of maxSeconds the audio uses
     POST   /v1/sessions/{id}/stop            the transcript, and the fields, as far as they get within 8 s
     POST   /v1/sessions/{id}/result?wait=S   the same, waiting up to S (at most 10) seconds for the fields
     DELETE /v1/sessions/{id}                 204; audio, transcript and fields are gone
 
-A transcript is {text, final, segments: [{start, end, startMs, endMs, final, unclear}]}, with UTF-16 offsets into text
-and unclear one of too_quiet, too_noisy, low_confidence or null. A result is {transcript, sorting, reason, fields,
+A dictation is in English unless it starts with {"spokenLanguage": "es"} (the expansion plan's step 17); see
+sessions.py for what a dictation in Spanish goes through. A transcript is {text, final, segments: [{start, end, startMs,
+endMs, final, unclear}]}, with UTF-16 offsets into text and unclear one of too_quiet, too_noisy, low_confidence, or in
+Spanish other_language (a passage Whisper didn't hear as Spanish), or null; a Spanish transcript has no tentative
+tail. A result is {transcript, sorting, reason, fields,
 notCarriedOver, proposals, provenance}: the transcript is final once the rest of the audio is transcribed, and sorting is pending,
 done (fields set) or unavailable (reason model_unavailable, model_timeout, model_output_invalid or transcript_too_long,
 and the transcript stays as plain text; or transcription_failed, and it stays as it was live, not final).
@@ -31,12 +35,19 @@ warnings: [{code, start, end}]} or {status: "empty", reasons: [...]}: a value th
 why; a warning is possible_correction, pointing at a later number, date or drug in the transcript that may be a
 correction the checks didn't hear, near_unclear_passage, pointing at a passage marked unclear beside one of the
 value's sources, or one_field_holds_dictation, on the only value offered when it quotes nearly the whole transcript,
-pointing at what it quotes (validation.py).
+pointing at what it quotes (validation.py). A result in Spanish also has "spokenLanguage": "es"; its pending fields
+are English, each with statements, [{start, end, sources: [{start, end}]}], each sentence's UTF-16 place in the value
+and the Spanish passages it was translated from, and may also warn ambiguous_frequency; its
+notCarriedOver lists the instructions, said in Spanish or in English, and what the checks cut from a translation as
+an instruction (translation.not_carried_over()), its proposals are always empty, and its provenance names Whisper and
+the Spanish prompt, schema and structuring (translation.py).
 
 The limits on all of it (sizes, sessions at once, how long things are kept and waited for) are in settings.py.
 
-Errors are {error, detail} with 400 (no owner, or a bad seq or wait), 401 (no key), 404 (no such session for this owner), 409
-(out_of_order with expectedSeq, stopped, not_stopped), 413 (too_large, too_long), 422 (not_audio) or 429 (busy).
+Errors are {error, detail} with 400 (no owner, or a bad seq or wait; bad_language, a start body that isn't one of
+the two above), 401 (no key), 404 (no such session for this owner), 409 (out_of_order with expectedSeq, stopped,
+not_stopped), 413 (too_large, too_long), 422 (not_audio), 429 (busy) or 503 (language_unavailable: Spanish without
+Whisper installed).
 Nothing a request carries is logged.
 
 Listening to a visit (the expansion plan's step 16; listening.py) uses the same routes and one more, every call with
@@ -95,12 +106,14 @@ from .asr import MedAsr, Recognizer
 from .diarize import Embedder
 from .listening import Listening, Members
 from .llama import LlamaServer, Structurer
-from .sessions import AMBIENT, DICTATION, SessionError
+from .sessions import AMBIENT, DICTATION, SessionError, Sessions, Spanish
 from .settings import Settings
+from .whisper_asr import Whisper
 
 log = logging.getLogger("ehr_dictation")
 
 OWNER = re.compile(r"[A-Za-z0-9-]{1,100}")
+LANGUAGES = ("en", "es")
 
 
 def create_app(
@@ -109,11 +122,13 @@ def create_app(
     recognizer: Recognizer | None = None,
     structurer: Structurer | None = None,
     models: provenance.Models | None = None,
+    spanish: Spanish | None = None,
     embedder: Embedder | None = None,
 ) -> FastAPI:
     """The app, from the environment unless told otherwise (the tests pass stand-ins for the models). Refuses to start
-    without its keys, or with a MedASR or speaker model that isn't the one models-manifest.json records; the recorded
-    speaker model failing to load turns listening to a visit off, logged, and nothing else."""
+    without its keys, or with a MedASR, a Whisper or a speaker model that isn't the one models-manifest.json records;
+    starts without Spanish when Whisper isn't installed, and the recorded speaker model failing to load turns listening
+    to a visit off, logged, and nothing else."""
     settings = settings or Settings.from_environment()
     _configure_logging()
     expected = hashlib.sha256(f"Bearer {settings.api_key}".encode()).digest()
@@ -123,9 +138,16 @@ def create_app(
         loaded_models = models or provenance.load(settings.models_dir)
         llama = None
         sorter = structurer
+        in_spanish = spanish
         if sorter is None:
             llama = LlamaServer(settings.llama_url, settings.llama_api_key)
             sorter = Structurer(llama, prompt.load(), loaded_models.language_file, timeout=settings.structuring_seconds)
+            if in_spanish is None and loaded_models.spanish_speech is not None:
+                in_spanish = Spanish(
+                    Whisper.load(settings.models_dir / provenance.WHISPER_DIR, settings.device),
+                    Structurer(llama, prompt.load(language="es"), loaded_models.language_file,
+                               timeout=settings.structuring_seconds),
+                )
         asr = recognizer or MedAsr(settings.models_dir / provenance.MEDASR_DIR, settings.device)
         speaker = embedder
         if speaker is None and loaded_models.speaker:
@@ -136,9 +158,10 @@ def create_app(
                                       loaded_models.speaker["sha256"], settings.device)
             except ecapa.WeightsDontFit as error:
                 log.error("listening to a visit is off: %s", error)
-        app.state.sessions = Listening(settings, asr, sorter, loaded_models, embedder=speaker)
+        app.state.sessions = Listening(settings, asr, sorter, loaded_models, spanish=in_spanish, embedder=speaker)
         sweeper = asyncio.create_task(_sweep(app.state.sessions))
-        log.info("ready: MedASR on %s, llama-server at %s, %s", settings.device, settings.llama_url,
+        log.info("ready: MedASR on %s, %s, llama-server at %s, %s", settings.device,
+                 f"Whisper on {settings.device}" if in_spanish else "no Whisper (Spanish refused)", settings.llama_url,
                  "listening to a visit" if speaker else "no speaker model, so no listening to a visit")
         try:
             yield
@@ -190,8 +213,9 @@ def create_app(
         if request.query_params.get("mode", kind) != kind:
             raise SessionError(400, "bad_request", "Name the same kind of session in the query and in X-Dictation-Mode.")
         if kind == DICTATION:
-            session = sessions(request).start(who)
-            return {"sessionId": session.id, "maxSeconds": settings.max_session_seconds, "maxChunkBytes": settings.max_chunk_bytes}
+            session = sessions(request).start(who, language=await _spoken_language(request))
+            return {"sessionId": session.id, "maxSeconds": sessions(request).max_seconds(session),
+                    "maxChunkBytes": settings.max_chunk_bytes}
         if (await _language(request)).lower() != "en":
             raise SessionError(422, "unsupported_language", "Listening to a visit works in English only.")
         speakers = request.query_params.get("speakers", "")
@@ -262,6 +286,18 @@ async def _read(request: Request, limit: int) -> bytes:
         if len(body) > limit:
             raise SessionError(413, "too_large", "This chunk is too large.")
     return bytes(body)
+
+
+async def _spoken_language(request: Request) -> str:
+    """The language the dictation is in: English with no body or {}, otherwise exactly "en" or "es"."""
+    try:
+        body = await _read(request, 1024)
+        data = json.loads(body) if body.strip() else {}
+    except (SessionError, ValueError):
+        data = None
+    if not isinstance(data, dict) or set(data) - {"spokenLanguage"} or data.get("spokenLanguage", "en") not in LANGUAGES:
+        raise SessionError(400, "bad_language", 'Send spokenLanguage as "en" or "es", or nothing for English.')
+    return data.get("spokenLanguage", "en")
 
 
 async def _sweep(sessions: Sessions) -> None:

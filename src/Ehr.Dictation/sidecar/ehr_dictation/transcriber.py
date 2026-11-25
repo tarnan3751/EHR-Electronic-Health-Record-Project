@@ -2,9 +2,12 @@
 
 Committed passages are never transcribed again. Each call cuts the uncommitted audio at the pauses segmenter.py finds,
 transcribes and commits each finished passage, and, while the clinician is still speaking, transcribes the rest as a
-tentative tail the next call replaces. At the end (final), everything is committed. Each passage is judged by quality.py
-as it is transcribed; silence makes no passage. The eval calls advance() on a whole recording at once, final, which is
-what stopping a session does with whatever audio was never committed.
+tentative tail the next call replaces, unless told not to (tentative=False): a dictation in Spanish shows finished
+passages only, since every Whisper call reads a 30-second window and the tail would be read again every second. At
+the end (final), everything is committed. Each passage is judged by quality.py as it is transcribed, and, if its sound
+passes, by the recognizer's own verdict, if it gives one (Whisper's); silence makes no passage. The eval calls
+advance() on a whole recording at once, final, which is what stopping a session does with whatever audio was never
+committed.
 
 A recorded visit (the expansion plan's step 16) is transcribed once it has stopped, a turn at a time (passages()), each
 turn cut at its own pauses and judged against the whole recording's background, as advance() judges a dictation's.
@@ -32,7 +35,7 @@ class Progress:
         return self.segments + ([self.tail] if self.tail else [])
 
 
-def advance(samples: np.ndarray, progress: Progress, recognizer: Recognizer, *, final: bool) -> Progress:
+def advance(samples: np.ndarray, progress: Progress, recognizer: Recognizer, *, final: bool, tentative: bool = True) -> Progress:
     frame_levels = segmenter.levels(samples)
     floor = segmenter.noise_floor(frame_levels)
     segments = list(progress.segments)
@@ -49,7 +52,7 @@ def advance(samples: np.ndarray, progress: Progress, recognizer: Recognizer, *, 
         if (segment := _passage(samples, frame_levels, floor, committed, samples.size, recognizer, final=True)) is not None:
             segments.append(segment)
         committed = samples.size
-    elif samples.size - committed >= segmenter.SAMPLE_RATE // 2:
+    elif tentative and samples.size - committed >= segmenter.SAMPLE_RATE // 2:
         tail = _passage(samples, frame_levels, floor, committed, samples.size, recognizer, final=False)
     return Progress(segments, committed, tail)
 
@@ -75,7 +78,7 @@ def _passage(
         return None
     recognition = recognizer.recognize(samples[start:end])
     has_text = bool(format(recognition.text))
-    unclear = quality.assess(passage_levels, floor, recognition.confidence, has_text)
+    unclear = quality.assess(passage_levels, floor, recognition.confidence, has_text) or recognition.unclear
     if not has_text and unclear is None:
         return None
     return Segment(start, end, recognition.text, recognition.confidence, unclear, final)

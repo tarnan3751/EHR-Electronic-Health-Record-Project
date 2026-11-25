@@ -38,7 +38,8 @@ def stored(variant: str, script: str, heard: str) -> dict:
     segment = Segment(0, 64000, heard, 0.9, None, True)
     transcript = assemble([segment], final=True)
     item = scoring.Item(variant=variant, script=script, tags=["accent:us", "noise:none", "container:webm"], seconds=4.0,
-                        hypothesis=transcript.text, sorting="done", segments=[dataclasses.asdict(segment)])
+                        hypothesis=transcript.text, sorting="done", segments=[dataclasses.asdict(segment)],
+                        timings={"structure": 12.0})
     scoring.weigh_proposals(item, transcript)
     return dataclasses.asdict(item)
 
@@ -139,10 +140,12 @@ def test_every_eval_module_is_hashed_with_the_answers_or_the_scoring():
     hashed = {*PIPELINE_FILES, *SCORING_FILES, *conversations.PIPELINE_FILES, *conversations.SCORING_FILES}
 
     # Neither the package, the gates, the clinical gold report nor the trick sentences' scorer (which the gate runs
-    # itself every time) makes or scores an answer: a dictation's (the first two lists) or a visit's (the visits' own,
-    # conversations.py).
+    # itself every time) makes or scores an answer: a dictation's (the first two lists; the Spanish eval's, the expansion
+    # plan's step 17, with the English set's, since run A's code sorts each script's text in its run) or a visit's (the
+    # visits' own, conversations.py); nor the review's wrong translations, which the gate checks the Spanish checks with,
+    # apart from any results.
     assert modules - hashed == {"ehr_eval/__init__.py", "ehr_eval/gate.py", "ehr_eval/ambient_gate.py",
-                                "ehr_eval/goldreport.py", "ehr_eval/tricks.py"}
+                                "ehr_eval/goldreport.py", "ehr_eval/tricks.py", "ehr_eval/wrong_translations.py"}
     assert not set(PIPELINE_FILES) & set(SCORING_FILES)
     assert not set(conversations.PIPELINE_FILES) & set(conversations.SCORING_FILES)
 
@@ -158,6 +161,17 @@ def test_results_that_miss_a_script_or_a_sorting_fail(eval_dir):
 
     assert any("cover 1 of the 2 scripts" in p for p in problems)
     assert any("didn't sort every recording" in p for p in problems)
+
+
+# The review's cases: a timeout relabelled sorted, its time left past the limit or deleted.
+@pytest.mark.parametrize("timings", [{"structure": 95.0}, {}, {"decode": 0.4, "transcribe": 3.0}, {"structure": None}])
+def test_a_recording_said_to_be_sorted_past_the_limit_or_untimed_fails(eval_dir, timings):
+    late = results(eval_dir)
+    late["items"][1]["timings"] = timings
+    save(eval_dir, "latest.json", late)
+
+    assert any("d02--clean sorted with no time to sort, or one past the sidecar's 90 seconds" in p
+               for p in check(eval_dir / "results", eval_dir))
 
 
 # The review's case: recordings dropped and the counts made to agree still fail, as do a recording held twice or one no
