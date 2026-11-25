@@ -148,7 +148,7 @@ async def main_async(args: argparse.Namespace, api_key: str) -> int:
 
     save(items, measured(items, scripts, english))
     metrics = json.loads(args.out.read_text(encoding="utf-8"))["metrics"]
-    print("\n".join([code_switching(metrics), no_speech_only(metrics), ambiguous_offered(metrics),
+    print("\n".join([*changed(metrics), code_switching(metrics), no_speech_only(metrics), ambiguous_offered(metrics),
                      *false_refusals(metrics), english_waits(metrics, args.device)]))
     print(f"Wrote {args.out}")
     return 0
@@ -246,6 +246,11 @@ def measured(items: list[scoring_es.SpanishItem], scripts: dict, english: dict) 
     return metrics
 
 
+def changed(metrics: dict) -> list[str]:
+    return [*scoring_es.changed_lines(metrics["mistranslations"], "Recordings dictated in Spanish"),
+            *scoring_es.changed_lines(metrics["text"]["mistranslations"], "Texts")]
+
+
 def false_refusals(metrics: dict) -> list[str]:
     return [*refusals.lines(metrics["discarded"], metrics["false_refusals"]),
             *(f"Texts: {line}" if not line.startswith(" ") else line
@@ -290,5 +295,6 @@ def rescore(stored: dict, eval_dir: Path = EVAL_DIR) -> dict:
 def main_rescore(path: Path, out: Path) -> int:
     results = rescore(json.loads(path.read_text(encoding="utf-8")))
     out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print("\n".join([*changed(results["metrics"]), *false_refusals(results["metrics"])]))
     print(f"Wrote {out}")
     return 0

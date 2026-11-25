@@ -132,3 +132,27 @@ def test_a_refusal_for_a_kind_the_scorer_compares_nothing_of_says_so():
     assert entries and all(e["unseen"] == ["translation_adds_words"] for e in entries)
     assert "the scorer compares nothing of translation_adds_words" in "\n".join(
         refusals.lines(scoring_es.score([item], SCRIPTS)["discarded"], found(item)))
+
+
+def test_a_known_scorer_limit_is_named_beside_what_it_counts_and_never_uncounts_it():
+    # scoring_es.KNOWN_LIMITS: a label beside an item counted as changed, matched by script, kind and words; the item
+    # is still counted.
+    assert scoring_es.known_limit("e13-dolor-abdominal", "number", "Blood pressure 118 over 72.")
+    assert scoring_es.known_limit("e13-dolor-abdominal", "number", "Blood pressure 128/72.") is None
+    assert scoring_es.known_limit("e12-anticoagulacion", "negation", "For the past two weeks.") is None
+    listed = {"unflagged_total": 1, "listed": [
+        {"variant": "e13-dolor-abdominal--babble-10db", "field": "objective", "kind": "number", "shown": "118 (BP)",
+         "flagged": False, "statement": "Blood pressure 118 over 72.",
+         "known_limit": scoring_es.known_limit("e13-dolor-abdominal", "number", "Blood pressure 118 over 72.")}]}
+    lines = scoring_es.changed_lines(listed, "Recordings")
+    assert lines[0] == "Recordings: 1 changed without a warning, 1 listed."
+    assert "known scorer limit: a blood pressure written 'N over N'" in lines[1]
+
+
+def test_a_right_refusal_whose_every_change_is_a_known_limit_says_so():
+    e13 = SCRIPTS["e13-dolor-abdominal"]
+    quote = next(q for s in e13.statements["objective"] for q in s.spanish if "/" in q)
+    at = e13.display.index(quote)
+    verdict, limit = refusals._judged("On examination, temperature 37.9 degrees, blood pressure 118 over 72, heart rate "
+                                      "102.", [(at, at + len(quote))], e13.display, "objective", e13)
+    assert verdict == "right" and "N over N" in limit

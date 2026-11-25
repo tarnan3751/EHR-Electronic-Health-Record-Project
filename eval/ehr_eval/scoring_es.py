@@ -28,7 +28,8 @@ runs to come.
   (eval/results/latest.json); thresholds() and the gate (gate.py) say so. Beside the rate, share is the statements
   holding one with or without a warning. A value in the right
   field worded unlike the gold isn't misfiled (content F1 covers it), and one no field's gold has is listed apart
-  (no_gold), never gated: a value the facts back, said of its item, or of nothing named where only one cited item has
+  (no_gold), never gated (the scorer's known limits, KNOWN_LIMITS, are named beside an item they count; eval/README.md
+  lists them all): a value the facts back, said of its item, or of nothing named where only one cited item has
   a value of its kind or the statement names the one it is (facts_es.compare()); one said of nothing named that could be
   either of two items' is changed, so a value moved between findings of one passage is a stop, never a no-gold value.
   Content F1 counts a misfiled value as well, per field: the passage's words lower precision
@@ -207,6 +208,47 @@ def drug_names() -> frozenset[str]:
                      | {name.lower() for script in load_english() for name in script.drugs})
 
 
+# The scorer's known limits (the owner's rule of 2026-11-24: "Any flaw that makes results look worse goes in the report
+# as a known limit, beside the numbers"; eval/README.md lists them all): misreadings that count a faithful statement as
+# changed, told apart where they can be cheaply, by the script, the kind counted and the English's words. Only a label
+# beside a listed item: each is still counted.
+KNOWN_LIMITS = (
+    ("e03", "duration", r";\s*3 days|\.\s*For 3 days", "a duration after both findings, in a clause of its own, is "
+     "said of nothing named, and both findings hold it"),
+    ("e04", "side", r"\bboth\b", "'both' is tied to the name after it"),
+    ("e05", "frequency", r"\bfor a week\b", "'for a week', how long, is read as weekly"),
+    ("e12", "history", r"\bfor the past\b", "'for the past two weeks' is read as the past"),
+    ("e13", "number", r"\b\d+ over \d+\b", "a blood pressure written 'N over N' isn't read as N/N"),
+    ("e13", "negation", r"\b(?:no|denies)\b[^.;]*,\s*has\b", "a negation is read across a comma to 'has ...'"),
+    ("h07", "duration", r"\b1-hour\b", "'1-hour glucose' is read as how long"),
+    ("h08", "duration", r"\bfor 2 days\b", "a duration is tied to the nearest name, the toe, not the pain"),
+    ("h08", "date", r"\bfor now\b", "'for now' is read as a date"),
+    ("h09", "number", r"\bdoxazosina\b", "a drug left in Spanish isn't a name the facts give, so its dose is read as "
+     "another's"),
+    ("h09", "action", r"\bholds on\b", "'holds on to' is read as holding a medication"),
+    ("h10", "action", r"\bkeep\b", "'keep' is read as continuing a medication"),
+    ("h10", "negation", r"\bnot needed\b", "a negation after its name ('X are not needed') isn't read"),
+)
+
+
+def changed_lines(mistranslations: dict, title: str) -> list[str]:
+    """For someone to read: each item counted as changed, by sentence, with "known scorer limit" beside those that match
+    one (KNOWN_LIMITS)."""
+    out = [f"{title}: {mistranslations['unflagged_total']} changed without a warning, {len(mistranslations['listed'])} "
+           f"listed."]
+    for entry in mistranslations["listed"]:
+        limit = f"; known scorer limit: {entry['known_limit']}" if entry.get("known_limit") else ""
+        out.append(f"  {entry['variant']} {entry['field']}: {entry['kind']} {entry['shown']}"
+                   f"{' (with a warning)' if entry['flagged'] else ''}{limit}: {entry['statement']!r}")
+    return out
+
+
+def known_limit(script: str, kind: str, english: str) -> str | None:
+    """The known scorer limit (KNOWN_LIMITS) an item counted as changed matches, if any."""
+    return next((note for key, limit_kind, pattern, note in KNOWN_LIMITS
+                 if script.startswith(key) and kind == limit_kind and re.search(pattern, english, re.IGNORECASE)), None)
+
+
 def _statement_items(english: str, spans: list[tuple[int, int]], hypothesis: str, gold: str, script: Script,
                      others: tuple[str, ...] = ()) -> tuple[list[tuple[str, str, bool]], list[tuple[str, str]],
                                                              list[tuple[str, str]]]:
@@ -305,7 +347,8 @@ def _mistranslations(items: list[SpanishItem], scripts: dict[str, Script]) -> di
                     unflagged[kind] += not outcome.warnings
                     listed.append({"variant": item.variant, "field": name, "kind": kind, "shown": what,
                                    "moved_from_another_passage": moved, "flagged": bool(outcome.warnings),
-                                   "statement": statement["english"]})
+                                   "statement": statement["english"],
+                                   "known_limit": known_limit(item.script, kind, statement["english"])})
                 statements += 1
                 misfiled_statements += bool(filed)
                 unflagged_statements += bool(filed) and not outcome.warnings

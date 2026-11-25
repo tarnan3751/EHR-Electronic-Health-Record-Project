@@ -74,15 +74,23 @@ UNSEEN = frozenset({"translation_adds_words", "finding_not_in_sources", "orderab
 
 def verdict(english: str, spans: list[tuple[int, int]] | None, hypothesis: str, name: str, script: Script) -> str:
     """"false" (a correct translation, as the scorer reads it), "right" or "undecided": the header says how."""
+    return _judged(english, spans, hypothesis, name, script)[0]
+
+
+def _judged(english: str, spans: list[tuple[int, int]] | None, hypothesis: str, name: str,
+            script: Script) -> tuple[str, str | None]:
+    """The verdict, and for a right one whose every change is a known scorer limit (scoring_es.KNOWN_LIMITS), the
+    limits: such a refusal may be a false one the scorer can't see."""
     if not spans:
-        return "right"
+        return "right", None
     others = tuple(script.gold[other].value for other in script.gold if other != name)
     changed, *_ = scoring_es._statement_items(english, spans, hypothesis, script.gold[name].value, script, others)
     if changed:
-        return "right"
+        limits = [scoring_es.known_limit(script.id, kind, english) for kind, _, _ in changed]
+        return "right", "; ".join(dict.fromkeys(limits)) if all(limits) else None
     entries = facts_es.entries(scoring_es.facts_of(script))
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items), scoring_es.drug_names())
-    return "false" if facts_es.claims(english, lexicon) else "undecided"
+    return ("false" if facts_es.claims(english, lexicon) else "undecided"), None
 
 
 def _gold_citing(script: Script, quotes: list[str]) -> list[str]:
@@ -111,9 +119,8 @@ def of_answers(items: list[scoring_es.SpanishItem], transcripts: dict[str, Trans
                     refused.append({
                         "variant": item.variant, "field": name, "english": statement["english"], "spanish": quotes,
                         "reasons": reasons, "gold": _gold_citing(script, quotes),
-                        "unseen": sorted(set(reasons) & UNSEEN),
-                        "verdict": verdict(statement["english"], _spans(quotes, item.hypothesis), item.hypothesis,
-                                           name, script)})
+                        "unseen": sorted(set(reasons) & UNSEEN)} | dict(zip(("verdict", "known_limit"), _judged(
+                            statement["english"], _spans(quotes, item.hypothesis), item.hypothesis, name, script))))
     by = {kind: [entry for entry in refused if entry["verdict"] == kind] for kind in ("false", "undecided", "right")}
     leave = [entry for entry in refused
              if "certainty_added" in entry["reasons"] and translation.LEAVE.search(entry["english"])]
@@ -144,7 +151,9 @@ def scorer_on_gold(scripts: list[Script]) -> list[dict]:
                                                           script.gold[name].value, script, others)
                 if changed:
                     found.append({"script": script.id, "field": name, "english": statement.english,
-                                  "changed": [[kind, what] for kind, what, _ in changed]})
+                                  "changed": [[kind, what] for kind, what, _ in changed],
+                                  "known_limit": [scoring_es.known_limit(script.id, kind, statement.english)
+                                                  for kind, _, _ in changed]})
     return found
 
 
@@ -170,6 +179,7 @@ def lines(discarded: dict, found: dict) -> list[str]:
            f"refusal)."]
     for entry in answers["false"] + answers["undecided"] + answers["right"]:
         unseen = f"; the scorer compares nothing of {', '.join(entry['unseen'])}" if entry.get("unseen") else ""
+        unseen += f"; known scorer limit: {entry['known_limit']}" if entry.get("known_limit") else ""
         out.append(f"  {entry['verdict']}: {entry['variant']} {entry['field']}: {entry['english']!r} for "
                    f"{' / '.join(entry['spanish'])!r} ({', '.join(entry['reasons'])}{unseen}); "
                    f"the gold: {entry['gold']}")
@@ -178,7 +188,8 @@ def lines(discarded: dict, found: dict) -> list[str]:
                    f"{' / '.join(entry['spanish'])!r} ({', '.join(entry['reasons'])})")
     for entry in found.get("scorer_on_gold", []):
         out.append(f"  the scorer reads the gold as changed: {entry['script']} {entry['field']}: {entry['english']!r} "
-                   f"({', '.join(f'{kind} {what}' for kind, what in entry['changed'])})")
+                   f"({', '.join(f'{kind} {what}' for kind, what in entry['changed'])})"
+                   + "".join(f"; known scorer limit: {note}" for note in dict.fromkeys(entry["known_limit"]) if note))
     if answers["false"] or answers["undecided"]:
         out.append("  A false refusal is the scorer's reading, of what the fact lists record: a change they don't "
                    "record reads as none (h04's \"for 3 weeks\" for \"hace 3 semanas\": the facts say 3 weeks, not "
@@ -198,7 +209,9 @@ def main(argv: list[str] | None = None) -> int:
     items = [stored_item(entry) for entry in stored["items"]]
     items = [item for item in items if item.script in scripts and not item.run_as and item.variant.endswith("--text")]
     transcripts = {item.variant: text_transcript(scripts[item.script])[0] for item in items}
-    print("\n".join(lines(scoring_es.score(items, scripts)["discarded"], measure(items, transcripts, scripts))))
+    metrics = scoring_es.score(items, scripts)
+    changed = scoring_es.changed_lines(metrics["mistranslations"], "Changed from the Spanish cited and shown")
+    print("\n".join([*lines(metrics["discarded"], measure(items, transcripts, scripts)), *changed]))
     return 0
 
 
