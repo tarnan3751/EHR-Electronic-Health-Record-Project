@@ -200,8 +200,10 @@ def test_the_spanish_eval_runs_scores_and_is_judged_from_end_to_end(run, monkeyp
     assert metrics["code_switching"]["passages"] > 0
 
     # The gate scores the stored answers again and finds what they give: only the item not sorted (with English results
-    # of this tree to cap the values filed in the wrong field at).
+    # of this tree to cap the values filed in the wrong field at). The owner's acceptances are run B's, which these
+    # stand-in answers don't give, so they are judged without them.
     english_results_to_cap_at(EVAL_DIR, run_dir / "results")
+    monkeypatch.setattr(gate, "KNOWN_LIMITATIONS", "none-accepted.toml")
     (problem,) = gate.check_spanish(run_dir / "results", EVAL_DIR)
     assert "didn't sort every Spanish recording and text" in problem
 

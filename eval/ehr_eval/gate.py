@@ -59,7 +59,8 @@ included (FR-14); every mistranslation shown without a warning (a number, unit, 
 side, severity, abbreviation, polarity, medication change, negation, certainty, history or relative that differs from
 what the Spanish it cites says, by the script's fact list: scoring_es.py) accepted by the owner in
 known-limitations.toml ([[accepted_mistranslation]]: variant, field, kind and what was shown, as the results list it),
-and each accepted one still shown; values filed in the wrong field (a value its field's gold lacks and another field's
+and each accepted one still shown, and no more of them, counted as shown, than most_mistranslations there, which is
+their number (the owner's cap of 2026-11-25, as step 15.1's on the trick sentences); values filed in the wrong field (a value its field's gold lacks and another field's
 gold has, the owner's ruling of 2026-11-24) capped, not refused: the statements holding one without a warning, over the
 statements shown, no more than English's rate measured the same way on the same kind of text plus 2 percentage points
 (scoring_es.CAP_POINTS), the recordings' at the English recordings' (latest.json, when it is this commit's) and the
@@ -72,7 +73,8 @@ date accuracy. The English checks above are unchanged.
 The review's wrong translations (eval/wrong-translations.toml; step 17), checked again by this commit's Spanish checks
 with no model (wrong_translations.py; check_wrong_translations()): the file is the one WRONG_TRANSLATIONS_SHA256
 records, every wrong pair marked as reversing the meaning that passes without a warning is one the owner has accepted
-by its id in known-limitations.toml ([[accepted_wrong_translation]]), and each accepted one still passes.
+by its id in known-limitations.toml ([[accepted_wrong_translation]]), and each accepted one still passes, and no more
+pass than most_wrong_translations there, which is their number (the owner's cap of 2026-11-25).
 
 The visits' results (eval/results/ambient-latest.json, listening to a visit) are checked here too, by ambient_gate.py,
 in the same way. Other results files (such as compare-low256.json, a comparison run) aren't checked.
@@ -107,6 +109,9 @@ ENGLISH_TEXT = "latest-en-text.json"  # the English text run's results (run_a_en
 # added, removed or marked otherwise changes the gate, and is recorded here with it, for review.
 WRONG_TRANSLATIONS_SHA256 = "101b9c1c885d47bc65baba54b27a05f858b643973280ef24207315be0824c5d1"
 KNOWN_LIMITATIONS = "known-limitations.toml"
+# The owner's caps in known-limitations.toml (2026-11-25): at most as many as he accepted by name, of each.
+MOST_MISTRANSLATIONS = "most_mistranslations"
+MOST_WRONG_TRANSLATIONS = "most_wrong_translations"
 RUN_IT = (
     "Run the eval on the server machine (eval/README.md: uv run --project eval python -m ehr_eval.run ...) and commit "
     "the eval/results/latest.json it writes."
@@ -464,9 +469,11 @@ def check_spanish(results_dir: Path = RESULTS_DIR, eval_dir: Path = EVAL_DIR) ->
             "language, hold an instruction to order something or change the allergy list; there must be none (FR-14). "
             f"Tighten the Spanish prompt or the checks (translation.py), then: {RUN_IT_ES}"
         )
-    problems += _unaccepted_mistranslations(
-        [e for e in metrics["mistranslations"]["listed"] + metrics["text"]["mistranslations"]["listed"]
-         if not e["flagged"]], eval_dir / KNOWN_LIMITATIONS)
+    unflagged = [e for e in metrics["mistranslations"]["listed"] + metrics["text"]["mistranslations"]["listed"]
+                 if not e["flagged"]]
+    problems += _unaccepted_mistranslations(unflagged, eval_dir / KNOWN_LIMITATIONS)
+    problems += _over_the_owners_cap(len(unflagged), eval_dir / KNOWN_LIMITATIONS, MOST_MISTRANSLATIONS,
+                                     "accepted_mistranslation", "changed values shown without a warning")
     problems += _misfiled_over_the_cap(metrics, results_dir, eval_dir)
 
     baseline_path = results_dir / "baseline-es.json"
@@ -663,6 +670,25 @@ def check_wrong_translations(eval_dir: Path = EVAL_DIR, sha256: str = WRONG_TRAN
         "Spanish checks without a warning, or isn't in the set as written. Remove it from the list."
         for id_, english in sorted(listed - {(pair.id, pair.english) for pair in reversing})
     ]
+    problems += _over_the_owners_cap(len(reversing), known, MOST_WRONG_TRANSLATIONS, "accepted_wrong_translation",
+                                     "wrong translations reversing the meaning that pass without a warning")
+    return problems
+
+
+def _over_the_owners_cap(found: int, known: Path, cap: str, table: str, what: str) -> list[str]:
+    """The owner's cap on what he accepts by name in known-limitations.toml (2026-11-25, as step 15.1's on the trick
+    sentences): the cap the number accepted by name, so it holds no slack; and no more found than the cap, counted as
+    found, not as names. With no cap written and none accepted, each one found is refused by name alone."""
+    data = tomllib.loads(known.read_text(encoding="utf-8")) if known.is_file() else {}
+    most, accepted = data.get(cap), len(data.get(table, []))
+    problems = []
+    if most != accepted and (most is not None or accepted):
+        problems.append(f"eval/known-limitations.toml's {cap} is {'missing' if most is None else most}, not the "
+                        f"{accepted} {what} accepted there by name ([[{table}]]): the cap is their number. Only the "
+                        "owner moves it, with the list.")
+    if most is not None and found > most:
+        problems.append(f"{found} {what}, more than the {most} the owner capped them at (eval/known-limitations.toml, "
+                        f"{cap}). Tighten the Spanish checks (translation.py, spanish.py) with a general rule.")
     return problems
 
 

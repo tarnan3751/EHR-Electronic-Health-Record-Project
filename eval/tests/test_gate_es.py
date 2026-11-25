@@ -22,7 +22,7 @@ from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.prompt import FIELDS
 from ehr_dictation.transcriber import Progress, advance
 from ehr_dictation.transcript import assemble
-from ehr_eval import run_es, scoring_es
+from ehr_eval import gate, run_es, scoring_es
 from ehr_eval.answers_es import variant_tags
 from ehr_eval.gate import check_spanish
 from ehr_eval.run_a import check, text_transcript
@@ -296,15 +296,30 @@ def test_a_mistranslation_shown_without_a_warning_fails_unless_the_owner_accepte
     accepting = "".join(
         f'[[accepted_mistranslation]]\nvariant = "e14-nino-sano--{kind}"\nfield = "objective"\nkind = "number"\n'
         f'shown = "11 kg (weight)"\nwhy = "synthetic"\n' for kind in ("clean", "text"))
-    (spanish_dir / "known-limitations.toml").write_text(accepting, encoding="utf-8")
-    english_results_to_cap_at(spanish_dir, spanish_dir / "results")  # scored with the list that is now there
-    save(spanish_dir, "latest-es.json", results(spanish_dir))
-    assert problems(spanish_dir) == []
+    # The owner's cap is the number he accepted by name: one more, or one fewer, and the cap fails.
+    for cap, failing in ((3, True), (1, True), (2, False)):
+        (spanish_dir / "known-limitations.toml").write_text(f"most_mistranslations = {cap}\n{accepting}", encoding="utf-8")
+        english_results_to_cap_at(spanish_dir, spanish_dir / "results")  # scored with the list that is now there
+        save(spanish_dir, "latest-es.json", results(spanish_dir))
+        found = problems(spanish_dir)
+        assert (found != []) is failing and all("most_mistranslations" in p for p in found)
 
     edit(spanish_dir, "e14-nino-sano", 'number = "12 kg"', 'number = "11 kg"')
     save(spanish_dir, "latest-es.json", results(spanish_dir))
     stale = problems(spanish_dir)
     assert len(stale) == 2 and all("no longer show" in p for p in stale)
+
+
+# The owner's cap (2026-11-25), counted as found, not as names: an accepted value that starts being shown twice goes
+# over it.
+def test_more_found_than_the_owners_cap_fails(tmp_path):
+    known = tmp_path / "known-limitations.toml"
+    known.write_text('most_mistranslations = 1\n[[accepted_mistranslation]]\nvariant = "v"\nfield = "plan"\n'
+                     'kind = "number"\nshown = "5 mg"\nwhy = "synthetic"\n', encoding="utf-8")
+
+    assert gate._over_the_owners_cap(1, known, gate.MOST_MISTRANSLATIONS, "accepted_mistranslation", "changed") == []
+    (over,) = gate._over_the_owners_cap(2, known, gate.MOST_MISTRANSLATIONS, "accepted_mistranslation", "changed")
+    assert over.startswith("2 changed, more than the 1 the owner capped them at")
 
 
 def test_values_filed_in_the_wrong_field_over_englishs_rate_fail_unless_the_owner_accepted_them(spanish_dir):

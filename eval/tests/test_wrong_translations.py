@@ -83,9 +83,12 @@ def test_a_reversing_pair_that_passes_fails_the_gate_unless_the_owner_accepted_i
     (problem,) = gate.check_wrong_translations(tmp_path, recorded(tmp_path))
     assert "w01" in problem and "reverses the meaning" in problem and "[[accepted_wrong_translation]]" in problem
 
-    (tmp_path / gate.KNOWN_LIMITATIONS).write_text(
-        '[[accepted_wrong_translation]]\nid = "w01"\nenglish = "Febrile patient."\nreason = "synthetic"\n',
-        encoding="utf-8")
+    accepting = '[[accepted_wrong_translation]]\nid = "w01"\nenglish = "Febrile patient."\nreason = "synthetic"\n'
+    # The owner's cap is the number he accepted by name (2026-11-25).
+    (tmp_path / gate.KNOWN_LIMITATIONS).write_text(accepting, encoding="utf-8")
+    (capped,) = gate.check_wrong_translations(tmp_path, recorded(tmp_path))
+    assert "most_wrong_translations is missing, not the 1" in capped
+    (tmp_path / gate.KNOWN_LIMITATIONS).write_text(f"most_wrong_translations = 1\n{accepting}", encoding="utf-8")
     assert gate.check_wrong_translations(tmp_path, recorded(tmp_path)) == []
 
     # Accepted, and no longer passing (or no longer marked reversing): the list must stay true.

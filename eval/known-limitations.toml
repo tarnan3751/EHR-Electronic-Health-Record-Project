@@ -6,6 +6,12 @@
 #
 # The clinician's review of each value against the transcript is the safety net for these (README.md, Dictation).
 
+# The owner's caps on the Spanish acceptances below (his ruling of 2026-11-25, as step 15.1's cap on the trick
+# sentences): the gate fails when more are found than the cap, counted as found, not as names, and when a cap isn't the
+# number accepted by name beneath it, so it holds no slack.
+most_mistranslations = 17
+most_wrong_translations = 41
+
 [[accepted]]
 variant = "d22-cellulitis-ed--babble-5db"
 # Step 14 (2026-11-22, decision D15): the same recording shows the same value, now in Subjective, which replaced History.
@@ -27,3 +33,494 @@ by = "the owner"
 #   english = "Febrile patient."
 #   reason = "..."
 #   accepted = "..."
+
+# The owner's ruling of 2026-11-25 (about 00:40), item 3, verbatim: "Accept as known limits, in my name: the 41 wrong
+# translations, run B's changed values, and the missed F1 and discard lines. Cap the gate at today's counts, as step
+# 15.1's is." He gave it in writing; a developer agent wrote these entries on his instruction, each copied from the
+# results and the set, as step 15.1's acceptances were written.
+#
+# Run B's changed values shown without a warning (eval/results/latest-es.json, the recordings; the texts show none),
+# each with what it is: Whisper's hearing, the English following the transcript shown, or one of the scorer's known
+# limits (eval/README.md, "Known scorer limits").
+
+[[accepted_mistranslation]]
+variant = "e01-hta-control--clean"
+field = "subjective"
+kind = "frequency"
+shown = "daily"
+why = "Whisper's hearing: losartán heard as \"los Artan\", so the English names Artan and the scorer reads its 50 mg once a day as moved from losartán; the English follows the transcript shown."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e01-hta-control--clean"
+field = "subjective"
+kind = "number"
+shown = "50 mg"
+why = "Whisper's hearing: losartán heard as \"los Artan\", so the English names Artan and the scorer reads its 50 mg once a day as moved from losartán; the English follows the transcript shown."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e01-hta-control--hvac-20db"
+field = "subjective"
+kind = "frequency"
+shown = "daily"
+why = "Whisper's hearing: losartán heard as \"los Sartan\", so the English names Sartan and the scorer reads its 50 mg once a day as moved from losartán; the English follows the transcript shown."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e01-hta-control--hvac-20db"
+field = "subjective"
+kind = "number"
+shown = "50 mg"
+why = "Whisper's hearing: losartán heard as \"los Sartan\", so the English names Sartan and the scorer reads its 50 mg once a day as moved from losartán; the English follows the transcript shown."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e04-alergias--clean"
+field = "objective"
+kind = "side"
+shown = "both (mucosal involvement)"
+why = "A known scorer limit, \"both\" is tied to the name after it: the sentence says both arms, swollen, for Whisper's \"abones\" (habones, wheals), which is a change no check or scorer compares."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e05-asma-nino--clean"
+field = "subjective"
+kind = "frequency"
+shown = "weekly (night cough)"
+why = "A known scorer limit: 'for a week', how long, is read as weekly."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e12-anticoagulacion--clean"
+field = "subjective"
+kind = "history"
+shown = "ibuprofen shown as in the past"
+why = "A known scorer limit: 'for the past two weeks' is read as the past."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e12-anticoagulacion--clean"
+field = "subjective"
+kind = "negation"
+shown = "chest pain not negated"
+why = "Whisper's hearing: a full stop inside the \"Niega\" list (\"Niega mareo, palpitaciones. Dolor torácico y síncope\"), so the English, as the transcript shown says, denies only the first two: a case only the reviewing clinician can catch."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e12-anticoagulacion--clean"
+field = "subjective"
+kind = "negation"
+shown = "syncope not negated"
+why = "Whisper's hearing: a full stop inside the \"Niega\" list (\"Niega mareo, palpitaciones. Dolor torácico y síncope\"), so the English, as the transcript shown says, denies only the first two: a case only the reviewing clinician can catch."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e12-anticoagulacion--monitor-20db"
+field = "subjective"
+kind = "history"
+shown = "ibuprofen shown as in the past"
+why = "A known scorer limit: 'for the past two weeks' is read as the past."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e12-anticoagulacion--monitor-20db"
+field = "subjective"
+kind = "negation"
+shown = "chest pain not negated"
+why = "Whisper's hearing: a full stop inside the \"Niega\" list (\"niega mareo, palpitaciones... Dolor torácico y síncope\"), so the English, as the transcript shown says, denies only the first two: a case only the reviewing clinician can catch."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e12-anticoagulacion--monitor-20db"
+field = "subjective"
+kind = "negation"
+shown = "syncope not negated"
+why = "Whisper's hearing: a full stop inside the \"Niega\" list (\"niega mareo, palpitaciones... Dolor torácico y síncope\"), so the English, as the transcript shown says, denies only the first two: a case only the reviewing clinician can catch."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e13-dolor-abdominal--babble-20db"
+field = "objective"
+kind = "number"
+shown = "118 (BP)"
+why = "A known scorer limit: a blood pressure written 'N over N' isn't read as N/N."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e13-dolor-abdominal--babble-20db"
+field = "objective"
+kind = "number"
+shown = "72 (BP)"
+why = "A known scorer limit: a blood pressure written 'N over N' isn't read as N/N."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e13-dolor-abdominal--babble-10db"
+field = "subjective"
+kind = "negation"
+shown = "nausea negated"
+why = "A known scorer limit: a negation is read across a comma to 'has ...'."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e13-dolor-abdominal--babble-10db"
+field = "objective"
+kind = "number"
+shown = "118 (BP)"
+why = "A known scorer limit: a blood pressure written 'N over N' isn't read as N/N."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_mistranslation]]
+variant = "e13-dolor-abdominal--babble-10db"
+field = "objective"
+kind = "number"
+shown = "72 (BP)"
+why = "A known scorer limit: a blood pressure written 'N over N' isn't read as N/N."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+# The review's wrong translations that reverse the meaning and pass the Spanish checks without a warning, by id
+# (eval/wrong-translations.toml): 41 of its 70 wrong pairs; 2 of its 30 faithful ones are refused.
+
+[[accepted_wrong_translation]]
+id = "w01"
+english = "Febrile patient."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w02"
+english = "Reactive pupils."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w03"
+english = "Palpable pedal pulses."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w04"
+english = "Breath sounds present at the right base."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w06"
+english = "Patient injured after the fall."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w07"
+english = "Patient with good appetite."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w08"
+english = "Patient urinating normally."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w09"
+english = "Bowel sounds audible."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w10"
+english = "Foot sensitive to monofilament."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w11"
+english = "Patient breathing normally."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w12"
+english = "Patient speaking fluently."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w13"
+english = "Accompanied by her father; has epilepsy."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w18"
+english = "Close contact with her son; diagnosed with influenza."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w19"
+english = "Lives with her mother; diagnosed with cancer."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w23"
+english = "Diabetic; lives with his brother."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w24"
+english = "Escalate the antibiotic."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w25"
+english = "Titrate levothyroxine down."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w37"
+english = "Restrict fluids."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w38"
+english = "Increase salt."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w44"
+english = "Agonizing shoulder pain."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w45"
+english = "Unbearable shoulder pain."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w46"
+english = "Trivial shoulder pain."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w47"
+english = "Minor bleeding."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w48"
+english = "Terrible shoulder pain."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w49"
+english = "Gross ankle edema."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w50"
+english = "Debilitating dyspnea."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w51"
+english = "Life-threatening hemorrhage."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w53"
+english = "Appendicitis."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w54"
+english = "Tuberculosis."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w55"
+english = "Diverticulitis."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w56"
+english = "Hernia."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w59"
+english = "Diagnosis: cholecystitis."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w60"
+english = "Migraine."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w61"
+english = "Sinusitis."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w63"
+english = "Denies heartburn but reports constipation."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w64"
+english = "Has hoarseness but no sneezing."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w65"
+english = "With fainting, without frequent falls."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w67"
+english = "No phlegm, bruises present."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w68"
+english = "Denies blood in the stool; reports burning on urination."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w69"
+english = "Coughs but does not sneeze."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_wrong_translation]]
+id = "w70"
+english = "Denies watery eyes, reports a runny nose."
+reason = "Accepted as a known limit in the owner's name, by id: his ruling of 2026-11-25, above."
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+# The stop lines run B and the hold-outs missed, as they were measured (eval/README.md, "The Spanish test set"): accepted,
+# not gated. The Spanish baseline (eval/results/baseline-es.json) holds run B's numbers, so a later run that scores lower
+# fails the gate.
+
+[[accepted_line]]
+line = "English content F1 below 0.5"
+of = "run B's recordings dictated in Spanish (eval/results/latest-es.json)"
+measured = "0.4069"
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_line]]
+line = "more than a third of the fields with gold discarded by the checks"
+of = "run B's recordings dictated in Spanish (eval/results/latest-es.json)"
+measured = "61 of 140 (0.4357)"
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_line]]
+line = "English content F1 below 0.5"
+of = "the held-out scripts h06 to h10, their texts (run A, as reported)"
+measured = "0.4311"
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_line]]
+line = "more than a third of the fields with gold discarded by the checks"
+of = "the held-out scripts h06 to h10, their texts (run A, as reported)"
+measured = "12 of 20 (0.6)"
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
+
+[[accepted_line]]
+line = "more than a third of the fields with gold discarded by the checks"
+of = "the held-out scripts h01 to h05, seen since, their texts (run A, as reported)"
+measured = "8 of 20 (0.4)"
+accepted = "2026-11-25"
+by = "Tahseen Arnan, the owner"
