@@ -98,16 +98,19 @@ the rules read it; then each sentence after that, up to the next one holding an 
 of the note's own sections, however far that is (not within the rules' reach: a refusal said three sentences on is
 shown too).
 
-A dictation whose transcript is mostly not English words offers nothing (the owner's ruling of 2026-11-25): a dictation
-in Spanish recorded with English chosen, which MedASR writes as words of English and of no language. check() refuses
-its fields whole (NotEnglish), which the session reports as it reports the model's failures: sorting unavailable, with
-the reason transcript_not_english, and the transcript kept as plain text; and proposals() proposes nothing from it.
-Mostly not English is fewer than ENGLISH_AT_LEAST of the transcript's words English, a passage marked unclear's words
-among them (english_share()). A word is English when SCOWL's lists hold it (englishwords.py: an ordinary dictionary's
+A dictation with too few English words offers nothing (the owner's ruling of 2026-11-25, "mostly not English words"):
+a dictation in Spanish recorded with English chosen, which MedASR writes as words of English and of no language.
+check() refuses its fields whole (NotEnglish), which the session reports as it reports the model's failures: sorting
+unavailable, with the reason transcript_not_english, and the transcript kept as plain text; and proposals() proposes
+nothing from it. Too few is fewer than two thirds (ENGLISH_AT_LEAST) of the transcript's words English, a passage
+marked unclear's words among them (english_share()): a line above his "mostly", set by the coordinator as the more
+protective reading, since the one such recording measured fell only just under one half, and a refusal keeps the
+transcript while a wrong offer can mislead. A word is English when SCOWL's lists hold it (englishwords.py: an ordinary dictionary's
 English, American, British and Canadian words), when it is a drug name (drugnames.py) or a word of an orderable's or an
 allergen's name (catalog.py), a clinical abbreviation or a unit the checks read (in this module and translation.py),
 or when it holds a digit (a number, or a code said with one: "A1c", "SpO2"); a possessive is its word's. A name no list
-holds isn't, so a dictation of names alone is refused. It holds at any length: a dictation of one word offers nothing
+holds isn't, so a short dictation more than a third of whose words are such names is refused ("Seen by Dr Okonkwo
+with Mrs Okafor.", 4 of 7). It holds at any length: a dictation of one word offers nothing
 if that word isn't English. A recorded visit's window, checked with a scope, is never refused so.
 
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
@@ -233,8 +236,8 @@ CORRECTION_WINDOW = 3  # words after a correction cue within which the corrected
 WARNING_REACH = 8
 NEAR_UNCLEAR = 5  # words between a source and an unclear passage that put a near_unclear_passage warning on the value
 WHOLE_DICTATION = 0.9  # the share of the transcript's words the only value offered may quote before it is warned of
-ENGLISH_AT_LEAST = 0.5  # the share of a dictation's words that must be English for it to offer anything: fewer is
-# "mostly not English words" (the owner's ruling of 2026-11-25)
+ENGLISH_AT_LEAST = 2 / 3  # the share of a dictation's words that must be English for it to offer anything (the
+# owner's ruling of 2026-11-25, "mostly not English words", read by the coordinator as the more protective line)
 WARNING_GAP_WORDS: frozenset[str] | None = frozenset(
     "no wait sorry scratch mean correction actually rather make change".split()
 )
@@ -382,8 +385,8 @@ def not_carried_over(transcript: Transcript) -> list[dict]:
 
 def check(fields: dict[str, dict], unknown: list[str], transcript: Transcript, *, scope: Scope | None = None) -> Checks:
     """The fields checked. With a scope, a conversation's window (step 16): see "Conversations" at the end. A dictation
-    whose transcript is mostly not English words raises NotEnglish (see the module's header)."""
-    if scope is None and mostly_not_english(transcript.text):
+    with too few English words raises NotEnglish (see the module's header)."""
+    if scope is None and too_little_english(transcript.text):
         raise NotEnglish
     words = tokens(transcript.text)
     terms = _terms(words)
@@ -787,7 +790,7 @@ def _reading(span: tuple[int, int], transcript: _Transcript) -> list[str]:
 
 
 class NotEnglish(StructuringFailed):
-    """A dictation whose transcript is mostly not English words, whose fields check() refuses whole (see the module's
+    """A dictation with too few English words, whose fields check() refuses whole (see the module's
     header): a StructuringFailed, so the session reports its reason as it reports the model's (sessions.py)."""
 
     reason = "transcript_not_english"
@@ -817,7 +820,7 @@ def english_share(text: str) -> float | None:
                for word in words) / len(words)
 
 
-def mostly_not_english(text: str) -> bool:
+def too_little_english(text: str) -> bool:
     """Whether fewer than ENGLISH_AT_LEAST of the text's words are English: a text with no words isn't."""
     share = english_share(text)
     return share is not None and share < ENGLISH_AT_LEAST
@@ -1839,9 +1842,9 @@ class Weighed:
 def proposals(transcript: Transcript) -> list[dict]:
     """What the dictation proposes (see the module's header): each order or allergy to add the clinician dictated
     plainly, as its kind, the place of its listed instruction and its warnings, in UTF-16 offsets. Never words. None
-    from a transcript mostly not English words."""
+    from a transcript with too few English words."""
     text = transcript.text
-    if mostly_not_english(text):
+    if too_little_english(text):
         return []
     return [
         {

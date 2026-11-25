@@ -1,5 +1,5 @@
-"""The words the English checks count as English when they decide whether a dictation in English is
-mostly not English words (validation.py, english_share()): SCOWL's English, American, British and
+"""The words the English checks count as English when they decide whether a dictation in English has
+too few English words (validation.py, english_share()): SCOWL's English, American, British and
 Canadian words, words with capitals and contractions up to size 50, release 2020.12.07, in lower
 case and without possessives. Written by src/Ehr.Dictation/write_english_words.py, which says what is
 left out and why; don't edit it. SCOWL's whole notice is LICENSE-SCOWL.md, beside this file.

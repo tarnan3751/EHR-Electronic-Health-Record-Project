@@ -225,7 +225,7 @@ def answers(settings: Settings) -> dict[str, dict]:
             keep(f"result-200-unavailable-{reason}", "result",
                  http.post(f"/v1/sessions/{session}/result", params={"wait": 5}, headers=HEADERS))
 
-    # A dictation in Spanish recorded with English chosen, mostly not English words (the owner's ruling of 2026-11-25):
+    # A dictation in Spanish recorded with English chosen, too few English words (the owner's ruling of 2026-11-25):
     # nothing offered, the transcript kept as plain text, with a reason of its own.
     with client(settings, FakeLlama(GROUNDED), HeardInSpanish()) as http:
         session = stopped(http)

@@ -100,8 +100,8 @@ public sealed record DictationResult(
         + "is kept as plain text. If you dictated in Spanish, choose Spanish as the language and dictate it again.";
 
     // Ours, never the service's, and only when the fields couldn't be sorted (UC 10): a visit left undrafted because
-    // dictations had K2 Horizon all along (model_busy) says so, and a dictation in English that is mostly not English
-    // words (transcript_not_english) points at the Spanish choice.
+    // dictations had K2 Horizon all along (model_busy) says so, and a dictation in English with too few English words
+    // (transcript_not_english) points at the Spanish choice.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message => Sorting != Sorting.Unavailable ? null : Reason switch
     {
@@ -204,7 +204,7 @@ public enum SortingFailure
     [JsonStringEnumMemberName("model_busy")]
     ModelBusy,
 
-    // A dictation in English whose transcript is mostly not English words (the owner's ruling of 2026-11-25): Spanish
+    // A dictation in English fewer than two thirds of whose words are English (the owner's ruling of 2026-11-25): Spanish
     // dictated with English chosen, which MedASR writes as words of English and of no language. Nothing is offered.
     [JsonStringEnumMemberName("transcript_not_english")]
     TranscriptNotEnglish,

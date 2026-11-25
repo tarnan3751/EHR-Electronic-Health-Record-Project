@@ -299,7 +299,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("0 of 3", await page.Locator("[data-review-progress]").TextContentAsync());
     }
 
-    // A dictation in English that is mostly not English words, Spanish dictated with English chosen (the expansion plan's
+    // A dictation in English with too few English words, Spanish dictated with English chosen (the expansion plan's
     // step 17): it goes on to its review like any unsorted dictation, which shows the transcript as plain text and the
     // app's own sentence, pointing at the Spanish choice, and nothing to accept.
     [Fact]

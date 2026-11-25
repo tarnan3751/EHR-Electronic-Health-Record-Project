@@ -59,7 +59,7 @@ SCHEMA_VERSION = 1
 
 def check_english(item: scoring_es.SpanishItem, fields: dict[str, dict], unknown: list[str], transcript) -> None:  # noqa: ANN001
     """A recording dictated as English: its proposal through the English checks, onto the item as the sidecar would
-    send it; one mostly not English words unsorted, with the reason the sidecar gives (validation.NotEnglish)."""
+    send it; one with too few English words unsorted, with the reason the sidecar gives (validation.NotEnglish)."""
     try:
         checks = validation.check(fields, unknown, transcript)
     except validation.NotEnglish as refused:

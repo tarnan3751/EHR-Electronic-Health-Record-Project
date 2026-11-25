@@ -80,7 +80,7 @@ def test_a_spanish_recording_dictated_as_english_goes_the_english_way_and_is_sco
                                pipeline(E14.display, {}, english)))
 
     assert item.run_as == "en" and "run-as:en" in item.tags
-    # Its transcript, the Spanish heard as English, is mostly not English words: the English checks offer nothing, as the
+    # Its transcript, the Spanish heard as English, has too few English words: the English checks offer nothing, as the
     # sidecar reports it (the owner's ruling of 2026-11-25).
     assert (item.sorting, item.reason, item.fields) == ("unavailable", "transcript_not_english", {})
     metrics = scoring_es.score_audio([item], SCRIPTS, ENGLISH)

@@ -61,7 +61,7 @@ namespace Ehr.Web.Api.Dictation;
 // pointing at what it quotes; the review screen shows it beside the field. When sorting is
 // "unavailable" (UC 10), reason is "model_unavailable", "model_timeout", "model_output_invalid",
 // "transcript_too_long", "transcription_failed" (the transcript is then as it was live, not final) or
-// "transcript_not_english" (a dictation in English mostly not English words), or for a visit "model_busy" (its windows
+// "transcript_not_english" (a dictation in English with too few English words), or for a visit "model_busy" (its windows
 // waited ten minutes for K2 Horizon), fields is null or all empty, and message is DictationResult.UnsortedMessage, "The
 // fields couldn't be sorted, so the transcript is kept as plain text.", for transcript_not_english
 // DictationResult.NotEnglishMessage, which points at the Spanish choice, or for model_busy DictationResult.BusyMessage,

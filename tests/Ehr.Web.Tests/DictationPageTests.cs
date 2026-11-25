@@ -110,7 +110,7 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.False(string.IsNullOrEmpty((string?)json["transcript"]!["text"]));
     }
 
-    // A dictation in Spanish recorded with English chosen, mostly not English words (the expansion plan's step 17): the
+    // A dictation in Spanish recorded with English chosen, too few English words (the expansion plan's step 17): the
     // transcript comes back as plain text, with the service's reason and the app's own sentence, which points at the
     // Spanish choice. The service's side is test_sessions.py's and test_validation.py's.
     [Fact]

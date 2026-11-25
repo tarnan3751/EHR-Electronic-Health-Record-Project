@@ -14,15 +14,17 @@ language of each dictation, English first and never remembered. A dictation in S
 labelled experimental on the Dictate page (the owner's ruling of 2026-11-25): its choice reads "Spanish, experimental
 (proposals in English)", and its hint opens with an "Experimental" tag.
 
-A dictation made with English chosen whose transcript is mostly not English words, as MedASR writes a dictation in
+A dictation made with English chosen whose transcript has too few English words, as MedASR writes a dictation in
 Spanish (words of English and of no language), offers nothing (the owner's ruling of 2026-11-25; `validation.py`): no
 field and no proposal, the transcript kept as plain text, the reason `transcript_not_english`, and the page's words "This
 dictation doesn't read as English, so no fields were proposed and the transcript is kept as plain text. If you dictated
-in Spanish, choose Spanish as the language and dictate it again." Mostly not English is fewer than half its words found
+in Spanish, choose Spanish as the language and dictate it again." Too few is fewer than two thirds of its words found
 in an English word list (SCOWL's, to size 50), the drug names and the reference data's orderables and allergens, the
-clinical abbreviations and units the checks read, or holding a digit. It holds at any length, and a name no list holds
-isn't English, so a short dictation that is mostly names is refused too; an English dictation with a Spanish phrase in it
-is checked as ever. A recorded visit is never refused so.
+clinical abbreviations and units the checks read, or holding a digit: a line above the owner's "mostly not English
+words", the coordinator's more protective reading (the plan's step 17 entry). It holds at any length, and a name no list
+holds isn't English, so a short dictation more than a third of whose words are such names is refused too ("Seen by Dr
+Okonkwo with Mrs Okafor.", 4 of 7 words English); an English dictation with a Spanish phrase in it is checked as ever. A
+recorded visit is never refused so.
 
 A dictation can be up to 3 minutes in English and 2 in Spanish (the decision log's step 17, decision 20), the limit the
 service gives each dictation as it starts. While recording, the Dictate page shows the time left beside Stop, counting
@@ -53,7 +55,7 @@ case has more than one test, the first is the primary one; the others cover the 
 | TC-UC9-11 | NFR-14 as reworded (step 17): Spanish dictation accuracy, and a Spanish live transcript's speed | NFR-14, FR-07 | Accuracy: `eval/tests/test_gate_es.py`: `test_a_spanish_baseline_holds_the_results_to_its_machine_and_scores`, and CI's "Check the committed eval results" step, which checks `eval/results/latest-es.json`. Speed: `test_sessions.py`: `test_a_spanish_chunk_is_answered_in_time_while_whisper_is_busy_and_the_next_one_catches_up`, `test_a_spanish_stop_answers_within_its_budget_and_the_result_follows`; the eval's live chunk times (`latest-es.json`, `metrics.live`) |
 | TC-UC9-12 | NFR-12 (step 17): the language chosen and a Spanish dictation made from the keyboard, in real Chromium, in both themes; Spanish labelled experimental, in its choice's words and with a tag at the head of its hint | NFR-12, proposed FR-61 | `DictationSpanishBrowserTests.cs`: `TC_UC9_12_spanish_is_chosen_and_dictated_from_the_keyboard`, `The_language_choice_fits_every_width_in_both_themes` |
 | TC-UC9-13 | Alternative flow (step 17): a dictation reaches its limit, 2 minutes in Spanish and 3 in English. While recording, the time left beside Stop counts down from the limit, in no live region, and the status line says "Dictation stops in a minute, at its 2-minute limit." (3-minute), then 30 seconds and 10 seconds left, and nothing between; at the limit the page sends no more audio, stops, and shows and says "The dictation stopped at its 2-minute limit." (3-minute), and the dictation goes on to its review. The time left fits 1,280 and 360 pixels in both themes | proposed FR-61, FR-07, NFR-12 | `DictationSpanishBrowserTests.cs`: `TC_UC9_13_the_time_left_counts_down_and_the_dictation_stops_at_its_limit` (Spanish and English), `The_time_left_fits_every_width_in_both_themes`; also `DictationSpanishTests.cs`: `A_dictation_in_spanish_is_refused_past_its_limit`, and `test_sessions.py`: `test_a_dictation_in_spanish_is_refused_past_two_minutes_and_one_in_english_isnt` |
-| TC-UC9-14 | Invalid input (step 17): a dictation made with English chosen whose transcript is mostly not English words, Spanish dictated with English chosen, offers no field and no proposal; the transcript stays as plain text, with the reason `transcript_not_english` and the page's words pointing at the Spanish choice. English with a Spanish phrase in it, a short dictation in English, and a recorded visit are checked as ever | proposed FR-61, FR-12, FR-13 | `test_validation.py`: `test_a_dictation_mostly_not_english_words_offers_no_field_and_no_proposal`, `test_english_is_checked_however_much_else_it_holds_and_however_short`, `test_a_short_dictation_mostly_not_english_words_is_refused_too`; also `test_sessions.py`: `test_a_dictation_mostly_not_english_words_offers_nothing_and_says_why`, `test_speaker_rules.py`: `test_a_window_mostly_not_english_words_is_checked_as_ever`, `DictationPageTests.cs`: `A_dictation_mostly_not_english_comes_back_unsorted_with_words_pointing_at_spanish`, `AiReviewBrowserTests.cs`: `A_dictation_mostly_not_english_reaches_its_review_saying_to_choose_spanish`, and `eval/tests/test_run_es.py`: `test_a_spanish_recording_dictated_as_english_goes_the_english_way_and_is_scored_for_fr14_only` |
+| TC-UC9-14 | Invalid input (step 17): a dictation made with English chosen fewer than two thirds of whose words are English, Spanish dictated with English chosen, offers no field and no proposal; the transcript stays as plain text, with the reason `transcript_not_english` and the page's words pointing at the Spanish choice. English with a Spanish phrase in it, a short dictation in English, and a recorded visit are checked as ever | proposed FR-61, FR-12, FR-13 | `test_validation.py`: `test_a_dictation_mostly_not_english_words_offers_no_field_and_no_proposal`, `test_english_is_checked_however_much_else_it_holds_and_however_short`, `test_a_short_dictation_with_too_few_english_words_is_refused_too`; also `test_sessions.py`: `test_a_dictation_mostly_not_english_words_offers_nothing_and_says_why`, `test_speaker_rules.py`: `test_a_window_with_too_few_english_words_is_checked_as_ever`, `DictationPageTests.cs`: `A_dictation_mostly_not_english_comes_back_unsorted_with_words_pointing_at_spanish`, `AiReviewBrowserTests.cs`: `A_dictation_mostly_not_english_reaches_its_review_saying_to_choose_spanish`, and `eval/tests/test_run_es.py`: `test_a_spanish_recording_dictated_as_english_goes_the_english_way_and_is_scored_for_fr14_only` |
 
 Unprefixed `test_*.py` files are in `src/Ehr.Dictation/sidecar/tests/`, and unprefixed `*Tests.cs` files in
 `tests/Ehr.Web.Tests/`.
@@ -76,9 +78,11 @@ Unprefixed `test_*.py` files are in `src/Ehr.Dictation/sidecar/tests/`, and unpr
   and states chest pain and syncope: **a case only the reviewing clinician can catch**, since the English is faithful to
   the transcript beside it; and e04's "habones en ambos brazos" (wheals) heard as "abones", a change no check or scorer
   compares. All are accepted by the owner as known limits (`eval/known-limitations.toml`).
-- TC-UC9-14's rule, measured on the stored transcripts (2026-11-25): none of the English eval's 100 recordings is refused;
-  the nearest, d16 and d48 at babble noise (0 and 5 dB), have 12 of their 15 words English (0.80, against a line of
-  0.5); then 0.907. None of the English text set's 51 scripts (lowest 0.937), none of the 590 trick sentences (0.75)
-  and, were it applied, none of the 22 visits (0.955). Run B's Spanish script dictated with English chosen (e01) is
-  refused: 31 of its 65 words English (0.477), 2.3 points under the line, the one such recording measured. Whisper's
-  own transcripts of the 36 Spanish recordings, read the same way, have at most 0.463.
+- TC-UC9-14's rule, measured on the stored transcripts (2026-11-25), against its line of two thirds: none of the
+  English eval's 100 recordings is refused; the nearest, d16 and d48 at babble noise (0 and 5 dB), have 12 of their
+  15 words English (0.80, 0.13 above the line); then 0.907. None of the English text set's 51 scripts (lowest 0.937),
+  none of the 590 trick sentences (lowest 0.75, 0.08 above) and, were it applied, none of the 22 visits (0.955). Run
+  B's Spanish script dictated with English chosen (e01) is refused: 31 of its 65 words English (0.477), 0.19 under the
+  line, the one such recording measured. Whisper's own transcripts of the 36 Spanish recordings, read the same way,
+  have at most 0.463. What the line costs: a short English dictation more than a third of whose words are names no
+  list holds is refused, such as "Seen by Dr Okonkwo with Mrs Okafor." (4 of 7), which a line of one half would offer.

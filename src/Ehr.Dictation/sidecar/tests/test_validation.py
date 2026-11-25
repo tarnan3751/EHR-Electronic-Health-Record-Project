@@ -1538,18 +1538,23 @@ def test_a_dictation_mostly_not_english_words_offers_no_field_and_no_proposal():
     "BP 142/88, SpO2 97%, A1c 7.1, COPD, patient's lisinopril 10 mg, 120 mmHg.",
     # However short.
     "Stable.",
+    # At the line, two words in three, and over it, with names no list holds.
+    "Okafor seen today.",
+    "Follow up with Dr Nwachukwu and Dr Okonkwo.",
 ])
 def test_english_is_checked_however_much_else_it_holds_and_however_short(said):
-    assert english_share(said) >= ENGLISH_AT_LEAST
+    assert english_share(said) >= ENGLISH_AT_LEAST == 2 / 3
     assert set(check(EMPTY, [], transcript(said)).fields) == set(FIELDS)
 
 
 @pytest.mark.parametrize(("said", "share"), [
     ("Paciente.", 0.0),
-    # A name no list holds isn't English: a short dictation that is mostly names is refused.
+    # A name no list holds isn't English: a short dictation more than a third of whose words are such names is refused,
+    # under the line though over one half, what the line costs.
     ("Seen with Mrs Okafor and Mr Nwachukwu.", 3 / 7),
+    ("Seen by Dr Okonkwo with Mrs Okafor.", 4 / 7),
 ])
-def test_a_short_dictation_mostly_not_english_words_is_refused_too(said, share):
+def test_a_short_dictation_with_too_few_english_words_is_refused_too(said, share):
     assert english_share(said) == pytest.approx(share)
     with pytest.raises(NotEnglish):
         check(EMPTY, [], transcript(said))

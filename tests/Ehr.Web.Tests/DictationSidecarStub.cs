@@ -397,7 +397,7 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
                 proposals,
                 provenance,
             },
-            // A dictation in English mostly not English words (step 17): unsorted, with its own reason.
+            // A dictation in English with too few English words (step 17): unsorted, with its own reason.
             StubSorting.NotEnglish => new
             {
                 transcript,
@@ -591,7 +591,7 @@ public enum StubSorting
     // A recorded visit the service was too busy to draft: unavailable, with model_busy (step 16).
     Busy,
 
-    // A dictation in English whose transcript is mostly not English words: unavailable, with transcript_not_english
+    // A dictation in English with too few English words: unavailable, with transcript_not_english
     // (step 17).
     NotEnglish,
 

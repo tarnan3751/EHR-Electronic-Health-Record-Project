@@ -3,7 +3,7 @@
 # dependencies = []
 # ///
 """Writes src/Ehr.Dictation/sidecar/ehr_dictation/englishwords.py: the words the English checks count as English when
-they decide whether a dictation in English is mostly not English words (validation.py, english_share()), so a Spanish
+they decide whether a dictation in English has too few English words (validation.py, english_share()), so a Spanish
 dictation recorded with English chosen offers nothing (the owner's ruling of 2026-11-25). And LICENSE-SCOWL.md beside
 it, the notice the lists ask to be shipped with them.
 
@@ -100,8 +100,8 @@ def notice(data: bytes) -> str:
 
 def module(listed: list[str]) -> str:
     lines = [
-        '"""The words the English checks count as English when they decide whether a dictation in English is',
-        "mostly not English words (validation.py, english_share()): SCOWL's English, American, British and",
+        '"""The words the English checks count as English when they decide whether a dictation in English has',
+        "too few English words (validation.py, english_share()): SCOWL's English, American, British and",
         f"Canadian words, words with capitals and contractions up to size {SIZE}, release {RELEASE}, in lower",
         "case and without possessives. Written by src/Ehr.Dictation/write_english_words.py, which says what is",
         "left out and why; don't edit it. SCOWL's whole notice is LICENSE-SCOWL.md, beside this file.",
