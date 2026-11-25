@@ -8,6 +8,7 @@ pinned, so the checks can get better without a test to change."""
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 from pathlib import Path
 
@@ -16,6 +17,10 @@ import pytest
 from ehr_eval import gate, wrong_translations
 from ehr_eval.scripts import EVAL_DIR
 
+# Every pair's id, kind, label and text, as the review wrote them (2026-11-24): pinned here apart from the gate's hash
+# of the file, so a pair marked as not reversing, relabelled or reworded fails this test even with a new
+# WRONG_TRANSLATIONS_SHA256 beside it. w23, w39 and w42 are marked reversing in doubt, conservative labels that stay.
+PAIRS_SHA256 = "85dff858a131edf3803fa3625c59ab248a5311434b29c8e6c9a0bee4e97311a1"
 PASSES = ("Paciente atérmico.", "Febrile patient.")  # a self-negating word the checks' list doesn't hold
 REFUSED = ("Suspender los opioides.", "Continue opioids.")  # a change the checks read the other way
 
@@ -31,6 +36,25 @@ def test_the_set_is_the_one_the_gate_records_and_holds_the_reviews_pairs():
     assert [pair.id for pair in faithful] == [f"f{i:02d}" for i in range(1, 31)]
     assert {pair.kind for pair in wrong} == {"selfneg", "who", "change", "severity", "doubt", "glossary"}
     assert all(isinstance(pair.reverses, bool) for pair in wrong) and context.endswith("visita.")
+
+
+def test_every_wrong_pair_is_marked_reversing_and_each_pair_is_pinned_as_written():
+    _, pairs = wrong_translations.load()
+    assert all(pair.reverses for pair in pairs if pair.wrong)
+    assert {pair.id for pair in pairs if pair.wrong and pair.id in ("w23", "w39", "w42") and pair.reverses} == {
+        "w23", "w39", "w42"}
+    rows = [[pair.id, pair.wrong, pair.kind, pair.reverses, pair.spanish, pair.english] for pair in pairs]
+    assert hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode()).hexdigest() == PAIRS_SHA256
+
+
+@pytest.mark.parametrize("change", [("reverses = true", "reverses = false"),
+                                    ("Febrile patient.", "Febrile patient today.")])
+def test_a_pair_relabelled_or_reworded_breaks_the_pin(tmp_path, monkeypatch, change):
+    text = (EVAL_DIR / wrong_translations.PAIRS).read_text(encoding="utf-8").replace(*change, 1)
+    (tmp_path / wrong_translations.PAIRS).write_text(text, encoding="utf-8")
+    _, pairs = wrong_translations.load(tmp_path)
+    rows = [[pair.id, pair.wrong, pair.kind, pair.reverses, pair.spanish, pair.english] for pair in pairs]
+    assert hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode()).hexdigest() != PAIRS_SHA256
 
 
 def write_set(directory: Path, *wrong: tuple[str, str], reverses: bool = True) -> None:
