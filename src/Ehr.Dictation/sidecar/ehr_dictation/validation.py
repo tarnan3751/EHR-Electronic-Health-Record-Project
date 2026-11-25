@@ -157,8 +157,8 @@ and every check reads the cleaned text. The checks, each with the reason code re
   think, given her normal oxygen, that she has pneumonia", "no evidence she has a fracture", "I think her knee pain is
   from arthritis", "it doesn't look like she has cellulitis". The subject is a pronoun (you included), "this", "there",
   "the patient" or a possessive and up to three words; the verb a form of "have" or "be", negated or not, or "does",
-  "did" or "do" with "have". "I don't think", "doubt" and "unlikely" are doubt as well as negation, so "She doesn't
-  have asthma." from "I don't think she doesn't have asthma" is refused. Uncertainty is also: "maybe", "perhaps",
+  "did" or "do" with "have". "I don't think" and "doubt" are doubt as well as negation, so "She doesn't have
+  asthma." from "I don't think she doesn't have asthma" is refused; "unlikely" is doubt only (CERTAINTY, not NEGATION). Uncertainty is also: "maybe", "perhaps",
   "presumably", "think", "believe", "suspect", "wonder", "not sure", "not certain", "not convinced", "either", "a
   chance", "concern that", "worried", "can't exclude" or "rule out"; she, he, it, they, you, this or the patient with
   "might", "may" or "could" and "have" or "be" ("she may have ibuprofen as needed" is read as doubt too, a known false
