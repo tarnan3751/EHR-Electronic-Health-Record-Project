@@ -9,11 +9,16 @@ refuse, each listed by sentence, beside the share of the fields with gold the ch
   that the checks refuse. A model's statement differs from the gold, so it is decided by the scorer, the reading that
   decides a mistranslation (scoring_es.py, facts_es.py, never the checks' own): counted as a false refusal when every
   passage it cites is in the transcript, the scorer reads something in it (a value, a name, a negation, a doubt, the
-  past or a relative of the script's fact list) and finds nothing changed from what the Spanish it cites says and no
-  value no field's gold has. One the scorer reads nothing in is listed as undecided, not counted: the facts don't say
-  enough to tell ("Right-handed patient" for "Paciente diestro" is read the same as "Left-handed patient"). The scorer
-  only reads what the facts list, so a word they don't list that the model got wrong ("febrile" for "atérmico") can
-  make a right refusal look false: every one is listed with the gold that cites the same Spanish, for a person to read.
+  past or a relative of the script's fact list) and finds nothing changed from what the Spanish it cites says; a value
+  no field's gold has is no change ("In 4 weeks." for "Control en 4 semanas." is a false refusal). One the scorer reads
+  nothing in is listed as undecided, not counted: the facts don't say enough to tell ("Right-handed patient" for
+  "Paciente diestro" is read the same as "Left-handed patient"). The rest are right refusals, listed too. The scorer
+  only reads what the facts list, so a change they don't record can make a right refusal look false: h04's "for 3
+  weeks" for "hace 3 semanas" (the facts say 3 weeks, not when), or a word they don't list that the model got wrong
+  ("febrile" for "atérmico"). So each is listed with the gold that cites the same Spanish and the checks' reasons the
+  scorer compares nothing of (UNSEEN), for a person to read. Also counted: the statements discarded alongside a refused
+  one (a field fails whole), and the refusals of a hedge of leave added ("The dose may be repeated" for "Se puede
+  repetir la dosis", translation.LEAVE): the owner's known false refusal.
 - The scorer's reading of the gold, for the scripts run only when asked (whose gold no test holds to the scorer): each
   gold statement the scorer reads as changing something, so a changed item an answer shows in the same statement may be
   the scorer's, not the model's.
@@ -60,13 +65,20 @@ def _spans(quotes: list[str], hypothesis: str) -> list[tuple[int, int]] | None:
     return spans
 
 
+# The checks' reasons whose kind the scorer compares nothing of: a refusal for one of them that the scorer reads as
+# false may be a right one it can't see.
+UNSEEN = frozenset({"translation_adds_words", "finding_not_in_sources", "orderable_not_in_sources",
+                    "dose_form_not_in_sources", "order_changed", "order_or_allergy_change", "too_long",
+                    "source_repeated"})
+
+
 def verdict(english: str, spans: list[tuple[int, int]] | None, hypothesis: str, name: str, script: Script) -> str:
     """"false" (a correct translation, as the scorer reads it), "right" or "undecided": the header says how."""
     if not spans:
         return "right"
     others = tuple(script.gold[other].value for other in script.gold if other != name)
-    changed, _, no_gold = scoring_es._statement_items(english, spans, hypothesis, script.gold[name].value, script, others)
-    if changed or no_gold:
+    changed, *_ = scoring_es._statement_items(english, spans, hypothesis, script.gold[name].value, script, others)
+    if changed:
         return "right"
     entries = facts_es.entries(scoring_es.facts_of(script))
     lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items), scoring_es.drug_names())
@@ -82,6 +94,7 @@ def _gold_citing(script: Script, quotes: list[str]) -> list[str]:
 def of_answers(items: list[scoring_es.SpanishItem], transcripts: dict[str, Transcript],
                scripts: dict[str, Script]) -> dict:
     refused: list[dict] = []
+    alongside = 0
     for item in items:
         if item.sorting != "done":
             continue
@@ -92,16 +105,19 @@ def of_answers(items: list[scoring_es.SpanishItem], transcripts: dict[str, Trans
                 continue
             for statement in outcome.statements:
                 reasons = refused_alone(name, statement, transcripts[item.variant])
+                alongside += not reasons
                 if reasons:
                     quotes = list(statement["spanish"])
                     refused.append({
                         "variant": item.variant, "field": name, "english": statement["english"], "spanish": quotes,
                         "reasons": reasons, "gold": _gold_citing(script, quotes),
+                        "unseen": sorted(set(reasons) & UNSEEN),
                         "verdict": verdict(statement["english"], _spans(quotes, item.hypothesis), item.hypothesis,
                                            name, script)})
-    false = [entry for entry in refused if entry["verdict"] == "false"]
-    return {"refused": len(refused), "false": false, "undecided": [e for e in refused if e["verdict"] == "undecided"],
-            "right": sum(1 for entry in refused if entry["verdict"] == "right")}
+    by = {kind: [entry for entry in refused if entry["verdict"] == kind] for kind in ("false", "undecided", "right")}
+    leave = [entry for entry in refused
+             if "certainty_added" in entry["reasons"] and translation.LEAVE.search(entry["english"])]
+    return {"refused": len(refused), **by, "alongside": alongside, "leave": leave}
 
 
 def of_gold(scripts: list[Script]) -> list[dict]:
@@ -145,18 +161,28 @@ def measure(items: list[scoring_es.SpanishItem], transcripts: dict[str, Transcri
 
 def lines(discarded: dict, found: dict) -> list[str]:
     """For someone to read: the discarded share with the false refusals beside it, and each, by sentence."""
+    answers = found["answers"]
     out = [f"Fields with gold discarded: {discarded['discarded']} of {discarded['fields_with_gold']} "
-           f"({discarded['share']}); false refusals: {found['count']} of the answers' {found['answers']['refused']} "
-           f"statements refused ({len(found['answers']['undecided'])} undecided), {found['gold_count']} of the gold."]
-    for entry in found["answers"]["false"] + found["answers"]["undecided"]:
+           f"({discarded['share']}); false refusals: {found['count']} of the answers' {answers['refused']} "
+           f"statements refused ({len(answers['undecided'])} undecided, {len(answers['right'])} right), "
+           f"{found['gold_count']} of the gold; {answers['alongside']} more statements discarded alongside a refused "
+           f"one; {len(answers['leave'])} refused for a hedge of leave added (\"may be repeated\", a known false "
+           f"refusal)."]
+    for entry in answers["false"] + answers["undecided"] + answers["right"]:
+        unseen = f"; the scorer compares nothing of {', '.join(entry['unseen'])}" if entry.get("unseen") else ""
         out.append(f"  {entry['verdict']}: {entry['variant']} {entry['field']}: {entry['english']!r} for "
-                   f"{' / '.join(entry['spanish'])!r} ({', '.join(entry['reasons'])}); the gold: {entry['gold']}")
+                   f"{' / '.join(entry['spanish'])!r} ({', '.join(entry['reasons'])}{unseen}); "
+                   f"the gold: {entry['gold']}")
     for entry in found["gold"]:
         out.append(f"  gold: {entry['script']} {entry['field']}: {entry['english']!r} for "
                    f"{' / '.join(entry['spanish'])!r} ({', '.join(entry['reasons'])})")
     for entry in found.get("scorer_on_gold", []):
         out.append(f"  the scorer reads the gold as changed: {entry['script']} {entry['field']}: {entry['english']!r} "
                    f"({', '.join(f'{kind} {what}' for kind, what in entry['changed'])})")
+    if answers["false"] or answers["undecided"]:
+        out.append("  A false refusal is the scorer's reading, of what the fact lists record: a change they don't "
+                   "record reads as none (h04's \"for 3 weeks\" for \"hace 3 semanas\": the facts say 3 weeks, not "
+                   "when), so each is for a person to read beside the Spanish.")
     return out
 
 

@@ -8,6 +8,7 @@ import json
 
 from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import HOLDOUT_DIR, load_scripts
+from ehr_dictation import translation
 from ehr_eval import refusals, run_es, scoring_es
 from ehr_eval.run_a import check, text_transcript
 
@@ -40,7 +41,8 @@ def test_a_correct_translation_the_checks_refuse_is_a_false_refusal_and_a_wrong_
     assert false["english"] == "Also takes acetylsalicylic acid 100 mg a day." and false["spanish"] == [ASPIRIN]
     assert false["reasons"] and "Also takes aspirin 100 mg daily." in false["gold"]
     assert found(right)["count"] == 1
-    assert found(wrong)["count"] == 0 and found(wrong)["answers"]["right"] == 1
+    (right_refusal,) = found(wrong)["answers"]["right"]
+    assert found(wrong)["count"] == 0 and right_refusal["english"] == "Also takes acetylsalicylic acid 300 mg a day."
 
 
 def test_a_statement_the_scorer_reads_nothing_in_is_undecided_and_one_citing_what_wasnt_said_is_a_right_refusal():
@@ -50,7 +52,7 @@ def test_a_statement_the_scorer_reads_nothing_in_is_undecided_and_one_citing_wha
                                              "english": "Also takes acetylsalicylic acid 300 mg a day."}])
     assert [e["verdict"] for e in found(unread)["answers"]["undecided"]] == ["undecided"]
     assert found(unread)["count"] == 0
-    assert found(elsewhere)["count"] == 0 and found(elsewhere)["answers"]["right"] == 1
+    assert found(elsewhere)["count"] == 0 and len(found(elsewhere)["answers"]["right"]) == 1
 
 
 def test_an_offered_field_has_no_refusal():
@@ -87,4 +89,36 @@ def test_the_command_reports_a_stored_run_a(tmp_path, capsys):
     path.write_text(json.dumps({"dataset": {"holdout": False}, "items": [dataclasses.asdict(item)]}), encoding="utf-8")
     assert refusals.main([str(path)]) == 0
     out = capsys.readouterr().out
-    assert "false refusals: 1 of the answers' 1 statements refused (0 undecided), 0 of the gold." in out
+    assert ("false refusals: 1 of the answers' 1 statements refused (0 undecided, 0 right), 0 of the gold; 0 more "
+            "statements discarded alongside a refused one; 0 refused for a hedge of leave added") in out
+
+
+def test_a_value_no_gold_has_is_no_change_so_its_refusal_is_false():
+    e01 = SCRIPTS["e01-hta-control"]
+    quote = "Control en 4 semanas."
+    at = e01.display.index(quote)
+    assert refusals.verdict("In 4 weeks.", [(at, at + len(quote))], e01.display, "plan", e01) == "false"
+    assert refusals.verdict("Follow-up in 5 weeks.", [(at, at + len(quote))], e01.display, "plan", e01) == "right"
+
+
+def test_statements_discarded_alongside_a_refused_one_and_refusals_of_leave_are_counted():
+    alongside = checked(E15, "subjective", [
+        {"spanish": [ASPIRIN], "english": "Also takes aspirin 100 mg daily."},
+        {"spanish": [ASPIRIN], "english": "Also takes acetylsalicylic acid 300 mg a day."}])
+    assert found(alongside)["answers"]["alongside"] == 1
+    leave = checked(E15, "subjective", [
+        {"spanish": [ASPIRIN], "english": "Also takes acetylsalicylic acid 100 mg a day, which may be continued."}])
+    (counted,) = found(leave)["answers"]["leave"]
+    assert "certainty_added" in counted["reasons"]
+    lines = refusals.lines(scoring_es.score([leave], SCRIPTS)["discarded"], found(leave))
+    assert "1 refused for a hedge of leave added" in lines[0] and lines[1].startswith("  right: ")
+
+
+def test_a_refusal_for_a_kind_the_scorer_compares_nothing_of_says_so():
+    assert refusals.UNSEEN <= set(translation.REASONS)
+    item = checked("e16-anadido-corto", "plan", [{"spanish": ["Evitar antiinflamatorios"],
+                                                  "english": "Avoid anti-inflammatory drugs"}])
+    entries = [e for kind in ("false", "undecided", "right") for e in found(item)["answers"][kind]]
+    assert entries and all(e["unseen"] == ["translation_adds_words"] for e in entries)
+    assert "the scorer compares nothing of translation_adds_words" in "\n".join(
+        refusals.lines(scoring_es.score([item], SCRIPTS)["discarded"], found(item)))
