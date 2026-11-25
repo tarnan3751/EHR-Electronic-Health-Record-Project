@@ -6,7 +6,7 @@
     ViewData["Title"] = "Audit";
 }
 <h1>Audit</h1>
-<p class="sc-lede">Every view and change of patient information, and every sign-in, newest first. Emergency access is marked for review until an administrator reviews it.</p>
+<p class="sc-lede">Every view and change of patient information, and every sign-in, newest first. Patients appear by ID, and a change to their information by the names of the fields it changed, never its values. Emergency access is marked for review until an administrator reviews it.</p>
 <form method="get" class="sc-filters">
     <div class="sc-field">
         <label asp-for="Action" class="sc-field__label">Action</label>
@@ -135,6 +135,12 @@ else
                             else if (e.TableName == "chart_history")
                             {
                                 <span class="sc-muted">A copy for the lists' history. Its values aren't shown here: see the entry's own event.</span>
+                            }
+                            else if (Model.Log.Fields.TryGetValue(e.Id, out var fields))
+                            {
+                                @* A write to patient data: the names of the fields it changed, never a value (step 18a). In
+                                   mono, as IDs are, and wrapping, since an insert can name a dozen. *@
+                                <span class="sc-muted">Fields changed:</span> <span class="sc-table__id" data-audit-fields>@fields</span>
                             }
                             else if (e.Reason is null && e.Details is null)
                             {

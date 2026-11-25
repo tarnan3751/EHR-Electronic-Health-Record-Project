@@ -7,9 +7,10 @@ namespace Ehr.Domain.Audit;
 // The audit log as admins review it: the newest events first, narrowed by action, actor, patient, the part of the
 // record a read was for (step 13c2), an emergency access's review (step 18) or time, a page at a time. Row-level security hands an admin every event and anyone else none, so nothing here checks who asks. Actors
 // are named from the account tables, which admins may read. Patients appear by ID only: an admin has no access to
-// patient data (db/policies/30-rls.sql), and asks a clinician when a review needs the name; the values a write changed,
-// which the trigger recorded, are the one place an admin sees any, and never those of a sensitive item: for such a write
-// the page says that a sensitive item changed and who changed it.
+// patient data (db/policies/30-rls.sql), and asks a clinician when a review needs the name. Of a write to patient data
+// an admin gets the names of the fields it changed, never a value (step 18a), and of a sensitive item's not even those:
+// the page says that a sensitive item changed and who changed it. An event about no patient, such as a desktop sign-in,
+// keeps its details.
 public sealed class AuditLog(EhrDbContext db)
 {
     public const int PageSize = 100;
@@ -83,16 +84,21 @@ public sealed class AuditLog(EhrDbContext db)
             page.RemoveAt(PageSize);
         }
 
-        // The values, for the events an admin may see them of: never a sensitive item's, nor the lists' history rows,
-        // which copy those items (ehr.shown_audit_details, db/policies/40-audit.sql). The page says so in their place.
+        // What an admin may see of each (ehr.shown_audit_details, db/policies/40-audit.sql): an event about no patient's
+        // details, and a write to patient data's changed fields by name (step 18a); nothing of a sensitive item's, the
+        // lists' history rows, messages or refill requests. The page says so in their place.
         var ids = page.Select(e => e.Id).ToArray();
-        var details = await db.Database
-            .SqlQuery<ShownDetails>($"SELECT id AS \"Id\", details::text AS \"Details\" FROM ehr.shown_audit_details({ids})")
-            .ToDictionaryAsync(shown => shown.Id, shown => shown.Details, cancellationToken);
+        var shown = await db.Database
+            .SqlQuery<ShownDetails>(
+                $"SELECT id AS \"Id\", details::text AS \"Details\", array_to_string(fields, ', ') AS \"Fields\" FROM ehr.shown_audit_details({ids})")
+            .ToListAsync(cancellationToken);
+        var details = shown.ToDictionary(s => s.Id, s => s.Details);
         foreach (var e in page)
         {
             e.Details = details.GetValueOrDefault(e.Id);
         }
+
+        var fields = shown.Where(s => s.Fields is not null).ToDictionary(s => s.Id, s => s.Fields!);
 
         var actorIds = page.Where(e => e.ActorId is not null).Select(e => e.ActorId!.Value).Distinct().ToList();
         var actors = await db.StaffUsers.AsNoTracking()
@@ -104,11 +110,11 @@ public sealed class AuditLog(EhrDbContext db)
             actors[account.Id] = $"Portal account {account.Email}";
         }
 
-        return new AuditPage(page, actors, more);
+        return new AuditPage(page, actors, more, fields);
     }
 }
 
-sealed record ShownDetails(Guid Id, string? Details);
+sealed record ShownDetails(Guid Id, string? Details, string? Fields);
 
 // What to show: one action or any; one staff or patient account or anyone; one patient or any; from a moment on;
 // before a moment (also how the next, older page is asked for); reads for one part of the record or any; emergency
@@ -124,5 +130,7 @@ public static class AuditReviewFilter
     public const string NotAppropriate = EmergencyAccessOutcomes.NotAppropriate;
 }
 
-// A page of events, newest first, the names of the accounts that acted, and whether older events remain.
-public sealed record AuditPage(IReadOnlyList<AuditEvent> Events, IReadOnlyDictionary<Guid, string> Actors, bool More);
+// A page of events, newest first, the names of the accounts that acted, whether older events remain, and for each write
+// to patient data the names of the fields it changed, comma-separated (step 18a).
+public sealed record AuditPage(IReadOnlyList<AuditEvent> Events, IReadOnlyDictionary<Guid, string> Actors, bool More,
+    IReadOnlyDictionary<Guid, string> Fields);

@@ -43,7 +43,7 @@ public class AuditModel(AuditLog log, StaffAccounts accounts, EmergencyAccessRev
     [BindProperty(SupportsGet = true)]
     public DateTimeOffset? Before { get; set; }
 
-    public AuditPage Log { get; private set; } = new([], new Dictionary<Guid, string>(), false);
+    public AuditPage Log { get; private set; } = new([], new Dictionary<Guid, string>(), false, new Dictionary<Guid, string>());
 
     public IReadOnlyList<StaffUser> Staff { get; private set; } = [];
 

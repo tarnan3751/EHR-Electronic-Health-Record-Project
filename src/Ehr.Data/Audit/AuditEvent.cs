@@ -35,7 +35,8 @@ public class AuditEvent
     public string? Reason { get; set; }
 
     // What changed, as JSON: the old and new values of the columns a write changed. The runtime roles can't read this
-    // column: admins get it through ehr.shown_audit_details, which leaves out a sensitive item's (AuditLog).
+    // column: admins get it through ehr.shown_audit_details only for an event about no patient, and of a write to patient
+    // data only the names of the fields it changed (AuditLog, step 18a).
     public string? Details { get; set; }
 
     // A write to a sensitive item (a diagnosis or medication marked sensitive). The audit page says that it changed
