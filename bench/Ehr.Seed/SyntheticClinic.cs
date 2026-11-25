@@ -70,7 +70,7 @@ public sealed class SyntheticClinic
                 Id = Uuid7(made, random),
                 PatientId = patientId,
                 Code = AllergyIntolerance.NoKnownAllergy,
-                Display = "No known allergy",
+                Display = AllergyIntolerance.NoKnownAllergyDisplay,
                 ClinicalStatus = AllergyClinicalStatus.Active,
                 RecordedAt = RecentDay(random),
             });

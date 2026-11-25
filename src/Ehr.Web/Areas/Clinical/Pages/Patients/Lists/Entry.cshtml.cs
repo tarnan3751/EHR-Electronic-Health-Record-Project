@@ -38,7 +38,10 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
             ["diagnoses"] = ("conditions", ClinicalCodeKind.Condition, "diagnosis", "Diagnosis"),
         };
 
+    // The search the clinician came from, from the address only: the form's own Name field is the entry's name, and
+    // bound as a search criterion it would put the entry's name, a sensitive diagnosis's too, into the chart's address.
     [BindProperty(SupportsGet = true)]
+    [FromQuery]
     public SearchQuery Search { get; set; } = SearchQuery.None;
 
     [BindProperty(SupportsGet = true)]
@@ -46,6 +49,17 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
 
     [BindProperty(SupportsGet = true)]
     public Guid? EntryId { get; set; }
+
+    // Set when the clinician came from the chart with sensitive items shown: the way back shows them again. From the
+    // address only, never the form: "Sensitive" is the entry's own box.
+    [BindProperty(SupportsGet = true, Name = "showSensitive")]
+    [FromQuery]
+    public bool ShowSensitive { get; set; }
+
+    // For a new entry: its ID, chosen when the form is opened and posted with it, so posting the same form twice (a
+    // double click) saves one entry, not two (ChartLists.SaveAsync). A post without one gets a new ID.
+    [BindProperty]
+    public Guid? NewEntryId { get; set; }
 
     [BindProperty]
     public string? Name { get; set; }
@@ -81,6 +95,8 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
     [BindProperty]
     public bool Sensitive { get; set; }
 
+    // Null only on the page that says a post wasn't saved because the patient left the clinician's panel (OffPanel),
+    // which reads nothing about the patient.
     public ChartEntryForm Form { get; private set; } = null!;
 
     // Step 15: the allergy the clinician's dictation proposed, from the query string, and how its review shows it.
@@ -97,7 +113,25 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         ? Url.Page("/Patients/Notes/Review", new { patientId = proposed.Row.PatientId, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId })
         : null;
 
+    // A diagnosis whose code is in a sensitive range: its "Sensitive" box is shown checked and can't be cleared.
+    public bool SensitiveByCode { get; private set; }
+
+    // Set when the post came from a clinician who no longer has the patient on their panel.
+    public bool OffPanel { get; private set; }
+
+    // Set when the database refused the write: the "Not saved:" notice above the form, which keeps what was entered.
+    public bool Refused { get; private set; }
+
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
+
+    // The fields in the order the form shows them.
+    static readonly string[] FieldOrder =
+        [nameof(Name), nameof(Reaction), nameof(Severity), nameof(Criticality), nameof(Dosage), nameof(Started), nameof(Stopped), nameof(Onset), nameof(Status)];
+
+    // The field that takes the focus: the first with an error; the name on a form with none. None when the database
+    // refused the save, or a dictation's proposal was decided first: its notice takes the focus instead
+    // (data-focus-on-load).
+    public string? Focused => Refused || ProposalDecided ? null : FieldOrder.FirstOrDefault(Errors.ContainsKey) ?? (Errors.Count == 0 ? nameof(Name) : null);
 
     public (string Table, string Kind, string One, string Label) About => Lists[List];
 
@@ -105,28 +139,27 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
 
     // The statuses a form offers, with the words the chart uses for them.
     // An allergy a dictation proposed is added as one the patient has (step 15).
-    public IReadOnlyList<(string Code, string Name)> Statuses => List switch
-    {
-        "allergies" when Proposal is not null => [(AllergyClinicalStatus.Active, "Active")],
-        "allergies" => [(AllergyClinicalStatus.Active, "Active"), (AllergyClinicalStatus.Inactive, "Inactive"), (AllergyClinicalStatus.Resolved, "Resolved")],
-        "medications" =>
-        [
-            (MedicationStatementStatus.Active, "Active"), (MedicationStatementStatus.OnHold, "On hold"), (MedicationStatementStatus.Stopped, "Stopped"),
-            (MedicationStatementStatus.Completed, "Completed"), (MedicationStatementStatus.EnteredInError, "Entered in error"),
-        ],
-        _ =>
-        [
-            (ConditionClinicalStatus.Active, "Active"), (ConditionClinicalStatus.Recurrence, "Recurrence"), (ConditionClinicalStatus.Remission, "Remission"),
-            (ConditionClinicalStatus.Inactive, "Inactive"), (ConditionClinicalStatus.Resolved, "Resolved"),
-        ],
-    };
+    public IReadOnlyList<(string Code, string Name)> Statuses => List == "allergies" && Proposal is not null
+        ? [(AllergyClinicalStatus.Active, "Active")]
+        : ChartListWords.Statuses(About.Table);
 
+    // What was typed into the free-text fields, for the page that says the post wasn't saved.
+    public IReadOnlyList<(string Field, string Value)> Typed =>
+        [.. new (string Label, string? Text)[] { (About.Label, Name), ("Reaction", Reaction), ("How it is taken", Dosage) }
+            .Where(typed => !string.IsNullOrWhiteSpace(typed.Text)).Select(typed => (typed.Label, typed.Text!))];
+
+    // The way back to the chart: with the search, and with sensitive items shown when they were.
     public Dictionary<string, string> ChartLink
     {
         get
         {
             var route = Search.RouteData();
             route["id"] = Form.Patient.Id.ToString();
+            if (ShowSensitive)
+            {
+                route["sensitive"] = "true";
+            }
+
             return route;
         }
     }
@@ -150,10 +183,12 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         else if (Form.Condition is { } condition)
         {
             (Name, Status, Onset, Sensitive) = (condition.Display, condition.ClinicalStatus, Date(condition.OnsetDate), condition.Sensitive);
+            SensitiveByCode = await lists.IsSensitiveDiagnosisAsync(condition.Code, HttpContext.RequestAborted);
         }
         else
         {
             Status = Statuses[0].Code;
+            NewEntryId = Guid.CreateVersion7();
         }
 
         return Page();
@@ -161,10 +196,15 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
 
     public async Task<IActionResult> OnPostAsync(Guid id)
     {
-        Response.Headers.CacheControl = "no-store";
         if (await LoadAsync(id) is { } refused)
         {
             return refused;
+        }
+
+        // A new entry keeps the ID its form was opened with, through any mistakes, so a repeated post updates it.
+        if (IsNew && (NewEntryId is null || NewEntryId == Guid.Empty))
+        {
+            NewEntryId = Guid.CreateVersion7();
         }
 
         var errors = new Dictionary<string, string>();
@@ -213,6 +253,14 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
             errors[nameof(Stopped)] = "The stop date is before the start date.";
         }
 
+        // A diagnosis sensitive by its code stays sensitive whatever was posted (its box is fixed, and a disabled box
+        // isn't sent); the database holds the same rule.
+        if (List == "diagnoses")
+        {
+            SensitiveByCode = code?.Sensitive ?? (kept && await lists.IsSensitiveDiagnosisAsync(Form.Condition?.Code, HttpContext.RequestAborted));
+            Sensitive |= SensitiveByCode;
+        }
+
         if (errors.Count > 0)
         {
             Errors = errors;
@@ -220,7 +268,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
             return Page();
         }
 
-        var entryId = EntryId ?? Guid.CreateVersion7();
+        var entryId = EntryId ?? NewEntryId!.Value;
         if (Proposed is { } proposed)
         {
             var added = await lists.AddProposedAsync(new AllergyIntolerance
@@ -242,7 +290,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
                 ProposedAllergy.Saved => Redirect(Url.Page("/Patients/Notes/Review",
                     new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId, decided = proposed.Row.Id })!),
                 ProposedAllergy.Decided => ProposalNotDecided(),
-                _ => RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id)),
+                _ => NotSaved(),
             };
         }
 
@@ -285,12 +333,31 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
                 Sensitive = Sensitive,
             }, IsNew, HttpContext.RequestAborted),
         };
-        if (!saved)
+        if (saved != ChartSave.Saved)
         {
-            return RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
+            return NotSaved();
         }
 
-        return Redirect(Url.Page("/Patients/Chart", Search.ChartRouteValues(id)) + $"#chart-{List}");
+        // The chart confirms it ("Saved:"), from the entry as the database now holds it.
+        var chart = Search.ChartRouteValues(id);
+        chart["saved"] = entryId;
+        chart["savedList"] = List;
+        if (ShowSensitive)
+        {
+            chart["sensitive"] = "true";
+        }
+
+        return RedirectToPage("/Patients/Chart", chart);
+    }
+
+    // Refused by the database (row-level security, or the entry isn't this patient's): the form again, with what was
+    // entered, and a notice that says nothing was saved. An allergy a dictation proposed too (step 15): its proposal
+    // stays waiting.
+    PageResult NotSaved()
+    {
+        Refused = true;
+        Response.StatusCode = StatusCodes.Status409Conflict;
+        return Page();
     }
 
     // Nothing saved, the allergy included: the dictation's proposal was decided first, in another tab.
@@ -322,9 +389,11 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         return null;
     }
 
-    // The gate, then the one recorded read. Null when the form may be shown.
+    // The gate, then the one recorded read. Null when the form may be shown. Never cached, opened or posted, as the
+    // chart isn't: the form can show a sensitive entry, and it shouldn't stay on a shared computer's disk.
     async Task<IActionResult?> LoadAsync(Guid id)
     {
+        Response.Headers.CacheControl = "no-store";
         if (!Lists.ContainsKey(List))
         {
             return NotFound();
@@ -332,6 +401,15 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
 
         if (!await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted))
         {
+            // A post from a form opened while the patient was on the panel: say it wasn't saved, and show what was
+            // typed, without reading anything about the patient. Anything else goes back to the chart.
+            if (HttpMethods.IsPost(Request.Method))
+            {
+                OffPanel = true;
+                Response.StatusCode = StatusCodes.Status409Conflict;
+                return Page();
+            }
+
             return RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
         }
 

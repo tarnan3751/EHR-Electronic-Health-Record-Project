@@ -22,6 +22,8 @@ A signed order is never edited in place. Each active order on the chart has two 
 - **Discontinue…** opens a page with the patient's banner and the order, and asks for the reason, which is required. **Discontinue order** records the order as discontinued, with the reason, your name and the time.
 - **Change** opens the order form filled with the order's item and details. Change what you need, add a reason if you want one, and choose **Sign changed order**: that signs a new order and discontinues the old one as replaced, together. The type stays the same; for another type, discontinue the order and place a new one.
 
+Back on the chart, a notice names what happened: "Order discontinued: Complete blood count (CBC) is listed under this chart's discontinued orders.", or, after a change, "Order changed: Metformin 500 mg tablet replaces Metformin 500 mg tablet, …".
+
 **Discontinued orders**, under the active orders, lists every discontinued order of the patient, newest first, with what it was, who discontinued it, when and why, and a "Changed" tag when a changed order replaced it. It is open to whoever the chart is open to, emergency access included.
 
 ### Results and their acknowledgment
@@ -184,7 +186,6 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - Results are released to the portal as soon as they are filed, before anyone acknowledges them.
 - Collection time is entered and shown on the clinic's clock, labeled (the plan's step 10d), and stored in UTC.
 - A change keeps the order's type.
-- The chart's confirmation after discontinuing doesn't name the order; the discontinued orders list does.
 - An order isn't sent anywhere: no lab, pharmacy or referral interface.
 - The catalog is small and synthetic, and changing it takes a migration.
 - Safety checks see only coded data: an allergy or medication typed without a code is not checked. Food and other non-drug allergies are not checked against drugs.

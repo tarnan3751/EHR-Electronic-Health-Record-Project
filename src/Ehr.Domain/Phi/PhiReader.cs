@@ -9,6 +9,7 @@ using Ehr.Data.Scheduling;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Messaging;
 using Ehr.Domain.Orders;
+using Ehr.Domain.Patients;
 using Ehr.Domain.Proxies;
 using Ehr.Domain.Refills;
 using Ehr.Domain.Results;
@@ -48,7 +49,8 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     // however many rows the sections hold: the same event a list of patients records for each. Draft and signed-note
     // reads have their own table/row events, also accepted by the cloud audit queue (CloudAuditEvents).
     public async Task<PatientChart?> ChartAsync(
-        Guid id, int visits, string part, CancellationToken cancellationToken, Guid? discontinued = null, bool sensitive = false, bool notes = true)
+        Guid id, int visits, string part, CancellationToken cancellationToken, Guid? discontinued = null, bool sensitive = false, bool notes = true,
+        (string Table, Guid Id)? saved = null, Guid? ordered = null)
     {
         // With the patient, in the same statement: which of the chart's occasional sections have anything in them.
         // Most charts have no appointment booked, no conversation, no resulted order waiting and no notes, and each
@@ -72,6 +74,15 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
                 Forms = db.QuestionnaireRequests.Count(r => r.PatientId == id),
                 FormToReview = db.InboxItems.Any(i => i.RecipientId == user.UserId && i.DoneAt == null && i.PatientId == id
                     && i.Kind == Ehr.Data.Inbox.InboxItemKind.FormAlert),
+                // Who recorded the active "No known allergies", from its history's first row; seeded entries have none.
+                // Asked here, not in a statement of its own, which about a third of the seeded charts would send.
+                NoKnownAllergiesBy = (
+                    from allergy in db.AllergyIntolerances
+                    join change in db.ChartHistory on allergy.Id equals change.RowId
+                    join staff in db.StaffUsers on change.ChangedById equals staff.Id
+                    where allergy.PatientId == id && allergy.Code == AllergyIntolerance.NoKnownAllergy && allergy.ClinicalStatus == AllergyClinicalStatus.Active
+                        && change.PatientId == id && change.Before == null
+                    select staff.DisplayName).FirstOrDefault(),
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (found is null)
@@ -112,9 +123,30 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         var visitVitals = encounters.ToDictionary(e => e.Id, e => VisitVitals.Of(pressures.FirstOrDefault(p => p.Systolic.EncounterId == e.Id), At(e.Id, VitalSign.HeartRate)));
         var latestVitals = newestVitals.Where(o => !VitalSign.BloodPressure.Contains(o.Code)).Select(LatestVital.Of);
         var orders = await ActiveOrders(id, catalogCode: null).ToListAsync(cancellationToken);
-        // Only when the discontinue page sent the clinician here: whether that order is this patient's, and discontinued.
-        var confirmed = discontinued is not null && await db.Orders.AsNoTracking()
-            .AnyAsync(order => order.Id == discontinued && order.PatientId == id && order.Status == OrderStatus.Revoked, cancellationToken);
+        // Only when the discontinue page sent the clinician here: that order's name, when it is this patient's and
+        // discontinued.
+        var discontinuedName = discontinued is null ? null : await (
+            from order in db.Orders.AsNoTracking()
+            join item in db.OrderCatalogItems on order.CatalogCode equals item.Code
+            where order.Id == discontinued && order.PatientId == id && order.Status == OrderStatus.Revoked
+            select item.Display).FirstOrDefaultAsync(cancellationToken);
+        // Only when the order form sent the clinician here: when the order just signed replaced one (a change), the
+        // name of the order it replaced, when both are this patient's.
+        var replacedName = ordered is null ? null : await (
+            from order in db.Orders.AsNoTracking()
+            join old in db.Orders on order.ReplacesOrderId equals (Guid?)old.Id
+            join item in db.OrderCatalogItems on old.CatalogCode equals item.Code
+            where order.Id == ordered && order.PatientId == id && old.PatientId == id
+            select item.Display).FirstOrDefaultAsync(cancellationToken);
+
+        // Only when the entry form sent the clinician here: the entry just saved, when it is this patient's. Found among
+        // the lists already read when it is current, sensitive ones included (they are left out below); otherwise, as an
+        // entry given another status, by one more query.
+        var savedEntry = saved is { } wanted ? await SavedEntryAsync(id, wanted.Table, wanted.Id, allergies, medications, conditions, sensitive, cancellationToken) : null;
+
+        // Only when "No known allergies" is the list's state: who recorded it, read with the patient above. Seeded
+        // entries have no history, and say only when.
+        var noneKnownBy = allergies.Count > 0 && allergies.All(a => a.Code == AllergyIntolerance.NoKnownAllergy) ? found.NoKnownAllergiesBy : null;
 
         var hidden = 0;
         if (!sensitive)
@@ -171,13 +203,40 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
             Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,
-            ConfirmsDiscontinued = confirmed,
+            DiscontinuedName = discontinuedName,
+            ReplacedName = replacedName,
             SensitiveHidden = hidden,
             SensitiveNotesHidden = sensitive ? 0 : found.SensitiveNotes,
             SensitiveShown = sensitive,
             Forms = found.Forms,
             FormToReview = found.FormToReview,
+            Saved = savedEntry,
+            NoKnownAllergiesRecordedBy = noneKnownBy,
         };
+    }
+
+    // The chart's view of an entry just saved (SavedEntry), or null when it isn't one of this patient's.
+    async Task<SavedEntry?> SavedEntryAsync(
+        Guid patient, string table, Guid entry, List<AllergyIntolerance> allergies, List<MedicationStatement> medications, List<Condition> conditions,
+        bool sensitive, CancellationToken cancellationToken)
+    {
+        switch (table)
+        {
+            case ChartListWords.Allergies:
+                var allergy = allergies.FirstOrDefault(a => a.Id == entry)
+                    ?? await db.AllergyIntolerances.AsNoTracking().SingleOrDefaultAsync(a => a.Id == entry && a.PatientId == patient, cancellationToken);
+                return allergy is null ? null : new SavedEntry(table, ChartLists.DisplayOf(allergy), allergy.ClinicalStatus, allergies.Contains(allergy), Hidden: false);
+            case ChartListWords.Medications:
+                var medication = medications.FirstOrDefault(m => m.Id == entry)
+                    ?? await db.MedicationStatements.AsNoTracking().SingleOrDefaultAsync(m => m.Id == entry && m.PatientId == patient, cancellationToken);
+                return medication is null ? null : new SavedEntry(table, medication.Display, medication.Status, medications.Contains(medication), medication.Sensitive && !sensitive);
+            case ChartListWords.Diagnoses:
+                var condition = conditions.FirstOrDefault(c => c.Id == entry)
+                    ?? await db.Conditions.AsNoTracking().SingleOrDefaultAsync(c => c.Id == entry && c.PatientId == patient, cancellationToken);
+                return condition is null ? null : new SavedEntry(table, condition.Display, condition.ClinicalStatus, conditions.Contains(condition), condition.Sensitive && !sensitive);
+            default:
+                return null;
+        }
     }
 
     // A patient and their current allergies, for the banner of a patient page that isn't the chart (a note, dictation):
@@ -243,6 +302,9 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
             return null;
         }
 
+        // The banner's allergies, in the same recorded read.
+        var allergies = await CurrentAllergies(id).ToListAsync(cancellationToken);
+
         // An entry that is sensitive now is sensitive throughout its history, whatever it was when a change was made:
         // a medication added unmarked and marked later doesn't stay readable here. So the entries are asked about, not
         // the old rows, and their changes are left out in the query itself, before the limit.
@@ -269,7 +331,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         // One event for one view: a read, or a read that showed sensitive items.
         audit.Record(sensitive ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id, part: AuditParts.Lists);
         await db.SaveChangesAsync(cancellationToken);
-        return new ChartHistory(patient, changes, more, hidden, sensitive);
+        return new ChartHistory(patient, allergies, changes, more, hidden, sensitive);
     }
 
     // UC 1 (Tahseen Arnan): the order form's view of a patient (OrderForm). One view of one patient, so one recorded read
@@ -317,6 +379,9 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
             return null;
         }
 
+        // The banner's allergies, in the same recorded read.
+        var allergies = await CurrentAllergies(id).ToListAsync(cancellationToken);
+
         var orders = await (
             from order in db.Orders.AsNoTracking()
             join item in db.OrderCatalogItems on order.CatalogCode equals item.Code
@@ -329,7 +394,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
 
         audit.Record(AuditActions.Read, patient.Id, PatientsTable, patient.Id, part: AuditParts.Orders);
         await db.SaveChangesAsync(cancellationToken);
-        return new DiscontinuedOrders(patient, [.. orders.Take(limit)], orders.Count > limit);
+        return new DiscontinuedOrders(patient, allergies, [.. orders.Take(limit)], orders.Count > limit);
     }
 
     // The allergies a patient has now, the high-risk ones first.

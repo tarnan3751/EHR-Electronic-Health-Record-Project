@@ -12,7 +12,11 @@
 --   X71-X83           intentional self-harm
 --   T14.91            suicide attempt
 --   R45.851           suicidal ideations
+--   R45.88            nonsuicidal self-harm
 --   Z91.51, Z91.52    personal history of suicidal behavior, and of nonsuicidal self-harm
+--   T71.1x2, T71.2x2  asphyxiation, intentional self-harm: the T71.1 and T71.2 codes whose sixth character is 2
+--                     (T71.162A). Checked against the fiscal year 2027 code file: exactly its 24 "intentional
+--                     self-harm" codes in T71, and no others.
 --   T36-T65, intent 2 poisoning by drugs and toxic effects of other substances, intentional self-harm: the codes whose
 --                     sixth character is 2 (T39.012A), and those of a four-character subcategory, where the 2 is
 --                     the fifth and an X fills the sixth (T36.92XA). Checked against the fiscal year 2027 code file:
@@ -28,9 +32,10 @@ AS $$
     SELECT coalesce(
         c ~ '^F[0-9][0-9A-Z]'
         OR (c ~ '^A[0-9]{2}' AND substr(c, 1, 3) BETWEEN 'A50' AND 'A64')
-        OR c ~ '^(B20|Z21|O04|Z332|T74|T76|R45851|T1491|Z9151|Z9152)'
+        OR c ~ '^(B20|Z21|O04|Z332|T74|T76|R45851|R4588|T1491|Z9151|Z9152)'
         OR (c ~ '^X[0-9]{2}' AND substr(c, 1, 3) BETWEEN 'X71' AND 'X83')
-        OR (c ~ '^T[0-9]{2}' AND substr(c, 1, 3) BETWEEN 'T36' AND 'T65' AND (substr(c, 6, 1) = '2' OR substr(c, 5, 2) = '2X')),
+        OR (c ~ '^T[0-9]{2}' AND substr(c, 1, 3) BETWEEN 'T36' AND 'T65' AND (substr(c, 6, 1) = '2' OR substr(c, 5, 2) = '2X'))
+        OR c ~ '^T71[12][0-9]2',
         false)
     FROM (SELECT upper(replace(btrim(code), '.', '')) AS c) AS normalized
 $$;
@@ -41,6 +46,8 @@ GRANT EXECUTE ON FUNCTION ehr.icd10cm_is_sensitive(text) TO ehr_app, ehr_read;
 --   1. An entry never moves: not to another patient, and not to another ID.
 --   2. A diagnosis whose code is in a sensitive range is sensitive, whatever the client sent: the app can't clear it.
 --   3. "No known allergies" is refused for a patient who has an active allergy recorded: the list is one or the other.
+--   4. A second active "No known allergies" is refused, as a unique violation naming the index that also holds it
+--      (ix_allergy_intolerances_one_no_known_allergy), so the app treats it as already recorded.
 CREATE OR REPLACE FUNCTION ehr.guard_chart_entry() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
@@ -68,6 +75,14 @@ BEGIN
                WHERE a.patient_id = NEW.patient_id AND a.clinical_status = 'active' AND a.code IS DISTINCT FROM 'no-known-allergy'
                  AND a.id <> NEW.id) THEN
             RAISE EXCEPTION 'A patient with an allergy recorded has no "No known allergies"' USING ERRCODE = '23514';
+        END IF;
+        -- After the lock, so a double click's second insert sees the first's row.
+        IF NEW.code = 'no-known-allergy' AND NEW.clinical_status = 'active'
+           AND EXISTS (
+               SELECT 1 FROM ehr.allergy_intolerances a
+               WHERE a.patient_id = NEW.patient_id AND a.clinical_status = 'active' AND a.code = 'no-known-allergy' AND a.id <> NEW.id) THEN
+            RAISE EXCEPTION '"No known allergies" is already recorded for this patient'
+                USING ERRCODE = '23505', CONSTRAINT = 'ix_allergy_intolerances_one_no_known_allergy';
         END IF;
     END IF;
 

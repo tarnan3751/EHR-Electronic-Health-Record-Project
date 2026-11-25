@@ -260,7 +260,7 @@ public class AiChartProposalSecurityTests(MigratedDatabase database) : IClassFix
             ("clinician", row.Clinician), ("id", row.OrderProposal)));
     }
 
-    // D12 for allergies (TC-UC4-32 and 33, in the database): an allergy decides a proposed allergy only when it is an active,
+    // D12 for allergies (TC-UC4-33 and 34, in the database): an allergy decides a proposed allergy only when it is an active,
     // coded allergy of the patient, not "No known allergies", added just then by the clinician deciding; and it decides one
     // proposal. One that was there before and is only changed now doesn't, nor one a colleague adds.
     [Fact]

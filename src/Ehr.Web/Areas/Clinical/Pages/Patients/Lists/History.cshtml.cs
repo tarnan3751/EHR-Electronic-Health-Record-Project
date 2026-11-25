@@ -22,6 +22,11 @@ public class HistoryModel(PhiReader phi, PatientAssignments assignments, BreakGl
 
     public ChartHistory History { get; private set; } = null!;
 
+    // For the banner, as on the chart: whether the patient is on the clinician's panel, or until when emergency access lasts.
+    public bool OnPanel { get; private set; }
+
+    public DateTimeOffset? EmergencyUntil { get; private set; }
+
     public static readonly IReadOnlyDictionary<string, string> ListNames = new Dictionary<string, string>
     {
         ["allergy_intolerances"] = "Allergy",
@@ -49,7 +54,13 @@ public class HistoryModel(PhiReader phi, PatientAssignments assignments, BreakGl
         return route;
     }
 
-    public static string Name(ChartChange change) => JsonDocument.Parse(change.After).RootElement.GetProperty("display").GetString() ?? "";
+    // The entry's name as the chart calls it: "No known allergies" for that entry, whatever name it was stored with.
+    public static string Name(ChartChange change)
+    {
+        var after = JsonDocument.Parse(change.After).RootElement;
+        var code = after.TryGetProperty("code", out var value) ? value.GetString() : null;
+        return ChartLists.DisplayOf(code, after.GetProperty("display").GetString() ?? "");
+    }
 
     // What the change did, in words: "Added", or each field that changed, from its old value to its new one.
     public static IReadOnlyList<string> Describe(ChartChange change)
@@ -61,25 +72,36 @@ public class HistoryModel(PhiReader phi, PatientAssignments assignments, BreakGl
         }
 
         var before = JsonDocument.Parse(change.Before).RootElement;
-        return [.. Fields.Where(field => after.TryGetProperty(field.Column, out var now) && before.TryGetProperty(field.Column, out var was) && Text(now) != Text(was))
-            .Select(field => $"{field.Label}: {Text(before.GetProperty(field.Column))} → {Text(after.GetProperty(field.Column))}")];
+        return [.. Fields.Where(field => after.TryGetProperty(field.Column, out var now) && before.TryGetProperty(field.Column, out var was) && Text(field.Column, now) != Text(field.Column, was))
+            .Select(field => $"{field.Label}: {Text(field.Column, before.GetProperty(field.Column))} → {Text(field.Column, after.GetProperty(field.Column))}")];
 
-        static string Text(JsonElement value) => value.ValueKind switch
+        // A stored value in the words the form uses for it ("On hold", "High risk"), not FHIR's code.
+        string Text(string column, JsonElement value) => value.ValueKind switch
         {
             JsonValueKind.Null => "not recorded",
             JsonValueKind.True => "yes",
             JsonValueKind.False => "no",
-            _ => value.ToString(),
+            _ => column switch
+            {
+                "clinical_status" or "status" => ChartListWords.Status(change.TableName, value.ToString()),
+                "severity" => ChartListWords.Severity(value.ToString()),
+                "criticality" => ChartListWords.Criticality(value.ToString()),
+                _ => value.ToString(),
+            },
         };
     }
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
         Response.Headers.CacheControl = "no-store";
-        if (!await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted)
-            && await breakGlass.ActiveUntilAsync(id, HttpContext.RequestAborted) is null)
+        OnPanel = await assignments.IsOnPanelAsync(id, HttpContext.RequestAborted);
+        if (!OnPanel)
         {
-            return RedirectToPage("/Patients/Reason", Search.ChartRouteValues(id));
+            EmergencyUntil = await breakGlass.ActiveUntilAsync(id, HttpContext.RequestAborted);
+            if (EmergencyUntil is null)
+            {
+                return RedirectToPage("/Patients/Reason", Search.ChartRouteValues(id));
+            }
         }
 
         if (await phi.ChartHistoryAsync(id, Limit, Sensitive, HttpContext.RequestAborted) is not { } history)
