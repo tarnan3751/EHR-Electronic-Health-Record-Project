@@ -18,8 +18,9 @@ namespace Ehr.Web.Tests;
 // A staff member's own passkeys at /passkeys (step 19, StaffPasskeys), checked against the server with a software
 // authenticator: added only with a current authenticator code, never a recovery code, a wrong one counted towards the
 // lockout; only a passkey that verified the person, made at a staff site's own address; the state bound to the account
-// and to the sign-in; a name and at most ten; removed only by its owner; recorded without its name; and off-site, both
-// posts forwarded to the clinic's server, or, cut off from it, not offered.
+// and to the sign-in; a name and at most ten; removed only by its owner, or all of them by an administrator's
+// authenticator reset; recorded without its name; and off-site, both posts forwarded to the clinic's server, or, cut
+// off from it, not offered.
 public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -195,6 +196,40 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("This Mac", Words(cutOff));
         Assert.DoesNotContain("handler=Options", cutOff);
         Assert.DoesNotContain("handler=Remove", cutOff);
+    }
+
+    // A lost device may hold a passkey as well as the authenticator: an administrator's authenticator reset (at
+    // /admin/staff, StaffAccounts) removes every passkey, each recorded as the administrator's doing, and the next
+    // sign-in enrolls an authenticator, offering no passkey.
+    [Fact]
+    public async Task An_administrators_authenticator_reset_removes_the_accounts_passkeys_too()
+    {
+        var admin = await apps.CreateStaffAsync("Laptop Admin", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        var account = await apps.CreateStaffAsync("Dr. Lost Laptop", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPrem, account);
+        using var laptop = new TestAuthenticator();
+        using var phone = new TestAuthenticator();
+        foreach (var (authenticator, name) in new[] { (laptop, "Grey laptop key"), (phone, "Blue phone key") })
+        {
+            using var added = await AddAsync(session.Client, account, authenticator, name);
+            Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+        }
+
+        using var reset = await PostFormAsync(adminSession.Client, "/admin/staff?handler=ResetAuthenticator", "/admin/staff", ("id", account.Id));
+
+        Assert.Contains("Dr. Lost Laptop will set up an authenticator app again at their next sign-in. Their 2 passkeys were removed.", Words(await ReadAsync(reset)));
+        Assert.Empty(await PasskeysAsync(account));
+        Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.PasskeyRemoved, actorId: admin.Id));
+        // The audit page shows them, about no patient, with the passkey named by its hash (step 18a keeps such an event's
+        // details), and never its name.
+        var audit = await adminSession.Client.GetStringAsync($"/admin/audit?Action={AuditActions.PasskeyRemoved}", Cancel);
+        Assert.Contains(StaffPasskeys.Reference(laptop.CredentialId), audit);
+        Assert.Contains(StaffPasskeys.Reference(phone.CredentialId), audit);
+        Assert.DoesNotContain("Grey laptop key", audit);
+        Assert.DoesNotContain("Blue phone key", audit);
+        using var next = await PostFormAsync(Client(apps.OnPrem, new CookieContainer()), "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
+        Assert.Equal("/sign-in/enroll", PathOf(next));
     }
 
     async Task<StaffUser> AccountAsync(StaffAccount account)

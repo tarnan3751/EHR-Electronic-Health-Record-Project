@@ -16,13 +16,13 @@ namespace Ehr.Domain.Accounts;
 // A staff member's passkeys (the expansion plan's step 19, UC 11): a second factor in place of the authenticator code,
 // after the password (StaffSignIn), never in place of the password, and never instead of the authenticator app, which
 // every staff account keeps. Added only while signed in, after a current code from the authenticator app; at most
-// MostPerAccount, each named; removed by their owner. Identity's own handler makes and checks each ceremony
-// (IPasskeyHandler), and the person must be verified by the device every time (AddEhrAccounts). Between the options the
-// page is given and the credential it sends back, the handler's state travels in the page, protected by Data
-// Protection, for a few minutes, bound to its purpose, to the account and to this sign-in, or for a sign-in to this
-// password step (StaffSignIn.PendingAsync): a state from another account's page, or from another sign-in or password
-// step of the same account, is refused. Every add, refusal and removal is an audit event that names the passkey by a
-// short hash, never its name.
+// MostPerAccount, each named; removed by their owner, or all of them by an administrator's authenticator reset
+// (StaffAccounts). Identity's own handler makes and checks each ceremony (IPasskeyHandler), and the person must be
+// verified by the device every time (AddEhrAccounts). Between the options the page is given and the credential it sends
+// back, the handler's state travels in the page, protected by Data Protection, for a few minutes, bound to its purpose,
+// to the account and to this sign-in, or for a sign-in to this password step (StaffSignIn.PendingAsync): a state from
+// another account's page, or from another sign-in or password step of the same account, is refused. Every add, refusal
+// and removal is an audit event that names the passkey by a short hash, never its name.
 public sealed class StaffPasskeys(
     UserManager<StaffUser> users, IPasskeyHandler<StaffUser> handler, IOptions<IdentityPasskeyOptions> options,
     IDataProtectionProvider dataProtection, AuditRecorder audit, EhrDbContext db, ILogger<StaffPasskeys> logger)
@@ -115,8 +115,9 @@ public sealed class StaffPasskeys(
         return null;
     }
 
-    // One of the account's own passkeys removed, by its owner. False when the account has no such passkey. Sessions
-    // already signed in with it go on: an administrator's authenticator reset ends those.
+    // One of the account's own passkeys removed, by its owner or by an administrator's reset (StaffAccounts), who is
+    // recorded as doing it. False when the account has no such passkey. Sessions already signed in with it go on: an
+    // administrator's authenticator reset ends those.
     public async Task<bool> RemoveAsync(StaffUser user, byte[] credentialId, CancellationToken cancellationToken)
     {
         if (await users.GetPasskeyAsync(user, credentialId) is null || !(await users.RemovePasskeyAsync(user, credentialId)).Succeeded)

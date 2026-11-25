@@ -70,10 +70,11 @@ public static class AuditActions
 
     public const string RecoveryCodeUsed = "recovery_code_used";
 
-    // A staff account's passkey (step 19) added or removed by its owner, each with the account and the passkey by a
-    // short hash of its credential's ID, never the name its owner gave it; or one refused as it was being added, with
-    // why (a wrong authenticator code, or a passkey that wasn't accepted). A sign-in with a passkey is a sign_in whose
-    // details name it the same way; a passkey refused at sign-in, a sign_in_failed, "passkey refused".
+    // A staff account's passkey (step 19) added by its owner, or removed by its owner or by an administrator's
+    // authenticator reset, each with the account and the passkey by a short hash of its credential's ID, never the name
+    // its owner gave it; or one refused as it was being added, with why (a wrong authenticator code, or a passkey that
+    // wasn't accepted). A sign-in with a passkey is a sign_in whose details name it the same way; a passkey refused at
+    // sign-in, a sign_in_failed, "passkey refused".
     public const string PasskeyAdded = "passkey_added";
 
     public const string PasskeyRemoved = "passkey_removed";
