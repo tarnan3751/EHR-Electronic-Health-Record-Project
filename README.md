@@ -222,7 +222,7 @@ uv run src/Ehr.Dictation/setup_models.py --only whisper   # Whisper, for dictati
 
 To run K2 Horizon in the local stack, set `LLAMA_MODEL_FILE` (the script prints the value) and `LLAMA_API_KEY` in `infra/compose/.env`, then start the `ai` profile (see [infra/compose/README.md](infra/compose/README.md#ai-profile)). K2 Horizon "thinks" before it answers, at length whichever effort its template is given (high, medium or low: at low, over 1,000 tokens and 80 seconds for a two-minute dictation on an M5's GPU), so the `llama` service turns reasoning off (`--reasoning off`), as the sidecar asks on every request. Off, a two-minute dictation takes about 30 seconds there.
 
-K2 Horizon "7B" stores about 9 billion parameters. With an 8K context it needs about 6 to 7 GB of memory, so a computer with 8 GB of RAM struggles. MedASR is small enough for any machine's CPU. Whisper takes about 3.3 GB more in fp32 on a CPU (about half that in fp16 on a GPU), which is why the `dictation` service's memory cap is 5 GB.
+K2 Horizon "7B" stores about 9 billion parameters. With an 8K context it needs about 6 to 7 GB of memory, so a computer with 8 GB of RAM struggles. MedASR is small enough for any machine's CPU. Whisper takes about 3.3 GB more in fp32 on a CPU (about half that in fp16 on a GPU); with it and the speaker model loaded, under two visits and six Spanish dictations at once, the `dictation` container peaked at 7.28 GiB, page cache included, which is why its memory cap is 10 GB (the peak plus 25%, rounded up).
 
 ## Dictation
 

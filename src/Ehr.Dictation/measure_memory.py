@@ -64,7 +64,11 @@ What it does:
    read, said to be sampled. Checks the container wasn't killed for memory or restarted.
 4. Prints, and writes to --out, the image measured, both peaks, the cap memory.peak gives (peak x 1.25, rounded up to
    the next whole GiB, the unit Docker's "g" is), and what each session came to. It fails (exit 1) unless all 8
-   sessions came back done: a partial load never gives a cap, printed or written.
+   sessions came back done: a partial load never gives a cap, printed or written. A session lost to model_timeout
+   still leaves the container's peak sound: its audio went through every model in the container (Whisper at each
+   chunk and after stop, the speaker model for a visit) before it waited on the model server, which runs outside the
+   container and isn't what the cap holds. The verdict stays "not whole", and the owner reads the peak printed (as on
+   2026-11-24, when two of six dictations timed out on the Mac's model server and the cap was set from the peak).
 
 The cap itself is set by hand from its result: infra/compose/compose.yaml's mem_limit and its comment, and the memory
 figures in infra/compose/README.md (Docker Desktop memory) and the root README (Dictation models).

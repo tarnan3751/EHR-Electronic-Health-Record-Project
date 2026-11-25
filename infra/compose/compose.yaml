@@ -212,10 +212,15 @@ services:
       - ./models:/models:ro
     read_only: true
     tmpfs: [/tmp]
-    # It decodes audio from outside: a cap, so nothing it's sent can take the server's memory. About 0.4 GB in use
-    # with MedASR loaded, and about 3.3 GB more with Whisper (Spanish dictation, in fp32 on the CPU); a full house of
-    # 3-minute dictations adds well under 1 GB.
-    mem_limit: 5g
+    # It decodes audio from outside: a cap, so nothing it's sent can take the server's memory. Measured on 2026-11-24
+    # at 23:54 CST by src/Ehr.Dictation/measure_memory.py, on the developer Mac (Apple M5), the image built from
+    # 32e88b9, with llama-server running natively: with MedASR, Whisper and the speaker model loaded, memory.peak
+    # 5.49 GiB (3.62 GiB of it not page cache); under the load the cap has to hold, two of the longest visits at once
+    # and then six of the longest Spanish dictations, 7.28 GiB (anon + shmem + kernel at most 5.19 GiB), never killed
+    # for memory. The owner's rule: that peak plus 25%, rounded up to a whole GiB (7.28 x 1.25 = 9.10). Two of the six
+    # dictations timed out waiting for the model server, outside this container, after their audio had gone through
+    # every model in it, so the peak stands (the coordinator's decision, the plan's step 17 entry).
+    mem_limit: 10g
     networks: [inference]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
