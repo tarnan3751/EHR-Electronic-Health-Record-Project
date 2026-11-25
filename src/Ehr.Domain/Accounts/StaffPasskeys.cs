@@ -1,0 +1,183 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using Ehr.Data;
+using Ehr.Data.Accounts;
+using Ehr.Data.Audit;
+using Ehr.Domain.Audit;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Ehr.Domain.Accounts;
+
+// A staff member's passkeys (the expansion plan's step 19, UC 11): a second factor in place of the authenticator code,
+// never in place of the password, and never instead of the authenticator app, which every staff account keeps. Added
+// only while signed in, after a current code from the authenticator app; at most MostPerAccount, each named; removed by
+// their owner. Identity's own handler makes and checks each ceremony (IPasskeyHandler), and the person must be verified
+// by the device every time (AddEhrAccounts). Between the options the page is given and the credential it sends back, the
+// handler's state travels in the page, protected by Data Protection, for a few minutes, bound to its purpose, to the
+// account and to this sign-in: a state from another account's page, or from another sign-in of the same account, is
+// refused. Every add, refusal and removal is an audit event that names the passkey by a short hash, never its name.
+public sealed class StaffPasskeys(
+    UserManager<StaffUser> users, IPasskeyHandler<StaffUser> handler, IOptions<IdentityPasskeyOptions> options,
+    IDataProtectionProvider dataProtection, AuditRecorder audit, EhrDbContext db, ILogger<StaffPasskeys> logger)
+{
+    public const int MostPerAccount = 10;
+
+    public const int LongestName = 50;
+
+    const string Adding = "add";
+
+    readonly ITimeLimitedDataProtector protector = dataProtection.CreateProtector("Ehr.Accounts.Passkeys").ToTimeLimitedDataProtector();
+
+    // Oldest first.
+    public async Task<IReadOnlyList<UserPasskeyInfo>> ListAsync(StaffUser user) =>
+        [.. (await users.GetPasskeysAsync(user)).OrderBy(passkey => passkey.CreatedAt)];
+
+    // The options for the browser to make a passkey with, and the state to send back with it; or what is wrong. The
+    // name, and a current code from the authenticator app (never a recovery code), come first. A wrong code counts
+    // towards the lockout, as at sign-in, and is recorded.
+    public async Task<PasskeyCeremony> BeginAddAsync(HttpContext context, StaffUser user, string? name, string? code, CancellationToken cancellationToken)
+    {
+        name = name?.Trim();
+        if (string.IsNullOrEmpty(name) || name.Length > LongestName)
+        {
+            return PasskeyCeremony.Refused("Name", $"Not saved: name the passkey, in {LongestName} characters or fewer, such as This Mac.");
+        }
+
+        if ((await users.GetPasskeysAsync(user)).Count >= MostPerAccount)
+        {
+            return PasskeyCeremony.Refused(null, TooMany);
+        }
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return PasskeyCeremony.Refused("Code", "Not saved: enter the code from your authenticator app.");
+        }
+
+        if (!await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, StaffSignIn.Normalize(code)))
+        {
+            await users.AccessFailedAsync(user);
+            audit.Record(AuditActions.PasskeyRefused, tableName: StaffTable, rowId: user.Id, reason: "wrong code");
+            await db.SaveChangesAsync(cancellationToken);
+            return PasskeyCeremony.Refused("Code", "Not saved: that code did not match. Enter the current code from your authenticator app.");
+        }
+
+        if (await SignedInAsync(context) is not { } binding)
+        {
+            return PasskeyCeremony.Refused(null, StartAgain);
+        }
+
+        var made = await handler.MakeCreationOptionsAsync(
+            new PasskeyUserEntity { Id = user.Id.ToString(), Name = user.Email!, DisplayName = user.DisplayName }, context);
+        return PasskeyCeremony.Ready(made.CreationOptionsJson, Protect(new(Adding, user.Id, binding, made.AttestationState!, name)));
+    }
+
+    // The passkey the browser made, added to the account; or why not.
+    public async Task<string?> FinishAddAsync(HttpContext context, StaffUser user, string? credentialJson, string? state, CancellationToken cancellationToken)
+    {
+        if (Unprotect(state, Adding, user.Id, await SignedInAsync(context)) is not { } ceremony || string.IsNullOrEmpty(credentialJson))
+        {
+            return StartAgain;
+        }
+
+        var made = await handler.PerformAttestationAsync(
+            new PasskeyAttestationContext { HttpContext = context, CredentialJson = credentialJson, AttestationState = ceremony.State });
+        if (!made.Succeeded)
+        {
+            logger.LogWarning("A passkey wasn't accepted as it was added: {Failure}", made.Failure?.Message);
+            audit.Record(AuditActions.PasskeyRefused, tableName: StaffTable, rowId: user.Id, reason: "not accepted");
+            await db.SaveChangesAsync(cancellationToken);
+            return "Not saved: the passkey wasn't accepted. A passkey has to ask for your PIN, fingerprint or face. Try again.";
+        }
+
+        if ((await users.GetPasskeysAsync(user)).Count >= MostPerAccount)
+        {
+            return TooMany;
+        }
+
+        made.Passkey.Name = ceremony.Name;
+        var added = await users.AddOrUpdatePasskeyAsync(user, made.Passkey);
+        if (!added.Succeeded)
+        {
+            return "Not saved: " + added.Errors.First().Description;
+        }
+
+        audit.Record(AuditActions.PasskeyAdded, tableName: StaffTable, rowId: user.Id, details: Details(made.Passkey.CredentialId));
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    // One of the account's own passkeys removed, by its owner. False when the account has no such passkey. Sessions
+    // already signed in with it go on: an administrator's authenticator reset ends those.
+    public async Task<bool> RemoveAsync(StaffUser user, byte[] credentialId, CancellationToken cancellationToken)
+    {
+        if (await users.GetPasskeyAsync(user, credentialId) is null || !(await users.RemovePasskeyAsync(user, credentialId)).Succeeded)
+        {
+            return false;
+        }
+
+        audit.Record(AuditActions.PasskeyRemoved, tableName: StaffTable, rowId: user.Id, details: Details(credentialId));
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // A passkey as the audit log names it: the start of a hash of its credential's ID, the same at every event.
+    public static string Reference(byte[] credentialId) => Convert.ToHexStringLower(SHA256.HashData(credentialId))[..12];
+
+    static string Details(byte[] credentialId) => JsonSerializer.Serialize(new { passkey = Reference(credentialId) });
+
+    const string StaffTable = "staff_users";
+
+    const string TooMany = "Not saved: an account can have at most 10 passkeys. Remove one first.";
+
+    const string StartAgain = "Not saved: the passkey took too long, or this page was open too long. Try again.";
+
+    // This staff sign-in, as its cookie's ticket has it: when it began (SessionTimes), kept by every renewal and
+    // different for every sign-in. Null without one.
+    static async Task<string?> SignedInAsync(HttpContext context)
+    {
+        var staff = await context.AuthenticateAsync(AccountSchemes.Staff);
+        return staff.Succeeded && SessionTimes.SignedIn(staff.Properties!) is { } at ? at.UtcDateTime.ToString("O") : null;
+    }
+
+    string Protect(Ceremony ceremony) =>
+        protector.Protect(JsonSerializer.Serialize(ceremony), options.Value.AuthenticatorTimeout + TimeSpan.FromMinutes(1));
+
+    // The ceremony the state names, if it is for this purpose, account and binding and hasn't expired; otherwise null.
+    Ceremony? Unprotect(string? state, string purpose, Guid account, string? binding)
+    {
+        if (string.IsNullOrEmpty(state) || binding is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var ceremony = JsonSerializer.Deserialize<Ceremony>(protector.Unprotect(state));
+            return ceremony is not null && ceremony.Purpose == purpose && ceremony.Account == account && ceremony.Binding == binding
+                ? ceremony
+                : null;
+        }
+        catch (Exception exception) when (exception is CryptographicException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    // What the page carries between the options and the credential: what it is for, whose, which sign-in, Identity's
+    // own state (the challenge), and the name being given.
+    sealed record Ceremony(string Purpose, Guid Account, string Binding, string State, string? Name);
+}
+
+// The options for the browser and the state to send back with its credential, or the field that is wrong and why, as
+// a notice ("Not saved: ...").
+public sealed record PasskeyCeremony(string? Options, string? State, string? Field, string? Problem)
+{
+    public static PasskeyCeremony Ready(string options, string state) => new(options, state, null, null);
+
+    public static PasskeyCeremony Refused(string? field, string problem) => new(null, null, field, problem);
+}

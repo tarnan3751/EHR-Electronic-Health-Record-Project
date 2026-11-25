@@ -153,8 +153,8 @@ public sealed class StaffSignIn(
         }
     }
 
-    // Codes are typed with the spaces or dashes apps show them with.
-    static string Normalize(string code) => code.Replace(" ", "").Replace("-", "");
+    // Codes are typed with the spaces or dashes apps show them with. Adding a passkey takes one too (StaffPasskeys).
+    internal static string Normalize(string code) => code.Replace(" ", "").Replace("-", "");
 
     async Task RecordAsync(string action, StaffUser user, string? reason, CancellationToken cancellationToken)
     {

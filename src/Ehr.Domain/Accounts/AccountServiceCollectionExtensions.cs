@@ -52,7 +52,7 @@ public static class AccountServiceCollectionExtensions
             .AddDefaultTokenProviders();
 
         // A passkey in place of the authenticator code, for staff only (step 19). Identity's own handler makes and checks
-        // the ceremonies, called directly: SignInManager's passkey methods keep their state in Identity's
+        // the ceremonies, called directly (StaffPasskeys): SignInManager's passkey methods keep their state in Identity's
         // two-factor cookie and sign in without the password. The person must be verified by the device (a PIN, a
         // fingerprint, a face) both when a passkey is made and whenever it is used, and only the staff sites' own
         // addresses may make or use one (PasskeySettings).
@@ -107,6 +107,7 @@ public static class AccountServiceCollectionExtensions
         services.AddScoped<PhiReader>();
         services.AddScoped<StaffSignIn>();
         services.AddScoped<StaffAccounts>();
+        services.AddScoped<StaffPasskeys>();
         services.AddScoped<DesktopSessions>();
         services.AddScoped<PatientSignIn>();
         services.AddScoped<PatientRegistration>();

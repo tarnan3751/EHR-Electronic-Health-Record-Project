@@ -70,6 +70,15 @@ public static class AuditActions
 
     public const string RecoveryCodeUsed = "recovery_code_used";
 
+    // A staff account's passkey (step 19) added or removed by its owner, each with the account and the passkey by a
+    // short hash of its credential's ID, never the name its owner gave it; or one refused as it was being added, with
+    // why (a wrong authenticator code, or a passkey that wasn't accepted).
+    public const string PasskeyAdded = "passkey_added";
+
+    public const string PasskeyRemoved = "passkey_removed";
+
+    public const string PasskeyRefused = "passkey_refused";
+
     // An admin created a staff account and its setup link.
     public const string StaffInvited = "staff_invited";
 
@@ -100,7 +109,7 @@ public static class AuditActions
     [
         Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
-        RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
+        RecoveryCodeUsed, PasskeyAdded, PasskeyRemoved, PasskeyRefused, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
         RegistrationReplaced, ProxyAccountCreated, SentToLab, ReviewItemsFailed,
     ];
 }

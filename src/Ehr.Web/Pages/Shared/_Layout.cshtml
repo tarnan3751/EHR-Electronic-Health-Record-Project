@@ -24,6 +24,7 @@
     var button = isPatient ? "sc-btn sc-btn--portal" : "sc-btn";
 }
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@inject Ehr.Domain.Accounts.PasskeySettings Passkeys
 <!doctype html>
 <html lang="en">
 <head>
@@ -127,6 +128,11 @@
                         }
                     </a>
                     <a asp-area="Clinical" asp-page="/QuickTexts/Index" class="sc-appbar__link" aria-current="@current("/QuickTexts/")">Quick text</a>
+                    @* A staff member's own passkeys (step 19), where the clinic has them. *@
+                    @if (Passkeys.On)
+                    {
+                        <a asp-area="Clinical" asp-page="/Passkeys/Index" class="sc-appbar__link" aria-current="@current("/Passkeys/")">Passkeys</a>
+                    }
                     @if (User.IsInRole(StaffRoles.Admin))
                     {
                         <a asp-area="Clinical" asp-page="/Admin/Staff" class="sc-appbar__link" aria-current="@current("/Admin/Staff")">Staff</a>
