@@ -45,7 +45,13 @@ struct App {
     wake: Notify,
     /// When the window locks, and what opens it.
     lock: Mutex<Lock>,
+    /// Why the kept sign-in was forgotten at start, for the sign-in form; none once someone signs in.
+    notice: Mutex<Option<&'static str>>,
 }
+
+/// Said when the app starts with servers other than the ones the kept sign-in was made with (step 19a's final review).
+const OTHER_SERVERS: &str = "Signed out: this app was started with servers other than the ones you signed in with, and \
+                             only those can open its lock. Sign in again; nothing on this computer was deleted.";
 
 /// What the commands that read the offline charts answer while the window is locked.
 const LOCKED: &str = "Locked: unlock the window to see the offline charts.";
@@ -187,6 +193,8 @@ struct View {
     /// When the offline charts were last downloaded, which the page shows beside them.
     charts_updated: Option<charts::Updated>,
     lock: LockView,
+    /// Why the kept sign-in was forgotten at start, shown with the sign-in form.
+    signed_out_because: Option<&'static str>,
 }
 
 #[tauri::command]
@@ -195,6 +203,7 @@ fn view(app: State<'_, App>) -> Result<View, String> {
     let store = app.store()?;
     Ok(View {
         lock,
+        signed_out_because: *app.notice.lock().unwrap_or_else(PoisonError::into_inner),
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
@@ -381,20 +390,23 @@ async fn sign_in(
     app.sync()?.sign_in(&email, &password, &code).await?;
     let remembered = remember_sign_in(&app, &email, password).await;
     app.lock().signed_in(SystemTime::now(), Moment::now());
+    *app.notice.lock().unwrap_or_else(PoisonError::into_inner) = None;
     app.wake.notify_one();
     remembered
 }
 
 /// After a sign-in with both factors, what the lock needs to open without a server (ehr_desktop::unlock): the password's
-/// slow hash, made off the async threads, never the password.
+/// slow hash, made off the async threads, never the password; and the servers the sign-in was made with, the only ones
+/// that may answer for the lock.
 async fn remember_sign_in(app: &App, email: &str, password: String) -> Result<(), String> {
     let verifier = tauri::async_runtime::spawn_blocking(move || unlock::hash(&password))
         .await
         .map_err(|error| error.to_string())?;
     let store = app.store()?;
-    app.sync()?.with_clinician(None, |owner| {
+    let sync = app.sync()?;
+    sync.with_clinician(None, |owner| {
         store
-            .unlock(|db| unlock::remember(db, owner, email, &verifier, unix_now()))
+            .unlock(|db| unlock::remember(db, owner, email, &verifier, unix_now(), sync.servers()))
             .map_err(Into::into)
     })
 }
@@ -444,18 +456,24 @@ async fn unlock(app: State<'_, App>, password: String, code: String) -> Result<L
         return Ok(app.lock_view());
     };
     let sync = app.sync()?;
+    let record = app
+        .store()?
+        .unlock(unlock::account)?
+        .ok_or_else(|| "Sign out, then sign in again.".to_owned())?;
+    // Only the servers the sign-in was made with answer for the lock. The app forgets a sign-in kept for others as it
+    // starts, before anything is sent, and its list can't change after: this repeats that check where it matters.
+    if record.servers != sync.servers() {
+        return Err(OTHER_SERVERS.to_owned());
+    }
     let next = if need == Need::Password {
         after_unlock(sync.unlock(&password).await)
     } else {
-        let email = app
-            .store()?
-            .unlock(unlock::account)?
-            .map(|account| account.email)
-            .ok_or_else(|| "Sign out, then sign in again.".to_owned())?;
+        let email = record.email;
         let answer = sync.sign_in_answer(&email, &password, &code).await;
         if answer.is_ok() {
             remember_sign_in(&app, &email, password).await?;
             app.lock().signed_in(SystemTime::now(), Moment::now());
+            *app.notice.lock().unwrap_or_else(PoisonError::into_inner) = None;
             app.wake.notify_one();
             return Ok(app.lock_view());
         }
@@ -596,16 +614,27 @@ fn times() -> lock::Times {
 
 /// Locked from the start whenever a sign-in is kept, so quitting never skips the lock. A sign-in kept by an earlier
 /// build, which has no record of the lock's (ehr_desktop::unlock), is forgotten here: the server ends it at its 12
-/// hours anyway, and the clinician signs in again. A record with no sign-in goes too.
-fn starting_lock(store: &Result<Mutex<Store>, String>, sync: &Result<sync::Sync, String>) -> Lock {
+/// hours anyway, and the clinician signs in again. A record with no sign-in goes too. So does a sign-in made with other
+/// servers than the app has now (EHR_SYNC_SERVERS), before anything is sent to them: any server can answer yes to a
+/// password, and only those the sign-in was made with may answer for the lock (step 19a's final review). The second
+/// value says why, when that's the reason.
+fn starting_lock(
+    store: &Result<Mutex<Store>, String>,
+    sync: &Result<sync::Sync, String>,
+) -> (Lock, Option<&'static str>) {
     let now = Moment::now();
     let record = store
         .as_ref()
         .ok()
         .and_then(|store| store::lock(store).unlock(unlock::account).ok().flatten());
     let clinician = sync.as_ref().ok().and_then(sync::Sync::clinician);
+    let servers = sync.as_ref().ok().map(sync::Sync::servers);
+    let for_this_clinician = record
+        .as_ref()
+        .is_some_and(|record| clinician == Some(record.clinician_id));
     if let Some(record) = &record
-        && clinician == Some(record.clinician_id)
+        && for_this_clinician
+        && servers == Some(record.servers.as_slice())
     {
         let signed_in_at =
             UNIX_EPOCH + Duration::from_secs(u64::try_from(record.signed_in_at).unwrap_or(0));
@@ -613,16 +642,17 @@ fn starting_lock(store: &Result<Mutex<Store>, String>, sync: &Result<sync::Sync,
         if record.wrong >= unlock::WRONG_BEFORE_SIGN_IN {
             lock.require_sign_in();
         }
-        return lock;
+        return (lock, None);
     }
-    // With no database there is nothing to show, and nothing is forgotten.
+    // With no database there is nothing to show, and nothing is forgotten; with no sync client, nothing is sent.
     if let (Ok(sync), Ok(store)) = (sync, store) {
         let _ = sync.forget_kept();
         if record.is_some() {
             let _ = store::lock(store).unlock(unlock::forget);
         }
     }
-    Lock::new(times(), None, false, now)
+    let notice = (for_this_clinician && sync.is_ok()).then_some(OTHER_SERVERS);
+    (Lock::new(times(), None, false, now), notice)
 }
 
 /// Every second: the lock's state, sent to the page when it changes.
@@ -755,13 +785,14 @@ fn main() {
             let store = open_store(app).map(Mutex::new);
             // After open_store, which chose the credential store that keeps the session.
             let sync = key::session_entry().and_then(sync::Sync::from_environment);
-            let lock = Mutex::new(starting_lock(&store, &sync));
+            let (lock, notice) = starting_lock(&store, &sync);
             app.manage(App {
                 store,
                 sync,
                 status: Mutex::new(Status::default()),
                 wake: Notify::new(),
-                lock,
+                lock: Mutex::new(lock),
+                notice: Mutex::new(notice),
             });
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
             tauri::async_runtime::spawn(lock_in_background(app.handle().clone()));
@@ -794,7 +825,113 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::path::Path;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use keyring_core::api::CredentialStoreApi;
+    use keyring_core::mock;
+
     use super::*;
+
+    const CLINICIAN: &str = "018f0000-0000-7000-8000-0000000000c1";
+    const SIGNED_IN_WITH: &str = "https://ehr.example.com:8443";
+
+    /// A server on a free local port that answers 204 to anything, as a stand-in anyone at the computer could start,
+    /// counting what reaches it.
+    fn yes_to_anything() -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let reached = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&reached);
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                count.fetch_add(1, Ordering::SeqCst);
+                let _ = stream.read(&mut [0; 4096]);
+                let _ = stream.write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
+            }
+        });
+        (url, reached)
+    }
+
+    /// A store with the lock's record of a sign-in made with `SIGNED_IN_WITH`, and a sync client for `servers` holding
+    /// that sign-in's session.
+    fn kept_sign_in(
+        servers: Vec<String>,
+    ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
+        let store = Store::open(Path::new(":memory:"), &[7; 32]).unwrap();
+        store
+            .unlock(|db| {
+                unlock::remember(
+                    db,
+                    CLINICIAN.parse().unwrap(),
+                    "clinician@example.com",
+                    &unlock::hash("the password"),
+                    unix_now(),
+                    &[SIGNED_IN_WITH.to_owned()],
+                )
+            })
+            .unwrap();
+        let credentials = mock::Store::new().unwrap();
+        let entry = credentials
+            .build("com.example.ehr", "server-session", None)
+            .unwrap();
+        entry
+            .set_password(
+                &serde_json::json!({ "token": "the-token", "displayName": "Dr. Example",
+                    "expiresAt": "2099-01-01T00:00:00Z",
+                    "offlineAccess": { "clinicianId": CLINICIAN, "expiresUnixSeconds": 4_102_444_800u64 } })
+                .to_string(),
+            )
+            .unwrap();
+        (Ok(Mutex::new(store)), sync::Sync::new(servers, entry))
+    }
+
+    /// Step 19a's final review, the reviewer's case: with the window locked, someone at the computer starts the app again
+    /// with EHR_SYNC_SERVERS naming a server of their own that answers yes to anything. The app forgets the kept sign-in
+    /// before anything is sent, says why, and keeps no record that could open the lock; the password, any password, then
+    /// goes nowhere, and the stand-in never hears from the app, the token least of all.
+    #[tokio::test]
+    async fn a_server_the_sign_in_wasnt_made_with_never_opens_the_lock_or_gets_the_token() {
+        let (stand_in, reached) = yes_to_anything();
+        let (store, sync) = kept_sign_in(vec![stand_in]);
+
+        let (mut lock, notice) = starting_lock(&store, &sync);
+
+        assert_eq!(lock.tick(Moment::now()), lock::State::SignedOut);
+        assert_eq!(notice, Some(OTHER_SERVERS));
+        let sync = sync.unwrap();
+        assert_eq!(sync.account(), None, "the kept sign-in is forgotten");
+        let store = store.unwrap();
+        assert_eq!(store::lock(&store).unlock(unlock::account).unwrap(), None);
+        assert_eq!(
+            sync.unlock("certainly not the password").await,
+            sync::Unlock::SessionOver
+        );
+        assert_eq!(reached.load(Ordering::SeqCst), 0, "nothing reached it");
+    }
+
+    /// Step 19a's final review: started again with the servers the sign-in was made with, the record of them survives the
+    /// restart and the app opens on the lock, for the password, with the sign-in kept.
+    #[test]
+    fn with_the_servers_it_was_made_with_a_kept_sign_in_starts_locked() {
+        let (store, sync) = kept_sign_in(vec![SIGNED_IN_WITH.to_owned()]);
+
+        let (mut lock, notice) = starting_lock(&store, &sync);
+
+        assert_eq!(
+            lock.tick(Moment::now()),
+            lock::State::Locked {
+                need: Need::Password,
+                why: Why::Started
+            }
+        );
+        assert_eq!(notice, None);
+        assert_eq!(sync.unwrap().account().as_deref(), Some("Dr. Example"));
+    }
 
     /// TC-UC7-10 (proposed FR-68), the lock's choice: the password is checked on this computer only when no server
     /// could check it; a server's no stands, the 12-hour end asks for the code too, and a session the server ended is

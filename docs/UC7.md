@@ -45,11 +45,19 @@ the app gets nothing either); saves already under way finish; sync, uploads incl
 
 | When | What it takes | Checked by |
 |---|---|---|
-| Within the sign-in's 12 hours | The password | The server when one answers within 5 seconds (`POST /api/desktop/unlock`, below), counting a wrong one towards the account's lockout; otherwise this computer, against its hash |
-| Past the 12 hours | A full sign-in: the password and the authenticator code, for the same account | The server; while no server can complete one (none answers, or the one that does can't, as the cloud app with the clinic's server cut off), the password alone opens the offline charts |
+| Within the sign-in's 12 hours | The password | One of the servers the sign-in was made with, when it answers within 5 seconds (`POST /api/desktop/unlock`, below), counting a wrong one towards the account's lockout; otherwise this computer, against its hash |
+| Past the 12 hours | A full sign-in: the password and the authenticator code, for the same account | The servers the sign-in was made with; while none can complete one (none answers, or the one that does can't, as the cloud app with the clinic's server cut off), the password alone opens the offline charts |
 | After the server ended the session | A full sign-in | The server only |
 
 A server's no stands: once one has said "wrong password" or "locked out", nothing is checked on this computer.
+
+**Only the servers the sign-in was made with** answer for the lock (step 19a's final review). Any server can answer yes
+to a password, so the app keeps, with the lock's record, the servers each sign-in was made with (the built-in ones, or
+`EHR_SYNC_SERVERS`), and asks only those. Started with any others, it forgets the kept sign-in and its record before
+anything is sent, the token included, and the sign-in form says: "Signed out: this app was started with servers other
+than the ones you signed in with, and only those can open its lock. Sign in again; nothing on this computer was
+deleted." So the hash on this computer isn't used then either: the lock is gone, and only a sign-in opens the offline
+charts. A release build takes HTTPS servers only, so nothing on the computer can stand in for one unauthenticated.
 
 **Past the 12 hours with no server** (decided under the plan's first principle: an outage is when the offline chart is
 needed, and the password still has to be known). The password alone opens the offline charts, to read and to save
@@ -119,8 +127,9 @@ earlier build say that when isn't recorded, until they are downloaded again.
   `Ehr-Sign-In: ended`, and nothing is recorded as an unlock.
 - **TC-UC7-08** (`src-tauri/src/unlock.rs`): the hash is salted Argon2id with its parameters, never the password, and
   tells the right password from a wrong one; 5 wrong ones wait 15 minutes and 10 take a full sign-in, a right one starts
-  the count again, and nothing is deleted; the count survives reopening the store, the server's end of the session leaves
-  only the email, and signing out leaves nothing.
+  the count again, and nothing is deleted; the count and the sign-in's servers survive reopening the store, the server's
+  end of the session leaves only the email and the servers, and signing out leaves nothing; a record from before the
+  servers were kept names none.
 - **TC-UC7-09** (`src-tauri/src/lock.rs`): a kept sign-in starts locked; the warning at 13 idle minutes and the lock at
   15, activity starting them again; a recording holds both off and counts as activity, and a hold the page never ended
   lapses after 5 minutes; time asleep counts, and a clock set back gains nothing; the 12-hour warning shows once and the
@@ -130,7 +139,11 @@ earlier build say that when isn't recorded, until they are downloaded again.
 - **TC-UC7-10** (`src-tauri/src/sync.rs`, `main.rs`): the password goes only to `/api/desktop/unlock`, with the token; a
   server's no stands and the next isn't asked; a 5xx is passed over; with no server it's checked here; the 12-hour answer
   keeps the session and any other 401 forgets it; past the 12 hours the password alone opens only when no server can
-  complete a sign-in, never after "wrong" or "locked out", and never after the server ended the session.
+  complete a sign-in, never after "wrong" or "locked out", and never after the server ended the session. From step 19a's
+  final review: started with a server the sign-in wasn't made with, one that answers yes to anything, the app forgets the
+  kept sign-in and says why, and any password then opens nothing and the stand-in hears nothing, the token least of all
+  (`a_server_the_sign_in_wasnt_made_with_never_opens_the_lock_or_gets_the_token`); started with the servers it was made
+  with, it starts locked for the password with the sign-in kept; a release build refuses a plain-HTTP server.
 - **TC-UC7-11** (`src-tauri/src/unlock.rs`): the hash takes under a second, and CI's macOS and Windows runners print how
   long.
 - **The download's time** (`charts.rs`, `a_download_records_when_it_was_made`): a download records when it was made and

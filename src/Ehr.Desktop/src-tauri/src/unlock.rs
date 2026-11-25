@@ -2,8 +2,9 @@
 //! slow hash of it, Argon2id, kept in the encrypted store beside the offline charts, never the password itself. Written
 //! at each sign-in with both factors, cleared when the server ends the session, deleted at sign-out. Kept with it: the
 //! clinician's email, so the lock's full sign-in is for the same account; when that sign-in was made, by this computer's
-//! clock, for its 12 hours; whether the server has said those 12 hours are over; and the wrong passwords typed here in a
-//! row: after 5 the lock waits 15 minutes, after 10 it takes a full sign-in. Nothing is ever deleted for a wrong one.
+//! clock, for its 12 hours; whether the server has said those 12 hours are over; the wrong passwords typed here in a
+//! row: after 5 the lock waits 15 minutes, after 10 it takes a full sign-in, and nothing is ever deleted for a wrong
+//! one; and the servers the sign-in was made with, the only ones that may answer for the lock (main.rs).
 //!
 //! The hash adds nothing against someone who can already read this store: they can read the charts in it directly. What
 //! it adds is a target for guessing the password away from the app, at Argon2id's cost per guess. The lock is against
@@ -36,7 +37,8 @@ const SCHEMA: &str = "
         signed_in_at INTEGER NOT NULL,
         sign_in_ended INTEGER NOT NULL DEFAULT 0,
         wrong INTEGER NOT NULL DEFAULT 0,
-        wait_until INTEGER
+        wait_until INTEGER,
+        servers TEXT
     );
 ";
 
@@ -52,6 +54,8 @@ pub struct Account {
     pub sign_in_ended: bool,
     pub wrong: u32,
     pub wait_until: Option<i64>,
+    /// The servers the sign-in was made with, in order; none for a record from before they were kept.
+    pub servers: Vec<String>,
 }
 
 /// Whether a password typed now may be checked against the hash.
@@ -78,7 +82,18 @@ impl Account {
 }
 
 pub fn initialize(db: &Connection) -> Result<()> {
-    db.execute_batch(SCHEMA)
+    db.execute_batch(SCHEMA)?;
+    // A store made by this step's first build has the table without its servers. The record in it then names none,
+    // and its sign-in is forgotten at the next start (main.rs).
+    let has_servers: bool = db.query_row(
+        "SELECT EXISTS (SELECT 1 FROM pragma_table_info('desktop_unlock') WHERE name = 'servers')",
+        [],
+        |row| row.get(0),
+    )?;
+    if !has_servers {
+        db.execute_batch("ALTER TABLE desktop_unlock ADD COLUMN servers TEXT")?;
+    }
+    Ok(())
 }
 
 /// The password's hash, with a new random salt, as a PHC string ("$argon2id$v=19$m=65536,t=3,p=1$…").
@@ -99,25 +114,33 @@ pub fn verify(verifier: &str, password: &str) -> bool {
         .is_ok()
 }
 
-/// After a sign-in with both factors: this clinician's record, and nobody else's, with no wrong passwords counted.
+/// After a sign-in with both factors: this clinician's record, and nobody else's, with no wrong passwords counted, and
+/// the servers it was made with.
 pub fn remember(
     db: &Connection,
     clinician_id: Uuid,
     email: &str,
     verifier: &str,
     signed_in_at: i64,
+    servers: &[String],
 ) -> Result<()> {
     db.execute_batch("DELETE FROM desktop_unlock")?;
     db.execute(
-        "INSERT INTO desktop_unlock (clinician_id, email, verifier, signed_in_at) VALUES (?1, ?2, ?3, ?4)",
-        params![clinician_id.to_string(), email, verifier, signed_in_at],
+        "INSERT INTO desktop_unlock (clinician_id, email, verifier, signed_in_at, servers) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            clinician_id.to_string(),
+            email,
+            verifier,
+            signed_in_at,
+            servers.join("\n")
+        ],
     )?;
     Ok(())
 }
 
 pub fn account(db: &Connection) -> Result<Option<Account>> {
     db.query_row(
-        "SELECT clinician_id, email, verifier, signed_in_at, sign_in_ended, wrong, wait_until FROM desktop_unlock",
+        "SELECT clinician_id, email, verifier, signed_in_at, sign_in_ended, wrong, wait_until, servers FROM desktop_unlock",
         [],
         |row| {
             let id: String = row.get(0)?;
@@ -135,6 +158,10 @@ pub fn account(db: &Connection) -> Result<Option<Account>> {
                 sign_in_ended: row.get(4)?,
                 wrong: row.get(5)?,
                 wait_until: row.get(6)?,
+                servers: row
+                    .get::<_, Option<String>>(7)?
+                    .map(|servers| servers.lines().map(str::to_owned).collect())
+                    .unwrap_or_default(),
             })
         },
     )
@@ -180,6 +207,13 @@ mod tests {
     const PASSWORD: &str = "a synthetic password";
     const NOW: i64 = 1_790_000_000;
 
+    fn servers() -> Vec<String> {
+        vec![
+            "https://ehr.example.com:8443".to_owned(),
+            "https://ehr-remote.example.com:9443".to_owned(),
+        ]
+    }
+
     fn signed_in() -> (Connection, Uuid) {
         let db = Connection::open_in_memory().unwrap();
         initialize(&db).unwrap();
@@ -190,6 +224,7 @@ mod tests {
             "clinician@example.com",
             &hash(PASSWORD),
             NOW,
+            &servers(),
         )
         .unwrap();
         (db, clinician)
@@ -261,13 +296,15 @@ mod tests {
             "clinician@example.com",
             &hash(PASSWORD),
             later,
+            &servers(),
         )
         .unwrap();
         assert_eq!(may_check(&db, later), Allowed::Check(""));
     }
 
-    /// TC-UC7-08: the count and the wait are kept in the database, so quitting the app doesn't reset them; the server's
-    /// end of the session leaves only the email; signing out leaves nothing.
+    /// TC-UC7-08: the count and the wait are kept in the database, so quitting the app doesn't reset them, and so are the
+    /// servers the sign-in was made with (step 19a's final review); the server's end of the session leaves only the email
+    /// and the servers; signing out leaves nothing.
     #[test]
     fn the_record_survives_reopening_and_goes_at_sign_out() {
         let path =
@@ -281,6 +318,7 @@ mod tests {
                 "clinician@example.com",
                 &hash(PASSWORD),
                 NOW,
+                &servers(),
             )
             .unwrap();
             for _ in 0..5 {
@@ -297,17 +335,38 @@ mod tests {
             (5, Some(NOW + WAIT_SECONDS))
         );
         assert!(reopened.sign_in_ended);
+        assert_eq!(reopened.servers, servers());
 
         session_over(&db).unwrap();
         let over = account(&db).unwrap().unwrap();
         assert_eq!(over.verifier, None);
         assert_eq!(over.email, "clinician@example.com");
+        assert_eq!(over.servers, servers());
         assert_eq!(over.may_check(NOW + WAIT_SECONDS), Allowed::SignIn);
 
         forget(&db).unwrap();
         assert_eq!(account(&db).unwrap(), None);
         drop(db);
         std::fs::remove_file(&path).unwrap();
+    }
+
+    /// A store made by this step's first build, whose table had no servers, gains the column, and its record names none.
+    #[test]
+    fn a_record_from_before_the_servers_were_kept_names_none() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE desktop_unlock (clinician_id TEXT PRIMARY KEY, email TEXT NOT NULL, verifier TEXT,
+                signed_in_at INTEGER NOT NULL, sign_in_ended INTEGER NOT NULL DEFAULT 0, wrong INTEGER NOT NULL DEFAULT 0,
+                wait_until INTEGER);
+             INSERT INTO desktop_unlock (clinician_id, email, verifier, signed_in_at)
+                VALUES ('018f0000-0000-7000-8000-0000000000c1', 'clinician@example.com', 'a hash', 1);",
+        )
+        .unwrap();
+
+        initialize(&db).unwrap();
+        initialize(&db).unwrap();
+
+        assert!(account(&db).unwrap().unwrap().servers.is_empty());
     }
 
     /// TC-UC7-11 (proposed FR-68, NFR-02): making the hash, which each unlock away from the server repeats, takes under a

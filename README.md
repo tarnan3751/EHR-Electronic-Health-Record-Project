@@ -136,7 +136,7 @@ cd src/Ehr.Desktop/src-tauri
 cargo tauri dev
 ```
 
-The first build takes several minutes because it downloads the pinned Rust and compiles SQLCipher and OpenSSL; later builds are quick. The window shows the quick text list and whether it's online. It tries https://ehr.example.com:8443 (the on-prem app) first, then https://ehr-remote.example.com:9443 (the cloud app); to use others, set `EHR_SYNC_SERVERS` to a comma-separated list. Without a server it still works, and says why it's offline.
+The first build takes several minutes because it downloads the pinned Rust and compiles SQLCipher and OpenSSL; later builds are quick. The window shows the quick text list and whether it's online. It tries https://ehr.example.com:8443 (the on-prem app) first, then https://ehr-remote.example.com:9443 (the cloud app); to use others, set `EHR_SYNC_SERVERS` to a comma-separated list (HTTPS only in a release build; a sign-in is tied to the servers it was made with, so starting with others signs the app out). Without a server it still works, and says why it's offline.
 
 At first launch it asks you to sign in, with the email, password and authenticator code of a clinician account. The account must have finished its setup in the web app first (an admin creates it at **Staff**; its setup link sets the password, and its first sign-in there enrolls the authenticator app), or come from the stack's example accounts (see "Test accounts" in [infra/compose/README.md](infra/compose/README.md#test-accounts)). Until you sign in, and after you sign out, the list can be read but not changed.
 

@@ -28,7 +28,8 @@ use crate::key;
 use crate::store::{self, Store};
 
 /// The on-prem app on the clinic network, then the cloud app over the internet. EHR_SYNC_SERVERS, separated by
-/// commas, replaces them.
+/// commas, replaces them: HTTPS only in a release build. A sign-in is tied to the servers it was made with (main.rs):
+/// started with others, the app forgets it before anything is sent.
 const DEFAULT_SERVERS: &str = "https://ehr.example.com:8443,https://ehr-remote.example.com:9443";
 const PATH: &str = "/api/sync/quick-texts";
 const SIGN_IN: &str = "/api/desktop/sign-in";
@@ -124,15 +125,12 @@ impl Sync {
     pub fn from_environment(saved: Entry) -> Result<Sync, String> {
         let servers =
             std::env::var("EHR_SYNC_SERVERS").unwrap_or_else(|_| DEFAULT_SERVERS.to_owned());
-        Sync::new(
-            servers
-                .split(',')
-                .map(str::trim)
-                .filter(|server| !server.is_empty())
-                .map(str::to_owned)
-                .collect(),
-            saved,
-        )
+        Sync::new(parse_servers(&servers, !cfg!(debug_assertions))?, saved)
+    }
+
+    /// The servers, in the order they're tried.
+    pub fn servers(&self) -> &[String] {
+        &self.servers
     }
 
     /// HTTPS is checked against the OS's trusted certificates, as a browser would. `saved` is where the session is
@@ -787,6 +785,26 @@ impl Sync {
     }
 }
 
+/// The servers a comma-separated list names. `https_only`, in a release build: a plain-HTTP server, which anything on
+/// this computer could stand in for, is refused, and the app can't sync until the list is put right.
+fn parse_servers(list: &str, https_only: bool) -> Result<Vec<String>, String> {
+    let servers: Vec<String> = list
+        .split(',')
+        .map(str::trim)
+        .filter(|server| !server.is_empty())
+        .map(str::to_owned)
+        .collect();
+    match servers
+        .iter()
+        .find(|server| https_only && !server.starts_with("https://"))
+    {
+        Some(server) => Err(format!(
+            "EHR_SYNC_SERVERS names {server}: this app connects to HTTPS servers only."
+        )),
+        None => Ok(servers),
+    }
+}
+
 /// Each server that couldn't be reached is listed with why: "https://ehr.example.com:8443 (Connection refused)".
 fn couldnt_connect(unreachable: &[String]) -> String {
     format!("Couldn't connect to {}.", unreachable.join(" or "))
@@ -1396,6 +1414,33 @@ mod tests {
                 .await,
             Err(SignInFailure::Unreachable(_))
         ));
+    }
+
+    /// The final review of step 19a: a server named over plain HTTP is refused in a release build, which is how
+    /// from_environment reads the list there, so nothing on this computer can stand in for a server unauthenticated.
+    #[test]
+    fn a_release_build_takes_https_servers_only() {
+        let list = "https://ehr.example.com:8443, http://127.0.0.1:9";
+        assert!(
+            parse_servers(list, true)
+                .unwrap_err()
+                .contains("http://127.0.0.1:9")
+        );
+        assert_eq!(
+            parse_servers(
+                "https://ehr.example.com:8443,,https://ehr-remote.example.com:9443",
+                true
+            ),
+            Ok(vec![
+                "https://ehr.example.com:8443".to_owned(),
+                "https://ehr-remote.example.com:9443".to_owned()
+            ])
+        );
+        assert_eq!(
+            parse_servers(list, false).unwrap().len(),
+            2,
+            "development builds"
+        );
     }
 
     /// The server answers 403 when the account isn't a clinician's.

@@ -50,6 +50,7 @@ async function refresh() {
     const signedIn = view.status.account != null;
     renderStatus(view.status, view.waiting);
     renderAccount(view.status.account);
+    show(byId('sign-in-notice'), view.signedOutBecause);
     renderOfflineAccess(view.offlineAvailable, signedIn);
     chartsUpdated = view.chartsUpdated;
     renderChartsUpdated();
