@@ -41,7 +41,7 @@
   "schema": "ee5d87769c927ac963bdca80dd784b1bc6861e46d70516299e4034da72988c1f",
   "structuring": "bec49b58c501abc6f7ef3938ebb84cca890b79f7c493d04c6105b8470a9d1b39",
   "pipeline": "e51298e314fcc4e71e4def42a41c8c0f9759b341b2d278563029fa76cab13701",
-  "scoring": "9cb2cb0119a96f87318e7c8b559984c5d9ff47e5dbed3351828b58a10fdf2245"
+  "scoring": "efb087420ec7cf4913455ece22cb8ee5f1c44734078188b6ce35510bcda78294"
  },
  "dataset": {
   "recordings_sha256": "106ddb7e1acaa55002fbd5801e27636ebb6b12ec61eade3c2d9f730eea4c1e68",
@@ -12350,59 +12350,10 @@
     "mixed-plan"
    ],
    "hypothesis": "Ctrol hypertension thecta dose annus cononypertension arterial this theaCD is annus. Tmesartan 20 mg of Snavesal dia, ReferaFLA ocasionale borlas manganas. legolor thoracico, Yegaivenia, untecedentary tobasmo lo the hoaz synchronousplorasonecentquentidose ofrinoviquatro FStentioro po gentaotakilis. widows cardiac arrhythmica soopluus.\nImpression: Hypertension arterial, nocontrolata.\nPlan: Omental, losartan a 0 mg of Savsal Da, Reducelazal and Ladeta. Resultel losartan. BUN and creatinine, and me potassium paraoil, controlling quadrosemnas.",
-   "sorting": "done",
-   "reason": null,
+   "sorting": "unavailable",
+   "reason": "transcript_not_english",
    "detail": null,
-   "fields": {
-    "subjective": {
-     "proposed": "",
-     "sources": [],
-     "status": "empty",
-     "reasons": [
-      "not_dictated"
-     ],
-     "value": "",
-     "warnings": [],
-     "statements": [],
-     "shown_statements": []
-    },
-    "objective": {
-     "proposed": "",
-     "sources": [],
-     "status": "empty",
-     "reasons": [
-      "not_dictated"
-     ],
-     "value": "",
-     "warnings": [],
-     "statements": [],
-     "shown_statements": []
-    },
-    "assessment": {
-     "proposed": "Hypertension arterial, nocontrolata.",
-     "sources": [
-      "Hypertension arterial, nocontrolata."
-     ],
-     "status": "pending",
-     "reasons": [],
-     "value": "Hypertension arterial, nocontrolata.",
-     "warnings": [],
-     "statements": [],
-     "shown_statements": []
-    },
-    "plan": {
-     "proposed": "Omental, losartan a 0 mg of Savsal Da, Reducelazal and Ladeta. Resultel losartan. BUN and creatinine, and me potassium paraoil, controlling quadrosemnas.",
-     "sources": [
-      "Omental, losartan a 0 mg of Savsal Da, Reducelazal and Ladeta. Resultel losartan. BUN and creatinine, and me potassium paraoil, controlling quadrosemnas."
-     ],
-     "status": "pending",
-     "reasons": [],
-     "value": "Omental, losartan a 0 mg of Savsal Da, Reducelazal and Ladeta. Resultel losartan. BUN and creatinine, and me potassium paraoil, controlling quadrosemnas.",
-     "warnings": [],
-     "statements": [],
-     "shown_statements": []
-    }
-   },
+   "fields": {},
    "unknown": [],
    "not_carried_over": [],
    "timings": {
@@ -18243,6 +18194,7 @@
      },
      "marked_share": 1.0,
      "sorting": "done",
+     "reason": null,
      "offered": [],
      "instructions_shown": []
     },
@@ -18252,18 +18204,13 @@
      "passages": 4,
      "marked": {},
      "marked_share": 0.0,
-     "sorting": "done",
-     "offered": [
-      "assessment",
-      "plan"
-     ],
-     "instructions_shown": [
-      "creatinine",
-      "potassium"
-     ]
+     "sorting": "unavailable",
+     "reason": "transcript_not_english",
+     "offered": [],
+     "instructions_shown": []
     }
    ],
-   "instructions_shown": 2
+   "instructions_shown": 0
   },
   "text": {
    "fields": {
@@ -19487,7 +19434,7 @@
     "gold": []
    }
   },
-  "instructions_shown": 2,
+  "instructions_shown": 0,
   "sorted_every_item": true,
   "false_refusals": {
    "count": 43,
@@ -21065,7 +21012,7 @@
   }
  },
  "rescored": {
-  "at": "2026-11-25T05:03:13+00:00",
+  "at": "2026-11-25T06:32:54+00:00",
   "scoring": "38b9b61ff364cb2cc7b80ac66ed0c9b374b600ef932890368a054a5b4f5ac22a"
  }
 }
