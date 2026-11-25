@@ -348,7 +348,7 @@ def test_a_trend_is_no_medication_change_and_a_drugs_change_still_is(english, ac
 
 
 # A trend is read only where its clause names a subject, and for its direction against the Spanish: given the other way
-# round it is changed, the right way it isn't. A change said of something named before ("which was increased", "it was
+# round it is changed, the right way it isn't. A change said of a drug named before ("which was increased", "it was
 # decreased") is a medication change, counted where the Spanish says none (the review of 2026-11-24).
 @pytest.mark.parametrize(("said", "of", "right", "reversed_"), [
     ("La hinchazón ha disminuido.", "swelling", "The swelling has decreased.", "The swelling has increased."),
@@ -358,6 +358,29 @@ def test_a_trend_is_no_medication_change_and_a_drugs_change_still_is(english, ac
 def test_a_trend_given_the_other_way_round_is_changed_and_the_right_way_is_not(said, of, right, reversed_):
     assert facts_changes(said, {"of": of}, right) == set()
     assert facts_changes(said, {"of": of}, reversed_) == {"polarity"}
+
+
+# A pronoun, relative or missing subject takes the kind of what was named before it: a finding gives a trend, read
+# against the Spanish; a drug a medication change. A medicine named by its class is a drug. And a Spanish trend in the
+# progressive ("está disminuyendo", "va a menos") is read as one (the re-check of 2026-11-24).
+@pytest.mark.parametrize(("said", "item", "right", "wrong"), [
+    ("Dolor lumbar. Ha disminuido.", {"of": "low back pain"}, "Low back pain. It has decreased.",
+     "Low back pain. It has increased."),
+    ("Edema en tobillos, que ha disminuido.", {"of": "ankle edema", "aka": ["edema"]}, "Ankle edema, which has decreased.",
+     "Ankle edema, which has increased."),
+    ("La hinchazón está disminuyendo.", {"of": "swelling"}, "The swelling has decreased.", "The swelling has increased."),
+    ("La hinchazón va a menos.", {"of": "swelling"}, "The swelling has decreased.", "The swelling has increased."),
+])
+def test_a_trend_said_of_a_finding_named_before_is_read_as_one(said, item, right, wrong):
+    assert facts_changes(said, item, right) == set()
+    assert facts_changes(said, item, wrong) == {"polarity"}
+
+
+def test_a_change_said_of_a_medicine_by_its_class_is_a_medication_change():
+    item = {"of": "blood pressure medication", "action": "stopped"}
+    assert "action" in facts_changes("Se suspendió la medicación de la tensión.", item,
+                                     "Blood pressure medicine has been increased.")
+    assert facts_changes("Se suspendió la medicación de la tensión.", item, "Blood pressure medication was stopped.") == set()
 
 
 @pytest.mark.parametrize("english", ["Lisinopril 10 mg daily, which was increased.", "Lisinopril 10 mg daily. It was decreased."])

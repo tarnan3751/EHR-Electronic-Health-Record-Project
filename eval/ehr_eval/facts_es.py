@@ -35,8 +35,9 @@ years old") is the age's number, as "34-year-old" is, not how long something las
 of an age; a weight lifted, carried or borne ("avoid lifting weight") is a load, not the vital sign; an increase or
 decrease after "has", "was" and the like, in a clause naming a subject and no drug, dose or number ("the swelling has
 decreased"), is a trend, not a medication change, and is changed when the Spanish says it the other way ("ha
-disminuido" as "has increased"), while one said of something named before ("which was increased", "it was
-decreased") is still a medication change; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
+disminuido", "está disminuyendo" or "va a menos" as "has increased"); one with a pronoun, a relative or no subject
+("it has decreased", "which was increased") takes the kind of the name said before it, a finding's a trend and a
+drug's a medication change, and a medicine named by its class ("blood pressure medicine") is a drug; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
 said of neither thing it links, with or without a comma before it, so it answers to either one's doubt in the facts and
 is added only if neither has one; and "unlikely", "may be" and "could be" are doubt, as "possible" and "might" are
 (DOUBT). "unlikely", "improbable", "not likely" and "less likely" are a negation too, said before or after a doubted
@@ -225,14 +226,19 @@ LOADS = {"lift", "lifts", "lifting", "lifted", "carry", "carries", "carrying", "
 # Before an increase or decrease said of something already named ("the swelling has decreased"), a finding's trend.
 PERFECT_OR_PASSIVE = {"has", "have", "had", "been", "is", "are", "was", "were"}
 # What can stand before "has decreased" without naming what changed: a pronoun or a relative ("which was increased",
-# "it was decreased" are said of something named before, a drug as often as not), or an article.
+# "it has decreased" are said of what was named before them: a trend of a finding, a change of a drug), or an article.
 NOT_A_SUBJECT = {"which", "that", "it", "this", "these", "those", "they", "who", "the", "a", "an", "its", "their"}
+# A subject that is a medicine without naming one: "blood pressure medicine has been increased" is a medication change.
+MEDICATION_WORDS = {"medicine", "medicines", "medication", "medications", "drug", "drugs", "pill", "pills", "tablet",
+                    "tablets"}
 # A trend's direction as the Spanish says it, past or perfect ("ha disminuido", "bajó", "ha aumentado", "subió").
 TREND_ES = {
-    "decrease": re.compile(r"\b(?:disminuid[oa]s?|disminuy[oó]|bajad[oa]s?|baj[oó]|descendid[oa]s?|descendi[oó]|"
-                           r"reducid[oa]s?|reduj[oe]|decrecid[oa]s?)\b", re.IGNORECASE),
-    "increase": re.compile(r"\b(?:aumentad[oa]s?|aument[oó]|subid[oa]s?|subi[oó]|incrementad[oa]s?|increment[oó]|"
-                           r"crecid[oa]s?|creci[oó])\b", re.IGNORECASE),
+    "decrease": re.compile(r"\b(?:disminuid[oa]s?|disminuy[oó]|disminuyendo|bajad[oa]s?|baj[oó]|bajando|descendid[oa]s?|"
+                           r"descendi[oó]|descendiendo|reducid[oa]s?|reduj[oe]|reduci[eé]ndose|decrecid[oa]s?|"
+                           r"decreciendo|van? a menos)\b", re.IGNORECASE),
+    "increase": re.compile(r"\b(?:aumentad[oa]s?|aument[oó]|aumentando|subid[oa]s?|subi[oó]|subiendo|incrementad[oa]s?|"
+                           r"increment[oó]|increment[aá]ndose|crecid[oa]s?|creci[oó]|creciendo|van? a m[aá]s)(?!\w)",
+                           re.IGNORECASE),
 }
 DOSE_WORDS = {"dose", "doses", "dosage", "dosing"}
 
@@ -559,9 +565,10 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
         if (tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] + ACTIONS["decrease"][0] + ACTIONS["decrease"][1]
                 and i and toks[i - 1] in PERFECT_OR_PASSIVE and clause_of[i] not in drugs_at | numbers_at
                 and not any(t in DOSE_WORDS for t, c in zip(toks, clause_of, strict=True) if c == clause_of[i])
-                and _subject_named(toks, clause_of, i)):
-            # "the swelling has decreased": a trend, where a subject is named and no drug or dose, not a medication
-            # change; read for its direction against the Spanish (compare()).
+                and _a_trend(toks, clause_of, i, labels)):
+            # "the swelling has decreased", "low back pain. it has decreased": a trend, where what changed is a finding
+            # and no drug or dose is named, not a medication change; read for its direction against the Spanish
+            # (compare()).
             take(i, i + 1, "trend", "increase" if tok in ACTIONS["increase"][0] + ACTIONS["increase"][1] else "decrease")
             continue
         if tok in ("use", "uses") and i - 1 in names_at:
@@ -621,14 +628,21 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
     return found
 
 
-def _subject_named(toks: list[str], clause_of: list[int], verb: int) -> bool:
-    """Whether the words of the verb's clause before its auxiliaries name a subject: one at least that isn't a pronoun,
-    relative or article (NOT_A_SUBJECT). "Which was increased" and "it was decreased" say it of something named before."""
+def _a_trend(toks: list[str], clause_of: list[int], verb: int, labels: list[tuple[int, int, str, bool]]) -> bool:
+    """Whether the verb's change is a trend of a finding, not a medication change: its subject, the words of its clause
+    before its auxiliaries, names something that isn't a medicine (MEDICATION_WORDS); or, a pronoun, a relative or
+    nothing ("it has decreased", "which has decreased", "has decreased"), it takes the kind of the nearest name said
+    before its clause: a finding gives a trend, a drug, or no name at all, a medication change."""
     start = verb
     while start and clause_of[start - 1] == clause_of[verb]:
         start -= 1
     before = [t for t in toks[start:verb] if t not in PERFECT_OR_PASSIVE and t.isalpha()]
-    return any(t not in NOT_A_SUBJECT for t in before)
+    if any(t in MEDICATION_WORDS for t in before):
+        return False
+    if any(t not in NOT_A_SUBJECT for t in before):
+        return True
+    earlier = [(end, drug) for _, end, _, drug in labels if end <= start]
+    return bool(earlier) and not max(earlier)[1]
 
 
 def _leave(toks: list[str], at: int) -> bool:
