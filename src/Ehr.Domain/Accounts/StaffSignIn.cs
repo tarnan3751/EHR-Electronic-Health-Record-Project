@@ -164,6 +164,11 @@ public sealed class StaffSignIn(
         return null;
     }
 
+    // The account held for the rest of the request (StaffUserLock) and read again, before its second factor is checked:
+    // second factors racing on one account are then checked and counted one after another, never lost to the account's
+    // concurrency stamp and rolled back (step 19's final review).
+    public Task HoldAccountAsync(StaffUser user, CancellationToken cancellationToken) => StaffUserLock.AcquireAsync(db, user, cancellationToken);
+
     // An account locked out, by wrong passwords or wrong second factors, takes no second factor until the lockout ends,
     // as it takes no password (CheckPasswordAsync). Recorded when it is so.
     public async Task<bool> LockedOutAsync(StaffUser user, CancellationToken cancellationToken)

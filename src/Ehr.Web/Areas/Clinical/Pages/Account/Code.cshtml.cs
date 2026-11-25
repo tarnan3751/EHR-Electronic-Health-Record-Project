@@ -49,7 +49,9 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
             return Page();
         }
 
-        // Wrong codes lock the account as wrong passwords do, and a locked account takes no code either (step 19).
+        // Wrong codes lock the account as wrong passwords do, and a locked account takes no code either (step 19), each
+        // checked and counted after any other for the same account.
+        await signIn.HoldAccountAsync(user, HttpContext.RequestAborted);
         if (await signIn.LockedOutAsync(user, HttpContext.RequestAborted))
         {
             ModelState.AddModelError("", Locked);
@@ -89,6 +91,7 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
 
         // The code's own field isn't part of this post.
         ModelState.Remove(nameof(Code));
+        await signIn.HoldAccountAsync(user, HttpContext.RequestAborted);
         if (await signIn.LockedOutAsync(user, HttpContext.RequestAborted))
         {
             ModelState.AddModelError("", Locked);
