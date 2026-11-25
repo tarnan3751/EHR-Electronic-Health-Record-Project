@@ -51,6 +51,6 @@ Unprefixed `test_*.py` files are in `src/Ehr.Dictation/sidecar/tests/`, and unpr
   to send, and the transcript carries on. The page's own retry after a dropped request isn't tested in a browser.
 - TC-UC9-06's accuracy is the committed eval run, made on a developer Mac (it says so), not on the clinic server. The
   gate has no accepted baseline yet, so "no lower than the baseline" has nothing to compare with until one is accepted.
-- TC-UC9-11's accuracy needs the Spanish eval run on audio, which hasn't been made yet: until `eval/results/latest-es.json`
-  is committed the gate fails. No test runs Whisper itself: its decoding is tested with stand-ins for its processor and
+- TC-UC9-11's accuracy is the Spanish eval run on audio, `eval/results/latest-es.json`, committed with run B of
+  2026-11-24. No test runs Whisper itself: its decoding is tested with stand-ins for its processor and
   model, and is first run on recordings by that eval.
