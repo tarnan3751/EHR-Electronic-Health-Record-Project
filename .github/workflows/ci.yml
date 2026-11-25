@@ -307,8 +307,8 @@ jobs:
       - name: Show containers and logs
         if: failure()
         run: |
-          docker compose ps --all
-          docker compose logs --no-color
+          docker compose --profile monitoring ps --all
+          docker compose --profile monitoring logs --no-color
 
       - name: Tear down
         if: always()
