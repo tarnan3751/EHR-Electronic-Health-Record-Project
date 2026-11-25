@@ -28,7 +28,10 @@ runs to come.
   (eval/results/latest.json); thresholds() and the gate (gate.py) say so. Beside the rate, share is the statements
   holding one with or without a warning. A value in the right
   field worded unlike the gold isn't misfiled (content F1 covers it), and one no field's gold has is listed apart
-  (no_gold), never gated. Content F1 counts a misfiled value as well, per field: the passage's words lower precision
+  (no_gold), never gated: a value the facts back, said of its item, or of nothing named where only one cited item has
+  a value of its kind or the statement names the one it is (facts_es.compare()); one said of nothing named that could be
+  either of two items' is changed, so a value moved between findings of one passage is a stop, never a no-gold value.
+  Content F1 counts a misfiled value as well, per field: the passage's words lower precision
   where it was filed and recall where it belonged. Not everything the first scorer counted: facts_es.py reads a number
   word only before a unit, a period or "times" ("three flights" is invisible), and a drug only by the scripts' names
   (drug_names()). And any one warning on a field exempts every changed or misfiled value in it from the stop lines

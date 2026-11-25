@@ -46,7 +46,9 @@ be", "could be" and "might" are doubt only of what they're said of, never of a f
 ("Chickenpox. School may be resumed"), and with a past participle not doubt at all ("may be resumed", "could be
 arranged": leave, or something that may be done). Then (compare()), against the items of the entries whose passages the statement cites, it is changed when it
 says a number, unit, frequency, duration, date, route, side, severity, polarity, drug or abbreviation those items
-don't say of what it says it of (a value of another item is changed too: "glucose 140" as "BP 140"), and when it says
+don't say of what it says it of (a value of another item is changed too: "glucose 140" as "BP 140"; one said of
+nothing named is backed only by the one cited item with a value of its kind, or by one the statement names, so "Febrile
+for 2 weeks" for "Fiebre de 3 días y tos de 2 semanas" is changed), and when it says
 an action, negation, doubt, past or relative other than theirs, or leaves out one they say of something it names.
 What it may leave out: any number, frequency and the like, as the checks allow. What it doesn't read: the meaning of
 any other word.
@@ -728,6 +730,14 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
         strict = claim.label in VITALS or (claim.label or "").lower() in lexicon.drugs
         own = of(claim.label, items) if claim.label in {item.of for item in items} and claim.kind != "date" else (
             [] if strict and claim.kind != "date" else items)
+        if own is items and claim.kind not in ("date", "action"):
+            # A value said of nothing a cited passage names ("Febrile for 2 weeks" for "Fiebre de 3 días y tos de 2
+            # semanas"): backed by the cited item with a value of its kind when there is just one (an age holds only its
+            # number); with two or more, only by those the statement names somewhere ("weight 84 kg, 2 kg more than").
+            # Otherwise it can't be told whose it is, and it is changed, never another item's value moved unseen. A
+            # date or a medication change is anyone's, as before.
+            holding = [item for item in items if item.of != "age" and any(item.values.get(kind) for kind in kinds)]
+            own = holding if len(holding) == 1 else [item for item in holding if item.of in named]
         backed = {value for item in own for kind in kinds for value in item.values.get(kind, ())}
         if claim.kind == "action":
             backed |= {value.removesuffix(", past") for value in backed}  # a present form for one said in the past

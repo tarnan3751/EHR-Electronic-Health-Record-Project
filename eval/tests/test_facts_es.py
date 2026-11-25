@@ -320,6 +320,30 @@ def test_a_change_said_of_a_drug_named_before_is_a_medication_change(english):
     assert facts_changes("Lisinopril 10 mg al día.", item, "Lisinopril 10 mg daily.", frozenset({"lisinopril"})) == set()
 
 
+# A value said of nothing the passage names is backed by the one cited item with a value of its kind, or by those the
+# statement names; with two or more and none named, it is changed, not a value no gold has (the review of 2026-11-24:
+# "Febrile for 2 weeks" for "Fiebre de 3 días y tos de 2 semanas" had moved the cough's two weeks unseen).
+@pytest.mark.parametrize(("english", "changed"), [
+    ("Febrile for 2 weeks.", {("duration", "2 weeks")}),
+    ("Coughing for 3 days.", {("duration", "3 days")}),
+    ("Fever for 2 weeks.", {("duration", "2 weeks (fever)")}),
+    ("Fever for 3 days and cough for 2 weeks.", set()),
+    ("Fever and cough, for 3 days and 2 weeks respectively.", set()),
+])
+def test_a_value_said_of_nothing_named_is_changed_where_it_could_be_either_items(english, changed):
+    entries = facts_es.entries([{"said": "Fiebre de 3 días y tos de 2 semanas.",
+                                 "items": [{"of": "fever", "duration": "3 days"}, {"of": "cough", "duration": "2 weeks"}]}])
+    lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
+    assert {(kind, what) for kind, what, _ in facts_es.compare(english, entries, entries, lexicon)[0]} == changed
+
+
+def test_a_value_said_of_nothing_named_is_backed_where_one_item_has_its_kind():
+    entries = facts_es.entries([{"said": "Fiebre de 3 días.", "items": [{"of": "fever", "duration": "3 days"}]}])
+    lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
+    changed, backed = facts_es.compare("Febrile for 3 days.", entries, entries, lexicon)
+    assert changed == [] and [(c.kind, c.value) for c in backed] == [("duration", "3 days")]
+
+
 def test_a_number_the_spanish_says_without_a_unit_may_be_given_a_unit_of_measurement_only():
     assert changes("e01", "TA 152/94, FC 78, peso 88 kg.", "BP 152/94 mmHg, HR 78 bpm, weight 88 kg.") == set()
     assert changes("e01", "TA 152/94, FC 78, peso 88 kg.", "BP 152/94, HR 78, weight 88 lb.") == {
