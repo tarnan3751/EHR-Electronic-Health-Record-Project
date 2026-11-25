@@ -18,7 +18,7 @@
 // review: nothing recorded is kept. Leaving the page before the voices are handed over does the same, and leaving it at
 // all ends listening here for good. When the visit can't be fetched or drafted, the page offers what can be done: try
 // again, discard the recording, or once the voices are handed over, open the draft to retrieve it. A chunk the recorder hands over after its listening is discarded, stopped or ended is
-// dropped. Every piece of text is set with textContent, never parsed as HTML.
+// dropped, and so is the server's answer to a chunk that arrives after then (step 18a). Every piece of text is set with textContent, never parsed as HTML.
 "use strict";
 
 (() => {
@@ -243,28 +243,38 @@
     }
 
     // 2. The chunks, in order, one at a time; none while paused or hidden. On a failure worth retrying they wait here.
+    // A run belongs to the listening it started for (own): an answer that arrives once that listening has ended, or once
+    // another has taken its place (discarding goes back to the consent at once), is dropped, never taken as the next
+    // listening's. Between the checks and the next await, own is state.
     async function pump() {
-        if (state.sending || state.ended || state.paused || !state.session) {
+        const own = state;
+        if (own.sending || own.ended || own.paused || !own.session) {
             return;
         }
 
-        state.sending = true;
+        own.sending = true;
         try {
-            while (state.queue.length > 0 && !state.ended && !state.paused) {
-                const chunk = state.queue[0];
+            while (own.queue.length > 0 && !own.ended && !own.paused) {
+                const chunk = own.queue[0];
                 let response;
                 try {
-                    response = await call("POST", `${api}/${state.session.sessionId}/audio?seq=${chunk.seq}`, chunk.blob, chunk.type);
+                    response = await call("POST", `${api}/${own.session.sessionId}/audio?seq=${chunk.seq}`, chunk.blob, chunk.type);
                 } catch {
-                    retryLater();
+                    if (own === state) {
+                        retryLater();
+                    }
                     return;
                 }
 
-                if (state.ended) {
+                if (own !== state || own.ended) {
                     return;
                 }
 
                 const body = await json(response);
+                if (own !== state || own.ended) {
+                    return;
+                }
+
                 if (response.ok) {
                     state.queue.shift();
                     state.retryMs = firstRetryMs;
@@ -307,10 +317,10 @@
                 return;
             }
         } finally {
-            state.sending = false;
+            own.sending = false;
         }
 
-        if (state.stopping && state.queue.length === 0 && state.recorder?.state === "inactive") {
+        if (own === state && own.stopping && own.queue.length === 0 && own.recorder?.state === "inactive") {
             finishRecording();
         }
     }
