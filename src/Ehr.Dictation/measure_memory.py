@@ -30,7 +30,8 @@ What it does:
    cap it is measuring, and waits until it is healthy. A new container starts its cgroup's memory.peak at zero, so the
    peak covers loading MedASR, Whisper and the speaker model as well as the load. From here on, whatever happens (a
    failure, a timeout, Ctrl-C), it recreates `dictation` with compose.yaml's own cap at the end (not with
-   --keep-raised).
+   --keep-raised); on a timeout or Ctrl-C it first stops the sender in the container, which a killed docker exec
+   leaves running, --keep-raised or not.
 2. Sends the load from inside the container (this file in --drive mode, standard library only, run with docker exec):
    two of the visits' longest recordings at once, each sent in chunks, stopped, its voices told apart, named and its
    note drafted; and, once both are stopped, the sessions the server takes besides them (max_sessions, 8, less the 2
@@ -44,7 +45,7 @@ What it does:
    read, said to be sampled. Checks the container wasn't killed for memory or restarted.
 4. Prints, and writes to --out, the image measured, both peaks, the cap memory.peak gives (peak x 1.25, rounded up to
    the next whole GiB, the unit Docker's "g" is), and what each session came to. It fails (exit 1) unless all 8
-   sessions came back done: a partial load never gives a cap.
+   sessions came back done: a partial load never gives a cap, printed or written.
 
 The cap itself is set by hand from its result: infra/compose/compose.yaml's mem_limit and its comment, and the memory
 figures in infra/compose/README.md (Docker Desktop memory) and the root README (Dictation models).
@@ -233,8 +234,12 @@ def measure(args: argparse.Namespace) -> dict:
             failed = drive.returncode != 0 or not sender
             results["sender_failed"] = (drive.stderr or "no output")[-2000:] if failed else None
         except subprocess.TimeoutExpired:
+            stop_sender(container_id)
             sender = {}
             results["sender_failed"] = f"the load took over {SENDER_SECONDS} s"
+        except KeyboardInterrupt:
+            stop_sender(container_id)  # killing docker exec leaves it running in the container
+            raise
         finally:
             done.set()
             sampler.join()
@@ -262,6 +267,24 @@ def measure(args: argparse.Namespace) -> dict:
             except subprocess.CalledProcessError as error:
                 print(f"Couldn't put dictation back as compose.yaml has it: {error.stderr[-500:]}. Run docker compose "
                       "--profile ai up -d --no-deps --force-recreate dictation from infra/compose.", file=sys.stderr)
+
+
+# The sender's processes in the container, found by their command line and stopped: run with docker exec, it outlives
+# a docker exec that is killed.
+STOP_SENDER = """import os, signal
+for pid in filter(str.isdigit, os.listdir("/proc")):
+    try:
+        command = open(f"/proc/{pid}/cmdline", "rb").read().split(b"\\0")
+    except OSError:
+        continue
+    if int(pid) != os.getpid() and b"/measure/measure_memory.py" in command and b"--drive" in command:
+        os.kill(int(pid), signal.SIGTERM)
+"""
+
+
+def stop_sender(container_id: str) -> None:
+    subprocess.run(["docker", "exec", container_id, "python", "-c", STOP_SENDER], capture_output=True, text=True,
+                   timeout=30)
 
 
 def whole(results: dict) -> list[str]:
@@ -409,18 +432,24 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"sessions": sessions, "maxrss_bytes": maxrss}))
         return 0
     results = measure(args)
+    problems = whole(results)
+    if problems:
+        results["cap_gib"] = None  # a partial load gives no cap
+        results["not_whole"] = problems
     if args.out:
         args.out.write_text(json.dumps(results, indent=1) + "\n", encoding="utf-8")
     not_cache_peak = results.get("not_cache_peak_bytes")
     print(f"Image {results['image']['name']} ({results['image']['id']}). Peak {results['peak_gib']} GiB "
           f"({results['peak_from']}, page cache included); anon + shmem + kernel at most "
           f"{round(not_cache_peak / GIB, 3) if not_cache_peak else 'unread'} GiB; the sender's own peak "
-          f"{results.get('sender_maxrss_bytes')} bytes. The cap memory.peak gives: {results['cap_gib']} GiB "
-          f"(peak x {HEADROOM}, rounded up).")
-    problems = whole(results)
-    for problem in problems:
-        print(f"Not whole: {problem}", file=sys.stderr)
-    return 1 if problems else 0
+          f"{results.get('sender_maxrss_bytes')} bytes.")
+    if problems:
+        for problem in problems:
+            print(f"Not whole: {problem}", file=sys.stderr)
+        print("No cap: the load wasn't whole, so the peak isn't the one the cap has to hold.", file=sys.stderr)
+        return 1
+    print(f"The cap memory.peak gives: {results['cap_gib']} GiB (peak x {HEADROOM}, rounded up).")
+    return 0
 
 
 if __name__ == "__main__":

@@ -65,9 +65,14 @@ class Docker:
         elif args[:2] == ["docker", "exec"] and args[3] == "cat":
             out = {"/sys/fs/cgroup/memory.peak": "5000000000\n", "/sys/fs/cgroup/memory.current": "4000000000\n",
                    "/sys/fs/cgroup/memory.stat": "anon 3000000000\nfile 900000000\nkernel 50000000\nshmem 1000\n"}[args[4]]
+        elif args[:2] == ["docker", "exec"] and args[4] == "-c":
+            pass  # the sender stopped in the container
         elif args[:2] == ["docker", "exec"]:
             return self.sender(args, kwargs)
         return subprocess.CompletedProcess(args, 0, out, "")
+
+    def stopped_sender(self) -> bool:
+        return any(args[:2] == ["docker", "exec"] and args[4] == "-c" and "--drive" in args[5] for args, _ in self.calls)
 
     def restored(self) -> bool:
         ups = [args for args, _ in self.calls if args[:2] == ["docker", "compose"] and "up" in args]
@@ -125,10 +130,27 @@ def test_once_the_cap_is_raised_the_stack_is_put_back_whatever_happens(monkeypat
         docker = Docker(sender)
         with pytest.raises(KeyboardInterrupt):
             measured(monkeypatch, sender, docker=docker)
-        assert docker.restored()
+        assert docker.restored() and docker.stopped_sender()
         return
     docker, code = measured(monkeypatch, sender)
     assert code == 1 and docker.restored()
+    # A sender that timed out is stopped in the container too: killing docker exec leaves it running.
+    assert docker.stopped_sender() is (failure == "timeout")
+
+
+@pytest.mark.parametrize("failure", ["timeout", "interrupted"])
+def test_the_sender_is_stopped_in_the_container_even_when_the_cap_is_kept_raised(monkeypatch, failure):
+    def sender(args, kwargs):  # noqa: ANN001, ANN202
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+        raise KeyboardInterrupt
+    docker = Docker(sender)
+    if failure == "interrupted":
+        with pytest.raises(KeyboardInterrupt):
+            measured(monkeypatch, sender, ["--keep-raised"], docker=docker)
+    else:
+        measured(monkeypatch, sender, ["--keep-raised"], docker=docker)
+    assert docker.stopped_sender() and len([args for args, _ in docker.calls if "up" in args]) == 1
 
 
 def test_kept_raised_only_when_asked(monkeypatch):
@@ -138,9 +160,13 @@ def test_kept_raised_only_when_asked(monkeypatch):
 
 @pytest.mark.parametrize("sessions", [DONE[:7], DONE[:7] + [{"kind": "visit", "file": "v9", "error": "KeyError: 'x'"}],
                                       DONE[:7] + [{"kind": "visit", "file": "v9", "sorting": "unavailable"}]])
-def test_it_fails_unless_all_eight_sessions_came_back_done(monkeypatch, sessions):
-    docker, code = measured(monkeypatch, answering(sessions))
+def test_it_fails_unless_all_eight_sessions_came_back_done_and_gives_no_cap_then(monkeypatch, tmp_path, capsys, sessions):
+    docker, code = measured(monkeypatch, answering(sessions), ["--out", str(tmp_path / "m.json")])
     assert code == 1 and docker.restored()
+    results = json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))
+    assert results["cap_gib"] is None and results["not_whole"]
+    out = capsys.readouterr()
+    assert "The cap" not in out.out and "No cap" in out.err
     assert measure_memory.whole({"sessions": DONE}) == []
 
 
