@@ -22,7 +22,11 @@ namespace Ehr.Domain.Accounts;
 // back, the handler's state travels in the page, protected by Data Protection, for a few minutes, bound to its purpose,
 // to the account and to this sign-in, or for a sign-in to this password step (StaffSignIn.PendingAsync): a state from
 // another account's page, or from another sign-in or password step of the same account, is refused. Every add, refusal
-// and removal is an audit event that names the passkey by a short hash, never its name.
+// and removal is an audit event that names the passkey by a short hash, never its name. Each change holds the account's
+// row first (StaffUserLock), so a locked-out account is refused before a code is checked, every wrong code is counted
+// however requests race, and two adds finishing at once can't both pass the limit; and an add or a removal Identity
+// fails to save throws, so the request's transaction is rolled back with nothing half-saved, and a passkey's row and its
+// audit event always commit together.
 public sealed class StaffPasskeys(
     UserManager<StaffUser> users, IPasskeyHandler<StaffUser> handler, IOptions<IdentityPasskeyOptions> options,
     IDataProtectionProvider dataProtection, AuditRecorder audit, EhrDbContext db, ILogger<StaffPasskeys> logger)
@@ -50,6 +54,11 @@ public sealed class StaffPasskeys(
         if (string.IsNullOrEmpty(name) || name.Length > LongestName)
         {
             return PasskeyCeremony.Refused("Name", $"Not saved: name the passkey, in {LongestName} characters or fewer, such as This Mac.");
+        }
+
+        if (await LockedOutAsync(user, cancellationToken))
+        {
+            return PasskeyCeremony.Refused(null, Locked);
         }
 
         if ((await users.GetPasskeysAsync(user)).Count >= MostPerAccount)
@@ -88,6 +97,11 @@ public sealed class StaffPasskeys(
             return StartAgain;
         }
 
+        if (await LockedOutAsync(user, cancellationToken))
+        {
+            return Locked;
+        }
+
         var made = await handler.PerformAttestationAsync(
             new PasskeyAttestationContext { HttpContext = context, CredentialJson = credentialJson, AttestationState = ceremony.State });
         if (!made.Succeeded)
@@ -104,12 +118,7 @@ public sealed class StaffPasskeys(
         }
 
         made.Passkey.Name = ceremony.Name;
-        var added = await users.AddOrUpdatePasskeyAsync(user, made.Passkey);
-        if (!added.Succeeded)
-        {
-            return "Not saved: " + added.Errors.First().Description;
-        }
-
+        Saved(await users.AddOrUpdatePasskeyAsync(user, made.Passkey));
         audit.Record(AuditActions.PasskeyAdded, tableName: StaffTable, rowId: user.Id, details: Details(made.Passkey.CredentialId));
         await db.SaveChangesAsync(cancellationToken);
         return null;
@@ -120,11 +129,13 @@ public sealed class StaffPasskeys(
     // administrator's authenticator reset ends those.
     public async Task<bool> RemoveAsync(StaffUser user, byte[] credentialId, CancellationToken cancellationToken)
     {
-        if (await users.GetPasskeyAsync(user, credentialId) is null || !(await users.RemovePasskeyAsync(user, credentialId)).Succeeded)
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
+        if (await users.GetPasskeyAsync(user, credentialId) is null)
         {
             return false;
         }
 
+        Saved(await users.RemovePasskeyAsync(user, credentialId));
         audit.Record(AuditActions.PasskeyRemoved, tableName: StaffTable, rowId: user.Id, details: Details(credentialId));
         await db.SaveChangesAsync(cancellationToken);
         return true;
@@ -162,7 +173,8 @@ public sealed class StaffPasskeys(
             return null;
         }
 
-        return (await users.AddOrUpdatePasskeyAsync(user, used.Passkey)).Succeeded ? Details(used.Passkey.CredentialId) : null;
+        Saved(await users.AddOrUpdatePasskeyAsync(user, used.Passkey));
+        return Details(used.Passkey.CredentialId);
     }
 
     // A passkey as the audit log names it: the start of a hash of its credential's ID, the same at every event.
@@ -171,6 +183,33 @@ public sealed class StaffPasskeys(
     static string Details(byte[] credentialId) => JsonSerializer.Serialize(new { passkey = Reference(credentialId) });
 
     const string StaffTable = "staff_users";
+
+    const string Locked = "Not saved: this account is locked after too many failed attempts. Try again in 15 minutes.";
+
+    // The account held for the rest of the request (StaffUserLock), then refused, and the refusal recorded, if it is
+    // locked out: by wrong passwords or codes, at sign-in or here, or disabled.
+    async Task<bool> LockedOutAsync(StaffUser user, CancellationToken cancellationToken)
+    {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
+        if (!await users.IsLockedOutAsync(user))
+        {
+            return false;
+        }
+
+        audit.Record(AuditActions.PasskeyRefused, tableName: StaffTable, rowId: user.Id, reason: "locked out");
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // Identity's store saves a passkey's row before it updates the account, so a failure after it would leave the row
+    // saved without its audit event: it throws instead, and the request's transaction is rolled back.
+    static void Saved(IdentityResult result)
+    {
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException($"A passkey change wasn't saved: {result.Errors.First().Code}.");
+        }
+    }
 
     const string TooMany = "Not saved: an account can have at most 10 passkeys. Remove one first.";
 

@@ -232,6 +232,142 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("/sign-in/enroll", PathOf(next));
     }
 
+    // The final review's probe: five wrong codes lock the account, and from then on no code is checked, the right one
+    // included, at an add's start or at its finish.
+    [Fact]
+    public async Task A_locked_account_is_refused_an_add_even_with_the_right_code()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Locked Adding", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPrem, account);
+        using var authenticator = new TestAuthenticator();
+        using var begun = await OptionsToAddAsync(session.Client, "This Mac", Totp.Code(account.AuthenticatorKey));
+        var (options, state) = await ReadyAsync(begun);
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            using var wrong = await OptionsToAddAsync(session.Client, "This Mac", Totp.WrongCode(account.AuthenticatorKey));
+            Assert.Contains("that code did not match", await wrong.Content.ReadAsStringAsync(Cancel));
+        }
+
+        using var refused = await OptionsToAddAsync(session.Client, "This Mac", Totp.Code(account.AuthenticatorKey));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        var answer = JsonSerializer.Deserialize<JsonElement>(await refused.Content.ReadAsStringAsync(Cancel));
+        Assert.Equal("Not saved: this account is locked after too many failed attempts. Try again in 15 minutes.", answer.GetProperty("problem").GetString());
+        Assert.False(answer.TryGetProperty("options", out _));
+
+        using var finished = await FinishAddAsync(session.Client, authenticator.Create(options, WebApps.OnSiteOrigin), state);
+        Assert.Contains("Not saved: this account is locked after too many failed attempts.", Words(await ReadAsync(finished)));
+        Assert.Empty(await PasskeysAsync(account));
+        Assert.Equal(2, (await EventsAsync(AuditActions.PasskeyRefused, account)).Count(e => e.Reason == "locked out"));
+    }
+
+    // The final review's probe: wrong codes sent at once are each checked and counted, one after another (the account's
+    // row is held), never lost to a failed update and answered 500; the fifth locks the account, and the rest are refused.
+    [Fact]
+    public async Task Many_wrong_codes_at_once_are_all_counted_and_the_fifth_locks_the_account()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Guessing Codes", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPrem, account);
+        var token = Token(await session.Client.GetStringAsync(PasskeysPage, Cancel));
+        const int Sent = 40;
+
+        var answers = await Task.WhenAll(Enumerable.Range(0, Sent).Select(async _ =>
+        {
+            using var response = await session.Client.PostAsync($"{PasskeysPage}?handler=Options",
+                Form(("name", "This Mac"), ("code", Totp.WrongCode(account.AuthenticatorKey)), ("__RequestVerificationToken", token)), Cancel);
+            return (response.StatusCode, Body: await response.Content.ReadAsStringAsync(Cancel));
+        }));
+
+        Assert.All(answers, a => Assert.Equal(HttpStatusCode.UnprocessableEntity, a.StatusCode));
+        Assert.Equal(5, answers.Count(a => a.Body.Contains("that code did not match", StringComparison.Ordinal)));
+        Assert.Equal(Sent - 5, answers.Count(a => a.Body.Contains("this account is locked", StringComparison.Ordinal)));
+        var events = await EventsAsync(AuditActions.PasskeyRefused, account);
+        Assert.Equal(5, events.Count(e => e.Reason == "wrong code"));
+        Assert.Equal(Sent - 5, events.Count(e => e.Reason == "locked out"));
+        await using var scope = apps.OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        Assert.True(await users.IsLockedOutAsync((await users.FindByIdAsync(account.Id.ToString()))!));
+    }
+
+    // The final review's probe: two adds finishing at once with nine stored can't both pass the limit; the one that
+    // does has its event, the other saves nothing.
+    [Fact]
+    public async Task Two_adds_finishing_at_once_with_nine_stored_leave_ten_each_with_its_event()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Two At Once", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPrem, account);
+        for (var added = 0; added < StaffPasskeys.MostPerAccount - 1; added++)
+        {
+            using var authenticator = new TestAuthenticator();
+            using var page = await AddAsync(session.Client, account, authenticator, name: $"Key {added}");
+            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+        }
+
+        using var first = new TestAuthenticator();
+        using var second = new TestAuthenticator();
+        var finishes = new List<(string Credential, string State)>();
+        foreach (var authenticator in new[] { first, second })
+        {
+            using var begun = await OptionsToAddAsync(session.Client, "One of two", Totp.Code(account.AuthenticatorKey));
+            var (options, state) = await ReadyAsync(begun);
+            finishes.Add((authenticator.Create(options, WebApps.OnSiteOrigin), state));
+        }
+
+        var token = Token(await session.Client.GetStringAsync(PasskeysPage, Cancel));
+        var pages = await Task.WhenAll(finishes.Select(async f =>
+        {
+            using var response = await session.Client.PostAsync($"{PasskeysPage}?handler=Add",
+                Form(("credential", f.Credential), ("state", f.State), ("__RequestVerificationToken", token)), Cancel);
+            return Words(await ReadAsync(response));
+        }));
+
+        Assert.Single(pages, p => p.Contains("Passkey added:", StringComparison.Ordinal));
+        Assert.Single(pages, p => p.Contains("an account can have at most 10 passkeys", StringComparison.Ordinal));
+        Assert.Equal(StaffPasskeys.MostPerAccount, (await PasskeysAsync(account)).Count);
+        Assert.Equal(StaffPasskeys.MostPerAccount, (await EventsAsync(AuditActions.PasskeyAdded, account)).Count);
+    }
+
+    // The final review's reading: an add and a removal at once leave the rows and the events agreeing, each row with its
+    // added event, the removed one with its removal.
+    [Fact]
+    public async Task An_add_and_a_removal_at_once_leave_the_rows_and_the_events_agreeing()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Add And Remove", StaffRoles.Clinician);
+        var session = await SignInAsync(apps.OnPrem, account);
+        using var kept = new TestAuthenticator();
+        using var removed = new TestAuthenticator();
+        using (var page = await AddAsync(session.Client, account, removed, name: "Old key"))
+        {
+            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+        }
+
+        using var begun = await OptionsToAddAsync(session.Client, "New key", Totp.Code(account.AuthenticatorKey));
+        var (options, state) = await ReadyAsync(begun);
+        var credential = kept.Create(options, WebApps.OnSiteOrigin);
+        var token = Token(await session.Client.GetStringAsync(PasskeysPage, Cancel));
+
+        var posts = await Task.WhenAll(
+            session.Client.PostAsync($"{PasskeysPage}?handler=Add", Form(("credential", credential), ("state", state), ("__RequestVerificationToken", token)), Cancel),
+            session.Client.PostAsync($"{PasskeysPage}?handler=Remove", Form(("id", Base64Url.EncodeToString(removed.CredentialId)), ("__RequestVerificationToken", token)), Cancel));
+        var pages = new List<string>();
+        foreach (var post in posts)
+        {
+            pages.Add(Words(await ReadAsync(post)));
+            post.Dispose();
+        }
+
+        Assert.Contains("Passkey added:", pages[0]);
+        Assert.Contains("Passkey removed:", pages[1]);
+
+        var stored = Assert.Single(await PasskeysAsync(account));
+        Assert.Equal(kept.CredentialId, stored.CredentialId);
+        Assert.Equal(
+            new[] { StaffPasskeys.Reference(removed.CredentialId), StaffPasskeys.Reference(kept.CredentialId) }.Order(),
+            (await EventsAsync(AuditActions.PasskeyAdded, account)).Select(e => JsonSerializer.Deserialize<JsonElement>(e.Details!).GetProperty("passkey").GetString()!).Order());
+        Assert.Equal(
+            [StaffPasskeys.Reference(removed.CredentialId)],
+            (await EventsAsync(AuditActions.PasskeyRemoved, account)).Select(e => JsonSerializer.Deserialize<JsonElement>(e.Details!).GetProperty("passkey").GetString()!));
+    }
+
     async Task<StaffUser> AccountAsync(StaffAccount account)
     {
         await using var scope = apps.OnPrem.Services.CreateAsyncScope();
