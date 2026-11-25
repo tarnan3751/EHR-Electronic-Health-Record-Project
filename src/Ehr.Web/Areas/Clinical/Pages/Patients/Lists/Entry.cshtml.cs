@@ -129,8 +129,9 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         [nameof(Name), nameof(Reaction), nameof(Severity), nameof(Criticality), nameof(Dosage), nameof(Started), nameof(Stopped), nameof(Onset), nameof(Status)];
 
     // The field that takes the focus: the first with an error; the name on a form with none. None when the database
-    // refused the save: its notice takes the focus instead (data-focus-on-load).
-    public string? Focused => Refused ? null : FieldOrder.FirstOrDefault(Errors.ContainsKey) ?? (Errors.Count == 0 ? nameof(Name) : null);
+    // refused the save, or a dictation's proposal was decided first: its notice takes the focus instead
+    // (data-focus-on-load).
+    public string? Focused => Refused || ProposalDecided ? null : FieldOrder.FirstOrDefault(Errors.ContainsKey) ?? (Errors.Count == 0 ? nameof(Name) : null);
 
     public (string Table, string Kind, string One, string Label) About => Lists[List];
 
@@ -289,7 +290,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
                 ProposedAllergy.Saved => Redirect(Url.Page("/Patients/Notes/Review",
                     new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId, decided = proposed.Row.Id })!),
                 ProposedAllergy.Decided => ProposalNotDecided(),
-                _ => RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id)),
+                _ => NotSaved(),
             };
         }
 
@@ -334,11 +335,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         };
         if (saved != ChartSave.Saved)
         {
-            // Refused by the database (row-level security, or the entry isn't this patient's): the form again, with
-            // what was entered, and a notice that says nothing was saved.
-            Refused = true;
-            Response.StatusCode = StatusCodes.Status409Conflict;
-            return Page();
+            return NotSaved();
         }
 
         // The chart confirms it ("Saved:"), from the entry as the database now holds it.
@@ -351,6 +348,16 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         }
 
         return RedirectToPage("/Patients/Chart", chart);
+    }
+
+    // Refused by the database (row-level security, or the entry isn't this patient's): the form again, with what was
+    // entered, and a notice that says nothing was saved. An allergy a dictation proposed too (step 15): its proposal
+    // stays waiting.
+    PageResult NotSaved()
+    {
+        Refused = true;
+        Response.StatusCode = StatusCodes.Status409Conflict;
+        return Page();
     }
 
     // Nothing saved, the allergy included: the dictation's proposal was decided first, in another tab.

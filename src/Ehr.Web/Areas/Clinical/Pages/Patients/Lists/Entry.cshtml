@@ -55,7 +55,7 @@ else
     @if (Model.ProposalDecided)
     {
         @* Step 15: nothing was added, so nothing waits to be undone. *@
-        <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> this proposal was decided first, in another tab or window. Nothing was added. <a href="@Model.ReviewLink">Go back to the review</a>.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Not saved:</span> this proposal was decided first, in another tab or window. Nothing was added. <a href="@Model.ReviewLink">Go back to the review</a>.</p>
     }
     else if (Model.Errors.Count > 0)
     {
