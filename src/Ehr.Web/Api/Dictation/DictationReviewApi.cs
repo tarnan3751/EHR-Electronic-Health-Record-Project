@@ -200,7 +200,8 @@ public static partial class DictationApi
         if (result.Transcript.Segments.Any(s => !Range(s.Start, s.End))
             || result.NotCarriedOver.Any(s => !Range(s.Start, s.End))) return null;
         // What a dictation proposes (the expansion plan's step 15) is one of its listed instructions, of the same kind, each
-        // once, at most AiChartProposal.MaxPerReview, from a final transcript, with a proposal's warnings only.
+        // once, at most AiChartProposal.MaxPerReview, from a final transcript, with a proposal's warnings only, and what
+        // was heard after it (step 15.1) after it in the transcript, with no speaker.
         var proposals = result.Proposals ?? [];
         // Nothing is proposed from a dictation in Spanish (the expansion plan's step 17): its instructions are listed for the
         // clinician to place, and a result from Spanish that proposes any is refused whole.
@@ -209,7 +210,8 @@ public static partial class DictationApi
             || proposals.DistinctBy(p => (p.Start, p.End)).Count() != proposals.Count
             || proposals.Any(p => !result.NotCarriedOver.Any(i => i.Start == p.Start && i.End == p.End
                     && i.Reason == (p.Kind == ProposalKind.Order ? Instruction.Order : Instruction.AllergyChange))
-                || p.Warnings.Any(w => w.Code == WarningCode.OneFieldHoldsDictation || !Range(w.Start, w.End)))) return null;
+                || p.Warnings.Any(w => w.Code == WarningCode.OneFieldHoldsDictation || !Range(w.Start, w.End))
+                || p.HeardAfter is { } after && (!Range(after.Start, after.End) || after.Start < p.End || after.Speaker is not null))) return null;
         var spoken = result.Transcript.Segments.Any(s => s.Speaker is not null || s.SpeakerGroup is not null) || result.Speakers is not null
             || result.NotCarriedOver.Any(i => i.Speaker is not null)
             || result.Fields is { } said && new[] { said.Subjective, said.Objective, said.Assessment, said.Plan }

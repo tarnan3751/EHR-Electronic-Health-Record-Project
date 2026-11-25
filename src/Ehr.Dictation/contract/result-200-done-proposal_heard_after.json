@@ -1,0 +1,139 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "result",
+  "status": 200,
+  "body": {
+    "transcript": {
+      "text": "Order a CBC. She turned down the blood test. Order a CBC. She turned down the blood test. Order a CBC. She turned down the blood test.",
+      "final": true,
+      "segments": [
+        {
+          "start": 0,
+          "end": 44,
+          "startMs": 0,
+          "endMs": 2490,
+          "final": true,
+          "unclear": null
+        },
+        {
+          "start": 45,
+          "end": 89,
+          "startMs": 2490,
+          "endMs": 5490,
+          "final": true,
+          "unclear": "too_quiet"
+        },
+        {
+          "start": 90,
+          "end": 134,
+          "startMs": 5490,
+          "endMs": 10000,
+          "final": true,
+          "unclear": null
+        }
+      ]
+    },
+    "sorting": "done",
+    "reason": null,
+    "fields": {
+      "subjective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "objective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "assessment": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "plan": {
+        "status": "pending",
+        "value": "She turned down the blood test.",
+        "sources": [
+          {
+            "start": 13,
+            "end": 43
+          }
+        ],
+        "warnings": [
+          {
+            "code": "near_unclear_passage",
+            "start": 45,
+            "end": 89
+          }
+        ]
+      }
+    },
+    "notCarriedOver": [
+      {
+        "reason": "order",
+        "start": 0,
+        "end": 11
+      },
+      {
+        "reason": "order",
+        "start": 45,
+        "end": 56
+      },
+      {
+        "reason": "order",
+        "start": 90,
+        "end": 101
+      }
+    ],
+    "proposals": [
+      {
+        "kind": "order",
+        "start": 0,
+        "end": 11,
+        "warnings": [],
+        "heardAfter": {
+          "start": 13,
+          "end": 44
+        }
+      },
+      {
+        "kind": "order",
+        "start": 90,
+        "end": 101,
+        "warnings": [
+          {
+            "code": "near_unclear_passage",
+            "start": 45,
+            "end": 89
+          }
+        ],
+        "heardAfter": {
+          "start": 103,
+          "end": 134
+        }
+      }
+    ],
+    "provenance": {
+      "speech": {
+        "repository": "google/medasr",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "language": {
+        "repository": "IFM/K2-Horizon-7B-GGUF",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "K2-Horizon-7B-Q4_K_M.gguf",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "llamaServer": "b11669-620d2225",
+      "prompt": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "schema": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "structuring": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "code": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
+}

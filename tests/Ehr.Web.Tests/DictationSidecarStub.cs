@@ -66,7 +66,9 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
 
     // Two plain instructions said after the chunks' sentences, once the dictation has stopped: an order and an allergy to
     // add, each listed as not carried over and proposed (the expansion plan's step 15), the allergy with a warning. Both
-    // kinds, so a test that follows a proposal to a signed order or a saved allergy has one of each to follow.
+    // kinds, so a test that follows a proposal to a signed order or a saved allergy has one of each to follow. What was
+    // heard after each is as the service finds it (step 15.1): the allergy's sentence after the order, nothing after the
+    // allergy.
     public bool Proposals { get; set; }
 
     // Said before the order, in its sentence, when set: a long one, for a page to wrap.
@@ -329,7 +331,7 @@ public sealed partial class DictationSidecarStub : HttpMessageHandler
             notCarriedOver = [new { reason = "order", start = order.Start, end = order.End }, new { reason = "allergy_change", start = allergy.Start, end = allergy.End }];
             proposals = new object[]
             {
-                new { kind = "order", start = order.Start, end = order.End, warnings = Array.Empty<object>() },
+                new { kind = "order", start = order.Start, end = order.End, warnings = Array.Empty<object>(), heardAfter = new { start = allergy.Start, end = allergy.End + 1 } },
                 new { kind = "allergy_addition", start = allergy.Start, end = allergy.End, warnings = new[] { new { code = "possible_correction", start = allergy.Start + 4, end = allergy.Start + 14 } } },
             };
         }

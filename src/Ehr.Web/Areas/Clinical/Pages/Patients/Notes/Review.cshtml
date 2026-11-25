@@ -174,13 +174,15 @@
                     </div>
                 }
             </dl>
-            @* The expansion plan's step 15: what the dictation proposes beyond the note, each opened in its form, where it is
-               signed or saved through every check of that form, or dismissed here. None holds up this review or signing. *@
+            @* The expansion plan's step 15: what the dictation proposes beyond the note, each in the clinician's words as heard,
+               with what was heard after it (step 15.1, so a retraction the service's rules don't read is in view beside the
+               button, as said and never judged), opened in its form, where it is signed or saved through every check of that
+               form, or dismissed here. None holds up this review or signing. *@
             @if (Model.ChartProposals.Count > 0)
             {
                 <section data-chart-proposals aria-labelledby="chart-proposals">
                     <h2 id="chart-proposals" tabindex="-1" autofocus="@(Model.Decided is not null && Model.NextProposal is null)">Proposed orders and allergies</h2>
-                    <p class="sc-prose">Dictation proposes these from what you said and places or saves none of them. Open each in its form to check every field and sign or save it there, or dismiss it. They don't hold up this review or signing the note.</p>
+                    <p class="sc-prose">Dictation proposes these from what you said and places or saves none of them. Each shows what you said after it. Open each in its form to check every field and sign or save it there, or dismiss it. They don't hold up this review or signing the note.</p>
                     @if (!OnPrem.IsReachable)
                     {
                         <p class="sc-muted" data-chart-proposals-offline>Opening or dismissing a proposal needs the clinic's server. The review remains readable.</p>
@@ -191,7 +193,11 @@
                             var row = proposed.Row;
                             <li class="sc-proposal" data-chart-proposal="@row.Id" data-review-state="@row.State" data-chart-proposal-start="@proposed.Start" data-chart-proposal-end="@proposed.End">
                                 <p class="sc-proposal__head"><span class="sc-proposal__field">@proposed.KindWords</span> <span class="@(proposed.Waiting ? "sc-tag sc-tag--warning" : row.State == AiChartProposalStates.Dismissed ? "sc-tag" : "sc-tag sc-tag--success")" data-chart-proposal-state>@proposed.StateWords</span></p>
-                                <p class="sc-proposal__value" data-chart-proposal-words>@proposed.Before<mark class="sc-transcript__source">@proposed.Words</mark>@proposed.After</p>
+                                <p class="sc-proposal__value" data-chart-proposal-words><span class="sc-proposal__field">As heard:</span> @proposed.Before<mark class="sc-transcript__source">@proposed.Words</mark>@proposed.After</p>
+                                @if (proposed.HeardAfter.Length > 0)
+                                {
+                                    <p class="sc-proposal__value" data-chart-proposal-heard-after><span class="sc-proposal__field">Heard after it:</span> @proposed.HeardAfter</p>
+                                }
                                 @* Its warnings only while it waits: once decided, there is nothing left to check them for. *@
                                 @if (proposed.Waiting)
                                 {

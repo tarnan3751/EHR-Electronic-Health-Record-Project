@@ -62,7 +62,7 @@ Copy already in the apps that sets the tone:
 - Off-site notice: "Read-only: the clinic's server can't be reached. You can look at records, but the newest changes may not appear yet, and nothing can be saved until it's back."
 - Dictation offline: "Dictation needs the clinic's server, which can't be reached right now. You can still type the note once it's back."
 - Dictation notice: "Nothing is saved: each proposed field waits for your review, and orders and allergy changes are never filled in from dictation."
-- A form opened from what a dictation proposed (the plan's step 15): "Proposed from dictation: check every field. Nothing here was filled in from it."
+- A form opened from what a dictation proposed (the plan's step 15): "Proposed from dictation: check every field. Nothing here was filled in from it.", then the dictated words after "As heard:", and what was heard after them after "Heard after it:" (step 15.1), as on the review, where both sit above the proposal's button: the words as said, never a judgment of them.
 - Emergency access: "Emergency access: this patient is not on your panel. Your access and the reason you gave are recorded for review."
 - Buttons name the action exactly: "Sign note…", "Confirm and sign note", "Open the chart", "Send a new link", "Keep mine". Never "OK", "Submit" or "Yes".
 - Status words are short and literal: "Signed · read-only", "Awaiting review", "Left empty", "Not sent yet", "Mine (not saved)", "Theirs (saved)".

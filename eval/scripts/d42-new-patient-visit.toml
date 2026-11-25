@@ -128,6 +128,7 @@ sources = [
 words = "refill the omeprazole"
 why = "not_plain"
 
-[[not_proposed]]
+[[proposals]]
+kind = "allergy_addition"
 words = "Put penicillin on his allergy list"
-why = "names_no_item"
+item = "penicillin"

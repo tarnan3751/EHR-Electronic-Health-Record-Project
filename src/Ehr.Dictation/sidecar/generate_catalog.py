@@ -7,6 +7,11 @@
   (db/reference/10-clinical-codes.sql, kinds medication and allergen, system rxnorm).
 - Allergens: every allergen the chart's codes hold (db/reference/10-clinical-codes.sql, kind allergen: RxNorm
   ingredients and UNII foods and environmental substances).
+- Common names (db/reference/dictation-names.toml, the expansion plan's step 15.1): a name a clinician dictates for an
+  item the reference data holds under another name ("penicillin", "latex", "CRP", "A1c"), each written whole as a name
+  of its own, of its kind only, and refused unless every code it stands for is in the reference data as that kind; and
+  those written as one word of letters and digits ("A1c", "HbA1c") listed again, in WHOLE_WORDS, the only such words a
+  proposal reads whole.
 
 An orderable that is a medication (an RxNorm drug, medication or ingredient, or a common catalog item of type
 medication) is marked "+" before its name: only a medication can be refilled, prescribed, renewed, called in or sent to
@@ -18,9 +23,9 @@ where it starts in a drug's; a LOINC order's component, before its property, sys
 whole name), an abbreviation given in parentheses ("Complete blood count (CBC)"), a brand in brackets ("[Prinivil]"),
 and a common catalog item's name, to its first comma or parenthesis. An item must begin with one of them whole and may
 go on along its name (validation.is_item()). So "lisinopril", "lisinopril 10 mg oral tablet", "CBC", "chest x-ray" and
-"lipid panel" can be items, and "morning", "pain", "normal" or "chest" alone can't. Names that come out the same are written once. Nothing is
-added by hand: a word the reference data doesn't hold is never part of an item. Run it after changing any of those
-files; a test fails while the copy is out of date.
+"lipid panel" can be items, and "morning", "pain", "normal" or "chest" alone can't. Names that come out the same are
+written once. Nothing else is added by hand: a word neither the reference data nor a common name holds is never part of
+an item. Run it after changing any of those files; a test fails while the copy is out of date.
 
 The names are a derived copy of LOINC's, RxNorm's and the FDA's UNII names, and carry their notices (catalog.py's
 header, and docs/expansion/reference-data.md, "Licenses and attribution").
@@ -32,6 +37,7 @@ from __future__ import annotations
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 SIDECAR = Path(__file__).resolve().parent
@@ -40,6 +46,7 @@ OUTPUT = SIDECAR / "ehr_dictation" / "catalog.py"
 CLINICAL_CODES = "db/reference/10-clinical-codes.sql"
 ORDER_CATALOG = "db/reference/20-order-catalog.sql"
 SCHEMA = "db/migrations/schema.sql"
+NAMES = "db/reference/dictation-names.toml"
 COMMON_ITEM = re.compile(r"VALUES \('(SYN-[A-Z]+-\d+)', '((?:[^']|'')*)', '(\w+)'\)")
 
 sys.path.insert(0, str(SIDECAR))
@@ -116,6 +123,27 @@ def whole(display: str) -> str:
     return name(display, [(0, len(display))])
 
 
+def common_names(repository: Path, orderables: dict[str, str], allergens: set[str]) -> tuple[set[str], set[str]]:
+    """The common names (NAMES) of each kind, orderables (each marked "+" when every code it stands for is a
+    medication) and allergens, each written whole. `orderables` gives each order catalog code its type; `allergens`
+    holds each allergen as system:code. A code that isn't one of its kind stops the generator."""
+    entries = tomllib.loads((repository / NAMES).read_text(encoding="utf-8")).get("name", [])
+    kinds: dict[str, set[str]] = {"orderable": set(), "allergen": set()}
+    for entry in entries:
+        known = orderables if entry["kind"] == "orderable" else allergens if entry["kind"] == "allergen" else {}
+        missing = [code for code in entry["codes"] if code not in known]
+        if missing or not entry["codes"]:
+            raise SystemExit(
+                f"{NAMES}: {entry['name']!r} stands for codes the reference data doesn't hold as an {entry['kind']}: "
+                f"{', '.join(missing) or 'none given'}."
+            )
+        if not entry.get("source", "").strip():
+            raise SystemExit(f"{NAMES}: {entry['name']!r} says no source for its name.")
+        medication = entry["kind"] == "orderable" and all(orderables[code] == "medication" for code in entry["codes"])
+        kinds[entry["kind"]].add(("+" if medication else "") + whole(entry["name"]))
+    return kinds["orderable"], kinds["allergen"]
+
+
 def names(repository: Path = REPOSITORY) -> tuple[list[str], list[str], dict[str, int]]:
     """The orderables' and the allergens' names, each sorted and once, and how many rows each source gave."""
     codes = copy_rows(repository / CLINICAL_CODES, "incoming_codes")
@@ -133,10 +161,15 @@ def names(repository: Path = REPOSITORY) -> tuple[list[str], list[str], dict[str
     drugs += [display for _, kind, display, *_ in catalog if kind == "medication"]
     substances = [display for kind, _, _, display, _ in codes if kind == "allergen"]  # ingredients, foods and the rest
     labs = [display for _, kind, display, *_ in catalog if kind == "lab"]
+    named_orderables, named_allergens = common_names(
+        repository,
+        {code: kind for code, kind, *_ in catalog} | {code: kind for code, _, kind in common_items},
+        {f"{system}:{code}" for kind, system, code, *_ in codes if kind == "allergen"},
+    )
     counts = {
         "order catalog": len(catalog), "common catalog items": len(common_items),
         "RxNorm medications": len([1 for kind, system, *_ in codes if kind == "medication" and system == "rxnorm"]),
-        "allergens": len(substances),
+        "allergens": len(substances), "common names": len(named_orderables) + len(named_allergens),
     }
     medications = (
         {drug(display, ingredients) for display in drugs}
@@ -149,18 +182,27 @@ def names(repository: Path = REPOSITORY) -> tuple[list[str], list[str], dict[str
     )
     allergens = {whole(display) for display in substances}
     marked = [("+" if name in medications else "") + name for name in sorted(orderables - {""})]
-    return marked, sorted(allergens - {""}), counts
+    marked = sorted(set(marked) | named_orderables, key=lambda name: name.lstrip("+"))
+    return marked, sorted((allergens | named_allergens) - {""}), counts
+
+
+def whole_words(repository: Path = REPOSITORY) -> tuple[str, ...]:
+    """The common names (NAMES) written as one word of letters and digits ("A1c"), in lower case, which a plain
+    instruction reads whole (validation.ONE_WORD); every other word of letters and digits is read with its digits apart."""
+    entries = tomllib.loads((repository / NAMES).read_text(encoding="utf-8")).get("name", [])
+    return tuple(sorted(entry["name"].lower() for entry in entries if re.fullmatch(r"[A-Za-z]+\d+[A-Za-z]*", entry["name"])))
 
 
 def render(repository: Path = REPOSITORY) -> str:
     orderables, allergens, counts = names(repository)
     sources = "; ".join(f"{source} {count}" for source, count in counts.items())
     return (
-        '"""Generated by src/Ehr.Dictation/sidecar/generate_catalog.py from the reference data: change that script or the\n'
-        "files it reads, not this one. The names a dictated order (ORDERABLES) or allergy to add (ALLERGENS) may name to be\n"
-        "proposed (validation.py, \"plain\"), one a line, as their words in lower case without numbers, each standalone run\n"
-        "marked \"^\" before its first word and \"$\" after its last, and a medication's \"+\" before it. Read only when a\n"
-        "proposal is weighed.\n"
+        '"""Generated by src/Ehr.Dictation/sidecar/generate_catalog.py from the reference data and its common names\n'
+        "(db/reference/dictation-names.toml): change that script or the files it reads, not this one. The names a dictated\n"
+        "order (ORDERABLES) or allergy to add (ALLERGENS) may name to be proposed (validation.py, \"plain\"), one a line, as\n"
+        "their words in lower case without numbers, each standalone run marked \"^\" before its first word and \"$\" after\n"
+        "its last, and a medication's \"+\" before it; and the common names written as one word of letters and digits\n"
+        "(WHOLE_WORDS), which a proposal reads whole. Read only when a proposal is weighed.\n"
         f"From: {sources} rows.\n\n"
         "A derived copy of names from three sources, which ask for these notices (docs/expansion/reference-data.md):\n"
         "- RxNorm: This product uses publicly available data courtesy of the U.S. National Library of Medicine (NLM),\n"
@@ -174,7 +216,8 @@ def render(repository: Path = REPOSITORY) -> str:
         "  license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc.\n"
         '  The version used is 2.83."""\n\n'
         f'ORDERABLES = """\n{chr(10).join(orderables)}\n"""\n\n'
-        f'ALLERGENS = """\n{chr(10).join(allergens)}\n"""\n'
+        f'ALLERGENS = """\n{chr(10).join(allergens)}\n"""\n\n'
+        f"WHOLE_WORDS = {whole_words(repository)!r}\n"
     )
 
 

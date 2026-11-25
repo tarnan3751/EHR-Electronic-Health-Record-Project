@@ -74,9 +74,10 @@ sources = [
 words = "send it to her usual pharmacy"
 why = "names_no_item"
 
-[[not_proposed]]
+[[proposals]]
+kind = "allergy_addition"
 words = "add latex to her allergy list"
-why = "names_no_item"
+item = "latex"
 
 [[proposals]]
 kind = "order"
