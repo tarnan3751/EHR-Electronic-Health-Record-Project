@@ -31,6 +31,11 @@ x-web-app: &web-app
     Ehr__CloudAudit__Key: ${EHR_CLOUD_AUDIT_KEY:?set it in infra/compose/.env}
     # Listening to a visit (step 16) ships switched off; this stack, with synthetic data only, switches it on.
     Ehr__Ambient__Enabled: "true"
+    # Staff passkeys (step 19): tied to the parent domain both staff sites share, so one passkey works on-site and
+    # off-site, and accepted only from those two addresses, never the portal's.
+    Ehr__Passkeys__Domain: example.com
+    Ehr__Passkeys__Origins__0: https://ehr.example.com:${ONPREM_HTTPS_PORT:-8443}
+    Ehr__Passkeys__Origins__1: https://ehr-remote.example.com:${CLOUD_HTTPS_PORT:-9443}
 
 x-postgres-healthcheck: &postgres-healthcheck
   test: ["CMD", "pg_isready", "-U", "postgres"]

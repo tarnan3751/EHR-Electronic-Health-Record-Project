@@ -76,6 +76,9 @@ builder.Services.PostConfigure<SiteAddresses>(addresses =>
     addresses.ClinicalBaseUrl = siteAddresses.ClinicalBaseUrl;
     addresses.PortalBaseUrl = siteAddresses.PortalBaseUrl;
 });
+// Passkeys for staff (step 19), optional: the domain they are tied to and the staff sites' addresses, checked here, so a
+// deployment with a wrong one fails at startup, with what to set; with neither, outside Development, there are none.
+builder.Services.AddSingleton(PasskeySettings.Checked(builder.Configuration.GetSection(PasskeySettings.Section).Get<PasskeySettings>(), builder.Environment.IsDevelopment()));
 // Only the on-prem app hashes enrollment codes (the cloud app forwards those posts), so only it holds the key: the
 // cloud server has a copy of the codes' table, and the key beside it would undo what the key is for.
 builder.Services.AddSingleton(site != Site.OnPrem

@@ -15,8 +15,8 @@ namespace Ehr.Domain.Accounts;
 public static class AccountServiceCollectionExtensions
 {
     // Accounts, sign-in and authorization: Identity for the two kinds of account, each with its own store and its own
-    // cookie; the policies attached to the areas; and the services the pages call. The host adds the AuditSource and,
-    // on the on-prem site, AdminBootstrap.
+    // cookie; staff passkeys; the policies attached to the areas; and the services the pages call. The host adds the
+    // AuditSource, the checked PasskeySettings and, on the on-prem site, AdminBootstrap.
     public static IServiceCollection AddEhrAccounts(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<BootstrapOptions>(configuration.GetSection(BootstrapOptions.Section));
@@ -50,6 +50,19 @@ public static class AccountServiceCollectionExtensions
             .AddUserStore<ProtectedTokenStore<PatientUser, PatientUserClaim, PatientUserLogin, PatientUserToken, IdentityUserPasskey<Guid>>>()
             .AddClaimsPrincipalFactory<PatientClaimsPrincipalFactory>()
             .AddDefaultTokenProviders();
+
+        // A passkey in place of the authenticator code, for staff only (step 19). Identity's own handler makes and checks
+        // the ceremonies, called directly: SignInManager's passkey methods keep their state in Identity's
+        // two-factor cookie and sign in without the password. The person must be verified by the device (a PIN, a
+        // fingerprint, a face) both when a passkey is made and whenever it is used, and only the staff sites' own
+        // addresses may make or use one (PasskeySettings).
+        services.AddScoped<IPasskeyHandler<StaffUser>, PasskeyHandler<StaffUser>>();
+        services.AddOptions<IdentityPasskeyOptions>().Configure<PasskeySettings>((options, passkeys) =>
+        {
+            options.ServerDomain = passkeys.Domain;
+            options.UserVerificationRequirement = "required";
+            options.ValidateOrigin = context => ValueTask.FromResult(!context.CrossOrigin && passkeys.Allows(context.Origin));
+        });
 
         services.AddAuthentication(AccountSchemes.Default)
             .AddPolicyScheme(AccountSchemes.Default, "Staff or patient cookie, by path",

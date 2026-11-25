@@ -175,7 +175,7 @@ The account is created at the next start if there are no staff accounts yet. The
 
 The local server stack sets them from `infra/compose/.env` (`EHR_ENROLLMENT_KEY`; the addresses are in `compose.yaml`).
 
-**Optional:** `Ehr:Lab:Key`, the key a lab's system calls the on-prem app with; without it there is no lab and its door isn't there (see [Simulated lab](#simulated-lab)). `RateLimits:LabRequestsPerMinute` (default 120) is how many requests with the lab's key that door takes a minute, and `RateLimits:LabKeylessRequestsPerMinute` (default 30) how many others, in a window of their own.
+**Optional:** `Ehr:Passkeys:Domain` and `Ehr:Passkeys:Origins`, for staff passkeys (the plan's step 19): the domain a passkey is tied to, the parent domain both staff sites share, such as `example.com`, and the staff sites' exact addresses under it, such as `https://ehr.example.com:8443` and `https://ehr-remote.example.com:9443` (never the portal's). Both or neither: without them, outside Development, there are no passkeys, and in Development they are `localhost` and the local address. A passkey is accepted only from those addresses, and changing the domain later means adding passkeys again; the authenticator app still works. The local stack sets them in `compose.yaml`. `Ehr:Lab:Key`, the key a lab's system calls the on-prem app with; without it there is no lab and its door isn't there (see [Simulated lab](#simulated-lab)). `RateLimits:LabRequestsPerMinute` (default 120) is how many requests with the lab's key that door takes a minute, and `RateLimits:LabKeylessRequestsPerMinute` (default 30) how many others, in a window of their own.
 
 **In VS Code:** open the repository folder, then use Terminal → Run Task:
 
