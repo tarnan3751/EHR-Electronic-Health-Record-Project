@@ -61,10 +61,20 @@ def test_an_offered_field_has_no_refusal():
     assert found(offered)["answers"]["refused"] == 0
 
 
-def test_a_gold_statement_the_checks_refuse_is_a_false_refusal_of_the_gold():
+def test_a_gold_statement_the_checks_refuse_is_a_false_refusal_of_the_gold(monkeypatch):
+    # Whatever the checks say of a held-out script's gold is reported, never pinned: the checks' verdict here is a
+    # stand-in's, so the tightening round's lists can change without a test to change.
     (h01,) = [script for script in SCRIPTS.values() if script.id.startswith("h01")]
-    assert {(e["field"], e["english"], tuple(e["reasons"])) for e in refusals.of_gold([h01])} >= {
-        ("objective", "Positive Lasègue sign in the right leg at 40 degrees.", ("translation_adds_words",))}
+    refused = h01.statements["objective"][0].english
+    monkeypatch.setattr(refusals, "refused_alone",
+                        lambda name, statement, transcript: ["a_reason"] if statement["english"] == refused else [])
+    assert [(e["script"], e["field"], e["english"], e["reasons"]) for e in refusals.of_gold([h01])] == [
+        (h01.id, "objective", refused, ["a_reason"])]
+    monkeypatch.setattr(refusals, "refused_alone", lambda name, statement, transcript: [])
+    assert refusals.of_gold([h01]) == []
+
+
+def test_the_test_sets_gold_has_no_false_refusal():
     test_set = [script for script in SCRIPTS.values() if script.path.parent != HOLDOUT_DIR]
     assert refusals.of_gold(test_set) == []
 

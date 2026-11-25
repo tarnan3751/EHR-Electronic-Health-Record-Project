@@ -115,15 +115,20 @@ def test_what_the_script_names_is_in_it(script):
         assert said_month(iso, display), iso
 
 
+# The Spanish months' names, the test's own, not the checks' table (spanish.MONTHS), so a script's dates are checked as
+# structure whatever that table holds; September has two.
+MONTHS_ES = (("enero",), ("febrero",), ("marzo",), ("abril",), ("mayo",), ("junio",), ("julio",), ("agosto",),
+             ("septiembre", "setiembre"), ("octubre",), ("noviembre",), ("diciembre",))
+
+
 def said_month(iso: str, display: str) -> bool:
     """Whether the display text names the date's month, by any of its Spanish names ("septiembre" or "setiembre")."""
-    english = list(dict.fromkeys(spanish.MONTHS.values()))[int(iso[5:7]) - 1]
-    folded = spanish.fold(display)
-    return any(re.search(rf"\b{name}\b", folded) for name, month in spanish.MONTHS.items() if month == english)
+    text = display.lower()
+    return any(re.search(rf"\b{name}\b", text) for name in MONTHS_ES[int(iso[5:7]) - 1])
 
 
-# spanish.MONTHS holds September twice, so the month a date names isn't its place among the table's keys: November was
-# read as "octubre" (the held-out scripts' author's finding, 2026-11-24).
+# September has two names, so the month a date names isn't its place among a list of names: November was read as
+# "octubre" when the checks' table was used (the held-out scripts' author's finding, 2026-11-24).
 @pytest.mark.parametrize(("iso", "display", "said"), [
     ("2026-11-03", "Vista el 3 de noviembre.", True), ("2026-11-03", "Vista el 3 de octubre.", False),
     ("2026-10-03", "Vista el 3 de octubre.", True), ("2026-10-03", "Vista el 3 de setiembre.", False),
@@ -200,14 +205,15 @@ def written(tmp_path, folder: str, replacements: list[tuple[str, str]]):  # noqa
     return load_scripts(tmp_path / folder)[0]
 
 
-# A drug the checks don't read from its Spanish (azitromicina, as azitromycin), well formed: what a held-out script may
-# say, and the test set's may not.
-OFF_LIST = [("nitrofurantoína", "azitromicina"), ("nitrofurantoin", "azithromycin"), ("Nitrofurantoin", "Azithromycin")]
+# A drug the checks don't read from its Spanish, well formed: what a held-out script may say, and the test set's may
+# not. Made up ("zentarimicina", read by the checks as "zentarimycin"), so no list the tightening round widens takes it.
+OFF_LIST = [("nitrofurantoína", "zentarimicina"), ("nitrofurantoin", "zentarithromycin"),
+            ("Nitrofurantoin", "Zentarithromycin")]
 
 
 def test_a_held_out_script_with_a_word_off_the_checks_lists_passes_the_format_tests(tmp_path):
     script = written(tmp_path, HOLDOUT_DIR.name, OFF_LIST)
-    assert held_out(script) and "azithromycin" not in spanish.drug_candidates("azitromicina")
+    assert held_out(script) and "zentarithromycin" not in spanish.drug_candidates("zentarimicina")
     assert format_failures(script) == []
     # The same file in the test set's folder is held to the checks' reading too.
     other = written(tmp_path, "scripts-es", OFF_LIST)
@@ -217,7 +223,7 @@ def test_a_held_out_script_with_a_word_off_the_checks_lists_passes_the_format_te
 @pytest.mark.parametrize("broken", [
     [("spanish = [\"No está embarazada.\"]", "spanish = [\"No está embarazada ahora.\"]")],  # a source not in the text
     [("spanish = [\"No está embarazada.\"]", "spanish = [\"No está embaraz\"]")],  # a source cut inside a word
-    [("drugs = [\"azitromicina\"]", "drugs = [\"fosfomicina\"]")],  # a drug listed that the text doesn't say
+    [("drugs = [\"zentarimicina\"]", "drugs = [\"fosfomicina\"]")],  # a drug listed that the text doesn't say
     [("negated = [\"fever\", \"low back pain\"]", "negated = [\"fever\", \"chest pain\"]")],  # a finding not in the gold
     [("retracted = [\"50 mg\", \"3 días\"]", "retracted = [\"50 mg\", \"4 días\"]")],  # a retraction not in the text
     [("voice = \"ef_dora\"", "voice = \"af_bella\"")],  # a voice the set doesn't have
