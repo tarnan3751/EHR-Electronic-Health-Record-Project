@@ -112,8 +112,11 @@ statement:
      valorar" are doubt, as "seems", "appears to be", "apparently", "looks like", "working diagnosis", "presumptive",
      "being considered" and "to be evaluated" are, and "may be", "might be" and "could be" after any subject, where
      validation.py reads them only after a pronoun (the owner's ruling of 2026-11-24, "Blood pressure may be rising"),
-     so a "may be" of leave ("the dose may be repeated") is refused as doubt added, a known false refusal; "nada de" is
-     a negation; "se descartó" and "descartado" are
+     so a "may be" of leave ("the dose may be repeated") is refused as doubt added, a known false refusal; but "may",
+     "might" or "could" with "be" and a past participle ("school may be resumed", "transfer could be arranged", "it may
+     be bandaged") never stands for a doubt the Spanish says (LEAVE): it says what may be done, not what may be so, so
+     "Chickenpox. School may be resumed in 1 week." for "Posible varicela. Volver al colegio en una semana." is a doubt
+     dropped, whether or not the finding is one the glossary pairs; "nada de" is a negation; "se descartó" and "descartado" are
      a negation, as "ruled out" is; "hace años", "el año pasado", "en el pasado", "previamente", "previo" and "antiguo"
      are the past, as "years ago", "last year", "in the past", "previously", "prior", "previous", "old" and "remote"
      are (MORE_ENGLISH, read as validation.py's own cues are); and "en la familia" is someone else, as "in the family"
@@ -1178,6 +1181,22 @@ MORE_ENGLISH = (
                          re.compile(r"\b(?:in (?:the|her|his|their) family|runs in the family)\b", re.I),
                          None, False, validation.TERMINATORS | validation.REPORTING),
 )
+# "May", "might" or "could" with "be" and a past participle: leave or a possibility of something done ("school may be
+# resumed", "transfer could be arranged", "cream may be applied", "it may be bandaged"), never a doubt the Spanish says
+# (the owner's ruling of 2026-11-24 keeps it refused as a doubt added). A participle: a word of five letters or more
+# ending in "ed", or one of the irregular ones a plan says.
+LEAVE = re.compile(
+    r"\b(?:may|might|could)\s+be\s+(?=(?:\w{3,}ed|seen|given|taken|done|made|kept|held|sent|shown|brought|put|set|left|"
+    r"begun|written|drawn|worn|driven|eaten|known|run|withdrawn|undertaken|overseen|split|cut|spread|fed|led|met|paid|"
+    r"read|sold|told|found|got|gotten|won|broken|chosen|frozen|spoken|stolen|woken|hidden|ridden|risen)\b)",
+    re.IGNORECASE)
+
+
+def _without_leave(text: str) -> str:
+    """The text with each LEAVE hedge's words blanked, the same length, so no cue reads them."""
+    return LEAVE.sub(lambda m: " " * len(m.group()), text)
+
+
 _NAMES = {"negation_dropped": "negation", "experiencer_dropped": "experiencer", "certainty_dropped": "certainty",
           "history_dropped": "history"}
 
@@ -2021,9 +2040,12 @@ def _compare(result: _Statement, ctx: _Context) -> None:
         reasons.add("action_changed")
 
     in_english = _english_qualified(english)
+    # A doubt the Spanish says needs one the English says of something, not a hedge of leave (LEAVE); a doubt added is
+    # read with every hedge.
+    kept = _english_qualified(_without_leave(english))
     for kind in ("negation", "certainty", "history", "experiencer"):
         in_spanish = bool(ctx.qualified[kind] & set(inside))
-        if in_spanish and not in_english[kind]:
+        if in_spanish and not kept[kind]:
             reasons.add(f"{kind}_dropped")
         elif in_english[kind] and not in_spanish:
             reasons.add(f"{kind}_added")

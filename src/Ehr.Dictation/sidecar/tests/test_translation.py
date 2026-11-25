@@ -558,6 +558,41 @@ def test_may_be_as_leave_is_read_as_doubt_too_a_known_false_refusal():
     assert reasons(text, [text], "The acetaminophen dose may be repeated.") == ["certainty_added"]
 
 
+# A hedge of leave ("may", "might" or "could" with "be" and a past participle) never stands for a doubt the Spanish says
+# (translation.LEAVE), whether or not the doubted finding is one the glossary pairs: the review's five, each refused
+# with the doubt dropped and offered with it kept. It is still a doubt added where the Spanish has none (above).
+LEAVE_CASES = [
+    ("Posible varicela. Volver al colegio en una semana.", "Chickenpox. School may be resumed in 1 week.",
+     "Possible chickenpox. School may be resumed in 1 week."),
+    ("Probable ictus. Se puede trasladar.", "Stroke. Transfer could be arranged.",
+     "Probable stroke. Transfer could be arranged."),
+    ("Posible esguince de tobillo, se puede vendar.", "Ankle sprain; bandage may be applied.",
+     "Possible ankle sprain; bandage may be applied."),
+    ("Sospecha de gripe. Puede volver al trabajo en tres días.", "Influenza. Return to work may be allowed in 3 days.",
+     "Suspected influenza. Return to work may be allowed in 3 days."),
+    ("Posible culebrilla. Se puede aplicar crema.", "Shingles. Cream may be applied.",
+     "Possible shingles. Cream may be applied."),
+    ("Posible esguince de tobillo, se puede vendar.", "Ankle sprain; it may be bandaged.",
+     "Possible ankle sprain; it may be bandaged."),
+]
+
+
+@pytest.mark.parametrize(("text", "dropped", "kept"), LEAVE_CASES)
+def test_a_hedge_of_leave_never_stands_for_a_doubt_the_spanish_says(text, dropped, kept):
+    assert reasons(text, [text], dropped, field="assessment") == ["certainty_dropped"]
+    assert reasons(text, [text], kept, field="assessment") == []
+
+
+def test_a_hedge_before_what_may_be_so_still_stands_for_the_doubt_and_a_participle_never_does():
+    assert reasons("Puede que esté subiendo la tensión.", ["Puede que esté subiendo la tensión."],
+                   "Blood pressure may be rising.", field="assessment") == []
+    assert reasons("Podría ser una fractura.", ["Podría ser una fractura."], "A fracture could be present.",
+                   field="assessment") == []
+    # A participle read as a state is read as leave too: refused, a known false refusal on the strict side.
+    assert reasons("Puede que esté elevada la tensión.", ["Puede que esté elevada la tensión."],
+                   "Blood pressure may be elevated.", field="assessment") == ["certainty_dropped"]
+
+
 # What validation.py reads as doubt in English, the Spanish reads in its words: "I doubt" is a negation as well.
 DOUBT_WORDS = [
     ("Dudo que tenga faringitis.", "I doubt she has pharyngitis.", ["negation_dropped", "certainty_dropped"]),
