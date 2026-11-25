@@ -1,8 +1,8 @@
 {
  "run": "A in English: K2 Horizon on the English test set's text, no speech recognition (the expansion plan's step 17)",
  "set": "en",
- "started_at": "2026-11-24T11:21:41+00:00",
- "finished_at": "2026-11-24T11:42:00+00:00",
+ "started_at": "2026-11-25T03:19:00+00:00",
+ "finished_at": "2026-11-25T03:39:38+00:00",
  "machine": {
   "label": "Apple M5, 24 GB, macOS 26.5.1 (developer Mac; not the server)",
   "description": "Apple M5, 24 GB, macOS 26.5.1",
@@ -29,8 +29,8 @@
   "prompt": "f06ae1fa7c90f4db0b15d0f6225d2b815d1390947ee4eeee54b13fecdbb4eff0",
   "schema": "b637e36b598d1ef532175d2cdcba2fac7bfe285613afac01de260bb486e59e29",
   "structuring": "108605225034ec804365d792bab3aec84891655614b4699049a6bbe62a268d7d",
-  "checks": "f94e37e90077280c4d3d763f5fb132adab43fcf1b2a7050b4507bb3cc8fc2c0f",
-  "pipeline": "d33a25844a0d1be1066cda57e24c9c779bc8cee9d74578370ccb97d207d0dc3d"
+  "checks": "7644dd50ec4448603b660372ad3fca283575d067d18959ffe057e8765f70c8eb",
+  "pipeline": "9a6949fd5f7fa558a2832c123840ca1e90510ecf7c0c836bfad51b1bae340421"
  },
  "dataset": {
   "scripts_sha256": "4afed80b193779c47a24614788da003cfdac7b77218edbaa384b99db12a93a0f",
@@ -70,10 +70,10 @@
   }
  ],
  "rescored": {
-  "at": "2026-11-25T01:24:00+00:00",
+  "at": "2026-11-25T05:02:59+00:00",
   "note": "the stored answers checked and scored again; no model was run",
   "before": {
-   "checks": "2f4e6d54363b70b318eebf8f3e2ab7c9a75420d1cb9c38639011b9162dbacabf"
+   "checks": "f94e37e90077280c4d3d763f5fb132adab43fcf1b2a7050b4507bb3cc8fc2c0f"
   }
  },
  "metrics": {
@@ -2351,8 +2351,8 @@
      "max": 0.0
     },
     "structure": {
-     "mean": 23.84,
-     "max": 90.0
+     "mean": 24.11,
+     "max": 90.01
     },
     "tokens_prompt": {
      "mean": 945.96,
@@ -2447,7 +2447,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 25.597279208013788
+    "structure": 25.181275165989064
    },
    "tokens": {
     "prompt_n": 956,
@@ -2544,7 +2544,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 18.696984167036135
+    "structure": 18.533184291038197
    },
    "tokens": {
     "prompt_n": 212,
@@ -2638,7 +2638,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 33.4021364999935
+    "structure": 33.013865041022655
    },
    "tokens": {
     "prompt_n": 349,
@@ -2720,7 +2720,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 21.27250608400209
+    "structure": 20.56640516698826
    },
    "tokens": {
     "prompt_n": 217,
@@ -2808,7 +2808,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 24.143938791006804
+    "structure": 24.461752582981717
    },
    "tokens": {
     "prompt_n": 244,
@@ -2898,7 +2898,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 19.877076208009385
+    "structure": 19.60964595800033
    },
    "tokens": {
     "prompt_n": 206,
@@ -2990,7 +2990,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 21.082737584016286
+    "structure": 21.236822041973937
    },
    "tokens": {
     "prompt_n": 211,
@@ -3070,7 +3070,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 11.542372292024083
+    "structure": 11.41516945802141
    },
    "tokens": {
     "prompt_n": 117,
@@ -3167,7 +3167,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 31.397238624980673
+    "structure": 30.991593790997285
    },
    "tokens": {
     "prompt_n": 344,
@@ -3263,7 +3263,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 32.75545100000454
+    "structure": 32.584384665999096
    },
    "tokens": {
     "prompt_n": 340,
@@ -3356,7 +3356,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 22.48778945900267
+    "structure": 21.859303583041765
    },
    "tokens": {
     "prompt_n": 215,
@@ -3468,7 +3468,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 34.61528987501515
+    "structure": 34.633722041966394
    },
    "tokens": {
     "prompt_n": 350,
@@ -3561,7 +3561,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 12.466162582975812
+    "structure": 13.297132791019976
    },
    "tokens": {
     "prompt_n": 122,
@@ -3650,7 +3650,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 19.784290249983314
+    "structure": 21.321085416013375
    },
    "tokens": {
     "prompt_n": 228,
@@ -3748,7 +3748,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 21.1744670420303
+    "structure": 22.70856412500143
    },
    "tokens": {
     "prompt_n": 221,
@@ -3859,7 +3859,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 22.628580458054785
+    "structure": 23.271488708036486
    },
    "tokens": {
     "prompt_n": 230,
@@ -3953,7 +3953,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 21.15737045800779
+    "structure": 22.156025042000692
    },
    "tokens": {
     "prompt_n": 236,
@@ -4044,7 +4044,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 21.039470667019486
+    "structure": 22.12595054099802
    },
    "tokens": {
     "prompt_n": 224,
@@ -4101,7 +4101,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 90.00163466704544
+    "structure": 90.00796037499094
    },
    "tokens": {},
    "segments": [
@@ -4189,7 +4189,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 17.084914499951992
+    "structure": 17.382259999983944
    },
    "tokens": {
     "prompt_n": 207,
@@ -4281,7 +4281,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 32.385205832950305
+    "structure": 32.735085499996785
    },
    "tokens": {
     "prompt_n": 347,
@@ -4370,7 +4370,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 24.916506749985274
+    "structure": 26.597180958022363
    },
    "tokens": {
     "prompt_n": 261,
@@ -4456,7 +4456,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 13.634357250004541
+    "structure": 14.074186665995512
    },
    "tokens": {
     "prompt_n": 131,
@@ -4540,7 +4540,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 20.83201062498847
+    "structure": 20.358917415956967
    },
    "tokens": {
     "prompt_n": 178,
@@ -4621,7 +4621,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 17.668231250019744
+    "structure": 17.994097957969643
    },
    "tokens": {
     "prompt_n": 176,
@@ -4706,7 +4706,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 19.545753917016555
+    "structure": 19.934364125016145
    },
    "tokens": {
     "prompt_n": 243,
@@ -4797,7 +4797,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 20.931242374994326
+    "structure": 21.653282332990784
    },
    "tokens": {
     "prompt_n": 219,
@@ -4890,7 +4890,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 23.289075208012946
+    "structure": 23.82518212503055
    },
    "tokens": {
     "prompt_n": 250,
@@ -4973,7 +4973,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 37.27979708299972
+    "structure": 34.267447042046115
    },
    "tokens": {
     "prompt_n": 357,
@@ -5064,7 +5064,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 20.992345834034495
+    "structure": 19.620234375004657
    },
    "tokens": {
     "prompt_n": 183,
@@ -5150,7 +5150,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 28.202912333013956
+    "structure": 28.31160950002959
    },
    "tokens": {
     "prompt_n": 286,
@@ -5240,7 +5240,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 21.18593391700415
+    "structure": 21.97605720802676
    },
    "tokens": {
     "prompt_n": 215,
@@ -5343,7 +5343,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 12.595215375011321
+    "structure": 13.162444291985594
    },
    "tokens": {
     "prompt_n": 132,
@@ -5432,7 +5432,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 16.949830958037637
+    "structure": 17.289855249982793
    },
    "tokens": {
     "prompt_n": 173,
@@ -5522,7 +5522,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 15.079160042048898
+    "structure": 15.19086116697872
    },
    "tokens": {
     "prompt_n": 151,
@@ -5618,7 +5618,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 20.239561334019527
+    "structure": 20.827362708048895
    },
    "tokens": {
     "prompt_n": 244,
@@ -5707,7 +5707,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 32.30770358396694
+    "structure": 33.2767727500177
    },
    "tokens": {
     "prompt_n": 342,
@@ -5794,7 +5794,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 22.985109040979296
+    "structure": 23.92085545795271
    },
    "tokens": {
     "prompt_n": 248,
@@ -5873,7 +5873,7 @@
    "not_carried_over": [],
    "unclear_passages": 0,
    "timings": {
-    "structure": 11.468238207977265
+    "structure": 11.820384291990194
    },
    "tokens": {
     "prompt_n": 117,
@@ -5967,7 +5967,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 18.89109820901649
+    "structure": 19.43195612501586
    },
    "tokens": {
     "prompt_n": 229,
@@ -6074,7 +6074,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 55.3262773330207
+    "structure": 57.260817917005625
    },
    "tokens": {
     "prompt_n": 576,
@@ -6194,7 +6194,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 47.36026149999816
+    "structure": 47.024038166040555
    },
    "tokens": {
     "prompt_n": 494,
@@ -6307,7 +6307,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 14.733272541023325
+    "structure": 15.241819208022207
    },
    "tokens": {
     "prompt_n": 163,
@@ -6409,7 +6409,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 13.759996458014939
+    "structure": 14.055199833994266
    },
    "tokens": {
     "prompt_n": 150,
@@ -6517,7 +6517,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 14.457031416008249
+    "structure": 14.787189417053014
    },
    "tokens": {
     "prompt_n": 181,
@@ -6641,7 +6641,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 18.53199395799311
+    "structure": 18.94181483302964
    },
    "tokens": {
     "prompt_n": 182,
@@ -6776,7 +6776,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 16.67811337497551
+    "structure": 16.98363158298889
    },
    "tokens": {
     "prompt_n": 163,
@@ -6905,7 +6905,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 18.34504875005223
+    "structure": 18.536573374993168
    },
    "tokens": {
     "prompt_n": 187,
@@ -7033,7 +7033,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 31.514814124966506
+    "structure": 31.95018995902501
    },
    "tokens": {
     "prompt_n": 329,
@@ -7179,7 +7179,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 16.40941045799991
+    "structure": 16.644066250009928
    },
    "tokens": {
     "prompt_n": 162,
@@ -7340,7 +7340,7 @@
    ],
    "unclear_passages": 0,
    "timings": {
-    "structure": 15.02326666697627
+    "structure": 15.305698167008813
    },
    "tokens": {
     "prompt_n": 149,
