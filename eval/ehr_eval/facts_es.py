@@ -39,9 +39,10 @@ disminuido" as "has increased"), while one said of something named before ("whic
 decreased") is still a medication change; and a doubt before a cause ("probably due to", CAUSES) is the doubt of that link,
 said of neither thing it links, with or without a comma before it, so it answers to either one's doubt in the facts and
 is added only if neither has one; and "unlikely", "may be" and "could be" are doubt, as "possible" and "might" are
-(DOUBT). "unlikely" and "improbable" are a negation too, read against what the Spanish says of a doubt its facts don't
-give the leaning of: right where it leans against ("poco probable", "improbable"), a negation added where it leans
-towards ("probable", "posible"), and a negation dropped where it leans against and the English doesn't say so. "May
+(DOUBT). "unlikely", "improbable", "not likely" and "less likely" are a negation too, said before or after a doubted
+item's name and whatever its facts say of its negation, read against how the Spanish leans in that item's own clause:
+right where it leans against ("poco probable", "improbable"), a negation added where it leans towards ("probable",
+"posible"), and a negation dropped where it leans against and the English doesn't say so. "May
 be", "could be" and "might" are doubt only of what they're said of, never of a finding named in another clause
 ("Chickenpox. School may be resumed"), and with a past participle not doubt at all ("may be resumed", "could be
 arranged": leave, or something that may be done). Then (compare()), against the items of the entries whose passages the statement cites, it is changed when it
@@ -175,11 +176,14 @@ NEGATIONS = ["no", "not", "denies", "deny", "denied", "without", "negative for",
 AFTER_NEGATIONS = ["ruled out", "was ruled out", "were ruled out", "excluded", "was excluded", "unlikely", "improbable"]
 NEGATION_ENDS = {"but", "however", "although", "though", "except", "with", ";", "."}
 # "unlikely", "may be" and "could be" are doubt too (the owner's ruling of 2026-11-24), "may" only before "be": "May 3"
-# is a date and "may take" leave to do something. "unlikely" and "improbable" are a negation as well (AFTER_NEGATIONS,
-# and _leans_against(): read against what the Spanish says, "poco probable" or "probable"). The modal hedges (MODAL)
-# are doubt only of what they're said of, and with a past participle ("school may be resumed", LEAVE_WORDS) not doubt
-# at all: leave, or something that may be done.
-DOUBT = ["possible", "possibly", "probable", "probably", "likely", "unlikely", "improbable", "suspected", "suspect", "suspicion of",
+# is a date and "may take" leave to do something. "unlikely", "improbable", "not likely" and "less likely" (AGAINST) are
+# a negation of what they doubt as well, before or after its name, whatever its facts say of its negation, read against
+# how the Spanish leans in its clause (_leanings(): "poco probable" against it, "probable" towards it). The modal hedges
+# (MODAL) are doubt only of what they're said of, and with a past participle ("school may be resumed", LEAVE_WORDS) not
+# doubt at all: leave, or something that may be done.
+AGAINST = (["unlikely"], ["improbable"], ["not", "likely"], ["less", "likely"], ["not", "probable"], ["less", "probable"])
+DOUBT = ["possible", "possibly", "probable", "probably", "likely", "unlikely", "improbable", "not likely", "less likely",
+         "not probable", "less probable", "suspected", "suspect", "suspicion of",
          "maybe", "perhaps", "might", "may be", "could be", "rule out", "r/o", "questionable", "consistent with",
          "compatible with", "suggestive of", "suggests", "concerning for", "i think", "presumed", "cannot exclude",
          "can't exclude"]
@@ -187,8 +191,14 @@ MODAL = (["may", "be"], ["could", "be"], ["might"])
 LEAVE_WORDS = frozenset("""seen given taken done made kept held sent shown brought put set left begun written drawn worn
     driven eaten known run withdrawn undertaken overseen split cut spread fed led met paid read sold told found got gotten
     won broken chosen frozen spoken stolen woken hidden ridden risen""".split())
-# The Spanish of a doubt that leans against what it doubts: "poco probable", "improbable".
+# The Spanish of a doubt that leans against what it doubts: "poco probable", "improbable"; and the Spanish of any doubt,
+# read on a clause without its accents (_leanings()).
 UNLIKELY_ES = re.compile(r"\b(?:poco\s+probables?|improbables?)\b", re.IGNORECASE)
+DOUBT_ES = re.compile(r"\b(?:probables?|posibles?|probablemente|posiblemente|sospecha|sospechos[oa]s?|descartar|"
+                      r"compatibles?|sugestiv[oa]s?|sugerentes?|presunt[oa]s?|presuntiv[oa]s?|quizas?|tal vez|puede que|"
+                      r"podria|pudiera|parece|impresiona|a valorar|dudos[oa]s?)\b", re.IGNORECASE)
+# Where a Spanish passage's clauses end: a mark, or a word joining two.
+CLAUSE_ES = re.compile(r"[;,.:]|\b(?:y|e|o|u|pero)\b", re.IGNORECASE)
 HISTORY = ["history of", "previous", "previously", "prior", "past", "old", "remote", "formerly", "used to",
            "in the past", "last year"]
 PRESENT = ["acute", "current", "currently", "active", "ongoing", "new"]
@@ -569,7 +579,7 @@ def claims(english: str, lexicon: Lexicon) -> list[Claim]:
                     modal = kind == "doubt" and phrase in MODAL
                     if modal and _leave(toks, i + len(phrase)):
                         continue  # "may be resumed": leave, not a doubt
-                    against = kind == "doubt" and phrase in (["unlikely"], ["improbable"])
+                    against = kind == "doubt" and phrase in AGAINST
                     take(i, i + len(phrase), kind, "hedge" if modal else "unlikely" if against else "yes")
     for i, tok in enumerate(toks):
         # A relative who has something ("her mother has"), or has what was named before ("colon cancer in her father"),
@@ -669,10 +679,20 @@ def _negations(toks: list[str], labels: list[tuple[int, int, str, bool]], clause
 # ---- Comparing ------------------------------------------------------------------------------------------------------
 
 
-def _leans_against(spanish: str) -> bool:
-    """Whether the Spanish's doubt leans against what it doubts ("poco probable", "improbable"), so "unlikely" is right
-    and "probable" isn't; otherwise ("probable", "posible") it leans towards it, and "unlikely" is a negation added."""
-    return bool(UNLIKELY_ES.search(spanish))
+def _leanings(entry: Entry) -> dict[int, bool | None]:
+    """For each doubted item of the entry (by id()), whether the Spanish's doubt of it leans against it ("poco probable",
+    "improbable": "unlikely" is right and "probable" isn't) or towards it ("probable", "posible": "unlikely" is a
+    negation added), read in its own clause: the passage's clauses that say a doubt, in order, are its doubted items'
+    in order when there are as many; when there aren't, the one leaning they all have, or none (unknown, not judged)."""
+    doubted = [item for item in entry.items if item.doubt]
+    folded = "".join(c for c in unicodedata.normalize("NFD", entry.said) if not unicodedata.combining(c))
+    clauses = [clause for clause in CLAUSE_ES.split(folded) if DOUBT_ES.search(clause) or UNLIKELY_ES.search(clause)]
+    leanings = [bool(UNLIKELY_ES.search(clause)) for clause in clauses]
+    if len(leanings) == len(doubted):
+        return {id(item): leaning for item, leaning in zip(doubted, leanings, strict=True)}
+    one = leanings[0] if leanings and len(set(leanings)) == 1 else (
+        bool(UNLIKELY_ES.search(folded)) if not leanings else None)
+    return {id(item): one for item in doubted}
 
 
 def negated(english: str, phrase: str) -> list[bool]:
@@ -688,6 +708,7 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
     script); and every value it says that they back (VALUES), which a misfiling is told by."""
     items = [item for entry in cited for item in entry.items]
     spanish_of = {id(item): entry.said for entry in cited for item in entry.items}
+    leaning = {key: value for entry in cited for key, value in _leanings(entry).items()}
     everywhere = [item for entry in script for item in entry.items]
     said = claims(english, lexicon)
     named = {claim.label for claim in said if claim.kind == "named"}
@@ -767,16 +788,16 @@ def compare(english: str, cited: list[Entry], script: list[Entry],
         for wanted in item.values.get("action", ()):
             if wanted not in actions and not (not wanted.endswith(", past") and f"{wanted}, past" in actions):
                 changed.append(("action", f"{wanted} ({item.of}) left out", False))
-        negated = [claim.value == "yes" for claim in said if claim.kind == "negated" and claim.label == item.of]
+        # "unlikely" said of it ("unlikely X" or "X unlikely") negates it too.
+        said_against = any(c.kind == "doubt" and c.value == "unlikely" and c.label == item.of for c in said)
+        negated = [claim.value == "yes" for claim in said if claim.kind == "negated" and claim.label == item.of] + (
+            [True] if said_against else [])
         if item.negated is not None and negated and item.negated not in negated:
             changed.append(("negation", f"{item.of} {'not ' if item.negated else ''}negated", False))
-        elif item.negated is None and item.doubt:
-            # A doubt the facts don't say the leaning of: as the Spanish leans ("poco probable" against, "probable"
-            # towards), and "unlikely" said of it only where the Spanish leans against it.
-            against = _leans_against(spanish_of[id(item)])
-            said_against = any(c.kind == "doubt" and c.value == "unlikely" and c.label == item.of for c in said)
-            if said_against != against:
-                changed.append(("negation", f"{item.of} {'not ' if against else ''}negated", False))
+        elif item.doubt and leaning.get(id(item)) is not None and said_against != leaning[id(item)]:
+            # A doubt read as the Spanish leans in its clause, whatever the facts say of its negation: "unlikely" said
+            # of it only where the Spanish leans against it ("poco probable"), never where it leans towards it.
+            changed.append(("negation", f"{item.of} {'not ' if leaning[id(item)] else ''}negated", False))
         # A modal hedge said of nothing named ("Chickenpox. School may be resumed") is no doubt of what is named.
         doubt = any(claim.kind == "doubt" and (claim.label == item.of or claim.value != "hedge") for claim in own)
         if item.doubt and not doubt:

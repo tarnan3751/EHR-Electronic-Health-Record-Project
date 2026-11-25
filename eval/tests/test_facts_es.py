@@ -286,6 +286,45 @@ def test_unlikely_is_a_negation_read_against_how_the_spanish_leans(said, english
     assert ("negation" in facts_changes(said, {"of": "pneumonia", "doubt": True}, english)) is caught
 
 
+# "unlikely" said of a doubted item negates it before or after its name, whatever its facts say of its negation (the
+# review of 2026-11-24: e15's neuropathy, whose facts say negated = false, given as "unlikely"); "not likely" and "less
+# likely" lean against it as "unlikely" does.
+@pytest.mark.parametrize(("english", "caught"), [
+    ("Uncontrolled type 2 diabetes with probable peripheral neuropathy.", False),
+    ("Uncontrolled type 2 diabetes with unlikely peripheral neuropathy.", True),
+    ("Uncontrolled type 2 diabetes; peripheral neuropathy unlikely.", True),
+])
+def test_unlikely_said_of_a_doubted_item_is_a_negation_whatever_its_facts_say(english, caught):
+    said = "Diabetes tipo 2 no controlada con probable neuropatía periférica."
+    assert ("negation" in {kind for kind, _ in changes("e15", said, english)}) is caught
+
+
+@pytest.mark.parametrize(("said", "english", "caught"), [
+    ("Probable neumonía.", "Unlikely pneumonia.", True),
+    ("Neumonía poco probable.", "Pneumonia is less likely.", False),
+    ("Neumonía poco probable.", "Pneumonia is not likely.", False),
+    ("Neumonía poco probable.", "Pneumonia is likely.", True),
+])
+def test_unlikely_before_the_name_and_less_likely_are_read_with_a_negation_in_the_facts(said, english, caught):
+    item = {"of": "pneumonia", "doubt": True, "negated": "poco" in said}
+    assert ("negation" in facts_changes(said, item, english)) is caught
+
+
+# The leaning is the item's own clause's, not the passage's: two doubts leaning each way are each read as said.
+@pytest.mark.parametrize(("english", "caught"), [
+    ("Probable pneumonia; pulmonary embolism unlikely.", False),
+    ("Pneumonia unlikely; pulmonary embolism unlikely.", True),
+    ("Probable pneumonia; probable pulmonary embolism.", True),
+])
+def test_each_doubted_item_is_read_against_its_own_clauses_leaning(english, caught):
+    entries = facts_es.entries([{"said": "Probable neumonía; tromboembolismo pulmonar poco probable.",
+                                 "items": [{"of": "pneumonia", "doubt": True},
+                                           {"of": "pulmonary embolism", "doubt": True}]}])
+    lexicon = facts_es.Lexicon(tuple(item for entry in entries for item in entry.items))
+    changed = facts_es.compare(english, entries, entries, lexicon)[0]
+    assert ("negation" in {kind for kind, _, _ in changed}) is caught
+
+
 @pytest.mark.parametrize("english", ["Fracture follow-up on May 3.", "You may take ibuprofen for the fracture.",
                                      "The fracture was seen in May."])
 def test_may_as_a_month_or_leave_is_no_doubt(english):
