@@ -15,6 +15,9 @@ public class AppointmentsModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public PatientAppointments? Appointments { get; private set; }
 
+    // Whether these are someone else's appointments, read as a proxy (FR-19): the page then doesn't call them "yours".
+    public bool Acting => subject.Acting is not null;
+
     public async Task OnGetAsync()
     {
         Response.Headers.CacheControl = "no-store";

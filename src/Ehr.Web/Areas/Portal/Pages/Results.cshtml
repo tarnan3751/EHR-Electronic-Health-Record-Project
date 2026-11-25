@@ -8,7 +8,7 @@
 <h1>Test results</h1>
 @if (!Model.Available)
 {
-    <p class="sc-notice sc-notice--danger">Your results are not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(Model.Acting ? "The results are" : "Your results are") not available right now. Contact the clinic if this continues.</p>
 }
 else if (Model.Results.Count == 0)
 {
@@ -60,7 +60,7 @@ else
                         }
                         @if (result.Note is { Length: > 0 } note)
                         {
-                            <p><strong>Note from your care team:</strong> @note</p>
+                            <p><strong>@(Model.Acting ? "Note from the care team:" : "Note from your care team:")</strong> @note</p>
                         }
                         @* UC 6's "question about a result": a message to the care team, its subject filled in. Posted, so the
                            test's name stays out of the address and the browser's history. Hidden while the site is read-only,

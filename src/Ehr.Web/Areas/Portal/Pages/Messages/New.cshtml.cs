@@ -27,6 +27,9 @@ public class NewModel(PortalSubject subject, SecureMessages messages) : PageMode
     // has the focus.
     public bool About { get; private set; }
 
+    // Whether these are someone else's messages, read as a proxy (FR-19): the page then doesn't call them "yours".
+    public bool Acting => subject.Acting is not null;
+
     public IActionResult OnGet()
     {
         Response.Headers.CacheControl = "no-store";
